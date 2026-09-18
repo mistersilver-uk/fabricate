@@ -1,43 +1,4 @@
-/**
- * THE FOUR REMAINING `role="table"` BROWSE VIEWS ARE LISTS (issue 1515).
- *
- * Four manager browsers still announced themselves as tables: a `role="table"` container over a
- * `role="row"` head of `role="columnheader"` spans, and one `role="row"` per record whose cells
- * carried `role="cell"`. None of them is a table. The leading column is an identity block, the
- * trailing one a control cluster, and at the stacked breakpoint the whole grid collapses to a
- * single column — so the promise a `table` makes to a screen reader, that the content can be
- * walked cell by cell against its column headers, was never kept.
- *
- * Three sibling surfaces had already been converted one at a time — the recipe library (issue
- * 643), the component directory (issue 676) and the essence catalogue (issue 1036) — and each
- * left its own per-view assertion behind and nothing that spoke for the views still carrying the
- * roles. This is that missing gate, for the last four.
- *
- * ── THE HAYSTACK IS NAMED, AND IT IS NOT THE REPOSITORY ────────────────────────────────────
- * A repo-wide grep for `role="table"` is REFUSED here, and deliberately. It returns
- * `GatheringTaskEditView.svelte`'s drops table — a real column grid inside an editor, ruled out of
- * scope — and it returns comment lines in `LibraryShelf.svelte`, `EssenceBrowserView.svelte` and
- * `EssenceRow.svelte`, which say the roles are GONE. A gate that reported those would be red for
- * prose and for an unrelated surface, and would be turned off rather than obeyed.
- *
- * So the haystack is exactly these four files plus any row child component they render, with
- * comments stripped first: the views' own explanations name `role="table"` and `role="row"` while
- * saying why neither is written any more.
- *
- * ── WHAT MAKES THIS NOT VACUOUS ────────────────────────────────────────────────────────────
- * An absence check over an empty haystack passes forever, and this one is written against a
- * hand-listed corpus, which is the shape that rots quietest. Four controls stand against it:
- *
- *   1. Every path is READ, so a renamed or moved view throws rather than being skipped.
- *   2. Each view is asserted POSITIVELY to emit `role="list"` and `role="listitem"`, so a file
- *      that lost its table roles by losing its rows altogether fails rather than passes.
- *   3. `role="listitem"` and the view's row class are both located INSIDE the `{#each paginated…}`
- *      loop, so a view that satisfies clause 2 with a stray role written outside its record loop —
- *      or that kept the role while its rows moved out from under the class — fails rather than
- *      passing on a source string clause 2 found anywhere in the file.
- *   4. The comment strip is asserted to have left real markup behind, so a strip that ate the
- *      template is reported rather than passing on an absence of source.
- */
+/** THE FOUR REMAINING `role="table"` BROWSE VIEWS ARE LISTS (issue 1515). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -54,13 +15,6 @@ const TABLE_ROLES = ['role="table"', 'role="row"', 'role="columnheader"', 'role=
  * makes a row operable. `row` is what keeps clause 2 honest: a source string saying
  * `role="listitem"` proves nothing about the records unless the role and that class are both
  * inside the view's own `{#each paginated…}` loop, which is what the second test below reads.
- * The COUNT of rows a mount draws is `manager-mounted.test.js`'s to prove and is not asserted
- * here — this file's claim is about source, and no floor is read from anywhere.
- *
- * `children` names any component the row delegates to. All four still write their row inline, so
- * the lists are empty today and the field exists so that the day a row moves into its own
- * `.svelte` — as the component and essence rows already did — the extraction is covered rather
- * than silently exempted.
  */
 const VIEWS = [
   {
@@ -91,11 +45,7 @@ const VIEWS = [
 
 const read = (file) => readFileSync(resolve(repoRoot, managerDir, file), 'utf8');
 
-/**
- * The file's source with every HTML and JavaScript comment removed. Both kinds matter: the views
- * explain the conversion in an HTML comment above the container and in a `//` comment above the
- * menu items, and both name the roles they no longer write.
- */
+/** The file's source with every HTML and JavaScript comment removed. Both kinds matter. */
 function markupOf(source) {
   return source
     .replace(/<!--[\s\S]*?-->/g, '')

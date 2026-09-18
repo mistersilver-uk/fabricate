@@ -1,16 +1,7 @@
 /**
- * adminStore — GM Knowledge surface (issue 785).
- *
- * Two contracts dominate here and neither is visible in rendered output, so both
- * are asserted on SPIES:
- *
- * 1. The whole-world `actors × items` scan must never join `refresh()` (invoked by
- *    ~40 mutation paths) and must be a total no-op while the surface is closed. A
- *    lazy-but-still-scanning implementation passes an empty-output assertion, so
- *    the seam spy's call count is the assertion.
- * 2. Every store action calls `refreshKnowledge({ force: true })` and NEVER
- *    `refresh()` — calling `refresh()` would work correctly at runtime and only
- *    cost performance, so nothing but a spy can catch it.
+ * adminStore — GM Knowledge surface (issue 785). 1. The whole-world `actors × items` scan must
+ * never join `refresh()` (invoked by ~40 mutation paths) and must be a total no-op while the
+ * surface is closed.
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -154,9 +145,7 @@ function makeHarness({ snapshot = rawSnapshot(), confirmResult = true } = {}) {
 async function settled(harness) {
   await harness.store.refresh();
   await new Promise((resolve) => setTimeout(resolve, 0));
-  // Prove the "did refresh() run" probe is STILL WIRED before zeroing it. Without
-  // this, `refresh()` dropping its `getAccessCharacterActors` call would silently
-  // vacate every `assert.equal(harness.calls.refresh, 0)` below into a tautology.
+  // Prove the "did refresh() run" probe is STILL WIRED before zeroing it.
   assert.ok(
     harness.calls.refresh > 0,
     'refresh() must still call getAccessCharacterActors, or the probe proves nothing'

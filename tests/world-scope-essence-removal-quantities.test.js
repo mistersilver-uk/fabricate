@@ -1,29 +1,4 @@
-/**
- * REMOVING AN ESSENCE FROM A SYSTEM PRESERVES ITS COMPONENT QUANTITIES (issue 1372, epic 1357).
- *
- * The world essence entry's per-system row offers `Remove`, and the reference's copy for it says
- * removal takes this system's rules: "Components here keep the values, but nothing resolves on
- * craft until the essence is added back."
- *
- * BOTH CLAUSES WERE FALSE AT ONCE, in opposite directions. `removeFromSystem` deleted the
- * membership record and left the in-system `essenceDefinitions` row standing, so the essence went
- * on resolving on every craft - the second clause. And deleting that row was refused, on the
- * belief that `_normalizeEssenceQuantities` would then run against a valid-id set without the
- * essence and STRIP its stored quantity from every component carrying it - the first clause,
- * pre-emptively.
- *
- * THE RULING IS THAT REMOVAL TAKES BOTH HALVES AND THE QUANTITIES SURVIVE. This file is the proof
- * of the half that was only ever asserted: the strip does not happen, and the reason is the Valid
- * Id Basis itself rather than a new special case. `CraftingSystemManager#_scopeBasis` builds the
- * essence basis as the UNION of the WORLD ROSTER and the system's surviving in-system array, so an
- * essence that is still a world entity is still in the basis after its in-system row is gone.
- *
- * ── THE NEGATIVE CONTROL IS THE POINT OF THE FILE ───────────────────────────────────────────
- * With NO world half the basis IS the in-system array alone and the strip is REAL. That arm is
- * asserted rather than omitted, because it is what makes the passing arm mean something: the
- * quantities are preserved BY the world roster, not by the normalizer being harmless. It is also
- * why `Remove from this system` may only ever be reached from a world-scope screen.
- */
+/** REMOVING AN ESSENCE FROM A SYSTEM PRESERVES ITS COMPONENT QUANTITIES (issue 1372, epic 1357). */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

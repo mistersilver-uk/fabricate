@@ -67,8 +67,7 @@ const populatedReport = {
       nav: { view: 'environment-edit' }
     },
     {
-      // A task-kind issue: `entityId` is the task RECORD id; the deep-link must
-      // resolve via the OWNING environment id (`environmentId`).
+      // A task-kind issue: `entityId` is the task RECORD id.
       kind: 'task',
       entityId: 'task-7',
       environmentId: 'e1',
@@ -137,17 +136,6 @@ describe('SystemOverviewView (mounted)', () => {
   });
 
   // ── The deep link is a `ghost`, and the sweep found it painted as a neutral (issue 1118) ──
-  //
-  // Audit row 21. One deep link per issue row, in a list whose SEVERITY CHIP is the loud
-  // thing: a solid control repeated down every row out-shouts the ranking the list exists to
-  // present, which is why `component/ComponentEditorHeader.svelte`'s Back — the ruling this
-  // repair follows — is ghost for the same reason.
-  //
-  // Bound to `[data-overview-link="recipe"]`, which names ONE control in this report and no
-  // other. Two mutations red it: dropping `role="ghost"` from the component, and moving that
-  // role onto a neighbour — the negative half below is what catches the second, because it
-  // asserts that the OTHER kinds' links carry it too by naming each, rather than asking
-  // whether "a ghost appears in this list".
   it('paints every issue row deep link as the ghost role', async () => {
     const target = await harness.mount({ report: populatedReport, onSelectIssue: () => {} });
     await flushRender();

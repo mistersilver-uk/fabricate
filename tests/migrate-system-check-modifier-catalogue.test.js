@@ -1,12 +1,6 @@
 /**
- * Issue 1095 — 1.22.0: lift the check-modifier catalogue to the system level and rename
- * `byRecipe` to `bySubject`.
- *
- * The migration's two failure modes are both silent. A move that clobbered an authored
- * system-level catalogue would destroy data with no error; a move that left the old key in
- * place would give one catalogue two locations, and `_normalizeCraftingCheck` (an allowlist
- * rebuild that no longer emits it) would drop whichever one the GM edited last. Neither
- * announces itself, so both are asserted here.
+ * Issue 1095 — 1.22.0: lift the check-modifier catalogue to the system level and rename `byRecipe`
+ * to `bySubject`.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -99,13 +93,7 @@ test('1.22.0 never clobbers an authored system-level catalogue', () => {
 });
 
 // A MALFORMED LEGACY VALUE IS SKIPPED, NOT DELETED — and skipping it is a decision, not an
-// oversight. Deleting a non-array `craftingCheck.checkModifiers` would be this migration
-// destroying data it has decided it cannot read, on the ONE path where the GM has no surviving
-// copy. It costs nothing to leave: nothing reads it, and `_normalizeCraftingCheck` is an allowlist
-// rebuild that drops it on the next save anyway, so the system still converges.
-//
-// Reverting the `Array.isArray` guard left the suite green: every other case here authors a
-// well-formed array, so the guard was undiscriminated by the fixtures.
+// oversight.
 test('1.22.0 leaves a MALFORMED legacy catalogue exactly where it was', () => {
   const migrated = migrateOne({
     id: 's',
@@ -174,11 +162,8 @@ test('1.22.0 is registered with a downgrade target that states the loss', () => 
   const entry = registry.find((migration) => migration.version === '1.22.0');
   assert.ok(entry, 'the migration is registered, or it never runs');
   assert.equal(entry.downgradeTo, '1.21.0');
-  // The downgrade is NOT lossless — the first entry in this registry of which that is
-  // true — and the entry DECLARES that machine-readably. The declaration is what routes it
-  // into the registry-wide rule in `tests/migration-runner.test.js`, which is where the
-  // label's "DOWNGRADING IS NOT LOSSLESS" clause is held; asserting the clause here as well
-  // would be a second copy of one rule.
+  // The downgrade is NOT lossless — the first entry in this registry of which that is true — and
+  // the entry DECLARES that machine-readably.
   assert.equal(
     entry.downgradeLosesData,
     true,
@@ -210,11 +195,9 @@ test('the export upcast lifts an imported bundle’s catalogue and rewrites its 
     recipes: [],
   };
   const migrated = migrateExportPayload(bundle);
-  // The upcast chain does not stop at `1.22.0`: `1.23.0`'s mirror merges the just-lifted
-  // catalogue into `system.modifiers`, and `1.28.0`'s then lifts THAT into the envelope's
-  // `characterLibraries` slice, so the ASSERTION IS ON THE END OF THE CHAIN. That composition is
-  // the point — a bundle and a world have to reach one state by one route — and asserting an
-  // intermediate key would pin a state no imported bundle is ever in.
+  // The upcast chain does not stop at `1.22.0`: `1.23.0`'s mirror merges the just-lifted catalogue
+  // into `system.modifiers`, and `1.28.0`'s then lifts THAT into the envelope's
+  // `characterLibraries` slice, so the ASSERTION IS ON THE END OF THE CHAIN.
   assert.deepEqual(migrated.characterLibraries.modifiers, CATALOGUE);
   assert.equal(migrated.system.modifiers, undefined, 'and the per-system copy is shed');
   assert.equal(Object.hasOwn(migrated.system, 'checkModifiers'), false);

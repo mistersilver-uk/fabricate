@@ -1,20 +1,12 @@
 /**
- * Build a real Foundry V13 ApplicationV2 window frame in the View Lab page.
- *
- * This is the browser half of `scripts/lib/foundryChromeSpec.js`: it walks the same sequence
- * `_renderFrame` → `_updateFrame` → `#applyPosition` that Foundry walks, so the captured window
- * is the genuine chrome around a genuine Fabricate app root, not a drawing of one.
- *
- * The frame is positioned but inert: nothing here wires drag, resize, minimize, or the controls
- * dropdown, because a screenshot never exercises them. See the fidelity register in
- * `scripts/README.md`.
+ * Build a real Foundry V13 ApplicationV2 window frame in the View Lab page. The frame is positioned
+ * but inert: nothing here wires drag, resize, minimize, or the controls dropdown, because a
+ * screenshot never exercises them.
  */
 import { APP_CHROME, FOUNDRY_CHROME_SPEC } from '../../scripts/lib/foundryChromeSpec.js';
 
 /**
- * Reproduce `Game##configureUI`'s page-level state. Everything in `foundry2.css` is rem-based
- * off the root font size, and the theme class on `body` is what selects Foundry's light/dark
- * chrome variables, so both have to be set before the frame is measured.
+ * Reproduce `Game##configureUI`'s page-level state.
  *
  * @param {object} [options] Page options.
  * @param {string} [options.systemId] Game system id, for the `system-<id>` body class.
@@ -41,10 +33,8 @@ function localizeControlLabels(localize) {
 }
 
 /**
- * `_updatePosition` clamps width/height to the element's COMPUTED min/max box and then centres
- * the window, and `#applyPosition` writes the result inline. Reproducing the clamp rather than
- * writing the declared size straight to the style is the whole point: it is what surfaces a
- * `max-height` collision instead of hiding one.
+ * `_updatePosition` clamps width/height to the element's COMPUTED min/max box and then centres the
+ * window, and `#applyPosition` writes the result inline.
  *
  * @param {HTMLElement} frame The `.application` element, already in the document.
  * @param {{width: number, height: number}} position Requested size.
@@ -85,7 +75,6 @@ function applyPosition(frame, position) {
  * @param {string} options.appId Key of {@link APP_CHROME}.
  * @param {(key: string) => string} [options.localize] i18n resolver for the title and labels.
  * @param {{width: number, height: number}} [options.position] Override the declared window size.
- * @returns {{frame: HTMLElement, content: HTMLElement, applied: object, declared: object}}
  */
 export function buildAppWindow({ appId, localize, position }) {
   const app = APP_CHROME[appId];
@@ -110,8 +99,6 @@ export function buildAppWindow({ appId, localize, position }) {
   frame.querySelector('.window-icon').className = FOUNDRY_CHROME_SPEC.windowIconClass(app.window.icon);
   // No `.controls-dropdown` to empty: V14 dropped that element from `_renderFrame` and routes
   // header controls through a context menu instead.
-  // Fabricate declares no header controls, so Foundry hides the ellipsis button. A frame that
-  // shows one is visibly wrong against any real screenshot.
   frame
     .querySelector('button[data-action=toggleControls]')
     .classList.toggle('hidden', app.window.controls.length === 0);
@@ -122,9 +109,7 @@ export function buildAppWindow({ appId, localize, position }) {
 }
 
 /**
- * Fail loudly when the rendered window is not the size it claims to be. `_updatePosition` clamps
- * without any signal, so a viewport 20px too short yields a green run and a wrong screenshot —
- * the worst failure mode this harness has.
+ * Fail loudly when the rendered window is not the size it claims to be.
  *
  * @param {{frame: HTMLElement, applied: object, declared: object}} window A built window.
  * @throws {Error} When the applied box differs from the declared one.

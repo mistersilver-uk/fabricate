@@ -1,14 +1,4 @@
-/**
- * `FillBar`, the product's ONE horizontal fill bar (issue 1096).
- *
- * `ui-integration/spec.md` §Shared product UI primitives recorded five hand-rolled copies of
- * this shape as a live non-conformance and named this component as the fix. What is pinned
- * here is the LEAF's own contract — the clamp, the tone vocabulary, the caller-owned colour
- * escape hatch, and the fact that it renders no `role` or `aria-*` of its own. That last one
- * is not an omission: the accessible semantics differ per site (`ChanceBar` is a `meter` with
- * its own `aria-valuenow`; an odds row's bar is decorative), so a leaf that guessed would
- * either duplicate the caller's announcement or invent one.
- */
+/** `FillBar`, the product's ONE horizontal fill bar (issue 1096). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -38,10 +28,7 @@ describe('FillBar (mounted)', () => {
   });
 
   it('CLAMPS out-of-range and non-finite input rather than painting past the track', async () => {
-    // The failure this prevents is not cosmetic: a caller that hands over a raw 0–1 RATIO
-    // instead of a percentage, or a `NaN` from an empty field, would otherwise paint a
-    // 4000%-wide fill or a `width: NaN%` declaration the browser drops entirely — and a
-    // dropped declaration leaves a FULL-width fill, which reads as 100%.
+    // The failure this prevents is not cosmetic.
     for (const [value, expected] of [
       [-20, '0'],
       [0, '0'],

@@ -1,8 +1,5 @@
 /**
  * Tool Studio, Checks Studio, modifier and outcome-band layout, measured in a real browser (issue 1670).
- *
- * A surface module of `manager-layout.test.js`. It registers its tests on import and owns no
- * browser: `tests/helpers/layout-harness.js` holds the one Chromium every surface shares.
  */
 
 import test from 'node:test';
@@ -318,11 +315,6 @@ test('manager character modifier search suggestions render with availability-sty
 });
 
 // Issue 883: the Checks rail was the last manager inspector still building its own cards.
-// It rendered the standing explanation as a `.manager-setup-card` — the format the numbered
-// first-run "Set up X" procedures use — so this one rail had a card shell, a 38px icon tile
-// and a 0.98rem heading no other inspector had, sitting directly beside a `.manager-inspector-card`.
-// `.manager-setup-card` itself is NOT dead: the first-run procedures still use it, which is
-// exactly why the rail could not simply be left alone.
 test("the checks rail follows the Tool Studio's inspector convention", () => {
   const rightMenu = withoutComments(
     readFileSync(resolve(managerComponentDir, 'checks/ChecksRightMenu.svelte'), 'utf8')
@@ -342,17 +334,6 @@ test("the checks rail follows the Tool Studio's inspector convention", () => {
   }
 
   // ── The heading convention INVERTED (issue 1096) ────────────────────────────────────
-  //
-  // This block used to assert the opposite: a `.manager-card-title` inside each card and
-  // NO `.manager-kicker` anywhere on the rail. The maintainer made the Tool Studio's
-  // inspector the authority for this rail's structure, and the Tool Studio's
-  // (`ToolBehaviorPreview.svelte`) is a flat uppercase `.manager-kicker` naming the
-  // section with its card directly beneath — never a card wrapping the section with a
-  // title inside it. Two studios cannot both be right, so the assertion moves with the
-  // ruling rather than being deleted.
-  // RETARGETED at the primitive (issue 1427), for the reason the explainer-card assertion
-  // above records: the shell class is `<InspectorCard>`'s to emit, and this rail passes only the
-  // Active card's own modifier plus its on/off state.
   assert.match(
     rightMenu,
     /<InspectorCard\s+class=\{`manager-checks-active-card /,
@@ -525,16 +506,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
       `the dashed Add control's right (${edges.addTierRight}) must equal the radio-card right (${edges.radioRight})`
     );
 
-    // MUTATION PROOF, same page: reintroducing the defect — wrapping the tier list in the bare
-    // `.manager-inspector-card` shell CraftingCheckEditor actually shipped — must desynchronise
-    // the edges the assertions above exist to pin. If this cannot fail, they prove nothing.
-    //
-    // THE CONTROL ARM CARRIES THE FAMILY ROOT TOO (issue 1508). What this arm removes is the
-    // CALLER's `manager-checks-card`, not the primitive's root: since the card family is rooted
-    // at `fabricate-card`, an arm written without it matches no card rule at all, so both arms
-    // would render unstyled and the `notEqual`s below would pass on two identical defaults —
-    // a mutation proof turned into a vacuous one. Both arms are rooted; only the caller class
-    // differs between them, which is the difference the assertions are about.
+    // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await checksRollEdges(page, 'fabricate-card manager-inspector-card');
     assert.notEqual(
       broken.rowLeft,
@@ -552,20 +524,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
 });
 
 test('both interpolated card fixtures are rooted at the class the primitive emits', () => {
-  // THE ONE CARRIER NO SCANNER SEES, GUARDED (issue 1508). The two card fixtures above build
-  // their `class` attribute by INTERPOLATION — `<section class="${tiersWrapperClass}">` and
-  // `<section class="${cardWrapperClass}">` — so `searchable-popover-area-scope.test.js`'s
-  // fixture clauses, which walk `class="…"` in `tests/**`, cannot read either one. That blind
-  // spot is the defect that cost issue 1502 a whole extra phase, when twelve `triggerClass="…"`
-  // sites went unrepaired because the census probe only matched `class="manager-button`.
-  //
-  // AND THE MUTATION-CONTROL ARMS ARE THE HALF THAT FAILS SILENTLY. Each pair's control arm is a
-  // one-sided `notEqual`, so an arm that lost the family root would go on satisfying it — the
-  // bare CARD SHELL and an UNSTYLED `<section>` both differ from the studio card, and the suite
-  // cannot tell which one it measured. Measured on this tree: unrooting only the two control
-  // arms leaves all 128 tests in this file green. So the root is asserted on all four call
-  // sites here, read out of `InspectorCard.svelte` rather than restated, which is what makes
-  // that mutation red.
+  // THE ONE CARRIER NO SCANNER SEES.
   const card = readFileSync(
     resolve(__dirname, '../../src/ui/svelte/components/InspectorCard.svelte'),
     'utf8'
@@ -593,8 +552,7 @@ test('both interpolated card fixtures are rooted at the class the primitive emit
       'Either a call site moved to a form this reader cannot see — in which case retarget the ' +
       'reader rather than deleting the assertion — or one was added or removed.'
   );
-  // TWO fixed arms and TWO controls, so the pair below is a discriminator rather than one value
-  // four times: the controls drop the CALLER's `manager-checks-card` and keep the root.
+  // TWO fixed arms and TWO controls.
   assert.deepEqual(
     [...new Set(wrapperArguments)].sort(compareStrings),
     [`${root} manager-inspector-card`, `${root} manager-inspector-card manager-checks-card`],
@@ -605,18 +563,12 @@ test('both interpolated card fixtures are rooted at the class the primitive emit
 });
 
 test('CraftingCheckEditor really wraps the routed tier list in the checks-card contract', () => {
-  // The two measurement tests above are built from class LITERALS, so this is the join: it
-  // proves the real component renders the wrapper class combination the passing test measured,
-  // not merely that some markup string with the right classes exists somewhere in this file.
+  // The two measurement tests above are built from class LITERALS, so this is the join.
   const craftingCheckEditor = readFileSync(
     resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'),
     'utf8'
   );
-  // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>`, which emits
-  // `manager-inspector-card` itself and APPENDS this caller's `class`, so the rendered class
-  // attribute the measurement above is built from is unchanged; what moved is where it is
-  // written. The `=""` on the hook is load-bearing rather than cosmetic: a bare `data-*` on a
-  // COMPONENT tag is the boolean `true` and would render `data-routed-tiers="true"`.
+  // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>`.
   assert.match(
     withoutComments(craftingCheckEditor),
     /<InspectorCard class="manager-checks-card" data-routed-tiers="">/,
@@ -650,15 +602,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
     );
     assert.equal(fixed.optionRadius, 10, "the combination-rule card's studio radius is 10px");
 
-    // MUTATION PROOF, same page: reintroducing the defect — wrapping the card in the bare
-    // `.manager-inspector-card` shell `CraftingModifierCatalogueCard` actually shipped with —
-    // must desynchronise both the card's own look AND the combination-rule scale, because the
-    // studio's selector for the latter is scoped to the ancestor carrying `manager-checks-card`
-    // and fires only then. If this cannot fail, the assertions above prove nothing.
-    //
-    // BOTH ARMS CARRY `fabricate-card` (issue 1508), for the reason the tier-row control above
-    // records: the arm removes the CALLER's class, never the family's root, and an unrooted
-    // control arm would compare two unstyled defaults instead of two card treatments.
+    // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await modifiersCombinationRuleMetrics(
       page,
       'fabricate-card manager-inspector-card'
@@ -691,9 +635,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
 });
 
 test('CraftingModifierCatalogueCard really wraps its card in the checks-card contract', () => {
-  // The measurement test above is built from class LITERALS, so this is the join: it proves the
-  // real component renders the wrapper class combination the passing test measured, not merely
-  // that some markup string with the right classes exists somewhere in this file.
+  // The measurement test above is built from class LITERALS, so this is the join.
   const modifierCatalogueSource = readFileSync(
     resolve(
       __dirname,
@@ -711,12 +653,6 @@ test('CraftingModifierCatalogueCard really wraps its card in the checks-card con
 });
 
 // ── ONE MODIFIER ROW, REACHING BOTH SCREENS THAT DRAW THE LIBRARY (issue 1373, round 4) ────
-//
-// The Tool Requirements bonus list drew the world modifier library as a stack of option cards.
-// The Checks Studio draws the SAME roster — `characterLibraries.modifiers[]` — as compact rows
-// one screen away, and reserves the card group for `How they combine`, a closed set of
-// behaviours. The maintainer's ruling moves the bonus list onto that row.
-//
 // The markup is shared as a component (`ModifierLibraryRow.svelte`, asserted in
 // `manager-contract.test.js`). What CANNOT be shared that way is the geometry: it lives in this
 // sheet, anchored on `.manager-checks-card`, so the row rendered on any other route would have
@@ -749,13 +685,6 @@ test('the modifier library row is one block per cell, reaching both screens that
     // The non-vacuity half: a second declaring block would satisfy the join above and still
     // let the two screens drift, so each cell is declared exactly once OUTSIDE a variant — in
     // the joined selector, and nowhere else.
-    //
-    // A VARIANT BLOCK IS EXEMPT, and by NAME rather than by pattern. Round 6 gave the row two
-    // declared variants, and `is-text-stacked` restates the expression cell's `flex` for a
-    // COLUMN context the joined value was not written for. That is an extension of the one
-    // owner rather than a second one, and it is reachable only from a row that asked for it.
-    // Exempting the two variant classes and nothing else is what keeps a plain copy on a
-    // third route failing here exactly as it did before.
     const declaringLines = css
       .split('\n')
       .filter((line) => line.trimEnd().endsWith(`.${cell} {`))
@@ -766,10 +695,7 @@ test('the modifier library row is one block per cell, reaching both screens that
       `${cell} must be declared exactly once outside the row's declared variants`
     );
   }
-  // AND THE PICK CONTROL IS THE MANAGER'S SHIPPED RADIO, joined the same way. Foundry's core
-  // sheet draws a native radio's inner chrome through ::before/::after that `appearance: none`
-  // does not remove, so a hand-rolled themed radio is not a few lines — it is the whole block
-  // `.manager-resolution-option` already carries, and a copy of it is a second owner.
+  // AND THE PICK CONTROL IS THE MANAGER'S SHIPPED RADIO.
   for (const rule of [
     "input[type='radio'] {",
     "input[type='radio']::before,",
@@ -788,20 +714,7 @@ test('the modifier library row is one block per cell, reaching both screens that
   );
 });
 
-// ── ONE ROW, TWO DECLARED VARIANTS, AND BOTH TRAVEL WITH THE PRIMITIVE (round 6) ────────────
-//
-// Round 5 put both Tool lists on this row and RECORDED two deviations from the reference rather
-// than reproducing them. The maintainer's round-6 ruling is that the reference's two rows
-// genuinely differ in exactly those two ways, and that the answer is declared variants on ONE
-// component — not two components, and not one shape forced on both:
-//
-//   `proto:2331`-`2333`  control FIRST, glyph BARE at 11px, label stacked over the expression
-//   `proto:2361`-`2364`  no leading control, label and expression INLINE, dot trailing
-//
-// Both variants are stated on the ROW's own class rather than on a route container, and that is
-// what makes them the primitive's rather than the Tool tab's: a fourth caller opting in gets the
-// rendering with the prop. A `.manager-tool-prerequisite-list`-anchored copy renders identically
-// today and gives that caller nothing, so the rooting is asserted rather than left to reading.
+// ── ONE ROW, TWO DECLARED VARIANTS.
 test('the leading-control variant carries the reference bare glyph', () => {
   // The TILE keeps two anchors — the two routes that still draw one.
   const tile =
@@ -845,10 +758,7 @@ test('the stacked-text variant is the row own, not the Tool tab', () => {
   assert.match(stackDeclarations, /flex-direction: column/, '`proto:2333` sets name over value');
   assert.match(stackDeclarations, /min-width: 0/, 'so a long expression ellipses inside the row');
 
-  // The expression cell is `flex: 1 1 0` in the INLINE row, which is what puts a trailing control
-  // against the row's right edge with no auto margin. Left alone inside a COLUMN that same
-  // declaration grows it to the row's height, so the variant restates it — at (0,4,0) against the
-  // joined cell's (0,3,0) rather than relying on source order, because the blocks are far apart.
+  // The expression cell is `flex: 1 1 0` in the INLINE row.
   const expression =
     '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked ' +
     '.manager-modifier-readonly-expression {';
@@ -875,18 +785,7 @@ test('the stacked-text variant is the row own, not the Tool tab', () => {
   }
 });
 
-// ── THE TWO PICK ROWS SHARE ONE SELECTED FACE, AT THE REFERENCE'S OWN TOKENS (round 5) ─────
-//
-// `proto:4741` and `proto:4752` are the same string: `background: bg1 | surface-active` and
-// `border: 1px solid (border | accent-border)`. Round 4 gave the bonus row the manager's OPTION
-// treatment instead, by joining `.manager-resolution-option.is-active` — which paints
-// `--fab-accent-soft` behind a 3px inset accent BAR at the row's leading edge. That bar is a
-// radio-card affordance, and it is doubly wrong on a checkbox list where several rows are active
-// at once and a leading bar reads as "this is the chosen one".
-//
-// So the two rows take one joined block at the reference's tokens. The RADIO reset stays joined
-// to the option treatment above, because that is Foundry's native-control chrome and is
-// genuinely shared; only the row's own fill and edge move.
+// ── THE TWO PICK ROWS SHARE ONE SELECTED FACE.
 test('the Tool pick rows share one selected face, at the reference tokens', () => {
   const restingRow =
     '.fabricate-manager .manager-tool-prerequisite-row,\n' +
@@ -924,18 +823,12 @@ test('the Tool pick rows share one selected face, at the reference tokens', () =
   );
 });
 
-// ── THE SELECTION BOX IS THE REFERENCE'S, NOT A 14px TICK IN AN 18px SQUARE (round 5) ──────
-//
+// ── THE SELECTION BOX IS THE REFERENCE'S.
 // `proto:4740` states the prerequisite box exactly: `width:16px; height:16px; border-radius:5px;
 // font-size:8px; color:var(--on-accent)`, over `background: transparent | var(--accent)` and
 // `border: 1px solid (--border-strong | --accent)`, with `fa-solid fa-check` drawn only when
 // checked. The shipped `sm` size declared NO font-size at all, so its tick inherited the row's
 // 14px into an 18px box and touched all four edges.
-//
-// READ OUT OF THE COMPONENT, not the sheet: `SelectionCheckbox` owns its appearance in its own
-// scoped block, and `styles/fabricate.css` is imported at `layer(modules)` while that block is
-// injected unlayered — so a sheet rule aimed at these properties would be emitted, would match,
-// and would have its declarations discarded with no gate objecting.
 test('the small selection box is the reference box', () => {
   const { css: selectionCss } = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/SelectionCheckbox.svelte')
@@ -952,9 +845,7 @@ test('the small selection box is the reference box', () => {
     /font-size: 8px/,
     'and states the tick size, which the inherited 14px overflowed'
   );
-  // The checked ink is the reference's `--on-accent`, stated for THIS size rather than for every
-  // size: `md` and `lg` are the toolbar and browser boxes, whose own frames measured
-  // `--fab-bg-1`, and re-inking those is a different screen's change.
+  // The checked ink is the reference's `--on-accent`.
   const onAccentStart = flat.indexOf('.fab-selection-check.is-sm.is-checked {');
   assert.ok(onAccentStart >= 0, 'the small box states its own checked ink');
   assert.match(
@@ -964,22 +855,7 @@ test('the small selection box is the reference box', () => {
   );
 });
 
-// ── THE EYEBROW IS THE REFERENCE'S, AND IT IS THE SHARED CLASS THAT SAYS SO (issue 1373) ──
-//
-// `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
-// letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`, and 63 further
-// eyebrows across the reference state it identically. The shared `.manager-kicker` shipped at
-// `0.72rem` — 11.52px, 35% over — with NO tracking and the MUTED ink, so every head that drew
-// one read as a small heading rather than as the quiet rule it is.
-//
-// FIXED ON THE SHARED CLASS. Three tool screens had each re-achieved the value locally, and the
-// world Tool entry still rendered two uppercase micro-labels at two sizes one tab apart. This
-// test now pins the shared class itself; a component that still restates the same figures is
-// harmless duplication, but a component that restates a DIFFERENT one is the defect returning.
-//
-// The cascade happens to favour a scoped rule in the card (the sheet is layered, the component
-// block is not), but the component assertions read the COMPILED scoped CSS rather than the
-// source, so what they pin is what Svelte emits.
+// ── THE EYEBROW IS THE REFERENCE'S.
 test('the Tool rule card eyebrow carries the reference type, not the shared kicker size', () => {
   const start = css.indexOf('.fabricate-manager .manager-kicker {');
   assert.ok(start >= 0, 'the shared eyebrow keeps a block of its own');
@@ -1040,20 +916,6 @@ test('the Tool rule card eyebrow carries the reference type, not the shared kick
 });
 
 // ── THE VALIDATION SUMMARY'S CLASSES AND THE SHEET'S RULES ARE ONE SET (issue 1373) ────────
-//
-// `EditorValidationSurface` emitted `is-${summary.status}` verbatim, and `summary.status` is the
-// CALL SITE's word: four of the six sites spell it `pass`/`warn`/`block` and two spell it
-// `clear`/`warning`/`blocked`. The sheet painted the second spelling only, plus one route-scoped
-// `is-pass` for the Checks Studio — so on the Tool editor's Validation tab, at both scopes, a
-// blocked record and a clean one rendered the same neutral card. The component's own doc
-// asserted the sheet painted both.
-//
-// TWO DIRECTIONS, because one alone is half a guard. A sheet rule for a class the surface cannot
-// emit is dead cascade; an emittable class with no rule is an unpainted status. Both were true
-// at once here, which is exactly how it survived: each half looked deliberate beside the other.
-//
-// The canonical set is read out of the COMPONENT's own source rather than re-typed, so widening
-// the vocabulary widens the gate and neither half can be greened by editing this file.
 test('the validation summary paints every status class it can emit, and only those', () => {
   const surface = readFileSync(
     resolve(__dirname, '../../src/ui/svelte/components/EditorValidationSurface.svelte'),
@@ -1113,9 +975,6 @@ test('the validation summary paints every status class it can emit, and only tho
 
 test('the locked activation indicator offers no hover affordance', async () => {
   // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
-  // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the
-  // pointer brightened a thing nothing happens when you press — a false affordance measurable
-  // only in a browser, since the rule is a `:hover` over a `color-mix()`.
   const context = await openLayoutContext({ viewport: { width: 600, height: 300 } });
   const page = await context.newPage();
   try {
@@ -1156,8 +1015,7 @@ test('the band fill is painted by rules that still match', async () => {
     await page.setContent(
       bandStripFixture(
         `<div class="fabricate-manager"><div class="fab-band-strip-track">` +
-          // `left`/`width` as the component emits them, so the band is a real bounded box
-          // and the long name below has something to be truncated against.
+          // `left`/`width` as the component emits them.
           `<span class="fab-band-strip-band" id="tinted" style="left: 0%; width: 90px; --fab-band-strip-fill: rgb(20, 90, 40); --fab-band-strip-ink: rgb(250, 200, 10);">` +
           // A long localized tier name, because the rule that keeps it on one line is the
           // reason the strip's height is stable — a wrapped name shoves the tier rows down.
@@ -1190,9 +1048,7 @@ test('the band fill is painted by rules that still match', async () => {
           whiteSpace: longNameStyle.whiteSpace,
           textOverflow: longNameStyle.textOverflow,
           overflow: longNameStyle.overflow,
-          // `line-height` computes to the keyword `normal` here, so the number of lines is
-          // derived from the rendered height against the font size instead: one line lands
-          // near 1.2em and two lines cannot fit under 2em.
+          // `line-height` computes to the keyword `normal` here.
           height: longName.getBoundingClientRect().height,
           fontSize: parseFloat(longNameStyle.fontSize),
           overflowed: longName.scrollWidth > longName.clientWidth,
@@ -1201,8 +1057,7 @@ test('the band fill is painted by rules that still match', async () => {
     });
   });
 
-  // The consuming rule exists AND reads the inline property: the same element with and
-  // without it must not paint the same colour.
+  // The consuming rule exists AND reads the inline property.
   assert.equal(painted.tinted.background, 'rgb(20, 90, 40)', 'the band paints its inline fill');
   assert.notEqual(
     painted.plain.background,
@@ -1224,13 +1079,10 @@ test('the band fill is painted by rules that still match', async () => {
     painted.longName.height < painted.longName.fontSize * 2,
     `so it occupies one line box, got ${painted.longName.height}px at ${painted.longName.fontSize}px`
   );
-  // The positive control: the name really is wider than its box, so "one line" is a fact
-  // about the rule rather than about a string that happened to fit.
+  // The positive control: the name really is wider than its box.
   assert.ok(painted.longName.overflowed, 'the fixture name is long enough to need truncating');
 
-  // The band's INK is per-band and inline (issue 1096), so the name rule has to READ it. A
-  // hard-coded `color: var(--fab-text)` here would leave the AA gate below measuring an ink no
-  // band ever wears; the untinted control proves the declared fallback still applies.
+  // The band's INK is per-band and inline (issue 1096).
   assert.equal(painted.inkedName, 'rgb(250, 200, 10)', 'a band name takes its own inline ink');
   assert.notEqual(painted.plainName, painted.inkedName, 'and falls back when the band omits one');
 
@@ -1277,9 +1129,7 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
 });
 
 test('every outcome band name clears WCAG AA in every shipped theme', async () => {
-  // The ramp is READ OUT OF the editor rather than restated, so adding a tone or widening the
-  // mix without re-checking contrast fails here. `bandFill`'s expression and the ink's are
-  // pinned too — otherwise this could go on measuring a formula the component no longer uses.
+  // The ramp is READ OUT OF the editor rather than restated.
   const toneNames = /const BAND_TONES = \[([^\]]+)\];/
     .exec(checkEditorSource)?.[1]
     .split(',')
@@ -1301,9 +1151,7 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
     /ink: `var\(--fab-\$\{tone\}-text\)`/,
     'and each band still takes its own tone-text ink'
   );
-  // An OPAQUE base is what makes this measurable at all: mixed into a translucent surface the
-  // fill's painted colour depends on whatever the strip is stacked on, so no fixture could
-  // state the contrast a GM actually sees.
+  // An OPAQUE base is what makes this measurable at all.
   assert.equal(toneBase, 'var(--fab-bg-0)', 'the ramp is mixed into an opaque base');
 
   const themes = [...css.matchAll(/:root\[data-fabricate-theme="([\w-]+)"\]/g)].map((m) => m[1]);
@@ -1331,17 +1179,6 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
     return page.evaluate(() => {
       // THE COLOUR IS RASTERISED, because scraping numbers out of the computed string is
       // what made the first version of this gate vacuous.
-      //
-      // `color-mix(in srgb, …)` does NOT compute to `rgb()`. It computes to
-      // `color(srgb 0.303059 0.374588 0.346039)` — fractional channels in 0..1. The old
-      // `colour.match(/[\d.]+/g)` read those three fractions as 0..255 channels, so EVERY
-      // fill measured as very nearly black, every ratio came back at 12-19:1, and the gate
-      // could not have failed whatever the ramp did. (`color-mix(in oklab, …)` computes to
-      // `oklab(…)` and breaks it the same way, with the added trap of negative a/b channels
-      // the regex silently drops the sign from.)
-      //
-      // A canvas does the colour-space conversion the browser itself does when painting, so
-      // the bytes that come back are the pixels a GM actually sees, in any colour space.
       const canvas = document.createElement('canvas');
       canvas.width = 1;
       canvas.height = 1;
@@ -1377,9 +1214,7 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
         if (!fillPixel || !inkPixel) {
           return { probe: band.dataset.probe, fill, ink, unreadable: true, ratio: 0 };
         }
-        // Alpha, measured rather than pattern-matched: a translucent fill in ANY colour
-        // space would make the ratio below a statement about a fixture, not about a GM's
-        // screen. `rgba(…)` was the only shape the old test could recognise.
+        // Alpha, measured rather than pattern-matched.
         const translucent = fillPixel[3] < 255 || inkPixel[3] < 255;
         const [light, dark] = [luminance(inkPixel), luminance(fillPixel)].sort((a, b) => b - a);
         return {
@@ -1394,19 +1229,14 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
     });
   });
 
-  // ── The measurement's own preconditions, asserted rather than assumed ──────────────────
-  //
-  // Every one of these is a way this gate can go green while measuring nothing, and the
-  // shipped version of it tripped the second.
+  // ── The measurement's own preconditions.
 
   // 1. The colour parsed at all. A value `fillStyle` refuses leaves the previous paint on the
   //    canvas, so a refusal must not read as a colour.
   const unreadable = measured.filter((m) => m.unreadable).map((m) => `${m.probe}: ${m.fill}`);
   assert.deepEqual(unreadable, [], `unrasterisable colours:\n- ${unreadable.join('\n- ')}`);
 
-  // 2. The fill did not collapse to black, which is exactly where a `color(srgb 0.30 …)`
-  //    string lands when it is scraped as three 0..255 channels — the failure that made this
-  //    gate report a comfortable 12-19:1 for every band regardless of the ramp.
+  // 2. The fill did not collapse to black.
   assert.ok(
     measured.every((m) => m.fillPixel !== 'rgb(0, 0, 0)'),
     'a fill measured as pure black means the colour never survived conversion'
@@ -1535,17 +1365,11 @@ test('a Modifiers card button renders exactly like the tool studio button of the
       assert.ok(measured[probe], `${probe} rendered`);
     }
 
-    // The gate would be vacuous if the sheet styled nothing: an unstyled button reports the
-    // UA default on both sides and matches trivially. These pin that the authority's own
-    // rule reached the fixture. 34px and 0.72rem are what `.manager-tool-edit-actions
-    // .manager-button` renders, and 34px is now the whole header cluster's height too: the
-    // 38px `.manager-header-actions` used to declare was RETIRED in issue 1118 rather than
-    // arbitrated, because it tied the primitive at (0,3,0) and won on source order alone.
+    // The gate would be vacuous if the sheet styled nothing.
     assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
     assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
 
-    // …and the control proves the conversion is doing work: the shipped bare class string
-    // renders at the app's inherited body size, which is the reported defect.
+    // …and the control proves the conversion is doing work.
     assert.notEqual(
       measured['card-unconverted'].fontSize,
       measured['tool-primary'].fontSize,
@@ -1577,8 +1401,6 @@ test('the Checks rail states its own control type scale instead of inheriting on
 
   try {
     // The rail is the workspace grid's 300px column, so the panel sibling is load-bearing:
-    // without it the rail lands in the `minmax(0, 1fr)` track and every control measures a
-    // width no product surface has.
     await page.setContent(`
       <!doctype html>
       <html lang="en">
@@ -1666,8 +1488,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
       assert.equal(measured[probe].fontWeight, '500', `${probe} reads at the prototype's weight`);
     }
 
-    // The NEGATIVE CONTROL for the pickers: the identical `.manager-field` control one card
-    // away still inherits 0.82rem/700, which is what the rail's two controls rendered as.
+    // The NEGATIVE CONTROL for the pickers.
     assert.equal(
       measured['field-select-elsewhere'].fontSize,
       '13.12px',
@@ -1680,15 +1501,10 @@ test('the Checks rail states its own control type scale instead of inheriting on
       'and the rail rule is therefore doing work'
     );
 
-    // The roll action takes the PRIMITIVE's scale, not a value chosen here: 11.52px is
-    // `.manager-button.fab-manager-button`'s 0.72rem, the Tool Studio's authority, and it is
-    // within half a pixel of the prototype's own 11.5px/700 roll button.
+    // The roll action takes the PRIMITIVE's scale, not a value chosen here.
     assert.equal(measured.roll.fontSize, '11.52px', 'the roll button reads at the primitive');
     assert.equal(measured.roll.fontWeight, '700');
-    // The Foundry reset. Core's `button` rule pins a height and centres content; the button
-    // is a full-width icon+label pair inside a card, so the rail block releases the height
-    // and the width. `height: auto` is the load-bearing half — `min-height` does not cancel
-    // a fixed `height`.
+    // The Foundry reset. Core's `button` rule pins a height and centres content.
     assert.equal(measured.roll.height, 34, 'released from Foundry’s fixed button height');
     assert.equal(
       measured.roll.width,
@@ -1696,8 +1512,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
       'and spans the card exactly as the controls above it do'
     );
 
-    // The NEGATIVE CONTROL for the button: the bare class string it shipped with lands on
-    // Foundry's app base, which is the reported "font is too large".
+    // The NEGATIVE CONTROL for the button.
     assert.equal(
       measured['roll-unconverted'].fontSize,
       '14px',
@@ -1721,14 +1536,7 @@ test('the modifier row gives every field room for its longest content at every m
       `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-world-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
     const boundField = (bound, caption) =>
       `<div class="fabricate-field manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
-    // The icon field's picker root element, which this copy omitted until issue 1470. The
-    // trigger's geometry rules are rooted at it now, so without it the field measures a bare
-    // button rather than the 38px combo the row is being asserted to have room for. Since issue
-    // 1503 the product writes the SHARED primitive's pair on that element too, because the
-    // picker renders through `SearchablePopover` and the caller's own pair arrives through
-    // `pickerClass` — so this copy carries all four. The measurement was re-run and is
-    // unchanged: the extra classes add `position: relative; min-width: 0`, and the field's width
-    // comes from its grid track.
+    // The icon field's picker root element.
     const editor = `
       <div class="manager-modifier-body manager-character-modifier-editor">
         <div class="manager-modifier-name-row">
@@ -1785,8 +1593,7 @@ test('the modifier row gives every field room for its longest content at every m
                   Number.parseFloat(labelStyle.paddingLeft) -
                   Number.parseFloat(labelStyle.paddingRight)
               ),
-              // The longest label the product itself authors, measured in the FIELD'S OWN
-              // font rather than compared to a round number someone picked.
+              // The longest label the product itself authors.
               needed: Math.round(measureText(label, 'Herbalism Training')),
             },
             bounds: ['min', 'max'].map((bound) => {
@@ -1837,10 +1644,7 @@ test('the modifier row gives every field room for its longest content at every m
 });
 
 test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
-  // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`, so the hash has to land on
-  // every element the rules reach — not only on the token `withScopeHash` stamps. A
-  // fixture that stamped the wrapper alone would compute `position: static` and read as
-  // a defect in the component rather than in the fixture.
+  // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`.
   const hash = previewScoped.hashClass;
   const view = await renderWithCascade(
     `<div class="fabricate-manager"><div class="manager-checks-simulator-readout ${hash}">` +
@@ -1894,8 +1698,7 @@ test('an odds row keeps its bar between a bounded label and a pinned percentage'
   );
   try {
     const row = await view.measure('#row');
-    // `overflow` is a SHORTHAND, so it is asked for by name; the enumerated snapshot holds
-    // `overflow-x`/`-y` only and an unnamed read would be `undefined` against every expectation.
+    // `overflow` is a SHORTHAND, so it is asked for by name.
     const label = await view.measure('#label', ['overflow']);
     const bar = await view.measure('#bar');
     const percent = await view.measure('#percent');

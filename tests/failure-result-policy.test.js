@@ -1,18 +1,6 @@
 /**
- * The FAILURE-RESULT POLICY (issue 1098), end to end through the seams that persist,
- * project, migrate and RESOLVE it.
- *
- * The engine capabilities the policy governs are pinned where their harnesses already
- * live: the salvage failure award in `tests/salvage-engine.test.js` (group 8), the routed
- * tier resolution in `tests/routed-resolution.test.js`, and the gathering award gate in
- * `tests/gathering-failure-results.test.js`. What this file owns is the FIELD — the shared
- * derivation, the three whitelist rebuilds it has to reach, the projection that decides
- * whether the UI can see it, and the seed migration that keeps every upgraded world on
- * today's behaviour.
- *
- * EVERY VALUE ASSERTED HERE IS NON-DEFAULT. `perRecord` is the read-time default, so a
- * fixture carrying it is no oracle at all: a normalizer that dropped the key entirely
- * would produce it and the assertion would still pass.
+ * The FAILURE-RESULT POLICY (issue 1098), end to end through the seams that persist, project,
+ * migrate and RESOLVE it.
  */
 
 import test from 'node:test';
@@ -150,9 +138,7 @@ test('salvage failure CONSUMPTION survives the normalizer at its two trap defaul
   assert.equal(authored.consumption.consumeComponentOnFail, false);
   assert.equal(authored.consumption.breakToolsOnFail, true);
 
-  // `breakToolsOnFail` is read NEW-THEN-LEGACY against the 1.7.0 `consumeCatalystsOnFail`
-  // rename. A reader that took the new key alone would flip a pre-1.7.0 system from ON to
-  // OFF on its first save.
+  // `breakToolsOnFail` is read NEW-THEN-LEGACY against the 1.7.0 `consumeCatalystsOnFail` rename.
   const legacyOnly = manager._normalizeSalvageCraftingCheck({
     consumption: { consumeCatalystsOnFail: true },
   });
@@ -181,9 +167,8 @@ test('1.25.0 seeds `never` onto every check that EXISTS, and nothing onto one th
 
   assert.equal(system.craftingCheck.failureResultPolicy, 'never');
   assert.equal(system.salvageCraftingCheck.failureResultPolicy, 'never');
-  // NO STORAGE CHURN: an absent block has no authored failure output to award and no
-  // surface to observe the policy on, so seeding one would touch every system in the
-  // world to change nothing. It picks up the read-time default when the GM authors it.
+  // NO STORAGE CHURN: an absent block has no authored failure output to award and no surface to
+  // observe the policy on, so seeding one would touch every system in the world to change nothing.
   assert.equal(
     Object.hasOwn(system, 'gatheringCraftingCheck'),
     false,
@@ -201,9 +186,7 @@ test('1.25.0 never overwrites an authored value, and is idempotent', () => {
   assert.equal(system.craftingCheck.failureResultPolicy, 'always', 'an authored value wins');
   assert.equal(system.salvageCraftingCheck.failureResultPolicy, 'never');
 
-  // A SECOND pass finds every check already carrying a value and writes nothing. The lab
-  // world depends on this directly: it boots the real runner with no `migrationVersion`,
-  // so every migration runs on every build.
+  // A SECOND pass finds every check already carrying a value and writes nothing.
   const snapshot = JSON.stringify(system);
   applySeededFailureResultPolicy(system);
   assert.equal(JSON.stringify(system), snapshot, 'a second pass changes nothing');
@@ -233,10 +216,7 @@ test('1.25.0 is pure and clone-first: the runner payload is never mutated', () =
 });
 
 test("decision 9's hazard: an upgraded world's tolerated failure salvage group awards NOTHING", () => {
-  // The concrete case the migration exists for. A salvage component may legally persist a
-  // reserved `role: 'failure'` group carrying results — `_normalizeSalvage` tolerates one
-  // whenever the Simple salvage check has an authored roll formula — and until issue 1098
-  // it awarded nothing, in every world, always.
+  // The concrete case the migration exists for (issue 1098).
   const world = [
     {
       id: 'upgraded',

@@ -52,9 +52,8 @@ const libraryTasks = [
 ];
 
 test('weather/time-of-day mismatch does not stop a task from being composed (runtime gate, not match)', () => {
-  // The weather-only task matches by biome but requires stormy weather; the
-  // environment currently has clear weather. Composition still includes it —
-  // the runtime engine surfaces the conditions gate via CONDITIONS_BLOCKED.
+  // The weather-only task matches by biome but requires stormy weather; the environment currently
+  // has clear weather.
   const service = makeService({
     tasks: [{ id: 'storm-pick', name: 'Storm Pick', biomes: ['cave'], weather: ['storm'], dropRows: [{ id: 'd', componentId: 'ore', quantity: 1, dropRate: 100 }] }]
   });
@@ -133,9 +132,7 @@ test('manual mode ignores the forced list, which belongs to automatic mode', () 
 });
 
 test('automatic mode honours the forced allow-list', () => {
-  // The rule flip's own proof (issue #1315). Automatic composition is "everything matching, minus
-  // the excluded, PLUS the forced": a force is how a GM overrides the match filter, and this is
-  // the mode that has one.
+  // The rule flip's own proof (issue #1315).
   const service = makeService({ tasks: libraryTasks });
   const composed = service.composeEnvironment(environment({
     compositionMode: 'automatic',

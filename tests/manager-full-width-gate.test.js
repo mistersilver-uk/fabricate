@@ -1,52 +1,14 @@
 /**
- * The full-width decision, asserted as ONE thing in two files (issue 1362, epic 1357).
- *
- * Suppressing `<aside class="manager-inspector">` in `CraftingSystemManagerRoot.svelte` and
- * releasing the third grid column in `styles/fabricate.css` are one decision expressed twice.
- * Doing only the first leaves a ~300px empty box holding the strip open; doing only the second
- * wraps the (empty) aside to an implicit grid row underneath the editor. Both halves have
- * shipped alone before — `checks` (issue 1096) and `world-currency` (issue 1311) each rendered
- * against a dead strip for a release — so the pairing is checked mechanically here.
- *
- * ── WHY IT IS NOT A SET OF ROUTE TOKENS ─────────────────────────────────────────────────
- *
- * Three of the shipped exclusions are not route tokens: `checks` is a FAMILY matched by a
- * prefix selector, World > Parties is a route+SUBSTATE matched by a compound attribute
- * selector, and the world-rules clause spans three tokens. So the registry carries the
- * stylesheet SELECTOR, and this gate compares selector strings.
- *
- * ── AND WHY IT IS A THREE-STATE CLASSIFICATION ──────────────────────────────────────────
- *
- * There are THREE layout states in the sheet, not two. `tool-edit` and `knowledge` suppress
- * the aside AND keep three tracks, repurposing the third column for their own content. A gate
- * asserting "aside excluded equals column released" is therefore UNSATISFIABLE on `main`, and
- * every loosening of it is vacuous. Each rule is classified by RESOLVED TRACK COUNT into
- * `shared-3-track`, `full-width-2-track` or `self-owned-3-track`, with `tool-edit` and
- * `knowledge` NAMED as the members of the self-owned class rather than excluded from scope.
- *
- * ── IT MUST FAIL LOUD ───────────────────────────────────────────────────────────────────
- *
- * The house helper for reading a rule out of this stylesheet (`blockFor` in
- * `tests/components/manager-layout.test.js`) answers `''` on no match, so the cheapest green
- * available to a broken parse is two empty sets comparing equal. Both parsed sets are
- * therefore asserted NON-EMPTY and asserted to contain three NAMED baseline members — one per
- * exclusion shape, spanning both aside-suppressing classes — BEFORE the equality runs.
- *
- * ── AND AT-RULE AWARE ───────────────────────────────────────────────────────────────────
- *
- * `.manager-body` is re-declared inside `@container fabricate-manager (max-width: 1120px)`,
- * where it stacks to one column. A flat scan reads those as "every route released"; this
- * parser tracks brace depth and only classifies rules opened at depth 0.
+ * The full-width decision, asserted as ONE thing in two files (issue 1362, epic 1357). IT MUST FAIL
+ * LOUD
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-// The parsers, the anchor and the aside assertion are SHARED with the two recipe-edit
-// suites through this helper (issue 1362 review S4). Two copies of an anchor are two
-// things to keep in step, which is the whole reason the helper exists — and the copy that
-// lived here was byte-identical to the helper's, at SonarCloud's ten-line duplication floor.
+// The parsers, the anchor and the aside assertion are SHARED with the two recipe-edit suites
+// through this helper (issue 1362 review S4).
 import {
   assertAsideBuiltFromSet,
   assertPredicatesMatchTheirIds,
@@ -67,22 +29,10 @@ const ROOT_COMPONENT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoo
 const css = readFileSync(resolve(ROOT, CSS_PATH), 'utf8');
 const rootSource = readFileSync(resolve(ROOT, ROOT_COMPONENT_PATH), 'utf8');
 
-/**
- * The routes that suppress the aside AND keep three tracks. NAMED rather than inferred: the
- * track count alone cannot separate them from `tools`, which also declares three tracks and
- * keeps its inspector.
- *
- * @type {ReadonlySet<string>}
- */
+/** The routes that suppress the aside AND keep three tracks. */
 const SELF_OWNED_THREE_TRACK = new Set(['tool-edit', 'knowledge']);
 
-/**
- * The three baseline members every parsed set must contain before the equality runs. One per
- * exclusion SHAPE — a prefix-matched family, a route+substate compound, an ordinary token —
- * and spanning both aside-suppressing classes.
- *
- * @type {readonly string[]}
- */
+/** The three baseline members every parsed set must contain before the equality runs. */
 const BASELINE_MEMBERS = Object.freeze([
   '.fabricate-manager[data-manager-view^="checks"] .manager-body::full-width-2-track',
   '.fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body::full-width-2-track',
@@ -214,17 +164,7 @@ test('the aside chain is BUILT from the set rather than restating it', () => {
 });
 
 test('every entry\'s PREDICATE answers for its own id', () => {
-  // THE FIELD THAT SHIPS THE DEFECT, and the one this gate could not see (issue 1362 review
-  // M1). `fullWidthLayout` derives from `predicate` and from nothing else; `id` and `selector`
-  // are read at runtime by nothing at all. Swapping two routes' predicates — the inspector
-  // suppressed on the wrong screen — left ALL FIVE tests here green, plus manager-contract,
-  // manager-layout, view-lab-cases and view-lab-source-coverage. The equivalent SELECTOR swap
-  // reds the selector-to-id test below, so the gate was built to catch this class of edit and
-  // missed the only field that decides anything.
-  //
-  // The two non-token predicates are NAMED with their exact expected text rather than skipped,
-  // mirroring how `SELF_OWNED_THREE_TRACK` above names its members: an exemption that merely
-  // skipped them would let either be rewritten into anything.
+  // THE FIELD THAT SHIPS THE DEFECT, and the one this gate could not see (issue 1362 review M1).
   assertPredicatesMatchTheirIds(rootSource);
 });
 

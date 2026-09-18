@@ -49,9 +49,7 @@ function names(emitted) {
   return emitted.at(-1).map((tier) => tier.id);
 }
 
-/**
- * A keydown on the grip, as a real one arrives: bubbling, cancellable, and carrying the key.
- */
+/** A keydown on the grip, as a real one arrives: bubbling, cancellable, and carrying the key. */
 function pressGrip(target, tierId, key) {
   const grip = target.querySelector(`[data-tier-grip="${tierId}"]`);
   assert.ok(grip, `a grip exists for ${tierId}`);

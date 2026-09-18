@@ -5,9 +5,7 @@ import { migrateRenameGatheringHazardsToEvents } from '../src/migration/migrateR
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { normalizeGatheringRealmModifier } from '../src/systems/gatheringRealms.js';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -70,9 +68,7 @@ function legacyData() {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Core rename
-// ---------------------------------------------------------------------------
 
 test('renames the gathering-config collection, rules, and event-record fields', () => {
   const { gatheringConfig } = migrateRenameGatheringHazardsToEvents(legacyData());
@@ -121,9 +117,7 @@ test('renames the region-modifier kind value hazardChance -> eventChance', () =>
   assert.equal(modifiers[1].kind, 'dropRate', 'other modifier kinds unchanged');
 });
 
-// ---------------------------------------------------------------------------
 // Keep-list: things that must NOT change
-// ---------------------------------------------------------------------------
 
 test('preserves the default-image asset path and the hazardous danger tier', () => {
   const { gatheringConfig } = migrateRenameGatheringHazardsToEvents(legacyData());
@@ -141,9 +135,7 @@ test('does not touch a d100 failure-result group literally named "hazard"', () =
   assert.equal(gatheringConfig.systems['sys-a'].events[0].resultGroups[0].name, 'hazard');
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency and anomalous payloads
-// ---------------------------------------------------------------------------
 
 test('is idempotent: a second run makes no further change', () => {
   const once = migrateRenameGatheringHazardsToEvents(legacyData());
@@ -187,9 +179,7 @@ test('does not mutate its inputs (deep-clones)', () => {
   assert.deepEqual(input, snapshot, 'input bundle left unchanged');
 });
 
-// ---------------------------------------------------------------------------
 // Through the runner
-// ---------------------------------------------------------------------------
 
 test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at the highest version', async () => {
   const data = legacyData();
@@ -218,9 +208,7 @@ test('runs through MigrationRunner from 0.9.0, rewrites the data, and lands at t
   assert.equal(store.get('travelConfig').realms[0].modifiers[0].kind, 'eventChance');
 });
 
-// ---------------------------------------------------------------------------
 // Legacy-acceptance fallback on read (imports bypass the startup migration)
-// ---------------------------------------------------------------------------
 
 test('realm-modifier normalizer accepts the legacy hazardChance kind on read', () => {
   const modifier = normalizeGatheringRealmModifier({ kind: 'hazardChance', value: 5 });

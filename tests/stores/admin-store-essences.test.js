@@ -1,16 +1,6 @@
 /**
- * Issue 1036 — the admin store's essence surface: the projections the redesigned library
- * reads, and the six write exports it drives.
- *
- * Two of the criteria here are about a hazard that has bitten this repo before, so both are
- * pinned with a deliberately awkward fixture:
- *
- * - **`enabled` is DEFAULT-TRUE**, so a `true` fixture round-trips green through a
- *   projection that drops the field entirely. Every assertion below uses `false`.
- * - **`selectedSystem` is a HAND-BUILT allowlist.** A persisted field is invisible to the
- *   whole UI until a projection names it, however correct the normalizer and the write path
- *   are — `componentCategories` and `categoryIcons` both shipped that way. These tests read
- *   the field through `viewState`, which is the only place a UI consumer can see it.
+ * Issue 1036 — the admin store's essence surface: the projections the redesigned library reads, and
+ * the six write exports it drives.
  */
 
 import assert from 'node:assert/strict';
@@ -91,9 +81,7 @@ function cardFor(store, id) {
   return cardsOf(store).find((card) => card.id === id);
 }
 
-// ---------------------------------------------------------------------------
 // Criterion 13 (store half) — both new persisted fields reach the UI
-// ---------------------------------------------------------------------------
 
 test('1036/13: a FALSE `enabled` survives the selectedSystem projection', async () => {
   const harness = makeEssenceStoreHarness({
@@ -104,9 +92,8 @@ test('1036/13: a FALSE `enabled` survives the selectedSystem projection', async 
   const projected = get(store.viewState).selectedSystem.essenceDefinitions.find(
     (def) => def.id === 'fire'
   );
-  // A `true` fixture here would pass against a projection that never emits the key at all,
-  // because the consumer convention folds an absent value onto `true`. Only `false` can
-  // distinguish "carried" from "dropped".
+  // A `true` fixture here would pass against a projection that never emits the key at all, because
+  // the consumer convention folds an absent value onto `true`.
   assert.equal(projected.enabled, false, '`selectedSystem` carries the disabled state');
 });
 
@@ -168,9 +155,7 @@ test('1036: the capability facts are derived, not invented', async () => {
   assert.equal(cardFor(store, 'water').hasEffectTransfer, false);
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 23 — recipeUsageCount across BOTH branches the shared walk covers
-// ---------------------------------------------------------------------------
 
 test('1036/23: recipeUsageCount counts BOTH the legacy set map and a step ingredient option', async () => {
   const harness = makeEssenceStoreHarness({
@@ -228,9 +213,7 @@ test('1036/17: the card carries the recipe IDENTITIES the delete-impact union ne
 });
 
 test('1036/17: the delete-impact statement reports a NON-ZERO carrier count on STORE-BUILT rows', async () => {
-  // Store-built rows carry the `componentUsageItems` and `recipeUsageIds` the impact union
-  // reads. The delete is WARNED, not BLOCKED (maintainer round), so every selected essence is
-  // deletable and the carriers are counted once each over the WHOLE selection.
+  // Store-built rows carry the `componentUsageItems` and `recipeUsageIds` the impact union reads.
   const harness = makeEssenceStoreHarness({
     essences: [
       makeEssence({ id: 'fire' }),
@@ -283,20 +266,10 @@ test('1036: a recipe reference is reported through its OWN key, never as a block
   );
 });
 
-// ---------------------------------------------------------------------------
-// `duplicateEssence` is RETIRED (issue 1372, maintainer parity round 8)
-//
-// It wrote a second `system.essenceDefinitions` entry with a fresh id and a `(copy)` name — a
-// SYSTEM-owned essence carrying its own name, icon and colour, minted from the rail whose own
-// banner says name, icon and colour come from the Essence Catalogue and are shared by every
-// system. Both claims were on screen a foot apart. `### GM World Essence Screens` requirement 13
-// closes the system layer to identity authorship, so the verb has no place to write.
-//
-// Asserted as an ABSENCE on the published API, not merely deleted: `CraftingSystemManagerRoot`
-// called it through `store.duplicateEssence?.()`, so a re-added export would silently wire a
-// button back up, and the surviving `_essenceNameTaken` guard would keep any test of the name
-// arithmetic green while the affordance itself was the defect.
-// ---------------------------------------------------------------------------
+// `duplicateEssence` is RETIRED (issue 1372, maintainer parity round 8). It wrote a second
+// `system.essenceDefinitions` entry with a fresh id and a `(copy)` name — a SYSTEM-owned essence
+// carrying its own name, icon and colour, minted from the rail whose own banner says name, icon and
+// colour come from the Essence Catalogue and are shared by every system.
 
 test('1372: the store publishes no essence duplicate verb', async () => {
   const harness = makeEssenceStoreHarness({
@@ -312,23 +285,13 @@ test('1372: the store publishes no essence duplicate verb', async () => {
   assert.equal(store.duplicateEssence, undefined, 'and duplicate is not one of its verbs');
 });
 
-// ---------------------------------------------------------------------------
-// `worldScope.essence.addToSystem` WRITES BOTH HALVES (issue 1372, maintainer parity round 8)
-//
-// The generic world-scope write family writes exactly one thing: a membership row in the
-// world-scope payload. Nothing on the System Essence Rules screen reads that row — `essenceCards`
-// is built from `selectedSystem.essenceDefinitions`, and the read union only ENRICHES rows it
-// already finds there — so `Add to this system` published a refresh and left the list exactly as
-// it was. A button that silently does nothing, on every essence, forever.
-//
-// That is the same root cause as the system-scope create draft this round removes, and removing
-// `+ Create essence` from the Essence Rules header is only safe once the remaining route lands.
-// ---------------------------------------------------------------------------
+// `worldScope.essence.addToSystem` WRITES BOTH HALVES (issue 1372, maintainer parity round 8). The
+// generic world-scope write family writes exactly one thing: a membership row in the world-scope
+// payload.
 
 /**
  * THE STORE FAKE IS SHARED (issue 1371, round 3). This suite's copy and the component suite's were
- * byte-identical; the shape belongs to the scope store rather than to either family. Aliased so
- * the call sites below still read as the essence store they drive.
+ * byte-identical; the shape belongs to the scope store rather than to either family.
  */
 const makeEssenceScopeStore = makeWorldScopeStoreFake;
 
@@ -369,18 +332,11 @@ test('1372: joining a world essence to a system writes the in-system record too'
   );
 });
 
-// ---------------------------------------------------------------------------
-// `worldScope.essence.removeFromSystem` WRITES BOTH HALVES TOO (issue 1372)
-//
-// The reference's copy for Remove says it takes this system's rules: "Components here keep the
-// values, but nothing resolves on craft until the essence is added back." Deleting only the
-// membership record left the in-system row standing, so the essence went on resolving on every
-// craft and the second clause was false. The first clause holds for free — the valid-id basis is
-// the union of the world roster with the in-system array, so the id is still vouched for and the
-// quantities are not pruned. `tests/world-scope-essence-removal-quantities.test.js` proves that
-// against a REAL `CraftingSystemManager`, with the no-world-half negative control; this harness
-// does not normalize, so it can only pin the two writes.
-// ---------------------------------------------------------------------------
+// `worldScope.essence.removeFromSystem` WRITES BOTH HALVES TOO (issue 1372). The reference's copy
+// for Remove says it takes this system's rules: "Components here keep the values, but nothing
+// resolves on craft until the essence is added back." Deleting only the membership record left the
+// in-system row standing, so the essence went on resolving on every craft and the second clause was
+// false.
 
 test('1372: removing a world essence from a system deletes the in-system record too', async () => {
   const harness = makeEssenceStoreHarness({
@@ -423,20 +379,9 @@ test('1372: removing an essence a system does not hold writes nothing', async ()
   assert.deepEqual(harness.writes, [], 'no membership record and no in-system row: nothing to do');
 });
 
-// ---------------------------------------------------------------------------
-// EVERY world-scope write REPUBLISHES (issue 1372)
-//
-// `buildWorldScopeState()` is read ONCE PER PUBLISH, so an action that persisted through its own
-// store and did not refresh left the screen rendering the state before the click. Measured in the
-// View Lab: clicking the inherit switch changed nothing visible, while the enable switch beside
-// it — which reads local draft state — flipped immediately. Only `addToSystem` looked right, and
-// only because its essence composition happened to call `refresh()` for its own second half.
-//
-// PINNED ON A GENERIC VERB, deliberately. `setSectionInherited` is one of the family
-// `createWorldScopeActions` mints per entity type, so it is the shape a verb added later will
-// have; asserting on the two composed essence verbs would leave the wrapper untested exactly
-// where it is doing the work.
-// ---------------------------------------------------------------------------
+// EVERY world-scope write REPUBLISHES (issue 1372). `buildWorldScopeState()` is read ONCE PER
+// PUBLISH, so an action that persisted through its own store and did not refresh left the screen
+// rendering the state before the click.
 
 test('1372: flipping an inherit switch re-flows the published world-scope projection', async () => {
   const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
@@ -516,9 +461,7 @@ test('1372: joining an essence the world roster does not hold writes nothing', a
   assert.deepEqual(scope.payload.membership, {});
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 23 — deleteEssence's boolean return
-// ---------------------------------------------------------------------------
 
 test('1036/23: deleteEssence returns TRUE only when it actually deleted', async () => {
   const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire' })] });
@@ -549,9 +492,7 @@ test('1036/23: deleteEssence returns FALSE for an unknown id but DELETES an in-u
   const store = await openStore(harness);
 
   assert.equal(await store.deleteEssence('nope'), false, 'an unknown id is not a success');
-  // The delete is WARNED, not BLOCKED (maintainer round): component usage no longer refuses
-  // it. The manager primitive strips the essence from every carrier, so the store lets it
-  // through and states the impact in the confirm dialog instead.
+  // The delete is WARNED, not BLOCKED (maintainer round): component usage no longer refuses it.
   assert.equal(await store.deleteEssence('fire'), true, 'a carried essence deletes');
   assert.equal(harness.system.essenceDefinitions.length, 0, 'the definition is gone');
 });
@@ -585,10 +526,8 @@ test('1036: deleteEssence hands the cascade impact counts to the confirm dialog'
   );
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1156 — the singular delete dialog omits a stated-zero consequence, per
-// consequence, the essence sibling of the recipe dialog's #1152 fix.
-// ---------------------------------------------------------------------------
+// Issue 1156 — the singular delete dialog omits a stated-zero consequence, per consequence, the
+// essence sibling of the recipe dialog's #1152 fix.
 
 test('1156: deleteEssence selects the plain branch when neither consequence is non-zero', async () => {
   const harness = makeEssenceStoreHarness({
@@ -663,9 +602,7 @@ test('1156: deleteEssence selects the singular recipes-only branch at exactly on
   assert.deepEqual(call.data, { name: 'Fire', components: 0, recipes: 1 });
 });
 
-// ---------------------------------------------------------------------------
 // deleteEssences — the set delete deletes every member; usage never blocks it
-// ---------------------------------------------------------------------------
 
 test('1036: deleteEssences deletes EVERY selected essence, carried or not', async () => {
   const harness = makeEssenceStoreHarness({
@@ -706,9 +643,7 @@ test('1036: deleteEssences issues ONE batched manager write for the whole set', 
   assert.deepEqual(deleteWrites[0].essenceIds, ['fire', 'water']);
 });
 
-// Issue 1144 — the toast's disable count does not exist unless the store passes it through
-// BY NAME. `deleteComponents` already proves this passthrough for its twin; this is the
-// essence half of the same seam.
+// Issue 1144 — the toast's disable count does not exist unless the store passes it through BY NAME.
 test('1144: deleteEssences passes recipesDisabled through from the manager by name', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [
@@ -729,9 +664,7 @@ test('1144: deleteEssences passes recipesDisabled through from the manager by na
   assert.deepEqual(result, { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 });
 });
 
-// ---------------------------------------------------------------------------
 // setEssenceEnabled — one manager write, and the invalidated-recipe report
-// ---------------------------------------------------------------------------
 
 test('1036: setEssenceEnabled routes ONE set-apply write and reports invalidated recipes', async () => {
   const harness = makeEssenceStoreHarness({
@@ -773,9 +706,7 @@ test('1036: re-enabling reports nothing invalidated and does not touch recipe st
   assert.equal(harness.recipes[0].enabled, true, 'no recipe was written either way');
 });
 
-// ---------------------------------------------------------------------------
 // applyEssenceBulkEdit — presence, never truthiness
-// ---------------------------------------------------------------------------
 
 test('1036: applyEssenceBulkEdit forwards a falsy-but-real edit VERBATIM', async () => {
   const harness = makeEssenceStoreHarness({
@@ -807,9 +738,7 @@ test('1036: applyEssenceBulkEdit writes nothing for an empty edit or an empty se
   assert.deepEqual(harness.writes, [], 'negative control: an accidental Apply re-writes nothing');
 });
 
-// ---------------------------------------------------------------------------
 // cancelEssenceDraft — the half worth naming is that it WRITES NOTHING
-// ---------------------------------------------------------------------------
 
 test('1036/23: cancelEssenceDraft republishes the persisted state and issues no write', async () => {
   const harness = makeEssenceStoreHarness({
@@ -825,9 +754,7 @@ test('1036/23: cancelEssenceDraft republishes the persisted state and issues no 
   assert.equal(cardFor(store, 'fire').enabled, false);
 });
 
-// ---------------------------------------------------------------------------
 // updateEssence — the new fields follow the same presence semantics as colorToken
-// ---------------------------------------------------------------------------
 
 test('1036: updateEssence writes `enabled` and `propertyMacroUuid` only when PRESENT', async () => {
   const harness = makeEssenceStoreHarness({

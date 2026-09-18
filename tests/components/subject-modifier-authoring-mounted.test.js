@@ -1,26 +1,4 @@
-/**
- * The SALVAGE and GATHERING check-modifier AUTHORING path, end to end (issue 1095).
- *
- * The resolver, the normalizers and the picker itself are each covered elsewhere. What was
- * not covered is the path between them — the two HOSTS that decide whether the picker
- * renders at all, what it is handed, and whether what the GM picks ever reaches a save. Every
- * assertion below was written against a mutation that survived the suite:
- *
- *  - the picker rendered under EVERY combination rule, not only `bySubject`;
- *  - it was unreachable under PROGRESSIVE salvage, because its gate was nested inside the DC
- *    override's `simple || routed` one — while `ChecksView` renders the salvage catalogue card
- *    in the progressive branch and `CraftingEngine` builds the context before dispatch, so the
- *    roll honoured a pick no editor could author;
- *  - `checkModifierIds` dropped out of the salvage dirty signature, which is the issue-651 bug
- *    verbatim: the GM picks, nothing is dirty, Save never enables, the edit is discarded;
- *  - the absence-preserving `delete` in `buildUpdates` went, so an inheriting component saved
- *    an authored pick of zero;
- *  - the cap never reached the picker.
- *
- * The gathering host is asserted alongside the salvage one, in one suite, because the two are
- * the two ends of ONE shared component and the defect that started this was precisely that
- * they disagreed.
- */
+/** The SALVAGE and GATHERING check-modifier AUTHORING path, end to end (issue 1095). */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -77,9 +55,7 @@ function salvageProps(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     salvageModifierPolicy: 'bySubject',
     salvageModifierMaxPicks: null,
-    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
-    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
-    // on the suppressed path; the inherit cases override it with their own mark.
+    // The activity MARKS the whole catalogue.
     salvageModifierDefaultIds: MARKED_IDS,
     ...rest,
   };
@@ -108,13 +84,7 @@ function setChecked(input, checked) {
   input.dispatchEvent(new input.ownerDocument.defaultView.Event('change', { bubbles: true }));
 }
 
-/**
- * Let the editor's `$effect`s run.
- *
- * `onDirtyChange` and `onDraftChange` are emitted from effects, not from the change handler,
- * so a test that read them synchronously after a click would see the state BEFORE the edit
- * and pass for the wrong reason on a component that emitted nothing at all.
- */
+/** Let the editor's `$effect`s run. */
 function flushEffects() {
   return new Promise((done) => setTimeout(done, 0));
 }
@@ -172,14 +142,7 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     salvageHarness.remount();
   });
 
-  // THE HOST→PICKER HOP FOR `inheritedIds`, which nothing pinned. The root→host hop is pinned by
-  // the source contract at the foot of this file; this is the OTHER half, and replacing
-  // `inheritedIds={salvageModifierDefaultIds}` with `[]` left the whole suite green.
-  //
-  // The symptom is not a blank. The picker falls into its EMPTY-SET branch and tells the GM that
-  // "the salvage check's default set is empty, so no check modifier applies to this component" —
-  // while the roll is in fact applying it. A confident false statement, on the one screen whose
-  // job is to say what this component actually rolls.
+  // THE HOST→PICKER HOP FOR `inheritedIds`.
   it('names the SALVAGE default set in the inherit note it hands the picker', async () => {
     const { target } = await mountSalvage({ salvageModifierDefaultIds: ['med'] });
     const note = target.querySelector(`${PICKER} [data-subject-modifier-inherited]`);
@@ -201,11 +164,6 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
   // reading proved nothing about the new one — and the bound is the half a GM cannot see
   // going wrong, because a picker offering too much looks exactly like a picker offering
   // the right amount until you know what the check marked.
-  //
-  // Asserted through the REAL host rather than against the picker directly, because the
-  // narrowing is only as good as the id list the host hands down: `ComponentEditView`
-  // reading the CRAFTING check's mark for its salvage picker would be invisible on both
-  // screens (the two agree in the lab world) and is exactly what this suite exists for.
   it('bounds the salvage pick by the SALVAGE mark, keeping an un-marked pick on the record (issue 1608)', async () => {
     const { target } = await mountSalvage({
       salvageModifierDefaultIds: ['med'],
@@ -304,8 +262,7 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     });
     target.querySelector(`${PICKER} [data-modifier-pill-menu-button]`).click();
     await Promise.resolve();
-    // The option is in the PORTALED panel, which is no longer a descendant of the picker
-    // (issue 1466); the mount hosts exactly one picker, so this stays unambiguous.
+    // The option is in the PORTALED panel.
     const option = target.querySelector('[data-modifier-pill-option="alch"]');
     assert.ok(Boolean(option), 'the add menu offers the catalogue entry');
     option.click();
@@ -357,9 +314,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
-    // rule controls render, and the three availability add menus' shared primitive (issue 1458).
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
@@ -386,9 +341,7 @@ async function mountGathering(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     gatheringModifierPolicy: 'bySubject',
     gatheringModifierMaxPicks: null,
-    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
-    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
-    // on the suppressed path; the inherit cases override it with their own mark.
+    // The activity MARKS the whole catalogue.
     gatheringModifierDefaultIds: MARKED_IDS,
     onUpdateTask: (patch) => updates.push(patch),
     ...overrides,
@@ -432,10 +385,7 @@ describe('gathering check-modifier pick — the GatheringTaskEditView host', () 
     gatheringHarness.remount();
   });
 
-  // The same hop on the OTHER host, and asserted separately rather than inferred from the salvage
-  // one: they are two different wirings in two different files, and one component with two
-  // disagreeing hosts is the defect this whole suite exists for. Replacing
-  // `inheritedIds={gatheringModifierDefaultIds}` with `[]` was likewise green.
+  // The same hop on the OTHER host.
   it('names the GATHERING default set in the inherit note it hands the picker', async () => {
     const { target } = await mountGathering({ gatheringModifierDefaultIds: ['med'] });
     const note = target.querySelector(`${GATHERING_PICKER} [data-subject-modifier-inherited]`);
@@ -461,25 +411,13 @@ describe('gathering check-modifier pick — the GatheringTaskEditView host', () 
 });
 
 // ── the manager root's wiring, pinned at the source ──────────────────────────
-//
-// The root is not mountable in isolation here, and these four wirings are invisible from
-// either host: each one resolves to a legal default (`[]`, `'addAll'`, `null`) that renders a
-// picker which simply never offers anything, or offers the WRONG activity's rule. Reading the
-// crafting check's rule for the salvage picker is the highest-value one — the two happen to
-// agree in the lab fixture, so a frame would not show it either.
 describe('CraftingSystemManagerRoot threads each host its OWN activity’s selection', () => {
   const source = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
     'utf8'
   );
 
-  // STILL THE WHOLE LIBRARY, deliberately, and this test says so rather than leaving the
-  // next reader to "fix" it. Issue 1608 narrows what a subject may PICK to the ids its
-  // activity marks — but the narrowing is `SubjectModifierPicker`'s, computed from the
-  // `inheritedIds` the row below wires, not the root's. Pre-filtering here instead would
-  // hand the component a list it could not tell apart from the catalogue, and the
-  // suppressed-picks note — which exists precisely to count the difference — would have
-  // nothing to count and would silently never render.
+  // STILL THE WHOLE LIBRARY, deliberately.
   it('hands both hosts the WORLD library, unnarrowed', () => {
     const wirings = [...source.matchAll(/checkModifierOptions=\{([^}]+)\}/g)].map((m) => m[1]);
     assert.equal(wirings.length, 2, 'one wiring per host — salvage and gathering');

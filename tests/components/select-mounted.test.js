@@ -1,44 +1,4 @@
-/**
- * THE APP'S ONE SELECT, WIRED (issue 1504).
- *
- * `src/ui/svelte/components/Select.svelte` is a THIN COMPOSITION over `SearchablePopover` with the
- * query field suppressed, so almost nothing here is about arithmetic: the cursor's numbers are
- * proved against the pure module in `tests/util/listbox-navigation.test.js` and the primitive's own
- * focus model in `tests/components/searchable-popover-keyboard-mounted.test.js`. What only a mount
- * of THIS component can show is the JOIN — every place where the select's own vocabulary
- * (`option.value`, three size rungs, a tick column, a derived group heading) has to line up with
- * the primitive's (`option.id`, `option.dataId`, `optionGroups`) — and every clause below is a way
- * for that join to be wrong while both halves are individually correct.
- *
- * Four of those joins are silent failures rather than loud ones, which is why each gets a clause
- * of its own and a named mutation that reds it:
- *
- *   - `aria-selected` is a STRICT equality inside the primitive. Forward a NUMERIC `value` and
- *     `'25' === 25` is false, so no row is marked at all — invisible at the one converting site
- *     that also passes `showTick={false}`;
- *   - `data-popover-option` is written as `option.dataId || undefined`, so a `dataId` of `''`
- *     omits the attribute. The bulk panels' leading "Leave unchanged" row is exactly that value,
- *     and it is the row a capture walk most needs to click;
- *   - `option.group` alone renders NO heading: the primitive buckets on `optionGroups`, and
- *     returns a flat list when that prop is empty. So the derivation is the feature;
- *   - the panel's width band is declared TWICE — as props, because the layout computes an inline
- *     width inside it, and in CSS, because the sheet's own `min-width: 240px` floors that result.
- *     Two copies of three numbers is a mirror, so a clause reads both out of the component.
- *
- * ── WHY THE SENTINEL IS PINNED AGAINST THE SOURCE ───────────────────────────────────────────
- * `__unchanged__` is a hand-maintained mirror across three places that no single gate spans: the
- * component, this suite, and any View Lab step or Foundry-smoke step that clicks the default row.
- * If the component's spelling drifted, nothing in `npm test` would red — the only symptom would be
- * a click timeout in a capture run, hours later and in a different job. So the literal is read out
- * of `Select.svelte`'s own source and compared against the value these cases use.
- *
- * ── WHY THE PAINT IS NOT ASSERTED HERE ──────────────────────────────────────────────────────
- * `tests/helpers/scoped-component-css.js` records that happy-dom cannot compute a cascade and that
- * no mounted harness loads `styles/fabricate.css`. Every geometry, fill, radius and focus claim is
- * therefore made in a real browser, in `tests/components/manager-layout.test.js`. What this file
- * asserts about appearance is only which HOOK is emitted — the size class, the tick element, the
- * `aria-*` state — never what it computes to.
- */
+/** THE APP'S ONE SELECT, WIRED (issue 1504). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -55,24 +15,14 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 const selectPath = resolve(repoRoot, 'src/ui/svelte/components/Select.svelte');
 const selectSource = readFileSync(selectPath, 'utf8');
-// The `.fabricate-select*` family lives in the GLOBAL SHEET (issue 1504), not in a scoped block
-// on the component, so the CSS half of the width-band mirror below is read from here.
+// The `.fabricate-select*` family lives in the GLOBAL SHEET (issue 1504).
 const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
-/**
- * THE SENTINEL THIS SUITE AND EVERY DRIVER STEP USE, stated independently of the component.
- *
- * Written as a literal rather than imported so the source clause below is a real comparison: an
- * import would make the two sides the same object and the mirror would be unfalsifiable.
- */
+/** THE SENTINEL THIS SUITE AND EVERY DRIVER STEP USE, stated independently of the component. */
 const UNCHANGED_OPTION_ID = '__unchanged__';
 
 /**
  * The bulk-edit shape: an empty-string sentinel leading a grouped list with hints and a gated row.
- *
- * It is one fixture rather than five because every join this suite is about is present in it at
- * once — the sentinel, a NUMERIC-free string value, two groups in first-appearance order, an
- * ungrouped tail, a hint, a badge and a gated row with its reason.
  */
 const TIERS = [
   { value: '', label: 'Leave unchanged', group: 'Instructions' },
@@ -95,13 +45,7 @@ const PAGE_SIZES = [
   { value: 50, label: '50' },
 ];
 
-/**
- * A list GATED AT BOTH ENDS, which is what makes an opening key's landing a real measurement.
- *
- * `nextActiveIndex` scans INWARD from the end a key names, so with the outermost rows enabled
- * every one of the four opening keys would land where a naive `0` / `count - 1` also lands and
- * the skip would be unfalsifiable.
- */
+/** A list GATED AT BOTH ENDS, which is what makes an opening key's landing a real measurement. */
 const GATED_ENDS = [
   { value: 'archived', label: 'Archived', disabled: true, disabledReason: 'Archived' },
   { value: 'simple', label: 'Simple' },
@@ -122,9 +66,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-select-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
   compiledModules: [
-    // The primitive's own compiled roster rather than a copy of it: issue 1371 gave
-    // `SearchablePopover` a `triggerButton` form that renders `ManagerButton`, and a `.svelte`
-    // the tree renders but a manifest omits does not fail this suite — it CANCELS it.
+    // The primitive's own compiled roster rather than a copy of it.
     ...SEARCHABLE_POPOVER_COMPILED_MODULES,
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/Select.svelte',
@@ -160,14 +102,7 @@ async function settle() {
   flushSync();
 }
 
-/**
- * Press a key ON THE ELEMENT THAT CURRENTLY HOLDS FOCUS.
- *
- * Addressing `document.activeElement` rather than a captured node is what makes the "focus never
- * moves onto a row" clause falsifiable: a model with roving focus would have this suite's own
- * keystrokes follow the focus, and a run that kept dispatching at the trigger could report an
- * unchanged `activeElement` while the browser had in fact moved on.
- */
+/** Press a key ON THE ELEMENT THAT CURRENTLY HOLDS FOCUS. */
 function pressKey(key, modifiers = {}) {
   const event = new globalThis.KeyboardEvent('keydown', {
     key,
@@ -180,14 +115,7 @@ function pressKey(key, modifiers = {}) {
   return event;
 }
 
-/**
- * Press a key AT A STATED CLOCK, so the type-ahead's inactivity window is observable both ways.
- *
- * `util/listboxNavigation.js` reads `Date.now()` when its caller states no clock, and the picker
- * deliberately states none so it has no timer to leak. A real wait could prove the reset but never
- * prove that a keystroke INSIDE the window extends rather than restarts the prefix: between two
- * synchronous dispatches, a slow machine looks exactly like the defect.
- */
+/** Press a key AT A STATED CLOCK, so the type-ahead's inactivity window is observable both ways. */
 function pressKeyAt(key, at) {
   const realNow = Date.now;
   Date.now = () => at;
@@ -239,11 +167,7 @@ describe('1504 Select — the select every screen renders', () => {
         !open.querySelector('input'),
         'a select is a select-only combobox: there is no query field to render'
       );
-      // A NODE-VERSUS-NODE `assert.equal` IS A HEAP HAZARD HERE, not a style choice: on failure
-      // `node:assert` serialises the actual value to build its diff and walks a mounted
-      // happy-dom element's circular tree until the heap dies, so a one-line focus defect
-      // surfaces as an OOM and a cancelled suite with no message. The boolean says the same thing
-      // and fails with a sentence.
+      // A NODE-VERSUS-NODE `assert.equal` IS A HEAP HAZARD HERE, not a style choice.
       assert.ok(
         document.activeElement === button,
         'the TRIGGER is the holder, and the panel opening does not take focus off it'
@@ -397,12 +321,7 @@ describe('1504 Select — the select every screen renders', () => {
     it('a label renders <Field as="div"> and points the trigger at its own caption', async () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies to every recipe here.' });
 
-      // THE HOST IS A `<div>` SINCE ISSUE 1510, and the host is the assertion rather than an
-      // incidental detail: on a `<label>` host this form shipped the double-toggle defect at all
-      // twelve of its call sites, because a `<label>` forwards a caption click into a control
-      // whose panel is dismissed on `mousedown` while open. `tests/components/
-      // manager-select-conversion-rendered.test.js` measures that in a real browser; this clause
-      // is what stops the host silently reverting.
+      // THE HOST IS A `<div>` SINCE ISSUE 1510.
       const field = harness.target.querySelector('div.manager-field');
       assert.ok(Boolean(field), 'the labelled form is the shared Field column, on a <div> host');
       assert.ok(
@@ -449,9 +368,7 @@ describe('1504 Select — the select every screen renders', () => {
       );
       harness.remount();
 
-      // THE ERROR TAKES THE SAME POINTER, because the two spans are one slot: the form renders
-      // the error INSTEAD of the hint, so a control in an error state must describe itself by the
-      // line it is actually drawing.
+      // THE ERROR TAKES THE SAME POINTER, because the two spans are one slot.
       await mountSelect({
         label: 'Resolution',
         hint: 'Applies to every recipe here.',
@@ -465,9 +382,7 @@ describe('1504 Select — the select every screen renders', () => {
       );
       harness.remount();
 
-      // A CALLER'S OWN ELEMENT WINS. A caller whose hint is conditional draws it itself — the
-      // world currency spend strategy is the shipped case — and then the primitive has no id to
-      // offer and the caller does.
+      // A CALLER'S OWN ELEMENT WINS. A caller whose hint is conditional draws it itself.
       const external = document.createElement('span');
       external.id = 'select-described-by-probe';
       external.textContent = 'Drawn by the caller.';
@@ -502,14 +417,6 @@ describe('1504 Select — the select every screen renders', () => {
 
     /**
      * THE PANEL IS A SECOND NAMED SURFACE, and the source-reading gate structurally cannot see it.
-     *
-     * `searchable-popover-source-contract.test.js` reads the call site's SOURCE TEXT for a
-     * non-empty `dialogAriaLabel`, so `dialogAriaLabel={label || ariaLabel}` satisfies it while
-     * resolving to `''` at runtime for every caller that names its control by a caption instead
-     * of a string — which is nine pagers and the scoped catalogue's sort key. That is the hole a
-     * composing primitive opens one indirection down, and only a RUN can close it: the assertion
-     * has to be on the rendered attribute, under both shapes a caller may name the control with.
-     *
      * The pointer's target is put on `<body>` rather than on the mount target, because `mount()`
      * builds a fresh target for every call and the second shape must find the same caption.
      */
@@ -536,12 +443,6 @@ describe('1504 Select — the select every screen renders', () => {
         harness.remount();
 
         // THE POINTER SHAPE ARRIVES TWICE, and only the second shape can red the SUPPRESSION.
-        // A caller that names its control by a caption alone leaves `dialogAriaLabel` empty, so
-        // dropping the mutual exclusion (`dialogAriaLabel || undefined`) still resolves to
-        // `undefined` and the panel looks correct. A control carrying BOTH — a `label`, which is
-        // also the panel's string name, and an `ariaLabelledBy` that must win over it — is the
-        // only shape where the suppression is the thing under measurement rather than a
-        // coincidence of an empty string.
         const pointedShapes = [
           ['named ONLY by the caption', { ariaLabel: '', ariaLabelledBy: caption.id }],
           ['ALSO carrying a string name', { label: 'Resolution', ariaLabelledBy: caption.id }],
@@ -634,9 +535,7 @@ describe('1504 Select — the select every screen renders', () => {
     });
 
     it('spells the sentinel in Select.svelte`s own source, so the mirror cannot drift', () => {
-      // A HAND-MAINTAINED MIRROR WITH NO OTHER GATE. The literal lives in the component, in this
-      // suite and in any capture or smoke step that clicks the default row; a drift would red
-      // nothing in `npm test` and would surface only as a click timeout in a capture run.
+      // A HAND-MAINTAINED MIRROR WITH NO OTHER GATE. The literal lives in the component.
       const declaration = selectSource.match(/const UNCHANGED_OPTION_ID = '([^']+)';/);
       assert.ok(Boolean(declaration), 'Select.svelte declares the sentinel as a named constant');
       assert.equal(
@@ -886,9 +785,7 @@ describe('1504 Select — the select every screen renders', () => {
     });
 
     it('refuses every opening key on a readonly trigger', async () => {
-      // `readonly` maps to the primitive's `triggerAriaDisabled`, which is a control that TAKES
-      // focus and refuses to open — so it is the one refusal a keyboard can actually reach, and
-      // an opening key must not be the route around it.
+      // `readonly` maps to the primitive's `triggerAriaDisabled`.
       const button = await closedTrigger({ readonly: true });
 
       const pressed = pressKey('ArrowDown');
@@ -938,9 +835,7 @@ describe('1504 Select — the select every screen renders', () => {
     });
 
     it('commits nothing when the GM dismisses the panel they typed open', async () => {
-      // THE ACTIVE OPTION IS NOT THE VALUE. Escape, an outside click and focus leaving the trigger
-      // all close through the primitive's own `close()`, which calls no `onChoose` — so every
-      // dismissal path leaves the value exactly as it was.
+      // THE ACTIVE OPTION IS NOT THE VALUE. Escape.
       await mountSelect({ options: MODES });
       trigger().focus();
 
@@ -1079,11 +974,6 @@ describe('1504 Select — the select every screen renders', () => {
       // pairs have to be CSS as well. Two copies of three pairs is what this clause pins together
       // — and since issue 1504 lifted the family into `styles/fabricate.css`, the two copies now
       // sit in two FILES, which is the drift this clause exists to catch.
-      //
-      // WHAT IT DOES NOT AND CANNOT SAY is what either copy RENDERS as. This suite is happy-dom,
-      // which computes no cascade, so the sheet's figure being equal to the prop's is the whole of
-      // this clause's reach — and for one review round that equality was read as evidence the
-      // sheet was fine while it was clipping every full-width caller to 340px.
       // `tests/components/select-popover-width.test.js` measures the rendered box in Chromium and
       // is the assertion that half of the claim belongs to.
       const table = selectSource.match(/const SIZES = Object\.freeze\(\{[\s\S]*?\n {2}\}\);/)?.[0];
@@ -1151,11 +1041,7 @@ describe('1504 Select — the select every screen renders', () => {
     });
 
     it('forwards triggerTitle onto the trigger, and drops a title placed in triggerData', async () => {
-      // THE PROP EXISTS BECAUSE `triggerData` CANNOT CARRY A TITLE, and that claim is what this
-      // pins. `SearchablePopover` spreads `triggerData` FIRST and then writes `title` from its
-      // own prop, so a caller's `triggerData.title` is deleted rather than merged — silently, and
-      // in the direction where the tooltip simply never appears. Both halves are asserted: the
-      // forwarded title WINS, and the map's is gone even when it is the only one passed.
+      // THE PROP EXISTS BECAUSE `triggerData` CANNOT CARRY A TITLE.
       await mountSelect({
         triggerTitle: 'System actions',
         triggerData: { title: 'ignored' },

@@ -1,26 +1,4 @@
-/**
- * Mounted coverage for the world Tags & Categories screen (issue 1392, epic 1357, PR 7a).
- *
- * ── WHY THE DELETE AFFORDANCE IS ASSERTED ON THE DOM AND NOT ON A PREDICATE ──────────────
- * `VocabularyPanel` renders the one-click delete affordance THREE times — the gate in
- * `requestRemove`, the usage chip (whose else-branch is the muted `Unused` chip) and the delete
- * control's destructive tone — and before this change all three read `row.totalUsage`. The world
- * screen needs a strictly narrower predicate, and the failure mode of rerouting only the GATE is
- * a row that reads `Unused` under a red button and then opens a confirm strip naming four
- * crafting systems: the screen states one thing and does another. No source assertion can see
- * that, because each of the three is correct in isolation. So this file mounts the real page and
- * reads the rendered row.
- *
- * The three rows below are the three states, and the third is the one the whole conjunction
- * exists for: ZERO references, and a deletion that still rewrites four inheriting systems.
- *
- * ── AND WHY THE PROJECTION ARM IS NOT HERE ───────────────────────────────────────────────
- * This file hand-supplies `silentlyDeletable` on its fixture rows, which is exactly what a page
- * receives from the projection — so deleting the COMPUTATION in `projectWorldVocabulary` cannot
- * red anything here, and the panel's default would then silently restore the one-click delete on
- * the one row it must never be offered for. That half is asserted against real stores in
- * `tests/world-vocabulary-store.test.js`.
- */
+/** Mounted coverage for the world Tags & Categories screen (issue 1392, epic 1357, PR 7a). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -31,18 +9,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * Localize out of the SHIPPED `lang/en.json` rather than out of a fixture label map.
- *
- * The page resolves its per-kind copy from a table — one `text()` call site serves all three
- * panels — so it cannot carry a per-kind literal fallback without becoming a second copy of the
- * lang file. That is deliberate, and it is why this suite drives the real strings: the confirm
- * sentences below are the ones a GM reads, and asserting that each renders its numbers is a
- * stronger claim than asserting a hand-written fallback does.
- *
- * The flattening walks the whole tree once and refuses an empty result, because a localizer that
- * resolved nothing would make every copy assertion below pass on the raw key.
- */
+/** Localize out of the SHIPPED `lang/en.json` rather than out of a fixture label map. */
 function installShippedLocalizer() {
   const labels = {};
   const walk = (node, prefix) => {
@@ -78,9 +45,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
-    // IconPicker positions its panel through the shared action (issue 1500), which resolves the
-    // manager's clipping boundary from `overlayBounds.js`; both are static imports of the picker,
-    // so the closure validator names them the moment the two trees meet.
+    // IconPicker positions its panel through the shared action (issue 1500).
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/utils/managerBrowserViewState.js',
@@ -116,10 +81,7 @@ function row(id, name, totalUsage, confirmTokens, silentlyDeletable) {
   return { id, name, totalUsage, confirmTokens, silentlyDeletable };
 }
 
-/**
- * The three affordance states, in ONE panel, plus a populated row in each of the other two so
- * the per-panel assertions below are not stated over an empty vocabulary.
- */
+/** The three affordance states, in ONE panel. */
 function vocabulary() {
   return {
     available: true,
@@ -169,7 +131,6 @@ describe('the world Tags & Categories screen', () => {
       'the released full-width main keeps the accessible name the placeholder supplied'
     );
     // ONE CHILD, because `.manager-main` is `grid-template-rows: minmax(0, 1fr)` on this route:
-    // a second top-level child would take an implicit `auto` row and collapse the explicit one.
     assert.equal(main.children.length, 1, '<main> renders exactly one element child');
     for (const kind of ['componentCategories', 'componentTags', 'recipeCategories']) {
       assert.ok(Boolean(root.querySelector(panelSelector(kind))), `${kind} panel renders`);
@@ -203,8 +164,7 @@ describe('the world Tags & Categories screen', () => {
     root.querySelector('[data-vocabulary-cancel-remove]').click();
     flushSync();
 
-    // ROW 2 — the POSITIVE CONTROL. A "confirm everything" fix, or one that never marks a row
-    // unused, would red here rather than passing quietly.
+    // ROW 2 — the POSITIVE CONTROL. A "confirm everything" fix.
     const unused = categoryCard(root, 'spare');
     assert.ok(
       Boolean(unused.querySelector('.manager-vocabulary-chip-unused')),
@@ -298,9 +258,7 @@ describe('the world Tags & Categories screen', () => {
   it('gives each panel its own row hook, input id and sort label id', async () => {
     const root = await harness.mount(mountProps());
     const rowAttributes = ['data-recipe-category-id', 'data-component-category-id', 'data-component-tag-id'];
-    // THREE PANELS ARE MOUNTED AT ONCE, so what the primitive calls a preference is a
-    // correctness requirement here: one shared hook would match rows in two panels and make
-    // every assertion above, and every capture `expectContained` target, ambiguous.
+    // THREE PANELS ARE MOUNTED AT ONCE.
     for (const attribute of rowAttributes) {
       assert.equal(
         root.querySelectorAll(`[${attribute}]`).length > 0,
@@ -356,9 +314,7 @@ describe('the world Tags & Categories screen', () => {
     const root = await harness.mount(
       mountProps({ actions: { addEntry: async () => true, removeEntry: async () => false } })
     );
-    // THE REGION IS IN THE DOCUMENT AT MOUNT, AND EMPTY. A live region inserted at the same
-    // moment as its content is not reliably announced: the assistive technology has nothing to
-    // observe the change against. So the element is rendered from the start and filled later.
+    // THE REGION IS IN THE DOCUMENT AT MOUNT.
     const before = root.querySelector('[data-wvocab-status]');
     assert.ok(Boolean(before), 'the live region exists before there is anything to announce');
     assert.equal(before.textContent.trim(), '', 'and it is empty until then');
@@ -378,9 +334,7 @@ describe('the world Tags & Categories screen', () => {
   });
 
   it('states the reference count ALONE when a deletion rewrites nothing', async () => {
-    // The common case for both component vocabularies is that nothing cascades, and a single
-    // sentence then reads "clears it from 0 world components, which 0 crafting systems inherit"
-    // — three numbers where the honest answer is one.
+    // The common case for both component vocabularies is that nothing cascades.
     const root = await harness.mount(mountProps());
     categoryCard(root, 'reagent').querySelector('.manager-icon-button').click();
     flushSync();
@@ -419,8 +373,7 @@ describe('the world Tags & Categories screen', () => {
       flushSync();
     };
 
-    // A DUPLICATE, in the OTHER case. De-duplication is on the derived id, so the hint has to
-    // catch `HERB` against the shipped `herb` before the write path refuses it silently.
+    // A DUPLICATE, in the OTHER case. De-duplication is on the derived id.
     type('HERB');
     const blockedHint = panel.querySelector('.manager-vocabulary-hint');
     assert.ok(Boolean(blockedHint), 'the add form states a hint');

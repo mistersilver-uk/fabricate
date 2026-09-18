@@ -1,9 +1,4 @@
-/**
- * UNIT AND PROPERTY COVERAGE for the pure world-scope transforms (issue 1363, Phase 10).
- *
- * The grouping rules, the oldest-wins identity rule, the id-claim ladder, the per-system map and
- * its two refusal invariants, and the membership records the migration writes.
- */
+/** UNIT AND PROPERTY COVERAGE for the pure world-scope transforms (issue 1363, Phase 10). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -53,9 +48,7 @@ function component(id, refs = [], extra = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Totality
-// ---------------------------------------------------------------------------
 
 test('grouping is TOTAL and NON-THROWING on an adversarial corpus', () => {
   for (const input of [undefined, null, 'nope', 42, [], malformedCorpus().systems]) {
@@ -85,9 +78,7 @@ test('the whole migration is TOTAL on a malformed corpus', () => {
   assert.ok(result._worldScopeEntityReport);
 });
 
-// ---------------------------------------------------------------------------
 // Grouping (`#### D2`)
-// ---------------------------------------------------------------------------
 
 test('components group by TRANSITIVE CLOSURE over source-reference sets', () => {
   const grouping = buildWorldScopeGrouping([
@@ -164,9 +155,7 @@ test('source references are read new-name-first and legacy-name-tolerant', () =>
   assert.deepEqual(sourceReferencesOf(null), []);
 });
 
-// ---------------------------------------------------------------------------
 // Identity and the ladder (`#### D3`)
-// ---------------------------------------------------------------------------
 
 test('the OLDEST contributing definition wins every identity field AS A UNIT', () => {
   const grouping = buildWorldScopeGrouping([
@@ -187,13 +176,8 @@ test('the OLDEST contributing definition wins every identity field AS A UNIT', (
 });
 
 test('the three SOURCE-LINK fields are UNIONED across the group, never taken from the donor', async () => {
-  // THE A-B-C CHAIN. Union-find guarantees only that the group is CONNECTED: C shares a uuid
-  // with B and nothing at all with A. Taking A's links as a unit would DELETE C's unique uuid
-  // permanently, and an owned Item sourced from it would then stop resolving at the
-  // source-reference tier - the tier this change's whole degradation story rests on.
-  // `Item.c` IS CLAIMED BY EXACTLY ONE MEMBER, and that is the point of the fixture: with every
-  // reference held by two or more members, a hypothetical "union only what >= 2 members share"
-  // implementation would pass this arm while still deleting the uuids only one member claims.
+  // THE A-B-C CHAIN. Union-find guarantees only that the group is CONNECTED: C shares a uuid with B
+  // and nothing at all with A.
   const grouping = buildWorldScopeGrouping([
     system('sys-a', { components: [component('c-a', ['Item.a'])] }),
     system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
@@ -250,19 +234,7 @@ test('the three SOURCE-LINK fields are UNIONED across the group, never taken fro
 });
 
 test('the union RESHAPING a member source link is not reported as an identity change', () => {
-  // THE OTHER HALF OF THE UNION RULE, and the one nothing pinned. Ruling 3 keeps the DONOR's two
-  // primaries and demotes every other member's into `aliasItemUuids`, so after the union almost
-  // every member's own source-link projection DIFFERS from the world entity's in SHAPE while
-  // losing no reference at all. `unionAbsorbed` is what stops that difference being reported, and
-  // without it the GM is told about renames that did not happen — including, absurdly, the DONOR
-  // being told its own identity changed inside its own group.
-  //
-  // MEASURED, so the mutation budget is honest: forcing `unionAbsorbed` to `true` is BYTE-
-  // IDENTICAL over the whole acceptance corpus, because `groupIdentity` collects EVERY member's
-  // references into `primaries ∪ aliases` and the predicate is therefore a tautology under the
-  // union. It is a defensive guard against a regression to donor-wins narrowing, not a reachable
-  // branch, and no test can redden that direction. Forcing it to `false` DOES redden, and that is
-  // the direction this arm owns: over-reporting.
+  // THE OTHER HALF OF THE UNION RULE, and the one nothing pinned.
   const grouping = buildWorldScopeGrouping([
     system('sys-a', { components: [component('c-a', ['Item.a'])] }),
     system('sys-b', { components: [component('c-b', ['Item.a', 'Item.b'])] }),
@@ -365,9 +337,7 @@ test('identityOf is absence-preserving and copies arrays rather than aliasing th
   assert.deepEqual(record.aliasItemUuids, ['Item.b'], 'the world entity never aliases the record');
 });
 
-// ---------------------------------------------------------------------------
 // The map and its two refusal invariants
-// ---------------------------------------------------------------------------
 
 test('the map image is DISJOINT from its key set on every accepted pair', () => {
   for (const scenario of scenarioSpecs()) {
@@ -388,15 +358,7 @@ test('the map image is DISJOINT from its key set on every accepted pair', () => 
 });
 
 test('the OUTPUT-uniqueness post-condition refuses a pair disjointness alone would allow', () => {
-  // TWO definitions in ONE system pointing at the SAME source item. They are one world entity,
-  // so `q` is re-keyed onto `p` — and the map `{q: p}` is PERFECTLY DISJOINT, because its image
-  // `p` is not one of its keys. Yet the pair would emit two definitions with the id `p`, which
-  // is silently last-wins in both index builders and makes one of them unreachable with no
-  // error. Only a post-condition on the OUTPUT can see it.
-  //
-  // THE FIXTURE MATTERS AND AN EARLIER ONE WAS VACUOUS: a cross-system collision that also
-  // re-keys the colliding id is caught by the disjointness check FIRST, so it proves nothing
-  // about this post-condition and survives its removal.
+  // TWO definitions in ONE system pointing at the SAME source item.
   const grouping = buildWorldScopeGrouping([
     system('sys-a', { components: [component('p', ['Item.x']), component('q', ['Item.x'])] }),
   ]);
@@ -443,9 +405,7 @@ test('normalizeRekeyMap drops anything that cannot be a map', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The membership records (`#### D1`, `#### D6`)
-// ---------------------------------------------------------------------------
 
 test('every membership record is created with EVERY SECTION OVERRIDDEN and its values verbatim', () => {
   const componentRecord = buildMembershipRecord(
@@ -534,11 +494,9 @@ test('every membership record is created with EVERY SECTION OVERRIDDEN and its v
 });
 
 test('macro and effectSource are written UNCONDITIONALLY, so neither can fall back', async () => {
-  // THE RAW CORPUS IS WHERE THIS BITES, and it is why the differential cannot carry this arm:
-  // it normalizes its corpora, and `_normalizeEssenceDefinition` always MINTS
-  // `propertyMacroUuid`, so an absence-preserving write is inert there. The migration reads the
-  // RAW `craftingSystems` setting, and `propertyMacroUuid` is new at issue 1036 - so any world
-  // not re-saved since carries essences with no such key at all.
+  // THE RAW CORPUS IS WHERE THIS BITES, and it is why the differential cannot carry this arm: it
+  // normalizes its corpora, and `_normalizeEssenceDefinition` always MINTS `propertyMacroUuid`, so
+  // an absence-preserving write is inert there (issue 1036).
   const { resolveScopedDefinition } = await import('../src/systems/scopedDefinitions.js');
   const { ESSENCE_SCOPE } = await import('../src/systems/essenceScope.js');
 
@@ -612,9 +570,6 @@ test('the world defaults change NOTHING at migration time, RESOLVED VALUE by res
   // THE SWITCH IS NOT THE VALUE, and asserting the switch was this arm's structural blindness:
   // `inherit: false` over an ABSENT section is exactly the state that FALLS BACK to the world
   // value, so `inherit[section] === false` is satisfied by the very records that inherit.
-  // The whole safety argument for electing a donor: a world default is only ever consulted for a
-  // system added LATER, or an override a GM clears later. The corpus differential is what proves
-  // it end to end; this pins the mechanism directly.
   const before = normalizeCorpus(CraftingSystemManager, scenarioSpecs()[0].raw);
   const result = migrateWorldScopeEntities({
     recipes: before.recipes,
@@ -710,12 +665,7 @@ test('CONSTRAINT 1: a donor whose category is the reserved `general` elects NO w
 });
 
 test('CONSTRAINT 0: a section ANY member left unauthored elects NO world default', async () => {
-  // THE BLOCKING DEFECT THIS CLOSES. `resolveScopedDefinition` resolves an `inherit: false` switch
-  // over an ABSENT section to the WORLD value - a stated requirement, not an accident - and
-  // `buildMembershipRecord` is necessarily absence-preserving for `category`, `breakage` and
-  // `onBreak`, because none of the three can express an empty override. So a world default for a
-  // section some member never authored silently hands that member the DONOR's value, which is
-  // exactly the "resolved behaviour is unchanged" condition the election was granted on.
+  // THE BLOCKING DEFECT THIS CLOSES.
   const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
   const elect = (memberRecords) =>
     electWorldDefault({
@@ -750,9 +700,8 @@ test('CONSTRAINT 0: a section ANY member left unauthored elects NO world default
 });
 
 test('CONSTRAINT 0 does NOT apply to the three sections that cannot fall back', async () => {
-  // `effectSource` and `macro` are written UNCONDITIONALLY by the membership builder, and both
-  // CAN express emptiness, so nothing falls back to them. `repairRequirements` is not a resolver
-  // section at all. Applying constraint 0 to them would lose the ruling's value for no safety.
+  // `effectSource` and `macro` are written UNCONDITIONALLY by the membership builder, and both CAN
+  // express emptiness, so nothing falls back to them.
   const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
   const elected = electWorldDefault({
     entityType: 'essences',

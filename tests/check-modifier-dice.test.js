@@ -1,13 +1,4 @@
-/**
- * Check modifiers ACCEPT DICE (issue 1118), on every combination rule.
- *
- * The suite is built around one rule: an assertion about what reaches Foundry is asserted
- * against a shape RECORDED from the shipped 14.365 dice stack
- * (`tests/helpers/recordedModifierRollShapes.js`), never against a shape invented here. The
- * emitted-formula tests below therefore assert an exact string AND that the string is a
- * recorded one, because a formula that is merely well-formed to look at is exactly what
- * `max(, 2)` was.
- */
+/** Check modifiers ACCEPT DICE (issue 1118), on every combination rule. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -42,24 +33,19 @@ const CATALOGUE = [
   { id: 'keyed', label: 'Keyed', expression: '1d4 + @prof' },
   { id: 'inverted', label: 'Inverted', expression: '1d8', min: 5, max: -1 },
   { id: 'unsafe', label: 'Unsafe', expression: '1d8', max: 1e21 },
-  // Two DIFFERENT kinds of unusable expression, and the distinction is the point.
-  // `1d4]` is refused by the reducer, which never reaches the engine. `1d4[fire` REDUCES
-  // fine — an unterminated flavour label contributes no value — and is refused by the
-  // 14.365 grammar, so only `Roll.validate` can catch it.
+  // Two DIFFERENT kinds of unusable expression, and the distinction is the point. `1d4]` is refused
+  // by the reducer, which never reaches the engine.
   { id: 'unreadable', label: 'Unreadable', expression: '1d4]' },
   { id: 'ungrammatical', label: 'Ungrammatical', expression: '1d4[fire' },
-  // PARSE-CLEAN, EVALUATE-FATAL. Each of these is authorable free text that `Roll.validate`
-  // accepts and the engine then refuses to roll, so only the maximized-roll predicate can
-  // catch them. `MAX` is a capitalized function name; `1000d6` exceeds Foundry's 999-result
-  // cap; `.5` is not a dice-grammar `Constant`.
+  // PARSE-CLEAN, EVALUATE-FATAL. Each of these is authorable free text that `Roll.validate` accepts
+  // and the engine then refuses to roll, so only the maximized-roll predicate can catch them.
   { id: 'shouty', label: 'Shouty', expression: 'MAX(1d4,2)' },
   { id: 'shouty-bounded', label: 'Shouty bounded', expression: 'MAX(1d4,2)', min: -1, max: 6 },
   { id: 'oversized', label: 'Oversized', expression: '1000d6' },
   { id: 'leading-dot', label: 'Leading dot', expression: '1d4 + .5' },
-  // NON-FINITE rather than fatal. Its MEAN is finite (2^566.5), so the reducer values it and
-  // hands it on; maximized it is 2^1030 = `Infinity`, nothing throws, and `Roll#total`'s
-  // `Number(this._total) || 0` hands that back as a number. Only the finite test refuses it —
-  // and the bounded sibling below IS accepted, because the clamp genuinely contains it.
+  // NON-FINITE rather than fatal. Its MEAN is finite (2^566.5), so the reducer values it and hands
+  // it on; maximized it is 2^1030 = `Infinity`, nothing throws, and `Roll#total`'s
+  // `Number(this._total) || 0` hands that back as a number.
   { id: 'explosive', label: 'Explosive', expression: 'pow(2, 1d10 * 103)' },
   {
     id: 'explosive-bounded',
@@ -89,8 +75,7 @@ function rolled(policy, ids, { maxModifierPicks, subject = {} } = {}) {
 // ── the emitted formula, against the recorded real-Foundry corpus ─────────────
 
 // THE MIRROR GUARD. Every recorded row carries the `(policy, ids)` that produces it, and this
-// drives the real resolver with it. Asserting shape properties of the fixture instead — which
-// is what this test did first — passes forever on a row nothing emits.
+// drives the real resolver with it.
 test('every recorded formula is one this resolver actually emits', () => {
   for (const row of RECORDED_CHECK_FORMULAS) {
     assert.equal(
@@ -164,11 +149,7 @@ test('a bound that cannot be a bound still blocks its entry, dice or not', () =>
     appendResolvedCheckModifier('1d20', ACTOR, context, recordedModifierRoll(calls)),
     '1d20 + 3[Modifiers] + (1d4)[Modifiers]'
   );
-  // THE CALL LIST, not just the formula. A faulted bound must be refused BEFORE a fragment is
-  // built from it — otherwise `min(max((1d8), 5), -1)` reaches the engine, and a guard that
-  // treats "the engine could not answer" as "unrollable" would swallow the mistake and emit
-  // the identical formula. Mutation found exactly that: dropping the bounds gate changed no
-  // assertion until this one existed.
+  // THE CALL LIST, not just the formula.
   assert.deepEqual(calls, ['(1d4)'], 'only the well-formed rolling entry is ever assembled');
   assert.equal(rolled('addAll', ['inverted']), '1d20', 'alone, it appends nothing at all');
 });
@@ -213,10 +194,8 @@ test('bySubject appends what the subject picked, dice included', () => {
 // ── what the resolver refuses ────────────────────────────────────────────────
 
 test('a fragment real Foundry refuses is dropped, and takes NOTHING else with it', () => {
-  // `1d4[fire` is authorable free text that REDUCES cleanly, so nothing before the engine
-  // can refuse it. Appending it would throw inside `new Roll(...)`, which is a ROLLED and
-  // therefore consuming failure — where before issue 1118 the same entry merely contributed
-  // 0. `Roll.validate` is the only thing standing between those two outcomes.
+  // `1d4[fire` is authorable free text that REDUCES cleanly, so nothing before the engine can
+  // refuse it (issue 1118).
   assert.deepEqual(
     RECORDED_FRAGMENT_VALIDITY.find(([fragment]) => fragment === '(1d4[fire)'),
     ['(1d4[fire)', false, 'throws'],
@@ -337,9 +316,7 @@ test('the interactive descriptor carries the fragment and a chip the roll can ke
     ],
     'a rolling option shows what it will ROLL; its average is a number the roll cannot produce'
   );
-  // The chip is written for a PLAYER and the fragment for the dice engine. Reading the chip
-  // back out of the fragment put `+min((1d4), 3)` on screen — parentheses that exist to make
-  // the append parse, and a function wrapper that is how a bound is spelled to Foundry.
+  // The chip is written for a PLAYER and the fragment for the dice engine.
   assert.ok(
     !choice.modifiers.some((modifier) => modifier.display.includes('min(')),
     'no chip renders the engine spelling of a bound'
@@ -351,11 +328,9 @@ test('the interactive descriptor carries the fragment and a chip the roll can ke
   );
 });
 
-// ── the engine guard is an EVALUATE oracle, not a parse one (issue 1118 review) ──
-//
-// `Roll.validate` is `evaluateSync({strict: false})`, and `_evaluateASTSync` skips every
-// non-deterministic node — so on a fragment that rolls it exercises no evaluate-time error
-// class at all. Eight recorded fragments validate `true` and cannot be rolled.
+// the engine guard is an EVALUATE oracle, not a parse one (issue 1118 review). `Roll.validate` is
+// `evaluateSync({strict: false})`, and `_evaluateASTSync` skips every non-deterministic node — so
+// on a fragment that rolls it exercises no evaluate-time error class at all.
 
 test('the recorded oracle carries fragments Roll.validate accepts and the engine refuses', () => {
   assert.ok(
@@ -369,9 +344,7 @@ test('the recorded oracle carries fragments Roll.validate accepts and the engine
 });
 
 test('a fragment that PARSES but cannot be rolled is dropped, and takes nothing with it', () => {
-  // Every one of these validated `true` on the real stack and threw at evaluate. Appending
-  // any of them makes `new Roll(...)` throw inside `evaluateCheckRoll`, which the runners
-  // catch as a FAILED check — ingredients spent and tools broken, on every attempt.
+  // Every one of these validated `true` on the real stack and threw at evaluate.
   for (const id of ['shouty', 'oversized', 'leading-dot']) {
     assert.equal(
       rolled('addAll', [id, 'flat', 'die']),
@@ -389,8 +362,7 @@ test('the clamp wrapper does not launder an unrollable expression', () => {
 
 test('a fragment that evaluates to a NON-FINITE total is refused, not appended', () => {
   // Nothing throws for this one: the guard's finite test is the only thing standing between an
-  // `Infinity` and the roll. The REDUCER cannot catch it either — the expression's mean is a
-  // perfectly finite 2^566.5, which is exactly why the guard evaluates MAXIMIZED.
+  // `Infinity` and the roll.
   assert.equal(rolled('addAll', ['explosive', 'flat']), '1d20 + 3[Modifiers]');
   // …and the BOUNDED sibling is accepted, because `min(max(…, -1), 6)` really does contain it.
   // A guard that refused anything mentioning `pow` would fail this half.
@@ -402,9 +374,8 @@ test('a fragment that evaluates to a NON-FINITE total is refused, not appended',
 
 test('the empty-head trap is closed by the finite test, not by the throw', () => {
   // `max(, 2)` PARSES, EVALUATES and totals `Math.max()` = -Infinity, which `Roll#total`'s
-  // `Number(this._total) || 0` passes through as a number. Nothing throws; only the finite
-  // test refuses it. Asserted through the double's own recorded behaviour, because no
-  // authored expression the resolver accepts reaches this shape any more.
+  // `Number(this._total) || 0` passes through as a number. Nothing throws; only the finite test
+  // refuses it.
   const Roll = recordedModifierRoll();
   const roll = new Roll('max(, 2)');
   roll.evaluateSync({ maximize: true });
@@ -413,13 +384,8 @@ test('the empty-head trap is closed by the finite test, not by the throw', () =>
 });
 
 test('an engine that cannot evaluate fails the guard OPEN', () => {
-  // The shape that actually occurs: a minimal `Roll` stub carrying `replaceFormulaData` and
-  // nothing else — every headless harness in this repo. Nothing evaluates the formula there,
-  // so refusing would silently delete every rolling modifier from every headless resolution.
-  // Inverting the posture to fail-closed must redden something, which is what this asserts.
-  //
-  // A `Roll` that is absent ENTIRELY is a different state and not this one: substitution
-  // itself needs `replaceFormulaData`, so the entry never reaches the guard at all.
+  // The shape that actually occurs: a minimal `Roll` stub carrying `replaceFormulaData` and nothing
+  // else — every headless harness in this repo.
   class SubstituteOnlyRoll {
     static replaceFormulaData(formula) {
       return String(formula);

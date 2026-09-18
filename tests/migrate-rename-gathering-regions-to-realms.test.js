@@ -51,9 +51,7 @@ function legacyData() {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Pure function: round-trip rename
-// ---------------------------------------------------------------------------
 
 test('renames the system region-library keys to realm', () => {
   const { systems } = migrateRenameGatheringRegionsToRealms(legacyData());
@@ -84,9 +82,7 @@ test('renames party current-region override maps and inner regionIds to realm', 
   assert.equal(override.mode, 'manual');
 });
 
-// ---------------------------------------------------------------------------
 // Keep-list: Foundry-bridge fields and modifier vocabulary stay
-// ---------------------------------------------------------------------------
 
 test('preserves the Foundry scene-bridge fields and modifier vocab', () => {
   const { systems } = migrateRenameGatheringRegionsToRealms(legacyData());
@@ -102,9 +98,7 @@ test('leaves the inert legacy environment.region free-text string', () => {
   assert.equal(environments[0].region, 'forest', 'inert legacy region string preserved');
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency and anomalous payloads
-// ---------------------------------------------------------------------------
 
 test('is idempotent: a second run makes no further change', () => {
   const once = migrateRenameGatheringRegionsToRealms(legacyData());
@@ -137,9 +131,7 @@ test('does not mutate its inputs (deep-clones)', () => {
   assert.deepEqual(input, snapshot, 'input bundle left unchanged');
 });
 
-// ---------------------------------------------------------------------------
 // Through the runner (proves the new gatheringParties runner wiring)
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
@@ -171,10 +163,8 @@ test('runs through MigrationRunner from 1.0.0, rewrites the data, and lands at t
 
   assert.equal(settings.store.get('migrationVersion'), '1.34.0', 'advances to the new highest version');
 
-  // 1.27.0 runs after this rename and LIFTS the realms to world scope (issue 1282), so the
-  // renamed realms land in `travelConfig` rather than back on the system. That the rename
-  // happened at all is what the world library proves — a `gatheringRegions` payload that was
-  // never renamed would arrive here empty.
+  // 1.27.0 runs after this rename and LIFTS the realms to world scope (issue 1282), so the renamed
+  // realms land in `travelConfig` rather than back on the system.
   const savedSystems = settings.store.get('craftingSystems');
   assert.equal(savedSystems[0].gatheringRealms, undefined, 'realms no longer live on the system');
   assert.equal(savedSystems[0].gatheringRegions, undefined);

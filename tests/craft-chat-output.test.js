@@ -1,18 +1,6 @@
 /**
- * Unit tests for T-056: Automatic Crafting Chat Output
- *
- * Tests the _postCraftChatMessage() method added to CraftingEngine and the
- * end-to-end craft() integration.
- *
- * Test cases:
- *  1. Success message payload content
- *  2. Failure message payload content
- *  3. Toggle disabled -> no ChatMessage.create call
- *  4. Toggle enabled (default) -> ChatMessage.create called
- *  5. No system found -> graceful, no error
- *  6. Localization keys used
- *  7. Exactly-once emission in full craft() flow
- *  8. No message for validation-only failures (no actor, missing items)
+ * Unit tests for T-056: Automatic Crafting Chat Output. Tests the _postCraftChatMessage() method
+ * added to CraftingEngine and the end-to-end craft() integration.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,10 +9,9 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
 
 /**
- * The published card renders ACKNOWLEDGED awards only: production hands
- * `_postCraftChatMessage` the array `_createResultItems` returned, carrying its
- * immutable per-invocation receipts, so a bare array of item-likes would stand in for
- * a caller that cannot exist.
+ * The published card renders ACKNOWLEDGED awards only: production hands `_postCraftChatMessage` the
+ * array `_createResultItems` returned, carrying its immutable per-invocation receipts, so a bare
+ * array of item-likes would stand in for a caller that cannot exist.
  */
 function awardedResults(entries) {
   return attachAwardReceipts(
@@ -39,9 +26,7 @@ function awardedResults(entries) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Minimal globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -53,9 +38,7 @@ function getProperty(object, path) {
 globalThis.foundry = { utils: { getProperty, setProperty: () => {} } };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 let chatCreated = [];
 function resetChat() {
@@ -210,9 +193,7 @@ function buildActors(item) {
   return { sourceActor, craftingActor };
 }
 
-// ---------------------------------------------------------------------------
 // Test 1: Success message payload content
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: success message includes actor name, recipe name, consumed and results', async () => {
   setupGame(true);
@@ -252,9 +233,8 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   assert.ok(content.includes('src="icons/sword.png"'), 'created result image src');
 });
 
-// Mutation control on the publication boundary: strip the receipts the writer
-// attached and the card refuses to publish rather than presenting planned awards as
-// actual ones. An empty award list is not an award, so it stays publishable.
+// Mutation control on the publication boundary: strip the receipts the writer attached and the card
+// refuses to publish rather than presenting planned awards as actual ones.
 test('_postCraftChatMessage: refuses to publish awards that carry no acknowledged receipts', async () => {
   setupGame(true);
   resetChat();
@@ -279,9 +259,8 @@ test('_postCraftChatMessage: refuses to publish awards that carry no acknowledge
 });
 
 test('_postCraftChatMessage: tools render authored component names (not the matched item) and never duplicate', async () => {
-  // A single owned item can satisfy two tool slots (source/name collision), which
-  // previously printed the item's name twice. The card must instead show each
-  // tool's authored component name.
+  // A single owned item can satisfy two tool slots (source/name collision), which previously
+  // printed the item's name twice. The card must instead show each tool's authored component name.
   const system = {
     id: 'sys-1',
     features: { chatOutput: true },
@@ -328,9 +307,7 @@ test('_postCraftChatMessage: tools render authored component names (not the matc
   assert.ok(content.includes('src="icons/smith.png"'), 'tool icon comes from the component');
 });
 
-// ---------------------------------------------------------------------------
 // Test 2: Failure message payload content
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: failure message includes actor, recipe, reason, and consumed resources', async () => {
   setupGame(true);
@@ -361,9 +338,7 @@ test('_postCraftChatMessage: failure message includes actor, recipe, reason, and
   assert.ok(content.includes('Magic Crucible'), 'Consumed tool in failure message');
 });
 
-// ---------------------------------------------------------------------------
 // Test 3: Toggle disabled -> no ChatMessage.create call
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: does not call ChatMessage.create when chatOutput is false', async () => {
   setupGame(false); // toggle OFF
@@ -382,9 +357,7 @@ test('_postCraftChatMessage: does not call ChatMessage.create when chatOutput is
   assert.equal(chatCreated.length, 0, 'ChatMessage.create must NOT be called when toggle is off');
 });
 
-// ---------------------------------------------------------------------------
 // Test 4: Toggle enabled (default) -> ChatMessage.create called
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: calls ChatMessage.create when chatOutput is true', async () => {
   setupGame(true); // toggle ON
@@ -403,9 +376,7 @@ test('_postCraftChatMessage: calls ChatMessage.create when chatOutput is true', 
   assert.equal(chatCreated.length, 1, 'ChatMessage.create must be called when toggle is on');
 });
 
-// ---------------------------------------------------------------------------
 // Test 5: No system found -> graceful, no error
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: does not throw when system is not found', async () => {
   setupGame(true);
@@ -430,9 +401,7 @@ test('_postCraftChatMessage: does not throw when system is not found', async () 
   assert.equal(chatCreated.length, 0, 'No message when system not found');
 });
 
-// ---------------------------------------------------------------------------
 // Test 6: Localization keys used
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: uses FABRICATE.Chat.* localization keys', async () => {
   const { i18nKeys } = setupGame(true);
@@ -458,9 +427,7 @@ test('_postCraftChatMessage: uses FABRICATE.Chat.* localization keys', async () 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Test 7: Exactly-once emission in full craft() flow
-// ---------------------------------------------------------------------------
 
 test('craft(): posts ChatMessage exactly once on success', async () => {
   setupGame(true);
@@ -542,9 +509,7 @@ test('craft(): posts ChatMessage exactly once on check failure', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Test 8: No message for validation-only failures (no actor, missing items)
-// ---------------------------------------------------------------------------
 
 test('craft(): does not post chat when craftingActor is missing', async () => {
   setupGame(true);
@@ -612,9 +577,7 @@ test('craft(): does not post chat when ingredient check fails (canCraft false)',
   assert.equal(chatCreated.length, 0, 'No chat message when craft fails due to missing items');
 });
 
-// ---------------------------------------------------------------------------
 // Additional: failure path respects toggle (chatOutput disabled)
-// ---------------------------------------------------------------------------
 
 test('_postCraftChatMessage: failure does not post when chatOutput toggle is off', async () => {
   setupGame(false); // toggle OFF

@@ -1,11 +1,4 @@
-/**
- * Unit coverage for linked-visual resolution + creation/relink/missing-policy.
- *
- * Covers resolving a linked Tile/Drawing/Token by uuid and via the scene-embedded
- * fallback, building/creating linked markers, relinking (with reverse-flag write +
- * old-marker clear), recreation, and the missing-linked-visual policy decisions.
- * The resolve edge (`globalThis.fromUuidSync`) is faked.
- */
+/** Unit coverage for linked-visual resolution + creation/relink/missing-policy. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -369,11 +362,8 @@ test('relinkVisual writes the reverse flag onto the new tile and clears it off t
 });
 
 test('relinkVisual clears the OLD marker even when applyBehaviorUpdate mutates behavior.system in place (live Foundry)', async () => {
-  // Live Foundry's behaviour update mutates `behavior.system.linkedVisual` IN
-  // PLACE — so by the time the forward await resolves, `behavior.system` already
-  // carries the NEW uuid. If `relinkVisual` read the prior link AFTER the await it
-  // would see the new uuid and never clear the OLD document's reverse flag. This
-  // simulates that mutation and asserts the OLD marker's reverse flag IS cleared.
+  // Live Foundry's behaviour update mutates `behavior.system.linkedVisual` IN PLACE — so by the
+  // time the forward await resolves, `behavior.system` already carries the NEW uuid.
   const visualUpdates = [];
   const behavior = {
     id: 'beh-1',

@@ -1,14 +1,7 @@
 /**
- * Tests for the `currency` ingredient match type (Part 3 of the recipe
- * requirement-sections work): a requirement alternative may carry a currency
- * cost (`match: { type:'currency', unit, amount }`) alongside component/tags.
- *
- * Covers:
- *   - `_normalizeMatch` round-trips a currency match (string unit, clamped amount)
- *   - `validate({requireComplete})` accepts a complete currency option
- *   - `validate({requireComplete})` rejects an incomplete currency option
- *     (empty unit / amount <= 0)
- *   - `validate({requireComplete:false})` is lenient for an incomplete currency
+ * Tests for the `currency` ingredient match type (Part 3 of the recipe requirement-sections work):
+ * a requirement alternative may carry a currency cost (`match: { type:'currency', unit, amount }`)
+ * alongside component/tags.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

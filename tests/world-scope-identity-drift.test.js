@@ -1,14 +1,6 @@
 /**
- * `reportWorldIdentityDrift`, PARTS (b) AND (c) (issue 1363, criterion 8).
- *
- * Part (a) — the ZERO case over the whole differential Inputs set — lives beside the differential
- * it is derived from, in `tests/world-scope-migration-differential.test.js`.
- *
- * DRIFTING THE CORPUS IS NOT A CODE MUTATION. An earlier form of this criterion was
- * "mutation-proven against a hand-drifted corpus", which varies the INPUT rather than the code and
- * is satisfied by a detector that reports every field always. So (b) is per-lifted-field positive
- * coverage and (c) mutates the DETECTOR in both directions: an always-equal detector must redden
- * (b), and an always-unequal detector must redden (a).
+ * `reportWorldIdentityDrift`, PARTS (b) AND (c) (issue 1363, criterion 8). DRIFTING THE CORPUS IS
+ * NOT A CODE MUTATION.
  */
 
 import assert from 'node:assert/strict';
@@ -59,8 +51,7 @@ test('the ZERO case: an equal world reports NOTHING, and it really examined some
   assert.deepEqual(reportWorldIdentityDrift(systems, scopeCorpus), []);
 
   // ANTI-VACUITY. `reportWorldIdentityDrift` returns `[]` immediately when a scope carries no
-  // entities, so an empty answer is also what a detector that read NOTHING returns. Perturbing
-  // one field at a time proves every `(entityType, field)` pair was actually compared.
+  // entities, so an empty answer is also what a detector that read NOTHING returns.
   let compared = 0;
   for (const [entityType, fields] of Object.entries(WORLD_IDENTITY_FIELDS)) {
     for (const field of fields) {
@@ -136,11 +127,7 @@ test('the detector is TOTAL: a malformed corpus answers an empty list', () => {
 });
 
 test('(c) the detector is neither ALWAYS-EQUAL nor ALWAYS-UNEQUAL, on ONE corpus', () => {
-  // BOTH DIRECTIONS, ON THE REAL DETECTOR. An earlier form of this arm asserted
-  // `(() => [])().length === 0` and `alwaysUnequal(...).length === 1` against local arrows,
-  // which are tautologies that cannot fail - in the one criterion whose whole point is refusing
-  // exactly that. What makes the property real is that the SAME detector answers differently
-  // for two inputs that differ by a single field, so neither stub could produce both answers.
+  // BOTH DIRECTIONS, ON THE REAL DETECTOR.
   const clean = equalWorld();
   assert.deepEqual(
     reportWorldIdentityDrift(clean.systems, clean.scopeCorpus),

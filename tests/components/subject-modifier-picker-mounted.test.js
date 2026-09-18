@@ -1,19 +1,4 @@
-/**
- * The SHARED subject check-modifier picker, MOUNTED (issue 1095).
- *
- * `SubjectModifierPicker` is the one authoring surface for `Component.salvage.checkModifierIds`
- * and `GatheringTask.checkModifierIds`, and it shipped with NO behavioural coverage at all:
- * replacing its whole render gate with `{#if false}` — the component draws nothing on either
- * host — left the entire suite green, as did collapsing the three-state contract its own
- * docblock calls the thing "a copy would fail silently" on.
- *
- * THE THREE STATES ARE THE SUBJECT. An ABSENT pick inherits the activity's default set; an
- * AUTHORED EMPTY array is a real pick of zero and adds nothing to the roll; an authored
- * non-empty array is the pick. Those are three DIFFERENT rolls, and the toggle is the only
- * place a GM can move between the first two — so `onChange(checked ? [] : null)` degrading to
- * `onChange([])` (toggling off no longer restores inheritance) or to `onChange(null)` (turning
- * it on authors nothing) are both silent losses of a persisted distinction.
- */
+/** The SHARED subject check-modifier picker, MOUNTED (issue 1095). */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -38,8 +23,7 @@ const harness = createMountedComponentHarness({
     'src/utils/rollFormulaRollability.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
-    // `ModifierPillSelect`'s add menu dismisses on an outside click, and since it became
-    // a `SearchablePopover` (issue 1458) it also portals its panel and lays it out.
+    // `ModifierPillSelect`'s add menu dismisses on an outside click.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
@@ -80,10 +64,7 @@ function mount(props = {}) {
     .mount({
       options: CATALOGUE,
       selectedIds: null,
-      // The activity MARKS the whole catalogue by default, because the mark now bounds
-      // what the picker offers (issue 1608): an unmarked catalogue offers nothing, so a
-      // fixture that left this empty would be testing the suppressed path everywhere.
-      // The inheritance cases below override it with their own mark.
+      // The activity MARKS the whole catalogue by default.
       inheritedIds: CATALOGUE.map((entry) => entry.id),
       maxPicks: null,
       subject: 'component',
@@ -132,13 +113,7 @@ describe('SubjectModifierPicker (mounted)', () => {
       !text.includes('ghost'),
       'an id naming nothing in the catalogue is dropped, exactly as the resolver drops it'
     );
-    // JOINED BY `formatList`, never by hand. The separator, the conjunction and the Oxford
-    // comma are all LANGUAGE rules, and `items.join(', ')` gets them wrong in English before
-    // it gets them wrong anywhere else: the recipe surface renders "Medicine and Herbalism"
-    // for this same set, so a hand-joined list here made one rule read two ways across three
-    // subjects. The oracle is `Intl.ListFormat` because that is what `formatList` degrades to
-    // with no Foundry i18n present, and in every English locale it differs from the naive
-    // comma join — which is what makes this assertion fail on the mutation.
+    // JOINED BY `formatList`, never by hand. The separator.
     const joined = new Intl.ListFormat(undefined, {
       style: 'long',
       type: 'conjunction',
@@ -200,9 +175,7 @@ describe('SubjectModifierPicker (mounted)', () => {
     assert.deepEqual(emitted.at(-1), [], 'removing the only pick leaves an authored empty array');
   });
 
-  // THE CAP IS ASKED OF THE RESOLVER, not read verbatim. A stored `0`, `-2` or `"three"` all
-  // mean UNLIMITED in the engine, and a picker that trusted them would refuse picks the roll
-  // would have honoured — and would print a cap sentence naming a bound that does not exist.
+  // THE CAP IS ASKED OF THE RESOLVER, not read verbatim. A stored `0`.
   it('reads the cap through the resolver, so an unlimited FORM shows no cap at all', async () => {
     for (const maxPicks of [null, undefined, 0, -2, 'three']) {
       harness.remount();
@@ -245,7 +218,7 @@ describe('SubjectModifierPicker (mounted)', () => {
     );
   });
 
-  // ONE OF THE TWO, NEVER BOTH — the same rule the catalogue card's eligibility pill follows, and
+  // ONE OF THE TWO, NEVER BOTH — the same rule the catalogue card's eligibility pill follows.
   // the same defect on the sibling surface: the checkbox carries the whole accessible name, so the
   // visible copy of those exact words beside it is a SECOND reading of one control and a reader
   // hears "Pick check modifiers for this component" twice.
@@ -269,14 +242,6 @@ describe('SubjectModifierPicker (mounted)', () => {
   });
 
   // THE CAP SENTENCE CARRIES A NUMBER, and the FALLBACK has to substitute it.
-  //
-  // The cap copy is the one string on this surface with an interpolation placeholder, so it is
-  // the one whose fallback cannot simply be the authored English: returning `copy.cap` verbatim
-  // renders a literal `{count}` and the suite was green on that. The build that reads the
-  // fallback is a real one — an unlocalized world, where `localize` finds no `game.i18n` and
-  // hands the key straight back — so `game` is unset here to put the component on exactly that
-  // path. (The harness's `i18n.format` stub returns a `key:{…}` marker rather than interpolating,
-  // so leaving it installed would assert against harness noise instead of the component.)
   it('interpolates the cap COUNT rather than printing a raw placeholder', async () => {
     const game = globalThis.game;
     globalThis.game = undefined;
@@ -307,14 +272,6 @@ describe('SubjectModifierPicker (mounted)', () => {
   });
 
   // ── the activity's MARK bounds what this record may pick (issue 1608) ───────
-  //
-  // `inheritedIds` is not merely the set the inherit note names: it is what the activity
-  // MARKS selectable, and the picker offers only that. Before this, all three `bySubject`
-  // hosts were handed the whole world library, so a component or a task could pick a
-  // modifier its own check refused.
-  //
-  // `MARKED_TWO` leaves `herb` catalogued-but-unmarked, which is the shape every case
-  // below turns on.
   const MARKED_TWO = ['med', 'alch'];
 
   /** The ids the add menu offers — where the narrowed OFFER shows. The panel is portaled. */
@@ -335,8 +292,7 @@ describe('SubjectModifierPicker (mounted)', () => {
     );
     harness.remount();
 
-    // THE NEGATIVE CONTROL: marking herb must put it back, or the assertion above would
-    // pass equally against a picker that offered nothing at all.
+    // THE NEGATIVE CONTROL: marking herb must put it back.
     const { target: wide } = await mount({
       selectedIds: [],
       inheritedIds: ['med', 'alch', 'herb'],
@@ -388,8 +344,7 @@ describe('SubjectModifierPicker (mounted)', () => {
       '1',
       'the COUNT rides the attribute, not only the localized sentence'
     );
-    // The note DESCRIBES the pill group, alongside the cap: a reader told only the cap
-    // would never hear that some of this record's own picks are missing from the row.
+    // The note DESCRIBES the pill group, alongside the cap.
     assert.match(
       one.querySelector('[data-modifier-pill-select]').getAttribute('aria-describedby'),
       new RegExp(note.id),
@@ -398,11 +353,7 @@ describe('SubjectModifierPicker (mounted)', () => {
   });
 
   it('says the picks are HIDDEN rather than absent when the activity marks NONE of them (issue 1608)', async () => {
-    // THE ZERO POINT of the suppression cohort: the activity marks nothing, so EVERY
-    // authored pick is suppressed and the pill row draws no chip. The row then falls back
-    // to its empty-set copy — the visible placeholder AND the `aria-live` summary — which
-    // was written for the OTHER zero, an authored pick of nothing, and says "nothing is
-    // added" directly above a note that says the picks are kept.
+    // THE ZERO POINT of the suppression cohort: the activity marks nothing.
     const { target } = await mount({ selectedIds: ['med', 'alch'], inheritedIds: [] });
     const placeholder = target.querySelector('.manager-availability-any').textContent.trim();
     const status = target.querySelector('[data-modifier-pill-status]').textContent.trim();
@@ -480,8 +431,7 @@ describe('SubjectModifierPicker (mounted)', () => {
     );
   });
 
-  // The picker is shared by two hosts editing two different records, and "this record" is the
-  // internal name for the abstraction they share — a noun neither screen shows.
+  // The picker is shared by two hosts editing two different records.
   it('names the SUBJECT, differently per host', async () => {
     const { target: component } = await mount({ subject: 'component' });
     const componentHeading = component.querySelector('.manager-recipe-micro-label').textContent;

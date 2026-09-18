@@ -1,13 +1,5 @@
 /*
  * THE FLATTENED LIST ROUTES' ROW STATES, ARBITRATED IN A REAL BROWSER (issue 1373).
- *
- * Three routes flatten their list rows to `background: transparent` so that a 1px border is what
- * makes a row a row — the reference's own construction on all of them. Each then has to restate
- * the two feedback states the flattening took away, and each got that partly wrong in the same
- * way. This file is named for the world Tools catalogue because that is where the defect was
- * found; it measures `world-tools`, `world-essences` and `essences`, because the second and third
- * carried it verbatim and a fix proved on one route by symmetry is not proved at all.
- *
  * ── THE GAP THIS CLOSES IS AN ASSERTION GAP, NOT A COVERAGE GAP ─────────────────────────────
  * `world-tool-catalogue-bulk` already photographs four ticked rows. What it cannot do is say
  * which of them is right: the capture driver clicks its last row and leaves the pointer on it, so
@@ -15,27 +7,6 @@
  * mouse — wearing the hover fill instead, and nothing anywhere says the fourth is wrong. A
  * reviewer reading the frame sees a list with a highlighted row in it, which is what a working
  * list also looks like.
- *
- * The arbitration is a pure specificity question and the sheet reads as though both states are
- * declared. A route's `:hover` is (0,4,0) and the shared `.is-bulk-selected` is (0,3,0), so hover
- * wins and a row a GM has just ticked loses its marking for as long as the pointer stays on it.
- * And the route's own `background: transparent` is (0,3,0) — a TIE with that shared rule, decided
- * by source order in its favour — so a ticked row painted nothing even at rest, on every route
- * that restated `.is-selected` and forgot its twin.
- *
- * ── WHY A BROWSER, AND WHY NOT A MOUNTED TEST ───────────────────────────────────────────────
- * happy-dom computes no cascade at all, so a mounted suite can state that the row carries
- * `is-bulk-selected` and never which declaration wins. And no frame can photograph a hover: the
- * View Lab has five step verbs and none of them is one, so the state the capture accidentally
- * produces is a state the registry has no way to assert about. `tool-rules-list-parity.test.js`
- * is the same argument for the system rules list one route away.
- *
- * ── THE LAYERING IS THE PRODUCT'S, AND THE FIRST TEST BELOW PROVES IT ───────────────────────
- * `module.json` registers `styles/fabricate.css` with no explicit `layer`, and Foundry imports an
- * unlayered module stylesheet at `layer(modules)`; a Svelte `css: 'injected'` block lands
- * UNLAYERED and beats it at any specificity. `tests/view-lab/cascade.css` is the reference that
- * states it. Loading the two flat would let a global rule this fixture measures as winning be
- * inert in the product, which is the failure mode a sibling lane already shipped once.
  */
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
@@ -51,16 +22,7 @@ const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const FRAME = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
 const ESSENCE_ROW = 'src/ui/svelte/apps/manager/essences/EssenceRow.svelte';
 
-/*
- * THE THREE ROUTES, AS DATA RATHER THAN AS THREE COPIES OF THE SAME FILE.
- *
- * `component` is the `.svelte` whose own block is injected UNLAYERED over the sheet when that
- * route's row renders, so the fixture arbitrates the same pair production does. Neither declares
- * a row background today and every assertion below is therefore decided by the global sheet —
- * they are loaded, and the scope hash stamped onto the fixture's rows, so that the day one grows
- * one this file reports the winner rather than the sheet's opinion of a rule that has stopped
- * applying.
- */
+/* THE THREE ROUTES, AS DATA RATHER THAN AS THREE COPIES OF THE SAME FILE. */
 const ROUTES = [
   { view: 'world-tools', rowClass: 'manager-scoped-list-row', component: FRAME, subject: 'Tool' },
   {
@@ -81,11 +43,6 @@ const ROUTES = [
   // had no such block at all until this lane appended one. It is added HERE rather than in a
   // copy of this file: a second copy is a SonarCloud duplication failure, and consolidating two
   // copies later makes the per-diff density worse rather than better.
-  //
-  // `components` is NOT a member. The system Component Rules list does not flatten
-  // `.manager-component-row`, so it declares none of these four selectors — and a route added
-  // here without a block passes every assertion below on the strength of the SHARED rules alone,
-  // which is exactly what the non-vacuity clause guards against.
   {
     view: 'world-components',
     rowClass: 'manager-scoped-list-row',
@@ -119,23 +76,7 @@ function container(view, rows) {
   );
 }
 
-/*
- * FOUR ROWS PER ROUTE, WHICH IS THE SMALLEST SET THAT SETTLES THE QUESTION, AND A FIFTH THAT IS
- * THE ORACLE RATHER THAN A CASE.
- *
- * The pointer can only be on one row, so each state needs a twin the pointer is NOT on — a single
- * hovered row would report a colour with nothing to compare it against, and the obvious wrong
- * repair (deleting the hover rule) would pass. `plain` is what proves hover still paints anything
- * at all.
- *
- * The fifth row sits OUTSIDE the route. `.fabricate-manager .manager-scoped-list-row.is-bulk-
- * selected` and its `.manager-essence-row` twin are the SHARED statement of what a ticked row
- * looks like, and every browser that does not flatten its rows renders under them untouched. So
- * the question a flattening route raises is not "what colour should this be" — which would want a
- * literal, and a literal is a second copy of a token — it is "does this route still say what the
- * shared rule says". Comparing the two containers asks exactly that, and it keeps answering it
- * through a theme change, a token rename or a ladder move.
- */
+/* FOUR ROWS PER ROUTE, WHICH IS THE SMALLEST SET THAT SETTLES THE QUESTION. */
 function markup(route) {
   return (
     container(route.view, [
@@ -199,25 +140,7 @@ test('the fixture layers the sheet the way Foundry does, or it proves nothing', 
   }
 });
 
-/*
- * THE NON-VACUITY CLAUSE FOR THE PARAMETERISATION ITSELF (issue 1371), and it is NOT the route
- * count.
- *
- * Every one of the four browser assertions below is satisfied, on a route that declares NOTHING,
- * by the SHARED rules alone: `.is-bulk-selected` already stands later than `:hover` at equal
- * specificity in the base ladder, so a route with no block of its own arbitrates correctly and
- * this file reports four passes about a screen it has never measured. That is the exact shape a
- * fourth ROUTES entry added without its stylesheet block would have.
- *
- * So each route must DECLARE something. Measured on this sheet, `world-tools`, `world-essences`
- * and `essences` each carry FOUR such selectors — the block shape is flatten, the
- * `:not(.is-selected):not(.is-bulk-selected):hover` guard, `.is-selected` and `.is-bulk-selected`
- * — and before this lane `world-components` carried ZERO.
- *
- * `tools` is deliberately NOT a member of ROUTES and this is where that shows: its rows are
- * `.manager-tools-row`, and it declares only two of the four, so a clause asserting a four-rule
- * shape across every shipped route would red on a clean tree.
- */
+/* THE NON-VACUITY CLAUSE FOR THE PARAMETERISATION ITSELF (issue 1371). */
 test('every parameterised route DECLARES its own row rules, or it measures nothing', () => {
   const declarations = [...sheet.matchAll(/([^{}]+)\{[^{}]*\}/g)].map((match) => match[1]);
   assert.ok(declarations.length > 2000, 'the selector scan found nothing; it is broken');
@@ -249,10 +172,6 @@ for (const route of ROUTES) {
       // row's resting fill at (0,3,0), which is the SAME weight as the shared `.is-bulk-selected`
       // rule and stands LATER in the file. So a ticked row on this screen paints nothing, and the
       // tick in its checkbox is the only thing distinguishing it from an untouched row.
-      //
-      // `.is-selected` WAS RESTATED FOR THE ROUTE and `.is-bulk-selected` was not, on all three,
-      // which is why this reads as an oversight rather than a decision: the fix is the missing
-      // twin of a rule that is already there, five lines away.
       assert.equal(
         routed,
         baseline,

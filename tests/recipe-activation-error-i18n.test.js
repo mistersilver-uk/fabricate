@@ -1,11 +1,6 @@
 /**
- * Issue 550: enable-recipe validation errors must be user-facing — localized and
- * free of leaked internal set IDs.
- *
- * These tests RED-fail on the pre-fix behavior (the signature-overlap message
- * embeds a raw Foundry ingredient-set id and carries no stable `code`) and pass
- * once the conflict carries a stable `code` + human-readable params and the UI
- * layer maps activation errors to localized, id-free copy.
+ * Issue 550: enable-recipe validation errors must be user-facing — localized and free of leaked
+ * internal set IDs.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -144,9 +139,7 @@ test('localizeActivationIssue degrades safely for an unrecognized code — retur
 });
 
 test('an UNNAMED shared component is dropped from the collision label — no id leaks on the component path', () => {
-  // A colliding pair whose shared satisfying component has NO managed name. The
-  // component-name label must OMIT it rather than fall back to its id, exercising
-  // `_overlapComponentNames`' name filter.
+  // A colliding pair whose shared satisfying component has NO managed name.
   const components = [{ id: 'nZ8kLq2pWv4tYr6b', name: '', tags: [] }];
   const group = () => ({
     id: `grp-${Math.random().toString(36).slice(2)}`,
@@ -240,10 +233,7 @@ test('localizeRecipeActivationError returns null for a plain (non-activation) er
 });
 
 // The recipe library draws the refusal in a `<Notice>`, whose specimen wants a title naming what
-// happened over a detail saying why (issue 1515). The parts are built from their own material —
-// the name from the error, the reasons from the issues — so the title is asserted to hold NO
-// reason text and the detail to hold no name clause. Cutting the one-line message at its colon
-// would satisfy a "two non-empty strings" check and fail both of these.
+// happened over a detail saying why (issue 1515).
 test('localizeRecipeActivationParts splits the refusal into a title and its reasons', () => {
   const { system, recipes, components } = collidingSystem();
   const { conflicts } = buildValidator(system, recipes, components).validateSystem('sys-alch');

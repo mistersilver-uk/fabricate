@@ -1,14 +1,6 @@
 /**
- * Tests for the pure system-validation aggregator and the GM-aware, cached
- * two-tier visibility gate it powers.
- *
- * The aggregator (`evaluateSystemValidation`) composes the per-entity readiness
- * evaluators (recipe / environment / salvage / signature) plus the NEW
- * system-level blocker checks. The visibility gate (`computeSystemVisibility`,
- * wired into `RecipeManager.getAvailableRecipes` and the gathering listing) hides
- * a whole system from non-GM users when it has a `blocks: 'system'` issue, hides
- * single entities marked `blocks: 'visibility'`, never mutates `enabled`, and
- * bypasses both tiers for GMs.
+ * Tests for the pure system-validation aggregator and the GM-aware, cached two-tier visibility gate
+ * it powers.
  */
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
@@ -49,9 +41,7 @@ const { evaluateSystemValidation, computeSystemVisibility } = await import(
 );
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
 // Shared fixtures (kept here so Sonar duplication stays low across the suite).
-// ---------------------------------------------------------------------------
 
 function componentMatch(componentId) {
   return { type: 'component', componentId };
@@ -102,9 +92,7 @@ function makeSystem(overrides = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Aggregator: composition
-// ---------------------------------------------------------------------------
 
 describe('evaluateSystemValidation — composition', () => {
   it('composes per-entity recipe issues (re-tagged with kind/entityId/nav)', () => {
@@ -124,11 +112,10 @@ describe('evaluateSystemValidation — composition', () => {
   });
 
   it('surfaces the #431 routed warnings for a check-mode recipe (projection + routing context)', () => {
-    // A routed check system with two success tiers; the recipe has TWO result
-    // groups (so mapping is required) both routed to tier "hit" only — so tier
-    // "crit" is unproduced AND nothing would surface these warnings unless the
-    // aggregator passes the routing context (routingProvider:'check' + the
-    // success-filtered tier options).
+    // A routed check system with two success tiers; the recipe has TWO result groups (so mapping is
+    // required) both routed to tier "hit" only — so tier "crit" is unproduced AND nothing would
+    // surface these warnings unless the aggregator passes the routing context
+    // (routingProvider:'check' + the success-filtered tier options).
     const system = makeSystem({
       resolutionMode: 'routedByCheck',
       craftingCheck: {
@@ -308,9 +295,7 @@ describe('evaluateSystemValidation — composition', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Aggregator: system-level blocker checks
-// ---------------------------------------------------------------------------
 
 describe('evaluateSystemValidation — system blockers set blocksSystem', () => {
   it('routedByCheck with no routed formula blocks the system unconditionally (with a recipe)', () => {
@@ -349,10 +334,7 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
   });
 
   it('routedByIngredients with an empty simple formula raises no blocker (its check is optional, like simple/alchemy)', () => {
-    // RI now reads craftingCheck.simple (unified onto the shared optional pass/fail
-    // slot). An unauthored simple formula simply means no check runs — its readiness
-    // stays identical to its equally-optional simple/alchemy peers; collectSystemBlockers
-    // only raises routedCheckNoFormula for routedByCheck.
+    // RI now reads craftingCheck.simple (unified onto the shared optional pass/fail slot).
     const system = makeSystem({
       resolutionMode: 'routedByIngredients',
       features: { craftingChecks: false },
@@ -384,9 +366,8 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
   });
 
   it('routed salvage with no tiers and salvage in use surfaces ONE critical system issue (not per-component)', () => {
-    // The Mythwright bug: routed salvage with no outcome tiers left every
-    // salvageable component permanently critical. Now the per-component salvage
-    // is valid and the gap is a single system-level issue instead.
+    // The Mythwright bug: routed salvage with no outcome tiers left every salvageable component
+    // permanently critical.
     const component = {
       id: 'comp-1',
       name: 'Slain Balehound',
@@ -489,9 +470,7 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
   });
 
   it('legacy enabled toggle cannot mask a missing progressive roll formula', () => {
-    // A check is usable IFF it has an authored roll formula. The legacy
-    // `craftingCheck.enabled` / `features.craftingChecks` toggles must NOT suppress
-    // the progressiveNoCheck blocker when no progressive formula is configured.
+    // A check is usable IFF it has an authored roll formula.
     const system = makeSystem({
       resolutionMode: 'progressive',
       features: { craftingChecks: true },
@@ -533,9 +512,7 @@ describe('evaluateSystemValidation — system blockers set blocksSystem', () => 
   });
 });
 
-// ---------------------------------------------------------------------------
 // Visibility gate: recipes (RecipeManager.getAvailableRecipes)
-// ---------------------------------------------------------------------------
 
 describe('two-tier visibility gate — recipes', () => {
   let manager;
@@ -546,8 +523,7 @@ describe('two-tier visibility gate — recipes', () => {
     game.fabricate.getCraftingSystemManager = () => csm;
     const recipeManager = new RecipeManager();
     recipeManager.initialized = true;
-    // Isolate the gate from inventory craftability — every enabled recipe is
-    // otherwise "available".
+    // Isolate the gate from inventory craftability — every enabled recipe is otherwise "available".
     recipeManager.canCraft = () => ({ canCraft: true });
     return recipeManager;
   }
@@ -614,9 +590,7 @@ describe('two-tier visibility gate — recipes', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // computeSystemVisibility — the hot-path decision used by the gates
-// ---------------------------------------------------------------------------
 
 describe('computeSystemVisibility', () => {
   it('reports blocksSystem and the per-entity hidden set without messages', () => {
@@ -643,9 +617,7 @@ describe('computeSystemVisibility', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Alchemy: Global visibility with discovery-by-brewing switched off (issue 966)
-// ---------------------------------------------------------------------------
 
 describe('alchemyGlobalNoDiscovery', () => {
   function alchemySystem(alchemy, overrides = {}) {
@@ -672,12 +644,9 @@ describe('alchemyGlobalNoDiscovery', () => {
   });
 
   it('scopes the claim to what a player can reach, because a GM grant is a second writer', () => {
-    // Issue 1289 makes `game.fabricate.grantRecipeKnowledge` a SECOND writer of
-    // `learnedRecipes`, and the alchemy `default:` reveal arm reads that map
-    // unconditionally — `learnOnCraft` gates only the brew-discovery union. So a granted
-    // entry under Global alchemy with auto-learn off IS revealed, and a validator telling
-    // the GM that no player will EVER see a recipe would be lying about the feature the
-    // same release ships. The warning is retained; only its claim is scoped.
+    // Issue 1289 makes `game.fabricate.grantRecipeKnowledge` a SECOND writer of `learnedRecipes`,
+    // and the alchemy `default:` reveal arm reads that map unconditionally — `learnOnCraft` gates
+    // only the brew-discovery union.
     const system = alchemySystem({ learnOnCraft: false }, { visibilityMode: 'global' });
     const issue = evaluateSystemValidation(system, { recipes: [] }).issues.find(
       (entry) => entry.code === 'alchemyGlobalNoDiscovery'

@@ -1,12 +1,4 @@
-/**
- * The manager shell: its three regions, its nav rail groups, and the browse state it lifts.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The manager shell: its three regions, its nav rail groups, and the browse state it lifts. */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,8 +15,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   craftingParent,
@@ -79,9 +70,7 @@ export function registerRailCases() {
     assert.ok(target.querySelector('.manager-main'));
     assert.ok(target.querySelector('.manager-inspector'));
     assert.equal(target.querySelectorAll('.manager-system-row').length, 2);
-    // The strip is `aria-hidden` and carries no `columnheader` since issue 1515: the library is a
-    // `role="list"` of `role="listitem"` rows, and a column header outside a table names nothing.
-    // It is still four VISUAL labels over the four-column grid the rows share.
+    // The strip is `aria-hidden` and carries no `columnheader` since issue 1515.
     const systemsHead = target.querySelector('.manager-table-head');
     assert.equal(systemsHead.getAttribute('aria-hidden'), 'true');
     assert.deepEqual(
@@ -130,9 +119,7 @@ export function registerRailCases() {
         'Tool Rules',
         'Checks',
         'Gathering',
-        // The four world scoped-entity leaves (issue 1362), in the prototype's authored order
-        // and ABOVE Parties. The lowercase `c` in `Component catalogue`, the plural in
-        // `Tools Catalogue` and the exact duplicate of `Tags & Categories` are all authored.
+        // The four world scoped-entity leaves (issue 1362).
         'Component catalogue',
         'Tags & Categories',
         'Essence Catalogue',
@@ -169,10 +156,7 @@ export function registerRailCases() {
       0,
       'the standalone Overview nav item should be removed'
     );
-    // NO ZERO BADGE (issue 1373). The rail states counts where there is something to count, and
-    // the reference draws none beside a row whose section is empty: a `0` there is a badge whose
-    // whole content is the absence the row already reads as. This system adopts no Tools, so the
-    // assertion is that the badge is ABSENT rather than that it reads zero.
+    // NO ZERO BADGE (issue 1373). The rail states counts where there is something to count.
     const toolsNav = navButton('Tool Rules');
     assert.ok(!toolsNav.querySelector('.manager-nav-count'), 'no zero count badge on Tool Rules');
     assert.ok(target.textContent.includes('Alchemy'));
@@ -219,8 +203,7 @@ export function registerRailCases() {
     });
     flushSync();
 
-    // The Crafting group is unconditional now (v1.3 headline): a live parent route,
-    // never a disabled "Soon" placeholder.
+    // The Crafting group is unconditional now (v1.3 headline).
     const crafting = craftingParent();
     assert.ok(crafting, 'the Crafting group renders with the experimental toggle off');
     assert.equal(
@@ -244,24 +227,6 @@ export function registerRailCases() {
   });
 
   // ── THE LIFTED BROWSE VIEW-STATE (issue 1438) ────────────────────────────────────────
-  //
-  // Issue 1036 lifted the Essence Studio's view-state and the test directly above proves it;
-  // this block is the same property for the remaining browse surfaces, and it is written as
-  // ONE table walked by ONE test body rather than as eight near-identical tests. That is not
-  // only economy: the claim IS uniform — "make the surface's state non-default, take the trip
-  // that unmounts it, come back and find the state" — and eight copies of it would be eight
-  // places for the claim to drift, plus the `tests/**` duplication SonarCloud counts.
-  //
-  // WHAT COUNTS AS "THE TRIP" DIFFERS BY SURFACE, AND THE TABLE SAYS WHICH. Four of these have
-  // an editor route, so the trip is the editor round-trip the issue names. The rest have no
-  // editor at all — a realm is authored in the inspector, a vocabulary entry inline, a
-  // character's knowledge in place — so what destroyed their state was leaving the route or
-  // switching a sub-tab. Both unmount the component, which is the whole of the defect; calling
-  // the second one an "editor round-trip" would be a false description of a real trip.
-  //
-  // EACH ENTRY ALSO PROVES ITS OWN NON-VACUITY: the trip is asserted to have CHANGED the route
-  // (or the rendered panel), because a `leave` step that silently did nothing would leave the
-  // surface mounted throughout and the restore assertion would pass without a remount.
   const LIFTED_BROWSE_SURFACES = [
     {
       name: 'the system library',
@@ -336,8 +301,7 @@ export function registerRailCases() {
       open: async () => {
         navButton('Tool Rules').click();
       },
-      // Sentence case since issue 1373's parity pass: the design sets this placeholder
-      // 'Search tools', and the screen's own page copy is sentence case throughout.
+      // Sentence case since issue 1373's parity pass.
       searchLabel: 'Search tools',
       term: 'Hammer',
       leave: () => navButton('Essence Rules').click(),
@@ -353,9 +317,7 @@ export function registerRailCases() {
       },
       searchLabel: 'Search recipe categories',
       term: 'Poti',
-      // A tab switch UNMOUNTS this panel and mounts the component one: the three are mutually
-      // exclusive branches. That is why each panel binds its OWN slot — proved by the sibling
-      // assertion below, which finds the component tab's box empty rather than carrying "Poti".
+      // A tab switch UNMOUNTS this panel and mounts the component one.
       leave: () => target.querySelector('[data-vocabulary-tab="component"]').click(),
       leftPanel: 'Search component categories',
       back: () => target.querySelector('[data-vocabulary-tab="recipe"]').click(),
@@ -476,9 +438,7 @@ export function registerRailCases() {
   }
 
   it('keeps a gathering task filter, not just its search, across the editor round-trip', async () => {
-    // The search box is the axis every surface in the table shares, so it is what the table
-    // asserts. A FILTER is a different control writing a different field of the same object,
-    // and a lift that carried only `searchTerm` would pass every row above.
+    // The search box is the axis every surface in the table shares.
     mountManager([]);
     await tick();
     flushSync();
@@ -493,8 +453,7 @@ export function registerRailCases() {
       '[aria-label="Filter gathering tasks by status"], [data-gathering-tasks-browser] select'
     );
     assert.ok(statusFilter, 'the task toolbar offers a status filter');
-    // `active` rather than `disabled`: both are non-default, but filtering to `disabled` hides
-    // the only enabled task and with it the Edit button this test has to press next.
+    // `active` rather than `disabled`: both are non-default.
     statusFilter.value = 'active';
     statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
@@ -526,16 +485,6 @@ export function registerRailCases() {
     // editor's component / tag / drop-rule / tool pickers belong to ONE editing session: they
     // name what the GM is attaching to THIS task right now, so carrying them back into the next
     // task would apply a filter nobody set on a record nobody was editing.
-    //
-    // WHAT ACTUALLY ENFORCES IT is the editor's task-change effect, keyed on a COMPONENT-LOCAL
-    // `lastTaskId`. That sentinel re-initialises to '' on every mount, so re-entry always reads
-    // as a task change and always clears all four — which is why the four declared defaults are
-    // not what this test measures. Perturbing them alone leaves it green; the guard that would
-    // fail it is the one that matters, a term given a home that outlives the mount.
-    //
-    // The library tool is fixture data, not decoration: the tool picker's search box renders
-    // only behind `{#if libraryToolList.length > 0}`, so without it the fourth term is not on
-    // screen and the loop below would silently assert over three.
     mountManager([], {
       gatheringLibraryTools: [
         { id: 'tool-chisel', label: 'Fine Chisel', enabled: true, componentId: 'c1' },
@@ -589,9 +538,7 @@ export function registerRailCases() {
   });
 
   it('shows the Crafting group unconditionally and gates only Graph on experimental features (issue 745)', async () => {
-    // Experimental OFF (the shipped default): the Crafting group renders and the
-    // unimplemented Graph placeholder is hidden. Both assertions run through the real
-    // `experimentalFeaturesEnabled` gating derivation, not a stubbed value.
+    // Experimental OFF (the shipped default).
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -736,8 +683,7 @@ export function registerRailCases() {
     });
     flushSync();
 
-    // On Components (a non-crafting route), manually expand the collapsed Crafting
-    // group via its toggle.
+    // On Components (a non-crafting route).
     navButton('Component Rules').click();
     await tick();
     flushSync();
@@ -759,10 +705,7 @@ export function registerRailCases() {
   });
 
   it('names the Gathering sub-tab in the trail, and the group above it navigates', async () => {
-    // FOUR SCREENS UNDER ONE NAME (issue 1328). Gathering is Environments, Tasks, Events and
-    // Settings, and its trail named only the group — so all four read `<system> > Gathering` and
-    // the trail could not tell a GM which one they were on. Checks already names its own sub-tab;
-    // this is that rule applied to the other group that has one.
+    // FOUR SCREENS UNDER ONE NAME (issue 1328). Gathering is Environments, Tasks.
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -784,8 +727,7 @@ export function registerRailCases() {
     flushSync();
     assert.deepEqual(crumbs(), ['Crafting Systems', 'Alchemy', 'Gathering', 'Environments']);
 
-    // A SECOND TAB IS A DIFFERENT TRAIL, which is the whole claim: a crumb that named the group
-    // alone would be identical here, and a crumb hard-coded to `Environments` would too.
+    // A SECOND TAB IS A DIFFERENT TRAIL, which is the whole claim.
     target.querySelector('#manager-gathering-nav-tasks').click();
     await tick();
     flushSync();
@@ -795,11 +737,7 @@ export function registerRailCases() {
       'tasks'
     );
 
-    // AND THE GROUP CRUMB IS A LABEL HERE, not a control. One rule decides it, the same one the
-    // Downtime tab crumb follows: a crumb is a control when pressing it goes somewhere the GM is
-    // not. From the library, `Gathering` names the route already on the screen — returning to it
-    // leaves the active tab where it is — so a button would sit there doing nothing. From an
-    // editor it really does leave, and the editor trails below draw it as a button.
+    // AND THE GROUP CRUMB IS A LABEL HERE, not a control. One rule decides it.
     assert.equal(
       Array.from(target.querySelectorAll('.manager-breadcrumbs button')).some(
         (button) => button.textContent.trim() === 'Gathering'
@@ -810,25 +748,8 @@ export function registerRailCases() {
   });
 
   // ── Rail group expand / collapse (issue 1185) ──────────────────────────────────────────
-  //
-  // The maintainer's report was that the rail's disclosure groups "sometimes refuse to
-  // minimize". "Sometimes" was two defects wearing one face, and both are behavioural rather
-  // than visual, so every case below drives the real controls and reads the rendered rail:
-  //
-  //   * four groups ran an auto-open effect that READ ITS OWN FLAG to guard itself, so a
-  //     collapse changed the effect's own dependency, re-ran it, passed the now-false guard
-  //     and forced the group straight back open;
-  //   * Crafting had the mirror defect — `craftingMenuExpanded = isCraftingRoute` never read
-  //     its own flag, so a collapse stuck, but LEAVING the category force-closed a group the
-  //     GM had deliberately opened.
-  //
-  // The rule these pin is the maintainer's: every group collapses in any state, whatever the
-  // others are doing, EXCEPT while one of its own rail sub-items is the current view.
   describe('rail group expansion is independent, sticky, and locked only by an active sub-tab', () => {
-    // The five groups, each with the disclosure that opens it, the submenu that proves it is
-    // open, and the navigation that lands on one of its own sub-items. Written once so a case
-    // asserts "every group", not "the four I remembered" — the Downtime group in particular is
-    // provider-driven, and nothing in the rule may key off a tab id.
+    // The five groups, each with the disclosure that opens it.
     const RAIL_GROUPS = [
       {
         id: 'crafting',
@@ -872,9 +793,7 @@ export function registerRailCases() {
       },
     ];
 
-    // Every rail navigation here passes `confirmRouteExit`, which is promise-shaped on some
-    // branches, so a bare `tick()` would let "the group stayed open" pass for a route change
-    // that simply had not landed yet.
+    // Every rail navigation here passes `confirmRouteExit`.
     async function settleRail() {
       for (let index = 0; index < 8; index += 1) await Promise.resolve();
       await tick();
@@ -1004,8 +923,7 @@ export function registerRailCases() {
       mountRail();
       const checks = RAIL_GROUPS[1];
 
-      // Left EXPANDED. Entering a sub-item records the intent as well as taking the lock, so
-      // the group the GM opened by walking into it survives walking back out.
+      // Left EXPANDED. Entering a sub-item records the intent as well as taking the lock.
       navButton('Checks').click();
       await settleRail();
       assert.equal(currentManagerView(), 'checks-crafting');
@@ -1021,9 +939,7 @@ export function registerRailCases() {
         'and the disclosure is live again the moment the lock releases'
       );
 
-      // Left COLLAPSED. The same group, collapsed off-route, is still collapsed after a move —
-      // the direction `craftingMenuExpanded = isCraftingRoute` used to get right and the four
-      // re-asserting effects used to get wrong.
+      // Left COLLAPSED. The same group, collapsed off-route.
       railToggle(checks).click();
       await settleRail();
       assert.ok(!isExpanded(checks));
@@ -1034,15 +950,7 @@ export function registerRailCases() {
       assert.ok(!isExpanded(checks), 'a collapse survives navigation too');
     });
 
-    // An editor detail route belongs to the group whose sub-item opened it: `recipe-edit` is
-    // reached from Recipes and is read as part of Recipes, so it locks Crafting exactly as a
-    // rendered rail entry does. That makes all five groups uniform — Gathering already locked
-    // throughout `environment-edit` / `gathering-task-edit` / `gathering-event-edit`, and
-    // Crafting and Checks were the outliers that released the group when an editor opened.
-    //
-    // The tail then walks the auto-open effect: leaving the editor re-enters `recipes` by
-    // assigning `activeView`, a route into the group that writes no expansion intent of its
-    // own, so without that effect the group would snap shut on the NEXT navigation away.
+    // An editor detail route belongs to the group whose sub-item opened it.
     it('stays locked inside its own editor detail route, and outlives the lock on return', async () => {
       await openRecipeEditor([]);
       assert.equal(currentManagerView(), 'recipe-edit');
@@ -1077,8 +985,7 @@ export function registerRailCases() {
       );
     });
 
-    // The Downtime group's children come from whichever provider holds the surface, so its
-    // collapse behaviour must be identical for a companion's tab set and for Core's four.
+    // The Downtime group's children come from whichever provider holds the surface.
     it('gives a provider-supplied Downtime tab set the same collapse behaviour as Core', async () => {
       const registry = createManagerExtensionsRegistry();
       registry.publicApi.registerWorldNavProvider(
@@ -1120,19 +1027,7 @@ export function registerRailCases() {
     });
   });
 
-  // ---------------------------------------------------------------------------
   // Leaving a library's route clears its search (issue 1462)
-  // ---------------------------------------------------------------------------
-  //
-  // Every case asserts a call DELTA across the ONE click under test, never presence.
-  // Presence is forbidden here and that is not style. The root's scope sentinel is SEEDED at
-  // declaration so no clear fires at mount, but a presence assertion would still be satisfied
-  // by the `systems` -> `recipes` hop each case uses to reach its starting route, and would
-  // then pass while the transition actually under test did nothing at all.
-  //
-  // For the same reason every Recipes-origin case routes `systems` -> `recipes` -> target and
-  // asserts it is on `recipes` first. `openTagsScreen` hops `systems` -> `tags` directly and
-  // never performs the transition these cases are about.
   describe('route-scoped library search clear', () => {
     function clearCallCount(calls) {
       return calls.filter((call) => call[0] === 'clearLibrarySearches').length;
@@ -1142,9 +1037,7 @@ export function registerRailCases() {
       return target.querySelector('.fabricate-manager').dataset.managerView;
     }
 
-    // Perform ONE click and report the `clearLibrarySearches` delta it produced, plus the
-    // route it landed on. Snapshotting immediately before the click is what makes the number
-    // attributable to that click and nothing else.
+    // Perform ONE click and report the `clearLibrarySearches` delta it produced.
     async function clickForClearDelta(calls, resolveButton, label) {
       const button = resolveButton();
       assert.ok(button, `the navigation target under test is rendered (${label})`);
@@ -1155,8 +1048,7 @@ export function registerRailCases() {
       return { delta: clearCallCount(calls) - before, view: currentManagerView() };
     }
 
-    // Mount and route to the recipe library, asserting arrival: a silently missing entry
-    // would leave every later assertion reading the previous screen.
+    // Mount and route to the recipe library, asserting arrival.
     async function openRecipeLibrary(calls, storeOptions = {}) {
       mountManager(calls, { experimentalFeaturesEnabled: true, ...storeOptions });
       craftingParent().click();
@@ -1166,11 +1058,7 @@ export function registerRailCases() {
     }
 
     it('mounting calls nothing, because the scope sentinel is seeded at declaration', async () => {
-      // The complement of every delta case, and the only assertion that can see the sentinel
-      // regress to an unseeded value. Left at a sentinel the effect fires once at mount on
-      // EVERY route before any navigation happens — a spurious refresh, and, worse, a call
-      // that makes a "was it called?" assertion true for the wrong reason. That is why every
-      // other case here measures a delta; this one measures the mount.
+      // The complement of every delta case.
       const calls = [];
       mountManager(calls, { experimentalFeaturesEnabled: true });
       await tick();

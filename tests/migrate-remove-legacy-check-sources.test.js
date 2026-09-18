@@ -1,8 +1,7 @@
-// Tests for the 1.8.0 migration that strips the deprecated check-source fields
-// (root macroUuid / successMacroUuid / failureMacroUuid / checkSource / builtIn)
-// from craftingCheck / salvageCraftingCheck / gatheringCraftingCheck, while
-// preserving simple.macroUuid (the dynamic-DC macro) and every other field. It also
-// retires the orphaned recipe resultSelection.macroUuid (a 1.6.0 macroOutcome vestige).
+// Tests for the 1.8.0 migration that strips the deprecated check-source fields (root macroUuid /
+// successMacroUuid / failureMacroUuid / checkSource / builtIn) from craftingCheck /
+// salvageCraftingCheck / gatheringCraftingCheck, while preserving simple.macroUuid (the dynamic-DC
+// macro) and every other field.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -11,9 +10,7 @@ const { migrateRemoveLegacyCheckSources } = await import(
 );
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
-// ---------------------------------------------------------------------------
 // Pure function
-// ---------------------------------------------------------------------------
 
 function fullyLoadedSystem() {
   return {
@@ -137,9 +134,7 @@ test('does not mutate the input recipes (deep-clones)', () => {
   assert.equal(input.resultSelection.macroUuid, 'Macro.recipe', 'the source recipe is untouched');
 });
 
-// ---------------------------------------------------------------------------
 // Through the runner
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(
@@ -209,11 +204,8 @@ test('runner: craftingSystems left untouched (no write) when no deprecated field
 
   await runner.run();
 
-  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because
-  // it stamps `craftingCheck.maxModifierPicks` on every system already on the
-  // `playerPicks` combination rule. The claim this test makes is about THIS migration, so
-  // it is asserted on the persisted payload's own fields rather than on the shared
-  // setting's write count.
+  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because it stamps
+  // `craftingCheck.maxModifierPicks` on every system already on the `playerPicks` combination rule.
   const persisted = settings.store.get('craftingSystems')[0];
   assert.equal(
     persisted.craftingCheck.simple.macroUuid,

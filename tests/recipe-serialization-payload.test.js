@@ -1,21 +1,4 @@
-/**
- * Serialized recipe payload contract (issue 1087).
- *
- * Every recipe is rewritten whole on every mutation, replicated to every client, and
- * stringified twice more by `RecipeManager.reload()`'s change comparison, so anything
- * `Recipe.toJSON()` emits is paid on every write by every client. Two things it used to emit
- * carry no information: the flat top-level `results` alias, which duplicated
- * `resultGroups[].results` wholesale, and the ~25 fields whose value is the one the
- * constructor rebuilds from absence.
- *
- * The whole change is WRITE-side. This suite is the proof that it is:
- *   - the alias is no longer emitted, but is still READ, permanently, and a payload that
- *     carries it survives a full save cycle with every result intact;
- *   - `RECIPE_OMITTED_WHEN_DEFAULT` is a hand-maintained mirror of the constructor, so it is
- *     checked mechanically against a maximal and a minimal recipe rather than by eye;
- *   - `enabled: true` is deliberately NOT omitted, and the reason is a live reader;
- *   - the reduction is measured on a fixed corpus against the shape written before it.
- */
+/** Serialized recipe payload contract (issue 1087). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -113,9 +96,7 @@ function minimalRecipe() {
   });
 }
 
-// ---------------------------------------------------------------------------
 // The retired write alias
-// ---------------------------------------------------------------------------
 
 test('1087: toJSON no longer emits the flat top-level results alias', () => {
   const json = maximalRecipe().toJSON();
@@ -129,10 +110,7 @@ test('1087: toJSON no longer emits the flat top-level results alias', () => {
 });
 
 test('1087: a legacy payload carrying ONLY the flat alias round-trips with no result lost', () => {
-  // THE READ PATH, which is the half that never changes. A world or an exported system
-  // written before result groups existed carries its outputs here and nowhere else, so an
-  // assertion that the alias is absent from OUTPUT cannot tell "still read" from "dropped" —
-  // only re-serializing the reconstruction can.
+  // THE READ PATH, which is the half that never changes.
   const legacy = {
     id: 'r-legacy',
     name: 'Legacy Flat',
@@ -189,9 +167,7 @@ test('1087: a legacy payload carrying BOTH shapes keeps the canonical groups, no
   assert.ok(!('results' in restored.toJSON()), 'and the stale alias is not written back');
 });
 
-// ---------------------------------------------------------------------------
 // The omitted defaults — mechanical guard over the hand-maintained table
-// ---------------------------------------------------------------------------
 
 test('1087: every RECIPE_OMITTED_WHEN_DEFAULT key is a field toJSON can actually emit', () => {
   // Catches a typo'd or renamed key, which would otherwise sit in the table forever matching
@@ -214,8 +190,6 @@ test('1087: a fully defaulted recipe omits every key in the table', () => {
 test('1087: a fully defaulted recipe emits EXACTLY the un-omittable field set', () => {
   // The table-driven assertions above are both scoped BY the table, so neither can see a key
   // DELETED from it: the field silently returns to every payload and the guards stay green.
-  // This pins the other side of the same fact — the literal key set on the wire — so growing
-  // it needs a deliberate edit here, whichever direction the change came from.
   assert.deepEqual(Object.keys(minimalRecipe().toJSON()).sort((a, b) => a.localeCompare(b)), [
     'complex',
     'enabled',
@@ -264,9 +238,8 @@ test('1087: the defaults the table omits are exactly the documented ones', () =>
 });
 
 test('1087: complex and metadata are NEVER omitted, because absence does not rebuild them', () => {
-  // `complex` absent is DERIVED, not defaulted: two result groups derive `true`, so omitting
-  // a stored `false` would flip the authoring mode. `metadata` absent is rebuilt with
-  // `Date.now()` and the current user, which is not the value that was omitted.
+  // `complex` absent is DERIVED, not defaulted: two result groups derive `true`, so omitting a
+  // stored `false` would flip the authoring mode.
   const derivesComplex = new Recipe({
     id: 'r-derive',
     name: 'Two Groups',
@@ -292,10 +265,7 @@ test('1087: enabled: true is still emitted, because a live reader tests it for t
   // `SignatureValidator.validateSystem` scopes its alchemy-collision scan with
   // `recipes.filter((recipe) => recipe?.enabled)` over payloads that
   // `CraftingSystemManager._assertNoAlchemySignatureCollisions` and
-  // `collectAlchemySignatureBlockers` hand it straight from `toJSON()`. Omitting the default
-  // empties that scan, and the save-block against colliding alchemy signatures silently
-  // stops firing. Absence is a live on-disk state for `allowPlayerResultReorder` (nothing
-  // ever seeded it) but never for `enabled`, which is why only one of the two is omitted.
+  // `collectAlchemySignatureBlockers` hand it straight from `toJSON()`.
   const json = minimalRecipe().toJSON();
 
   assert.equal(json.enabled, true, 'the enabled flag stays on the wire');
@@ -305,16 +275,11 @@ test('1087: enabled: true is still emitted, because a live reader tests it for t
   );
 });
 
-// ---------------------------------------------------------------------------
 // Measured reduction on a fixed corpus
-// ---------------------------------------------------------------------------
 
 /**
- * The payload shape written before this change: the current one plus the flat alias plus every field the
- * table now omits. Derived from the model itself — the in-memory value of an omitted key IS
- * the default that used to be written — so it cannot drift from the table.
- * @param {Recipe} recipe
- * @returns {Record<string, unknown>}
+ * The payload shape written before this change: the current one plus the flat alias plus every
+ * field the table now omits.
  */
 function preRetirementPayload(recipe) {
   const payload = { ...recipe.toJSON() };

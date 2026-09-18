@@ -1,10 +1,4 @@
-/**
- * Issue 651 — `progressiveResultOrder.js`: the D5 reconciliation contract.
- *
- * Progressive awarding spends a roll DOWN the list, so every clause of this contract
- * guards a silent failure: a dropped result silently denies a player an award, and an
- * unranked stage displacing a ranked one silently demotes the player's choice.
- */
+/** Issue 651 — `progressiveResultOrder.js`: the D5 reconciliation contract. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -14,9 +8,7 @@ const { progressiveOrderKey, applyPlayerResultOrder } = await import(
 
 const r = (id, extra = {}) => ({ id, ...extra });
 
-// ---------------------------------------------------------------------------
 // progressiveOrderKey
-// ---------------------------------------------------------------------------
 
 test('progressiveOrderKey namespaces by scope', () => {
   assert.equal(progressiveOrderKey({ scope: 'recipe', id: 'abc' }), 'recipe:abc');
@@ -41,9 +33,7 @@ test('progressiveOrderKey returns null for an unusable scope or id', () => {
   assert.equal(progressiveOrderKey(), null);
 });
 
-// ---------------------------------------------------------------------------
 // applyPlayerResultOrder — the core contract
-// ---------------------------------------------------------------------------
 
 test('reorders results to match the stored order', () => {
   const results = [r('a'), r('b'), r('c')];
@@ -107,9 +97,7 @@ test('a non-array results input is returned unchanged', () => {
   assert.equal(applyPlayerResultOrder(undefined, ['a']), undefined);
 });
 
-// ---------------------------------------------------------------------------
 // Duplicate ids — first match wins, both sides
-// ---------------------------------------------------------------------------
 
 test('duplicate ids IN THE ORDER: first match wins, no doubling', () => {
   const results = [r('a'), r('b')];
@@ -142,9 +130,7 @@ test('duplicate ids in BOTH the order and results: each mention consumes one cop
   assert.equal(out[2].id, 'b');
 });
 
-// ---------------------------------------------------------------------------
 // Junk tolerance
-// ---------------------------------------------------------------------------
 
 test('an order longer than results is harmless', () => {
   const results = [r('a')];

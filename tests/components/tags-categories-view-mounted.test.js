@@ -1,29 +1,4 @@
-/**
- * Mounted coverage for the Tags & Categories screen (issue 924).
- *
- * The view had NO test file of its own — it appeared only as a harness fixture inside
- * `manager-mounted.test.js` — so nothing asserted the tab semantics its keyboard handler
- * depends on. That mattered when the compiler's
- * `a11y_no_noninteractive_element_to_interactive_role` warnings on its `<nav>` and
- * `<section>` were fixed: the elements changed, the ROLES deliberately did not, and
- * `handleTabKeydown` resolves the strip with `.closest('[role="tablist"]')`. A source-string
- * assertion cannot observe that traversal, so the keyboard half of this file dispatches real
- * `KeyboardEvent`s and reads `document.activeElement`.
- *
- * Built on the shared mount harness rather than inlined boilerplate — an inlined mount trips
- * SonarCloud's new-code duplication threshold.
- *
- * ── ISSUE 1429 MOVED THE STRIP AND THIS FILE DELIBERATELY DID NOT MOVE WITH IT ──────────
- * The tablist is `VocabularyTabs` -> `EditorTabs` now, not markup this view authors. Every
- * clause below still mounts THIS view and reads the rendered DOM, which is the point: a
- * conversion is exactly the change under which a suite that had been asserting on the view's
- * own source, or on a hand-written copy of its markup, would keep passing while the product
- * stopped emitting it. Mounting the real tree is what makes the roving `tabindex`, the
- * `aria-selected` binding and the Arrow/Home/End traversal observable across the seam — and
- * the traversal in particular is now `EditorTabs`' `parentElement`/`[role="tab"]` walk rather
- * than this view's old `.closest('[role="tablist"]')`, so the CONTRACT is asserted here while
- * the mechanism belongs to the primitive.
- */
+/** Mounted coverage for the Tags & Categories screen (issue 924). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -62,13 +37,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
-    // The strip, extracted from this view in issue 1429, and the primitive it wraps. Both are
-    // rendered by the tree under test, and a rendered `.svelte` the harness omits HANGS the
-    // suite (`# cancelled`) rather than failing it.
+    // The strip, extracted from this view in issue 1429.
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/VocabularyTabs.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
@@ -144,10 +116,7 @@ describe('TagsCategoriesView (mounted)', () => {
     }
   });
 
-  // THE ONE INTENTIONAL RENDERED CHANGE in issue 1429's conversion, asserted positively rather
-  // than left to a parity comparison. A parity harness cannot see this on its own: reverting the
-  // vehicle makes the converted strip byte-identical to the strip it replaced, so the comparison
-  // reports parity precisely when the correction is missing.
+  // THE ONE INTENTIONAL RENDERED CHANGE in issue 1429's conversion.
   it('draws each vocabulary count on the record-count vehicle, not through a chip', async () => {
     const root = await harness.mount(
       mountProps({ counts: { recipeCategories: 4, componentCategories: 11, itemTags: 2 } })
@@ -230,7 +199,6 @@ describe('TagsCategoriesView (mounted)', () => {
     // one-line focus regression surfaces as a `# cancelled` suite with no message —
     // indistinguishable from a missing harness allowlist entry. Proved by mutating
     // `EditorTabs`' `Home` branch, which took this suite from a clean red to a two-minute hang.
-    // An id string diffs in one line and names the tab that took focus.
     const focusedTab = () => activeElement()?.getAttribute('data-vocabulary-tab') ?? null;
 
     const recipe = tabButton(root, 'recipe');

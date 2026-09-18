@@ -1,57 +1,6 @@
 /**
- * A shared primitive names its own controls, and does it in a language a world can change
- * (issue 1497).
- *
- * `openspec/specs/design-system/spec.md` makes naming a COMPONENT OBLIGATION under "Naming,
- * announcement and hit targets are component obligations": an icon-only control carries an
- * accessible name, and the primitive is what carries it rather than each of its callers. Nothing
- * checked that, and two failure modes had shipped by the time anyone looked.
- *
- * ── ONE: A NAME NO WORLD CAN TRANSLATE ──────────────────────────────────────────────────
- * A prop that exists to NAME a control and defaults to `'Percentage'` ships that English word as
- * the accessible name of every caller that does not override it. Foundry localizes through
- * `game.i18n`, and a hard-coded default never reaches it — so a French world hears "Percentage"
- * read out by its screen reader, with no setting anywhere that changes it. Ten such defaults are
- * pinned here, across six components.
- *
- * A LOCALIZATION KEY default is not this defect and is deliberately absent: `DropZone` defaults to
- * `'FABRICATE.DropZone.DefaultLabel'`, which resolves through the lang files like anything else.
- * The two are told apart by SHAPE, and the shape is asserted in both directions below.
- *
- * ── TWO: A NAME THAT SUPPRESSES THE NAME ────────────────────────────────────────────────
- * The worse one, and it looks like compliance. `aria-label={label}` on a prop defaulting to `''`
- * renders `aria-label=""`, and an EMPTY aria-label does not fall back to the element's content —
- * it overrides it. The control had a perfectly good name from its own text and the attribute took
- * it away. `aria-label={label || undefined}` omits the attribute instead, which is why the guarded
- * spelling is the rule and `IconButton` and `SelectionCheckbox` already ship it.
- *
- * Measured, of the 45 `aria-label` bindings in this corpus: ten are already guarded, and exactly
- * TWO bind a prop that defaults to the empty string. Every other unguarded binding defaults to
- * `undefined` or to a non-empty string, neither of which can render an empty attribute, so none
- * of them is a violation of this obligation and none is a row — a gate that flagged all 35 would
- * be answered by deleting it.
- *
- * The second of the two is the one worth naming. `ManagerModal` binds `aria-label={title}` on a
- * `role="dialog" aria-modal="true"` root, so a modal opened without a title announces as an
- * UNNAMED DIALOG — and a modal is the one place a screen-reader user cannot recover by reading
- * around it, because everything outside it is inert. The prop is called `title` rather than
- * anything label-shaped, which is why the binding rather than the prop NAME is what selects this
- * population.
- *
- * ── WHAT THIS GATE DOES NOT DECIDE ──────────────────────────────────────────────────────
- * Whether a given component's root control can render with no visible text. The spec's obligation
- * is about controls that can, and no static rule tells those apart from a component that always
- * has a label beside it. So the population is every NAME-BEARING PROP, on the reading that a prop
- * called `ariaLabel` or `numberLabel` exists to name something or it would not exist. That is a
- * superset, and it is the honest superset: the alternative is a hand-maintained list of which
- * components count, which is the kind of mirror that rots without anybody editing it.
- *
- * ── THE PROP PATTERN IS NARROW ON PURPOSE ───────────────────────────────────────────────
- * `/^aria[A-Z]|Label$|^label$/` rather than `/aria|label$/i`. The loose spelling matches `variant`
- * — through the `aria` in the middle of it — and `triggerAriaDisabled`, which is a boolean and has
- * no accessible name to give. Both were live false positives in the measurement that opened this
- * issue, and a gate whose first output is two rows nobody can act on is a gate that gets widened
- * to nothing.
+ * A shared primitive names its own controls, and does it in a language a world can change (issue
+ * 1497).
  */
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
@@ -78,48 +27,16 @@ const COMPONENTS_DIRECTORY = 'src/ui/svelte/components';
 /** Where the manifest's manager-side rows live. */
 const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
 
-/**
- * A prop that exists to give a control its accessible name.
- *
- * Three alternations, each earning its place: `ariaLabel` and `ariaDescription` (camel-cased
- * `aria-*`), anything ending `Label`, and the bare `label`. See the header for the two live false
- * positives the loose spelling produced.
- */
+/** A prop that exists to give a control its accessible name. */
 const NAME_BEARING_PROP = /^aria[A-Z]|Label$|^label$/u;
 
-/**
- * A Foundry localization key, which is a translatable default rather than untranslated text.
- *
- * Dotted, and starting with a capital — `FABRICATE.DropZone.DefaultLabel`. Deliberately not "any
- * string containing a dot": a default of `'Item.'` is a sentence, and a default of `'%'` is a
- * unit. This has to be tight in the direction that matters, which is not calling untranslated
- * English a key.
- */
+/** A Foundry localization key, which is a translatable default rather than untranslated text. */
 const LOCALIZATION_KEY = /^[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+$/u;
 
-/**
- * `aria-label={someProp}` and nothing else — no `||`, no `?:`, no call.
- *
- * THE QUOTES ARE OPTIONAL BECAUSE SVELTE'S ARE. `aria-label="{label}"` is the same binding written
- * with the quotes left on, and it is a spelling authors reach for by habit from plain HTML — so
- * requiring the unquoted form put every quoted one OUTSIDE the population rather than in it, which
- * is a gate that a defect can leave by adding two characters. No file in this corpus writes the
- * quoted form today, which is precisely why nothing noticed.
- */
+/** `aria-label={someProp}` and nothing else — no `||`, no `?:`, no call. */
 const BARE_PROP_BINDING = /^aria-label=["']?\{([A-Za-z_$][\w$]*)\}["']?$/u;
 
-/**
- * The corpus: the flat primitive directory plus every manifest row under `apps/manager/`.
- *
- * BOTH HALVES, because the obligation is about SHARED components and the manifest is what decides
- * which those are. The flat directory alone would miss `ManagerModal` and `EditorValidationSurface`
- * — which between them carry three of the twelve rows below — and the manifest alone would miss the
- * components under `components/` that carry no manifest row at all.
- *
- * Recorded non-members are included with members. A row on `NOT_A_PRIMITIVE` is a component the
- * register has ADJUDICATED, which makes it exactly as shared as one that passed: the judgement was
- * about membership of the vocabulary, not about whether the thing renders in the product.
- */
+/** The corpus: the flat primitive directory plus every manifest row under `apps/manager/`. */
 function corpusFiles() {
   const flat = readdirSync(path.join(repoRoot, COMPONENTS_DIRECTORY))
     .filter((name) => name.endsWith('.svelte'))
@@ -132,12 +49,7 @@ function corpusFiles() {
   );
 }
 
-/**
- * The corpus, parsed once.
- *
- * Lazily, so a walk failure is a failing test rather than an unattributed module-load throw that
- * escapes the `# fail` count entirely.
- */
+/** The corpus, parsed once. */
 let cached = null;
 function corpus() {
   if (cached === null) {
@@ -150,28 +62,7 @@ function corpus() {
   return cached;
 }
 
-/**
- * Every prop destructured from `$props()` in one template, with what its default IS.
- *
- * Read from the SCRIPT AST rather than by matching braces in the text. The brace-matching version
- * of this scan was written first and has two failure modes that both under-report: a default
- * holding an object literal or an arrow function contains commas and braces of its own, and a
- * `//` comment inside the destructuring is not a prop. Neither errors — each simply drops props
- * on the floor, and this gate's whole job is to find props.
- *
- * A `RestElement` is skipped: `...rest` names no prop, and there is nothing about its contents a
- * template scanner can decide.
- *
- * THE TWO DEFAULT FIELDS ARE SEPARATE ON PURPOSE, because the two clauses ask different questions
- * of them and `null` would be ambiguous across both. `defaultsToString` says the default is a
- * string LITERAL — as opposed to absent, or `undefined`, or an expression — and `stringDefault`
- * carries its value, which may legitimately be the empty string. A single field could not tell
- * "defaults to `''`" from "has no string default", and the empty-string case is precisely the
- * defect the second clause exists to find.
- *
- * @param {{ast: object}} template
- * @returns {Array<{name: string, defaultsToString: boolean, stringDefault: string|null}>}
- */
+/** Every prop destructured from `$props()` in one template, with what its default IS. */
 function propsOf({ ast }) {
   const props = [];
   const visit = (node) => {
@@ -233,9 +124,7 @@ function nameBearingProps() {
 
 test('the corpus reaches both halves of the shared component set', () => {
   // A ratchet over an empty corpus passes forever, and this one has TWO ways to empty: the flat
-  // directory read and the manifest filter. Floored separately for that reason — a manifest that
-  // stopped yielding manager rows would leave 26 files scanned, which any single floor generous
-  // enough for the total would accept.
+  // directory read and the manifest filter.
   const files = corpusFiles();
   const flat = files.filter((file) => file.startsWith(`${COMPONENTS_DIRECTORY}/`)).length;
 
@@ -259,10 +148,9 @@ test('the corpus reaches both halves of the shared component set', () => {
 });
 
 test('the prop pattern selects names and rejects the two shapes that are not names', () => {
-  // BOTH POLARITIES, and the negative half is the one that matters: this pattern was TIGHTENED
-  // from `/aria|label$/i`, which matched `variant` on the `aria` inside it and `triggerAriaDisabled`
-  // on nothing meaningful at all. A widened pattern here does not fail — it adds rows nobody can
-  // act on, which is how a gate gets deleted.
+  // BOTH POLARITIES, and the negative half is the one that matters: this pattern was TIGHTENED from
+  // `/aria|label$/i`, which matched `variant` on the `aria` inside it and `triggerAriaDisabled` on
+  // nothing meaningful at all.
   for (const name of ['label', 'ariaLabel', 'ariaDescription', 'numberLabel', 'rangeLabel']) {
     assert.ok(
       NAME_BEARING_PROP.test(name),
@@ -283,9 +171,7 @@ test('the prop pattern selects names and rejects the two shapes that are not nam
 });
 
 test('a localization key is a translatable default, and English text is not', () => {
-  // The distinction the first ratchet turns on, in both directions and against the live tree. Get
-  // it wrong one way and `DropZone` arrives as a ninth row for doing the right thing; get it wrong
-  // the other and every English default is excused as a key.
+  // The distinction the first ratchet turns on, in both directions and against the live tree.
   for (const key of ['FABRICATE.DropZone.DefaultLabel', 'FABRICATE.Manager.Close']) {
     assert.ok(LOCALIZATION_KEY.test(key), `${key} is a localization key`);
   }
@@ -332,10 +218,7 @@ test('no shared component defaults an accessible name to untranslated text', () 
 });
 
 test('the binding pattern reads the quoted spelling of a prop binding too', () => {
-  // SYNTHETIC AND BOTH POLARITIES. Svelte accepts `aria-label={label}` and `aria-label="{label}"`
-  // as the same binding, and this corpus happens to write only the first — so the live rows cannot
-  // tell a pattern that reads both from one that reads one. The clause below reports the bindings
-  // that can render EMPTY, and a spelling it does not match is a site it silently does not police.
+  // SYNTHETIC AND BOTH POLARITIES.
   const bound = (text) => (BARE_PROP_BINDING.exec(text) ?? [])[1] ?? null;
 
   assert.equal(bound('aria-label={label}'), 'label', 'the unquoted spelling is the live one');
@@ -354,9 +237,7 @@ test('the binding pattern reads the quoted spelling of a prop binding too', () =
 
 test('no aria-label can render empty and suppress the name the content already gives', () => {
   // THE SHAPE, NOT THE COUNT. An empty `aria-label` does not fall back to the element's text — it
-  // REPLACES it with nothing, so a button reading "Delete" announces as an unnamed button. That is
-  // strictly worse than having written no attribute at all, which is why the fix is `|| undefined`
-  // rather than a better default.
+  // REPLACES it with nothing, so a button reading "Delete" announces as an unnamed button.
   const bindings = [];
   const findings = [];
   for (const template of corpus().templates) {
@@ -372,9 +253,7 @@ test('no aria-label can render empty and suppress the name the content already g
     }
   }
 
-  // Non-vacuity on the population, and on the GUARDED shape specifically. If nothing in the corpus
-  // were written `{x || undefined}` any more, this gate would be demanding a spelling the product
-  // no longer uses, and the reader of a failure would have no example to copy.
+  // Non-vacuity on the population, and on the GUARDED shape specifically.
   assert.ok(
     bindings.length >= 30,
     `only ${bindings.length} \`aria-label\` attributes reached the scan, against the 45 this ` +
@@ -403,8 +282,7 @@ test('no aria-label can render empty and suppress the name the content already g
 
 test('every finding cites a file the corpus actually holds', () => {
   // The mirror guard. Both baselines key on a path, and a path that no longer exists is a row that
-  // can never be observed — which `assertRatchet` reports as VANISHED, correctly but late. This
-  // says it in the language of the mistake: the file was renamed and the row was not.
+  // can never be observed — which `assertRatchet` reports as VANISHED, correctly but late.
   const wanted = corpus().wanted;
   const stale = [...KNOWN_UNTRANSLATED_NAME_DEFAULTS, ...KNOWN_EMPTY_NAME_BINDINGS]
     .map((row) => row.key.split(' | ')[0])

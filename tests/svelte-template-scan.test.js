@@ -1,37 +1,4 @@
-/**
- * Direct proof for the template scanner in `tests/helpers/svelteTemplateScan.js` (issue 1497).
- *
- * Its three consumers — the native-`<select>` ratchet, the required-names gate and the
- * keyboard-focus gate — can each assert only a TOTAL over the real corpus, and a total cannot
- * tell a subtly blind walk from a correct one on the days the two happen to agree. Worse, every
- * one of those gates fails in the SAFE-LOOKING direction when the walk goes blind: fewer
- * `<select>` elements, fewer unnamed controls, fewer undeclared focus targets. A walk that stops
- * descending into `{#each}` reports a tidier product.
- *
- * So the properties live here, and each one is a defect this repository has actually shipped or
- * come within one edit of shipping:
- *
- *   - an element-only walk lost three focus targets in ONE change, when three manager landmarks
- *     became component tags carrying a rest spread (issue 1039).
- *   - a regex walk ended the tag at the first `>` in the source, which inside
- *     `use:portal={() => host()}` is the arrow's, and could not see `ThresholdBandStrip`.
- *   - a hand-listed child walk skips whichever AST branch it forgot, and `{#if}`, `{#each}`,
- *     `{#snippet}` and a component's default slot are four differently-named branches.
- *   - `parse` without `modern: true` returns a legacy AST with no `RegularElement` in it, so a
- *     caller that forgot the flag walks a real tree and reports nothing, without erroring.
- *
- * ── WHY THE FIXTURES ARE STRINGS, AND WHY ONE OF THEM IS A REAL FILE ────────────────────
- * `UI_PATH_PATTERN` in `scripts/lib/viewLabCases.js` is `/^(src\/ui\/|styles\/)|\.(svelte|css)$/`,
- * and its second alternation is NOT anchored to a directory — so `isUiFile` returns true for
- * `tests/fixtures/anything.svelte`. A COMMITTED `.svelte` fixture would arm the screenshot-
- * evidence gate on every change that touches it while rendering nothing at all. Templates are
- * therefore parsed from strings.
- *
- * `svelteFiles` cannot be: it is a filesystem walk, and proving it against strings would prove
- * nothing about recursion, extension filtering or ordering. It is exercised over REAL FILES in a
- * tmpdir, which `isUiFile` never reaches and which is never committed — the arrangement
- * `style-block-scan.test.js` arrived at for the same conflict.
- */
+/** Direct proof for the template scanner in `tests/helpers/svelteTemplateScan.js` (issue 1497). */
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -77,9 +44,7 @@ function withTempTree(body) {
 }
 
 test('the walk descends into every block form, not a hand-listed set of child keys', () => {
-  // FOUR DIFFERENTLY-NAMED BRANCHES, one per block form, plus a component's default slot. A walk
-  // written against `node.children` sees the first and misses the rest, and misses them SILENTLY:
-  // the assertion it feeds reports a tidier tree.
+  // FOUR DIFFERENTLY-NAMED BRANCHES, one per block form, plus a component's default slot.
   const seen = visited(
     [
       '{#if open}<span id="in-if"></span>{/if}',
@@ -101,10 +66,7 @@ test('the walk descends into every block form, not a hand-listed set of child ke
 });
 
 test('a Component tag is visited, because a rest spread makes it the rendered element', () => {
-  // The issue 1039 defect, as a property. `<ManagerToolbar tabindex="-1">` forwards the attribute
-  // onto whatever element the primitive writes, so the RENDERED node is a focus target while the
-  // AST node is a `Component`. Three landmarks converted in one change; an element-only walk
-  // would have dropped all three and taken the gate's non-vacuity floor down with them.
+  // The issue 1039 defect, as a property.
   const seen = visited('<ManagerToolbar tabindex="-1" data-keyboard-focus="true" />');
 
   assert.deepEqual(
@@ -117,8 +79,7 @@ test('a Component tag is visited, because a rest spread makes it the rendered el
 
 test('`inForm` is true only under a real <form> element, and a component is not one', () => {
   // Foundry's `hasFocus` returns `!!focused.form` for a BUTTON, so this flag is the difference
-  // between a recognised control and a bare div. A component NAMED `Form` is not a `<form>`: it
-  // renders whatever it renders, and treating it as one would exempt every button inside it.
+  // between a recognised control and a bare div.
   const seen = visited(
     [
       '<button id="outside"></button>',
@@ -138,9 +99,8 @@ test('`inForm` is true only under a real <form> element, and a component is not 
 });
 
 test('the flag is scoped to the subtree, so a sibling after a form is outside it', () => {
-  // The mutable-accumulator mistake: thread `inForm` as a shared variable rather than a
-  // parameter, and every element AFTER the first `<form>` in the file inherits it. That exempts
-  // the whole rest of the template and there is no assertion over element identity that notices.
+  // The mutable-accumulator mistake: thread `inForm` as a shared variable rather than a parameter,
+  // and every element AFTER the first `<form>` in the file inherits it.
   const seen = visited('<form><button id="a"></button></form>\n<button id="b"></button>');
 
   assert.deepEqual(
@@ -154,8 +114,7 @@ test('the flag is scoped to the subtree, so a sibling after a form is outside it
 test('an attribute written after a directive holding `>` is still found', () => {
   // THE REGEX DEFECT, PINNED. `/<(\w+)\b([^>]*?)>/` ends the tag at the `>` inside the arrow
   // function, so `tabindex` — written after it — does not exist as far as that matcher is
-  // concerned. Two files were corrupted by a patch built on it before anyone noticed the walk was
-  // also under-reporting.
+  // concerned.
   const source = '<div use:portal={() => getPopoverHost()} tabindex="-1" role="button"></div>';
   const [element] = elementsOf(source);
 
@@ -170,9 +129,7 @@ test('an attribute written after a directive holding `>` is still found', () => 
 });
 
 test('a spread and a directive are not attributes, however they are spelled', () => {
-  // `attributeNamed` filters on `type === 'Attribute'`, and both halves of that matter. A
-  // `SpreadAttribute` may well carry the key at runtime, and no template scanner can decide that
-  // — reporting it as declared would be a permission granted by a guess.
+  // `attributeNamed` filters on `type === 'Attribute'`, and both halves of that matter.
   const source = '<div {...rest} bind:this={node} onclick={run} tabindex="-1"></div>';
   const [element] = elementsOf(source);
 
@@ -203,8 +160,7 @@ test('svelteFiles recurses, filters by extension, and returns a stable order', (
   withTempTree((root) => {
     mkdirSync(join(root, 'nested', 'deeper'), { recursive: true });
     // Written out of order on purpose: `readdirSync` is not required to sort, and two of these
-    // gates pin per-file counts. An order that differed between a dev machine and the runner
-    // would produce a diff nobody authored.
+    // gates pin per-file counts.
     writeFileSync(join(root, 'nested', 'deeper', 'Zulu.svelte'), '<i></i>\n');
     writeFileSync(join(root, 'nested', 'deeper', 'Alpha.svelte'), '<i></i>\n');
     writeFileSync(join(root, 'nested', 'Mike.svelte'), '<i></i>\n');
@@ -226,9 +182,7 @@ test('svelteFiles recurses, filters by extension, and returns a stable order', (
 });
 
 test('parsedTemplates reaches the real corpus and reports POSIX-separated paths', () => {
-  // The non-vacuity control for the helper itself, over the tree its consumers scan. A walk that
-  // returned nothing would leave all three gates green with empty findings, which is the exact
-  // failure this file exists to make audible.
+  // The non-vacuity control for the helper itself, over the tree its consumers scan.
   const templates = parsedTemplates();
 
   assert.ok(

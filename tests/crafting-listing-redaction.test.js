@@ -1,31 +1,7 @@
 /**
- * Player-visible redaction pins for the crafting read path (issue 1075, under #1070).
- *
- * ## Why this suite exists, and why it lands BEFORE the summary/detail split
- *
- * #1075 splits `CraftingListingBuilder.buildListing` into a cheap paged summary phase and
- * a per-recipe detail phase. The risk in that split is not performance, it is DISCLOSURE:
- * `RecipeVisibilityService` is over two thousand lines, the teaser gate it feeds is the only
- * thing standing between an undiscovered recipe and the player's screen, and the failure
- * mode of moving a field to the wrong phase is a leak rather than a slow list.
- *
- * So the behaviour is pinned against the PRE-SPLIT builder first, and every later commit has
- * to keep these assertions green. A regression suite written after a refactor pins the
- * refactor, not the behaviour it was supposed to preserve.
- *
- * ## The adapter is the only thing the split is allowed to move
- *
- * Every assertion below reaches the player-visible model through {@link playerView}. Before
- * the split it reads one corpus-wide listing of rich models; after it, `rows` are #1091
- * summaries and `detailFor` hydrates one recipe. That indirection is deliberate: it keeps the
- * ~30 disclosure assertions BYTE-IDENTICAL across the split, so the diff of the commit that
- * performs the split shows the adapter moving and nothing else. An assertion rewritten in the
- * same commit as the code it guards proves nothing.
- *
- * `rows` are therefore only ever asserted on fields BOTH shapes carry — identity, grouping,
- * browse status and the redaction verdict. The material-availability half is deliberately not
- * asserted at row level, because the split legitimately re-derives it through #1077's
- * optimistic projection; what must not change is who is redacted and what is withheld.
+ * Player-visible redaction pins for the crafting read path (issue 1075, under #1070). So the
+ * behaviour is pinned against the PRE-SPLIT builder first, and every later commit has to keep these
+ * assertions green.
  */
 
 import assert from 'node:assert/strict';
@@ -53,9 +29,8 @@ const LIBRARY = Object.freeze([
   },
   { id: 'c-slag', name: 'Cooled Slag', img: 'icons/slag.webp', difficulty: 3 },
   { id: 'c-warding-nail', name: 'Warding Nail', img: 'icons/nail.webp', difficulty: 4 },
-  // Tags are authored on the COMPONENT definition, which is the only place Fabricate ever
-  // writes them (issue 857). The tag-matched fixtures below hold an item that carries no
-  // `flags.fabricate.tags` of its own, exactly as a real owned stack does.
+  // Tags are authored on the COMPONENT definition, which is the only place Fabricate ever writes
+  // them (issue 857).
   {
     id: 'c-brine-salt',
     name: 'Brine Salt',
@@ -140,14 +115,7 @@ function teaserAccess(hiddenFields) {
   };
 }
 
-/**
- * A builder over a fixed entry list, with an `evaluateCraftability` tripwire.
- *
- * The tripwire is counted rather than merely stubbed: "an undiscovered recipe's exact
- * craftability is never computed" is the disclosure half nothing in the returned model can
- * show, since the leak would be the WORK rather than a field. `counters` is returned so a
- * test can prove the count is non-vacuous by invoking the tripwire itself.
- */
+/** A builder over a fixed entry list, with an `evaluateCraftability` tripwire. */
 function forgeBuilder({
   entries,
   system = forgeSystem(),
@@ -188,9 +156,8 @@ function forgeBuilder({
     craftingSystemManager,
     localize: (key) => key,
     nowWorldTime: () => 4200,
-    // The summary phase's held-quantity tallies resolve item identity through this seam
-    // (issue 1075). Wired by NAME here, which is enough for a fixture and keeps the real
-    // four-module matcher graph out of the suite.
+    // The summary phase's held-quantity tallies resolve item identity through this seam (issue
+    // 1075).
     resolveComponentForItem: (item, components) =>
       components.find((component) => component.name === item?.name) ?? null,
     ...(isSystemBlockedForRecipes && { isSystemBlockedForRecipes }),
@@ -198,14 +165,7 @@ function forgeBuilder({
   return { builder, counters, recipeManager };
 }
 
-/**
- * The viewing character, holding MORE than the fixture recipe requires.
- *
- * A stocked actor rather than an empty one, because after the summary/detail split the row's
- * material verdict comes from what this actor really holds instead of from a stubbed
- * `canCraft`. An empty actor would paint every row `missingMaterials`, which outranks nothing
- * but does mask the statuses these tests are actually about.
- */
+/** The viewing character, holding MORE than the fixture recipe requires. */
 const ACTOR = Object.freeze({
   id: 'actor-fern',
   name: 'Fern',
@@ -223,9 +183,8 @@ function playerView({ builder }, viewer = PLAYER, craftingActor = ACTOR) {
     listing,
     rows,
     rowFor: (id) => rows.find((row) => row?.id === id) ?? null,
-    // Deliberately by ID and with no `access` argument, so the detail phase re-resolves
-    // visibility for itself. Handing it the row's access would test the projection while
-    // skipping the gate that decides whether the projection may run at all.
+    // Deliberately by ID and with no `access` argument, so the detail phase re-resolves visibility
+    // for itself.
     detailFor: (id) => builder.buildRecipeDetail({ recipeId: id, craftingActor, viewer }),
   };
 }
@@ -249,11 +208,9 @@ describe('crafting redaction — an undiscovered recipe stays undiscovered', () 
   });
 
   it('carries no material-availability signal on a redacted row', () => {
-    // Availability is derived from the recipe's INGREDIENTS, one of the three fields a
-    // teaser hides by default, so a row answering "you have the materials" would leak the
-    // shape of a requirement the player is not meant to see — once per inventory change.
-    // Asserted as falsy rather than `=== null` so it holds for a shape that omits the field
-    // entirely as well as one that withholds it.
+    // Availability is derived from the recipe's INGREDIENTS, one of the three fields a teaser hides
+    // by default, so a row answering "you have the materials" would leak the shape of a requirement
+    // the player is not meant to see — once per inventory change.
     const row = playerView(fullyHidden()).rowFor('r-warding-nails');
     assert.ok(!row.availability, 'no availability may ride on a redacted row');
   });
@@ -281,10 +238,9 @@ describe('crafting redaction — an undiscovered recipe stays undiscovered', () 
   });
 
   it('withholds the duration and the step structure regardless of the hidden-field list', () => {
-    // Timing and step shape are spoiler detail for a Discovery-Mode teaser independently of
-    // the configurable result-field redaction, so a teaser naming ONLY `ingredients` must
-    // still surface neither. The recipe authors a 6-hour requirement, so a `null` here is a
-    // decision rather than an absent fixture value.
+    // Timing and step shape are spoiler detail for a Discovery-Mode teaser independently of the
+    // configurable result-field redaction, so a teaser naming ONLY `ingredients` must still surface
+    // neither.
     const partial = forgeBuilder({
       entries: [{ recipe: forgeRecipe(), access: teaserAccess(['ingredients']) }],
     });
@@ -303,11 +259,7 @@ describe('crafting redaction — an undiscovered recipe stays undiscovered', () 
   });
 
   it('never evaluates exact craftability for a redacted recipe', () => {
-    // The disclosure no returned field can show: the leak here would be the WORK, not a
-    // value. Exact evaluation reads the actor's inventory against the hidden requirements,
-    // and a "why is opening this list slow only when I own the reagents?" oracle is a real
-    // side channel — but the first-order reason is simpler: a redacted model has nowhere to
-    // put the answer, so computing it is pure disclosure risk for no product.
+    // The disclosure no returned field can show: the leak here would be the WORK, not a value.
     const { builder, counters, recipeManager } = fullyHidden();
     playerView({ builder });
     assert.equal(counters.get('evaluateCraftability'), 0);
@@ -353,9 +305,8 @@ describe('crafting redaction — a partial teaser hides exactly what it names', 
   });
 
   it('never attaches per-set craftability to a teaser, even when ingredients are shown', () => {
-    // The set NAMES are permitted for a teaser that does not hide `ingredients`; the actor's
-    // exact standing against them is not, in either direction. A satisfied-looking set is
-    // the same disclosure as an unsatisfied one.
+    // The set NAMES are permitted for a teaser that does not hide `ingredients`; the actor's exact
+    // standing against them is not, in either direction.
     const detail = playerView(partial(['results'])).detailFor('r-warding-nails');
     assert.equal(detail.ingredientSets[0].craftability, null);
   });
@@ -481,9 +432,7 @@ describe('crafting redaction — a blocked system exposes nothing to a player', 
   });
 });
 
-// ---------------------------------------------------------------------------
 // The material verdict a row actually carries
-// ---------------------------------------------------------------------------
 
 /** A tag-matched recipe: 2x anything carrying the authored `quenchant` tag. */
 function brineRecipe() {
@@ -508,12 +457,7 @@ function brineRecipe() {
   });
 }
 
-/**
- * An actor holding `quantity` Brine Salt and NOTHING ELSE.
- *
- * The held item carries no `flags.fabricate.tags`, because Fabricate never stamps that flag
- * onto an inventory item — its tags come from the `c-brine-salt` component it resolves to.
- */
+/** An actor holding `quantity` Brine Salt and NOTHING ELSE. */
 function brineActor(quantity) {
   return {
     id: 'actor-brine',
@@ -526,11 +470,8 @@ const visible = (recipe) => ({ recipe, access: { visible: true, reason: 'ok' } }
 
 describe('crafting availability — a row says what the actor really holds', () => {
   it('reports a tag-matched recipe AVAILABLE from the component-authored tags', () => {
-    // The defect this pins (issue 857 read forwards): authored tags live on the managed
-    // component, never on the owned item's flags. A tally reading only the item flag is
-    // empty in every real world, so every tag-matched option reported `false` — the row
-    // painted "Missing materials" while the inspector this PR hydrates from the exact model
-    // said "Available", on the same screen, in the direction the contract forbids.
+    // The defect this pins (issue 857 read forwards): authored tags live on the managed component,
+    // never on the owned item's flags.
     const view = playerView(
       forgeBuilder({ entries: [visible(brineRecipe())] }),
       PLAYER,
@@ -561,11 +502,8 @@ describe('crafting availability — a row says what the actor really holds', () 
   });
 
   it('carries a non-null availability on an ordinary component-matched row', () => {
-    // `assert.ok(!row.availability)` on the redacted row is only a controlled negative if
-    // something asserts the field IS populated when it should be. Without this pair, a
-    // summary phase that stopped passing the snapshot altogether would leave every
-    // assertion in this file green while every player row read "available" regardless of
-    // inventory.
+    // `assert.ok(!row.availability)` on the redacted row is only a controlled negative if something
+    // asserts the field IS populated when it should be.
     const row = playerView(forgeBuilder({ entries: [visible(forgeRecipe())] })).rowFor(
       'r-warding-nails'
     );
@@ -584,9 +522,7 @@ describe('crafting availability — a row says what the actor really holds', () 
   });
 });
 
-// ---------------------------------------------------------------------------
 // The detail phase's own gates — an id is not a permission
-// ---------------------------------------------------------------------------
 
 describe('crafting detail gates — hydrating by id re-applies every summary-phase gate', () => {
   it('answers nothing for an id no recipe exists for', () => {
@@ -596,9 +532,7 @@ describe('crafting detail gates — hydrating by id re-applies every summary-pha
   });
 
   it('re-applies the system block; an id is not a permission', () => {
-    // `hydrateCraftingRecipe({recipeId})` is client-reachable and the id arrives from the
-    // client. Without this gate a player passes a blocked system's recipe id and receives
-    // the full rich model — description, ingredient sets, check DC, outcome tiers.
+    // `hydrateCraftingRecipe({recipeId})` is client-reachable and the id arrives from the client.
     const blocked = () =>
       forgeBuilder({
         entries: [visible(forgeRecipe())],
@@ -631,10 +565,8 @@ describe('crafting detail gates — hydrating by id re-applies every summary-pha
   });
 
   it('answers nothing for a recipe the GM has disabled', () => {
-    // The summary phase sources from `getRecipes({enabled: true})`, so it can never project
-    // a disabled recipe. `recipeManager.getRecipe` applies no such filter, so without this
-    // gate a player who holds an id from before the GM disabled it — or any id at all —
-    // hydrates the full model of a recipe the summary phase would refuse to list.
+    // The summary phase sources from `getRecipes({enabled: true})`, so it can never project a
+    // disabled recipe.
     const disabled = () => forgeBuilder({ entries: [visible(forgeRecipe({ enabled: false }))] });
 
     assert.equal(playerView(disabled()).detailFor('r-warding-nails'), null);

@@ -4,11 +4,6 @@
  * components are not compiled in the Node test runner, so we assert their source
  * shape). The non-trivial view logic is covered separately by
  * interactable-config-view.test.js + interactable-config-actions.test.js.
- *
- * Covers: ApplicationV2 + SvelteApplicationMixin per-ref instance semantics, the
- * services bag routing every write through the active-GM behaviour-update edge
- * (no client-side mutation), the action seams (test-as-player, jump, relink,
- * recreate, remove, restock, enable/lock, delete), and the factory registration.
  */
 
 import { describe, it, afterEach } from 'node:test';
@@ -40,15 +35,7 @@ const rootSource = readFileSync(
   'utf8'
 );
 
-/**
- * The primitives this panel adopted (issue 1520), read so the clauses below can assert the
- * WHOLE chain rather than one end of it.
- *
- * A source-shape suite that only checked what this root PASSES would pass just as happily if
- * the primitive stopped honouring it, and one that only checked the primitive would say
- * nothing about this window. Each retargeted clause therefore reads both: the prop this root
- * writes, and the attribute, class or paint the primitive turns it into.
- */
+/** The primitives this panel adopted (issue 1520). */
 const noticeSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/components/Notice.svelte'),
   'utf8'
@@ -88,13 +75,7 @@ describe('InteractableConfigApp shell', () => {
   });
 
   it('routes every write through the active-GM behaviour-update edge (no client mutation)', () => {
-    // The panel must not call behavior.update(...) directly; all writes go through
-    // emitInteractableBehaviorWrite (local apply on the active GM, socket emit
-    // otherwise) or the active-GM-routed applier seams.
-    // writeBehavior wraps system-CONTENTS under `system` exactly once — a
-    // RegionBehavior.update needs `{ system: ... }` or the write silently no-ops
-    // (BUG: Disable/Lock never persisted). The relink/recreate seams wrap
-    // separately and must NOT route through writeBehavior.
+    // The panel must not call behavior.update(...) directly.
     assert.ok(appSource.includes('emitInteractableBehaviorWrite(behavior)({ system: systemPatch })'), 'writeBehavior wraps the system patch under { system }');
     assert.ok(!/behavior\.update\(/.test(appSource), 'no direct behavior.update(...) client mutation');
     assert.ok(appSource.includes('applyInteractableBehaviorUpdate'), 'relink/recreate route the GM behaviour-update edge');
@@ -166,8 +147,7 @@ describe('InteractableConfigApp shell', () => {
     assert.ok(appSource.includes('configureSource:'), 'declares the configureSource service');
     assert.ok(appSource.includes('planConfigureSource(readInteractableBehaviorSystem(behavior)'), 'uses the pure planner');
     assert.ok(/configureSource:[\s\S]*?_assertGM\(\)/.test(appSource), 'configureSource is GM-guarded');
-    // The write routes through writeBehavior (the GM-routed seam), and no-ops on an
-    // incomplete selection (planner returns null → no partial write).
+    // The write routes through writeBehavior (the GM-routed seam).
     assert.ok(/configureSource:[\s\S]*?if \(!patch\) return undefined/.test(appSource), 'no-ops on an incomplete selection (no partial write)');
     assert.ok(/configureSource:[\s\S]*?writeBehavior\(patch\.system\)/.test(appSource), 'routes the GM behaviour-update seam');
   });
@@ -290,23 +270,6 @@ describe('InteractableConfigRoot body', () => {
   });
 
   // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
-  //
-  // Each of these attributes moved from an element this file writes onto a shared primitive's
-  // element - through a rest spread, a `triggerData` map or a `dataAttr` prop - and one
-  // of them (`data-interactable-needs-config`) had NO route at all until `Notice`'s
-  // declared hook prop was used, because that component takes no rest spread. The View Lab's
-  // two config cases select on three of them as well, and a lab selector that resolves nothing
-  // fails the WHOLE capture rather than one frame.
-  //
-  // THE MECHANISM MOVED TO `tests/helpers/interactablesSmokeLocators.js` (issue 1520, phase 5),
-  // which is where the browser's and the manager's own copies of this clause read it from as
-  // well. One extraction and one matcher, so the token terminator and the non-vacuity floor
-  // cannot be right in one window's suite and wrong in another's - and so three near-identical
-  // loops do not become new duplicated lines under the SonarCloud gate.
-  //
-  // The PREFIX is scoped and the negative lookahead is load-bearing rather than tidy: phase 5
-  // added `data-interactable-manager-*` and `data-interactable-browser-*` hooks to the same
-  // harness, and an unscoped `data-interactable-*` scan would assert THIS root writes them.
   it('still emits every data-interactable-* locator the Foundry smoke drives', () => {
     assertLocatorsEmitted({
       locators: prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-(?!manager-|browser-)'),
@@ -315,37 +278,18 @@ describe('InteractableConfigRoot body', () => {
       what: 'config-panel hooks',
       root: 'the config root',
     });
-    // The window's own root container, which the smoke waits on three times and which the
-    // conversion deliberately KEEPS: it is the scroll box, not a control family.
+    // The window's own root container.
     assert.ok(SMOKE_SOURCE.includes('.fabricate-interactable-config'), 'the smoke keys on the root container');
     assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'and the root container is still emitted');
   });
 
   // AN OPTION PANEL IS NEVER NARROWER THAN THE TRIGGER IT DROPS FROM (issue 1520 review).
-  //
-  // The published `interactables-config-source-open` frame - the one the design-system spec now
-  // REQUIRES this change to carry, because it is the only assertion that distinguishes a panel
-  // portalled onto the window frame from one that fell back to `<body>` - shipped a 340px option
-  // panel hanging under a 450px trigger. The two halves are separately correct and wrong
-  // together: this window states `width: 100%` on the trigger, as `Select` documents a
-  // converting full-width site must, and `Select`'s `form` rung caps its PANEL at 340px, which
-  // was the primitive's own untouched band from before any full-width caller existed. A native
-  // `<select>`'s popup is never narrower than its control, and these replaced native `<select>`s.
-  //
-  // Every link is read, because the cap is spent through three files: the constant this window
-  // passes, the prop the primitive honours in preference to its band, and the clamp that turns
-  // the pair into a width. The count is EXACT so a ninth select added without the cap reds here
-  // rather than shipping one narrow panel among eight correct ones.
   it('caps its option panels wide enough for a full-width trigger', () => {
     assert.ok(
       rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 480'),
       "the cap is this window's declared width, so it never binds and the trigger decides"
     );
-    // THE CORPUS IS THE EMITTING HALF, matching the sibling clause in
-    // `interactable-browser-app.test.js` (issue 1520 review round 2). Correct either way today —
-    // no comment in this root writes a `<Select …/>` tag — but an EXACT count over a whole-file
-    // corpus is a census a docblock example can move, and two clauses added in one change should
-    // not read the same file two ways.
+    // THE CORPUS IS THE EMITTING HALF.
     const selects = emittingHalfOf(rootSource).match(/<Select\b[\s\S]*?\/>/g) ?? [];
     assert.equal(selects.length, 8, 'the panel renders eight shared selects');
     for (const tag of selects) {
@@ -359,9 +303,7 @@ describe('InteractableConfigRoot body', () => {
       'the trigger is full width, which is what makes the band too narrow'
     );
 
-    // The primitive's half, both ends: the band the cap replaces, and the precedence that lets a
-    // caller replace it. A `maxWidth` prop that stopped winning over the band would leave every
-    // assertion above green and every panel narrow again.
+    // The primitive's half, both ends: the band the cap replaces.
     assert.ok(
       selectSource.includes('form: Object.freeze({ minWidth: 240, maxWidth: 340 })'),
       "the form rung's own band is the 340px one this window overrides"
@@ -372,7 +314,6 @@ describe('InteractableConfigRoot body', () => {
     );
 
     // And the clamp, which is why raising the cap widens the panel instead of fixing it at 480:
-    // the panel takes the trigger's width, floored at `minWidth` and ceilinged at `maxWidth`.
     assert.ok(
       popoverLayoutSource.includes('clamp(Math.max(triggerWidth, minWidth), minWidth, maxWidth)'),
       'the panel width tracks the trigger between the two bounds'
@@ -380,35 +321,11 @@ describe('InteractableConfigRoot body', () => {
   });
 
   // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520).
-  //
-  // This clause used to assert `rootSource.includes('.fab-ic-')` under the message "component
-  // classes are fab-ic-* scoped" - which asserted the PRESENCE of the exact debt issue 1520
-  // removes, and which would still pass today, because layout residue keeps the prefix alive.
-  // Deleting it would have left this suite saying nothing at all about how the window is
-  // painted, so it is inverted instead: every CONTROL family is a shared primitive imported
-  // from `src/ui/svelte/components/`, and the `.fab-ic-*` names that survive are an
-  // EXACT allow-list of this window's own layout.
-  //
-  // THE STATEMENT AND ITS DATA BOTH LIVE IN `tests/helpers/interactablesWindowContract.js`,
-  // which the browser's and the manager's own copies of this clause read as well: one shape
-  // over three allow-lists, so an exactness that is right for one window cannot be loosened
-  // for another - and so three near-identical bodies do not become new duplicated lines.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
     assertWindowContract({ rootSource, contract: CONFIG_PANEL_CONTRACT });
   });
 
-  // THE LIVE STATE IS A SWITCH WHERE THE LABEL IS A STATE, AND A PRESSED BUTTON WHERE IT IS NOT
-  // (issue 1520, and the maintainer ruling at review).
-  //
-  // Two of this panel's four `aria-pressed` controls are `<StatusToggle>`s - the task-node link,
-  // whose two labels read "Linked to gathering task" / "Independent…", and "Hidden from players".
-  // The other two are NOT, and that is the ruling rather than an omission: "Disable" and "Lock"
-  // flip to "Enable" and "Unlock", which are action verbs, so a knob drawn ON beside the word
-  // "Enable" states the opposite of the state it reports. Issue 1625 supplies the state readings
-  // and converts them; until then they are `ManagerButton`s carrying `aria-pressed`.
-  //
-  // Every link in each chain is read, because any one of them alone would go green while the
-  // pair beside it was broken.
+  // THE LIVE STATE IS A SWITCH WHERE THE LABEL IS A STATE.
   it('shows the live linked/hidden state on the shared switch (on -> aria-pressed + is-on)', () => {
     assert.ok(rootSource.includes('on={!isUnlinked}'), 'the task-node switch is on when the node is linked');
     assert.ok(rootSource.includes('on={view.presentation.hidden}'), 'the hidden switch is on when the interactable is hidden from players');
@@ -420,15 +337,14 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(statusToggleSource.includes('on ? STATE_CLASSES.on : STATE_CLASSES.off'), 'StatusToggle draws `on` as its state class');
     assert.ok(statusToggleSource.includes("const STATE_CLASSES = Object.freeze({ on: 'is-on', off: 'is-off' })"), 'the state class is is-on/is-off');
 
-    // The sheet's half: the on position is a THEMED accent, never a literal colour - which is
-    // the substance the deleted `.fab-ic-btn-toggle.is-active` assertion carried.
+    // The sheet's half: the on position is a THEMED accent.
     assert.ok(
       /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
       'the on position is painted with the themed accent token'
     );
   });
 
-  // AND EACH SWITCH REACHES THE `aria-pressed` BRANCH, which the clause above does NOT establish
+  // AND EACH SWITCH REACHES THE `aria-pressed` BRANCH.
   // (issue 1520 review). `StatusToggle` renders one of three hosts off its `as` prop, and only
   // the default `button` host writes `aria-pressed`: `as="checkbox"` renders a `<label>` around
   // a real `<input type="checkbox">` and `as="indicator"` renders a `<span role="img">`, neither
@@ -437,11 +353,6 @@ describe('InteractableConfigRoot body', () => {
   // load-bearing: the Foundry smoke reads `aria-pressed` off the node-link control and
   // `interactables-config-configured` selects on it, so a host change here would fail a capture
   // WHOLE rather than fail a test.
-  //
-  // Asserted as the ABSENCE of a host declaration on every tag, not as the presence of an
-  // expected one, because the default is what these sites want and writing `as="button"` on each
-  // would be the same statement made twice. The rest spread is refused for the same reason it
-  // would defeat the check: `{...someBag}` could carry an `as` this scan cannot see.
   it('leaves every one of its switches on the default pressable host', () => {
     const tags = rootSource.match(/<StatusToggle\b[\s\S]*?\/>/g) ?? [];
     assert.equal(tags.length, 2, 'the panel renders exactly the node-link and hidden switches');
@@ -453,21 +364,14 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(statusToggleSource.includes("as = 'button'"), 'the unspecified host is the pressable button');
   });
 
-  // THE TWO CONTROLS THAT DECLINED THE CONVERSION, PINNED AS BUTTONS (issue 1520, maintainer
-  // ruling). Without this clause the ruling lives only in a source comment, and the next reader
-  // "finishes the job" - which is exactly the outcome the ruling rejects. The polarity is pinned
-  // with it: `aria-pressed` reads DISABLED and LOCKED, which is what the shipped button announced
-  // before the conversion and what issue 1625 must preserve when it supplies the state readings.
+  // THE TWO CONTROLS THAT DECLINED THE CONVERSION.
   it('keeps Disable and Lock as pressed buttons, with the state on aria-pressed', () => {
     assert.ok(rootSource.includes('aria-pressed={view.state.enabled === false}'), 'Disable announces pressed while the interactable is disabled');
     assert.ok(rootSource.includes('aria-pressed={view.state.locked === true}'), 'Lock announces pressed while the interactable is locked');
     assert.ok(!rootSource.includes('on={view.state.enabled === false}'), 'Disable is not a switch');
     assert.ok(!rootSource.includes('on={view.state.locked === true}'), 'Lock is not a switch');
 
-    // The pressed state has a VISUAL expression, which is the half the sheet records as missing
-    // for the component browser's grouping switch - a `.manager-button` under a class with no CSS
-    // anywhere, so its `aria-pressed` state was announced and never drawn. Keyed on the attribute
-    // rather than on a companion class, so the drawn and announced states cannot drift.
+    // The pressed state has a VISUAL expression.
     assert.ok(
       /\.fab-ic-actions :global\(\.fabricate-button\[aria-pressed='true'\]\)\s*\{[^}]*var\(--fab-accent\)/.test(rootSource),
       'the pressed state is drawn from the themed accent token, keyed on aria-pressed'
@@ -477,8 +381,7 @@ describe('InteractableConfigRoot body', () => {
   it('renders the read-only facts as an inline grid and labels the gate "Status"', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.StatusLabel'), 'uses the Status label key (renamed from Activation)');
     assert.ok(!rootSource.includes('FABRICATE.Canvas.Interactable.Config.ActivationLabel'), 'no longer references the Activation label key');
-    // Grid layout: 3 columns with the environment fact, 2 without — driven by a
-    // class toggle, with a min-width container collapse for narrow panels.
+    // Grid layout: 3 columns with the environment fact, 2 without.
     assert.ok(rootSource.includes("class:has-environment={view.interactableType === 'gatheringTask'}"), 'environment presence toggles the grid columns');
     assert.ok(/\.fab-ic-fact-list\s*\{[\s\S]*?display:\s*grid/.test(rootSource), 'fact list is a grid (inline columns), not a vertical stack');
     assert.ok(rootSource.includes('repeat(3, minmax(0, 1fr))'), '3 columns when the environment fact is present');
@@ -487,8 +390,7 @@ describe('InteractableConfigRoot body', () => {
   });
 
   it('pins the "Needs configuration" identity state + the picker write-through (issue 342)', () => {
-    // A prominent unconfigured state, driven by the single authority surfaced on
-    // the view model (view.unconfigured), with a write-through picker.
+    // A prominent unconfigured state.
     assert.ok(rootSource.includes('view?.unconfigured === true'), 'reads the unconfigured authority from the view model');
     assert.ok(rootSource.includes('data-interactable-needs-config'), 'renders the Needs-configuration state');
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'), 'localized Needs-configuration title');
@@ -501,12 +403,7 @@ describe('InteractableConfigRoot body', () => {
     // The Apply button is gated so an incomplete selection cannot be submitted.
     assert.ok(rootSource.includes('disabled={!canApplyIdentity}'), 'Apply is disabled until the selection is complete');
     // THE PROMINENCE IS THE NOTICE'S WARNING TONE, AND IT IS PAINTED ONCE (issue 1520).
-    //
     // This clause used to read the section's own `.fab-ic-identity.is-unconfigured` accent box.
-    // That class sat on the SECTION - around the banner AND the picker beneath it - so keeping
-    // it beside a toned `<Notice>` would have drawn two tinted, bordered boxes for one state,
-    // in two different colour families. The box is deleted and the tone is where the statement
-    // lives, so the assertion is a positive one about the tone reaching the bar.
     assert.ok(rootSource.includes('tone="warning"'), 'the needs-configuration bar is a warning-toned Notice');
     assert.ok(rootSource.includes('dataAttr="data-interactable-needs-config"'), 'the hook rides the declared prop, which is the only route Notice offers');
     assert.ok(

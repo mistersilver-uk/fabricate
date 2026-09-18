@@ -1,9 +1,4 @@
-/**
- * Fixtures and rendered-geometry readers for `manager-layout-downtime.js` (issue 1670).
- *
- * GM Downtime rail, preview and companion-panel layout: the markup, the component sources and the
- * page readers that surface's tests measure through. Nothing here asserts.
- */
+/** Fixtures and rendered-geometry readers for `manager-layout-downtime.js` (issue 1670). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,19 +13,6 @@ import { css } from './manager-layout-shared.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // -- The GM Downtime preview at a real window width (issue 1185) ------------------------
-//
-// A container query is measured against the CONTENT box, so a threshold reads far larger
-// than the window it actually fires in. The shipped preview collapsed at `max-width: 1040px`
-// and an ordinary 1314px Foundry window gives this panel 1052px: the board dropped below the
-// hero and the four feature cards folded to 2x2 on a window nobody would call narrow. The
-// visual-parity harness could not see it either, because it ran at the one width that cleared
-// the breakpoint -- by four pixels.
-//
-// So this gate measures the arrangement at the width the defect was reported from, and at the
-// widths where the layout is SUPPOSED to fold, in a real browser with the component's own
-// compiled CSS. Nothing else in the repository can evaluate a container query: happy-dom
-// cannot compute a cascade, and a source assertion on the breakpoint number would pass on any
-// arithmetic somebody wrote down.
 const downtimePreviewPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte'
@@ -94,19 +76,6 @@ export async function readDowntimePreviewArrangement(paneWidth) {
 }
 
 // -- Downtime rail tab badges, measured (issue 1302) --------------------------------------
-//
-// A companion's badge is the ISSUE-SUMMARY vehicle in the sub-item's trailing track (issue
-// 1515 moved it off the record-count vehicle), and its label is the companion's own and is
-// not Core's to shorten. So the interesting question is not
-// whether the numeral fits — it is what YIELDS when it does not, and that is a computed-layout
-// fact no other harness in the repository can evaluate: happy-dom applies no stylesheet and
-// returns `0` for every box metric.
-//
-// The fixtures below are hand-built markup, which is the shipped idiom in this file and the
-// only way to reach a state at a chosen viewport. The cost of a hand-built fixture is that it
-// keeps passing after the component stops emitting that markup, so each one opens by checking
-// its own marker against the component source; the render sites' BRANCHES are pinned
-// separately, by AC-15 in `manager-contract.test.js`.
 const managerRootPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'
@@ -148,12 +117,6 @@ export function railPage(navMarkup, bodyClass = '') {
 
 
 // -- The companion Downtime panel's layout contract (issue 1213) -------------------------
-//
-// This is the Manager counterpart of the player seam's panel contract, and every claim in it
-// is a computed-style fact that nothing else in the repository can evaluate: happy-dom cannot
-// compute a cascade, so a mounted suite can only assert that a DECLARATION exists, never that
-// it lands on a real box.
-//
 // The chain is applied WHOLE, deliberately. Two earlier probes of this same rule reached the
 // wrong conclusion by shortening it -- one set `height: 100%` on the companion root alone,
 // which reads as definite while its ancestor is auto, and one appended a tall child to a
@@ -162,11 +125,6 @@ export function railPage(navMarkup, bodyClass = '') {
 // `.downtime-host` -> `.downtime-extension-panels` -> the panel region -> the mount target,
 // with the host's own compiled CSS after the global sheet, and every overflow case below
 // controls the flex factor explicitly.
-//
-// One thing is deliberately NOT asserted anywhere here: `contain`. The Manager root's
-// `container-type: inline-size` implies layout containment, but reading the `contain` property
-// returns `none`, so an assertion on it would be measuring the absence of a declaration rather
-// than the presence of the behaviour.
 const downtimeHostPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'
@@ -182,10 +140,6 @@ export const MANAGER_WIDTH_LADDER = [1400, 1200, 1100, 900, 700, 600];
 
 /**
  * Render the Downtime route at one Manager width and read it with `readInPage`.
- *
- * The Manager chrome around the host is what makes the block size definite, so it is stated
- * once here and every case below shares it — the two modes differ only in the host's own
- * class and children.
  *
  * @param {number} managerWidth width of the whole Manager window, in px
  * @param {string} hostClasses extra classes on `.downtime-host`

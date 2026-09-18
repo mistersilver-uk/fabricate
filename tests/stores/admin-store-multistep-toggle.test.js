@@ -1,9 +1,8 @@
 /**
- * Disabling the multi-step feature (issue 710) is NON-destructive and behaviour-
- * changing, so `adminStore.toggleFeature('multiStepRecipes', false)` opens a
- * warning/confirm dialog when the system has multi-step recipes: only on confirm
- * does the toggle persist, the step data is never rewritten, and enabling never
- * prompts. These tests drive the store's public toggle through a mock service graph.
+ * Disabling the multi-step feature (issue 710) is NON-destructive and behaviour- changing, so
+ * `adminStore.toggleFeature('multiStepRecipes', false)` opens a warning/confirm dialog when the
+ * system has multi-step recipes: only on confirm does the toggle persist, the step data is never
+ * rewritten, and enabling never prompts.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

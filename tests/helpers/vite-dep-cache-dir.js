@@ -1,14 +1,4 @@
-/**
- * A dep-optimizer cache directory no other test process can invalidate.
- *
- * `node --test` runs test files in parallel processes; five of them boot a Vite server rooted at
- * the repository, so Vite's default `cacheDir` has them share one `<root>/node_modules/.vite` and
- * fail each other's in-flight requests with `ERR_OUTDATED_OPTIMIZED_DEP` whenever one rewrites the
- * pre-bundle. The race is cold-cache only, which is why it reads as intermittent (issue 1654).
- *
- * One directory per process rather than per server: two servers inside one file are sequential, so
- * sharing an optimized bundle is safe and keeps the second boot warm.
- */
+/** A dep-optimizer cache directory no other test process can invalidate (issue 1654). */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,12 +1,4 @@
-/**
- * The Checks route: its four tabs, every check editor and the Validation activity rail.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The Checks route: its four tabs, every check editor and the Validation activity rail. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,8 +25,7 @@ let ChecksViewComponent;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { navButton, openChecksActivity, openChecksSection } = queries;
 const { mountManager, mountWorldRulesDestination, openRecipeEditor } = createManagerMounts({
@@ -96,8 +87,7 @@ export function registerChecksCases() {
     await tick();
     flushSync();
 
-    // Activating the group PARENT redirects to the first available child (issue 1096), so
-    // the route id names the activity rather than the studio.
+    // Activating the group PARENT redirects to the first available child (issue 1096).
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks-crafting');
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-checks-nav-item]')).map((button) =>
@@ -209,11 +199,7 @@ export function registerChecksCases() {
       ),
       'the crafting section lists the roll-formula readiness check'
     );
-    // The Validation route DOES have a rail now (issue 1096) — but it is not the activity
-    // stack. It carries the documentation/quickstart pair and the "All checks" summary and
-    // NOTHING else: no activation toggle, no Preview-as, no simulator, no odds and no
-    // This-check digest, because none of them has a subject on a route that validates all
-    // three checks at once. It also renders no section strip.
+    // The Validation route DOES have a rail now (issue 1096).
     assert.ok(
       target.querySelector('[data-checks-help="validation"]'),
       'Validation keeps the documentation pair'
@@ -278,10 +264,7 @@ export function registerChecksCases() {
   });
 
   it('keeps the rail’s THREE badge-column markers pairwise distinguishable (issue 1096)', async () => {
-    // A record count, an issue count and an unsaved marker share one column, and the rule is
-    // that a GM must be able to tell them apart at a glance AND a screen reader must be able
-    // to tell them apart at all. Colour alone does neither, so each is asserted on a
-    // NON-COLOUR attribute plus its accessible name.
+    // A record count, an issue count and an unsaved marker share one column.
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -289,8 +272,7 @@ export function registerChecksCases() {
       props: {
         store: createStore([], {
           alchemyResolutionMode: 'simple',
-          // No salvage check at all under ROUTED salvage: the mode requires an authored
-          // formula, so salvage carries a real readiness issue and its child gets a badge.
+          // No salvage check at all under ROUTED salvage.
           salvageResolutionMode: 'routed',
         }),
         services: { openCurrentAdmin: () => {} },
@@ -312,8 +294,7 @@ export function registerChecksCases() {
     assert.ok(parentBadge, 'the group parent carries the total');
     assert.match(parentBadge.getAttribute('aria-label'), /issue/i);
 
-    // 3. The RECORD count is a different attribute entirely and names no unit — which is why
-    //    the issue badge has to.
+    // 3. The RECORD count is a different attribute entirely and names no unit.
     const recordCount = target.querySelector('.manager-nav-button .manager-nav-count');
     assert.ok(recordCount, 'the rail still renders record-count numerals');
     assert.ok(
@@ -321,8 +302,7 @@ export function registerChecksCases() {
       'a record count is a bare numeral; it is the issue badge that must name its unit'
     );
 
-    // 4. The DIRTY marker is a third attribute with its own name, and it is reachable only
-    //    once something is unsaved — so its absence here is part of the claim.
+    // 4. The DIRTY marker is a third attribute with its own name.
     assert.ok(
       !target.querySelector('[data-checks-nav-dirty]'),
       'nothing is dirty yet, so no unsaved marker renders'
@@ -346,9 +326,7 @@ export function registerChecksCases() {
   });
 
   it('gives the section strip’s warning dot a TEXT accessible name (issue 1096)', async () => {
-    // The frames show "The roll ●" — a colour-and-shape-only signal, which is no signal at
-    // all to a screen reader. The dot therefore carries a name stating the UNIT, and a
-    // section may carry a count and a dot at once without either being lost.
+    // The frames show "The roll ●" — a colour-and-shape-only signal.
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -363,8 +341,7 @@ export function registerChecksCases() {
     await tick();
     flushSync();
 
-    // A routed check with no authored formula raises `noRollFormula`, which buckets to The
-    // roll — the section dot, the rail badge and the Validation route all read the same map.
+    // A routed check with no authored formula raises `noRollFormula`.
     const dot = target.querySelector('[data-checks-section-dot="roll"]');
     assert.ok(dot, 'the roll section carries a warning dot');
     assert.match(dot.getAttribute('aria-label'), /issue/i);
@@ -397,9 +374,7 @@ export function registerChecksCases() {
 
   it('Checks: alchemy checkMode=none is the OFF state — the turn-on empty state and a live Active toggle, not a read-only notice', async () => {
     await mountChecksWithAlchemyCheckMode('none');
-    // `none` is no longer a MODE the studio offers; it is what the Active switch writes when
-    // the GM turns the check off. So the route takes the shared off-state empty state, with
-    // the way back on inside it, exactly as an optional crafting or salvage check does.
+    // `none` is no longer a MODE the studio offers.
     assert.ok(
       target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
       'the crafting route renders the shared off-state panel'
@@ -413,8 +388,7 @@ export function registerChecksCases() {
       null,
       'the retired read-only notice is gone — it named a mode the selector no longer offers'
     );
-    // The switch is LIVE and reads off, which is the whole point: a check that is off needs
-    // the control that turns it back on, not a note explaining that it cannot be turned off.
+    // The switch is LIVE and reads off, which is the whole point.
     const toggle = target.querySelector('[data-checks-active-toggle]');
     assert.ok(toggle, 'the Active toggle renders and is operable');
     assert.equal(
@@ -423,8 +397,7 @@ export function registerChecksCases() {
       'and carries no "cannot be turned off" hint'
     );
 
-    // Turning it back on stages `simple` and the authoring surface returns — the round trip
-    // an alchemy GM had no way to make at all before.
+    // Turning it back on stages `simple` and the authoring surface returns.
     target.querySelector('[data-checks-turn-on]').click();
     await tick();
     flushSync();
@@ -535,9 +508,7 @@ export function registerChecksCases() {
   });
 
   it('Checks: the alchemy Active toggle stages the check OFF as checkMode none, applied by Save checks', async () => {
-    // The off state is the MODE, not `craftingCheck.enabled` — the engine ignores that flag
-    // for alchemy and dispatches on `alchemy.checkMode` alone, so writing it would have moved
-    // a switch the engine never reads.
+    // The off state is the MODE, not `craftingCheck.enabled`.
     const calls = await mountChecksWithAlchemyCheckMode('simple');
     const toggle = target.querySelector('[data-checks-active-toggle]');
     assert.ok(toggle, 'the Active toggle renders for alchemy simple');
@@ -596,21 +567,18 @@ export function registerChecksCases() {
     const consume = behaviour.querySelector('[data-recipe-field="consumeOnFail"]');
     const history = behaviour.querySelector('[data-recipe-field="showAttemptHistoryToPlayers"]');
     assert.ok(learn && consume && history, 'all three behaviour toggles render');
-    // Default fixture: learnOnCraft true, consumeOnFail true, showAttemptHistoryToPlayers
-    // false — a stored non-default false must read back OFF, not the default ON.
+    // Default fixture: learnOnCraft true, consumeOnFail true.
     assert.equal(learn.getAttribute('aria-pressed'), 'true');
     assert.equal(consume.getAttribute('aria-pressed'), 'true');
     assert.equal(history.getAttribute('aria-pressed'), 'false');
-    // The consumption-policy card is alchemy-exclusive-off: alchemy resolves consumption
-    // through its own consumeOnFail flag, so the craftingCheck.consumption card is hidden.
+    // The consumption-policy card is alchemy-exclusive-off.
     assert.equal(
       target.querySelector('[data-checks-panel="crafting"] [data-failure-consumption]'),
       null,
       'the failure consumption policy card is not shown in alchemy mode'
     );
 
-    // Toggling one flag sends the FULL config with only that field flipped, so a partial
-    // saveAlchemyConfig does not silently re-default the untouched flags.
+    // Toggling one flag sends the FULL config with only that field flipped.
     history.click();
     await tick();
     flushSync();
@@ -656,8 +624,7 @@ export function registerChecksCases() {
     const consume = policy.querySelector('[data-recipe-field="consumeIngredientsOnFail"]');
     const breakTools = policy.querySelector('[data-recipe-field="breakToolsOnFail"]');
     assert.ok(consume && breakTools, 'both policy toggles render');
-    // Stored non-default fixture: consume OFF, break ON — the projection reads them back
-    // exactly (a dropped default-true field would invert consumeIngredientsOnFail to ON).
+    // Stored non-default fixture: consume OFF, break ON.
     assert.equal(consume.getAttribute('aria-pressed'), 'false');
     assert.equal(breakTools.getAttribute('aria-pressed'), 'true');
     // The alchemy behaviour card is not shown outside alchemy mode.
@@ -699,8 +666,7 @@ export function registerChecksCases() {
       !policy.querySelector('i.fa-fire-flame-curved, i.fa-hammer-crash'),
       'and neither keeps the glyph the exemption used to defend'
     );
-    // The note the prototype ends the screen with, which the removed wrapper's description
-    // was carrying — it names the two policies this screen does NOT govern.
+    // The note the prototype ends the screen with.
     const note = target.querySelector('[data-failure-salvage-note]');
     assert.ok(Boolean(note), 'the salvage note closes the screen');
     assert.ok(
@@ -727,15 +693,12 @@ export function registerChecksCases() {
       document.body.appendChild(target);
       mounted = mount(ChecksRightMenuComponent, {
         target,
-        // An activation is supplied so the Active card renders too — it is the rail's other
-        // card and shares the same inspector-card contract (issue 883).
+        // An activation is supplied so the Active card renders too.
         props: { activeTab, activation: { enabled: true, optional: true } },
       });
       flushSync();
 
-      // The DESTINATIONS are what this row is for, and they survive the explainer card's
-      // removal (issue 1096): the per-route docs page and the shared Quickstart, in that
-      // order, still both reachable from the top of the rail.
+      // The DESTINATIONS are what this row is for.
       const linkRow = target.querySelector(`[data-checks-help="${activeTab}"]`);
       assert.ok(linkRow, `${activeTab} menu renders its documentation link pair`);
       const linkHrefs = Array.from(linkRow.querySelectorAll('a')).map((anchor) =>
@@ -751,15 +714,7 @@ export function registerChecksCases() {
         assert.equal(anchor.getAttribute('rel'), 'noreferrer');
       }
 
-      // FLAT HEADING, CARD BENEATH — the Tool Studio's inspector convention, which the
-      // maintainer made the authority for this rail's structure. This block asserted the
-      // opposite (a `.manager-card-title` inside the card, no kicker anywhere) until that
-      // ruling; the assertion moves with it rather than being deleted.
-      //
-      // The ACTIVATION card is the one section with no heading at all, which is not an
-      // exception to that convention but the prototype's own reading of this card: the switch
-      // and the words `Check is on` beside it say what an `ACTIVE` kicker over a card saying
-      // `On` said twice (issue 1096, maintainer inspector comparison).
+      // FLAT HEADING, CARD BENEATH — the Tool Studio's inspector convention.
       const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
       assert.ok(activeCard, `${activeTab} menu renders its Active card`);
       assert.ok(
@@ -776,8 +731,7 @@ export function registerChecksCases() {
         'and it reads the sentence the prototype gives the card, not a bare On/Off'
       );
 
-      // Every OTHER section keeps the flat kicker, and now carries the prototype's leading
-      // glyph in the same row. A kicker with no glyph is the reading this replaced.
+      // Every OTHER section keeps the flat kicker.
       const digestHead = target.querySelector('[data-checks-digest]').previousElementSibling;
       assert.ok(
         Boolean(digestHead?.classList.contains('manager-checks-rail-head')),
@@ -844,16 +798,14 @@ export function registerChecksCases() {
     assert.equal(rows[0].getAttribute('data-outcome-id'), 'seed1');
     assert.equal(rows[0].querySelector('[data-outcome-name]').value, 'Hit');
 
-    // The formula field lives on The roll, the tier rows on Outcomes (issue 1096), so the
-    // rest of this test reads the roll section.
+    // The formula field lives on The roll, the tier rows on Outcomes (issue 1096).
     await openChecksSection('roll');
     // The editor is seeded from the selected system's persisted routed config
     // (legacy `rollExpression` migrates to the shared `rollFormula` field).
     const expressionInput = target.querySelector('[data-check-roll-formula]');
     assert.equal(expressionInput.value, '2d6');
 
-    // Routed mode requires the check, so the Active card shows the required hint
-    // (no on/off toggle).
+    // Routed mode requires the check.
     assert.ok(
       target.querySelector('[data-checks-active="crafting"] [data-checks-active-required]'),
       'routed crafting check shows the required hint'
@@ -922,8 +874,7 @@ export function registerChecksCases() {
       craftingPanel.querySelector('[data-simple-check-editor]'),
       'routedByIngredients renders the simple pass/fail editor'
     );
-    // It is NOT the routed tier editor: no relative/fixed toggle, no outcome-tiers
-    // table, no "Recipes do not have a DC" fixed-mode notice.
+    // It is NOT the routed tier editor: no relative/fixed toggle.
     assert.equal(
       craftingPanel.querySelector('[data-crafting-check-editor]'),
       null,
@@ -1087,8 +1038,7 @@ export function registerChecksCases() {
     const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
     assert.ok(saved, 'Save persists the salvage progressive config through the store');
     assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
-    // Issue 651 retired the system-level reorder flag: the draft clone no longer
-    // carries it, so a legacy stored value is not written back on save.
+    // Issue 651 retired the system-level reorder flag.
     assert.equal(
       saved[1].allowPlayerReorder,
       undefined,
@@ -1147,11 +1097,7 @@ export function registerChecksCases() {
       'the DRAFT clone carried the persisted order; a whitelist that dropped it reads empty'
     );
 
-    // THE FIELD KEEPS THE GM'S OWN TEXT, and only a ROUND TRIP can show it. The stored
-    // datum is `number[]`, so echoing it back would delete a trailing separator and a
-    // half-typed word from under the cursor. The input below is the one that discriminates:
-    // it BOTH adds a number (so the order upstream really changes, and the resync runs) AND
-    // carries noise that stores as nothing (so a resync would rewrite the field).
+    // THE FIELD KEEPS THE GM'S OWN TEXT.
     setInputValue(field, '6, 9, 14, x');
     await tick();
     flushSync();
@@ -1289,8 +1235,7 @@ export function registerChecksCases() {
     const saved = calls.find((call) => call[0] === 'saveGatheringCheckProgressive');
     assert.ok(saved, 'Save persists the gathering progressive config through the store');
     assert.equal(saved[1].awardMode, 'exceed', 'the new award mode is sent');
-    // Issue 651 retired the system-level reorder flag: the draft clone no longer
-    // carries it, so a legacy stored value is not written back on save.
+    // Issue 651 retired the system-level reorder flag.
     assert.equal(
       saved[1].allowPlayerReorder,
       undefined,
@@ -1381,7 +1326,7 @@ export function registerChecksCases() {
     await tick();
     flushSync();
 
-    // Simple mode: the check is optional, so the Active card offers an on/off toggle
+    // Simple mode: the check is optional.
     // and the central column is the singleton page (not the routed editor).
     const toggle = target.querySelector(
       '[data-checks-active="crafting"] [data-checks-active-toggle]'
@@ -1449,10 +1394,7 @@ export function registerChecksCases() {
       'relative mode shows the recipe tiers card'
     );
 
-    // NO COLUMN HEADER ROW (issue 1096). The tier list is the prototype's flex list, not a
-    // subgrid table: every control on the row states its own subject through its accessible
-    // name, so a header row of three words was a second, weaker copy of that. What replaces
-    // the assertion is the naming it was standing in for.
+    // NO COLUMN HEADER ROW (issue 1096). The tier list is the prototype's flex list.
     assert.equal(
       target.querySelector('.manager-checks-outcome-head'),
       null,
@@ -1541,15 +1483,6 @@ export function registerChecksCases() {
   });
 
   // ── The ZERO state must offer the way out of itself (issue 1097 follow-up) ─────────────
-  //
-  // Reported from a live build on alchemy at `checkMode: 'tiered'`, and NOT alchemy-specific:
-  // this is the routed editor for every routed check, and every one of them starts empty. The
-  // add control was the last child of `.manager-checks-tier-list`, which renders only in the
-  // `{:else}` branch — so a check with no tiers showed the sentence "No outcome tiers yet. Add
-  // the tiers this check routes results into." with nothing on screen to press.
-  //
-  // The case above cannot see this and never could: it mounts a check that ALREADY has a
-  // relative tier, which is the state that worked. Emptiness is the whole subject here.
   for (const [type, key] of [
     ['relative', 'relativeOutcomes'],
     ['fixed', 'fixedOutcomes'],
@@ -1637,8 +1570,7 @@ export function registerChecksCases() {
       null,
       'no value range is computed (the roll may reference actor data)'
     );
-    // Inline textual validation moved to the Checks Validation tab; the editor
-    // keeps only the per-row invalid highlight as a localized affordance.
+    // Inline textual validation moved to the Checks Validation tab.
     assert.equal(
       target.querySelector('[data-checks-validation]'),
       null,
@@ -1726,8 +1658,7 @@ export function registerChecksCases() {
     assert.ok(target.querySelector('[data-simple-check-editor]'));
     // DC + comparison sit on the formula line.
     assert.equal(target.querySelector('[data-check-dc]').value, '12');
-    // The comparison is a SEGMENTED CONTROL now (issue 1096), not a <select>: two options is
-    // not a list to open, and both readings are on screen with the one in force lit.
+    // The comparison is a SEGMENTED CONTROL now (issue 1096), not a <select>.
     assert.ok(
       target.querySelector('[data-threshold-mode-option="meet"]').classList.contains('is-active'),
       'the meet-or-exceed segment is the lit one'
@@ -1935,8 +1866,7 @@ export function registerChecksCases() {
     return radio;
   }
 
-  // A trigger's controls sit behind a disclosure (issue 1096): a check with three triggers
-  // used to draw three full editors, taller than the pane. Open the one under test first.
+  // A trigger's controls sit behind a disclosure (issue 1096).
   function openTrigger(root, id) {
     const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
     assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
@@ -2008,8 +1938,7 @@ export function registerChecksCases() {
     fixedOutcomes: [],
   };
 
-  // The unified trigger editor is ALWAYS rendered, regardless of authority; only the
-  // per-trigger break pill is gated. Confirm across all three editors.
+  // The unified trigger editor is ALWAYS rendered, regardless of authority.
   const breakageEditorCases = [
     {
       name: 'simple',
@@ -2149,15 +2078,13 @@ export function registerChecksCases() {
     const successSeg = tierTrigger.querySelector('[data-trigger-outcome="success"]');
     const noneSeg = tierTrigger.querySelector('[data-trigger-outcome="none"]');
     assert.ok(successSeg, 'the outcome toggle renders for an outcomeTier trigger');
-    // Disabled on the RADIO, which is what actually prevents the choice — the class
-    // alone would only dim it, and `select()` guards nothing but `next !== value`.
+    // Disabled on the RADIO, which is what actually prevents the choice.
     assert.ok(
       successSeg.querySelector('input[type="radio"]').disabled,
       'an outcomeTier condition disables the forcing segments'
     );
     assert.ok(noneSeg.classList.contains('is-active'), 'the outcome is pinned to No effect');
-    // Stepping is deliberately NOT pinned: it reads the rolled tier and produces the
-    // final one, so there is no circularity to prevent.
+    // Stepping is deliberately NOT pinned.
     assert.equal(
       tierTrigger.querySelector('[data-trigger-tier-step-mode="up"] input[type="radio"]').disabled,
       false,
@@ -2165,10 +2092,7 @@ export function registerChecksCases() {
     );
   });
 
-  // `activity` is a PROP now (issue 1096): the four activities became rail routes, so the
-  // view no longer owns which one is open. `section` selects one of the five sections the
-  // strip switches between, and it is clicked rather than passed because the strip is what
-  // owns that state — a test that set it directly would stop noticing if the strip broke.
+  // `activity` is a PROP now (issue 1096): the four activities became rail routes.
   function mountChecksView(props, section = '') {
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2210,8 +2134,7 @@ export function registerChecksCases() {
       'crafting break card renders under checkDriven authority'
     );
 
-    // Gathering is an opt-in feature: with it off, its Checks tab is not offered at
-    // all (so there is no disabled gathering editor to reach).
+    // Gathering is an opt-in feature: with it off.
     assert.equal(
       target.querySelector('[data-checks-nav-item="gathering"]'),
       null,
@@ -2226,13 +2149,7 @@ export function registerChecksCases() {
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
     });
-    // The feature GATE moved out of this view and into the rail model (issue 1096), so the
-    // question "is gathering offered" is asked of `buildChecksNavItems` — asserted directly
-    // in `tests/checks-nav.test.js` — and what remains for the view is that it renders the
-    // gathering route when the router hands it one.
-    // `assert.ok(!el)`, never `assert.equal(el, null)`: on failure `node:assert` serialises
-    // the actual value to build its diff and walks a mounted happy-dom element's circular
-    // tree until the heap dies, which surfaces as a cancelled suite with no message.
+    // The feature GATE moved out of this view and into the rail model (issue 1096).
     assert.ok(
       !target.querySelector('[data-checks-nav-item="gathering"]'),
       'the four activities are rail children now; this view renders one of them'
@@ -2268,9 +2185,7 @@ export function registerChecksCases() {
     );
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(card, 'the modifier card renders in the crafting stack when a formula is authored');
-    // THE RULE GRID IS ITS OWN CARD since issue 1096's parity round — `How they combine` is a
-    // sibling studio card rather than an uppercase kicker inside the library card — so the grid
-    // is reached from the panel, not from `card`.
+    // THE RULE GRID IS ITS OWN CARD since issue 1096's parity round.
     const ruleCard = target.querySelector('[data-crafting-modifier-policy-card]');
     assert.ok(ruleCard, 'the combination rule renders as its own card beside the library');
     // The policy radio-cards reflect the passed default policy.
@@ -2297,9 +2212,7 @@ export function registerChecksCases() {
       patches.some((p) => p.defaultModifierPolicy === 'playerPicks'),
       'selecting playerPicks emits defaultModifierPolicy'
     );
-    // NO ENTRY AUTHORING, ON ANY ACTIVITY (issue 1117). The library is authored once, in
-    // System settings › Modifiers; every patch this card can emit is a selection patch, and
-    // the deep link is what replaces the editor.
+    // NO ENTRY AUTHORING, ON ANY ACTIVITY (issue 1117). The library is authored once.
     for (const editorHook of [
       '[data-crafting-modifier-add]',
       '[data-crafting-modifier-field="expression"]',
@@ -2312,8 +2225,7 @@ export function registerChecksCases() {
       Boolean(card.querySelector('[data-crafting-modifier-edit-link]')),
       'the deep link to the one authoring surface renders instead'
     );
-    // The entry is READ OUT instead — identity and expression, so the GM can tell which
-    // entry a checkbox is about without leaving the screen.
+    // The entry is READ OUT instead — identity and expression.
     assert.equal(
       card.querySelector('[data-crafting-modifier-readonly="label"]').textContent.trim(),
       'Medicine'
@@ -2322,10 +2234,7 @@ export function registerChecksCases() {
       card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
       '@abilities.med.mod'
     );
-    // The eligibility state is authored PER ROW (issue 1095), and since issue 1096's parity
-    // round the PILL IS THAT CONTROL: one `aria-pressed` toggle button at the row's right end,
-    // where there used to be a `SelectionCheckbox` with an inert `StatusPill` beside it on a
-    // second line. Turning the pre-selected entry off emits an empty defaultModifierIds patch.
+    // The eligibility state is authored PER ROW (issue 1095).
     const eligibility = card.querySelector('[data-crafting-modifier-eligibility="med"]');
     assert.ok(eligibility, 'each catalogue row carries its own eligibility control');
     assert.equal(eligibility.tagName, 'BUTTON', 'the accessible CONTROL is the pill itself');
@@ -2378,8 +2287,7 @@ export function registerChecksCases() {
         values: ['equal', 'partial', 'exceed'],
       },
       {
-        // `simple`, not `none`: `routeIsOff` answers from `alchemyCheckMode` directly, so a
-        // `none` fixture renders the turn-on panel and finds no options at all here.
+        // `simple`, not `none`: `routeIsOff` answers from `alchemyCheckMode` directly.
         props: { resolutionMode: 'alchemy', alchemyCheckMode: 'simple' },
         attr: 'data-crafting-alchemy-checkmode-option',
         section: 'roll',
@@ -2408,15 +2316,6 @@ export function registerChecksCases() {
 
   // The check-modifier RULE group is rendered through the shared RadioCardGroup primitive
   // (issues 855, 1055), and its hook attributes are a hand-maintained mirror:
-  // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
-  // smoke frame and `scripts/lib/viewLabCases.js` clicks
-  // `[data-crafting-modifier-policy-option="…"] input`. Neither producer runs in
-  // `npm test`, so re-plumbing the group through a different primitive could drop an
-  // attribute with no unit failure at all.
-  //
-  // `bySubject` is in the list: it is a first-class COMBINATION RULE, labelled "By recipe"
-  // authoring-ordered third so the two non-selecting rules sit on the top row of the 2x2
-  // and the two selecting rules on the bottom one.
   it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
     mountChecksView(
       {
@@ -2427,9 +2326,7 @@ export function registerChecksCases() {
       },
       'modifiers'
     );
-    // SCOPED TO THE RULE CARD, not the library card: issue 1096's parity round split
-    // `How they combine` out into its own studio card, and the capture registry's selectors
-    // were re-pointed with it.
+    // SCOPED TO THE RULE CARD, not the library card.
     const group = target.querySelector(
       '[data-crafting-modifier-policy-card] [data-crafting-modifier-policy]'
     );
@@ -2456,11 +2353,7 @@ export function registerChecksCases() {
       true,
       'the passed rule is pinned on the radio-cards'
     );
-    // The maintainer asked for TWO columns, and the count is the layout: `RadioCardGroup`
-    // uses a FIXED track count (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so
-    // four options at two columns is a clean 2x2 with no orphan row. Read off the custom
-    // property the group actually sets rather than off a computed width, which happy-dom
-    // does not resolve.
+    // The maintainer asked for TWO columns, and the count is the layout.
     assert.match(
       group.querySelector('.manager-resolution-mode-options').getAttribute('style') || '',
       /--manager-radio-card-columns:\s*2/,
@@ -2477,8 +2370,7 @@ export function registerChecksCases() {
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
       modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
     };
-    // A cap on a selection nobody makes is a control with no effect, so the two
-    // non-selecting rules do not render it at all.
+    // A cap on a selection nobody makes is a control with no effect.
     for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
       mountChecksView(
         { ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 },
@@ -2515,13 +2407,7 @@ export function registerChecksCases() {
     }
   });
 
-  // CLEARING the field is a real edit, and it is the only gesture that can put a system
-  // back to unlimited: absence cannot be reached by clicking anything. Two View Lab cases
-  // depend on it — `manager-checks-crafting-modifiers` and
-  // `manager-recipe-edit-crafting-modifier-custom-set` both empty this Stepper to reach the
-  // no-cap state, because the lab boots every migration over its world and 1.20.0's stamps
-  // a cap of 1 onto any `playerPicks` system that carries none. Nothing drove the emptied
-  // field through this card, so the patch it emits was only ever exercised by a capture run.
+  // CLEARING the field is a real edit.
   it('checks view: emptying the pick-cap Stepper patches a null cap, not an omission (issue 1055)', () => {
     const patches = [];
     mountChecksView(
@@ -2540,8 +2426,7 @@ export function registerChecksCases() {
     input.value = '';
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
-    // `null`, not a missing key: the store spreads this patch onto the persisted check, so
-    // an omitted key would leave the old bound in place and the gesture would do nothing.
+    // `null`, not a missing key: the store spreads this patch onto the persisted check.
     assert.deepEqual(
       patches,
       [{ maxModifierPicks: null }],
@@ -2592,9 +2477,7 @@ export function registerChecksCases() {
   // reported nothing about a catalogue that reaches no roll, which is the defect the
   // card must state rather than conceal. It stamps WHICH of the three causes applies.
   it('checks view: the modifier catalogue card renders an inert notice naming the cause when the check has no formula (issue 1055)', () => {
-    // A non-empty catalogue is part of the fixture, not incidental: the notice reports a
-    // CATALOGUE that reaches no roll, so an empty one has nothing to warn about and is
-    // deliberately silent (see the `inert` gate in `CraftingModifierCatalogueCard`).
+    // A non-empty catalogue is part of the fixture, not incidental.
     mountChecksView(
       {
         resolutionMode: 'simple',
@@ -2614,12 +2497,7 @@ export function registerChecksCases() {
     );
   });
 
-  // The other half of that gate, and the reason it exists: a brand-new system is
-  // `simple` + `rollFormula: ''` with no modifiers, so an ungated notice put a permanent
-  // warning ("These modifiers reach no roll…") directly above the empty state, warning
-  // about nothing on first contact with the tab. The cause is unchanged between the two
-  // mounts — only the catalogue is — so this pins the CATALOGUE as the gate rather than
-  // some incidental difference in the check.
+  // The other half of that gate, and the reason it exists.
   it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
     const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
     mountChecksView({ ...props, modifiers: [] }, 'modifiers');
@@ -2652,20 +2530,11 @@ export function registerChecksCases() {
     );
   });
 
-  // Issue 1094 retired the THIRD cause. `noPlaceholder` — "a formula is authored but
-  // never spends the check-modifier placeholder" — is not merely unreachable, it is not a
-  // value this surface can produce: the resolved scalar is appended to whatever the GM
-  // authored. The negative half below is what pins that, and it FAILS against the
-  // pre-change component, which rendered a `noPlaceholder` notice for exactly that input.
+  // Issue 1094 retired the THIRD cause. `noPlaceholder`.
   it('checks view: the inert cause discriminates no-check from no-formula (issues 1055, 1094)', () => {
-    // Every case below carries a non-empty catalogue: the notice is gated on one, so an
-    // empty catalogue would make all the assertions read the same silent card.
+    // Every case below carries a non-empty catalogue: the notice is gated on one.
     const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
-    // ALCHEMY `none` NO LONGER APPEARS HERE. It used to be this test's `noCheck` case — the
-    // one crafting configuration that reached it — but it is now the OFF state of an optional
-    // check, so its route collapses to the shared turn-on panel and renders no Modifiers
-    // section to carry a notice. That is asserted below rather than dropped silently, because
-    // "the notice moved" and "the notice stopped rendering" are different facts.
+    // ALCHEMY `none` NO LONGER APPEARS HERE. It used to be this test's `noCheck` case.
     for (const { props, cause } of [
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
@@ -2680,8 +2549,7 @@ export function registerChecksCases() {
       mounted = null;
       target.remove();
     }
-    // …and an ORDINARY authored formula — the exact input that used to raise
-    // `noPlaceholder` — shows no notice at all.
+    // …and an ORDINARY authored formula.
     mountChecksView(
       {
         resolutionMode: 'simple',
@@ -2698,8 +2566,7 @@ export function registerChecksCases() {
     mounted = null;
     target.remove();
 
-    // The alchemy OFF route: no Modifiers section at all, so no inert notice — the same
-    // treatment any other optional check that has been switched off already gets.
+    // The alchemy OFF route: no Modifiers section at all, so no inert notice.
     mountChecksView(
       {
         resolutionMode: 'alchemy',
@@ -2769,11 +2636,7 @@ export function registerChecksCases() {
     );
   });
 
-  // What marking an entry MEANS depends on the rule, and the readings are materially different
-  // decisions — the whole set nobody narrows, the set compared for a maximum, or the menu
-  // offered to whoever the rule defers to. Issue 1096's parity round moved this sentence into
-  // the card's DESCRIPTION slot and took the prototype's own wording for it, so the probes
-  // below are its new sentences; the property under test is unchanged.
+  // What marking an entry MEANS depends on the rule.
   it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
     const introText = (craftingDefaultModifierPolicy) => {
       mountChecksView(
@@ -2813,7 +2676,6 @@ export function registerChecksCases() {
 
   it('the routed editor renders the tier-step row in BOTH tier types', () => {
     // The check-wide natural-stepping boolean and its card are gone (issue 975):
-    // stepping is a per-trigger effect now, and it is no longer relative-only.
     mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
     assert.ok(
       openTrigger(target, 'c1').querySelector('[data-trigger-tier-step]'),
@@ -2867,9 +2729,7 @@ export function registerChecksCases() {
   });
 
   it('carries an authored tierStep through the root draft and into the Save payload', async () => {
-    // The allowlist trap: `cloneCheckBreakage` rebuilds each trigger key by key, and
-    // `checkRoutedDirty` compares the JSON of two values that BOTH pass through it — so
-    // a dropped key makes the editor look CLEAN and persist nothing, with no error.
+    // The allowlist trap: `cloneCheckBreakage` rebuilds each trigger key by key.
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3004,25 +2864,7 @@ export function registerChecksCases() {
     });
   }
 
-  // ---------------------------------------------------------------------------
   // The manager root's crafting-modifier WIRING (issue 1055).
-  //
-  // Both ENDS of each wire are already covered — `mountChecksView` mounts ChecksView
-  // directly and `recipe-edit-mounted.test.js` mounts RecipeEditView directly — but
-  // nothing mounted the ROOT against a system carrying a `bySubject` rule and a
-  // `maxModifierPicks` cap, so both forwards were deletable green. Dropping
-  // `craftingModifierPolicy={…}` from the RecipeEditView call site lets the prop fall to
-  // its `= 'addAll'` default and EVERY recipe loses its picker; dropping
-  // `craftingModifierMaxPicks={…}` lets it fall to `null` and every recipe becomes
-  // unbounded — a cap shipping dead under a green suite. Dropping the ChecksView ones
-  // pins the rule radio at `addAll` and hides the cap field for every system.
-  //
-  // Every case asserts BOTH ends, so a fixture that never reached the surface at all
-  // cannot pass by rendering nothing.
-  // The catalogue is SYSTEM-level since issue 1095, so the fixture is a PAIR: the entries
-  // go on the system and only the selection triple stays on `craftingCheck`. Both halves
-  // are forwarded together by `modifierRuleSystem` below, because a catalogue with no
-  // selection and a selection with no catalogue each render an empty card.
   const MODIFIER_CATALOGUE = [
     { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
     { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
@@ -3091,13 +2933,6 @@ export function registerChecksCases() {
   });
 
   // THE CROSS-COPY, END TO END (issues 1308, 1311).
-  //
-  // Copying between the two libraries used to be an in-page affair, and its only coverage lived
-  // in the System Settings ergonomics suite. Once the two lists became sibling ROUTES the copy
-  // became a navigation, which a page component cannot perform, so the page hands the entry up
-  // and the root owns the mapping, the write, the route change, the open request and the
-  // announcement. The page-level suites prove the page hands it up and honours a nonce; only this
-  // proves the root does the other five things — without it, deleting any one of them ships green.
   it('root: copying a modifier lands on Character prerequisites with the new entry open', async () => {
     const { calls } = await mountWorldRulesDestination(
       {
@@ -3114,8 +2949,7 @@ export function registerChecksCases() {
     );
 
     target.querySelector('[data-copy-to-prerequisite="mod-herbalism"]').click();
-    // The copy is a write THEN a navigation, so the microtask queue has to drain past the
-    // store call before the route change is observable.
+    // The copy is a write THEN a navigation.
     for (let i = 0; i < 4; i += 1) {
       await Promise.resolve();
       await tick();
@@ -3162,8 +2996,7 @@ export function registerChecksCases() {
         picker,
         `rule ${policy}: eligible-modifier picker rendered = ${picker}`
       );
-      // The rejected design's surfaces are GONE, not merely hidden: no rule select on the
-      // recipe, and no neutral "the system decides" banner on every other rule.
+      // The rejected design's surfaces are GONE, not merely hidden.
       assert.ok(
         !editor.querySelector('.manager-main [data-recipe-crafting-modifier]'),
         `rule ${policy}: a recipe never authors the combination rule`
@@ -3208,15 +3041,7 @@ export function registerChecksCases() {
     );
   });
 
-  // ---------------------------------------------------------------------------
   // The View Lab's own `expectSelector`s, run against the mounted root.
-  //
-  // Two capture cases assert a `:has()` / `:not(:has())` RELATIONSHIP between hooks the
-  // tests above only ever assert one at a time — that the catalogue card CONTAINS both the
-  // restored `bySubject` card and the cap field's unlimited reading, and that the recipe
-  // picker contains a pill row and NO cap sentence. A selector can fail on the relationship
-  // while every individual hook is present and correct, and the only thing that ran it was
-  // a capture job needing harvested Foundry chrome.
 
   it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
     const selector = labCaseSelector('manager-checks-crafting-modifiers');
@@ -3236,8 +3061,7 @@ export function registerChecksCases() {
     target.remove();
     target = null;
 
-    // The negative control, and the state the capture job actually hit: the hooks are all
-    // present, the nesting is right, and the cap simply reads a bound instead of unlimited.
+    // The negative control, and the state the capture job actually hit.
     mountManager([], modifierRuleSystem('playerPicks', 1));
     navButton('Checks').click();
     await tick();
@@ -3284,11 +3108,6 @@ export function registerChecksCases() {
   });
 
   // ── Issue 1096, revision 2: the seven behaviours whose mutations SURVIVED ─────────────
-  //
-  // Everything below was written because a full-suite mutation of the code it covers left
-  // the suite green. That is the standard each of these is held to: revert the line and one
-  // NAMED test here goes red. They are grouped in one block because they share the same
-  // mount-and-route setup, not because they are one concern.
 
 
   async function mountChecks(calls = [], storeOptions = {}) {
@@ -3299,13 +3118,7 @@ export function registerChecksCases() {
     return target;
   }
 
-  /**
-   * The routed crafting system these Checks cases share, in its two arms. `rollFormula: ''`
-   * is the BROKEN one — it raises `noRollFormula`, which is what gives the Validation route a
-   * deep-linkable row — and `'1d20'` the clean one. Hoisted because four cases carried
-   * byte-identical copies of it, and a fixture restated once per case is a fixture that can
-   * silently stop being the same fixture.
-   */
+  /** The routed crafting system these Checks cases share. */
   const routedCraftingOptions = (rollFormula) => ({
     alchemyResolutionMode: 'routedByCheck',
     craftingCheck: {
@@ -3322,8 +3135,6 @@ export function registerChecksCases() {
     // ALCHEMY + TIERED. The route renders the ROUTED editor (its own derivation reads
     // `alchemy.checkMode`), so the routed draft is the one a GM edits — but the rail badge
     // picked the SIMPLE draft from a second mapping while evaluating it under ROUTED rules.
-    // The fixture makes the two answers differ: the routed draft has an unnamed, non-success
-    // tier (two criticals), the simple draft is clean.
     await mountChecks([], {
       alchemyResolutionMode: 'alchemy',
       alchemyConfig: { checkMode: 'tiered', learnOnCraft: true, consumeOnFail: true },
@@ -3342,8 +3153,7 @@ export function registerChecksCases() {
     assert.ok(badge, 'the routed draft is broken, so the rail child is badged');
     assert.equal(badge.textContent.trim(), '2', 'unnamed tier + no success tier');
 
-    // And the Validation route reports exactly the same two, from the same pass. The
-    // invariant this whole studio is built on is that these can never disagree.
+    // And the Validation route reports exactly the same two.
     await openChecksActivity('validation');
     const reported = [
       ...target.querySelectorAll(
@@ -3354,9 +3164,7 @@ export function registerChecksCases() {
   });
 
   it('marks and SAVES an alchemy-tiered edit, which lands on the routed draft', async () => {
-    // The same disagreement, on the other side: dirty tracking and Save dispatched through
-    // the mapping that said `simple`, so an edit to the routed draft the GM can actually make
-    // was never marked unsaved and never written.
+    // The same disagreement, on the other side.
     const calls = [];
     await mountChecks(calls, {
       alchemyResolutionMode: 'alchemy',
@@ -3393,9 +3201,7 @@ export function registerChecksCases() {
   });
 
   it('raises NO readiness issue on a crafting mode that rolls no check at all', async () => {
-    // Alchemy `none`. The coerced reading demanded a roll formula, so the rail carried a
-    // permanent "1 issue" badge that no control on the route could clear — the route renders
-    // no formula field at all.
+    // Alchemy `none`. The coerced reading demanded a roll formula.
     await mountChecks([], {
       alchemyResolutionMode: 'alchemy',
       alchemyConfig: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true },
@@ -3417,8 +3223,7 @@ export function registerChecksCases() {
   });
 
   it('states a result for a Validation group with neither a tick nor an issue', async () => {
-    // Gathering in `d100` with no eligible modifiers evaluates to nothing at all, and an
-    // unfiltered map drew a `GATHERING CHECK` heading with a rule under it and nothing else.
+    // Gathering in `d100` with no eligible modifiers evaluates to nothing at all.
     await mountChecks([], { gatheringResolutionMode: 'd100' });
     await openChecksActivity('validation');
     const group = target.querySelector('[data-checks-validation-section="gathering"]');
@@ -3433,9 +3238,7 @@ export function registerChecksCases() {
   });
 
   it('honours a REPEATED deep link to a section the GM has since left', async () => {
-    // The latch was on the section VALUE, so the second request equalled it and was
-    // swallowed: deep-link to `roll`, click Triggers, deep-link to `roll` again, and the GM
-    // landed on Triggers. Cross-activity deep-linking makes that the ordinary path.
+    // The latch was on the section VALUE.
     await mountChecks([], routedCraftingOptions(''));
     await openChecksActivity('validation');
 
@@ -3474,11 +3277,7 @@ export function registerChecksCases() {
   });
 
   it('reads the locked activation state in the SAME words the live switch uses', async () => {
-    // ONE vocabulary across both slots, and it is the CARD's. The two readings were `Check is
-    // on` and `On`, which is two vocabularies for one state side by side; they were unified on
-    // `On` and are now unified on the prototype's own sentence, because the heading that used
-    // to name this section is gone and the card has to say what it is (issue 1096). The
-    // property under test is unchanged: the locked reading is the live switch's own word.
+    // ONE vocabulary across both slots.
     await mountChecks([], { alchemyResolutionMode: 'simple' });
     await openChecksActivity('crafting');
     const live = target.querySelector('[data-checks-active-toggle] .manager-status-toggle-label');
@@ -3505,15 +3304,11 @@ export function registerChecksCases() {
   });
 
   it('opens the section a digest row describes, and offers nothing to press on an absence', async () => {
-    // The digest rows grew the prototype's trailing chevron, and a chevron that goes nowhere is
-    // worse than no chevron: it advertises a destination the row does not have. So the row IS
-    // the deep link — the same one the Validation issues use — and a row that reports an
-    // ABSENCE is not a link at all (issue 1096).
+    // The digest rows grew the prototype's trailing chevron.
     await mountChecks([], routedCraftingOptions('1d20'));
     await openChecksActivity('crafting');
 
-    // ONE card of rows, not one card per row. Direct children, so a row re-wrapped in its own
-    // card fails here rather than passing on a selector that finds it at any depth.
+    // ONE card of rows, not one card per row. Direct children.
     const digest = target.querySelector('[data-checks-digest]');
     const rows = [...digest.children];
     assert.ok(rows.length >= 2, 'the digest states more than one fact');
@@ -3553,15 +3348,7 @@ export function registerChecksCases() {
   });
 
   it('offers only formula tokens the active world can resolve', async () => {
-    // `@ingredients` resolved against NOTHING. A GM clicked the chip, it wrote
-    // `… + @ingredients` into the roll formula, and the check was broken by the control that
-    // offered it — a one-click path to a broken check, which is worse than no chip. It sat in
-    // a hard-coded list beside `@prof` and `@level`, two more dnd5e-shaped guesses in a
-    // system-agnostic module that nothing had ever proved either.
-    //
-    // The row is derived from the world now, through the same preset bundles the modifier
-    // chips read, so this asserts the DERIVATION rather than a replacement literal list: a
-    // chip may only offer an expression the product would itself author for this system.
+    // `@ingredients` resolved against NOTHING. A GM clicked the chip.
     await mountChecks([], routedCraftingOptions('1d20'));
     await openChecksActivity('crafting');
     const chips = [...target.querySelectorAll('[data-check-formula-token]')];
@@ -3590,7 +3377,6 @@ export function registerChecksCases() {
     // fact about the space the histogram beneath it walked, so it is derived rather than
     // stated — a fixed "20" beside a 2d6 check would be a claim about a check that does not
     // roll a d20.
-    //
     // IT READS THE PANEL, NOT THE FORMULA (issue 1097). This assertion used to expect
     // `all 6 faces` for `2d6 + @prof`, off a regex that finds the first `NdS` in the AUTHORED
     // string. That was the only derivation available while the panel was a slot; now that the
@@ -3601,7 +3387,7 @@ export function registerChecksCases() {
     // as the fallback for a rail mounted without a view-model and is unreachable here.
     await mountChecks([], routedCraftingOptions('1d20 + @prof'));
     await openChecksActivity('crafting');
-    // This suite installs no dice engine, so the enumerator refuses every formula here for
+    // This suite installs no dice engine.
     // want of one. That is exactly the condition the arms below measure, and the POSITIVE
     // arm — a real d20 check whose heading reads `all 20 faces` — is asserted in
     // `tests/components/check-preview-mounted.test.js`, which does install one.
@@ -3620,10 +3406,7 @@ export function registerChecksCases() {
   });
 
   it('names each mode in the ALL CHECKS rail the way its own picker names it', async () => {
-    // The rail read the AUTHORED tokens straight out of the system, and the three subsystems
-    // spell one concept three ways — so the card printed `routedByCheck` on the crafting row
-    // directly above `routed` on the salvage row, two camelCase identifiers for one mode,
-    // while the window header two panels away said "Routed by check".
+    // The rail read the AUTHORED tokens straight out of the system.
     await mountChecks([], {
       ...routedCraftingOptions('1d20'),
       salvageResolutionMode: 'routed',
@@ -3665,19 +3448,7 @@ export function registerChecksCases() {
   });
 
   it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {
-    // The mirror defect, which is why the latch cannot simply be removed: a request treated
-    // as a standing instruction drags the strip back on every recomputation.
-    //
-    // THE PROBE HAS TO CHANGE THE ACTIVITY, not just the section. Under Svelte 5's
-    // fine-grained reactivity the adoption effect reads `activity`, `requestedSection`,
-    // `requestedSectionNonce`, `adoptedSectionNonce` and `sections` — it never reads
-    // `activeSection`, so a section click writes a value the effect does not depend on and
-    // the effect does not re-run at all. An earlier version of this test clicked two further
-    // sections and asserted the strip stayed put; that is true whether or not the latch
-    // works, and breaking the latch (`requestedSectionNonce !== adoptedSectionNonce` →
-    // a constant) left the suite green. A rail click to another activity DOES re-run it,
-    // and `checksActiveSection` on the root is never cleared, so the standing request is
-    // still there to be wrongly re-applied.
+    // The mirror defect, which is why the latch cannot simply be removed.
     await mountChecks([], {
       salvageResolutionMode: 'routed',
       salvageCraftingCheck: {
@@ -3723,12 +3494,7 @@ export function registerChecksCases() {
   });
 
   it('deep-links to the owning ACTIVITY as well as the section', async () => {
-    // Both halves of `onOpenActivity`, driven from the Validation route. Dropping either the
-    // `setView` or the section left the other looking correct.
-    //
-    // The fixture picks an issue that buckets to OUTCOMES, not to the roll: `roll` is the
-    // section the strip opens on by default, so a deep link that dropped the section entirely
-    // would still land there and the assertion would prove nothing.
+    // Both halves of `onOpenActivity`.
     await mountChecks([], {
       salvageResolutionMode: 'routed',
       salvageCraftingCheck: {
@@ -3781,14 +3547,11 @@ export function registerChecksCases() {
   });
 
   it('renders the full activity rail stack, so the Validation absence assertions mean something', async () => {
-    // The four rail hooks were asserted ABSENT on Validation and nowhere else, so renaming
-    // all four out of existence satisfied the negative loop and the suite stayed green.
+    // The four rail hooks were asserted ABSENT on Validation and nowhere else.
     await mountChecks([], { alchemyResolutionMode: 'simple' });
     await openChecksActivity('crafting');
     for (const present of [
       // `data-checks-rail` is the View Lab's `manager-checks-stacked-floor` wait selector.
-      // A rename fails the capture job WHOLE, publishing nothing while `check-screenshots`
-      // stays green on stale frames — so it is pinned here, not only in the case registry.
       '[data-checks-rail="crafting"]',
       '[data-checks-active="crafting"]',
       '[data-checks-preview-as]',
@@ -3799,11 +3562,7 @@ export function registerChecksCases() {
     ]) {
       assert.ok(target.querySelector(present), `an activity route renders ${present}`);
     }
-    // Preview-as was a PRE-ROLL SLOT under issue 1096 — a stated sentence and no control —
-    // because two enabled-looking selects reading "No actors" / "No records" would have
-    // invited a choice nothing consumed. Issue 1097 supplies the thing behind them, so the
-    // assertion inverts rather than relaxes: BOTH selectors are real, and the actor one
-    // carries the explicit "No actor" option the readout's unresolved warning depends on.
+    // Preview-as was a PRE-ROLL SLOT under issue 1096.
     const previewAs = target.querySelector('[data-checks-preview-as]');
     const actorPicker = previewAs.querySelector('[data-checks-preview-actor]');
     const recordSelect = previewAs.querySelector('[data-checks-preview-record]');
@@ -3824,9 +3583,7 @@ export function registerChecksCases() {
   });
 
   it('keeps the gathering d100 route on its own explanation, not the check-OFF empty state', async () => {
-    // The D-2 predicate. `optional` means `mode === 'd100'` on gathering — the one mode with
-    // no toggle at all — so reading `optional && !enabled` collapsed the d100 route to "turn
-    // this check on" for a check nobody can turn on, and took the shipped explanation away.
+    // The D-2 predicate. `optional` means `mode === 'd100'` on gathering.
     await mountChecks([], {
       gatheringResolutionMode: 'd100',
       gatheringCraftingCheck: { enabled: false },
@@ -3845,8 +3602,7 @@ export function registerChecksCases() {
       'and the rail states the locked reading rather than removing the switch'
     );
 
-    // The positive half, so the assertion above is discriminating: an activity that DOES have
-    // a live toggle, switched off, still collapses to the empty state.
+    // The positive half, so the assertion above is discriminating.
     await mountChecks([], {
       alchemyResolutionMode: 'simple',
       craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 12 } },
@@ -3878,9 +3634,7 @@ export function registerChecksCases() {
     await settleRouteExit();
     const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
     assert.ok(prompt, 'leaving the studio with an unsaved edit prompts');
-    // Lowercase because the localization fake returns the key, so the root's `text()` falls
-    // back to the activity id. The point of the assertion is that the prompt is TOLD which
-    // activities are dirty, not how the label is cased.
+    // Lowercase because the localization fake returns the key.
     assert.deepEqual(prompt[1], ['crafting'], 'and NAMES the dirty activity');
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.managerView,
@@ -3923,8 +3677,7 @@ export function registerChecksCases() {
   });
 
   it('discards a staged alchemy check-mode change along with the other drafts', async () => {
-    // The other defect the staging fixes: the mode persisted on click, so the Discard branch
-    // of the exit prompt reset every OTHER draft and left this one applied.
+    // The other defect the staging fixes: the mode persisted on click.
     const calls = [];
     await mountChecks(calls, {
       alchemyResolutionMode: 'alchemy',
@@ -4029,9 +3782,7 @@ export function registerChecksCases() {
   });
 
   it('stays on the Checks route when a Save-on-navigate does not land', async () => {
-    // `finishChecksRouteExit` returned `true` unconditionally after awaiting the save, so a
-    // refused write navigated away from work nothing had persisted. The essence and
-    // system-details guards gate on `result !== false`; this one now does too.
+    // `finishChecksRouteExit` returned `true` unconditionally after awaiting the save.
     const calls = [];
     await mountChecks(calls, {
       alchemyResolutionMode: 'simple',
@@ -4112,9 +3863,7 @@ export function registerChecksCases() {
     const inks = drawn.map((band) => /--fab-band-strip-ink:\s*([^;]+)/.exec(styleOf(band))?.[1]);
     assert.equal(bands.length, 5, 'five authored tiers draw five bands');
     assert.equal(new Set(bands).size, 5, `five DISTINCT fills, got ${bands.join(' | ')}`);
-    // The ramp itself, named tone by tone in value order, because "five distinct fills" alone
-    // would pass just as well for five arbitrary colours in an arbitrary order — and the order
-    // is the claim: the strip has to read left-to-right as escalating.
+    // The ramp itself, named tone by tone in value order.
     assert.deepEqual(
       bands.map((fill) => /var\(--fab-([\w-]+)\)/.exec(fill)?.[1]),
       ['danger', 'warning', 'success', 'info', 'accent'],
@@ -4134,9 +3883,7 @@ export function registerChecksCases() {
       `every band carries its own tone's ink, got ${inks.join(' | ')}`
     );
 
-    // The KEY: each tier row wears its own band's tone, at FULL STRENGTH rather than as the
-    // band's mixed fill, or the ramp is a pattern with no legend and no way to tell which row
-    // moved which band.
+    // The KEY: each tier row wears its own band's tone.
     const swatch = (id) =>
       target.querySelector(`[data-outcome-swatch="${id}"]`)?.getAttribute('style') || '';
     assert.ok(swatch('ruined').startsWith('--fab-outcome-swatch:'), 'the swatch carries a fill');
@@ -4151,11 +3898,7 @@ export function registerChecksCases() {
   });
 
   it('spends the whole ramp on a THREE-tier check, so it still reads as escalating', async () => {
-    // The three-tier case is where ranking inside each semantic family went wrong: the single
-    // failure tier was a family of one and took that family's strongest tone, so the strip ran
-    // mid, dark, light — the darkest band in the MIDDLE and the failure lighter than the first
-    // success. Walking one ramp across the whole list is the fix, and it is only visible at a
-    // count where the two rules disagree.
+    // The three-tier case is where ranking inside each semantic family went wrong.
     await mountChecks([], {
       alchemyResolutionMode: 'routedByCheck',
       craftingCheck: {
@@ -4228,8 +3971,7 @@ export function registerChecksCases() {
       target.querySelector(`#${panelId}`),
       `aria-controls must name a node that exists, got ${panelId}`
     );
-    // The other four reference nothing rather than an id that resolves to nothing: an IDREF
-    // to nowhere is reported as a broken relationship, not as "not currently shown".
+    // The other four reference nothing rather than an id that resolves to nothing.
     for (const tab of tabs.filter((candidate) => candidate !== controlled[0])) {
       assert.ok(
         !tab.hasAttribute('aria-controls'),
@@ -4239,9 +3981,7 @@ export function registerChecksCases() {
   });
 
   it('gives every labelled rail marker a role, so the name is actually exposed', async () => {
-    // ARIA-in-HTML forbids `aria-label` on a generic element: a bare `<span aria-label>` has
-    // no role to hang the name on, so the name is simply not exposed. The sibling dirty
-    // marker already had `role="img"`; the two issue badges did not.
+    // ARIA-in-HTML forbids `aria-label` on a generic element.
     await mountChecks([], { alchemyResolutionMode: 'routedByCheck' });
     for (const selector of [
       '[data-checks-nav-issues="checks"]',

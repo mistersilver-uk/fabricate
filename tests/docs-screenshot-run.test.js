@@ -1,20 +1,4 @@
-/**
- * The refusals a documentation screenshot run makes, exercised.
- *
- * Every judgement in `scripts/lib/docsScreenshotRun.js` exists to stop a picture being published
- * that is not of this commit, and a refusal is invisible when it is working. That is the failure
- * mode this file exists for: while the logic lived inside `scripts/docs-screenshots.mjs` — which
- * dispatches from `process.argv` at module scope and so cannot be imported — each of the four
- * refusals could be deleted with the whole suite still green.
- *
- * WHY A SOURCE ASSERTION AT THE END
- * ---------------------------------
- * Extracting the decisions makes them testable and introduces exactly one new way to be wrong: the
- * CLI could stop asking them. Nothing else can catch that, because the CLI still cannot be
- * imported, so the last test reads it and checks that every exported judgement is named in it. That
- * is a weak check on purpose — it proves the wiring exists, not that it is right — and it is the
- * only kind available on the near side of a real render.
- */
+/** The refusals a documentation screenshot run makes, exercised. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -53,11 +37,8 @@ test('a manifest this run did not write is refused', () => {
     'the first run on a clean checkout has no earlier manifest to be newer than'
   );
 
-  // The renderer writes its manifest LAST, so a throw before its render loop — a squatted lab
-  // port, no browser installed, a viewport assertion — leaves the previous run's manifest in
-  // place. Its own recorded head cannot catch that, because a previous run AT THIS COMMIT wrote
-  // this commit's head into it and every frame in it agrees by construction. Only the fact that
-  // the file did not move can catch it.
+  // The renderer writes its manifest LAST, so a throw before its render loop — a squatted lab port,
+  // no browser installed, a viewport assertion — leaves the previous run's manifest in place.
   const unmoved = staleManifestReason(OUTPUT, 2000, 2000);
   assert.ok(
     unmoved,

@@ -1,39 +1,4 @@
-/**
- * The documentation screenshot map, gated in both directions.
- *
- * `docs/_data/screenshots.json` says which View Lab cases feed the documentation site. Three
- * things have to keep agreeing for a generated frame to mean anything: the case registry, the
- * images committed under `docs/img/screenshots/lab/`, and the image slots the pages declare. This
- * fails when any one of them moves without the others.
- *
- * WHY THE GENERATED FRAMES HAVE THEIR OWN DIRECTORY
- * -------------------------------------------------
- * The reverse direction — "every committed image is named by the map" — is the one that catches an
- * image nobody generated: a browser grab, a leftover from an abandoned selection, a frame whose
- * map entry was deleted. It only works because the generated set lives in a directory of its own.
- * Mixed in with the hand-curated frames in the flat `docs/img/screenshots/`, the only available
- * test for "is this one of mine" would be "is it in the map", and the assertion would reduce to
- * the map restating itself. Five case ids share the `fabricate-` prefix with the one curated file
- * that remains, so the two populations cannot be told apart by name either — and that stays true
- * however far the curated set shrinks, because the prefix is what makes them indistinguishable.
- *
- * `tests/docs-screenshots.test.js` owns the flat directory and this owns `lab/`. Neither may claim
- * the other's population, and neither is allowed to enumerate it by accident.
- *
- * WHY THE DIGEST IS ASSERTED RATHER THAN CARRIED
- * ----------------------------------------------
- * An unread digest is decoration. It exists so that a hand-captured browser grab dropped into the
- * map cannot pass every other check while claiming to be generated from the product, and so a
- * toolchain rewrite is identifiable — neither of which happens unless something reads it. Shape
- * and uniqueness are what this file checks.
- *
- * Nothing re-derives the digest, here or anywhere, and nothing can. It is the SHA-256 of the source
- * PNG a render produced, and this renderer is not byte-deterministic: a fresh render of the
- * identical case yields a different PNG, and so a different digest, while showing the identical
- * view. The digest is therefore provenance — which render this asset came from — and it moves only
- * when a frame is actually rewritten. `docs:screenshots:check` re-renders and compares PIXELS,
- * because that is the only comparison the renderer's own jitter does not defeat.
- */
+/** The documentation screenshot map, gated in both directions. */
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -55,15 +20,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const docsDir = join(root, 'docs');
 
-/**
- * Directories under `docs/` that are generated or vendored, and so cannot declare a slot.
- *
- * Deliberately shorter than the equivalent list in `tests/docs-screenshots.test.js`. That test
- * additionally skips `_includes`, `_layouts` and `_data` because it scans for literal file names
- * and would otherwise read the include template's own path as a permanent phantom reference. This
- * one looks for slot declarations, and a layout or an include is as entitled to declare one as a
- * page is — skipping them would turn a real declaration into a false orphan report.
- */
+/** Directories under `docs/` that are generated or vendored, and so cannot declare a slot. */
 const IGNORED_DOCS_DIRS = new Set(['_site', 'vendor', '.jekyll-cache', 'node_modules']);
 
 const map = await readDocsScreenshotMap(root);

@@ -29,9 +29,7 @@ function makeManager() {
   return new CraftingSystemManager(recipeManagerStub);
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: _normalizeEssenceDefinition — 6 tests
-// ---------------------------------------------------------------------------
 
 test('_normalizeEssenceDefinition - string entry gets default icon', () => {
   const manager = makeManager();
@@ -77,9 +75,7 @@ test('_normalizeEssenceDefinition - object entry with sourceItemUuid uses it as 
   assert.equal(result.associatedSystemItemId, null);
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: _normalizeSystem round-trip — 4 tests
-// ---------------------------------------------------------------------------
 
 test('_normalizeSystem - normalized system includes icon and sourceItemUuid on essences', () => {
   const manager = makeManager();
@@ -166,10 +162,9 @@ test('_normalizeSystem - v2 sourceComponentId survives with resolved sourceItemU
 });
 
 test('_normalizeSystem - stale sourceComponentId is preserved but skips legacy sourceItemUuid', () => {
-  // The component array is NON-EMPTY, which is what makes the component Valid Id Basis KNOWN
-  // (issue 1359): the id genuinely names nothing in this system, so the legacy uuid is dropped
-  // exactly as it always was. With an EMPTY array the basis is UNKNOWN and the uuid is retained
-  // instead — see the next case.
+  // The component array is NON-EMPTY, which is what makes the component Valid Id Basis KNOWN (issue
+  // 1359): the id genuinely names nothing in this system, so the legacy uuid is dropped exactly as
+  // it always was.
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
@@ -191,9 +186,7 @@ test('_normalizeSystem - stale sourceComponentId is preserved but skips legacy s
 test('_normalizeSystem - an EMPTY component array is an UNKNOWN basis, so the legacy uuid survives', () => {
   // Issue 1359 (epic 1357). An empty in-system array plus an unwritten world component setting is
   // not an empty corpus, it is an UNKNOWABLE one — the state every client is in after the
-  // world-scope migration lands on the active GM and before the setting replicates. Nulling the
-  // authored uuid there is a silent, permanent deletion, because this normalizer is a whitelist
-  // rebuild and the next save makes it durable.
+  // world-scope migration lands on the active GM and before the setting replicates.
   const manager = makeManager();
   const system = manager._normalizeSystem({
     id: 'sys-1',
@@ -227,9 +220,7 @@ test('_normalizeSystem - raw document sourceItemUuid is preserved when no source
   assert.equal(essence.associatedSystemItemId, null);
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: Edge cases — 2 tests
-// ---------------------------------------------------------------------------
 
 test('_normalizeEssenceDefinition - empty string icon falls back to default', () => {
   const manager = makeManager();

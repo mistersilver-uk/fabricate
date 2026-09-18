@@ -123,11 +123,6 @@ describe('SegmentedControl (mounted)', () => {
   });
 
   // ── The semantic variant ramp (issue 1286) ─────────────────────────────────────
-  //
-  // `info` and `warning` were added so a three-way minor/major/severe control can name
-  // every one of its segments. The CSS declared only `success` and `danger` before, so two
-  // of the three severity segments rendered as the plain active tile — the class was there
-  // and the colour was not, which is the failure a class-only assertion cannot see.
   it('tints the active segment for EVERY declared variant, and paints each one', async () => {
     const options = [
       { value: 'minor', variant: 'info', fallback: 'Minor' },
@@ -201,10 +196,6 @@ describe('SegmentedControl (mounted)', () => {
   });
 
   // ── The icon-only variant (issue 1036) ──────────────────────────────────────────
-  //
-  // Opt-in, and the opt-out side is the half worth pinning: the essence library's
-  // list/grid toggle is the only consumer that sets it, so the other four must render
-  // exactly what they rendered before the flag existed.
   it('adds is-icon-only to the track only when iconOnly is set', async () => {
     const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
     assert.equal(
@@ -281,8 +272,7 @@ describe('SegmentedControl (mounted)', () => {
       null,
       'and the radio does not also carry it, which would make the selector ambiguous'
     );
-    // The tile's visible content is the glyph, so a compacted segment that rendered no
-    // icon would be an empty click target.
+    // The tile's visible content is the glyph.
     assert.ok(
       Boolean(root.querySelector('[data-seg="destroyed"] i.fa-trash')),
       'the glyph is what the tile shows'
@@ -290,11 +280,6 @@ describe('SegmentedControl (mounted)', () => {
   });
 
   // ── The tag TONE (issue 1373) ───────────────────────────────────────────────────
-  //
-  // `tone` says what the track is ABOUT and repaints its edge and both segments together;
-  // the per-option `variant` tints one ACTIVE segment to say what choosing it means. They
-  // are different axes, so the opt-out side is what matters here: nine of the ten consumers
-  // pass no tone and must render exactly the markup they rendered before it existed.
   it('adds is-tag to the track only when tone is set, and leaves the segments alone', async () => {
     const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
     assert.equal(
@@ -313,9 +298,7 @@ describe('SegmentedControl (mounted)', () => {
       toned.querySelector('.manager-segmented.is-tag'),
       'tone="tag" marks the TRACK'
     );
-    // The tone is a track statement, so no segment gains a class: painting the chosen one
-    // through `is-tag` on the SEGMENT would collide with the per-option variant ramp, which
-    // is the axis this prop deliberately is not.
+    // The tone is a track statement, so no segment gains a class.
     assert.equal(
       [...toned.querySelectorAll('.manager-segment')].filter((segment) =>
         segment.classList.contains('is-tag')
@@ -323,8 +306,7 @@ describe('SegmentedControl (mounted)', () => {
       0,
       'no segment carries the tone class'
     );
-    // An unknown tone renders the default track rather than an is-<anything> class, so a
-    // typo degrades to the shipped rendering instead of emitting a selector nothing styles.
+    // An unknown tone renders the default track rather than an is-<anything> class.
     harness.remount();
     const unknown = await harness.mount({
       options: OPTIONS,
@@ -340,7 +322,6 @@ describe('SegmentedControl (mounted)', () => {
   });
 
   // ── THE PILL SHAPE AND THE SOFT-ACCENT TONE (issue 1371) ───────────────────────────────
-  //
   // The reference draws its entry filter (`proto:5457`, `All / With rules / Without`) as a RUN
   // OF SEPARATE PILLS rather than as tiles inside a frame: no track fill, no track edge, radius
   // 999 per segment, every segment at 600, the idle one a real tile on `--fab-bg-1` behind a
@@ -348,10 +329,6 @@ describe('SegmentedControl (mounted)', () => {
   // component already separates — `shape` for the construction, `tone` for the paint — because
   // the shipped `tone="accent"` is the OTHER accent control (`proto:1558`, the cohort switch,
   // solid fill on a bare idle segment) and both have to keep rendering.
-  //
-  // A parity lane proved this is unreachable from `styles/fabricate.css` at any specificity:
-  // Foundry imports the module sheet at `layer(modules)` and this component's block is injected
-  // unlayered, so the primitive's own declaration wins however the sheet's selector is written.
   it('adds is-pill to the track only when shape is set, and rounds only the segments', async () => {
     const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
     assert.equal(
@@ -402,9 +379,7 @@ describe('SegmentedControl (mounted)', () => {
     });
     const softTrack = soft.querySelector('.manager-segmented');
     assert.ok(softTrack.classList.contains('is-accent-soft'), 'tone="accent-soft" marks the TRACK');
-    // `is-accent` is a PREFIX of `is-accent-soft`, and a class list is matched by whole token, so
-    // the shipped cohort switch's rules must not reach this track. Asserted rather than assumed:
-    // a `className.includes(...)` check anywhere would read the two as the same tone.
+    // `is-accent` is a PREFIX of `is-accent-soft`, and a class list is matched by whole token.
     assert.equal(
       softTrack.classList.contains('is-accent'),
       false,
@@ -428,10 +403,7 @@ describe('SegmentedControl (mounted)', () => {
   });
 
   it('composes the pill run with the compact density and the badge slot', async () => {
-    // The consuming lane passes all three: `density="compact"` is the rung the reference's
-    // `padding: 5px 11px` / 10.5px segment already lands on, `shape="pill"` is the corner and
-    // the frameless track, `tone="accent-soft"` is the paint, and the tally rides the mono
-    // `badge` slot the reference draws it in.
+    // The consuming lane passes all three.
     const root = await harness.mount({
       options: [
         { value: 'all', fallback: 'All', badge: 6 },
@@ -457,9 +429,6 @@ describe('SegmentedControl (mounted)', () => {
   it('paints every declared shape and tone in the scoped style block', () => {
     // The mirror guard, in both directions. A value accepted by the class builder but never
     // given a rule renders as the shipped track while the class assertions above still pass:
-    // the class is there, the treatment is not, and nothing says so. Derived from the
-    // component's own class expression rather than restated, so a fourth value added to one
-    // and not the other fails here instead of shipping unpinned.
     const trackClasses = segmentedSource.slice(
       segmentedSource.indexOf('class={`manager-segmented'),
       segmentedSource.indexOf('role="radiogroup"')
@@ -467,9 +436,7 @@ describe('SegmentedControl (mounted)', () => {
     const declared = [...trackClasses.matchAll(/' (is-[a-z-]+)'/g)].map(([, name]) => name);
     assert.ok(declared.length >= 8, `the track builder still names its variants (${declared})`);
     const styleBlock = segmentedSource.slice(segmentedSource.indexOf('<style>'));
-    // Whole-token match, not `includes`. `is-accent` is a PREFIX of `is-accent-soft`, so a
-    // substring lookup would report the solid cohort tone as painted by the soft one's rules
-    // and this guard would answer yes to a question nothing had asked.
+    // Whole-token match, not `includes`. `is-accent` is a PREFIX of `is-accent-soft`.
     assert.deepEqual(
       declared.filter(
         (name) => !new RegExp(`\\.manager-segmented\\.${name}(?![\\w-])`).test(styleBlock)
@@ -480,15 +447,7 @@ describe('SegmentedControl (mounted)', () => {
   });
 
   it('states the pill run and the soft accent in tokens, at the reference values', () => {
-    // `proto:5457` exactly: radius 999 per segment, `font: 600`, the idle segment on
-    // `background: var(--bg1); border: 1px solid var(--border); color: var(--muted)` and the
-    // chosen one on `var(--accent-soft)` / `var(--accent-border)` / `var(--accent)`. The three
-    // accent tokens are BYTE-EQUAL to the reference's here — `--fab-accent-soft` is
-    // `rgb(232 198 167 / 16%)` and the reference draws `rgba(232,198,167,.16)` — so this is a
-    // token statement rather than an approximation, and no colour literal enters `src/ui/**`.
-    //
-    // Each assertion is anchored to ITS OWN rule head with a `[^}]*` body, so a declaration
-    // that drifted into a neighbouring rule cannot satisfy the one that lost it.
+    // `proto:5457` exactly: radius 999 per segment, `font: 600`.
     const styleBlock = segmentedSource.slice(segmentedSource.indexOf('<style>'));
     const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rule = (head, declaration) =>

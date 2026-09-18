@@ -1,18 +1,7 @@
 /**
- * Issue 600 (#540 Phase 2): the one-shot, active-GM re-stamp that back-fills the durable
- * per-system component identity `flags.fabricate.roles[systemId].componentId` onto OWNED
- * ACTOR items that currently resolve to a system component ONLY by name.
- *
- * These tests drive the pure migration module (`restampOwnedItemComponentIdentity.js`) with
- * the REAL flag reader/writer (`getFabricateFlag`/`setFabricateFlag`) over `getFlag`/`setFlag`
- * fakes that mirror Foundry's doubly-nested `flags.fabricate.fabricate.roles` layout, and
- * assert the guarantees:
- *   - a name-only owned item GAINS the correct `roles[systemId].componentId` and then resolves
- *     via `resolveComponentForItem` by IDENTITY (RED before, GREEN after);
- *   - idempotence: a second run is a no-op;
- *   - a foreign-system role leaf is never clobbered (per-leaf merge write);
- *   - a dotted systemId is skipped safely (no mis-nested flag);
- *   - an already-durably-flagged item is left untouched.
+ * Issue 600 (#540 Phase 2): the one-shot, active-GM re-stamp that back-fills the durable per-system
+ * component identity `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that
+ * currently resolve to a system component ONLY by name.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,10 +21,8 @@ test.after(() => {
   console.warn = originalWarn;
 });
 
-// ---------------------------------------------------------------------------
-// getProperty/setProperty over dotted paths so the fake item's getFlag/setFlag walk and
-// write `flags.fabricate.fabricate.roles.<systemId>.componentId` exactly as Foundry does.
-// ---------------------------------------------------------------------------
+// getProperty/setProperty over dotted paths so the fake item's getFlag/setFlag walk and write
+// `flags.fabricate.fabricate.roles.<systemId>.componentId` exactly as Foundry does.
 function getProperty(object, path) {
   if (!object || !path) return undefined;
   return String(path)
@@ -54,9 +41,8 @@ function setProperty(object, path, value) {
 }
 
 /**
- * A live owned-item fake: `getFlag`/`setFlag` read and write `flags.fabricate.<key>` so a
- * write is visible to a subsequent read (needed for the idempotence + resolve-after
- * assertions). Records each `setFlag` for write-count assertions.
+ * A live owned-item fake: `getFlag`/`setFlag` read and write `flags.fabricate.<key>` so a write is
+ * visible to a subsequent read (needed for the idempotence + resolve-after assertions).
  */
 function makeOwnedItem({ name, uuid, roles = {}, componentId } = {}) {
   const flags = { fabricate: { fabricate: { roles } } };
@@ -144,10 +130,8 @@ test('600: idempotent — a second run stamps nothing', async () => {
 });
 
 test('600: an item durably flagged for another system is NOT stamped into a merely same-named system (issue 538)', async () => {
-  // The item already carries a DIFFERENT system's COMPONENT identity (roles.sysB.componentId)
-  // and only shares a display NAME with sysA's component (no raw-ref link to sysA). At runtime
-  // the #538 gate suppresses the cross-system name fallback, so it does NOT resolve into sysA —
-  // the migration must NOT manufacture a permanent roles.sysA leaf.
+  // The item already carries a DIFFERENT system's COMPONENT identity (roles.sysB.componentId) and
+  // only shares a display NAME with sysA's component (no raw-ref link to sysA).
   const item = makeOwnedItem({
     name: 'Healing Potion',
     uuid: 'Item.owned-copy',
@@ -171,9 +155,8 @@ test('600: an item durably flagged for another system is NOT stamped into a mere
 });
 
 test('600: a legitimate stamp preserves a pre-existing unrelated role leaf (per-leaf merge write)', async () => {
-  // The item is UNFLAGGED for component identity (only a sibling system's TOOL leaf, which the
-  // #538 gate ignores) and name-matches sysA, so it is a legitimate stamp target. The write must
-  // add roles.sysA.componentId while the unrelated roles.sysB.toolId leaf survives the merge.
+  // The item is UNFLAGGED for component identity (only a sibling system's TOOL leaf, which the #538
+  // gate ignores) and name-matches sysA, so it is a legitimate stamp target.
   const item = makeOwnedItem({
     name: 'Healing Potion',
     uuid: 'Item.owned-copy',
@@ -193,9 +176,7 @@ test('600: a legitimate stamp preserves a pre-existing unrelated role leaf (per-
 
 test('600: a legacy flat componentId-scalar item is NOT stamped into a merely same-named system', async () => {
   // The migration's primary target class: an owned copy carrying the legacy flat
-  // `flags.fabricate.componentId` scalar (naming a component in ANOTHER system, absent from
-  // sysA). `itemHasComponentIdentityFlag` is true via the legacy tier, so — exactly as at
-  // runtime — it must NOT loosely name-match sysA. No leaf may be stamped.
+  // `flags.fabricate.componentId` scalar (naming a component in ANOTHER system, absent from sysA).
   const item = makeOwnedItem({
     name: 'Healing Potion',
     uuid: 'Item.owned-copy',

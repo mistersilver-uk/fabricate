@@ -1,12 +1,4 @@
-/**
- * The world-scope routes: Parties, Travel, the scoped-entity leaves and the published corpus.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The world-scope routes: Parties, Travel, the scoped-entity leaves and the published corpus. */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,9 +16,7 @@ import { railCounts as sharedRailCounts } from '../helpers/validationSurfaceRead
 // world corpus on every trigger — which a fake store would assert about itself.
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks on a
-// panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
-// lookup is therefore rooted on the mount target and not on the control's own container.
+// Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
@@ -43,8 +33,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   gatheringSubitem,
@@ -83,8 +72,7 @@ export function registerWorldScopeCases() {
   });
 
 
-  // The card moved to World > Rules & Resources > Character prerequisites in issue 1311; the
-  // contract it carries is unchanged, so the assertions are the same and only the route differs.
+  // The card moved to World > Rules & Resources > Character prerequisites in issue 1311.
   it('World prerequisites page renders an icon picker left of the name input (issue 544)', async () => {
     await mountWorldRulesDestination(
       {
@@ -122,17 +110,7 @@ export function registerWorldScopeCases() {
     );
   });
 
-  // The four World > Parties capture cases (issue 1182). Each asserts a RELATIONSHIP — two
-  // cards inside one list, a last card without a first, a popover with title/count metadata,
-  // no unlink footer, and an option meta line — and one bad `expectSelector` fails the capture job WHOLE
-  // and publishes nothing, so each is run here against the real rendered DOM before it can
-  // cost twenty minutes of a job that needs harvested Foundry chrome. Every one carries its
-  // negative control: the state the pane is in BEFORE the case's steps, which is the frame
-  // that would otherwise be published under the case's name.
-  //
-  // The party fixture MIRRORS `tests/view-lab/world/labWorld.js` — same ids, same names, same
-  // enabled flags, same travel actors — because a selector proved against a different world
-  // proves nothing about the frame.
+  // The four World > Parties capture cases (issue 1182). Each asserts a RELATIONSHIP.
   const LAB_MIRROR_ACTORS = [
     {
       uuid: 'Actor.lab-actor-brenna',
@@ -142,8 +120,7 @@ export function registerWorldScopeCases() {
     },
     { uuid: 'Actor.lab-actor-idrin', name: 'Idrin Ashfall', img: '', isPlayerCharacter: true },
     { uuid: 'Actor.lab-actor-vosk', name: 'Vosk', img: '', isPlayerCharacter: true },
-    // The vehicle. Not a player character, so neither picker offers it — unless it is
-    // already this party's travel actor, which is the one case that overrides the filter.
+    // The vehicle. Not a player character, so neither picker offers it.
     { uuid: 'Actor.lab-actor-wagon', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
   ];
   const labMirrorParty = (id, name, enabled, memberUuids, travelActorUuid) => ({
@@ -154,12 +131,7 @@ export function registerWorldScopeCases() {
     memberActorUuids: memberUuids,
     memberCards: memberUuids.map((uuid) => ({
       uuid,
-      // `?? uuid` rather than a bare `.name`: this fixture is built at DESCRIBE-BODY scope
-      // inside a describe holding 301 `it()`s, so a mirror that drifts out of
-      // `LAB_MIRROR_ACTORS` would throw while the body runs, deregister all 301, and still
-      // summarise `# fail 0` — the same shape that hid a failure in
-      // `player-character-actor-types.test.js` on this branch. Falling back to the uuid keeps
-      // drift visible as an ordinary assertion failure in the one test that reads the name.
+      // `?? uuid` rather than a bare `.name`.
       name: LAB_MIRROR_ACTORS.find((actor) => actor.uuid === uuid)?.name ?? uuid,
       img: '',
       stale: false,
@@ -203,9 +175,7 @@ export function registerWorldScopeCases() {
   }
 
   it('root: the World Parties capture cases satisfy their own selectors (issue 1182)', async () => {
-    // Empty, with its negative control first: the populated pane. This case's selector is
-    // a bare presence check, so without the control it could not fail on a pane that
-    // rendered the no-parties panel over a full card list — the frame it must never publish.
+    // Empty, with its negative control first.
     const empty = labCaseSelector('manager-world-parties-empty');
     await openLabMirrorParties();
     assert.ok(
@@ -227,7 +197,7 @@ export function registerWorldScopeCases() {
     target.remove();
     target = null;
 
-    // Search, with its negative control first: unfiltered, those two cards are the second and
+    // Search, with its negative control first: unfiltered.
     // the fifth of five at a page size of four, so they are never siblings in one list.
     const filtered = labCaseSelector('manager-world-parties-search-filtered');
     await openLabMirrorParties();
@@ -236,8 +206,7 @@ export function registerWorldScopeCases() {
       'unfiltered, the last-page card is not on the page at all — so an unfiltered frame ' +
         'cannot be published under the filtered case'
     );
-    // The term is READ FROM THE CASE's own step, not restated: a restated copy would keep
-    // passing after the case it mirrors started typing something else.
+    // The term is READ FROM THE CASE's own step, not restated.
     const searchStep = VIEW_LAB_CASES.find(
       (entry) => entry.id === 'manager-world-parties-search-filtered'
     ).steps.at(-1);
@@ -314,8 +283,7 @@ export function registerWorldScopeCases() {
     );
     assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
 
-    // Rooted on `target` rather than on `pagination`: the panel is portaled out of the pager's
-    // subtree onto the manager root, so a `pagination`-rooted lookup matches nothing.
+    // Rooted on `target` rather than on `pagination`.
     chooseSelectOption(target, '[data-pagination-size]', 6);
     await tick();
     flushSync();
@@ -325,9 +293,7 @@ export function registerWorldScopeCases() {
       'Page 1 of 1',
       'a page-size mutation always returns the party list to its first page'
     );
-    // The load-bearing half. The walk left the pane on page TWO, which does not hold
-    // `lab-party`, so this card can only be back on screen because the index reset — a
-    // pane that kept `pageIndex = 1` at the new size would render an empty second page.
+    // The load-bearing half. The walk left the pane on page TWO.
     assert.ok(
       Boolean(parties.querySelector('[data-manager-travel-party-id="lab-party"]')),
       'the first-page party is rendered again'
@@ -344,8 +310,7 @@ export function registerWorldScopeCases() {
       props: {
         store: createStore(calls, {
           gatheringRealmsEnabled: true,
-          // The World nav's Downtime entry is experimental-gated (issue 1257), and this case
-          // asserts the whole World group, so it opts in.
+          // The World nav's Downtime entry is experimental-gated (issue 1257).
           experimentalFeaturesEnabled: true,
         }),
         services: { openCurrentAdmin: () => {} },
@@ -385,20 +350,6 @@ export function registerWorldScopeCases() {
     assert.ok(!gatheringSubitem('Travel'), 'Travel is a top-level sibling, not a Gathering child');
     assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
     // EVERY WORLD LEAF CARRIES AN EXPLICIT ACCESSIBLE NAME AND ITS OWN COUNT (issue 1362).
-    //
-    // Both halves are about the COLLAPSED rail, and both are invisible at full width.
-    // `styles/fabricate.css` hides `.manager-nav-label` AND `.manager-nav-count` at 56px,
-    // leaving only an `aria-hidden` glyph — so a leaf without an `aria-label` has an EMPTY
-    // accessible name in exactly the state this epic ships a frame of. The four scoped-entity
-    // leaves shipped without one, and without the count its system sibling and every other
-    // World entry carries.
-    //
-    // The count is pinned here rather than left to a later PR because it is a ONE-WAY DOOR:
-    // `openspec/specs/ui-integration/spec.md` `### GM World Scoped Entity Routes` requirement 7
-    // bars every later PR in this epic from touching `CraftingSystemManagerRoot.svelte`, so a
-    // badge omitted now could never be added. They read 0 until a corpus exists, which is
-    // truthful — and PR 7 fills the vocabulary one from `worldScopeProjection.js`, which is not
-    // a gateway path.
     for (const [item, label] of [
       ['component-catalogue', 'Component catalogue'],
       ['vocabulary', 'Tags & Categories'],
@@ -423,8 +374,7 @@ export function registerWorldScopeCases() {
       worldTravelItem('travel').querySelector('.manager-nav-label').textContent.trim(),
       'Travel'
     );
-    // The realm count rides the parent, as the party count rides Parties and the coin count
-    // rides Currency — one number per World entry, naming what it holds.
+    // The realm count rides the parent.
     assert.equal(
       worldTravelItem('travel').querySelector('.manager-nav-count').textContent.trim(),
       '1'
@@ -470,11 +420,7 @@ export function registerWorldScopeCases() {
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'Realm actions'
     );
-    // The INSPECTOR, not just the panel. World > Travel renders its own `manager-main`, but its
-    // detail pane is a branch of the chain nested inside the shared inspector aside — so a route
-    // missing from that chain's outer condition makes the branch unreachable and the aside falls
-    // through to nothing. The failure is silent: the route commits, the panel renders, and only
-    // the detail pane is absent, which is why every assertion above stayed green through it.
+    // The INSPECTOR, not just the panel. World > Travel renders its own `manager-main`.
     assert.equal(
       target.querySelector('.manager-travel-inspector')?.getAttribute('aria-label'),
       'Selected realm',
@@ -590,8 +536,7 @@ export function registerWorldScopeCases() {
     assert.ok(target.querySelector('[data-travel-panel="realms"]'));
   });
 
-  // Issue 1282: the toggle states PARTICIPATION, so it lives on System Settings beside
-  // Currency and gates nothing about the World > Travel route, which is always reachable.
+  // Issue 1282: the toggle states PARTICIPATION.
   it('flips Travel & Realms from the System Settings tile while World Travel stays put', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -642,9 +587,7 @@ export function registerWorldScopeCases() {
     assert.ok(!gatheringSubitem('Travel'), 'Travel is not nested inside Gathering');
   });
 
-  // The route used to evaporate under the GM when the selected system's toggle went off, which
-  // is the fallback this replaced (issue 1282). Realms are world geography: the page they are
-  // authored on cannot depend on which crafting system happens to be selected.
+  // The route used to evaporate under the GM when the selected system's toggle went off.
   it('keeps World Travel on screen when the selected system opts out of Travel & Realms', async () => {
     const calls = [];
     const store = createStore(calls, { gatheringRealmsEnabled: true });
@@ -673,9 +616,7 @@ export function registerWorldScopeCases() {
     assert.ok(target.querySelector('[data-travel-panel="realms"]'));
   });
 
-  // Realms became WORLD geography in issue 1282, so the library is the same library whichever
-  // crafting system is selected. Before it, a GM running two systems authored the same valley
-  // twice and the two copies could disagree.
+  // Realms became WORLD geography in issue 1282.
   it('keeps the realm library and the party list global across a scope switch', async () => {
     mountManager([], {
       gatheringRealmsEnabled: true,
@@ -757,12 +698,7 @@ export function registerWorldScopeCases() {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
     assert.ok(target.querySelector('[data-travel-panel="parties"]'));
-    // ONE PAGE HEADER (issue 1515). This route used to render the kicker, the title AND a
-    // description sentence a second time inside `.manager-main`, under a page header already
-    // saying two of the three. The eyebrow moves to the shell as a `<Kicker>`, the title was
-    // always the shell's, and the description sentence RETIRES: the maintainer ruled the lede
-    // keeps the computed census, which is the one line on the screen the rows do not already say.
-    // `docs/world/parties.md` carries the retired sentence.
+    // ONE PAGE HEADER (issue 1515). This route used to render the kicker.
     assert.ok(
       !target.querySelector('.manager-main .manager-section-header'),
       'World Parties renders no second page header'
@@ -780,8 +716,7 @@ export function registerWorldScopeCases() {
       false,
       'the retired description sentence is gone rather than moved'
     );
-    // The page header carries the computed census, pinned exactly or the count could drift
-    // unnoticed.
+    // The page header carries the computed census.
     assert.equal(
       target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
       '2 parties · 1 enabled · 1 of 2 characters assigned'
@@ -802,8 +737,7 @@ export function registerWorldScopeCases() {
     assert.equal(target.querySelector('[data-party-realm-evidence-unavailable]'), null);
     assert.equal(target.textContent.includes('No current realm set for this system.'), false);
 
-    // Every card renders its own controls in the full-width pane; no party selection or
-    // inspector echo is needed to reach this CRUD walk.
+    // Every card renders its own controls in the full-width pane.
     assert.equal(target.querySelector('.manager-party-enable-toggle'), null);
 
     createButton.click();
@@ -828,8 +762,7 @@ export function registerWorldScopeCases() {
     });
     await tick();
     flushSync();
-    // The gate opens only once the drop lands a travel actor (req 4): before it, the pill
-    // is `aria-disabled` and explains itself rather than being `disabled` and unreachable.
+    // The gate opens only once the drop lands a travel actor (req 4): before it.
     const enableButton = secondCard.querySelector('[data-manager-party-enable="party-two"]');
     assert.equal(enableButton.getAttribute('aria-disabled'), null);
     enableButton.click();
@@ -865,9 +798,7 @@ export function registerWorldScopeCases() {
   it('counts a multi-party character once and counts only enabled parties in the World Parties subtitle', async () => {
     mountManager([], {
       noSystems: true,
-      // Mira is in BOTH parties; Vale is a member of the disabled one only; Wagon is a
-      // travel actor and not a player character, so it is outside both the numerator and
-      // the denominator — counting it would render "3 of 2 characters assigned".
+      // Mira is in BOTH parties; Vale is a member of the disabled one only.
       travelParties: [
         {
           id: 'party-one',
@@ -922,8 +853,7 @@ export function registerWorldScopeCases() {
     await tick();
     flushSync();
 
-    // The pane records the card that issued the failing mutation, so the rejection has to be
-    // provoked from a card rather than injected: `_travelErrorState` carries no party id.
+    // The pane records the card that issued the failing mutation.
     const firstCard = target.querySelector('[data-manager-travel-party-id="party-one"]');
     firstCard.querySelector('[data-manager-party-add-open="party-one"]').click();
     await tick();
@@ -950,8 +880,7 @@ export function registerWorldScopeCases() {
       'the message is associated with the member list that produced it'
     );
     assert.equal(secondCard.querySelector('.manager-party-field-error'), null);
-    // A field error whose card is on the page suppresses the pane-level summary, so the GM
-    // reads it once and in context.
+    // A field error whose card is on the page suppresses the pane-level summary.
     assert.equal(target.querySelector('[data-manager-party-summary-error]'), null);
 
     unmount(mounted);
@@ -973,8 +902,7 @@ export function registerWorldScopeCases() {
     await tick();
     flushSync();
 
-    // `setPartyEnabled` passes no field context, and req 5 can reject an enable the
-    // travel-actor gate allowed, so the enable control is never the only feedback surface.
+    // `setPartyEnabled` passes no field context.
     store.viewState.update((state) => ({
       ...state,
       travelError: 'Mira is already in an enabled party.',
@@ -1039,18 +967,9 @@ export function registerWorldScopeCases() {
   });
 
   // ── The four rail-reachable world scoped-entity routes actually render (issue 1362) ───────
-  //
-  // NOTHING ELSE IN `npm test` RENDERS A PLACEHOLDER PAGE. `data-scoped-page` appears only in
-  // the View Lab registry, which is a capture gate rather than a unit gate, so a swapped
-  // `titleKey`, a duplicated `pageId` or a route wired to the wrong page shipped green here and
-  // failed only at capture. `tests/components/manager-contract.test.js` covers all SEVEN pages
-  // from source; this covers the four a GM can actually reach, through the rail, in the DOM.
   describe('world scoped-entity routes (issue 1362)', () => {
     /**
-     * Rail leaf id -> the route token it commits, the screen title it renders, and the BODY
-     * SELECTOR that route's page draws. The titles are the prototype's, verbatim, including the
-     * lowercase `c` and the plural `Tools`.
-     *
+     * Rail leaf id -> the route token it commits, the screen title it renders.
      * The body selector was a fixed `[data-scoped-placeholder="<token>"]` for all four, and the
      * screen lanes of this epic make that false one route at a time and in no fixed order: issue
      * 1372 replaced `world-essences` and issue 1373 replaced `world-tools`, and both draw the
@@ -1079,8 +998,7 @@ export function registerWorldScopeCases() {
         '[data-wvocab-panel="componentCategories"]',
       ],
       ['essence-catalogue', 'world-essences', 'Essence Catalogue', '[data-scoped-list]'],
-      // Issue 1373: the real catalogue. `data-scoped-list` is the shell's own hook, and the
-      // route token pins it to the screen this row is about rather than to any scoped list.
+      // Issue 1373: the real catalogue. `data-scoped-list` is the shell's own hook.
       ['tool-catalogue', 'world-tools', 'Tools Catalogue', '[data-scoped-list="world-tools"]'],
     ];
 
@@ -1144,10 +1062,6 @@ export function registerWorldScopeCases() {
     });
 
     // THE WORLD BREAKAGE DEFAULT IS ON THE CATALOGUE AND NOWHERE ELSE (issue 1373).
-    //
-    // Asserted in the DOM rather than from source because "the only surface at world scope
-    // that authors it" is a claim about what RENDERS: a second writer added to the entry
-    // route would leave every source assertion in this repository green.
     it('the world Tools Catalogue carries the world breakage default control', async () => {
       await mountRail();
       worldNavItem('tool-catalogue').click();
@@ -1185,13 +1099,7 @@ export function registerWorldScopeCases() {
     });
   });
 
-  // ── The world scope corpus reaches the DOM, on every publish trigger (issue 1362) ─────────
-  //
-  // ASSERTED AT THE DOM, NEVER BY OBJECT IDENTITY. Identity is a proxy that fails in both
-  // directions here: the projection legitimately republishes an equal corpus on a no-op, and a
-  // bare `{...corpus}` would satisfy an identity check while reaching no rendered element at
-  // all. The rail's own count badge is the assertion target, because it is the one thing on
-  // screen this PR actually derives from the world corpus.
+  // ── The world scope corpus reaches the DOM.
   describe('world scope publication (issue 1362)', () => {
     let scopeStores;
 
@@ -1214,9 +1122,6 @@ export function registerWorldScopeCases() {
         // missing `save`. The persisted shape is a map per sub-key and the published corpus is
         // an array per sub-key, and these two are where that conversion lives in production, so
         // the double does it rather than pretending the two shapes are one.
-        //
-        // `save` REPLACES the corpus object rather than mutating it, which is the property the
-        // resolved-union memo keys on.
         get: () => ({
           ...extraCorpus,
           entities: corpus.entities.map((entry) => ({ ...entry })),
@@ -1251,25 +1156,11 @@ export function registerWorldScopeCases() {
     /**
      * Mount the manager over a REAL admin store driven by the fakes above.
      *
-     * PARAMETERIZED RATHER THAN COPIED (issue 1374) in exactly the two places the tool-breakage
-     * block needs: the world tool corpus, which carried no `toolBreakage` at all, and the
-     * SELECTED system, which authored none. A second copy of this harness would be the
-     * near-identical block SonarCloud's new-code duplication gate counts, and both defaults
-     * leave every existing caller reading exactly what it read before.
-     *
-     * `craftingCheck` joins them for the same reason (issue 1373): AC-4 needs a trigger to
-     * exist before the authority-gated break-tools card has anywhere to render, and the
-     * default fixture authors none.
-     *
      * @param {object} [options]
      * @param {object|null} [options.worldToolBreakage] The world scope's `toolBreakage` block.
      * @param {object|null} [options.systemToolBreakage] The selected system's own block.
      * @param {Array<object>|null} [options.worldTools] The world tool corpus. Named entities,
-     *   for the same reason `worldEssences` is: the default roster is id-only, and a breadcrumb
-     *   is about a name.
      * @param {Array<object>|null} [options.worldEssences] The world essence corpus. Named
-     *   entities are what the entry heading below is about; the id-only default keeps the rail
-     *   counts every caller above it reads exactly where they were.
      * @param {object|null} [options.craftingCheck] The selected system's crafting check.
      * @param {string} [options.resolutionMode] The selected system's resolution mode.
      * @returns {Promise<object>} the store
@@ -1285,13 +1176,9 @@ export function registerWorldScopeCases() {
       worldComponents,
       craftingCheck,
       resolutionMode,
-      // The COMPONENT's services bag, which is a different one from the admin store's: the
-      // shell reaches `services.resolveToolSource` to turn a drag payload into a snapshot, and
-      // that seam has no other route into the mounted tree (issue 1373).
+      // The COMPONENT's services bag, which is a different one from the admin store's.
       componentServices = {},
-      // The ADMIN store's actor roster, published as `viewState.actorOptions`. The world Tool
-      // entry's `Preview as` picker reads it; it used to read a `getWorldActors` the root's
-      // narrowed services bag never carried, and rendered `No actor` alone in every world.
+      // The ADMIN store's actor roster.
       actorOptions = [],
     } = {}) {
       scopeStores = {
@@ -1301,8 +1188,7 @@ export function registerWorldScopeCases() {
           worldTools ?? worldEntities(1, 'tool'),
           worldToolBreakage ? { toolBreakage: worldToolBreakage } : {}
         ),
-        // The FOURTH leg starts absent, which is the shipped state: no world vocabulary store
-        // exists until PR 7 registers one, and the badge must read 0 rather than blank.
+        // The FOURTH leg starts absent, which is the shipped state.
         vocabulary: null,
       };
       const forge = makeSystem({
@@ -1364,9 +1250,7 @@ export function registerWorldScopeCases() {
     });
 
     it('republishes it on the SETTINGS-BRIDGE reload, and the DOM moves', async () => {
-      // The bridge reloads the store and re-emits `craftingSystemsChanged`, which the manager
-      // app answers with `refresh()`. Modelled by replacing the corpus wholesale, exactly as
-      // `ScopedDefinitionStore#load` does.
+      // The bridge reloads the store and re-emits `craftingSystemsChanged`.
       const store = await mountWithRealStore();
       scopeStores.component.replace(worldEntities(7, 'comp'));
       await settle(store);
@@ -1378,9 +1262,7 @@ export function registerWorldScopeCases() {
       const before = JSON.parse(JSON.stringify(get(store.viewState).worldScope));
       await store.selectSystem('sys2');
       await settle(store);
-      // The world corpus is world scope: a system change must republish it and must not alter
-      // it. Deep-equal rather than identity, because the projection answers a NEW object every
-      // publish by design.
+      // The world corpus is world scope.
       assert.deepEqual(get(store.viewState).worldScope, before);
       assert.deepEqual(railCounts(), ['3', '2', '1']);
     });
@@ -1402,8 +1284,7 @@ export function registerWorldScopeCases() {
         ['3', '2', '1'],
         'an in-place edit with no publish must not reach the DOM'
       );
-      // And the same edit DOES reach it once a publish runs, so the assertion above is a
-      // measurement rather than a rail that never updates.
+      // And the same edit DOES reach it once a publish runs.
       await settle(store);
       assert.deepEqual(railCounts(), ['9', '2', '1']);
     });
@@ -1436,19 +1317,6 @@ export function registerWorldScopeCases() {
     });
 
     // ── THE RESOLVED TOOL-BREAKAGE AUTHORITY REACHES THE CARD (issue 1374) ──────────────
-    //
-    // NESTED HERE, not appended at the file foot, because `mountWithRealStore` is declared
-    // inside this describe and a sibling block cannot see it. The two things this needed from
-    // that harness — a world `toolBreakage` on the tool corpus and an authored override on the
-    // selected system — are PARAMETERS on it now rather than a second copy of it.
-    //
-    // WHY ALL THREE CASES ARE MANDATORY. `resolveToolBreakageAuthority` has exactly three
-    // return paths, and each of the two plausible wrong implementations passes one of the first
-    // two cases: a projection that always answered the world value passes case 1 and fails case
-    // 2, while the local coercion this change replaced fails case 1 and passes case 2. Case 3
-    // is the branch neither of the other two can reach, and without it a `source` that never
-    // answers `default` is green.
-    //
     // `source` IS READ OFF THE PUBLISHED PROJECTION, not off the DOM, and that is the honest
     // place for it: `ToolsBrowserView` does not declare `breakageSource` yet — the lane that
     // draws the tri-state control declares it — so the prop is inert and renders nothing. What
@@ -1494,9 +1362,6 @@ export function registerWorldScopeCases() {
           worldToolBreakage: { authority: 'checkDriven' },
         });
         // AC-1. POSITIVELY, through the helper that reads the class AND the radio together:
-        // `inherit` is the single selected segment and `checkDriven` is NOT. Selecting the
-        // resolved token here is the defect - it draws an inherited value as this system's own
-        // choice, and re-clicking it MINTS an override nothing can then clear.
         assert.equal(
           selectedAuthority(await openToolStudio()),
           'inherit',
@@ -1562,33 +1427,10 @@ export function registerWorldScopeCases() {
       });
 
       // AC-3. CHOOSING `Inherit` CLEARS RATHER THAN MINTS.
-      //
-      // ASSERTED ON THE FORWARDED ARGUMENT, never on a post-state, and that is not a
-      // convenience: `adminStore.js`'s `setToolBreakageAuthority` writes `{toolBreakage: {}}`
-      // for anything outside the two tokens, and `updateSystem` is what turns that into a key
-      // REMOVAL. A double whose `updateSystem` ends in `Object.assign` cannot delete a key, so
-      // a post-state check cannot tell a clear from a re-write of the same token.
-      //
-      // The seam is a property read at CALL TIME - `store.setToolBreakageAuthority?.(...)` in
-      // the shell - so replacing the property after mount intercepts the real call path rather
-      // than a copy of it.
-      // AC-4. A WORLD `checkDriven` WITH NOTHING ON THE SYSTEM REACHES `ChecksView`.
-      //
-      // `tests/world-scope-tool-breakage-authority.test.js` records that of the FOUR manager
-      // surfaces reading this field, only the Tool Studio radiogroup has behavioural coverage -
-      // the other three are held by a text scan alone. This is the second, and it is the one
-      // that matters most: a re-default anywhere along the chain leaves a GM who authored a
-      // world `checkDriven` looking at a triggers list that says, in as many words, "switch the
-      // tool-breakage authority to check-driven".
-      //
-      // A TRIGGER HAS TO EXIST FIRST. The gate is `showBreakTools`, which is only asked once
-      // there is a trigger card to ask it on, so the fixture authors one.
       it('a WORLD checkDriven reaches the Checks triggers with NOTHING on the system', async () => {
         await mountWithRealStore({
           worldToolBreakage: { authority: 'checkDriven' },
-          // `routedByCheck` because the crafting check is OPTIONAL in `simple` mode, and an
-          // optional check that is off collapses the section strip to `roll` alone - so the
-          // triggers section, and with it the authority gate, would have nowhere to render.
+          // `routedByCheck` because the crafting check is OPTIONAL in `simple` mode.
           resolutionMode: 'routedByCheck',
           craftingCheck: {
             enabled: true,
@@ -1656,22 +1498,6 @@ export function registerWorldScopeCases() {
     });
 
     // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
-    //
-    // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
-    // this describe, and it is the only harness in the repository that drives the manager shell
-    // over a real world-scope corpus — which is what it takes to render this heading at all.
-    //
-    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS, and that is the point rather than a
-    // preference. The heading lives in `.manager-header`, a SIBLING of `.manager-main`, so
-    // `WorldEssenceEntryPage`'s own mounted suite cannot see it: every assertion there is green
-    // whether the shell renders the draft name, the persisted name or nothing. And the seam
-    // between them is a reported value, so a test that read the reporting callback would be
-    // satisfied by a shell that received the name and printed the other one.
-    //
-    // The DOM, not the callback, for the reason Svelte 5 makes sharp: the shell holds this name
-    // in a rune it can only publish by REASSIGNING, and every wrong version of that — a mutated
-    // object, a value read off the deliberately non-reactive draft handle — reports correctly
-    // and renders staleness.
     describe('world essence entry heading (issue 1372)', () => {
       /** Two NAMED world essences: the heading is about a name, so an id-only corpus is mute. */
       const WORLD_ESSENCES = Object.freeze([
@@ -1778,16 +1604,6 @@ export function registerWorldScopeCases() {
       });
 
       // ── AND SO DOES THE REST OF THE CHROME (issue 1372, parity round 6) ──────────────
-      //
-      // The heading was fixed on its own in round 5, and the two things beside it were left on
-      // the published corpus: the breadcrumb's last crumb and the 44px medallion. The result was
-      // the same self-contradiction one rung quieter — `Aether` in the trail under an
-      // `Aetherlight` heading, and a tile still wearing the colour on disk.
-      //
-      // THE DOM, NOT THE REPORT, for the reason this whole block is mounted: the shell holds
-      // the reported identity in a rune it can only publish by REASSIGNING, and the wrong
-      // versions of that — a mutated object, a value read off the deliberately non-reactive
-      // draft handle — report correctly and render staleness.
 
       const crumbText = () =>
         target
@@ -1834,11 +1650,7 @@ export function registerWorldScopeCases() {
       });
 
       it('resolves the crumb GENERICALLY, so every scoped entry route inherits it', async () => {
-        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`, and
-        // the buffered name is read from a route-agnostic channel in front of it. This asserts
-        // the SHAPE of that: the leaf carries the route it is on, and the same element answers
-        // for the component and tool entries with no code of their own. A per-essence crumb
-        // would satisfy the test above and leave the tool entry to repeat the fix.
+        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`.
         await openAshEntry();
         await typeName('Aetherlight');
         const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
@@ -1890,10 +1702,7 @@ export function registerWorldScopeCases() {
       });
 
       it('FOLLOWS the buffered icon in the heading medallion, before any Save', async () => {
-        // The COLOUR case above and this one are not one test twice: the colour is a bare palette
-        // key the medallion turns into a tint, the icon is a class it renders directly, and a
-        // shell that read one buffered field and not the other would pass whichever of the two
-        // was written first.
+        // The COLOUR case above and this one are not one test twice.
         await openAshEntry();
         const trigger = target.querySelector('.essence-icon-picker-trigger');
         assert.ok(Boolean(trigger), 'the entry editor rendered no icon picker');
@@ -1925,17 +1734,6 @@ export function registerWorldScopeCases() {
     });
 
     // ── AND THE WORLD TOOL ENTRY INHERITS IT (issue 1373) ────────────────────────────
-    //
-    // The crumb above is derived once for all three entry routes, so this screen was supposed to
-    // need ONE LINE: reporting its buffered identity through the same `onDraftIdentityChange`
-    // prop the essence entry reports through. This block is what makes that claim falsifiable
-    // rather than an argument — the shell's derivation being generic does nothing at all for a
-    // page that never reports, and the failure would be silent: the crumb keeps rendering, on
-    // the record on disk, under a heading that has moved.
-    //
-    // THE DOM, NOT THE CALLBACK, for the same reason the essence block states: the shell holds
-    // the reported identity in a rune it can only publish by reassigning, and the wrong versions
-    // of that report correctly and render staleness.
     describe('world tool entry crumb (issue 1373)', () => {
       /** One NAMED world tool: a breadcrumb is about a name, so the id-only default is mute. */
       const WORLD_TOOLS = Object.freeze([Object.freeze({ id: 'pick', name: 'Mining Pick' })]);
@@ -2045,22 +1843,6 @@ export function registerWorldScopeCases() {
     });
 
     // ── ONE GAME-WORLD ITEM IS ONE WORLD TOOL (issue 1373) ──────────────────────────────
-    //
-    // The catalogue's creation zone minted `store.randomID()` unconditionally and wrote the
-    // dropped uuid into BOTH source fields, so dragging the same Item on twice produced two
-    // world Tools with identical identity. `worldScopeActions.createEntity` cannot catch that:
-    // it dedupes on the entity ID and the id is fresh every time. Both records then appear in
-    // every system's catalogue and nothing on any screen says which one a recipe means.
-    //
-    // It is also the rule the rest of the epic already follows. `worldScopeEntityGrouping`
-    // groups the migration BY RESOLVED SOURCE ITEM precisely so one real Item becomes one world
-    // record, and the system-scope path this zone replaced upserted — `_findToolForUpsert`
-    // resolves a drop by requested id, then by a durable flag, then by the source references.
-    //
-    // NESTED HERE because `mountWithRealStore` is declared in this describe and is the only
-    // harness in the repository that drives the shell over a REAL world-scope corpus. A fake
-    // `worldScope.tool` would answer whatever the test told it to and could not see a second
-    // entity land in the corpus at all.
     describe('world Tool creation from an Item drop (issue 1373)', () => {
       const HAMMER = Object.freeze({
         uuid: 'Item.smith-hammer',
@@ -2116,10 +1898,6 @@ export function registerWorldScopeCases() {
       /**
        * Drop one Item on the creation zone, capturing what the GM is told while it happens.
        *
-       * `ui.notifications` is installed per drop and removed again: nothing else in this
-       * describe needs the Foundry `ui` global, and a standing one is something a neighbouring
-       * test comes to depend on.
-       *
        * @param {string} uuid
        * @returns {Promise<string[]>} the info toasts raised by the drop.
        */
@@ -2149,8 +1927,7 @@ export function registerWorldScopeCases() {
         assert.equal(managerView(), 'world-tool-entry', 'and lands the GM on it');
         const created = worldToolIds()[0];
 
-        // BACK TO THE CATALOGUE AND DROP THE SAME ITEM AGAIN, which is exactly what a GM does
-        // when they cannot remember whether they already made a Tool for this Item.
+        // BACK TO THE CATALOGUE AND DROP THE SAME ITEM AGAIN.
         await goToToolCatalogue();
         const secondDrop = await dropItem(HAMMER.uuid);
 
@@ -2173,10 +1950,6 @@ export function registerWorldScopeCases() {
 
       it('resolves the drop through the whole source-reference union, not one field', async () => {
         // THE UNION IS THE SHARED WALK, not a fourth comparison written at the call site.
-        // `getItemMatchUuids` reads `registeredItemUuid`, `originItemUuid` AND `aliasItemUuids`,
-        // and a record whose link was re-pointed keeps the old uuid as an alias — so a match on
-        // the alias alone is a real world in which a naive `registeredItemUuid ===` test mints
-        // the duplicate this block exists to refuse.
         await openToolCatalogue([
           {
             id: 'legacy-hammer',
@@ -2199,17 +1972,11 @@ export function registerWorldScopeCases() {
       });
 
       it('reuses a world-DISABLED record, and says that is what happened', async () => {
-        // THE DECISION, PINNED. `enabled` is the world master switch, so opening a disabled
-        // record silently leaves a GM on a screen whose Tool does nothing with no reason given —
-        // and minting a second record instead would put two rows behind one Item and strand the
-        // GM's own switch decision on the one they can no longer find. So it is the SAME reuse
-        // with a DIFFERENT sentence: the record opens, and the toast names the switch, on the
-        // one screen where that switch can be moved.
+        // THE DECISION, PINNED. `enabled` is the world master switch.
         const store = await openToolCatalogue([
           { id: 'shelved', name: 'Shelved Hammer', originItemUuid: HAMMER.uuid },
         ]);
-        // Disabled through the REAL write family, so the state under test is the one the
-        // projection publishes rather than a hand-stamped field the projection never reads.
+        // Disabled through the REAL write family.
         assert.equal(await store.worldScope.tool.setWorldEnabled('shelved', false), true);
         await settleDrop();
 
@@ -2244,18 +2011,6 @@ export function registerWorldScopeCases() {
     });
 
     // ── THE WORLD COMPONENT CATALOGUE'S CREATION ZONE (issue 1371) ────────────────────────
-    //
-    // NESTED HERE for the reason the tool block above is: `mountWithRealStore` is the only
-    // harness in the repository that drives the manager shell over a real world-scope corpus,
-    // and the drop handler lives in the shell — a page cannot reach the services bag that
-    // resolves a payload, and `worldScopeActions` reads no Foundry global by design.
-    //
-    // TWO PROPERTIES, AND THE SECOND IS NEW BEHAVIOUR ON ONE ZONE. The drop RESOLVES before it
-    // mints, because `createEntity` dedupes on the entity id and the id is fresh every time — so
-    // an unresolved drop turns one Item into two world components with identical identity, and
-    // nothing on any screen says which one a recipe means. And an EMBEDDED Item is refused,
-    // which no shipped drop path does today: its uuid dies with its parent actor, while a
-    // compendium Item resolves through every client.
     describe('the world Component catalogue mints ONE record per source Item', () => {
       const RESIN = Object.freeze({
         uuid: 'Item.resin',
@@ -2270,15 +2025,6 @@ export function registerWorldScopeCases() {
         description: '',
       });
       // THE TWO COMPENDIUM SHAPES, and the resolver has to answer BOTH.
-      //
-      // `PACKED` is what a 14.365 GM drags: a full `Compendium.<scope>.<pack>.Item.<id>` uuid.
-      // Note it HAS an `.Item.` segment in the middle — that is the primary document's own pair,
-      // and reading it as an embedded pair is precisely the mistake a fixed-offset segmenter
-      // makes.
-      //
-      // `PACKED_LEGACY` is the pre-v10 `{pack, id}` pair, which `resolveDropUuid` still resolves
-      // to `Compendium.<pack>.<id>`. Round 1 covered only this one, so the shape a GM can actually
-      // produce was uncovered.
       const PACKED = Object.freeze({
         uuid: 'Compendium.p.q.Item.b',
         name: 'Packed Ore',
@@ -2331,8 +2077,6 @@ export function registerWorldScopeCases() {
 
       /**
        * Drop one payload on the creation zone, capturing what the GM is told while it happens.
-       *
-       * `foundry.utils.parseUuid` IS SEEDED, and that is load-bearing rather than scaffolding:
        * the embedded-uuid gate FAILS CLOSED, so without a parser every drop is refused and every
        * assertion below would pass for a fixture reason rather than a behavioural one. The stub
        * answers the shape the real parser does — `embedded` is the segment pairs after the
@@ -2358,22 +2102,6 @@ export function registerWorldScopeCases() {
           utils: {
             ...(previousFoundry?.utils ?? {}),
             // A DOUBLE THAT MATCHES CORE'S EDGE SEMANTICS, NOT JUST ITS HAPPY PATH.
-            //
-            // Two corrections, and each of them was producing a false pass:
-            //
-            //  1. IT RETURNS `null` RATHER THAN THROWING. Real `parseUuid` never throws for a
-            //     malformed uuid — it answers `null`. A stub that threw made the gate's `catch`
-            //     look like the branch under test, when in a live client that catch is
-            //     unreachable and the null branch is the only thing standing between this zone
-            //     and an unparseable payload. A double STRICTER than core is exactly how a
-            //     fail-open gate ships behind a green fail-closed assertion.
-            //  2. THE COMPENDIUM PREFIX IS SPLICED, NOT COUNTED. This assumed a fixed offset of
-            //     three for a compendium uuid, which is right only for the legacy
-            //     `Compendium.<pack>.<id>` shape. A 14.365 compendium drag carries
-            //     `Compendium.<scope>.<pack>.Item.<id>` — five segments — and the fixed offset
-            //     read its `Item.<id>` primary pair as an EMBEDDED pair, reporting the one
-            //     compendium shape a GM can actually produce as an embedded Item. Core splices
-            //     the pack triple first and then the primary pair; so does this.
             parseUuid: (uuid) => {
               if (typeof uuid !== 'string') return null;
               const parts = uuid.split('.');
@@ -2469,18 +2197,7 @@ export function registerWorldScopeCases() {
       });
 
       it('and still MINTS from a compendium drag, in BOTH shapes core has emitted', async () => {
-        // THE POSITIVE CONTROL for the refusal, and it needs both shapes because they fail
-        // differently.
-        //
-        // The FULL uuid is what a 14.365 GM actually drags: `Compendium#_getEntryDragData` returns
-        // `{type, uuid}` and `CompendiumCollection#getUuid` composes
-        // `Compendium.<scope>.<pack>.Item.<id>`. It has an `.Item.` segment in the middle, so a
-        // segmenter that counts a fixed offset instead of splicing the pack triple reads its
-        // primary pair as an embedded one and REFUSES the commonest compendium drop there is.
-        //
-        // The `{pack, id}` pair is the pre-v10 legacy shape `resolveDropUuid` still tolerates. It
-        // carries no `uuid` at all, so a handler reading `data.uuid` refuses it while a
-        // uuid-string fixture stays green. Round 1 covered only this one.
+        // THE POSITIVE CONTROL for the refusal.
         await openComponentCatalogue([]);
 
         const modern = await dropPayload({ type: 'Item', uuid: 'Compendium.p.q.Item.b' });
@@ -2495,22 +2212,7 @@ export function registerWorldScopeCases() {
       });
 
       it('and REFUSES a uuid the parser cannot read, because the gate fails CLOSED', async () => {
-        // THE BRANCH THIS MEASURES IS THE NULL RETURN, not a throw. Real `parseUuid` answers
-        // `null` for a malformed uuid and never throws, so the gate's `catch` is unreachable in a
-        // live client — and a gate that only caught throws would ACCEPT this while the assertion
-        // stayed green against a stricter double.
-        //
-        // `Actor.a.Item` IS SUCH A UUID and it is the only one asserted here. It has three
-        // segments: core splices the primary `<Type>.<id>` pair off the front and is left with a
-        // single trailing segment, an ODD remainder that cannot be read as `<Type>, <id>` pairs,
-        // so core answers `null` rather than half-reading it.
-        //
-        // `nonsense` USED TO BE IN THIS LOOP AND DOES NOT BELONG. Core does not null a
-        // single-segment uuid: it answers a well-formed result with `embedded: []`, because an
-        // unresolvable primary id is not a parse failure. The old stub nulled it, which made this
-        // loop assert a refusal production never makes — the mirror of the too-loose double the
-        // note above warns about, and just as capable of shipping a green test about nothing. Its
-        // real outcome is asserted below instead.
+        // THE BRANCH THIS MEASURES IS THE NULL RETURN.
         await openComponentCatalogue([]);
 
         const refused = await dropPayload({ type: 'Item', uuid: 'Actor.a.Item' });
@@ -2520,17 +2222,6 @@ export function registerWorldScopeCases() {
 
       it('and a uuid that parses but resolves to nothing is DROPPED SILENTLY, which is a gap', async () => {
         // RECORDED RATHER THAN REPAIRED, and asserted so it is recorded in a form that cannot rot.
-        //
-        // A single-segment uuid parses (see above), passes the embedded gate correctly — nothing
-        // about it says "this belongs to an actor" — and then fails to resolve to an Item. The
-        // handler's `if (!source) return false` says nothing at all, so the GM drops something on
-        // the zone and gets no record and no message.
-        //
-        // It is NOT this lane's to fix: `resolveToolSource` is the shared resolution service the
-        // essence and tool creation paths use too, and adding a toast on its empty return changes
-        // three lanes' behaviour from one issue's diff. What this test buys is that the silence is
-        // a KNOWN state with a name: the day someone adds the message, this test fails and points
-        // at the decision rather than at a mystery.
         await openComponentCatalogue([]);
 
         const unresolved = await dropPayload({ type: 'Item', uuid: 'nonsense' });
@@ -2541,8 +2232,7 @@ export function registerWorldScopeCases() {
           'and — today — nothing is said either; see the note above before "fixing" this line'
         );
 
-        // THE POSITIVE CONTROL ON THE FIXTURE, so the silence above is the RESOLUTION failing and
-        // not the drop zone being unreachable in this arrangement.
+        // THE POSITIVE CONTROL ON THE FIXTURE.
         const resolved = await dropPayload({ type: 'Item', uuid: RESIN.uuid });
         assert.equal(worldComponentIds().length, 1);
         assert.deepEqual(resolved.warn, []);
@@ -2555,11 +2245,6 @@ export function registerWorldScopeCases() {
         // was never executed. A gate that fails open on an absent parser is not a gate: the exact
         // client state that removes the check is the one where the check matters, because nothing
         // else in this path distinguishes a world Item from an actor's embedded copy.
-        //
-        // The consequence of failing closed is deliberate and is asserted here too: a legitimate
-        // world Item is refused as well. That is the correct trade for a creation path — the GM is
-        // told why and can retry, where the alternative silently mints a world component pointing
-        // at an Item inside somebody's inventory.
         await openComponentCatalogue([]);
 
         const refused = await dropPayload({ type: 'Item', uuid: RESIN.uuid }, { withParser: false });
@@ -2579,26 +2264,8 @@ export function registerWorldScopeCases() {
     });
 
     // ── THE WORLD COMPONENT ENTRY SAYS THERE ARE UNSAVED CHANGES (issue 1371, round 5) ──
-    //
-    // NESTED HERE for the reason the essence block below records: `mountWithRealStore` is the
-    // only harness in the repository that drives the manager shell over a real world-scope
-    // corpus, and this marker is rendered by the SHELL.
-    //
-    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS. The marker sits in `.manager-header`, a
-    // sibling of `.manager-main`, so `WorldComponentEntryPage`'s own mounted suite cannot see
-    // it — every assertion there is green whether the shell renders the marker, renders it
-    // permanently, or renders nothing at all. Lane A proved the behaviour against the running
-    // app and could not place a guard from its page mount; this is that guard.
-    //
-    // THE PAIR IS ASSERTED TOGETHER, not the marker alone. The marker and the Save's disabled
-    // state read one `worldComponentEntryDirty`, and the failure worth catching is the two
-    // DISAGREEING — a screen offering a Save it will not perform, or refusing one over an edit
-    // it is showing as pending.
     describe('world component entry unsaved marker (issue 1371)', () => {
-      // A SOURCE-LESS record, and that is load-bearing rather than incidental: the entry renders
-      // the name as a read-only `<span>` when a Foundry item backs it, because the identity then
-      // follows the item. The editable `<input>` this block types into exists only for a record
-      // with no source, which is the state a GM authors a name in.
+      // A SOURCE-LESS record, and that is load-bearing rather than incidental.
       const UNBOUND_SALT = Object.freeze({
         id: 'lab-unbound-salt',
         name: 'Unbound Salt',
@@ -2691,17 +2358,6 @@ export function registerWorldScopeCases() {
       });
 
       // ── AND SOMETHING PRESSES IT (issue 1371 r19-entry2) ────────────────────────────────
-      //
-      // Everything above proves the Save EXISTS and ENABLES. Nothing pressed it, and under M34
-      // that button is the only way four staged sections reach the disk: before this case,
-      // replacing the shell's `onSave={saveWorldComponentEntry}` with `() => {}` left every one
-      // of this file's tests green. The page's own suite drives the HANDLE, which is the seam
-      // rather than the control, so the wire from the header's button through the shell to that
-      // handle was covered by nothing at all.
-      //
-      // READ BACK OFF THE CORPUS, not off a spy: this block mounts the REAL admin store over the
-      // real scope store, so "the write landed" is a fact about what a reload would find rather
-      // than about which function was called.
 
       /**
        * Give the world a vocabulary, so the category picker and the tag run have something to
@@ -2776,22 +2432,6 @@ export function registerWorldScopeCases() {
     });
 
     // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────
-    //
-    // NESTED HERE for the same reason the block above is: `mountWithRealStore` is declared in
-    // this describe, and it is the only harness in the repository that drives the manager shell
-    // over a real world-scope corpus — which is what it takes to render this heading at all.
-    //
-    // ONLY A MOUNT OF THE SHELL CAN ANSWER THIS, and that is the point rather than a
-    // preference. The heading lives in `.manager-header`, a SIBLING of `.manager-main`, so
-    // `WorldEssenceEntryPage`'s own mounted suite cannot see it: every assertion there is green
-    // whether the shell renders the draft name, the persisted name or nothing. And the seam
-    // between them is a reported value, so a test that read the reporting callback would be
-    // satisfied by a shell that received the name and printed the other one.
-    //
-    // The DOM, not the callback, for the reason Svelte 5 makes sharp: the shell holds this name
-    // in a rune it can only publish by REASSIGNING, and every wrong version of that — a mutated
-    // object, a value read off the deliberately non-reactive draft handle — reports correctly
-    // and renders staleness.
     describe('world essence entry heading (issue 1372)', () => {
       /** Two NAMED world essences: the heading is about a name, so an id-only corpus is mute. */
       const WORLD_ESSENCES = Object.freeze([
@@ -2898,16 +2538,6 @@ export function registerWorldScopeCases() {
       });
 
       // ── AND SO DOES THE REST OF THE CHROME (issue 1372, parity round 6) ──────────────
-      //
-      // The heading was fixed on its own in round 5, and the two things beside it were left on
-      // the published corpus: the breadcrumb's last crumb and the 44px medallion. The result was
-      // the same self-contradiction one rung quieter — `Aether` in the trail under an
-      // `Aetherlight` heading, and a tile still wearing the colour on disk.
-      //
-      // THE DOM, NOT THE REPORT, for the reason this whole block is mounted: the shell holds
-      // the reported identity in a rune it can only publish by REASSIGNING, and the wrong
-      // versions of that — a mutated object, a value read off the deliberately non-reactive
-      // draft handle — report correctly and render staleness.
 
       const crumbText = () =>
         target
@@ -2954,11 +2584,7 @@ export function registerWorldScopeCases() {
       });
 
       it('resolves the crumb GENERICALLY, so every scoped entry route inherits it', async () => {
-        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`, and
-        // the buffered name is read from a route-agnostic channel in front of it. This asserts
-        // the SHAPE of that: the leaf carries the route it is on, and the same element answers
-        // for the component and tool entries with no code of their own. A per-essence crumb
-        // would satisfy the test above and leave the tool entry to repeat the fix.
+        // The crumb is derived once for all three entry routes out of `SCOPED_ENTRY_ROUTES`.
         await openAshEntry();
         await typeName('Aetherlight');
         const leaf = target.querySelector('[data-breadcrumb-world-scoped]');
@@ -3010,10 +2636,7 @@ export function registerWorldScopeCases() {
       });
 
       it('FOLLOWS the buffered icon in the heading medallion, before any Save', async () => {
-        // The COLOUR case above and this one are not one test twice: the colour is a bare palette
-        // key the medallion turns into a tint, the icon is a class it renders directly, and a
-        // shell that read one buffered field and not the other would pass whichever of the two
-        // was written first.
+        // The COLOUR case above and this one are not one test twice.
         await openAshEntry();
         const trigger = target.querySelector('.essence-icon-picker-trigger');
         assert.ok(Boolean(trigger), 'the entry editor rendered no icon picker');
@@ -3054,17 +2677,6 @@ export function registerWorldScopeCases() {
       // exercised. This walks it through the root: the world rail, the catalogue row's open
       // action, the entry's member-row `View system rules`, and the rules list's
       // `aria-current` row.
-      //
-      // ITS OWN MOUNT, on `mountWithRealStore`'s shape, because that helper seeds neither a
-      // membership record nor an in-system row: the member-row link is drawn only for a
-      // membership record, and `aria-current` lives on a MEMBER row of the rules list, which
-      // needs the system's own `components` entry. This suite is append-only for the lane, so
-      // the two knobs are not added to the shared helper.
-      //
-      // TWO MEMBERS, AND THE ORDER IS THE NON-VACUITY. M14 (r13-list) selects the FIRST drawn
-      // row whenever nothing this system holds is selected, and `Ash` sorts before `Coal` — so a
-      // deep link that dropped its entity id would land the GM on Ash with a row marked, and an
-      // assertion that "some row is current" would pass. The assertion is which row.
       const worldRecord = (id, name) =>
         Object.freeze({
           id,
@@ -3119,9 +2731,6 @@ export function registerWorldScopeCases() {
             getSystems: () => systems,
             getSystem: (id) => systems.find((system) => system.id === id) || null,
             // THE RULES LIST'S ROWS COME FROM HERE, not from `system.components` directly:
-            // `buildItemCards` asks `getItems(systemId, search)`, and the shared helper's `[]`
-            // is why it never had a rules row to mark. The shipped manager answers the
-            // system's own array; so does this.
             getItems: (id) => systems.find((system) => system.id === id)?.components ?? [],
           }),
           getComponentScopeStore: () => scopeStores.component,

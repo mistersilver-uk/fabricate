@@ -1,24 +1,6 @@
 /**
  * THE WORLD ESSENCE COLOUR, EVERYWHERE AN ESSENCE IS DRAWN (issue 1371 r18-colour, maintainer
  * ruling M29).
- *
- * The maintainer's third live test: the essence editor sets a colour per essence, the world
- * catalogue's bulk `Essence values` rows draw it, and NOTHING ELSE does — the rules library's row
- * chips were one grey pill each, the rules editor's `Essence contribution` tiles were grey with a
- * grey glyph, and the inspector said `1 essence` in plain text. This suite pins the one primitive
- * that closes it and the three system-scope sites that render it:
- *
- *   1. `Chip` gains `tint` — a bare `--fab-tag-*` key that inks the chip in its own colour over the
- *      quiet surface, the face the reference draws for a row's essence dot (`proto:5502`);
- *   2. `EssenceChip` composes it and owns the essence-to-chip mapping — the glyph fallback, the
- *      `{name} {quantity}` accessible name, the count in the mono face — so no site restates it;
- *   3. `ComponentRow`'s badges, `ComponentBrowserInspector`'s essence run and
- *      `EssenceQuantityCard`'s tile each carry the colour, and each is asserted THROUGH the site's
- *      own render, not through a copy of its markup.
- *
- * The DEFAULT-UNCHANGED assertions on `Chip` matter as much as the positive ones: it has 60-odd
- * callers, and a prop that leaked a class or a style onto every one of them would repaint the
- * whole manager to close one ruling.
  */
 
 import assert from 'node:assert/strict';
@@ -73,8 +55,7 @@ const essenceChip = createMountedComponentHarness({
   componentPath: ESSENCE_CHIP_PATH,
 });
 
-// The ROW ALONE, not the whole browser view: the row is an import-free presentational leaf, so
-// mounting it directly is the narrowest tree that renders the badge run through the real row.
+// The ROW ALONE, not the whole browser view: the row is an import-free presentational leaf.
 const ROW_PATH = 'src/ui/svelte/apps/manager/components/ComponentRow.svelte';
 const row = createMountedComponentHarness({
   repoRoot,

@@ -1,10 +1,8 @@
 /**
- * Unit tests for T-052: Recipe visibility UI
- * Covers:
- *   - System normalisation accepts 'global', 'player', 'knowledge' listModes
- *   - Default listMode is 'global'
- *   - Recipe validation allows restricted=true with empty allowedUserIds
- *   - RecipeManagerApp context exposes recipeVisibility data for template
+ * Unit tests for T-052: Recipe visibility UI Covers: - System normalisation accepts 'global',
+ * 'player', 'knowledge' listModes - Default listMode is 'global' - Recipe validation allows
+ * restricted=true with empty allowedUserIds - RecipeManagerApp context exposes recipeVisibility
+ * data for template
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,9 +34,7 @@ function makeManager() {
   return new CraftingSystemManager(recipeManagerStub);
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: _normalizeRecipeVisibility — listMode support
-// ---------------------------------------------------------------------------
 
 test('_normalizeRecipeVisibility - defaults to global when no listMode provided', () => {
   const manager = makeManager();
@@ -84,9 +80,7 @@ test('_normalizeRecipeVisibility - old data with no listMode gets global default
   assert.equal(result.listMode, 'global');
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: _normalizeRecipeVisibility — knowledge sub-object preserved
-// ---------------------------------------------------------------------------
 
 test('_normalizeRecipeVisibility - knowledge.mode defaults to itemOrLearned', () => {
   const manager = makeManager();
@@ -106,9 +100,8 @@ test('_normalizeRecipeVisibility - knowledge.mode accepts learned', () => {
   assert.equal(result.knowledge.mode, 'learned');
 });
 
-// consumeOnLearn moved to per-recipe-item caps (issue 511); it is no longer a
-// system-wide knowledge field. See tests/recipe-item-definitions.test.js for its
-// per-item normalization.
+// consumeOnLearn moved to per-recipe-item caps (issue 511); it is no longer a system-wide knowledge
+// field. See tests/recipe-item-definitions.test.js for its per-item normalization.
 
 test('_normalizeRecipeVisibility - knowledge.learn.dragDropEnabled defaults true', () => {
   const manager = makeManager();
@@ -125,9 +118,7 @@ test('_normalizeRecipeVisibility - knowledge.learn.dragDropEnabled can be set fa
   assert.equal(result.knowledge.learn.dragDropEnabled, false);
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: _normalizeSystem — listMode flows through system normalisation
-// ---------------------------------------------------------------------------
 
 test('_normalizeSystem - recipeVisibility.listMode defaults to global', () => {
   const manager = makeManager();
@@ -162,9 +153,7 @@ test('_normalizeSystem - preserves knowledge listMode', () => {
   assert.equal(system.recipeVisibility.listMode, 'knowledge');
 });
 
-// ---------------------------------------------------------------------------
 // Group 4: updateSystem — listMode change is non-destructive
-// ---------------------------------------------------------------------------
 
 test('updateSystem - changing listMode from knowledge to player normalises correctly', async () => {
   const manager = makeManager();
@@ -223,9 +212,7 @@ test('updateSystem - changing listMode from player to global results in global',
   assert.equal(updated.recipeVisibility.listMode, 'global');
 });
 
-// ---------------------------------------------------------------------------
 // Group 5: Knowledge sub-object structure completeness
-// ---------------------------------------------------------------------------
 
 test('_normalizeRecipeVisibility - global mode produces complete knowledge sub-object', () => {
   // Even for global, the knowledge sub-object should be present (non-destructive switching)
@@ -247,9 +234,7 @@ test('_normalizeRecipeVisibility - knowledge mode does not affect learn strategy
   assert.equal(result.knowledge.learn.dragDropEnabled, true);
 });
 
-// ---------------------------------------------------------------------------
 // Group 6: _prepareRecipeContext — showVisibilitySummary only for player mode
-// ---------------------------------------------------------------------------
 
 test('_normalizeSystem - global mode system has recipeVisibility with correct listMode', () => {
   const manager = makeManager();

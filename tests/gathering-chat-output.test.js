@@ -7,9 +7,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 
-// ---------------------------------------------------------------------------
 // Globals / harness
-// ---------------------------------------------------------------------------
 
 let chatCreated = [];
 function resetChat({ throwOnCreate = false } = {}) {
@@ -71,11 +69,7 @@ test('posts exactly one card with resolved component/event/tool/economy content'
 
   assert.equal(chatCreated.length, 1, 'one message posted');
   const { content, speaker, ...rest } = chatCreated[0];
-  // NO `user` KEY, AND ITS ABSENCE IS THE ASSERTION. `ChatMessage`'s author field is `author`,
-  // there is no `user` -> `author` shim on this document, and `DocumentAuthorField` already
-  // defaults to `game.user.id` -- so a `user` key was silently dropped on v14 and warned on v13
-  // while the card was authored correctly anyway. Passing it asserted nothing and cost a
-  // compatibility warning; this pins that it is not passed rather than that it is.
+  // NO `user` KEY, AND ITS ABSENCE IS THE ASSERTION.
   assert.ok(!('user' in rest), 'no dead `user` key -- ChatMessage defaults `author` itself');
   assert.equal(speaker.alias, 'Aria', 'speaker is the gathering actor');
   assert.ok(content.includes('2× Herb'), 'component name + quantity resolved via componentId join');
@@ -116,10 +110,9 @@ test('createdResults join recovers component name, not the raw uuid', async () =
   assert.ok(!content.includes('Item.h1'), 'raw item uuid not shown when component resolves');
 });
 
-// A blind attempt used to post NOTHING, which made a successful blind gather
-// indistinguishable from nothing happening: the start response withholds
-// `createdResults` by design, so the card is the player's only report. These two pin
-// the replacement contract — the card is always posted; only the IDENTITY moves.
+// A blind attempt used to post NOTHING, which made a successful blind gather indistinguishable from
+// nothing happening: the start response withholds `createdResults` by design, so the card is the
+// player's only report.
 async function startBlind(engine, { revealedTaskIds = null } = {}) {
   if (revealedTaskIds) {
     engine.richState = { listRevealedTaskIds: () => revealedTaskIds };
@@ -197,11 +190,8 @@ test('_terminalStart posts chat output for transparent tasks', async () => {
   assert.ok(chatCreated[0].content.includes('Herb'), 'component resolved');
 });
 
-// ---------------------------------------------------------------------------
-// A d100 gather whose drop rows all miss reports SUCCESS (d100 status is decided by
-// events, not by drops) and awards nothing. The card used to degrade to a bare
-// "Gathering Successful" header, which is what a broken module looks like.
-// ---------------------------------------------------------------------------
+// A d100 gather whose drop rows all miss reports SUCCESS (d100 status is decided by events, not by
+// drops) and awards nothing.
 
 test('a succeeded attempt that awarded nothing posts an explicit empty-results card', async () => {
   resetChat();
@@ -258,13 +248,8 @@ test('a component-identified award renders its component, with no uuid to join o
   assert.ok(!content.includes('fabricate-gather-chat__empty'), 'this is NOT an empty award');
 });
 
-// ---------------------------------------------------------------------------
-// The pooled `Nd100` roll is chat output too: `resolveD100Attempt` posts it via
-// `toMessage`, publicly, with the flavour the engine hands it. It used to be built
-// from `task.name` unconditionally, so the very first blind attempt broadcast the
-// drawn task's real name to the whole table — the one place blind gathering spoke
-// was the one place it leaked.
-// ---------------------------------------------------------------------------
+// The pooled `Nd100` roll is chat output too: `resolveD100Attempt` posts it via `toMessage`,
+// publicly, with the flavour the engine hands it.
 
 function buildD100Engine({ revealedTaskIds = null } = {}) {
   const calls = [];

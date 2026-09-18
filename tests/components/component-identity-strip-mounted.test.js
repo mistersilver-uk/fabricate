@@ -1,22 +1,6 @@
 /**
  * The Component Rules editor's identity callout (issue 676, AC3; rebuilt for issue 1371's
  * maintainer parity round 4).
- *
- * -- WHAT THIS SUITE USED TO BE, AND WHY IT IS NOT THAT ANY MORE --------------------------
- * It asserted the strip's SOURCE CAPABILITIES per capability - drop-to-replace, right-click
- * unlink, open-sheet on the name, the overflow's two commands, and the two negative states -
- * because AC3 demands per-capability assertions rather than "reachable" in aggregate.
- *
- * Every one of those controls is GONE from this screen (`rebuild-spec.md` D3, gap-list row 129).
- * Under epic 1357 the record that names the source Item is world catalogue data, so it is
- * authored on the world Component entry, and the reference draws ONE info-soft callout here:
- * the chip, the name, a `World catalogue` pill, the attribution note, and one exit. Deleting
- * those cases without stating the removal would leave the reference's own anatomy unasserted, so
- * this suite now pins THAT - including the two smoke hooks, which survive the rebuild and abort
- * Phase D0 if either goes missing.
- *
- * The structural trap the last describe guards is unchanged and is still the point: source
- * actions must COMMIT IMMEDIATELY and must never be staged into the editor draft.
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,8 +17,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-identity-strip-',
   rawModules: [
-    // The callout writes the attribution sentence itself, so the component-scope model is in its
-    // static graph. A missing entry HANGS this suite (`# cancelled`) rather than failing it.
+    // The callout writes the attribution sentence itself.
     ...COMPONENT_SCOPE_LEAF_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/utils/componentCategories.js',
@@ -107,8 +90,7 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
   });
 
   it('draws ONE callout: the name, the World catalogue pill, the note and one exit', async () => {
-    // Gap-list rows 129 and 131. Two stacked cards became one, and the pill reads
-    // `World catalogue` rather than `World definition`.
+    // Gap-list rows 129 and 131. Two stacked cards became one.
     const { props } = track();
     const target = await harness.mount(props);
 
@@ -134,7 +116,7 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
   });
 
   it('and that pill is the reference MICRO scale, taken from the primitive', async () => {
-    // `proto:1313` draws it at `padding: 2px 8px`, a stadium corner and `600 9px`, which is
+    // `proto:1313` draws it at `padding: 2px 8px`, a stadium corner and `600 9px`.
     // `Chip`'s shipped `density="list"` to within the one pixel of vertical padding that
     // component's docblock records. The class is the assertion because the geometry is declared
     // in `Chip.svelte`'s scoped block and nowhere else: a caller that restated it in the global
@@ -163,12 +145,6 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
     // an info-soft fill on an info-soft callout, which the parity run MEASURED equal rather
     // than estimated equal, and the badge would dissolve into the card. That is gap-list row
     // 131, and it is why this pill shipped toneless for a round.
-    //
-    // `emphasis="outlined"` is the axis that closes it. `Chip`'s outlined emphasis states ONLY
-    // the fill, so `tone` keeps the edge and the ink — which is the MIRROR of the emphasis of
-    // the same name on the status pill issue 1506 retired, and the reason the two classes are
-    // asserted together here rather than one standing in for the other. That inversion is now
-    // history rather than a live comparison, so what this case pins is THIS chip's two classes.
     const { props } = track();
     const target = await harness.mount(props);
     const pill = target.querySelector('[data-component-world-pill]');
@@ -205,8 +181,7 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
   });
 
   it('its exit invokes the navigation prop with the component id', async () => {
-    // The prop defaults to a no-op at the call site, so an unwired exit is silently inert rather
-    // than an error — a source assertion alone cannot say the click reaches it.
+    // The prop defaults to a no-op at the call site.
     const { opened, props } = track();
     const target = await harness.mount(props);
     target.querySelector('[data-component-edit-action="open-world-entry"]').click();
@@ -229,9 +204,7 @@ describe('ComponentIdentityStrip — the reference callout (issue 1371, parity r
   });
 
   it('reads the LIVE prop, so a world-side identity edit re-renders here', async () => {
-    // `ComponentEditView` re-seeds its drafts only when `componentKey` changes, and a catalogue
-    // edit moves neither the id nor the option counts. Seed the name into `$state` here and a
-    // successful edit one route away would leave this card showing the old one.
+    // `ComponentEditView` re-seeds its drafts only when `componentKey` changes.
     const { props } = track();
     const first = await harness.mount(props);
     assert.equal(

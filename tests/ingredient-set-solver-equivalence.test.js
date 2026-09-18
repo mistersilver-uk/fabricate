@@ -1,39 +1,6 @@
 /**
  * Differential equivalence for the staged ingredient resolver (issue 1083), with the PRE-1083
  * whole-set solver as the oracle.
- *
- * The acceptance bar is not "still satisfiable". It is byte-identical selections wherever the
- * old path already succeeded: `plan` order and per-stack draws feed consumption, `currencySpends`
- * feeds the currency ledger, and `selectedIngredients` is read POSITIONALLY by
- * `RecipeManager._chosenOptionByGroup`. A resolver that found a different valid assignment would
- * pass every correctness test in this repository and silently consume different documents.
- *
- * ## How the oracle is captured
- *
- * There is no way to run both implementations in one process, so the old one is run once and its
- * answers are frozen here. {@link FINGERPRINTS} was produced by checking out
- * `src/models/IngredientSet.js` at this branch's base (`af58030e`, the last commit before the
- * undo journal) and running this exact file's generator against it. The generator is seeded and
- * lives in this file, so both runs saw byte-identical inputs.
- *
- * Regenerate with:
- *
- *   git checkout <ref> -- src/models/IngredientSet.js
- *   FABRICATE_PRINT_SOLVER_FINGERPRINTS=1 node --conditions=browser --test \
- *     tests/ingredient-set-solver-equivalence.test.js
- *
- * A regenerated table is a claim that the contract changed, and has to be argued as one — that
- * is the point of freezing it rather than recomputing it.
- *
- * ## What the corpus covers
- *
- * 240 seeded cases over every shape the five interlocking guarantees live in: component and tag
- * options that overlap on the same stacks (the shared `remaining` ledger and no-double-count),
- * `quantity > 1` groups that only resolve under a partial unit split, essence options funded from
- * a joint block including dual-essence carriers, currency options (ordered strictly after items),
- * `optionOverrides` pins with and without a `heldItemId`, and unsatisfiable sets whose
- * `missingGroups` have/need must survive unchanged. Roughly a third of the corpus is
- * unsatisfiable, which is deliberate: the failing path is the one that explores the whole space.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -65,11 +32,7 @@ const TAGS = ['iron', 'wood', 'ember'];
 const ESSENCES = ['fire', 'earth'];
 const UNITS = ['gp', 'sp'];
 
-/**
- * One held stack: a component identity, a tag list and an essence map, all decided by the seed.
- * The matcher and essence probe below read these fields, so the fixture's identity model is
- * explicit rather than borrowed from Fabricate's flag resolution.
- */
+/** One held stack: a component identity, a tag list and an essence map, all decided by the seed. */
 function heldStack(random, index) {
   return {
     uuid: `held-${index}`,
@@ -160,14 +123,7 @@ function buildCase(caseIndex) {
   return { set: new IngredientSet({ id: `set-${caseIndex}`, ingredientGroups }), items, options };
 }
 
-/**
- * The full observable selection as one string.
- *
- * Every field a consumer reads is in here, in order: a fingerprint that only compared `success`
- * would be satisfied by a resolver that consumed entirely different stacks. `selectedIngredients`
- * is recorded as the per-group option INDEX because that is exactly how
- * `RecipeManager._chosenOptionByGroup` reads it — positionally.
- */
+/** The full observable selection as one string. */
 function fingerprint(set, selection) {
   const optionIndexOf = (option) => {
     for (const [groupIndex, group] of set.ingredientGroups.entries()) {
@@ -489,19 +445,9 @@ test('the corpus exercises every guarantee it claims to', () => {
 });
 
 test('a substantial share of the corpus still reaches the backtracking search', () => {
-  // The generator is a hand-maintained mirror of the shapes this table claims to cover, and
-  // issue 1083 added a fast path that resolves an UNCONTENDED component without visiting a
-  // single node. A future tweak to the seed, the option mix or the inventory sizes could drift
-  // the corpus into being answered entirely by that fast path, at which point the 240-line
-  // oracle above would still be a wall of green while testing none of the search it exists to
-  // pin. `searchStats.nodes` is the only observable that can tell the two apart.
-  //
-  // What this does NOT claim is rescue DEPTH. A prune or ordering error inside the search is
-  // still masked whenever `_resolveGreedy` — which applies neither the pass index's essence
-  // prune nor contention scoping — can answer the case on its own, and only a small minority of
-  // the corpus is genuinely rescued by the search. That is why the essence-prune boundary is
-  // pinned by a named case in `tests/ingredient-set-essence-block.test.js` rather than left to
-  // this corpus.
+  // The generator is a hand-maintained mirror of the shapes this table claims to cover, and issue
+  // 1083 added a fast path that resolves an UNCONTENDED component without visiting a single node.
+  // What this does NOT claim is rescue DEPTH.
   let searched = 0;
   let contended = 0;
   for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
@@ -546,9 +492,8 @@ test('the staged resolver is byte-identical to the pre-1083 solver', () => {
 });
 
 test('every satisfied selection is a valid, non-double-counting draw', () => {
-  // Equivalence to the old solver is necessary, not sufficient: two implementations can agree on
-  // a wrong answer. This re-derives the invariants from the fixture instead of from either
-  // implementation, so a shared defect still fails.
+  // Equivalence to the old solver is necessary, not sufficient: two implementations can agree on a
+  // wrong answer.
   for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
     const { set, items, options } = buildCase(caseIndex);
     const selection = set.resolveIngredientSelection(items, MATCHER, options);
@@ -575,9 +520,7 @@ test('every satisfied selection is a valid, non-double-counting draw', () => {
 });
 
 test('resolution is repeatable and independent of held-item order', () => {
-  // Determinism is a hard requirement, not a nicety. `success` must be invariant under a
-  // shuffled inventory (that is what the #663 search exists to guarantee), and an identical
-  // input must produce an identical plan every time.
+  // Determinism is a hard requirement, not a nicety.
   for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
     const { set, items, options } = buildCase(caseIndex);
     const first = set.resolveIngredientSelection(items, MATCHER, options);

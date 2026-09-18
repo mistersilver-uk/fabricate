@@ -1,12 +1,5 @@
 /**
  * `RowDisclosure`, the product's ONE row disclosure (issue 1096).
- *
- * `ui-integration/spec.md` §Shared product UI primitives states this control's contract in
- * normative terms — `aria-expanded`, `aria-controls` and an accessible name — and until this
- * file existed nothing held it to any of them. Its two sibling primitives (`FillBar`,
- * `ThresholdBandStrip`) each landed with a suite; this one landed with the assertion that its
- * only consumer renders SOMETHING, which cannot see a chevron that announces nothing.
- *
  * The name is the sharpest of the three requirements and the easiest to lose: this control
  * renders an icon and no text, so without `aria-label` it has NO accessible name at all and a
  * screen reader announces "button, collapsed" for every row on the screen. The name is
@@ -66,8 +59,7 @@ describe('RowDisclosure (mounted)', () => {
     const expandedIcon = expanded.querySelector('.fab-row-disclosure > i').className;
 
     assert.notEqual(collapsedIcon, expandedIcon, 'the two states are visually distinguishable');
-    // The glyph is decorative: the state is already announced by `aria-expanded`, so an
-    // icon that ALSO announced it would be read twice.
+    // The glyph is decorative: the state is already announced by `aria-expanded`.
     assert.equal(expanded.querySelector('.fab-row-disclosure > i').getAttribute('aria-hidden'), 'true');
   });
 
@@ -118,7 +110,7 @@ describe('RowDisclosure (mounted)', () => {
   });
 
   it('omits aria-controls entirely rather than pointing at nothing', async () => {
-    // An `aria-controls=""` is an IDREF to nowhere, which assistive technology reports as a
+    // An `aria-controls=""` is an IDREF to nowhere.
     // broken relationship. A caller with no stable id has a layout problem, not an ARIA one.
     const root = await harness.mount({ expanded: false, label: 'Row' });
     assert.ok(!control(root).hasAttribute('aria-controls'));
@@ -140,9 +132,7 @@ describe('RowDisclosure (mounted)', () => {
   });
 
   it('carries the Foundry button reset, or the host sheet stretches it out of its row', async () => {
-    // Asserted against the DECLARATION: happy-dom performs no layout, so a measured box is
-    // zeros here. Foundry's own sheet centres button content and pins a fixed height, which
-    // is exactly what turns a 24px chevron into a full-height block beside a row's text.
+    // Asserted against the DECLARATION: happy-dom performs no layout.
     const source = await import('node:fs').then(({ readFileSync }) =>
       readFileSync(resolve(repoRoot, 'src/ui/svelte/components/RowDisclosure.svelte'), 'utf8')
     );

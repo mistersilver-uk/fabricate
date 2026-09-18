@@ -1,14 +1,4 @@
-/**
- * Q3 — importReferenceResolver: all three dispositions.
- *
- *   - external-resolvable, unchanged        → retained
- *   - external-resolvable, remapped          → remapped (value updated)
- *   - external-absent                        → reported (value kept verbatim)
- *   - broken-internal (id resolves to nothing) → reported (data-integrity)
- *
- * Covers external absence for: environment sceneUuid, realm sceneUuid +
- * sceneRegionUuid, and drop-row itemUuid.
- */
+/** Q3 — importReferenceResolver: all three dispositions. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -250,11 +240,7 @@ test('rebindCopyContainerIds: regenerates env ids, preserves realm + task/event/
     assert.deepEqual(env.includedRealmIds, [FIXTURE_REALM_ID], 'env realm refs left as authored');
   }
 
-  // Task / event / modifier ids PRESERVED (D3) so linkages survive. The modifier library moved
-  // onto the SYSTEM in issue 1117 and to the WORLD SLICE in issue 1308, so its ids are asserted
-  // there — and the drop-row reference that names one must still resolve. Deliberately NOT
-  // rebound under copy mode: these ids are world scope, shared by every crafting system, so
-  // rebinding them would fork the world's own rules per copy.
+  // Task / event / modifier ids PRESERVED (D3) so linkages survive (issue 1117).
   const slice = prepared.gatheringConfig.system;
   assert.equal(slice.tasks[0].id, f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0].id);
   assert.equal(slice.events[0].id, f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].events[0].id);

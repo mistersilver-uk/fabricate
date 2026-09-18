@@ -107,9 +107,7 @@ describe('Workbench (mounted)', () => {
     assert.equal(brewButton(target).disabled, true, 'in-flight guard blocks double-submit');
   });
 
-  // -------------------------------------------------------------------------
   // D — chip interaction event hit-tests (add / remove-one / remove-all)
-  // -------------------------------------------------------------------------
 
   function mountChip(calls) {
     return harness.mount({
@@ -163,14 +161,11 @@ describe('Workbench (mounted)', () => {
   });
 
   it('Enter on the focused `×` REMOVES all and does NOT bubble to the chip-body add', async () => {
-    // Regression: without the target===currentTarget guard, an Enter keydown from a
-    // focused nested button bubbles to the chip-body handler, which preventDefaults
-    // the button's native activation and fires onAdd — so Enter on × would ADD.
+    // Regression: without the target===currentTarget guard.
     const calls = [];
     const target = await mountChip(calls);
     const removeAll = target.querySelector('[data-alchemy-chip-remove="emberroot"]');
-    // A real activation dispatches keydown (bubbling) AND the native click; the
-    // guard must let the click through while ignoring the bubbled keydown.
+    // A real activation dispatches keydown (bubbling) AND the native click.
     removeAll.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     removeAll.click();
     assert.deepEqual(calls, [['removeAll', 'emberroot']], 'Enter on × removes all and never adds');
@@ -326,16 +321,7 @@ describe('Workbench (mounted)', () => {
   });
 });
 
-/**
- * The Workbench's adoption of the shared tile and label, and the two conversions this phase
- * measured and REFUSED (issue 1514, phase 3).
- *
- * The refusals are asserted as well as the conversions, because a deferral recorded only in a
- * comment is a deferral the next author reverses without reading it. Both are stated as the
- * measurement that produced them: the status strip is the one banner in the tab whose resting
- * tone no `Notice` can paint, and the still-needed well is the one whose body no `Callout` can
- * hold.
- */
+/** The Workbench's adoption of the shared tile and label. */
 describe('Workbench primitive adoption (issue 1514)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());

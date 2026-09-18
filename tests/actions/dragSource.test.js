@@ -1,11 +1,6 @@
 /**
- * Unit tests for src/ui/svelte/actions/dragSource.js
- *
- * dragSource is the net-new drag SOURCE half (its drop sibling dragDrop.js is
- * covered by tests/actions/dragDrop.test.js). Like that action it is a plain
- * Svelte action — a function operating on a DOM element — so it can be tested in
- * Node with a mock element + mock dragstart/dragend events; no browser or Svelte
- * compiler is needed.
+ * Unit tests for src/ui/svelte/actions/dragSource.js. dragSource is the net-new drag SOURCE half
+ * (its drop sibling dragDrop.js is covered by tests/actions/dragDrop.test.js).
  */
 
 import { describe, it } from 'node:test';
@@ -13,9 +8,7 @@ import assert from 'node:assert/strict';
 
 const { dragSource } = await import('../../src/ui/svelte/actions/dragSource.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /** Minimal mock DOM node tracking listeners, classes and attributes. */
 function makeNode() {
@@ -77,9 +70,7 @@ function fire(node, type, event) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Test suites
-// ---------------------------------------------------------------------------
 
 describe('dragSource action — attach', () => {
   it('marks the node draggable and attaches dragstart + dragend listeners', () => {

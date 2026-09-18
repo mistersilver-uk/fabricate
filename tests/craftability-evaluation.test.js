@@ -1,17 +1,12 @@
 /**
- * Unit tests for T-082: evaluateCraftability() unified computation path
- *
- * Covers:
- *   TC1: Fully satisfied recipe — canCraft true, all ingredientStates satisfied
- *   TC2: Partially satisfied — canCraft false, states identify shortages
- *   TC3: Unsatisfied — canCraft false, actor has nothing
- *   TC4: Exact boundary — actor has exactly the required quantity
- *   TC5: Multiple component source actors — correct aggregation
- *   TC6: Managed-component matching (match.type === 'component')
- *   TC7: Shared items across groups — remaining-quantity tracking consistent
- *   TC8: Tool presence/absence — toolStates match craftability
- *   TC9: Essence requirements — essenceStates match craftability
- *   TC10 (regression): False uncraftable state — managed-component scenario
+ * Unit tests for T-082: evaluateCraftability() unified computation path. Covers: TC1: Fully
+ * satisfied recipe — canCraft true, all ingredientStates satisfied TC2: Partially satisfied —
+ * canCraft false, states identify shortages TC3: Unsatisfied — canCraft false, actor has nothing
+ * TC4: Exact boundary — actor has exactly the required quantity TC5: Multiple component source
+ * actors — correct aggregation TC6: Managed-component matching (match.type === 'component') TC7:
+ * Shared items across groups — remaining-quantity tracking consistent TC8: Tool presence/absence —
+ * toolStates match craftability TC9: Essence requirements — essenceStates match craftability TC10
+ * (regression): False uncraftable state — managed-component scenario
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,9 +20,7 @@ import {
   makePurseActor,
 } from './helpers/currencyRequirementFixtures.js';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -58,9 +51,7 @@ globalThis.game = { user: { isGM: true }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 
-// ---------------------------------------------------------------------------
 // Imports — must come after globals are set
-// ---------------------------------------------------------------------------
 
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
@@ -68,13 +59,9 @@ const { Recipe } = await import('../src/models/Recipe.js');
 const { deriveToolSourceFromComponents } =
   await import('../src/migration/migrateToolsToFirstClass.js');
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
-/**
- * Make a minimal mock item matched by itemUuid on an Ingredient.
- */
+/** Make a minimal mock item matched by itemUuid on an Ingredient. */
 function makeItem(uuid, quantity = 1, extraFlags = {}) {
   return {
     uuid,
@@ -85,9 +72,7 @@ function makeItem(uuid, quantity = 1, extraFlags = {}) {
   };
 }
 
-/**
- * Make a managed-component item: matched by componentId via registeredItemUuid.
- */
+/** Make a managed-component item: matched by componentId via registeredItemUuid. */
 function makeComponentItem(uuid, registeredItemUuid, quantity = 1) {
   return {
     uuid,
@@ -127,9 +112,7 @@ function makeRecipe(ingredientSets, extra = {}) {
   });
 }
 
-/**
- * Build a mock actor whose items collection is array-like.
- */
+/** Build a mock actor whose items collection is array-like. */
 function makeActor(items) {
   const itemsArray = [...items];
   itemsArray[Symbol.iterator] = itemsArray[Symbol.iterator].bind(itemsArray);
@@ -151,17 +134,13 @@ function makeActorWithIterableCollection(items) {
   };
 }
 
-/**
- * Build a RecipeManager with no system features (uuid-based matching still works).
- */
+/** Build a RecipeManager with no system features (uuid-based matching still works). */
 function makeRecipeManager() {
   globalThis.game = { user: { isGM: true }, fabricate: null };
   return new RecipeManager();
 }
 
-/**
- * Build a RecipeManager wired to a system that exposes named components.
- */
+/** Build a RecipeManager wired to a system that exposes named components. */
 function makeRecipeManagerWithSystem(systemId, components, tools = []) {
   // Mirror production: `_normalizeSystem` derives a component-linked tool's own source refs
   // (issue 561) from its component via the SAME shared helper, so the tool matches owned
@@ -191,9 +170,7 @@ function makeRecipeManagerWithSystem(systemId, components, tools = []) {
   return new RecipeManager();
 }
 
-/**
- * Build a system manager that also supports essences.
- */
+/** Build a system manager that also supports essences. */
 function makeRecipeManagerWithEssences(systemId, essenceDefinitions, components = []) {
   const system = {
     id: systemId,
@@ -214,9 +191,7 @@ function makeRecipeManagerWithEssences(systemId, essenceDefinitions, components 
   return new RecipeManager();
 }
 
-// ---------------------------------------------------------------------------
 // TC1: Fully satisfied — all ingredients present at exact+ quantities
-// ---------------------------------------------------------------------------
 
 test('TC1: evaluateCraftability returns canCraft true and all ingredientStates satisfied', () => {
   const itemA = makeItem('item-a', 2);
@@ -240,9 +215,7 @@ test('TC1: evaluateCraftability returns canCraft true and all ingredientStates s
   }
 });
 
-// ---------------------------------------------------------------------------
 // TC2: Partially satisfied — some ingredients present, some missing
-// ---------------------------------------------------------------------------
 
 test('TC2: evaluateCraftability returns canCraft false and identifies shortages', () => {
   const itemA = makeItem('item-a', 1); // has item-a
@@ -267,9 +240,7 @@ test('TC2: evaluateCraftability returns canCraft false and identifies shortages'
   assert.equal(stateB.need, 2, 'should report the needed quantity');
 });
 
-// ---------------------------------------------------------------------------
 // TC3: Unsatisfied — actor has none of the required ingredients
-// ---------------------------------------------------------------------------
 
 test('TC3: evaluateCraftability returns canCraft false when actor has nothing', () => {
   const set = makeIngredientSet([makeGroupData([makeIngredientData('item-a', 1)])]);
@@ -286,9 +257,7 @@ test('TC3: evaluateCraftability returns canCraft false when actor has nothing', 
   assert.equal(result.ingredientStates[0].have, 0);
 });
 
-// ---------------------------------------------------------------------------
 // TC4: Exact boundary — actor has exactly the required quantity
-// ---------------------------------------------------------------------------
 
 test('TC4: evaluateCraftability succeeds when actor has exactly the required quantity', () => {
   const itemA = makeItem('item-a', 3); // exactly 3
@@ -306,9 +275,7 @@ test('TC4: evaluateCraftability succeeds when actor has exactly the required qua
   assert.equal(result.ingredientStates[0].need, 3);
 });
 
-// ---------------------------------------------------------------------------
 // TC5: Multiple component source actors — ingredients split across two actors
-// ---------------------------------------------------------------------------
 
 test('TC5: evaluateCraftability correctly aggregates items from multiple actors', () => {
   // Actor 1 has item-a, Actor 2 has item-b — together they can craft
@@ -338,9 +305,7 @@ test('TC5: evaluateCraftability correctly aggregates items from multiple actors'
   }
 });
 
-// ---------------------------------------------------------------------------
 // TC6: Managed-component matching (match.type === 'component' with componentId)
-// ---------------------------------------------------------------------------
 
 test('TC6: evaluateCraftability matches managed-component ingredients by registeredItemUuid', () => {
   const systemId = 'sys-tc6';
@@ -476,14 +441,11 @@ test('TC6d: the name fallback does NOT match a differently-named item', () => {
   assert.equal(result.ingredientStates[0].satisfied, false);
 });
 
-// ---------------------------------------------------------------------------
 // TC7: Shared items across groups — remaining-quantity tracking consistent
-// ---------------------------------------------------------------------------
 
 test('TC7: evaluateCraftability tracks remaining quantity across groups (no double-counting)', () => {
-  // Both Group 1 and Group 2 require item-a quantity 1.
-  // Actor has item-a with quantity 1 (only enough for ONE group).
-  // canCraft should be false AND states should reflect the shortage consistently.
+  // Both Group 1 and Group 2 require item-a quantity 1. Actor has item-a with quantity 1 (only
+  // enough for ONE group).
   const itemA = makeItem('item-a', 1);
 
   const set = makeIngredientSet([
@@ -531,9 +493,7 @@ test('TC7b: evaluateCraftability succeeds when shared item covers both groups', 
   }
 });
 
-// ---------------------------------------------------------------------------
 // TC8: Tool presence/absence
-// ---------------------------------------------------------------------------
 
 test('TC8: evaluateCraftability toolStates show available when tool present', () => {
   const systemId = 'sys-tc8';
@@ -755,9 +715,7 @@ test('TC8f: a second physical copy remains available as the Tool', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // TC9: Essence requirements
-// ---------------------------------------------------------------------------
 
 test('TC9: evaluateCraftability essenceStates show satisfied when essences available', () => {
   const systemId = 'sys-tc9';
@@ -873,9 +831,8 @@ test('TC9a: missing legacy essence states retain authored presentation metadata'
     type: essenceId,
     name: 'Restorative',
     icon: 'fas fa-heart',
-    // Issue 917 adds the GM-authored per-essence colour token to every essence
-    // projection; null (unauthored) renders as the theme accent, which is what every
-    // essence renders as today.
+    // Issue 917 adds the GM-authored per-essence colour token to every essence projection; null
+    // (unauthored) renders as the theme accent, which is what every essence renders as today.
     colorToken: null,
     isEssence: true,
     need: 2,
@@ -1003,16 +960,9 @@ test('TC9d: evaluateCraftability essenceStates show unsatisfied when essences in
   assert.equal(result.essenceStates[0].satisfied, false);
 });
 
-// ---------------------------------------------------------------------------
-// TC10 (regression): False uncraftable state — managed-component scenario
-//
-// Reproduces the reported bug: a recipe with managed-component ingredients
-// where the actor has all required items at sufficient quantities.
-// The old divergent paths could produce contradictory results where
-// individual ingredient display states all showed satisfied=true but
-// canCraft returned false (or vice versa). evaluateCraftability must
-// return consistent canCraft:true and all states satisfied.
-// ---------------------------------------------------------------------------
+// TC10 (regression): False uncraftable state — managed-component scenario. Reproduces the reported
+// bug: a recipe with managed-component ingredients where the actor has all required items at
+// sufficient quantities.
 
 test('TC10 (regression): evaluateCraftability is consistent when actor has all managed-component ingredients', () => {
   const systemId = 'sys-tc10';
@@ -1104,9 +1054,7 @@ test('TC10b (regression): evaluateCraftability returns all states unsatisfied wh
   );
 });
 
-// ---------------------------------------------------------------------------
 // evaluateShoppingRequirement: union across ingredient sets, max need per component
-// ---------------------------------------------------------------------------
 
 test('evaluateShoppingRequirement unions all ingredient sets with the max need per component', () => {
   const systemId = 'sys-shop';
@@ -1141,9 +1089,7 @@ test('evaluateShoppingRequirement unions all ingredient sets with the max need p
   assert.equal(byName.Iron.have, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Issue 551: tag- and currency-matched ingredient tiles resolve an image
-// ---------------------------------------------------------------------------
 
 /**
  * A tag-carrying inventory item: matched by its fabricate `tags` flag, and
@@ -1234,10 +1180,7 @@ test('issue 551: a short-stocked tag group shows the first matching held item im
 });
 
 test('issue 917: an unmatched tag group reports NO image so the tile draws its glyph', () => {
-  // This reverses the issue-551 expectation by design (issue 917 AC5). The bag SVG is
-  // Foundry's generic default Item image, not artwork: rendering it told the player
-  // their requirement looked like a bag. A null image is the signal the tile needs to
-  // fall back to a material glyph instead.
+  // This reverses the issue-551 expectation by design (issue 917 AC5).
   const systemId = 'sys-917-tagfallback';
   const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['gem'], 1)])]);
   const recipe = new Recipe({
@@ -1298,18 +1241,11 @@ test('issue 551: a currency-matched tile shows a coin icon instead of a blank', 
   assert.notEqual(result.ingredientStates[0].img, null);
 });
 
-// ---------------------------------------------------------------------------
-// Issue 553: the displayed ingredient tile must match the option/item the
-// engine actually consumes. The engine (resolveIngredientSelection) walks groups
-// in order and deducts consumed quantities, so a shared component can satisfy an
-// earlier group and force a later group onto a DIFFERENT option/item. The tile
-// must follow the engine's selection, not re-derive its own.
-// ---------------------------------------------------------------------------
+// Issue 553: the displayed ingredient tile must match the option/item the engine actually consumes.
 
 test('issue 553: a component shared across two groups shows the option the engine consumes, not a re-derived one', () => {
-  // Recipe: group1 options [A, B], group2 options [A, C]. Actor holds 1x A, 1x B, 1x C.
-  // Engine: group1 takes A (A now exhausted); group2 cannot use A, falls through to C.
-  // The old display re-derived group2 as satisfied by A (no deduction) — wrong.
+  // Recipe: group1 options [A, B], group2 options [A, C]. Actor holds 1x A, 1x B, 1x C. Engine:
+  // group1 takes A (A now exhausted); group2 cannot use A, falls through to C.
   const systemId = 'sys-553-comp';
   const compA = 'comp-553-a';
   const compB = 'comp-553-b';
@@ -1360,9 +1296,8 @@ test('issue 553: a component shared across two groups shows the option the engin
 });
 
 test('issue 553: two items sharing a tag show the item each group actually consumes', () => {
-  // Two groups both satisfied by tag 'metal'; actor holds two DIFFERENT metal items.
-  // The engine consumes metal-A for group1 (deducting it) and metal-B for group2.
-  // The old display borrowed the FIRST tag-matching item (metal-A) for BOTH tiles.
+  // Two groups both satisfied by tag 'metal'; actor holds two DIFFERENT metal items. The engine
+  // consumes metal-A for group1 (deducting it) and metal-B for group2.
   const systemId = 'sys-553-tag';
   const set = makeIngredientSet([
     makeGroupData([makeTagIngredientData(['metal'], 1)]),
@@ -1401,10 +1336,8 @@ test('issue 553: two items sharing a tag show the item each group actually consu
   );
 });
 
-// ---------------------------------------------------------------------------
-// Essence GROUP OPTIONS (issue 649): ingredient-tile name/icon + have/need,
-// consumption through the call site, and unknown-id activation validation.
-// ---------------------------------------------------------------------------
+// Essence GROUP OPTIONS (issue 649): ingredient-tile name/icon + have/need, consumption through the
+// call site, and unknown-id activation validation.
 
 function makeEssenceOptionGroup(essenceId, amount, id = null) {
   return makeGroupData(
@@ -1453,10 +1386,9 @@ test('essence group tile resolves the essence NAME + icon (never the raw id) and
   assert.equal(state.icon, 'fas fa-heart', 'the essence definition icon is carried on the tile');
   assert.equal(state.isEssence, true, 'the tile is marked for essence glyph rendering');
   assert.equal(state.img, null, 'the tile does not expose the synthetic aura image');
-  // Issue 917 renames the essence tile's numerator: `delivered` is the essence amount
-  // the resolved allocation actually supplies (capped at `need`, so a satisfied tile
-  // reads exactly 2/2), while the uncapped amount held moves to `owned`. It used to
-  // read `have: 3` — the whole inventory — for a plan that draws 2.
+  // Issue 917 renames the essence tile's numerator: `delivered` is the essence amount the resolved
+  // allocation actually supplies (capped at `need`, so a satisfied tile reads exactly 2/2), while
+  // the uncapped amount held moves to `owned`.
   assert.equal(state.need, 2, 'need is the essence amount, not the option quantity');
   assert.equal(state.delivered, 2, 'delivered is what the plan supplies, never 3/2');
   assert.equal(state.owned, 3, 'owned is the accumulated essence (3 herbs x 1 each)');
@@ -1498,9 +1430,8 @@ test('a MISSING essence group tile shows the accumulated have and the essence am
 });
 
 test('consumption threads the component-aware resolver: a component-defined essence draws down via canCraft', () => {
-  // Finding 6: drive through the RecipeManager call site with a component-defined
-  // essence (no essence flag on the item). This FAILS if evaluateCraftability stops
-  // binding `_buildEssenceOptionResolver` (the flag-only default would miss it).
+  // Finding 6: drive through the RecipeManager call site with a component-defined essence (no
+  // essence flag on the item).
   const systemId = 'sys-ess-consume';
   const essenceId = 'aether';
   const components = [
@@ -1531,16 +1462,7 @@ test('consumption threads the component-aware resolver: a component-defined esse
   assert.ok(satisfiableSet, 'a satisfiable set is reported');
 });
 
-// ---------------------------------------------------------------------------
-// Issue 857: a by-TAG ingredient must match owned items whose MANAGED COMPONENT
-// carries the tag. Authored tags live on the component definition (the same source
-// the recipe editor links tag ingredients from), and Fabricate never stamps a
-// `flags.fabricate.tags` onto inventory items — so an owned item that resolves to a
-// tagged component (by source uuid) but carries no tag flag of its own must still be
-// offered as available. Before the fix the tag matcher read only the item's own
-// (never-populated) tag flag, so a by-tag ingredient reported "no components
-// available" while an identical by-component ingredient worked.
-// ---------------------------------------------------------------------------
+// Issue 857: a by-TAG ingredient must match owned items whose MANAGED COMPONENT carries the tag.
 
 test('issue 857: a by-tag ingredient matches an owned item via its managed component tags', () => {
   const systemId = 'sys-857-tag-component';
@@ -1627,9 +1549,8 @@ test('issue 857: a by-tag ingredient stays unsatisfied when no owned component c
     resultGroups: [{ id: 'rg-1', results: [] }],
   });
 
-  // The owned component is tagged `mineral`, not `plant`: it must not satisfy the
-  // `plant` tag group (the fix widens matching to component tags, it does not match
-  // every owned item).
+  // The owned component is tagged `mineral`, not `plant`: it must not satisfy the `plant` tag group
+  // (the fix widens matching to component tags, it does not match every owned item).
   const manager = makeRecipeManagerWithSystem(systemId, [
     { id: compStone, registeredItemUuid: srcStone, name: 'River Stone', tags: ['mineral'] },
   ]);
@@ -1661,19 +1582,10 @@ test('_validateEssenceReferences flags an essence OPTION referencing a deleted e
   );
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493: a currency requirement states a COST, never a have/need ratio, and
-// carries the reason when the world's currency cannot be resolved at all.
-// ---------------------------------------------------------------------------
+// Issue 1493: a currency requirement states a COST, never a have/need ratio, and carries the reason
+// when the world's currency cannot be resolved at all.
 
-/**
- * A manager whose crafting system has currency ENABLED, over an injected world ladder.
- *
- * Both scopes go through the constructor seams (the shared fixture in
- * `helpers/currencyRequirementFixtures.js`) rather than the `game.fabricate` global that
- * `makeRecipeManagerWithSystem` installs, because these fixtures need to vary the WORLD
- * half per test while every other suite in this file shares one global.
- */
+/** A manager whose crafting system has currency ENABLED, over an injected world ladder. */
 function makeCurrencyManager(systemId, units) {
   return makeCurrencyRecipeManager(RecipeManager, { systemId, units });
 }
@@ -1774,14 +1686,8 @@ test('issue 1493: a non-currency requirement is not marked as currency and carri
   assert.equal(state.have, 2);
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 (revision 2): the SHOPPING projection must not re-derive a currency
-// requirement's verdict. `_buildCurrencyIngredientState` takes `satisfied` from the
-// resolver's own `missingGroups` result; the shopping projection then re-derived every
-// state's satisfaction from `have >= need`, and a currency state's `have` is a documented
-// placeholder (always 0) against a `need` that is a PRICE. So every currency requirement
-// read unaffordable, and a player carrying 500 gp was told to buy the materials instead.
-// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2): the SHOPPING projection must not re-derive a currency requirement's
+// verdict.
 
 test('issue 1493: the shopping requirement keeps the resolver verdict for an affordable cost', () => {
   const systemId = 'sys-1493-shop-afford';
@@ -1839,12 +1745,9 @@ test('issue 1493: a non-currency shopping state is still re-derived against the 
 });
 
 test('issue 1493: a currency cost never merges with an item requirement describing identically', () => {
-  // Reachable, not hypothetical. An INCOMPLETE currency match (the misconfiguration this
-  // whole issue is about) falls back to `Ingredient#getDescription()`, which reads
-  // "Unknown ingredient" — and so does any option with no match at all. Only a managed
-  // component carries an id, so both states keyed on that shared description, and the
-  // max-need merge then compared a price against an occurrence count and kept ONE of
-  // them: the currency requirement vanished from the shopping list entirely.
+  // Reachable, not hypothetical. An INCOMPLETE currency match (the misconfiguration this whole
+  // issue is about) falls back to `Ingredient#getDescription()`, which reads "Unknown ingredient" —
+  // and so does any option with no match at all.
   const systemId = 'sys-1493-key';
   const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
   const recipe = new Recipe({
@@ -1872,16 +1775,8 @@ test('issue 1493: a currency cost never merges with an item requirement describi
   );
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 (revision 3): the shopping projection's currency EXEMPTION must exempt
-// nothing else, and its dedup key must keep every kind apart.
-//
-// The exemption's neighbour in that same expression is the essence restatement:
-// `_buildEssenceIngredientState` never sets `have` at all (it reports `delivered` and
-// `owned`, which answer two different questions), so the projection restates `owned` as the
-// `have` the aggregator shops against. Exempt that line and every essence row reaches the
-// shopping list with `have: 0` and its whole need reported as missing.
-// ---------------------------------------------------------------------------
+// Issue 1493 (revision 3): the shopping projection's currency EXEMPTION must exempt nothing else,
+// and its dedup key must keep every kind apart.
 
 test('issue 1493: the shopping projection restates an essence row owned amount as its have', () => {
   const systemId = 'sys-1493-shop-essence';
@@ -1925,12 +1820,10 @@ test('issue 1493: the shopping projection restates an essence row owned amount a
 });
 
 test('issue 1493: an essence requirement never merges with an item requirement describing identically', () => {
-  // The `essence:` half of the same kind-qualified key as the currency test above, and
-  // reachable the same way: an INCOMPLETE essence match (an option whose essence was never
-  // chosen) falls back to `Ingredient#getDescription()`, which reads "Unknown ingredient" —
-  // and so does any option with no match at all. Only a managed component carries an id, so
-  // both states keyed on that shared description and the max-need merge kept ONE of them,
-  // comparing an essence amount against an occurrence count.
+  // The `essence:` half of the same kind-qualified key as the currency test above, and reachable
+  // the same way: an INCOMPLETE essence match (an option whose essence was never chosen) falls back
+  // to `Ingredient#getDescription()`, which reads "Unknown ingredient" — and so does any option
+  // with no match at all.
   const systemId = 'sys-1493-essence-key';
   const manager = makeCurrencyManager(systemId, SPENDABLE_GOLD_UNITS);
   const recipe = new Recipe({

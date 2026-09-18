@@ -1,26 +1,4 @@
-/**
- * The two TOOL-FAMILY world-scope write actions, over a REAL store (issue 1373, epic 1357).
- *
- * ## Why a real `createToolScopeStore` rather than a hand-written double
- *
- * Both actions are about ABSENCE, and absence is exactly what a double gets wrong.
- *
- * `setWorldToolBreakage`'s clear has to survive a round trip through `normalizeWorldToolBreakage`
- * (which answers `{}` for anything unrecognized), through `_persistedShape` (which spreads the
- * normalized corpus's extras), and out to the setting - and a world SETTING preserves key
- * absence, which is the OPPOSITE of `setFlag`, whose merge resurrects a removed key. A double
- * that stores a value object rather than the setting's own payload cannot see the difference.
- *
- * `setWorldRepairRequirements` cannot be faked at all: `updateWorldDefaultSection` REFUSES every
- * name outside `TOOL_SECTIONS`, and `repairRequirements` is deliberately not one of them. That
- * refusal is asserted here as a positive fact rather than left implicit, because it is the whole
- * reason the second action exists.
- *
- * ## The settings seam is a plain map, and that matches production
- *
- * `game.settings.get` answers an ALREADY-PARSED value for a JSONField setting, so a fixture that
- * stored a JSON STRING would exercise the store's fallback rather than its production path.
- */
+/** The two TOOL-FAMILY world-scope write actions, over a REAL store (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -30,16 +8,7 @@ import { createWorldScopeEntityActions } from '../src/ui/svelte/stores/worldScop
 
 const KEY = SETTING_KEYS.TOOL_SCOPE;
 
-/**
- * A tool scope store over an in-memory settings map, plus the tool action family bound to it.
- *
- * `reload()` builds a SECOND store over the SAME map, which is what a world reload does - and
- * is the only way to prove a write actually reached the setting rather than only the cache.
- *
- * @param {Map<string, unknown>} [settings]
- * @returns {{store: object, actions: object, settings: Map<string, unknown>,
- *   reload: () => object}}
- */
+/** A tool scope store over an in-memory settings map, plus the tool action family bound to it. */
 function toolScope(settings = new Map()) {
   const seams = {
     getSetting: (key) => settings.get(key),
@@ -86,9 +55,7 @@ test('the world tool-breakage authority round-trips through a real store, INCLUD
     'it reached the SETTING, not only the cache'
   );
 
-  // THE CLEAR IS THE HALF THAT MATTERS. Without it a world authority is a one-way door: the
-  // resolver reads the world layer only when a system authored nothing, so a world value that
-  // can be set and never unset changes every absent-preserving system for good.
+  // THE CLEAR IS THE HALF THAT MATTERS.
   assert.equal(await actions.setWorldToolBreakage(null), true);
   assert.equal(
     'toolBreakage' in store.get(),
@@ -160,11 +127,7 @@ test('addToSystem SEEDS the repair list as a DEEP COPY, so neither scope can rea
   const record = membershipOf(store, 'hammer', 'sys-forge');
   assert.equal(record.repairRequirements.length, 2, 'the seed landed');
 
-  // THE LENGTH ASSERTION ABOVE PASSES EITHER WAY, which is why this one exists. Replace
-  // `seedToolRepairRequirements`'s `structuredClone` with a plain reference and the seeded
-  // record ALIASES the world default inside one published corpus - so a later in-place edit of
-  // either reaches through into the other, and a world edit silently rewrites a system that
-  // has already diverged.
+  // THE LENGTH ASSERTION ABOVE PASSES EITHER WAY, which is why this one exists.
   worldDefaultOf(store, 'hammer').repairRequirements.push({ id: 'g3', ingredients: [] });
   assert.equal(
     membershipOf(store, 'hammer', 'sys-forge').repairRequirements.length,

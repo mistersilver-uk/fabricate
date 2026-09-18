@@ -1,9 +1,4 @@
-/**
- * Proves `tests/helpers/moduleAst.js`, which lives outside the `npm test` glob (issue 1658).
- * The parser choice is load-bearing for two gates, so the properties they rely on are pinned here
- * rather than assumed: unshifted positions, a resolvable scope chain, and a regex that stays a
- * literal instead of contributing braces.
- */
+/** Proves `tests/helpers/moduleAst.js`, which lives outside the `npm test` glob (issue 1658). */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 

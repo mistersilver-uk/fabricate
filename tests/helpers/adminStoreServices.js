@@ -1,22 +1,7 @@
-/**
- * Shared `createAdminStore` test fixtures (issue 785).
- *
- * The `makeRecipe` / `makeSystem` / `createServices` triple was duplicated across
- * adminStore suites; SonarCloud counts `tests/**` like `src/`, so a fresh copy fails
- * the new-code duplication gate — and extracting a helper only helps if the copies it
- * was extracted FROM are deleted, since CPD needs just two copies to report. The
- * suites whose triple was token-identical therefore import from here.
- *
- * `createServices` takes an `overrides` object so a suite can add or replace any
- * single service (a spy, a seam stub) without forking the whole factory. Two
- * recipe-manager writes are threadable through it: `updateRecipe` replaces the
- * default capturing stub outright.
- */
+/** Shared `createAdminStore` test fixtures (issue 785). */
 
-// Sonar flags `Math.random()` as S2245 (a MAJOR vulnerability) even in test code,
-// and a single new-code finding above rating A fails the quality gate. A monotonic
-// counter is both gate-safe and strictly better here: fixture ids become
-// deterministic, so a failing assertion names the same recipe on every run.
+// Sonar flags `Math.random()` as S2245 (a MAJOR vulnerability) even in test code, and a single
+// new-code finding above rating A fails the quality gate.
 let recipeIdSequence = 0;
 
 export function makeRecipe(overrides = {}) {
@@ -96,9 +81,7 @@ export function createServices(system, recipes = [], capture = [], overrides = {
     getScriptMacros: () => [],
     getSceneOptions: () => [],
     getWorldUsers: () => [],
-    // The raw actor DOCUMENTS the store builds its learned-knowledge index from (issue
-    // 1132). It reads `globalThis.game` because that is where these fixtures already seed
-    // their actors; the real seam in `SvelteCraftingSystemManagerApp` does the same read.
+    // The raw actor DOCUMENTS the store builds its learned-knowledge index from (issue 1132).
     getWorldActors: () => {
       const raw = globalThis.game?.actors;
       return Array.isArray(raw?.contents) ? raw.contents : Array.isArray(raw) ? raw : [];
@@ -116,12 +99,8 @@ export function createServices(system, recipes = [], capture = [], overrides = {
  * single-nested-only fixture correctly resolves to nothing.
  */
 /**
- * `isOwner` defaults to TRUE because these fixtures model a GM session, which is the only
- * session the manager runs in. `Actor#isOwner` short-circuits to OWNER for any `isGM`, so a
- * GM client genuinely sees every world actor as writable — and the learned-knowledge index
- * is scoped to `selectWritableActors` (issue 970/1132), so an actor without the field is
- * filtered out and contributes nothing. Pass `isOwner: false` to model the non-owned actor
- * both the count and the cascade must exclude.
+ * `isOwner` defaults to TRUE because these fixtures model a GM session, which is the only session
+ * the manager runs in (issue 970).
  */
 export function makeFlaggedActor({
   id,

@@ -1,19 +1,4 @@
-/**
- * Combined defects 2 + 3 (issue 675), exercised through a REAL inventoryStore so
- * the post-salvage reload is genuine rather than stubbed:
- *
- *  - Defect 2: after a salvage roll the inspector must STAY on the Salvage tab. The
- *    reload hands the component a new item object with the SAME key; the tab reset
- *    must key on the key, not the object reference, or the player is dropped onto
- *    Info while the success ribbon sits on Salvage.
- *  - Defect 3: after salvaging the LAST copy the header must read honestly ("None
- *    remaining", not a stale "1 total") and the footer must NOT offer "Salvage
- *    again" — there is nothing left to break down. The success ribbon still shows.
- *
- * A real store makes both fall out of the same reload: it holds the salvaged row
- * selected, carries the true post-salvage remaining (0) onto it, and produces a new
- * same-key item object — the exact conditions the two fixes must survive together.
- */
+/** Combined defects 2 + 3 (issue 675). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -45,23 +30,17 @@ const harness = createMountedComponentHarness({
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
-    // The REAL store imports these two leaves (unlike the mocked-store suite); they
-    // are import-free, so copying them verbatim resolves the compiled store's graph.
+    // The REAL store imports these two leaves (unlike the mocked-store suite).
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',
-    // And these three since issue 1286: the store marks the fired complication tense onto
-    // the stage rows through `progressiveStageComplications`, whose own closure is
-    // `complicationPlan` -> `componentComplications`.
+    // And these three since issue 1286.
     'src/utils/progressiveStageComplications.js',
     'src/utils/complicationPlan.js',
     'src/utils/componentComplications.js',
   ],
   runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
   compiledModules: [
-    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
-    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
-    // segmented track, and a manifest that named each would insert lines into a block Sonar
-    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
@@ -76,9 +55,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
     // The shared complication summary row and the leaf it renders (issue 1286).
-    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
-    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
-    // suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
@@ -273,11 +249,7 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     assert.doesNotMatch(total.textContent, /Total:/, 'never the stale counted "N total"');
   });
 
-  // Issue 675 (re-report): the previous fix tried to PREVENT the tab reset, which
-  // assumed the inspector instance never remounts. In the real Foundry flow the roll
-  // dialog can remount it, and the bounce returned. The robust fix actively OPENS
-  // Salvage when a held result is present on a fresh mount — this test tears the tree
-  // down and remounts against the SAME store to prove it survives that remount.
+  // Issue 675 (re-report): the previous fix tried to PREVENT the tab reset.
   it('reopens Salvage on a REMOUNT while a result is held (survives a dialog-driven remount)', async () => {
     const services = makeServices();
     services.inventory = createInventoryStore({ services });
@@ -312,13 +284,7 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     );
   });
 
-  // -------------------------------------------------------------------------
   // Bulk salvage (issue 859), driven through the SAME real store.
-  //
-  // The mocked-store suite pins the panel's markup from props; this one pins the
-  // GESTURE — shift-click, Shift+Enter and Escape actually moving the real store's
-  // selection and the view re-rendering off it. A POJO store cannot show that at all.
-  // -------------------------------------------------------------------------
 
   /** Dispatch a real bubbling event on `node` with the modifier keys set. */
   function fire(node, type, init = {}) {
@@ -427,11 +393,7 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
   });
 
   it('InventoryDetail imports NOTHING from the bulk tree — the router bypass', async () => {
-    // The same assertion the mocked-store suite makes, restated HERE because this suite
-    // is the one whose `compiledModules` list would have to grow if the bypass were ever
-    // routed through `InventoryDetail`: a `{#if}` in a router does not keep a branch out
-    // of the compiled module's STATIC imports, so the bulk tree would silently join
-    // `recipe-item-editor-mounted` and `manager-mounted`'s graphs too.
+    // The same assertion the mocked-store suite makes.
     const { readFileSync } = await import('node:fs');
     const detail = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/inventory/InventoryDetail.svelte'),

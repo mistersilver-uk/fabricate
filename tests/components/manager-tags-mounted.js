@@ -1,12 +1,4 @@
-/**
- * The Tags & Categories route: both tabs, their icons, badges and cascade-safe delete.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The Tags & Categories route: both tabs, their icons, badges and cascade-safe delete. */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,8 +13,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { navButton, vocabularyCounters } = queries;
 const { mountManager, openTagsScreen } = createManagerMounts({
@@ -79,8 +70,7 @@ export function registerTagsCases() {
     assert.ok(target.querySelector('[data-vocabulary-tab="tag"]'));
     assert.ok(target.textContent.includes('potions'), 'recipe tab shows its custom category');
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
-    // A referenced category carries a per-category icon on its row, and that icon IS the
-    // shared searchable IconPicker trigger (issue 878) — not a raw class input.
+    // A referenced category carries a per-category icon on its row.
     assert.ok(
       target.querySelector(
         '[data-vocabulary-icon-picker="potions"] .essence-icon-picker-trigger.manager-vocabulary-icon-trigger i'
@@ -88,8 +78,7 @@ export function registerTagsCases() {
       'the row icon renders the shared IconPicker trigger'
     );
 
-    // Item 5 of issue 878: the view renders NO page header of its own — the shell's
-    // `.manager-header` already carries the title and subtitle for this route.
+    // Item 5 of issue 878: the view renders NO page header of its own.
     assert.equal(
       target.querySelector('.manager-tags-categories .manager-section-header'),
       null,
@@ -158,10 +147,7 @@ export function registerTagsCases() {
       null,
       'the retired bullet list must be gone from the rail, not merely unstyled'
     );
-    // A bold lead-in and its prose are one sentence, so they need a separator. A literal
-    // space there is the last token inside the `{#if}` and Svelte trims block-trailing
-    // whitespace, which ran them together ("…Item.Drag any Item…") — invisible to every
-    // structural assertion above and only caught in a screenshot (issue 881).
+    // A bold lead-in and its prose are one sentence.
     for (const row of howItWorks.querySelectorAll('.manager-explainer-card-list > li')) {
       const lead = row.querySelector('strong');
       if (!lead) continue;
@@ -239,7 +225,6 @@ export function registerTagsCases() {
     flushSync();
     assert.ok(target.querySelector('[data-tag-id="ore"]'), 'the tag tab lists item tags');
     // Tag rows carry a fixed, non-editable decorative accent tile (issue 689 fidelity):
-    // the same leading 34x34 tile as the category tabs, but a span not an editable button.
     const tagIconTile = target.querySelector(
       '[data-tag-id="ore"] .manager-vocabulary-icon.is-decorative'
     );
@@ -267,9 +252,7 @@ export function registerTagsCases() {
     assert.ok(calls.some((call) => call[0] === 'addTag' && call[1] === 'spice'));
     assert.equal(tagInput.value, '');
 
-    // An UNUSED entry deletes in one click, matching the prototype: no confirm strip
-    // opens and the store's remove action fires immediately. `herb` carries zero
-    // references in this fixture, so it renders the Unused chip and skips confirmation.
+    // An UNUSED entry deletes in one click, matching the prototype.
     assert.ok(
       target.querySelector('[data-tag-id="herb"] .manager-vocabulary-chip-unused'),
       'the unused tag row is flagged Unused'
@@ -289,10 +272,7 @@ export function registerTagsCases() {
   });
 
   it('manages COMPONENT categories as an independent tab, distinct from recipe categories (issue 676, 689)', async () => {
-    // The three vocabularies are tabs (issue 689); the component tab renders its own
-    // VocabularyPanel over the SIBLING `componentCategories` vocabulary. The root calls
-    // the store's component handlers optional-chained, so without a real export an
-    // absent one no-ops silently — these call-site assertions are what catch that.
+    // The three vocabularies are tabs (issue 689).
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -376,10 +356,7 @@ export function registerTagsCases() {
   });
 
   it('counts the reserved General bucket in the tab badge, the glance tile and the entry chip alike (issue 878)', async () => {
-    // Three counters used to disagree on one screen: the tab badge and the at-a-glance
-    // tile subtracted General while the panel's entry chip included it, so the same
-    // vocabulary read 0, 0 and 1. All three now report the whole vocabulary — the GM's
-    // own entries PLUS the reserved bucket recipes and components genuinely fall under.
+    // Three counters used to disagree on one screen.
     await openTagsScreen();
 
     // The fixture seeds exactly one custom recipe category (`potions`) and one custom
@@ -390,8 +367,7 @@ export function registerTagsCases() {
       { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
       'one custom recipe category plus General is two, on all three surfaces'
     );
-    // With a custom entry present General has something to be distinguished FROM, so it
-    // takes its row — and the row is what the second of the two numbers accounts for.
+    // With a custom entry present General has something to be distinguished FROM.
     assert.ok(
       target.querySelector('[data-category-id="general"]'),
       'the reserved row is listed once a custom category exists'
@@ -420,11 +396,7 @@ export function registerTagsCases() {
   });
 
   it('leaves General out of the list until the first custom category exists, and explains it in the empty state (issue 878)', async () => {
-    // With no GM-defined categories the reserved row was the only thing in the list: a
-    // row that cannot be renamed, deleted or re-iconed, standing where the onboarding
-    // guidance belongs. It is now withheld until there is a custom entry beside it, and
-    // the empty-state card carries the explanation instead. General is still COUNTED —
-    // the card is what accounts for the 1 the counters report.
+    // With no GM-defined categories the reserved row was the only thing in the list.
     await openTagsScreen([], {
       selectedSystemOverrides: { categories: [], componentCategories: [] },
     });
@@ -471,8 +443,7 @@ export function registerTagsCases() {
       'the component card explains its own General, not the recipe one'
     );
 
-    // Tags again as the control: an empty tag vocabulary has genuinely nothing, so it
-    // must count 0 rather than inheriting a reserved bucket it does not have.
+    // Tags again as the control: an empty tag vocabulary has genuinely nothing.
     target.querySelector('[data-vocabulary-tab="tag"]').click();
     await tick();
     flushSync();
@@ -499,11 +470,7 @@ export function registerTagsCases() {
     await tick();
     flushSync();
 
-    // The row's icon tile IS the shared IconPicker trigger: clicking it opens the same
-    // searchable popover the gathering time-of-day / weather / biome icon fields use,
-    // rather than the free-text "type a Font Awesome class, then Save icon" strip it
-    // replaced (issue 878). The popover portals to `.fabricate-manager`, so it is found
-    // from the manager root rather than from inside the row.
+    // The row's icon tile IS the shared IconPicker trigger.
     const picker = target.querySelector('[data-vocabulary-icon-picker="potions"]');
     assert.ok(picker, 'the custom category row renders an icon picker');
     assert.equal(
@@ -556,8 +523,7 @@ export function registerTagsCases() {
     await tick();
     flushSync();
 
-    // The add form's icon field is the SAME control as the row tile, not a second
-    // free-text one (issue 878, item 4).
+    // The add form's icon field is the SAME control as the row tile.
     const iconField = target.querySelector('[data-vocabulary-add-icon]');
     assert.ok(iconField, 'the add form renders an icon field');
     assert.equal(
@@ -652,26 +618,8 @@ export function registerTagsCases() {
   });
 
   // ── The nav badge reads the pre-counted tag placeholders (issue 1081) ────────────────
-  //
-  // The Tags & Categories count badge is a SIBLING of the view switch, so it re-derives on
-  // every render of the manager in every view. Counting recipe tag placeholders in the
-  // component reads `ingredientSets` and `steps` off each projected row, and those are
-  // DETAIL-tier fields sharing one memoized producer whose first read deep-clones the whole
-  // recipe body — so an always-mounted badge materialised the entire library before first
-  // paint. The store publishes the count as data instead.
-  //
-  // Both legs are stated here because the threading has a destructive failure mode as well
-  // as a slow one: `VocabularyPanel` deletes a row reading `0 references` in ONE CLICK with
-  // no confirm strip, and a tag referenced only by a recipe ingredient placeholder is
-  // exactly the population that reads that way when the count goes missing.
   describe('the Tags & Categories badge reads pre-counted placeholders (issue 1081)', () => {
-    /**
-     * A projected recipe row whose detail-tier fields are COUNTING getters.
-     *
-     * They are the two fields `countRecipeTagPlaceholders` walks, and on a real row reading
-     * either one builds the whole detail bundle. A row that simply carried the arrays could
-     * not tell a pre-counted read from a walk.
-     */
+    /** A projected recipe row whose detail-tier fields are COUNTING getters. */
     function countingRecipeRow(reads) {
       const ingredientSets = [
         {
@@ -725,14 +673,11 @@ export function registerTagsCases() {
       const row = countingRecipeRow(reads);
       mountManager([], {
         recipes: [row],
-        // As the real store publishes it, on every one of its publishes: `herb` is named by
-        // one recipe placeholder and by no component in this fixture.
+        // As the real store publishes it, on every one of its publishes.
         recipeTagPlaceholderCounts: { herb: 1 },
       });
 
-      // THE PERF LEG. The badge has already rendered — it is a sibling of every view — and
-      // this route is not the Recipe Studio, so nothing here has any business touching a
-      // recipe's detail tier.
+      // THE PERF LEG. The badge has already rendered — it is a sibling of every view.
       assert.equal(
         target.querySelectorAll('[data-tag-id]').length,
         0,
@@ -768,8 +713,7 @@ export function registerTagsCases() {
         'reaching the screen that renders the number still walked nothing'
       );
 
-      // POSITIVE CONTROL, same fixture and the same counters: the getters are live, so the
-      // zeros above are a measurement rather than two fields nothing could ever have read.
+      // POSITIVE CONTROL, same fixture and the same counters: the getters are live.
       void row.ingredientSets;
       void row.steps;
       assert.deepEqual(

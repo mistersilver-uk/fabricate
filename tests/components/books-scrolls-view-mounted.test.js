@@ -26,9 +26,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
-    // push-button (issue 1118) both Clear filters controls render.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // Issue 1515: the filter bar has a search field now, and it is the shared one.
@@ -43,7 +41,6 @@ const harness = createMountedComponentHarness({
 // Dispatch a Foundry-style drop on a node. getDragEventData (no `foundry` global in
 // the harness) falls back to parsing `dataTransfer.getData('text/plain')`, so a
 // JSON payload here round-trips exactly as a real world/compendium item drag would.
-// Passing `data: null` simulates a drop with no payload.
 function fireDrop(node, data) {
   const raw = data === undefined ? null : JSON.stringify(data);
   const event = new Event('drop', { bubbles: true, cancelable: true });
@@ -91,9 +88,6 @@ describe('BooksScrollsView (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-books-scrolls-item]').length, 3);
     assert.equal(root.querySelector('[data-books-scrolls-name="primer"]').textContent.trim(), "Journeyman's Primer");
     // Type pill: Book (2+ recipes) is neutral, Scroll (1) is neutral, Incomplete (0) is danger.
-    // A multi-recipe item names its own count in the type pill, matching the
-    // Knowledge surface; a single-recipe item stays "Scroll" and an empty one
-    // "Incomplete".
     assert.equal(root.querySelector('[data-books-scrolls-type="primer"]').textContent.trim(), '2 Recipe Book');
     assert.ok(!root.querySelector('[data-books-scrolls-type="primer"]').classList.contains('is-danger'));
     assert.equal(root.querySelector('[data-books-scrolls-type="scroll"]').textContent.trim(), 'Scroll');
@@ -165,7 +159,7 @@ describe('BooksScrollsView (mounted)', () => {
     root.querySelector('[data-books-scrolls-toggle="primer"]').click();
     assert.deepEqual(toggled, { id: 'primer', enabled: false });
 
-    // The blank-window "Create recipe item" dialog is gone (issue 844) — creation is
+    // The blank-window "Create recipe item" dialog is gone (issue 844).
     // the drop-zone below. There is no create button.
     assert.equal(root.querySelector('[data-books-scrolls-create]'), null);
     assert.equal(root.querySelector('[data-books-scrolls-empty-create]'), null);

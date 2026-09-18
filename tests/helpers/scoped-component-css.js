@@ -1,25 +1,4 @@
-/*
- * Scoped-component CSS for the real-browser computed-CSS gates (issue 883).
- *
- * The font-size gates render RAW HTML against `styles/fabricate.css` in Chromium, because
- * happy-dom cannot compute a cascade. That worked while every manager rule lived in the
- * global sheet. It stops working the moment a shared primitive owns its appearance in a
- * scoped `<style>`: the fixture's elements match nothing, the role falls back to Foundry's
- * 14px app base, and the gate's own anti-bleed assertion fires.
- *
- * Deleting those roles from the gate would "fix" it by removing the only real-browser
- * coverage the repo has for the primitive — and that coverage is precisely what catches
- * the hazard scoped styles introduce. Svelte compiles `.manager-chip` to
- * `.manager-chip.svelte-<hash>`, TWO classes, and `css: 'injected'` (svelte.config.js) puts
- * it in `document.head` AFTER Foundry's `<link>` for the global sheet. A global rule at two
- * classes therefore TIES and loses on source order, silently.
- *
- * So the gate keeps the coverage instead: compile the component, take its real scoped CSS,
- * append it after the global sheet (matching injection order) and stamp the real hash class
- * onto the fixture's elements (matching specificity). Both halves are needed — appending the
- * CSS without the hash class would make the rules match nothing, and adding the hash class
- * without the real ordering would prove the wrong winner.
- */
+/** Scoped-component CSS for the real-browser computed-CSS gates (issue 883). */
 import { readFileSync } from 'node:fs';
 import { compile } from 'svelte/compiler';
 

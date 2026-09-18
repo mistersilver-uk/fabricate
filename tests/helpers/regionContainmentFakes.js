@@ -1,58 +1,31 @@
 /**
- * Shared fakes for the token->region containment seam (issue 999).
- *
- * These stand in for a Foundry `RegionDocument` and `TokenDocument` on a client
- * that is NOT viewing the token's scene — the condition the containment re-check
- * has to survive — so neither fake ever exposes a placeable (`object`).
- *
- * Two properties of these fakes are load-bearing rather than decoration:
- *
- *  - `rectRegion` always carries a `uuid` AND `flags.fabricate.environmentId`.
- *    `sceneRegionUuidsContainingToken` skips a region without a uuid, and
- *    `regionEnvironmentIdsAtPoint` skips one without the env-id flag, BOTH before
- *    they reach `testPoint`. A fake lacking either records zero calls, which
- *    would make the elevation pins on those two functions silently vacuous.
- *  - `tokenDoc`'s `testInsideRegion` defaults to ABSENT and is NEVER derived from
- *    the rect. Every outcome of Foundry's own containment predicate is therefore
- *    a deliberate choice by the test, so no assertion aimed at the membership or
- *    centre-point signal can be silently satisfied by it, and which signal
- *    answered stays provable.
+ * Shared fakes for the token->region containment seam (issue 999). `rectRegion` always carries a
+ * `uuid` AND `flags.fabricate.environmentId`.
  */
 
 /**
- * A RegionDocument fake whose `testPoint` is an axis-aligned rectangle, plus an
- * optional elevation band. Returns false (never throws) for non-finite input, and
- * records every submitted point on `testPointCalls`.
+ * A RegionDocument fake whose `testPoint` is an axis-aligned rectangle, plus an optional elevation
+ * band.
  *
- * @param {object} [options]
- * @param {string} [options.id]
- * @param {string} [options.uuid]
- * @param {string} [options.environmentId]
- * @param {number} [options.x]  Rect left.
- * @param {number} [options.y]  Rect top.
- * @param {number} [options.w]  Rect width.
- * @param {number} [options.h]  Rect height.
- * @param {{ bottom?: number, top?: number }|null} [options.elevationBand]
- *   Absent ⇒ THIS FAKE admits any elevation, including `undefined` and `NaN`.
- *   That is a simplification, not a model of Foundry: real
- *   `RegionDocument#testPoint` still rejects `undefined`/`NaN` even with no band
- *   configured, because an unset `bottom` normalizes to `-Infinity` and neither
- *   value compares true against `-Infinity` or `Infinity`. An elevation of
- *   exactly `-Infinity` is NOT rejected the same way, because `#testElevation`'s
- *   flat-region escape (`elevation === bottom`) admits it. `undefined`/`NaN` is
- *   exactly what the real defect submits (issue 999).
- *   Present ⇒ only a finite elevation inside the band is admitted (see
- *   {@link admitsElevation}), and `top` here is INCLUSIVE, unconditionally.
- *   That matches Foundry V13.351, where `top` is always inclusive and there is
- *   no `topInclusive` field at all, but diverges from Foundry V14.365, where
- *   `top` is exclusive unless the region sets `topInclusive` (see AGENTS.md's
- *   FoundryVTT Notes).
- *   Do not read this fake as a model of Foundry's own elevation-band semantics:
- *   it happens to agree with V13 and silently diverge from V14, which is MORE
- *   misleading than a simplification that matched neither build, because a
- *   reader targeting V13 could reasonably conclude this fake models core
- *   faithfully and generalise from it.
- * @returns {object}
+ * @param {number} [options.x] Rect left.
+ * @param {number} [options.y] Rect top.
+ * @param {number} [options.w] Rect width.
+ * @param {number} [options.h] Rect height.
+ * @param {{ bottom?: number, top?: number }|null} [options.elevationBand] Absent ⇒ THIS FAKE admits
+ * any elevation, including `undefined` and `NaN`. That is a simplification, not a model of Foundry:
+ * real `RegionDocument#testPoint` still rejects `undefined`/`NaN` even with no band configured,
+ * because an unset `bottom` normalizes to `-Infinity` and neither value compares true against
+ * `-Infinity` or `Infinity`. An elevation of exactly `-Infinity` is NOT rejected the same way,
+ * because `#testElevation`'s flat-region escape (`elevation === bottom`) admits it.
+ * `undefined`/`NaN` is exactly what the real defect submits (issue 999). Present ⇒ only a finite
+ * elevation inside the band is admitted (see {@link admitsElevation}), and `top` here is INCLUSIVE,
+ * unconditionally. That matches Foundry V13.351, where `top` is always inclusive and there is no
+ * `topInclusive` field at all, but diverges from Foundry V14.365, where `top` is exclusive unless
+ * the region sets `topInclusive` (see AGENTS.md's FoundryVTT Notes). Do not read this fake as a
+ * model of Foundry's own elevation-band semantics: it happens to agree with V13 and silently
+ * diverge from V14, which is MORE misleading than a simplification that matched neither build,
+ * because a reader targeting V13 could reasonably conclude this fake models core faithfully and
+ * generalise from it.
  */
 export function rectRegion({
   id = 'region-1',
@@ -81,15 +54,7 @@ export function rectRegion({
   return region;
 }
 
-/**
- * Whether a band admits an elevation; a non-finite elevation is never admitted.
- * `top` is treated as INCLUSIVE here, unconditionally — matching Foundry
- * V13.351 (`top` is always inclusive, no `topInclusive` field) but diverging
- * from Foundry V14.365 (`top` is exclusive unless `topInclusive` is set).
- * Not a model of Foundry's band semantics on V14: this fake agrees with V13
- * and disagrees with V14, which is a more misleading kind of simplified than
- * one that matched neither build.
- */
+/** Whether a band admits an elevation; a non-finite elevation is never admitted. */
 function admitsElevation(band, elevation) {
   const value = Number(elevation);
   if (!Number.isFinite(value)) return false;
@@ -99,12 +64,10 @@ function admitsElevation(band, elevation) {
 }
 
 /**
- * Sibling of {@link rectRegion} that omits `testPoint` entirely (a region shape
- * the geometric signal cannot question). `testPointCalls` is retained so a test
- * can still assert it stayed empty.
+ * Sibling of {@link rectRegion} that omits `testPoint` entirely (a region shape the geometric
+ * signal cannot question). `testPointCalls` is retained so a test can still assert it stayed empty.
  *
- * @param {object} [options]  As {@link rectRegion}.
- * @returns {object}
+ * @param {object} [options] As {@link rectRegion}.
  */
 export function rectRegionWithoutTestPoint(options = {}) {
   const region = rectRegion(options);
@@ -113,11 +76,10 @@ export function rectRegionWithoutTestPoint(options = {}) {
 }
 
 /**
- * Sibling of {@link rectRegion} whose `testPoint` THROWS. A throw means "could
- * not determine", not "outside".
+ * Sibling of {@link rectRegion} whose `testPoint` THROWS. A throw means "could not determine", not
+ * "outside".
  *
- * @param {object} [options]  As {@link rectRegion}.
- * @returns {object}
+ * @param {object} [options] As {@link rectRegion}.
  */
 export function rectRegionThrowingTestPoint(options = {}) {
   const region = rectRegion(options);
@@ -129,25 +91,18 @@ export function rectRegionThrowingTestPoint(options = {}) {
 }
 
 /**
- * A TokenDocument fake with NO placeable, as seen by a client not viewing its
- * scene. `parent` is the passed scene object identically (real Foundry
- * guarantees `tokenDoc.parent === scene` for a scene's embedded tokens), and
- * `getCenterPoint()` computes the centre from the footprint and that scene's
- * grid size.
+ * A TokenDocument fake with NO placeable, as seen by a client not viewing its scene.
  *
- * @param {object} [options]
- * @param {number} [options.x]  Document top-left x (NOT the centre).
- * @param {number} [options.y]  Document top-left y (NOT the centre).
- * @param {number} [options.width]   Footprint width in grid squares.
- * @param {number} [options.height]  Footprint height in grid squares.
- * @param {object|null} [options.scene]  The parent scene (should carry `grid.size`).
- * @param {number} [options.elevation]  Omitted ⇒ the document has no elevation.
- * @param {*} [options.regions]  The membership collection, used VERBATIM (Set,
- *   `{ contents }`, array, null, ...).
- * @param {true|false|'throws'|'absent'} [options.insideRegion]  Drives
- *   `testInsideRegion`; defaults to `'absent'` (the method is not defined).
- * @param {string} [options.actorId]
- * @returns {object}
+ * @param {number} [options.x] Document top-left x (NOT the centre).
+ * @param {number} [options.y] Document top-left y (NOT the centre).
+ * @param {number} [options.width] Footprint width in grid squares.
+ * @param {number} [options.height] Footprint height in grid squares.
+ * @param {object|null} [options.scene] The parent scene (should carry `grid.size`).
+ * @param {number} [options.elevation] Omitted ⇒ the document has no elevation.
+ * @param {*} [options.regions] The membership collection, used VERBATIM (Set, `{ contents }`,
+ * array, null, ...).
+ * @param {true|false|'throws'|'absent'} [options.insideRegion] Drives `testInsideRegion`; defaults
+ * to `'absent'` (the method is not defined).
  */
 export function tokenDoc({
   x = 0,
@@ -173,9 +128,8 @@ export function tokenDoc({
     parent: scene,
     regions,
     testInsideRegionCalls: [],
-    // A complete ElevatedPoint, exactly as V13/V14 TokenDocument#getCenterPoint
-    // returns it: the document's elevation is passed through VERBATIM, including
-    // when it is absent.
+    // A complete ElevatedPoint, exactly as V13/V14 TokenDocument#getCenterPoint returns it: the
+    // document's elevation is passed through VERBATIM, including when it is absent.
     getCenterPoint: () => ({
       x: x + (grid * width) / 2,
       y: y + (grid * height) / 2,
@@ -193,16 +147,8 @@ export function tokenDoc({
 }
 
 /**
- * A minimal Scene fake carrying the grid size the centre computation needs, plus
- * the token documents `_tokenInsideRegion` enumerates. Fixture fidelity matters
- * here: a token document with no grid-bearing parent degrades to its top-left,
- * which REPRODUCES the bug rather than testing the fix.
- *
- * @param {object} [options]
- * @param {string} [options.id]
- * @param {number} [options.gridSize]
- * @param {Array<object>} [options.tokens]
- * @returns {object}
+ * A minimal Scene fake carrying the grid size the centre computation needs, plus the token
+ * documents `_tokenInsideRegion` enumerates.
  */
 export function gridScene({ id = 'scene-1', gridSize = 100, tokens = [] } = {}) {
   return { id, grid: { size: gridSize }, tokens: { contents: [...tokens] } };

@@ -8,18 +8,8 @@ import {
   isPlayerCharacterActor
 } from '../src/config/playerCharacterTypes.js';
 
-// This file used to RE-IMPLEMENT the player-character predicate locally, on the
-// grounds that there was nothing importable in `main.js`. Issue 1024 destroyed that
-// justification by extracting the concept into `src/config/playerCharacterTypes.js`,
-// so both mirrors are gone: left alone, the local copy would have asserted the OLD
-// hardcoded behaviour forever and the bar's PC narrowing would have lost all
-// behavioural coverage.
-//
-// `isPlayerCharacterActor` is the settings-bound binding. Under `node --test` there is
-// no `game`, so its reader degrades to `[]` and it resolves to `{'character'}` — which
-// is exactly the un-configured world these cases model. The configured-`robot` case
-// below uses `createPlayerCharacterActorPredicate` with an injected reader rather than
-// installing a `game` global, so nothing leaks between test files.
+// This file used to RE-IMPLEMENT the player-character predicate locally, on the grounds that there
+// was nothing importable in `main.js` (issue 1024).
 function isSelectableBarActor({ actor, viewer }) {
   return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);
 }
@@ -38,15 +28,9 @@ const player = { id: 'player', isGM: false };
 const gm = { id: 'gm', isGM: true };
 
 /**
- * Foundry's ownership answer for a fixture actor, as the PASSED user's question.
- *
- * `isOwner` is deliberately absent from every fixture here (issue 1288): Foundry defines
- * it as `testUserPermission(game.user, 'OWNER')` against the AMBIENT user, so a fixture
- * that hard-codes it asserts nothing at all about the `viewer` these cases vary — and
- * would have reported the GM-side relay's inert authorization as healthy.
+ * Foundry's ownership answer for a fixture actor, as the PASSED user's question (issue 1288).
  *
  * @param {string} userId The one user holding OWNER.
- * @returns {{testUserPermission: Function}}
  */
 function ownedBy(userId) {
   return {

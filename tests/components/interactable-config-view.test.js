@@ -2,10 +2,6 @@
  * Pure view-helper coverage for the Interactable config panel
  * (`interactableConfigView.js`): the linked-visual status banner and the
  * activation gate summary line.
- *
- * A region-first interactable carries NO per-interactable node pool (the
- * environment's `nodeRuntime[taskId]` owns depletion/respawn), so there is no
- * node count line or respawn-ETA formatting to cover here.
  */
 
 import { describe, it } from 'node:test';

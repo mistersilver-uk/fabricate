@@ -13,13 +13,6 @@ import {
 } from '../src/config/gatheringCharacterModifierPresets.js';
 
 // ISSUE 1117 — THE LIBRARY MOVED, SO THIS SUITE MOVED WITH IT.
-//
-// It used to assert the gathering-config normalizer's per-system `characterModifiers`
-// block. There is no such block any more: the ONE library lives on the crafting system as
-// `system.modifiers`, and `CraftingSystemManager._normalizeModifierLibrary` owns its shape
-// (asserted in `tests/crafting-modifier-config.test.js`). What is left here is what is
-// still gathering's own: that the gathering config NO LONGER EMITS a library at all, that
-// the d100 resolution path reads the system's, and the preset seeding both surfaces share.
 
 function makeService(config = {}, options = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
@@ -31,9 +24,7 @@ function makeService(config = {}, options = {}) {
   });
 }
 
-// THE RETIREMENT, asserted rather than assumed. `normalizeGatheringConfig` is an allowlist
-// rebuild, so NOT emitting the key is what deletes it from every world on the next save —
-// and that is precisely what makes the 1.23.0 migration's ordering load-bearing.
+// THE RETIREMENT, asserted rather than assumed.
 test('the gathering config no longer emits a character modifier library', () => {
   const service = makeService({
     systems: {
@@ -78,9 +69,8 @@ test('a drop row resolves its reference against the SYSTEM library', async () =>
   assert.equal(evaluateCalls[0].provider, undefined);
 });
 
-// The negative control for the move: a library left at the OLD location resolves nothing,
-// so a reference to it is a misconfiguration rather than a silent success. Without this the
-// test above would pass just as well against a read-alias.
+// The negative control for the move: a library left at the OLD location resolves nothing, so a
+// reference to it is a misconfiguration rather than a silent success.
 test('a library left in the gathering config resolves NOTHING', async () => {
   const service = makeService(
     {
@@ -108,9 +98,7 @@ test('a library left in the gathering config resolves NOTHING', async () => {
   assert.equal(result.diagnostics[0].code, 'MISSING_CHARACTER_MODIFIER');
 });
 
-// The preset bundles are unchanged. Since issue 1308 the library they seed is WORLD scope, so
-// their output is asserted through the normalizer that owns it rather than through the crafting
-// system, which no longer carries a copy.
+// The preset bundles are unchanged (issue 1308).
 test('seeded presets survive the library normalizer, edits and all', () => {
   const presets = getCharacterModifierPresetsForFoundrySystem('dnd5e');
   const seeded = seedCharacterModifierPresets({ presets }).next;
@@ -123,10 +111,8 @@ test('seeded presets survive the library normalizer, edits and all', () => {
   assert.equal(strength.isRollExpression, false);
 });
 
-// Nothing is auto-seeded, and since issue 1308 a crafting system carries no library key at all:
-// the world store owns it, so the system's own copy is SHED rather than emitted empty. Asserting
-// `undefined` rather than `[]` is the point — an emitted empty array would be the per-system copy
-// coming back, and the allowlist rebuild would then keep overwriting the world library's readers.
+// Nothing is auto-seeded, and since issue 1308 a crafting system carries no library key at all: the
+// world store owns it, so the system's own copy is SHED rather than emitted empty.
 test('a new system carries no library key and nothing is auto-seeded', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   assert.equal(manager._normalizeSystem({ id: 'sys', name: 'S' }).modifiers, undefined);

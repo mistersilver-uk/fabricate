@@ -175,14 +175,8 @@ test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt fo
 });
 
 /**
- * ## The RECORDED breakdown (issue 1648, TP14-B)
- *
- * Everything above is the live preview — odds computed from current configuration. This is
- * the other half: what a real d100 gather leaves behind, read back through a fresh run
- * manager and the journal builder after the actor flags were serialized. Evaluated rows,
- * the selected subset and their row/source links must survive that trip, and a recorded
- * quantity must come from an ACKNOWLEDGED receipt rather than the authored row — which is
- * only observable once the two disagree, so one test makes them disagree.
+ * The RECORDED breakdown (issue 1648, TP14-B). Everything above is the live preview — odds computed
+ * from current configuration.
  */
 
 const ORE_SOURCE_UUID = 'Compendium.fixture.materials.Item.iron-ore';

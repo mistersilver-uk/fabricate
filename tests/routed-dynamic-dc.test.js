@@ -1,20 +1,6 @@
 /**
- * THE ROUTED CHECK'S OWN DC SOURCE (issue 1096).
- *
- * A routed RELATIVE check is defined as bands offset from a DC (`dc + outcome.dc`), so it has
- * a DC by construction — and the engine already resolved it through `_resolveSimpleCheckDc`,
- * which is parameterized over the check config precisely so routed takes the same recipe-tier
- * and dynamic path. The plumbing existed; only the field did not.
- *
- * Four things are pinned here, and each is a way this could silently do nothing:
- *
- * 1. the field SURVIVES A WHOLE NORMALIZER REBUILD — that normalizer is an allowlist, so a
- *    key it does not emit is deleted on the next save;
- * 2. the anchor REACHES THE MACRO, which is what makes tiers and macros compose rather than
- *    compete;
- * 3. a macro that fails FALLS BACK to the anchor and never throws, because a throw inside the
- *    engine is a CONSUMING failure — ingredients spent, tools broken;
- * 4. the DC source TRAVELS with a mode change, which is where it was previously lost.
+ * THE ROUTED CHECK'S OWN DC SOURCE (issue 1096). Four things are pinned here, and each is a way
+ * this could silently do nothing:
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

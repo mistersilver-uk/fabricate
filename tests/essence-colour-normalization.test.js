@@ -1,11 +1,7 @@
 /**
- * Issue 917 — `EssenceDefinition.colorToken` persistence.
- *
- * `_normalizeEssenceDefinition` has TWO branches (the legacy bare-string shorthand and
- * the object form) and BOTH are whitelist rebuilds that drop any key they do not name.
- * A field added to only one is lost on the next save, silently and only for the systems
- * that happen to take the other branch — so both are pinned here, plus the round-trip
- * through `updateSystem` a GM save actually performs.
+ * Issue 917 — `EssenceDefinition.colorToken` persistence. `_normalizeEssenceDefinition` has TWO
+ * branches (the legacy bare-string shorthand and the object form) and BOTH are whitelist rebuilds
+ * that drop any key they do not name.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

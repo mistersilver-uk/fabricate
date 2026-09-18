@@ -1,6 +1,4 @@
 // Shared fakes for the actor-scoped run-manager coherence suites (issues 733 + 739).
-// A minimal actor whose flags stand in for the SYNCED Foundry actor document, plus a
-// globals shim wiring foundry.utils.randomID and game.{user,time,actors}.
 
 import { mergeHistoryFlag } from './journal-fixtures.js';
 
@@ -17,7 +15,6 @@ export class FakeActor {
   /**
    * EVERY real Foundry Actor has this, so omitting it sends production down a fallback branch
    * production never reaches — how issue 1648's blind-history leak shipped reading green.
-   * Mirrors `tests/helpers/gathering-blind-runs.js`: a GM passes every level.
    */
   testUserPermission(user, level) {
     if (!user) return false;

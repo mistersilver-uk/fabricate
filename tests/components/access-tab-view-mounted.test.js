@@ -28,9 +28,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE chip (issue 883), the shared no-state primitive (issue 785), and the labelled
-    // push-button (issue 1118) Clear filters and Clear search both render.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -124,9 +122,7 @@ describe('AccessTabView (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-access-row]').length, 0);
   });
 
-  // Issue 924 — the list was a `<div role="list">` of `<button role="listitem">`, which
-  // overrode each row button's own interactive role and told assistive technology the row
-  // was not operable. It is now a real `<ul>`/`<li>` with the button inside the item.
+  // Issue 924 — the list was a `<div role="list">` of `<button role="listitem">`.
   it('renders the access list as a real ul/li with the button inside the item', async () => {
     const root = await harness.mount({
       recipes: [makeRecipe({ id: 'alloy', name: 'Alloy Bronze', characterCount: 1 })]
@@ -147,9 +143,7 @@ describe('AccessTabView (mounted)', () => {
     assert.equal(row.parentElement.parentElement, list, 'and each item sits in the ul');
   });
 
-  // `aria-pressed` described an independent toggle: a row cannot be un-pressed, and selecting
-  // another silently un-presses the first. `aria-current` means "the current item in a set of
-  // related items", is valid on any role, and is ABSENT rather than "false" when not current.
+  // `aria-pressed` described an independent toggle: a row cannot be un-pressed.
   it('marks the selected row with aria-current and omits the attribute otherwise', async () => {
     const root = await harness.mount({
       recipes: [
@@ -170,10 +164,7 @@ describe('AccessTabView (mounted)', () => {
     );
   });
 
-  // The loud failure mode on this surface, and the one nothing photographic can catch: the
-  // manager access screen matches no screenshot recipe and the smoke walk never visits it.
-  // Unreset, Foundry's `@layer elements.typography` `ul, ol` rule draws bullets and a
-  // ~21-24px indent on a GM screen.
+  // The loud failure mode on this surface, and the one nothing photographic can catch.
   it('resets the ul so Foundry draws no bullets or indent on it', () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/AccessTabView.svelte'),
@@ -194,10 +185,7 @@ describe('AccessTabView (mounted)', () => {
     );
   });
 
-  // Issue 884 — the row thumbnail is the recipe's own icon, resolved through the
-  // shared helper. It used to prefer the first containing book's artwork. Issue 1506
-  // converted this row's raw `<img>` into the shared tile, so the query is the
-  // primitive's own image rather than the retired sheet class it used to carry.
+  // Issue 884 — the row thumbnail is the recipe's own icon.
   itResolvesTheRecipesOwnImage({
     harness,
     mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'alloy', ...imageOverrides })] }),

@@ -1,15 +1,4 @@
-/**
- * The STANDALONE component editor window (`ComponentEditorRoot`), mounted (issue 1036).
- *
- * It reaches the same whitelist rebuild the in-manager editor does — `handleSave` hands its
- * essence draft straight to `buildComponentEditorUpdates`, which builds `updates.essences`
- * SOLELY from those rows — so the add-new offer rule has to hold here too, and for the same
- * reason. This window had no mounted coverage at all before: the only test naming it
- * (`component-editor-layout.test.js`) scans its source text.
- *
- * Criteria 2 and 18. Each assertion carries its negative control, because a filter that
- * filters nothing passes the positive half of both.
- */
+/** The STANDALONE component editor window (`ComponentEditorRoot`), mounted (issue 1036). */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -95,8 +84,7 @@ describe('1036 ComponentEditorRoot — the add-new essence offer', () => {
       ),
     });
 
-    // The negative control for the whole projection: flip the one field and all three come
-    // back. Without this, "Air is absent" could be measuring anything.
+    // The negative control for the whole projection.
     assert.deepEqual(essenceNames(target).sort(), ['Air', 'Earth', 'Fire']);
     harness.remount();
   });
@@ -104,10 +92,6 @@ describe('1036 ComponentEditorRoot — the add-new essence offer', () => {
   /**
    * Mount the editor, drive the Earth quantity field with `edit`, save, and report the saved
    * per-essence quantities.
-   *
-   * The two cases below differ ONLY in how that one field is driven — a typed `input` event
-   * versus the user agent's own Up-arrow step — so the mount / locate / save / read round trip
-   * they share is written here rather than twice.
    *
    * @param {(input: HTMLInputElement) => void} edit
    * @returns {Promise<Map<string, number>>} saved quantity by essence id

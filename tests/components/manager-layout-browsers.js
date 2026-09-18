@@ -1,8 +1,5 @@
 /**
  * Component, essence, environment, system and Knowledge browser layout, measured in a real browser (issue 1670).
- *
- * A surface module of `manager-layout.test.js`. It registers its tests on import and owns no
- * browser: `tests/helpers/layout-harness.js` holds the one Chromium every surface shares.
  */
 
 import test from 'node:test';
@@ -119,10 +116,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
     onBlock.includes('--fab-toggle-knob: var(--fab-on-accent);'),
     'and its knob is the ink that family reads against'
   );
-  // Issue 643: OFF is now NEUTRAL (bg-3 / border-strong), not amber. A disabled
-  // recipe, component or environment is an ordinary state, not a warning. The
-  // state colour moved onto the TRACK via the local --fab-toggle-* properties,
-  // so these assertions read the custom-property declarations, not a background.
+  // Issue 643: OFF is now NEUTRAL (bg-3 / border-strong).
   assert.ok(
     offBlock.includes('var(--fab-surface-raised)'),
     'disabled status should read as a neutral off switch, not a warning'
@@ -135,9 +129,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
     offBlock.includes('--fab-toggle-knob: var(--fab-text-subtle);'),
     'the off knob recedes; the lit position is the loud one'
   );
-  // The switch sets `border: 0` on the BUTTON, so a `:hover { border-color }` rule on
-  // the button is inert. The hover affordance has to live on the TRACK, which is the
-  // part with an edge — otherwise every switch in the manager has no hover state at all.
+  // The switch sets `border: 0` on the BUTTON.
   const toggleHoverBlock = blockFor(
     '.fabricate-toggle.manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
@@ -177,11 +169,6 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
 // The three multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
 // the variant the shared-primitive rule refuses, and it would drift the moment any one
 // surface is re-toned.
-//
-// The ESSENCE row joined for issue 1036. Its absence was a live defect, not a missing
-// nicety: `EssenceRow.svelte` already wrote `class:is-bulk-selected` and NOTHING matched it
-// in either the sheet or the component's own scoped block, so a ticked essence read exactly
-// like an unticked one — in the one studio whose bulk panel can also DELETE what is ticked.
 test('the bulk-selected row state is one joined selector across every multi-select studio', () => {
   assert.ok(
     css.includes(
@@ -189,21 +176,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
     ),
     'the recipe and essence rows JOIN the component row rule rather than authoring a second block'
   );
-  // ── A ROUTE MAY RESTATE THE TONE, AND MAY NOT RE-TONE IT (issue 1373) ────────────────────
-  // Three routes flatten their rows to `background: transparent` so that a 1px border is what
-  // makes a row a row, which is the reference's own construction on those screens. That
-  // flattening is written at (0,3,0) — the SAME weight as the shared rule above — and stands
-  // LATER in the sheet, so it cancelled the ticked fill outright and a ticked row on those
-  // screens painted nothing at all. The repair is a route-scoped RESTATEMENT, and that is a
-  // different object from the per-studio copy this test was written to forbid: it must name
-  // `var(--fab-surface-active)`, the shared rule's own value, so re-toning one studio still
-  // fails here. What stays capped at one is the UNSCOPED statement.
-  //
-  // The scoped-list row joins the loop although it is not in the join above — it has a block of
-  // its own by design, and it is the row class two of those three routes render.
-  //
-  // Comments are stripped first: a paragraph naming a selector is not a declaration of it, and
-  // every one of these rules is explained at length directly above itself.
+  // ── A ROUTE MAY RESTATE THE TONE.
   const declarations = css.replaceAll(/[/][*][^]*?[*][/]/g, '');
   const ruleAt = (selector) => {
     const at = declarations.indexOf(selector);
@@ -216,9 +189,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
     'manager-scoped-list-row',
   ];
   for (const row of bulkRows) {
-    // Every selector that names this row's ticked state, each taken back to the start of its
-    // own line so the route attribute — the thing that distinguishes a restatement from a copy
-    // — travels with it. Selectors in this sheet are written one per line.
+    // Every selector that names this row's ticked state.
     const needle = `.${row}.is-bulk-selected`;
     const written = declarations
       .split(needle)
@@ -237,9 +208,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
       );
     }
   }
-  // The negative control on the widening: the environments and gathering-task browsers have
-  // no bulk selection at all, so adding the essence row must not have turned the join into
-  // "every browser row". A ticked treatment on a row nothing can tick is a dead rule.
+  // The negative control on the widening.
   for (const row of ['manager-environment-row', 'manager-gathering-task-row']) {
     assert.equal(
       css.includes(`.${row}.is-bulk-selected`),
@@ -248,13 +217,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
     );
   }
 
-  // The selection ROW joins the same way, for the same reason: one primitive renders it in
-  // all three toolbars and its `rowClass` prop picks which third applies.
-  //
-  // The essence library joined for issue 1036, and its absence was a live defect rather
-  // than a cosmetic one: it passed `rowClass="manager-essence-filter-row"` while authoring
-  // that class only in its own scoped `<style>`, which a child component's root element
-  // cannot see. The selection row therefore rendered with NO row metrics at all.
+  // The selection ROW joins the same way, for the same reason.
   assert.ok(
     css.includes(
       '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection,\n.fabricate-manager .manager-essence-filter-row.is-selection {'
@@ -268,17 +231,9 @@ test('the bulk-selected row state is one joined selector across every multi-sele
   );
 });
 
-// Two long-label regressions the shared switch caused, both confirmed on a real smoke
-// frame. `.manager-status-toggle` is a STATUS cell: it caps at 78px and ellipsises its
-// label, which is right for "On"/"Off" and wrong for anything the GM has to read.
+// Two long-label regressions the shared switch caused.
 test('long-labelled switches escape the status cell geometry', () => {
-  // (1) The library's grouping switch used to render as "Grou…": 78px - 34px track - gap
-  // leaves ~36px. It now carries NO label of its own — the uppercase micro-label beside it
-  // is its accessible name (`aria-labelledby`) — so it is track-only, and it opts out of
-  // the status-cell cap so the track is not squeezed either.
-  // The component library's grouping switch (issue 676) shares the rule: it shipped as a
-  // `.manager-button` under a class carrying NO CSS at all, so its pressed state had no
-  // visual expression whatsoever.
+  // (1) The library's grouping switch used to render as "Grou…".
   const groupToggleBlock = blockFor(
     '.fabricate-manager .manager-recipe-filter-row .manager-status-toggle[data-recipe-group-toggle],\n.fabricate-manager .manager-component-filter-row .manager-status-toggle[data-component-group-by-category]'
   );
@@ -288,8 +243,7 @@ test('long-labelled switches escape the status cell geometry', () => {
   );
   assert.ok(groupToggleBlock.includes('width: auto;'), 'a track-only switch is sized by its track');
 
-  // The micro-label is what titles the control, and `white-space: nowrap` is the whole
-  // reason "Sort by" no longer breaks onto two lines in the flagship frame.
+  // The micro-label is what titles the control.
   const filterLabelBlock = blockFor(
     '.fabricate-manager .manager-recipe-filter-label,\n.fabricate-manager .manager-component-filter-label,\n.fabricate-manager .manager-essence-filter-label'
   );
@@ -307,11 +261,6 @@ test('long-labelled switches escape the status cell geometry', () => {
 
   // (2) The Overview Enabled/Locked status cards are left-aligned rows (icon + copy
   // + switch), not the media column's centred, 14ch-clamped stack (issue 643).
-  // RE-KEYED AT ISSUE 1509 PHASE 4, not relaxed: the family is rooted at
-  // `fabricate-toggle-card`, the class `ToggleCard` writes at the head of its own root template,
-  // so the card's rule is a COMPOUND and its sub-line's is a descendant chain. Same position,
-  // same declarations, same ranks — (0,2,0) both, before and after — so every assertion below
-  // reads the same block it always did.
   const statusCardBlock = blockFor('.fabricate-toggle-card.manager-recipe-status-card');
   const statusSubBlock = blockFor('.fabricate-toggle-card .manager-recipe-status-sub');
   assert.ok(
@@ -330,9 +279,7 @@ test('long-labelled switches escape the status cell geometry', () => {
   );
 });
 
-// Selection is an identity cue ("you are here"), never a status. Success/amber stay
-// reserved for enabled and warning states — a selected row tinted `--fab-success-soft`
-// wears the exact colour its own ON switch uses, inches away (issue 643).
+// Selection is an identity cue ("you are here").
 test('a selected browser row reads as an identity cue in the accent family, not a status', () => {
   const selectedRowBlock = blockFor(
     '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-environment-row.is-selected,\n.fabricate-manager .manager-gathering-task-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected'
@@ -389,8 +336,7 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   }
 
   const MONO = [
-    // Read out of `Chip.svelte`'s scoped block, since the chip owns its own appearance
-    // (issue 883); everything else in this list is still global-sheet.
+    // Read out of `Chip.svelte`'s scoped block.
     '.manager-chip.is-mono',
     // Three classes, and issue 1509 keeps all three WITHOUT the reason issue 883 gave. That
     // reason was that three classes out-rank `Chip.svelte`'s own scoped `.manager-chip.svelte-
@@ -419,10 +365,7 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     );
   }
 
-  // The last clause of the contract, applied: "a control whose text is words rather than
-  // a number stays in the UI face". "2 in · 1 out" is a PHRASE — the mono face marks a
-  // numeric (a quantity, a DC, a count badge), it does not decorate a readout, and the
-  // mono digits visibly widened this one.
+  // The last clause of the contract, applied.
   assert.equal(
     blockFor('.fabricate-manager .manager-recipe-io-counts').includes(
       'font-family: var(--fab-font-mono);'
@@ -433,16 +376,11 @@ test('the typographic contract sets names in the serif and numerics in the mono 
 });
 
 test('manager components browser defines drop target and compact responsive list geometry', () => {
-  // Issue 676: the component library is a LIST, not a column grid. The
-  // `.manager-components-table` block and its six component-grid column-template
-  // permutations are gone with the table scaffolding, and rows flex + wrap instead —
-  // which is what makes the narrow (stacked) surface the smoke harness photographs
-  // reflow rather than crush fixed tracks.
+  // Issue 676: the component library is a LIST.
   const listBlock = blockFor('.fabricate-manager .manager-components-list');
   const rowBlock = blockFor('.fabricate-manager .manager-component-row');
   const rowMetaBlock = blockFor('.fabricate-manager .manager-component-row-meta');
-  // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508): the bar's own rules are
-  // `.fabricate-filter-bar.manager-toolbar`, not `.fabricate-manager .manager-toolbar`.
+  // ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1508).
   const toolbarBlock = Array.from(
     css.matchAll(/\.fabricate-filter-bar\.manager-toolbar\s*\{[\s\S]*?\}/g)
   )
@@ -454,18 +392,14 @@ test('manager components browser defines drop target and compact responsive list
     '.fabricate-manager .manager-component-identity .manager-system-copy'
   );
 
-  // Drop target, toolbar, LIST (it takes the slack), pager. The view's own duplicate page
-  // header is gone (issue 676 — the shell already renders one), so the growing track must
-  // be the list; leaving the old four-`auto`-then-`1fr` template handed it to the PAGER.
+  // Drop target, toolbar, LIST (it takes the slack).
   assert.ok(
     blockFor('.fabricate-manager[data-manager-view="components"] .manager-main').includes(
       'grid-template-rows: auto auto minmax(0, 1fr) auto;'
     ),
     'components route should give the growing row to the list, not the pager'
   );
-  // The absence assertion on that dropped column template is GONE (issue 1399): its
-  // needle named a legacy generation the sheet no longer declares, so it could only ever
-  // pass. `tests/token-generation-gate.test.js` bans the shape from a live population.
+  // The absence assertion on that dropped column template is GONE (issue 1399).
   assert.ok(listBlock.includes('display: flex;'), 'the component list stacks its rows');
   assert.ok(
     rowBlock.includes('display: flex;'),
@@ -520,8 +454,6 @@ test('manager components browser defines drop target and compact responsive list
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
   // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its
   // own selects carried no font-size at all and were rendering at Foundry's 14px app base.
-  // The essence library joined both lists for issue 1036 — see the selection-row assertion
-  // above for why its scoped copy of them was not equivalent.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'
@@ -572,21 +504,16 @@ test('manager components browser defines drop target and compact responsive list
       componentCopyBlock.includes('overflow: hidden;'),
     'component identity copy should clamp inside the row instead of overflowing below the thumbnail'
   );
-  // No medium-query stacking rule is needed any more: the row wraps natively, so the
-  // narrow surface reflows without a breakpoint re-templating its columns.
+  // No medium-query stacking rule is needed any more: the row wraps natively.
 });
 
-// Issue 1036. The essence-grid column template, its `.has-no-source` variant,
+// Issue 1036. The essence-grid column template.
 // the `.manager-essence-source-cell-image` block and the narrow-container `grid-template-
 // columns` stacking rule are all RETIRED here, and that is a deliberate edit rather than
 // incidental churn: the essence row is a FLEX card that wraps, so a column template on it
 // would place nothing, and the narrow join's `align-items: stretch` is a live flex property
 // that would stretch the medallion and the whole control cluster to full card height. The
 // replacement narrow behaviour is authored in `EssenceRow.svelte`'s own scoped block.
-//
-// What stays global is what a scoped child block cannot reach: the route-level `.manager-
-// main` row template, and the identity button's reset — which must beat Foundry's host
-// button geometry — joined to the three siblings that already carry it.
 test('manager essence browser defines a wrapping card row rather than a column template', () => {
   const identityResetBlock = blockFor(
     '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity,\n.fabricate-manager .manager-essence-identity'
@@ -607,10 +534,6 @@ test('manager essence browser defines a wrapping card row rather than a column t
   // silently coexisting with the flex row. Each needle carries the punctuation that only a
   // DECLARATION or a RULE OPENER has — a bare class-name match would be satisfied by the
   // retirement comments themselves, which name what they retired.
-  // The essence column template's own absence assertion is GONE (issue 1399): its needle
-  // was a legacy generation name the sheet no longer declares, so it could only ever pass.
-  // `tests/token-generation-gate.test.js` bans the shape from a population that is not
-  // empty. The three needles below name live selectors and stay.
   assert.equal(
     css.includes('.manager-essences-table.has-no-source {'),
     false,
@@ -627,8 +550,7 @@ test('manager essence browser defines a wrapping card row rather than a column t
     'and the table head itself'
   );
 
-  // The identity button JOINS the shared reset, so a `<button>` used as a row identity is
-  // not cropped by Foundry's fixed button height — a defect no mounted test can see.
+  // The identity button JOINS the shared reset.
   assert.ok(
     identityResetBlock.includes('appearance: none;'),
     'the essence identity button joins the shared manager button reset'
@@ -649,8 +571,7 @@ test('manager essence browser defines a wrapping card row rather than a column t
     'and the height:auto that lets the grid card grow past it'
   );
 
-  // The row still joins the four shared lists, so the one-consistent-selected-row-signal
-  // rule holds by construction rather than by convention.
+  // The row still joins the four shared lists.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row'
@@ -776,18 +697,12 @@ test('manager environments browser and edit route define compact responsive geom
   const reorderStackBlock = blockFor('.fabricate-manager .manager-environment-reorder-stack');
   const editorShellBlock = blockFor('.fabricate-manager .manager-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
-  // NOT `blockFor`: that returns the FIRST block matching the selector, and the workspace's
-  // narrow override — which sets only the column token — is declared EARLIER in the file than
-  // the base rule this assertion is about. The base rule is the unindented one.
+  // NOT `blockFor`: that returns the FIRST block matching the selector.
   const workspaceBlock = (css.match(
     /^\.fabricate-manager \.manager-environment-workspace \{[\s\S]*?\}/m
   ) || [''])[0];
   const weightFieldBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field');
-  // The overflow menu is the shared `<ActionMenu>` primitive since issue 1477, so its family is
-  // rooted at the two namespace classes THAT COMPONENT writes rather than at `.fabricate-manager`
-  // and the environment editor's own name. Everything asserted below is the same declaration set
-  // at the same specificity — the item rules keep their `button` type selector precisely so that
-  // re-rooting moves nothing in this screen's cascade.
+  // The overflow menu is the shared `<ActionMenu>` primitive since issue 1477.
   const compMenuBlock = blockFor(
     '.fabricate-action-menu-panel.manager-action-menu-panel'
   );
@@ -1006,10 +921,7 @@ test('manager environments browser and edit route define compact responsive geom
       compMenuLabelBlock.includes('text-overflow: ellipsis;'),
     'composition overflow menu labels should truncate inside the bounded menu width'
   );
-  // The disabled NOTE ("Enable in library first") used to be a second, near-identical rule plus a
-  // `::before` spacer, because it was the one menu row with no glyph. `<ActionMenu>` renders the
-  // icon cell for every item, so the note takes the item rule's geometry unchanged and the pair
-  // is retired rather than re-rooted. What is left is the disabled STATE.
+  // The disabled NOTE ("Enable in library first") used to be a second.
   assert.ok(
     compMenuDisabledBlock.includes('opacity: 0.45;') &&
       compMenuDisabledBlock.includes('cursor: default;'),
@@ -1060,12 +972,7 @@ test('manager environments browser and edit route define compact responsive geom
       mediumQuery.includes('overflow: visible;'),
     'stacked environment edit layout should release nested scroll containment'
   );
-  // The workspace's own narrow override is NOT asserted as text here. It was, and the
-  // assertion passed for the whole life of a rule that never applied: a container query adds
-  // no specificity, so `grid-template-columns` inside this block tied with the base rule
-  // declared later in the sheet and lost on source order. A source-text assertion cannot tell
-  // a live rule from a dead one — `manager workspace restacks at the declared floor` below
-  // measures the rendered grid instead.
+  // The workspace's own narrow override is NOT asserted as text here. It was.
 });
 
 test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
@@ -1523,29 +1430,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const mainBlock = blockFor('.fabricate-manager .manager-system-edit-main');
   const formBlock = blockFor('.fabricate-manager .manager-system-edit-form');
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
-  // `:not(.fab-stepper-input)` (issue 676): the shared `Stepper` brings its own
-  // borderless chrome from a component-scoped <style>, which this rule out-specifies —
-  // so a Stepper inside any `.manager-field` was being stretched to 100%/36px and
-  // re-bordered. The exclusion is part of the selector's source text, so this
-  // source-text lookup has to carry it.
-  // `blockFor` anchors on the selector text IMMEDIATELY followed by `{`, so this must
-  // name the whole selector list of the height rule — which is what distinguishes it
-  // from the width rule above it (that one also lists `textarea`).
-  //
-  // `:not(.fab-stepper-input)` (issue 676): the shared `Stepper` brings its own
-  // borderless chrome from a component-scoped <style>, which this rule out-specifies —
-  // so a Stepper inside any `.manager-field` was being stretched to 100%/36px and
-  // re-bordered. `:not([type='radio'])` excludes the custom resolution radios for the
-  // same reason — the text-field treatment tied their own rule on specificity and, later
-  // in the file, squared the dot and stretched it to fill the flex line.
-  // `:not([type='range'])` (issue 883) excludes the chance slider, whose 6px track and
-  // coloured fill are painted BEHIND a transparent input that this rule was stretching to
-  // 36px and filling opaquely.
-  // The list used to end in `.manager-component-inline-control`, a class no source file
-  // emits since the issue-1371 rebuild gave the Category select a card of its own. It was
-  // removed from all three of the sheet's lists at revision 8, and this anchor with it: a
-  // retired selector kept inside a live selector list is dead CSS the block-granular
-  // dead-class gate cannot see, and a test anchor naming it kept it alive by hand.
+  // `:not(.fab-stepper-input)` (issue 676).
   const fieldInputBlock = blockFor(
     ".fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
       '.fabricate-field.manager-field select'
@@ -1560,9 +1445,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrowQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
-  // ONE track since issue 1515 deleted this tab's duplicate page header: the scrolling form is
-  // the only child of `.manager-system-edit-main`, and a leading `auto` track would take it while
-  // the growing one sat empty.
+  // ONE track since issue 1515 deleted this tab's duplicate page header.
   assert.ok(
     mainBlock.includes('grid-template-rows: minmax(0, 1fr);'),
     'system edit main should reserve scrollable form space'
@@ -1625,10 +1508,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   );
 });
 
-// The GM Knowledge surface (issue 785). Its layout is FIVE pieces, and the failure
-// mode of doing only some of them is silent: a dead 300px inspector strip, or an
-// action cluster clipped with no scrollbar. The paired `.is-rail-collapsed` sibling
-// is already covered by the generic guard above; the rest is pinned here.
+// The GM Knowledge surface (issue 785). Its layout is FIVE pieces.
 test('the Knowledge surface owns its third column and wraps its row action clusters', () => {
   const bodyBlock = blockFor('.fabricate-manager[data-manager-view="knowledge"] .manager-body');
   const collapsedBlock = blockFor(
@@ -1660,19 +1540,14 @@ test('the Knowledge surface owns its third column and wraps its row action clust
     mainBlock.includes('display: contents;'),
     "the view's own main must not become a fourth grid item"
   );
-  // The 832-1000px band is the real hazard: three columns still hold while the
-  // detail pane is at its narrowest, so the action cluster has to wrap.
+  // The 832-1000px band is the real hazard.
   assert.ok(rowBlock.includes('flex-wrap: wrap;'), 'rows wrap rather than clip');
   assert.ok(copyColumnBlock.includes('min-width: 0;'), 'the copy column may shrink');
   assert.ok(
     factBlock.includes('width: auto;'),
     '.manager-fact is authored width:100% for grids and must hug content in this flex cluster'
   );
-  // A spent row is muted by COLOUR on its name, never by a group `opacity`: a group
-  // dim composites the chips — the row's only status signal — below the 4.5:1 floor
-  // their 10px text needs, in six of the seven themes. And `.manager-button:disabled`
-  // already carries opacity 0.62, so a row-level dim would take the disabled Expend
-  // button to about 0.38.
+  // A spent row is muted by COLOUR on its name, never by a group `opacity`.
   assert.ok(
     spentBlock.includes('color: var(--fab-text-muted);'),
     'the spent row is muted by colour on its name'
@@ -1697,10 +1572,7 @@ test('the Knowledge surface owns its third column and wraps its row action clust
   );
 });
 
-// Every Knowledge rule that an existing rule already expressed is authored ONCE, as a
-// joined selector list. A byte-identical second block is what the maintainer's
-// "do not duplicate CSS for minor variations" instruction rules out, and it is also
-// what SonarCloud's duplication gate reads.
+// Every Knowledge rule that an existing rule already expressed is authored ONCE.
 test('the Knowledge surface joins the rules it shares instead of restating them', () => {
   const occurrences = (needle) => css.split(needle).length - 1;
 
@@ -1710,10 +1582,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
       '.manager-knowledge-main {',
       1,
     ],
-    // The compact chip scale used to be a fourth entry here — an opt-in join listing the
-    // Tools library and the two Knowledge row containers. Issue 883 made the compact scale
-    // the ONLY scale, owned by `Chip.svelte`, so there is no join left to assert; its
-    // absence is checked by the chip's own contract test instead.
+    // The compact chip scale used to be a fourth entry here.
     [
       // The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
       // scale; the Knowledge row actions and reset cluster join it rather than restating
@@ -1740,13 +1609,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     );
   }
 
-  // Class names that carry no CSS and no consumer: each sat beside a `data-knowledge-*`
-  // attribute already doing the hook job.
-  //
-  // The second block (issue 785) is the bespoke no-state and standing-statement classes the
-  // shared `EmptyState` / `Callout` primitives replaced. Each was a per-screen re-derivation
-  // of one meaning — a dashed panel, an icon tile, or a bare "nothing here" sentence — and
-  // leaving any of them in the sheet is how the next copy gets written against it.
+  // Class names that carry no CSS and no consumer.
   const retired = [
     'manager-knowledge-quantity-chip',
     'manager-knowledge-type-pill',
@@ -1775,32 +1638,22 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     'manager-recipe-tags-empty',
     // The per-screen re-size of the shared warning band.
     'manager-knowledge-learned-band',
-    // The Knowledge page-header roll-up pill: every other browser surface reports its
-    // count in the nav-rail badge, so a header pill was a one-screen divergence.
+    // The Knowledge page-header roll-up pill.
     'manager-knowledge-header-pills',
-    // The reserved row's inline explanatory sentence: ellipsised to fit one line it
-    // truncated to "Built…", so it became the row's tooltip instead (issue 878).
+    // The reserved row's inline explanatory sentence.
     'manager-vocabulary-locked-hint',
     // The third block (issue 772): classes retired by extracting three shared primitives
     // and CONVERTING the duplicates that would otherwise have sat beside them. A primitive
     // whose duplicate survives has added a variant rather than removed one, so each of
     // these names is the proof that the conversion actually happened.
-    //
-    // The Tool Studio checklist row's hand-rolled check box, now `SelectionCheckbox`.
     'manager-checklist-card-check',
-    // The fourth block (issue 1373, round 5): the Tool Studio's checklist ROW itself, with its
-    // icon and copy cells. `proto:4741` states the reference's prerequisite row identically to
-    // `proto:4752`'s bonus row, so the maintainer ruled the prerequisite list onto the SAME
-    // `ModifierLibraryRow` the bonus list already draws — and `ChecklistCardRow.svelte`, whose
-    // only caller that list was, went with it. The names are ratcheted for the reason the third
-    // block records: a retired row left in the sheet is a fourth row waiting to be copied.
+    // The fourth block (issue 1373, round 5): the Tool Studio's checklist ROW itself.
     'manager-checklist-card-row',
     'manager-checklist-card-icon',
     'manager-checklist-card-copy',
     // And the hand-rolled box it used before issue 772, dead in the sheet ever since.
     'manager-tool-prerequisite-check',
     // The component editor's hand-rolled tag pill, now `Chip tone="tag"`.
-    //
     // The CONTAINER is retired with it, and that is not tidiness: this assertion is a bare
     // `css.includes(dead)` substring test, and `manager-component-tag-toggles` (plural)
     // CONTAINS `manager-component-tag-toggle`. Left in the sheet as layout context under
@@ -1809,10 +1662,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     // `manager-component-tag-run`.
     'manager-component-tag-toggles',
     'manager-component-tag-toggle',
-    // The component editor's hand-rolled −/input/+ essence row, now the shared `Stepper`
-    // inside `EssenceQuantityCard`. The card's own appearance classes are deliberately NOT
-    // here: they MOVED into that component's scoped block rather than dying, so they are
-    // absent from the sheet for a different reason and are still rendered.
+    // The component editor's hand-rolled −/input/+ essence row.
     'manager-component-essence-stepper',
     'manager-component-essence-quantity',
   ];
@@ -1820,8 +1670,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }
 
-  // And they must be gone from the MARKUP too, not merely unstyled: an unconverted site is
-  // what makes a primitive a fourth way of doing the same thing.
+  // And they must be gone from the MARKUP too, not merely unstyled.
   const managerComponents = readdirSync(managerComponentDir, {
     recursive: true,
     withFileTypes: true,
@@ -1845,10 +1694,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
         .replace(/\/\*[\s\S]*?\*\//g, '')
     )
     .join('\n');
-  // The markup half used to walk a HARDCODED two-string list, which made it vacuous for
-  // every name added to the ratchet after it was written: a retired class could be deleted
-  // from the sheet and left rendering in a component, and both halves would still pass. It
-  // walks the SAME list now, so retiring a name is one edit and both halves bite.
+  // The markup half used to walk a HARDCODED two-string list.
   for (const dead of [...retired, 'class="manager-empty', 'manager-recipe-section-empty"']) {
     assert.equal(
       managerComponents.includes(dead),
@@ -1861,10 +1707,6 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
 // Issue 883: eight manager browser rows and value cards each declared their own edge,
 // corner and fill, and had already drifted to three corner radii (8px, 9px, 10px) and two
 // fills. The Tool Studio's row is canonical, and every other surface JOINS it.
-//
-// This guard is deliberately two-sided. Asserting the joined rule exists proves the shared
-// treatment is authored; asserting each row block no longer carries the properties proves
-// no surface kept a private copy, which is the failure mode a one-sided check misses.
 test('every manager browser row joins ONE edge, corner and fill treatment', () => {
   const occurrences = (needle) => css.split(needle).length - 1;
 
@@ -1885,10 +1727,7 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
   ];
 
   const shared = `${ROWS.map((row) => `.fabricate-manager ${row}`).join(',\n')} {`;
-  // Counted on the WHOLE selector list, not on its last selector. The Knowledge guard
-  // above can anchor on its last selector because that one is unique; every row class
-  // here legitimately opens other blocks too (a grid template, a responsive override),
-  // so only the full list identifies this rule.
+  // Counted on the WHOLE selector list.
   assert.equal(
     occurrences(shared),
     1,
@@ -1904,20 +1743,14 @@ test('every manager browser row joins ONE edge, corner and fill treatment', () =
     assert.ok(treatment.includes(declaration), `the shared row treatment declares ${declaration}`);
   }
 
-  // No surface restates it, in ANY of its blocks — a private copy hiding in a later
-  // override is exactly what a first-match-only check would miss. The retired values were
-  // `border-radius: 9px` (recipe, component), `border-radius: 10px` (the vocabulary card)
-  // and a solid `--fab-bg-3` fill on six of the nine.
+  // No surface restates it, in ANY of its blocks.
   for (const row of ROWS) {
     const escaped = row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const blocks = [
       ...css.matchAll(new RegExp(`\\.fabricate-manager ${escaped}\\s*\\{[\\s\\S]*?\\}`, 'g')),
     ].map(([block]) => block);
     for (const block of blocks) {
-      // The shared rule itself matches here, starting at whichever of its selectors this
-      // is, so every such match is a SUFFIX of the treatment block rather than equal to
-      // it. Skipping on containment covers both, and a genuine restatement can only be
-      // skipped by being byte-identical to a suffix of the shared rule — i.e. by being it.
+      // The shared rule itself matches here.
       if (treatment.includes(block)) continue;
       assert.equal(
         /border-radius:|border: 1px solid|background: var\(--fab-bg-3\);/.test(block),

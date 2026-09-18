@@ -1,16 +1,4 @@
-/**
- * The fail-closed path.
- *
- * "Fails closed rather than approximating" is the property the whole View Lab rests on — a frame
- * drawn without the real cascade is worse than no frame, because it looks authoritative. That
- * property was documented in three places and asserted in none: `foundryChromeCache.js` had zero
- * behavioural coverage, so a regression making `resolveChromeCache` return a partial cache instead
- * of `null` would ship green and the lab would quietly draw half-chrome.
- *
- * These run against TEMPORARY directories rather than the real cache, so they neither need a
- * harvest nor can be fooled by one being present — which is what lets them run everywhere, unlike
- * the drift test that necessarily skips without harvested material.
- */
+/** The fail-closed path. */
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -65,9 +53,7 @@ test('a truncated manifest resolves to null rather than throwing or half-trustin
 });
 
 test('an explicit version that is not harvested resolves to null even when another is', () => {
-  // The CI job pins the version from committed provenance. If a DIFFERENT build is present, the
-  // pin must miss rather than silently falling back to whatever was harvested — a newer stylesheet
-  // rendered through markup transcribed from an older build gives genuine CSS around a stale DOM.
+  // The CI job pins the version from committed provenance.
   const root = scratchRoot();
   try {
     const dir = join(root, CHROME_CACHE_DIRNAME, '13.351');
@@ -107,8 +93,7 @@ test('the missing-chrome message tells the operator what to do', () => {
   try {
     const message = missingChromeMessage(root);
     // Collapsed, because the message is hard-wrapped for a terminal and a promise that happens to
-    // straddle a line break is still the promise. Pinning the wrapping instead makes an editorial
-    // reflow look like a lost guarantee.
+    // straddle a line break is still the promise.
     const flowed = message.replaceAll(/\s+/g, ' ');
     assert.match(flowed, /viewlab:chrome:harvest/);
     assert.match(flowed, /never downloads them for you/);
@@ -137,9 +122,7 @@ test('provenance may be written from a release-archive harvest', () => {
 test('provenance is refused for a local-install harvest, and says why', () => {
   // The two sources hold the same Foundry and different bytes: the Windows installer ships
   // `application.mjs` with CRLF where the release archive uses LF (verified against 14.365 — 87904
-  // bytes with 2258 CRLF versus 85646 with none). CI harvests the archive and checks the recorded
-  // digests on the runner that draws, so an install-derived record would fail the drift gate on
-  // every later pull request, for a reason the failure message would not explain.
+  // bytes with 2258 CRLF versus 85646 with none).
   assert.throws(
     () =>
       assertProvenanceWritable({

@@ -1,45 +1,4 @@
-/**
- * The forward-port's change-provenance verifier (issue #1418).
- *
- * The gate this module powers is the one path by which content reaches `main` without satisfying
- * `main`'s ruleset, and it runs perhaps twice a month. A path that rarely runs is a path whose
- * defects are discovered late, so the verifier is driven here from RECORDED EVIDENCE rather than
- * from a shape someone typed out from memory.
- *
- * ── THE FIXTURES ARE VERBATIM CAPTURED PAYLOADS ─────────────────────────────────────────────────
- * `tests/fixtures/forward-port-provenance/` holds real responses, captured on 2026-09-01 against
- * commits that were genuinely absent from `main` at the time:
- *
- *   rev-list-parents.txt  `git rev-list --parents origin/main..origin/release`
- *   pulls/<sha>.json      `GET /repos/mistersilver-uk/fabricate/commits/<sha>/pulls`
- *   merges/<sha>.txt      the merge-content verdict `scripts/forward-port-content-gate.sh` computes
- *                         for that commit — DERIVED by running the script's own predicate against
- *                         these four commits' real objects, not typed out from expectation
- *
- * The range is pull request #1421 (`d904316a`, merged as `74e0988f`) and #1425 (`9a27eb2e`, merged
- * as `efebbb90`), both genuinely reviewed against `release`. They are the positive control, and
- * both merges re-merge to exactly their own trees, so they are also real content-free-merge
- * fixtures.
- *
- * Recording them verbatim rather than restating them is load-bearing, and the reason is a mistake
- * that was actually made while planning this: a `--jq` projection reported
- * `{"number":1414,"base":"main","merged":true}`, but the raw payload has NO `merged` key at all —
- * `--jq` had synthesised it. A hand-written fixture would have encoded that invented shape and the
- * suite would have passed against a verifier that could not read a real response. Every negative
- * control below is therefore DERIVED from the captured payload by changing one field, so each one
- * still proves which real field the predicate reads.
- *
- * ── WHAT THIS FILE CANNOT PROVE, AND WHERE THAT IS PROVED INSTEAD ───────────────────────────────
- * The verifier is pure and never runs `git`, so everything below exercises how it READS the
- * collector's merge-content verdict. Nothing here can show that the verdict itself is right.
- *
- * That gap is precisely where the original combined-diff predicate hid. Its "evil merge" case
- * handed the verifier a hand-written filename string, which proves the plumbing and not the git
- * behaviour beneath it; and the recorded fixtures come from a linear, fast-forwardable topology, on
- * which a broken predicate happens to answer correctly. `tests/forward-port-content-gate.test.js`
- * closes it by running the real script over real constructed merges — including the divergent clean
- * auto-merge, the one shape that tells a working predicate from a broken one.
- */
+/** The forward-port's change-provenance verifier (issue #1418). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -120,10 +79,6 @@ function runWith(argv, overlay = {}) {
 /**
  * Drive the CLI over a wholly in-memory range, so a case states exactly its own evidence.
  *
- * Any commit whose evidence is not supplied resolves to a path that exists nowhere, so the read
- * throws — which is the fail-closed behaviour several cases below assert.
- *
- * @param {{commits: string, merges?: Record<string, string|Error>, pulls?: Record<string, string|Error>, options?: string[]}} input
  * @returns {{code: number, out: string, err: string}} The outcome.
  */
 function verifyInMemory({ commits, merges = {}, pulls = {}, options = [] }) {
@@ -182,8 +137,7 @@ test('the captured REST payload is read through its real field names', () => {
   });
 
   // The trap this pins: REST reports `state: "closed"` for a MERGED pull request, exactly as it
-  // does for an abandoned one, and carries no `merged` boolean at all. A verifier keying on
-  // `state` would accept a pull request that was closed unmerged.
+  // does for an abandoned one, and carries no `merged` boolean at all.
   assert.ok(!Object.hasOwn(JSON.parse(capturedPulls())[0], 'merged'), 'REST carries no `merged`');
 });
 
@@ -200,8 +154,7 @@ test('the captured rev-list listing parses to its real topology', () => {
 
 test('the ordinary release shape — a CI --no-ff promote merge with NO pull request — is accepted', () => {
   // promote-to-early-access.yml merges a beta tag into `release` with the App token, and that merge
-  // is associated with no pull request at all. A gate demanding one would red every routine
-  // release, so this case is the reason the content-free-merge rule exists.
+  // is associated with no pull request at all.
   const { code, out } = verifyInMemory({
     commits: mergeCommitLine(CONSTRUCTED.ordinaryMerge, 'chore(#627): promote v1.9.2 into release'),
     merges: { [CONSTRUCTED.ordinaryMerge]: 'content-free\n' },
@@ -223,19 +176,14 @@ test('an EVIL merge — content present in no parent — is refused', () => {
 
   assert.equal(code, 1);
   assert.match(err, new RegExp(`REFUSED ${CONSTRUCTED.evilMerge}`));
-  // BOTH halves of why: rule 1 did not hold for the merge, AND rule 2 found nothing either. A
-  // refusal naming only the missing pull request would send an operator looking for a review that
-  // could never have accounted for invented content in the first place.
+  // BOTH halves of why: rule 1 did not hold for the merge, AND rule 2 found nothing either.
   assert.match(err, /re-merging its two parents produces a different tree/);
   assert.match(err, /no pull request is associated with it at all/);
 });
 
 test('EVERY merge-content verdict except `content-free` leaves the merge to rule 2', () => {
   // The collector re-merges a merge's two parents and states its conclusion as one token. Only
-  // `content-free` is an acceptance. The other three are genuinely different situations and each
-  // must say which one it was, because they point at different remedies — but none of them is a
-  // refusal in itself: a merge commit closing a reviewed pull request based on `release` WAS
-  // reviewed, its resolution included, so rule 2 still gets to answer.
+  // `content-free` is an acceptance.
   for (const [verdict, reason] of [
     [`carries-content ${REMERGED_TREE}`, /produces a different tree/],
     ['remerge-conflicted', /do not merge cleanly, so it embeds a resolution/],
@@ -264,9 +212,7 @@ test('EVERY merge-content verdict except `content-free` leaves the merge to rule
 
 test('the merge-content vocabulary is read from the FIRST token, and its detail is ignored', () => {
   // The collector writes `carries-content <tree>` and `parent-count <n>`: the verdict is the first
-  // token and the rest is diagnostic detail this module reports but never interprets. Reading the
-  // whole line would make every `carries-content` verdict unknown — which fails closed, but on the
-  // wrong diagnosis, and would make the re-merged tree unusable as the refusal's evidence.
+  // token and the rest is diagnostic detail this module reports but never interprets.
   assert.deepEqual(readMergeContentStatus('content-free\n'), {
     contentFree: true,
     verdict: 'content-free',
@@ -282,10 +228,7 @@ test('the merge-content vocabulary is read from the FIRST token, and its detail 
 });
 
 test('a merge-content verdict the verifier does not know is UNVERIFIABLE, never a pass', () => {
-  // The collector and the verifier are two files that have to agree on one vocabulary. If they
-  // drift, nothing can be concluded — and the direction that matters is that the drift must not
-  // resolve to "introduced nothing". An empty file is the same case: the collector writes one for
-  // every commit it collects, so an empty one means the collection did not finish.
+  // The collector and the verifier are two files that have to agree on one vocabulary.
   for (const [label, status, pattern] of [
     ['unknown', 'content-free-ish\n', /is not a merge-content verdict this verifier knows/],
     ['empty', '   \n', /merge-content status is empty/],
@@ -317,8 +260,7 @@ test('a commit with no associated pull request is refused BY SHA, with its subje
 
 test('a merged pull request based on the WRONG line is refused', () => {
   // This is the finding that settled the canonical requirement: #1414 was a merged, reviewed pull
-  // request — based on `main`. Reviewing a change against a different line is not reviewing it for
-  // landing on this one, so "it was reviewed" is not the question the gate asks.
+  // request — based on `main`.
   const { code, err } = verifyInMemory({
     commits: ordinaryCommitLine(CONSTRUCTED.loose, MERGE_COMMIT),
     pulls: {
@@ -364,8 +306,7 @@ test('an ABANDONED pull request is refused, even though its state reads `closed`
 
 test('a BLANK merged_at is not a merge date', () => {
   // `merged_at` is the single field the whole predicate rests on, and it is a string — so the
-  // difference between "absent" and "present but empty" is real. Read without trimming, a payload
-  // carrying whitespace would be truthy and the pull request would read as merged.
+  // difference between "absent" and "present but empty" is real.
   const { code, err } = verifyInMemory({
     commits: ordinaryCommitLine(CONSTRUCTED.loose, MERGE_COMMIT),
     pulls: {
@@ -418,10 +359,7 @@ test('an empty or malformed commit listing is unverifiable, never "nothing to ch
   assert.equal(malformed.code, 2);
   assert.match(malformed.err, /is not a '<sha> <parent-sha>…' line/);
 
-  // The object-id pattern is ANCHORED. Unanchored it matches the hex PREFIX of a token that is not
-  // an object id at all, so a corrupted listing would be accepted and each of its "commits" would
-  // then fail later, on an unreadable evidence file — the same exit code reached by a different and
-  // far less useful route, and one that no longer says the listing itself is wrong.
+  // The object-id pattern is ANCHORED.
   const almostASha = verifyInMemory({
     commits: `${'d'.repeat(40)}zzz ${MERGE_COMMIT}\tA Contributor\tchore: something`,
   });
@@ -429,8 +367,7 @@ test('an empty or malformed commit listing is unverifiable, never "nothing to ch
   assert.match(almostASha.err, /is not a '<sha> <parent-sha>…' line/);
 
   // A repeated sha cannot come out of `git rev-list`, so a listing containing one was not produced
-  // the way this verifier's contract says it was. Deciding the same commit twice would also double
-  // its weight in the "N of M commits" count a refusal reports.
+  // the way this verifier's contract says it was.
   const line = ordinaryCommitLine(CONSTRUCTED.loose, MERGE_COMMIT);
   const duplicated = verifyInMemory({ commits: `${line}\n${line}` });
   assert.equal(duplicated.code, 2);

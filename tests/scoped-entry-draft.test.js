@@ -1,25 +1,7 @@
 /**
- * The world scoped-entry editor's BUFFERED DRAFT (issue 1372, epic 1357).
- *
- * `scopedEntryDraft.js` is the shared seam behind the world essence entry editor's explicit Save,
- * and behind the world tool entry editor's next. Everything in it is pure, so this file is the
- * whole of its contract; the RENDERED half — that typing writes nothing until Save, and that the
- * button is disabled until there is something to write — is
- * `tests/components/essence-world-scope-screens-mounted.test.js`, because those are questions
- * about the DOM.
- *
- * ── WHAT EACH CLAUSE IS ACTUALLY GUARDING ─────────────────────────────────────────────────────
- * Three of these are the difference between a buffered editor that works and one that opens
- * dirty, saves too much, or never clears:
- *
- *  - a section value is stored OPAQUELY and may be a bare string or an `{id, name}` pair, so
- *    identity comparison reports every store round-trip as a change and every reload opens the
- *    editor with unsaved work in it;
- *  - a Save writes only the keys that DIFFER, so re-pointing one world default does not restate
- *    the name and description over whatever another client wrote to them meanwhile;
- *  - the exit guard answers `true` SYNCHRONOUSLY on the clean path, because the shell's route-exit
- *    cascade preserves the promise identity of what it is handed and a resolved promise there
- *    would put every route activation in the manager one microtask later.
+ * The world scoped-entry editor's BUFFERED DRAFT (issue 1372, epic 1357). `scopedEntryDraft.js` is
+ * the shared seam behind the world essence entry editor's explicit Save, and behind the world tool
+ * entry editor's next.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -47,12 +29,7 @@ const SHAPE = Object.freeze({
   sections: Object.freeze(['effectSource', 'macro']),
 });
 
-/**
- * A projected entry, in the shape `worldScopeProjection` builds.
- *
- * @param {object} [overrides]
- * @returns {object}
- */
+/** A projected entry, in the shape `worldScopeProjection` builds. */
 function entryOf({ entity = {}, defaults = null } = {}) {
   return {
     id: 'ash',
@@ -127,11 +104,9 @@ describe('the persisted snapshot a draft is seeded from and measured against', (
 
 describe('an edit produces a NEW draft object', () => {
   it('never mutates the draft it was handed, on either part', () => {
-    // This module's own answers depend on it: `scopedEntryWrites` takes the draft and the
-    // persisted snapshot as two values, and the caller seeds the draft FROM that snapshot — so a
-    // wither that mutated its argument would make the two one object and report every edit as no
-    // change. That is why it is asserted here, as a property of the function, rather than left to
-    // each caller to remember.
+    // This module's own answers depend on it: `scopedEntryWrites` takes the draft and the persisted
+    // snapshot as two values, and the caller seeds the draft FROM that snapshot — so a wither that
+    // mutated its argument would make the two one object and report every edit as no change.
     const baseline = scopedEntryBaseline(entryOf(), SHAPE);
     const named = withScopedEntryIdentity(baseline, 'name', 'Aether');
     assert.notEqual(named, baseline);
@@ -181,9 +156,8 @@ describe('what a Save writes, and what it deliberately does not', () => {
   });
 
   it('compares an OPAQUE section value STRUCTURALLY, so a round-trip is not a change', () => {
-    // `updateWorldDefaultSection` writes the value opaquely and the normalizer coerces shape
-    // rather than meaning, so the same authored default arrives as a NEW object on every publish.
-    // Reference comparison would report it as an edit and open the editor dirty, for ever.
+    // `updateWorldDefaultSection` writes the value opaquely and the normalizer coerces shape rather
+    // than meaning, so the same authored default arrives as a NEW object on every publish.
     const stored = { id: 'Item.ember', name: 'Ember Brand' };
     const baseline = scopedEntryBaseline(
       entryOf({ defaults: { id: 'ash', effectSource: stored } }),
@@ -314,13 +288,9 @@ describe('flushing a draft through the world-scope write family', () => {
     assert.deepEqual(actions.calls, [], 'the essence write after the refused tag write never ran');
   });
 
-  // ── A FOUNDRY-REFUSED WRITE REJECTS; IT DOES NOT ANSWER `false` (issue 1371 r19-entry2) ──────
-  // These verbs end in `game.settings.set` on a WORLD setting, and Foundry's socket layer posts
-  // its own error toast and then REJECTS. Everything here tested `=== false` and nothing caught,
-  // so a real refusal left this function as a rejected promise: the route-exit guard's
-  // `(await handle.save()) !== false` rejected instead of declining the exit, and the header's
-  // `onclick={() => onSave()}` dropped it unhandled. Under M34 that is four writes as one
-  // sequence, so it also matters WHICH of them had already landed.
+  // A FOUNDRY-REFUSED WRITE REJECTS; IT DOES NOT ANSWER `false` (issue 1371 r19-entry2) ──────
+  // These verbs end in `game.settings.set` on a WORLD setting, and Foundry's socket layer posts its
+  // own error toast and then REJECTS.
   it('a REJECTING write answers false, stops the sequence, and reports the step and what had landed', async () => {
     const actions = actionsOf();
     const refusals = [];
@@ -499,12 +469,10 @@ describe('the route-exit guard', () => {
   });
 });
 
-// ── THE REFUSED-SAVE SENTENCE, WHICH ALL THREE ENTRY EDITORS NOW COMPOSE FROM ONE TABLE ────────
-// (issue 1371 r20-entry3; Foundry review round 6 findings 4 and 6.)
-// The component entry carried its own four-name map while its two siblings read the shared
-// section table and reported nothing at all, so a rejection on either sibling left the GM with
-// Foundry's raw message. `reportRefusedScopedEntrySave` is the one composer; what is tested here
-// is the sentence it makes and the table it makes it from.
+// THE REFUSED-SAVE SENTENCE, WHICH ALL THREE ENTRY EDITORS NOW COMPOSE FROM ONE TABLE ────────
+// (issue 1371 r20-entry3; Foundry review round 6 findings 4 and 6.) The component entry carried its
+// own four-name map while its two siblings read the shared section table and reported nothing at
+// all, so a rejection on either sibling left the GM with Foundry's raw message.
 describe('the refused-save sentence', () => {
   /** A localizer with NO translations, so every assertion reads the English floor. */
   const format = (key, fallback, data) => {
@@ -555,9 +523,7 @@ describe('the refused-save sentence', () => {
   it('names the IDENTITY patch per entity type, and names NO field it cannot promise', () => {
     // A GM told "the name, icon, colour and description did not save" on the tool entry — which
     // buffers its name alone — has been told something false, so the identity fragment is per
-    // entity type rather than one sentence for all three. The two enumerating labels became the
-    // FIELD SET at r21-store4 (UX round 7): every fragment is an item in the list the landed
-    // clause joins, so a fragment that is itself a comma list makes the join unreadable.
+    // entity type rather than one sentence for all three.
     const identity = { step: SCOPED_ENTRY_IDENTITY_STEP, error: new Error('refused'), landed: [] };
     assert.deepEqual(sentenceFor(identity, 'component'), [
       'Saving the shared identity fields did not complete. refused',
@@ -596,10 +562,9 @@ describe('the refused-save sentence', () => {
   });
 
   it('EVERY section a scope descriptor declares has a fragment, so no sentence can name a raw key', () => {
-    // The mirror guard. The fragment table is hand-maintained beside `SECTION_COPY`, and a
-    // section added to a descriptor without one would fall through to its own key — putting
-    // `Saving effectSource did not complete.` in front of a GM. The two entry-level steps the
-    // component's draft stages (M34) are not descriptor sections and are named explicitly.
+    // The mirror guard. The fragment table is hand-maintained beside `SECTION_COPY`, and a section
+    // added to a descriptor without one would fall through to its own key — putting `Saving
+    // effectSource did not complete.` in front of a GM.
     const declared = new Set(['tags', 'aliases']);
     for (const descriptor of Object.values(WORLD_SCOPE_DESCRIPTORS)) {
       for (const section of descriptor.sections ?? []) declared.add(section);

@@ -8,17 +8,13 @@ import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// Real en.json so the tests assert LOCALIZED copy resolves — not the component's
-// inline text() fallback (which would mask a missing or renamed key). The unified
-// trigger editor is keyed under FABRICATE.Admin.Manager.Checks.Breakage (+ a few
-// reused Crafting keys for the award/break labels).
+// Real en.json so the tests assert LOCALIZED copy resolves.
 const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 function lookup(key) {
   return key.split('.').reduce((node, part) => (node == null ? undefined : node[part]), en);
 }
 
-// Use the shared mounted-component harness; do not re-inline compile/mount
-// boilerplate (it duplicates the other mount tests and trips the duplication gate).
+// Use the shared mounted-component harness.
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-triggers-',
@@ -32,10 +28,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js'
   ],
   compiledModules: [
-    // The shipped segmented primitive: the outcome toggle and the tier-step mode
-    // control both render it (issue 975). The harness validates the STATIC import
-    // closure of every declared module, so this entry is required whether or not a
-    // given test renders it.
+    // The shipped segmented primitive.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The shared numeric stepper: the condition Value field and the tier-step operand are
     // both built on it (issue 1050), and the same static-closure rule applies.
@@ -72,10 +65,7 @@ function triggerBlock(triggers) {
   return { triggers };
 }
 
-// The segmented control's real control is the visually hidden radio — the `<label>`
-// is only the styled surface. This is the idiom every other SegmentedControl consumer
-// test uses (`selectRadio` in crafting-settings-view-mounted.test.js): set `.checked`,
-// then dispatch a bubbling `change`. A bare `.click()` on the label is NOT it.
+// The segmented control's real control is the visually hidden radio.
 function chooseSegment(root, optionDataAttr, value) {
   const radio = root.querySelector(`[${optionDataAttr}="${value}"] input[type="radio"]`);
   assert.ok(radio, `a radio exists for ${optionDataAttr}="${value}"`);
@@ -84,9 +74,7 @@ function chooseSegment(root, optionDataAttr, value) {
   return radio;
 }
 
-// A trigger's controls live behind a disclosure (issue 1096), so every test that drives one
-// has to OPEN it first — which is also the cheapest possible proof that the disclosure works,
-// since a broken one takes the whole suite down with it.
+// A trigger's controls live behind a disclosure (issue 1096).
 function expandTrigger(root, id) {
   const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
   assert.ok(Boolean(disclosure), `a disclosure renders for trigger ${id}`);
@@ -135,13 +123,7 @@ async function mountRouted(tierStep, { outcomeOptions = ROUTED_TIERS, onChange, 
   return root;
 }
 
-/**
- * The simple-check mount: one `1d20` check over `triggers`, with the break pills off.
- *
- * The sibling of `mountRouted` above and there for the same reason — seven cases spelled out the
- * same four props to say "a simple check over 1d20", which is one call written seven times, and
- * SonarCloud counts duplication in `tests/**` exactly as it does in `src/`.
- */
+/** The simple-check mount: one `1d20` check over `triggers`, with the break pills off. */
 function mountSimple(triggers, overrides = {}) {
   return harness.mount({
     value: triggerBlock(triggers),
@@ -215,8 +197,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
       !hidden.querySelector('[data-trigger-break]'),
       'no break card when showBreakTools is false (toolSpecific)'
     );
-    // And the GM is told WHY, in the place the control would have been — the sentence that
-    // used to head the whole list on a card the prototype does not have.
+    // And the GM is told WHY, in the place the control would have been.
     const hint = hidden.querySelector('[data-trigger-break-unavailable]');
     assert.ok(Boolean(hint), 'the authority is explained where the missing card would be');
     assert.equal(hint.textContent.trim(), breakageKeys.LeadOutcomeOnly);
@@ -308,9 +289,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     const card = root.querySelector('[data-trigger="o1"]');
     const radioFor = (value) =>
       card.querySelector(`[data-trigger-outcome="${value}"] input[type="radio"]`);
-    // Disabled on the RADIO, not merely a dimmed class: `select()` guards only
-    // `next !== value`, so a live-but-dimmed segment would still force an outcome and
-    // re-open the circularity this pin exists to prevent.
+    // Disabled on the RADIO, not merely a dimmed class.
     assert.ok(radioFor('success').disabled, 'the success segment is disabled for an outcomeTier condition');
     assert.ok(radioFor('failure').disabled, 'the failure segment is disabled for an outcomeTier condition');
     assert.equal(radioFor('none').disabled, false, 'No effect stays choosable');
@@ -368,16 +347,14 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
   });
 
   it('renders the tier-step control even when tool breakage is not authored here', async () => {
-    // Stepping is not a breakage concept: gating it on showBreakTools would hide it
-    // under toolSpecific authority, which has nothing to do with tiers.
+    // Stepping is not a breakage concept.
     const root = await mountRouted({ mode: 'up', steps: 2, tierId: null });
     assert.ok(root.querySelector('[data-trigger-tier-step]'), 'the row renders');
     assert.ok(!root.querySelector('[data-trigger-break]'), 'and the break card does not');
   });
 
   it('gives the outcome and tier-step controls different radio group names', async () => {
-    // A shared `name` makes the browser treat both radio sets as ONE group, so
-    // choosing a tier-step mode would silently uncheck the outcome radio.
+    // A shared `name` makes the browser treat both radio sets as ONE group.
     const root = await mountRouted({ mode: 'none', steps: 1, tierId: null });
     const card = root.querySelector('[data-trigger="r1"]');
     const outcomeName = card
@@ -390,8 +367,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     assert.ok(stepName, 'the tier-step radios are named');
     assert.notEqual(outcomeName, stepName, 'the two controls are separate radio groups');
 
-    // And the real behavioural consequence: choosing a step mode leaves the outcome
-    // radio checked.
+    // And the real behavioural consequence.
     chooseSegment(card, 'data-trigger-tier-step-mode', 'up');
     assert.equal(
       card.querySelector('[data-trigger-outcome="none"] input[type="radio"]').checked,
@@ -469,9 +445,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     const cue = root.querySelector('[data-trigger-step-no-tiers]');
     assert.ok(cue, 'the tier-step cue renders');
     assert.equal(cue.textContent.trim(), breakageKeys.TierStepNoTiers);
-    // Distinct from the outcomeTier CONDITION's cue: a trigger that is both
-    // outcomeTier-conditioned and target-stepping must not carry two identically
-    // hooked nodes in one card.
+    // Distinct from the outcomeTier CONDITION's cue.
     assert.ok(
       !root.querySelector('[data-trigger-no-tiers]'),
       'the condition cue is a different hook and does not render here'
@@ -551,12 +525,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     chooseSegment(card, 'data-trigger-tier-step-mode', 'down');
     assert.equal(emitted.at(-1).triggers[0].tierStep.mode, 'down', 'the step is authored');
   });
-  // Issue 1050's keyboard non-regression entry, still owed after issue 1096 returned this field
-  // to a PLAIN `<input type="number">` (a threshold is typed, not walked to — reaching 20 from 1
-  // is nineteen clicks of a stepper). Up/Down are native user-agent behaviour, so the two things
-  // keeping them alive are that the element stays a number input and that its `input` event still
-  // reaches the commit path. `stepUp()` throws on a non-steppable input, so a drift to
-  // `type="text"` fails here rather than silently shipping a click-only control.
+  // Issue 1050's keyboard non-regression entry.
   it('still steps the condition value from the keyboard', async () => {
     const emitted = [];
     const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
@@ -576,9 +545,6 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
 });
 
 // ── THE COLLAPSED HEAD AND ITS DISCLOSURE (issue 1096) ─────────────────────────────────
-//
-// The head is the only thing a GM sees until they open a trigger, so what it says and whether
-// it opens are the whole of this screen's readability. Every case here drives the real control.
 describe('CheckTriggers (mounted): the collapsed head', () => {
   const stepUp = {
     id: 'u1',
@@ -771,12 +737,6 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
 });
 
 // ── The common-trigger presets, THROUGH THE RENDERED CONTROL (issue 1096) ──────────────
-//
-// The pure-module test proves `buildPresetTrigger` returns the right object. It says nothing
-// about whether a GM clicking the button reaches it — the handler, the button's own state and
-// the emit that carries the result are all outside that proof, and the control shipped INERT
-// with that proof green. These go through the DOM: find the rendered button, click it, and
-// assert the trigger arrives in the emitted block.
 describe('the common-trigger presets author a trigger when CLICKED', () => {
   it('renders a preset button per offered preset for a routed check', async () => {
     const root = await harness.mount({

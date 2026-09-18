@@ -1,48 +1,4 @@
-/*
- * THE WORLD COMPONENT CATALOGUE, RENDERED IN A REAL BROWSER (issue 1371).
- *
- * Two things happy-dom cannot answer and this file therefore does: WHICH ELEMENT IS ON TOP at a
- * control's own centre (the pointer hit-tests the delta's acceptance criteria name), and WHAT THE
- * CASCADE ACTUALLY RESOLVES for a rule that has to beat an unlayered competitor (the toolbar's
- * two micro-type corrections). Both are read off the SHIPPED markup and the SHIPPED stylesheets.
- *
- * ── WHY THIS FILE EXISTS ─────────────────────────────────────────────────────────────────
- * The issue's own acceptance criteria require a pointer hit-test on the catalogue row's identity
- * button, its `open-entry` pen, the bulk selection checkbox and the armed bulk delete, with the
- * stated reason that the row's trailing meta run shares a flex row with `.manager-action-group`
- * and the dock is a `position: sticky` band with negative inline margins that the list scrolls
- * under. UX review rounds 1 and 2 both found the set untested (`review-r9-ux.md` F-H): nothing in
- * `tests/components/world-component-catalogue-mounted.test.js` calls `elementFromPoint`, and
- * nothing can — happy-dom computes no layout at all, so `document.elementFromPoint` there answers
- * `null` for every point on the page and an assertion built on it would be vacuous rather than
- * false. DOM presence is not the question here. Which element is ON TOP at the control's own
- * centre is.
- *
- * ── AND WHY THE MARKUP IS THE PRODUCT'S ──────────────────────────────────────────────────
- * `tests/components/tool-rules-list-parity.test.js` hand-writes its fixture, which is the right
- * trade for a type-and-cascade contract and the wrong one here: a hand-written row goes on being
- * hit-testable after the real row stops emitting the element the test probes. So this follows
- * `tests/components/bulk-edit-dock-pinning.test.js` instead — MOUNT the shipped
- * `WorldComponentCataloguePage` through the shared harness, take the rendered tree's own
- * `innerHTML`, and ship that into Chromium inside the manager shell it actually renders in.
- * Deleting the checkbox, the pen or the dock from the product empties this gate's markup and the
- * `found` assertions fail on the spot.
- *
- * ── BOTH STYLESHEETS, FOR THE REASON THE DOCK GATE RECORDS ───────────────────────────────
- * `styles/fabricate.css` owns `.manager-body`'s column grid, `.manager-inspector`'s scrollport
- * and the route-scoped row rules; each component's own appearance lives in a Svelte-scoped block
- * that appears nowhere in that file. Injecting one without the other leaves half the geometry
- * unstyled, and an unstyled row hit-tests differently from a real one. The rendered markup
- * already carries the real `svelte-<hash>` classes, so the two halves match by construction —
- * `HASH_PARITY` below asserts that rather than assuming it.
- *
- * ── THE NEGATIVE CONTROL IS IN THE FILE, NOT IN A LOST SHELL SESSION ─────────────────────
- * A hit test that has never been seen to FAIL is indistinguishable from one that reports `true`
- * for everything. The second page load injects one extra rule that overlays each row and the dock
- * with a transparent `::after`, and the suite asserts that EVERY target then misses and that the
- * interceptor is named in the report. That is the whole reddening argument, run on every CI
- * execution rather than pasted into a handoff once.
- */
+/* THE WORLD COMPONENT CATALOGUE, RENDERED IN A REAL BROWSER (issue 1371). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -68,27 +24,17 @@ const { harness, compiledModules } = createWorldComponentCatalogueHarness({
   tmpPrefix: 'fabricate-catalogue-pointer-',
 });
 
-// The manager host is deliberately wide: `styles/fabricate.css` collapses `.manager-body` to a
-// single scrolling column at or below 1120px of container width, which would stack the list over
-// the inspector and put the dock somewhere no GM sees it. This measures the configuration the
-// screen is FOR, and `MIN_ROW_HEIGHT_PX` below is what stops a collapsed layout passing quietly.
+// The manager host is deliberately wide.
 const HOST_WIDTH_PX = 1280;
 const HOST_HEIGHT_PX = 720;
 // Anti-vacuity: a row laid out with no stylesheet is a few pixels tall and every point in it
 // belongs to whatever painted last. A real row is the reference's 38px medallion plus padding.
 const MIN_ROW_HEIGHT_PX = 40;
-// Anti-vacuity for the collector: the tree's styled components. Measured at 20; a floor well
-// under it still fails loudly if the collector silently stops finding blocks.
+// Anti-vacuity for the collector: the tree's styled components. Measured at 20.
 const MIN_SCOPED_BLOCKS = 12;
 
 /**
  * Every scoped `<style>` block in the tree, in the order the harness compiles them.
- *
- * READ OFF THE HARNESS MANIFEST rather than off a second hand-written list, so a component added
- * to the screen cannot arrive styled in the browser and unstyled here. A module with no block at
- * all is skipped — `IconButton`, `ManagerButton`, `ManagerToolbar`, `ArmedDangerButton` and
- * `InspectorCard` all draw entirely from the global sheet — and the count is asserted so the
- * skip cannot quietly become "all of them".
  *
  * @returns {{css: string, hashes: string[], blocks: number}}
  */
@@ -108,12 +54,6 @@ function collectScopedCss() {
 
 /**
  * The catalogue's rendered markup inside the manager shell it ships in.
- *
- * The page's own root IS `main.manager-main`, so the wrappers here are only what sits above it:
- * the themed area root that carries the route attribute every `[data-manager-view=…]` rule in
- * the sheet reads, `.manager-body`'s column grid, and the rail that occupies the first track.
- * The inspector is INSIDE the page — `EntityListInspectorFrame` renders it as the second track of
- * its own layout — so nothing here supplies one.
  *
  * @param {string} productMarkup
  * @param {string} scopedCss
@@ -142,15 +82,7 @@ function cataloguePage(productMarkup, scopedCss, control) {
     </body></html>`;
 }
 
-/**
- * The rule set that reddens every assertion below.
- *
- * A transparent `::after` stretched over each row and over the dock is the exact shape of the
- * defect a hit test exists to catch: nothing moves, nothing changes colour, every element is
- * still in the DOM at its right size, and every control stops being clickable. `position:
- * relative` on the row is part of the control rather than of the product — the row does not
- * declare one — because an absolutely positioned overlay needs a containing block to stretch to.
- */
+/** The rule set that reddens every assertion below. */
 const OVERLAY_CONTROL = `
   .manager-scoped-list-row { position: relative; }
   .manager-scoped-list-row::after { content: ''; position: absolute; inset: 0; }
@@ -164,21 +96,7 @@ const OVERLAY_CONTROL = `
   .manager-scoped-list-search-row::after { content: ''; position: absolute; inset: 0; }
 `;
 
-/**
- * The four controls the delta names, each as the point a GM aims at and the control it must hit —
- * and, since issue 1371 r17-b (quality N3), the five controls r16 put inside the bulk insets.
- *
- * `probe` and `target` differ for the checkbox and for the inset row. `SelectionCheckbox` keeps
- * the real `<input>` in the DOM at 1x1 `opacity: 0` and paints a sibling
- * `<span class="fab-selection-check">`; the pointer aims at the painted box and the control that
- * receives it is the `<label>` wrapping both. Probing the input would measure a one-pixel point
- * no GM can aim at. An inset row is a `<button>` whose label is a `<span>` child: a GM aims at the
- * name, and the point must belong to the row.
- *
- * The inset controls are the fragile kind a geometry read cannot see: 22px icon-only pager
- * buttons inside a 36px band inside a recessed card, 22px stepper adjuncts beside a 30px-capped
- * input, and a chip run painted above the inset, all inside a scroller the dock bleeds across.
- */
+/** The four controls the delta names. */
 const TARGETS = [
   {
     label: 'row identity button',
@@ -207,15 +125,13 @@ const TARGETS = [
     target: '[data-bulk-inset="systems"] [data-world-component-bulk-option]',
   },
   {
-    // LIVE, not disabled: the honest mount hands the panel seven systems, so page two exists and
-    // this button is the one a GM presses to reach the sixth.
+    // LIVE, not disabled: the honest mount hands the panel seven systems.
     label: 'system inset pager next',
     probe: '[data-bulk-inset-next="systems"]',
     target: '[data-bulk-inset-next="systems"]',
   },
   {
-    // The WELL is what a GM aims at and the `<input>` is the control, as with the checkbox: the
-    // input must fill the well, or a click at the well's edge focuses nothing.
+    // The WELL is what a GM aims at and the `<input>` is the control, as with the checkbox.
     label: 'tag inset search well, aimed at the well',
     probe: '[data-bulk-inset="tags"] .fab-bulk-inset-search',
     target: '[data-bulk-inset-search="tags"]',
@@ -238,11 +154,7 @@ const TARGETS = [
   },
 ];
 
-/**
- * SEVEN systems for the honest mount (issue 1371 r17-b): five more than the shared roster, so the
- * systems inset pages and its `Next` is a live control rather than a disabled one. The corpus's
- * membership still names only the first two; the five extra hold nothing.
- */
+/** SEVEN systems for the honest mount (issue 1371 r17-b): five more than the shared roster. */
 const SEVEN_SYSTEMS = [
   ...COMPONENT_SYSTEMS,
   ...['Glass', 'Herb', 'Jewel', 'Loom', 'Mint'].map((name) => ({
@@ -250,10 +162,7 @@ const SEVEN_SYSTEMS = [
     name,
   })),
 ].map((system) =>
-  // ONE SYSTEM'S RULES CARRY AN ESSENCE FOR `resin` (issue 1371 r18-cat, M30), so the measured
-  // row draws a chip run and its geometry can be read; `coal` carries none, so a chipless row
-  // stands beside it for the height comparison. Rules on a raw system are not membership — the
-  // corpus's membership still names only the first two systems, so the delete plan is unmoved.
+  // ONE SYSTEM'S RULES CARRY AN ESSENCE FOR `resin` (issue 1371 r18-cat, M30).
   system.id === 'sys-glass'
     ? { ...system, components: [{ id: 'resin', essences: { flame: 2 } }] }
     : system
@@ -262,11 +171,6 @@ const SEVEN_SYSTEMS = [
 /**
  * Hit-test every target at its own centre, wholly inside the page.
  *
- * `closest` rather than identity, because the topmost element at a control's centre is normally
- * one of its own children — the pen's `<i>`, the identity button's name `<span>`, the danger
- * button's label. What a pointer hit-test asks is whether the point belongs to the control, not
- * whether the control has no children.
- *
  * @param {Array<{label: string, probe: string, target: string}>} targets
  * @returns {Array<object>}
  */
@@ -274,10 +178,7 @@ function measurePointerTargets(targets) {
   return targets.map(({ label, probe, target }) => {
     const element = document.querySelector(probe);
     if (!element) return { label, probe, target, found: false };
-    // AS A GM REACHES IT: the bulk panel is taller than its column, so a control below the fold
-    // or under the sticky dock is scrolled to before it is aimed at. `elementFromPoint` answers
-    // `null` outside the viewport and the dock for a point beneath it, and neither is a hit-test
-    // of the control — the first measurement of the inset controls read exactly those two.
+    // AS A GM REACHES IT: the bulk panel is taller than its column.
     element.scrollIntoView({ block: 'center', inline: 'nearest' });
     const box = element.getBoundingClientRect();
     const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
@@ -295,14 +196,7 @@ function measurePointerTargets(targets) {
   });
 }
 
-/**
- * The toolbar's two micro-type roles, as the cascade actually resolves them.
- *
- * READ IN THE BROWSER, because both values are decided by a LAYER contest rather than by
- * specificity alone: `styles/fabricate.css` is imported at `layer(modules)` and the frame's own
- * `css: 'injected'` block is unlayered, so the route correction has to live in the unlayered
- * block to win at all. Nothing in the source text says which rule won; only a computed style does.
- */
+/** The toolbar's two micro-type roles, as the cascade actually resolves them. */
 function measureToolbarType() {
   const read = (selector) => {
     const element = document.querySelector(selector);
@@ -321,11 +215,7 @@ function measureToolbarType() {
     membershipLabel: read('[data-scoped-list-filter-label="membership"]'),
     sortLabel: read('.manager-scoped-list-sort-label'),
     direction: read('[data-scoped-list-direction]'),
-    // The ink the reference gives the direction toggle, resolved from the theme rather than
-    // written here as a literal — the token is the design system's answer and a colour value is
-    // not. Read through a PROBE rather than off the custom property, because a custom property
-    // answers its authored form while `color` answers the computed one, and comparing the two
-    // string forms would fail on notation alone.
+    // The ink the reference gives the direction toggle.
     secondaryInk: readTokenAsColor('--fab-text-secondary'),
   };
 
@@ -348,8 +238,6 @@ function measureToolbarType() {
 
 /**
  * The list column's LEAD and FOOT, measured against the column itself (issue 1371 r13-cat).
- *
- * M13: the drop zone takes the whole lead row now that the `+ Register item` action is gone.
  * M21 (issue 1371 r16-cat, superseding r13's M19): the whole list column runs edge to edge in its
  * pane — toolbar, rows scroller and pager all start and end at the column's own edges, the toolbar
  * sits at the pane's top and the pager flush at its bottom, the way the system Component Rules
@@ -357,10 +245,6 @@ function measureToolbarType() {
  * carrying a 16px inset on every side, so the toolbar and rows ran 337→1143 and the pager alone
  * bled through it (M19's negative margins). The rows keep their own inline inset INSIDE the
  * scroller, so they still sit inside the pager band exactly as the rules list's rows do.
- *
- * Read off a mount whose view-state pages at TWO rows, because the frame's pager is
- * `multiPageOnly` and the corpus is four records: at the default window there is no pager in
- * the markup to measure at all.
  */
 function measureListFrame() {
   const box = (selector) => {
@@ -446,8 +330,7 @@ function measureRowOrder() {
   const checkbox = row.querySelector('.fab-selection-checkbox').getBoundingClientRect();
   const medallion = row.querySelector('.fab-medallion').getBoundingClientRect();
   const pen = row.querySelector('[data-scoped-list-action="open-entry"]').getBoundingClientRect();
-  // THE ESSENCE CHIP RUN AND THE STAT COLUMNS (issue 1371 r18-cat, M30), and a chipless row's
-  // height to hold the chipped one against.
+  // THE ESSENCE CHIP RUN AND THE STAT COLUMNS (issue 1371 r18-cat, M30).
   const run = row.querySelector('[data-world-component-row-essences="resin"]');
   const chip = row.querySelector('[data-world-component-row-essence="flame"]');
   const stats = row.querySelector('[data-world-component-row-meta="resin"]');
@@ -485,12 +368,7 @@ function measureRowOrder() {
   };
 }
 
-/**
- * The lead toolbar row's two selects (issue 1371 r18-cat, M30): the source select the prototype
- * draws (`proto:579`, measured by the parity region `cat-toolbar-source-filter`) and the essence
- * select the ruling adds beside it, which the prototype's catalogue does not draw and which has
- * therefore to match the control it stands beside rather than a prototype element of its own.
- */
+/** The lead toolbar row's two selects (issue 1371 r18-cat, M30). */
 function measureLeadRow() {
   const read = (selector) => {
     const element = document.querySelector(selector);
@@ -539,16 +417,13 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         systems: SEVEN_SYSTEMS,
         // ONE WORLD ESSENCE, so the essence group draws a row whose geometry can be measured (M25).
         worldEssences: [{ id: 'flame', name: 'Flame', icon: 'fas fa-fire', colorToken: 'ember' }],
-        // `resin` is the one record NO system holds, so the bulk delete plan frees it and the
-        // dock's danger leg arms for real rather than branching to `Cannot delete`.
+        // `resin` is the one record NO system holds.
         actions: { deleteEntity: async () => true },
         worldItems: [{ uuid: 'Item.resin-source', name: 'Wildwood Resin', description: 'Tapped.' }],
       });
       target.querySelector('[data-scoped-list-select="resin"]').click();
       await drainMicrotasks();
-      // STAGE ONE OF EVERYTHING THE GEOMETRY PASS MEASURES, before arming the delete — the danger
-      // control disarms on blur, so it goes last: a direction (the ACTIVE segment's fill), a
-      // system (a lit box) and a tag (a staged chip).
+      // STAGE ONE OF EVERYTHING THE GEOMETRY PASS MEASURES, before arming the delete.
       target.querySelector(':scope [data-world-component-bulk-mode-option="add"]').click();
       await drainMicrotasks();
       target
@@ -569,9 +444,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       rendered.armed = danger.getAttribute('data-armed') === 'true';
       rendered.markup = target.innerHTML;
 
-      // A SECOND MOUNT, paged at two rows, so the foot pager is in the markup (see
-      // `measureListFrame`). Nothing is ticked here: the bulk dock replaces the inspector, and
-      // this mount measures the resting column.
+      // A SECOND MOUNT, paged at two rows.
       const paged = await harness.mount({
         scope: componentScopeFor(),
         systems: COMPONENT_SYSTEMS,
@@ -593,8 +466,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       await page.setContent(cataloguePage(rendered.markup, rendered.scoped.css, ''), {
         waitUntil: 'load',
       });
-      // GEOMETRY FIRST, hit-tests after: the hit-tests scroll the panel to each control, and the
-      // geometry pass reads viewport-relative boxes.
+      // GEOMETRY FIRST, hit-tests after: the hit-tests scroll the panel to each control.
       rowOrder = await page.evaluate(measureRowOrder);
       toolbarType = await page.evaluate(measureToolbarType);
       leadRow = await page.evaluate(measureLeadRow);
@@ -685,10 +557,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   }
 
   it('draws `SORT BY` exactly as it draws `MEMBERSHIP`, which is what the reference does', () => {
-    // UX round-2 finding F-K. `proto:582` and `proto:585` are the same declaration, and the
-    // subject drew 8.5px/700/.09em beside 9.28px/600/.08em — two micro-labels, one row, two
-    // treatments. Asserted AGAINST THE SIBLING rather than against three literals, because what
-    // the reference states is that the two are identical.
+    // UX round-2 finding F-K. `proto:582` and `proto:585` are the same declaration.
     assert.ok(toolbarType.membershipLabel.found, 'the membership micro-label renders');
     assert.ok(toolbarType.sortLabel.found, 'and so does the sort one');
     assert.deepEqual(
@@ -710,8 +579,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   });
 
   it('inks the direction toggle at the reference’s weight and secondary ink', () => {
-    // `proto:587` is `font:600 11px var(--sans);color:var(--text2)`; the toggle shipped at the
-    // manager's `--fab-recipe-control-font` (11.52px) at the inherited 400, in the primary ink.
+    // `proto:587` is `font:600 11px var(--sans);color:var(--text2)`.
     assert.ok(toolbarType.direction.found, 'the direction toggle renders');
     assert.equal(toolbarType.direction.fontWeight, '600');
     assert.equal(toolbarType.direction.fontSize, '11px');
@@ -776,8 +644,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
         rowOrder.essenceChip.height <= 24,
       `the chip is the compact scale (${rowOrder.essenceChip.height}px), not the default badge`
     );
-    // A PILL: the corner is at least half the chip's height, which is what makes the ends round
-    // whatever literal the primitive declares (`Chip` computes 10px on its 20px compact face).
+    // A PILL: the corner is at least half the chip's height.
     assert.ok(
       Number.parseFloat(rowOrder.essenceChipRadius) >= rowOrder.essenceChip.height / 2,
       `a pill, as every manager chip is (${rowOrder.essenceChipRadius} on ${rowOrder.essenceChip.height}px)`
@@ -789,10 +656,6 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     // was a hand-rolled `Chip` restating the glyph, the count and the accessible name, and dropping
     // the colour — while requirement 21 states the rule as a universal ("wherever it is drawn as a
     // chip"). It is `EssenceChip` now, and the fixture's `flame` carries `colorToken: 'ember'`.
-    //
-    // MEASURED AGAINST THE TOKEN, not against a hex this file spells: both sides are read out of
-    // the same themed root, so a re-derived palette moves them together and this pin keeps
-    // asserting the RELATION rather than a colour that used to be right.
     assert.equal(rowOrder.essenceChipTint, 'ember', 'the chip declares the roster’s own token');
     assert.notEqual(
       rowOrder.emberInk,
@@ -868,8 +731,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       Math.round(column.bottom),
       'and the pager sits flush at the pane`s bottom, as the rules list`s footer does'
     );
-    // THE ROWS SIT INSIDE THE BAND'S EDGES: the scroller keeps its own inline inset, so the band
-    // and the toolbar frame the rows exactly as the rules list frames its own.
+    // THE ROWS SIT INSIDE THE BAND'S EDGES: the scroller keeps its own inline inset.
     assert.ok(
       firstRow.left > pager.left && firstRow.right < pager.right,
       `the rows (${firstRow.left}→${firstRow.right}) are inside the band ` +
@@ -885,9 +747,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     const { aside, scroller, dock, apply, danger } = bulkGeometry;
     assert.ok(Boolean(dock) && Boolean(aside), 'NON-VACUITY: the panel and its dock render');
     assert.ok(dock.width > 250, 'NON-VACUITY: the dock is a real width');
-    // THE DOCK BAND IS THE INSPECTOR'S WHOLE WIDTH, inside its divider hairline. Before M24 the
-    // scroller clipped the shell's `--fab-space-3` bleed inside the column's `--fab-space-4`
-    // inset, so the band (and both buttons) stopped 16px short of each edge.
+    // THE DOCK BAND IS THE INSPECTOR'S WHOLE WIDTH.
     assert.equal(
       Math.round(dock.left),
       Math.round(aside.left + aside.borderLeft),
@@ -899,8 +759,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       Math.round(aside.right),
       'because the bulk scroller — not the column — now carries the inset the dock bleeds through'
     );
-    // AND THE BUTTONS ARE THE PANEL'S WIDTH: the dock's own inset is the pane's 16px on each side,
-    // `proto:791`'s `padding: 13px 17px` on the 4px scale.
+    // AND THE BUTTONS ARE THE PANEL'S WIDTH.
     for (const [name, control] of [
       ['Apply', apply],
       ['delete', danger],
@@ -932,25 +791,19 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
       insetPager,
       pagerButton,
     } = bulkGeometry;
-    // SYSTEM ROWS: `proto:5273` pads `7px 9px` around a 15px box, a 33px row — the 30 rung, with
-    // a 16px box so the row centres on the 4px scale.
+    // SYSTEM ROWS: `proto:5273` pads `7px 9px` around a 15px box, a 33px row — the 30 rung.
     assert.equal(Math.round(systemRow.height), 30, 'a system row is on the 30px rung');
     assert.ok(Boolean(systemBox), 'and carries the reference`s box');
     assert.equal(Math.round(systemBox.width), 16, 'the box is 16px wide');
     assert.equal(Math.round(systemBox.height), 16, 'and 16px tall');
-    // CATEGORY AND TAG ROWS: `proto:5296` / `proto:5330` pad `6px 9px` around 10.5px type, a
-    // 27px row — the 28 rung.
+    // CATEGORY AND TAG ROWS: `proto:5296` / `proto:5330` pad `6px 9px` around 10.5px type.
     assert.equal(Math.round(categoryRow.height), 28, 'a category row is on the 28px rung');
     assert.equal(Math.round(tagRow.height), 28, 'and so is a tag row');
     // THE STAGED CHIP: `proto:5313` pads `4px 9px` on a 999 corner — Chip's inspector density.
     assert.ok(Boolean(tagChip), 'NON-VACUITY: a chip is staged');
     assert.equal(tagChip.paddingLeft, '8px', 'the chip takes the 8px inset (9 on the 4px scale)');
     assert.equal(tagChip.radius, '999px', 'on the stadium corner');
-    // THE DIRECTION TRACK: `proto:5155` draws 28px segments on a 7px corner, the chosen one
-    // FILLED and the idle one bare. The segment's height is its `6px` insets around the label's
-    // line box, so it is a font metric rather than a stated rung: 28.4px on the lab's real host
-    // face, 26-27 on this harness's Arial. The 26-32px band is what the corner is read against,
-    // and the band is what is asserted.
+    // THE DIRECTION TRACK: `proto:5155` draws 28px segments on a 7px corner.
     assert.ok(
       segmentActive.height >= 26 && segmentActive.height <= 29,
       `a segment sits in the 26-32px band (measured ${segmentActive.height})`
@@ -979,10 +832,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
   });
 
   it('makes the whole 28px search well the control, not a strip inside it (issue 1371 r17-b)', () => {
-    // FOUND BY THE HIT-TEST, not by a geometry read: the first measurement of the well put the
-    // `<input>` at 263x11 inside a 28px well, so a GM aiming at the well's upper or lower third
-    // clicked the well's padding and focused nothing. `design-system/spec.md` puts a hit target
-    // at 24px or more; the input now stretches to the well.
+    // FOUND BY THE HIT-TEST, not by a geometry read.
     const { searchWell, searchInput } = bulkGeometry;
     assert.ok(Boolean(searchWell) && Boolean(searchInput), 'NON-VACUITY: the well and its input render');
     assert.equal(Math.round(searchWell.height), 28, '`proto:1139`: the well is 28px');
@@ -1004,8 +854,7 @@ describe('the catalogue’s rendered pointer targets and toolbar micro-type', ()
     assert.equal(Math.round(essenceStep.width), 22, '`proto:1207`: the shared Stepper`s 22px adjunct…');
     assert.equal(Math.round(essenceStep.height), 22);
     assert.equal(essenceStep.radius, '6px', '…on a 6px corner');
-    // `proto:5628`'s value column is a 26px LABEL; the shared `Stepper`'s is a typeable input, capped
-    // at 30px in this layout context (the system panel's own cap) so the `n/N` stays on the row.
+    // `proto:5628`'s value column is a 26px LABEL; the shared `Stepper`'s is a typeable input.
     assert.equal(Math.round(essenceValue.width), 30, 'the stepper`s input is capped at 30px');
     assert.ok(Boolean(essenceChip), 'and the staged chip is drawn above the inset');
     assert.equal(essenceChip.paddingLeft, '8px', 'at the inspector density the tag chips take');

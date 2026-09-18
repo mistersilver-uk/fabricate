@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 
 import { resolveProgressiveAward } from '../src/utils/progressiveAward.js';
 
-// ---------------------------------------------------------------------------
 // Shared fixtures / builders (Sonar counts tests/**; keep one definition each).
-// ---------------------------------------------------------------------------
 
 // Three ordered results with costs 2, 3, 5 keyed by id. `costMap` is the
 // difficulty lookup the util's `costFor` reads from.
@@ -43,9 +41,7 @@ function awardedIds(outcome) {
   return outcome.awarded.map((entry) => entry.id);
 }
 
-// ---------------------------------------------------------------------------
 // Award-mode loop semantics (the three modes)
-// ---------------------------------------------------------------------------
 
 test('equal mode awards full results while remaining >= cost, then stops', () => {
   // value 5: r-1 (cost 2, remaining 3), r-2 (cost 3, remaining 0), r-3 (cost 5 > 0) stops.
@@ -95,9 +91,7 @@ test('award mode defaults to equal when omitted', () => {
   assert.deepEqual(awardedIds(outcome), ['r-1', 'r-2']);
 });
 
-// ---------------------------------------------------------------------------
 // invalidCost: 'skip' vs 'fail' (divergence 1) across all three modes
-// ---------------------------------------------------------------------------
 
 const INVALID_RESULTS = Object.freeze([
   { id: 'r-1', componentId: 'a' }, // cost 2
@@ -137,10 +131,8 @@ test("invalidCost treats a sub-1 cost as invalid", () => {
   assert.equal(fail.invalidResultId, 'r-2');
 });
 
-// ---------------------------------------------------------------------------
-// zeroRemainingOnPartial (divergence 2) — the ONLY observable guard for the
-// latent salvage partial-remaining behaviour.
-// ---------------------------------------------------------------------------
+// zeroRemainingOnPartial (divergence 2) — the ONLY observable guard for the latent salvage
+// partial-remaining behaviour.
 
 test('zeroRemainingOnPartial true zeroes the budget after the partial tail award (crafting/gathering)', () => {
   // value 4: r-1 (cost 2, remaining 2), r-2 partial tail → remaining zeroed.
@@ -165,9 +157,7 @@ test('zeroRemainingOnPartial only applies to the partial tail, not exact/equal a
   assert.equal(kept.remaining, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Edge cases
-// ---------------------------------------------------------------------------
 
 test('empty / non-array results award nothing and keep the budget', () => {
   for (const results of [[], null, undefined]) {
@@ -190,15 +180,7 @@ test('zero budget awards nothing in every mode', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// partialResult / haltedResult / skippedResults — the five-bucket stage model
-// (issue 1286). Each stage in the ordered list lands in exactly ONE bucket:
-//   full      — in `awarded` and NOT `partialResult`
-//   partial   — the `partial`-mode tail award, itself a MEMBER of `awarded`
-//   halted    — the one stage that stopped the loop and was NOT awarded
-//   unreached — every stage after the halt, never evaluated
-//   skipped   — an invalid cost, derived over the WHOLE ordered list
-// ---------------------------------------------------------------------------
+// partialResult / haltedResult / skippedResults — the five-bucket stage model (issue 1286).
 
 /** Derive the five buckets the way a consumer must: `full = awarded \ {partialResult}`. */
 function buckets(outcome, ordered) {
@@ -415,11 +397,9 @@ test('empty / non-array results report empty and null new fields', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// The progressiveStageThresholds oracle — unchanged by the additive fields, and
-// now extended to the skipped bucket (a stage with no threshold is never awarded
-// at any budget, which is exactly what `skippedResults` reports).
-// ---------------------------------------------------------------------------
+// The progressiveStageThresholds oracle — unchanged by the additive fields, and now extended to the
+// skipped bucket (a stage with no threshold is never awarded at any budget, which is exactly what
+// `skippedResults` reports).
 
 const { progressiveStageThresholds } = await import('../src/utils/progressiveStageThresholds.js');
 

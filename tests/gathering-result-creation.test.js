@@ -1,20 +1,9 @@
 /**
  * Issue 780: a GATHERED AWARD item must carry the durable per-system component identity
- * (`flags.fabricate.roles[systemId].componentId`) of the awarded component at creation, so
- * a gathered part resolves to its OWN component through the identity tier once #601 removes
- * the name-fallback match tier — instead of degrading to name-only when the awarding
- * component has no registered source item.
- *
- * These drive the REAL `createGatheringResultCreator().create()` closure and assert on the
- * CAPTURED `createEmbeddedDocuments` payload (never a fake-document read-back — the stamp
- * lives in the create payload). Key invariants pinned here:
- *   - the stamped id is the one the RESULT authored (`result.componentId || systemItemId`),
- *     NEVER `source.id` (in the registeredItemUuid case `source` is the source Item);
- *   - ANY `itemUuid`-resolved result — even one carrying a stray `result.componentId` —
- *     stamps NO roles leaf (no managed component);
- *   - a dotted `systemId` stamps nothing (degrades to raw-reference resolution);
- *   - `flags.core.sourceId` is still written;
- *   - the stack/`existing.update` branch stamps NO roles leaf (create-only).
+ * (`flags.fabricate.roles[systemId].componentId`) of the awarded component at creation, so a
+ * gathered part resolves to its OWN component through the identity tier once #601 removes the
+ * name-fallback match tier — instead of degrading to name-only when the awarding component has no
+ * registered source item.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -249,15 +238,9 @@ for (const result of [[], undefined, [{ uuid: 'Actor.other.Item.wrong', quantity
   });
 }
 
-// ---------------------------------------------------------------------------
-// The award seam must never drop a result in silence.
-//
-// A gathering attempt that reports success and then quietly awards nothing is
-// indistinguishable from a broken module: the node and stamina are already spent and
-// nobody is told why. Two silent drops lived here — an `itemUuid` branch with no
-// component fallback (the sibling `registeredItemUuid` branch has always had one), and
-// a bare `continue` for anything that failed to resolve.
-// ---------------------------------------------------------------------------
+// The award seam must never drop a result in silence. A gathering attempt that reports success and
+// then quietly awards nothing is indistinguishable from a broken module: the node and stamina are
+// already spent and nobody is told why.
 
 test('an itemUuid that fails to resolve FALLS BACK to the row component instead of vanishing', async () => {
   const system = { id: SYSTEM_ID, components: COMPONENTS };

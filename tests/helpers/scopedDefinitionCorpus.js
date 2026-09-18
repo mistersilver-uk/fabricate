@@ -1,36 +1,9 @@
 /**
  * The crafting-system corpus fixture the Scoped Entity Definitions equivalence guard runs over
- * (issue 1359, part of epic 1357).
- *
- * WHY A SHARED FIXTURE RATHER THAN A LITERAL PER CASE. The acceptance bar for this change is the
- * ABSENCE of change: with every world setting unwritten, `_normalizeSystem` must emit byte-for-byte
- * what the pre-#1359 tree emitted. That claim is only worth anything if the corpus it is made over
- * actually EXERCISES the pruning paths the union basis now gates — component essence quantities,
- * essence source components, tool prerequisites, and the two category icon maps. So the fixture is
- * built once, here, and every case in `tests/scoped-definition-read-and-basis.test.js` derives from
- * it.
- *
- * EVERY ID IS EXPLICIT AND EVERY VALUE IS DETERMINISTIC. `_normalizeSystem` mints an id through
- * `foundry.utils.randomID()` for any entry that lacks one, so a fixture with an implicit id could
- * never be compared against a checked-in golden. The floors below are asserted by the suite for the
- * same reason `craftingDefinitionWriteShape.golden.json` carries a non-vacuousness floor: a fixture
- * that silently shrank to one component would still be "deep-equal to the golden" and would prove
- * nothing at all.
- *
- * THE ADVERSARIAL VARIANTS ARE DERIVED, NOT RE-AUTHORED. Each one empties exactly ONE in-system
- * array while leaving a record elsewhere still referencing an id of that type, which is the state
- * the epic's migration produces on a client whose world setting has not replicated yet. On the
- * pre-#1359 tree each of those prunes; under the Valid Id Basis each is retained, because an empty
- * array plus an unseeded world store is an UNKNOWN basis rather than an empty one.
+ * (issue 1359, part of epic 1357). WHY A SHARED FIXTURE RATHER THAN A LITERAL PER CASE.
  */
 
-/**
- * The non-vacuousness floors the equivalence suite asserts before it compares anything.
- *
- * @type {Readonly<{components: number, essences: number, tools: number,
- *   componentCategories: number, recipeCategories: number, componentCategoryIcons: number,
- *   categoryIcons: number}>}
- */
+/** The non-vacuousness floors the equivalence suite asserts before it compares anything. */
 export const SCOPED_CORPUS_FLOORS = Object.freeze({
   components: 6,
   essences: 4,
@@ -50,11 +23,7 @@ const ESSENCES = [
     description: 'Flow',
     iconCode: 'fas fa-droplet',
     // An essence whose behaviour is sourced from a MANAGED COMPONENT, carrying BOTH the component
-    // id and an authored uuid. This is the reference the component basis gates: with `components`
-    // empty and the basis unknown, the authored `sourceItemUuid` must SURVIVE rather than being
-    // resolved away to `null`. It carries its own uuid because the retention has nothing to retain
-    // otherwise — an essence with only a component id is not an adversarial fixture, it is an
-    // empty one.
+    // id and an authored uuid.
     sourceComponentId: 'cmp-ash-salt',
     sourceItemUuid: 'Compendium.world.materials.Item.ashsalt00000001',
   },
@@ -190,8 +159,7 @@ export function scopedDefinitionCorpus(overrides = {}) {
     categoryIcons: { smithing: 'fas fa-hammer', alchemy: 'fas fa-flask' },
     itemTags: ['metal', 'alchemical', 'refined'],
     // The legacy in-system character libraries, still carried until the 1.28.0 migration strips
-    // them. They give `_characterLibraryBasis` a non-empty legacy half, so the character-library
-    // pruning stays live and cannot be confused with the scope basis this change adds.
+    // them.
     characterPrerequisites: [
       {
         id: 'prq-smiths-tools',
@@ -217,16 +185,7 @@ export function scopedDefinitionCorpus(overrides = {}) {
   };
 }
 
-/**
- * The corpus with ONE in-system array emptied, leaving every reference to it in place.
- *
- * This is the shape the epic's migration produces on a client that has not yet received the world
- * setting: the legacy half is gone and the world half is unwritten, so the basis is UNKNOWN. The
- * pre-#1359 tree prunes against it; this change must retain.
- *
- * @param {'components'|'essenceDefinitions'|'componentCategories'|'categories'} key
- * @returns {object}
- */
+/** The corpus with ONE in-system array emptied, leaving every reference to it in place. */
 export function corpusWithEmptied(key) {
   return scopedDefinitionCorpus({ [key]: [] });
 }

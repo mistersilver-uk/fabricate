@@ -26,7 +26,6 @@ function createRecipeBrowserHarness({ rawModules = CRAFTING_APP_RAW_MODULES, com
 
 /**
  * BOTH FIXTURES ARE A MODULE THE CHAIN REALLY REACHES, and issue 1506 had to move both.
- *
  * They were `CraftingThumb.svelte` and, one rung below it, `craftingImageDefaults.js`. That
  * change retired the crafting tiles into the shared `Medallion`, so the thumb is not on disk and
  * neither `.filter()` would remove anything — leaving `assert.rejects` waiting on a setup that
@@ -34,12 +33,6 @@ function createRecipeBrowserHarness({ rawModules = CRAFTING_APP_RAW_MODULES, com
  * outcome and it is why they are re-pointed here rather than deleted: this diagnostic is what
  * turns every other mounted suite's missing-module HANG into a named error, so it is the last
  * guard in the repository that should be allowed to go vacuous.
- *
- * The RAW chain is re-pointed one rung shorter, at `RecipeListRow`'s own direct import of the
- * recipe-status vocabulary, because the retired tile's own `.js` import is the thing that no
- * longer exists: `Medallion` is an import-free leaf by contract, so there is no two-rung raw
- * chain through the new tile to point at, and inventing one would fight a stated goal of that
- * change. The COMPILED case keeps its two-rung shape at the tile that replaced the thumb.
  */
 describe('createMountedComponentHarness dependency validation', () => {
   it('reports the full importer chain for an omitted indirect raw import before component import', async () => {
@@ -107,15 +100,10 @@ describe('createMountedComponentHarness dependency validation', () => {
  * first test runs, so `node --test` reports `# cancelled N` with `# fail 0` and a gate reading
  * the fail count sees green. That is what issue 1185 was, and what a five-name allowlist routing
  * everything else to `svelte/internal/client` had rebuilt one import away from happening again.
- *
- * So the routing is asserted SEMANTICALLY — the specifier a name is routed to must really export
- * it — with the input derived from the installed Svelte rather than listed here, so a Svelte
- * release that adds an export is covered the day it lands instead of the day someone remembers.
  */
 describe('rewriteClientImports', () => {
   it('routes every `svelte` export to a specifier that actually provides it', async () => {
-    // Under the wrong condition set `svelte` is the SERVER build, whose export list is a
-    // different set; this test would then be asserting about a module no mounted suite loads.
+    // Under the wrong condition set `svelte` is the SERVER build.
     assertClientSvelteReactivity();
 
     const exportedNames = Object.keys(await import('svelte')).filter((name) => name !== 'default');
@@ -153,9 +141,7 @@ describe('rewriteClientImports', () => {
   });
 
   it('appends `.js` to `.svelte` specifiers and rewrites nothing else', () => {
-    // The compiler's own runtime import already names `svelte/internal/client`, and the bare
-    // `svelte` line is the component's own. Pinned as whole text because the defect this guards
-    // is a rewrite that fires where it should not.
+    // The compiler's own runtime import already names `svelte/internal/client`.
     const compiled = [
       "import 'svelte/internal/disclose-version';",
       "import * as $ from 'svelte/internal/client';",
@@ -190,8 +176,6 @@ describe('rewriteClientImports', () => {
 const harnessUrl = pathToFileURL(resolve(repoRoot, 'tests/helpers/svelte-component-harness.js')).href;
 
 // Each probe runs in a fresh process so the condition set under test is the process's own.
-// The reactivity barrel is only ever EVALUATED here, never in the guard: its client build
-// touches URLSearchParams at module scope, which teardownDOM removes from this process.
 function probe(source, { browser }) {
   const conditions = browser ? ['--conditions=browser'] : [];
   return execFileSync(process.execPath, [...conditions, '--input-type=module', '-e', source], {

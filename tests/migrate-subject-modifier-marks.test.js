@@ -1,19 +1,7 @@
 /**
- * Issue 1608 — 1.33.0: record the mark that keeps every existing subject pick rolling.
- *
- * Under `bySubject` the activity check's `defaultModifierIds` stopped being a mere default and
- * became the MARK that BOUNDS what a subject may pick. Every already-shipped check carries a
- * real array — `_normalizeCheckModifierSelection` emits the key unconditionally — so a check
- * whose GM never toggled a row "Selectable" is persisted as `[]`, and an empty mark bounds
- * everything away. Without this pass the upgrade would silently stop applying every pick those
- * worlds authored.
- *
- * THE PASS HAS TWO HALVES AND BOTH ARE LOAD-BEARING. Seeding the mark restores the AUTHORING
- * subjects; pinning the INHERITING ones is what stops the seed handing them the whole union,
- * because under `bySubject` a subject with no authored pick resolves the mark itself. The
- * suite asserts the outcome the way a GM measures it — through `resolveEligibleModifierIds`,
- * before and after — rather than only on the persisted shape, so a half that stopped working
- * cannot pass by writing plausible-looking data.
+ * Issue 1608 — 1.33.0: record the mark that keeps every existing subject pick rolling. Under
+ * `bySubject` the activity check's `defaultModifierIds` stopped being a mere default and became the
+ * MARK that BOUNDS what a subject may pick.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -100,9 +88,7 @@ function rolled(check, subjectPick) {
   });
 }
 
-// ---------------------------------------------------------------------------
 // The seed — the authoring subjects keep rolling
-// ---------------------------------------------------------------------------
 
 test('1.33.0 seeds an empty bySubject mark with the union of what its recipes pick', () => {
   const result = migrate({
@@ -164,9 +150,7 @@ test('1.33.0 preserves a key already in a recipe’s craftingModifier block when
   );
 });
 
-// ---------------------------------------------------------------------------
 // The other two subjects
-// ---------------------------------------------------------------------------
 
 test('1.33.0 seeds and pins the SALVAGE mark from the components’ own picks', () => {
   const systems = [
@@ -188,11 +172,6 @@ test('1.33.0 seeds and pins the SALVAGE mark from the components’ own picks', 
 
 test('1.33.0 pins a component carrying NO salvage block without making it salvageable', () => {
   // The pin writes `salvage.checkModifierIds` and creates the block when a component has none.
-  // It MUST NOT be guarded on the block's presence: a genuinely salvageable component that
-  // simply never opened its picker has no `checkModifierIds` sub-key either, and skipping it
-  // would hand it the whole seeded union. What makes the CREATED block inert is that every
-  // reader keys on `salvage.enabled === true`, which the pin never writes — measured here
-  // through a shipped reader rather than by inspecting the shape.
   const systems = [
     system({
       components: [
@@ -259,9 +238,7 @@ test('1.33.0 reads a recipe only for the system it belongs to', () => {
   assert.deepEqual(result.recipes[1].craftingModifier.modifierIds, ['alch']);
 });
 
-// ---------------------------------------------------------------------------
 // What it deliberately leaves alone
-// ---------------------------------------------------------------------------
 
 for (const policy of ['addAll', 'highest', 'playerPicks']) {
   test(`1.33.0 leaves an empty ${policy} mark alone — there it is the SOURCE, not a bound`, () => {
@@ -345,9 +322,7 @@ test('1.33.0 finds the catalogue in a surviving in-system copy as well as the wo
   );
 });
 
-// ---------------------------------------------------------------------------
 // Purity, idempotence, and the no-throw guarantee
-// ---------------------------------------------------------------------------
 
 test('1.33.0 is idempotent: a second pass over its own output changes nothing', () => {
   const first = migrate({
@@ -392,9 +367,7 @@ test('1.33.0 skips malformed input rather than throwing or repairing it', () => 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Runner registration
-// ---------------------------------------------------------------------------
 
 test('the 1.33.0 registry entry declares a lossless downgrade to 1.32.0', () => {
   const runner = new MigrationRunner({ getSetting: () => undefined, setSetting: async () => {} });
@@ -460,9 +433,7 @@ test('the runner does not re-run 1.33.0 once the world is at that version', asyn
   );
 });
 
-// ---------------------------------------------------------------------------
 // The IMPORT-side mirror — a bundle exported before the upgrade
-// ---------------------------------------------------------------------------
 
 test('the export upcast seeds a LEGACY bundle’s mark from its own recipes and tasks', () => {
   const upcast = migrateExportPayload({
@@ -497,10 +468,7 @@ test('the export upcast reads a LEGACY bundle whose modifier library has not bee
 
 test('the export upcast leaves a CURRENT-schema bundle alone — there an empty mark is an ANSWER', () => {
   // Since issue 1608 an empty mark under `bySubject` MEANS “nothing is selectable”, so a GM who
-  // un-marks the last row authors exactly the shape this seed keys on. The current-schema branch
-  // runs on EVERY payload forever, so seeding there would revert that answer — and pin every
-  // sibling subject of the activity — on every export/import round trip, which is the selection
-  // triple round-trip `import-export/spec.md` § Round-trip integrity requires.
+  // un-marks the last row authors exactly the shape this seed keys on.
   const payload = {
     schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     system: system({ components: [component('c-1', ['alch']), component('c-2')] }),
@@ -513,8 +481,6 @@ test('the export upcast leaves a CURRENT-schema bundle alone — there an empty 
   const upcast = migrateExportPayload(payload);
 
   // The selection triple, which `import-export/spec.md` § Round-trip integrity names by field.
-  // `failureResultPolicy` is a separate, legitimate branch-independent derivation and is not
-  // part of the triple, so the comparison is per key rather than over the whole check.
   const triple = (check) => ({
     defaultModifierPolicy: check.defaultModifierPolicy,
     defaultModifierIds: check.defaultModifierIds,

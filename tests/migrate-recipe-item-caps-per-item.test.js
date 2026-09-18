@@ -1,13 +1,9 @@
 /**
- * Tests for the 1.11.0 migration
- * (src/migration/migrateRecipeItemCapsPerItem.js): seeding each recipe item
- * definition's per-item `caps` from the old system-wide
- * `recipeVisibility.knowledge.item` / `.learn`, stripping the relocated fields
- * (while keeping `mode` + `learn.dragDropEnabled`), idempotency, empty-array
- * safety, purity, and a `_normalizeSystem` round-trip.
- *
- * node:test + node:assert/strict. Pure function; Foundry globals only for the
- * normalizer round-trip.
+ * Tests for the 1.11.0 migration (src/migration/migrateRecipeItemCapsPerItem.js): seeding each
+ * recipe item definition's per-item `caps` from the old system-wide
+ * `recipeVisibility.knowledge.item` / `.learn`, stripping the relocated fields (while keeping
+ * `mode` + `learn.dragDropEnabled`), idempotency, empty-array safety, purity, and a
+ * `_normalizeSystem` round-trip.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

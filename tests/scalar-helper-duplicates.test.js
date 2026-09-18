@@ -1,31 +1,7 @@
 /**
  * THE SCALAR HELPERS ARE DECLARED ONCE, AND THE ONES THAT ARE NOT SAY WHY (issue #1662).
- *
- * Eleven names were being redefined across `src/` — 61 declarations between them, every copy
- * counted by SonarCloud's duplication detector. The issue asked for one implementation each.
- *
- * SIX OF THE ELEVEN COULD BE MERGED. FIVE COULD NOT, and that is the finding, not a caveat. The
- * bodies were compared before anything was consolidated, and only six names are written
- * identically at every site. The other five differ in ways that change what the function returns:
- *
- *   - `numberOrNull` (5 sites, 3 bodies) — two have no empty-string or null guard, so `''` and
- *     `null` come back as `0` rather than `null`, because `Number('')` is `0`.
- *   - `stringOrEmpty` (9 sites, 4 bodies) — three return `String(value)`; one TRIMS it. `' a '`
- *     is `' a '` or `'a'` depending which file you are in.
- *   - `trimmed` (10 sites, 2 bodies) — `typeof value === 'string' ? value.trim() : ''` against
- *     `String(value ?? '').trim()`. The number `42` is `''` in six files and `'42'` in four.
- *   - `stringOrNull` (9 sites, 4 bodies) — two delegate to other local helpers, two inline.
- *   - `normalizeList` (4 sites, 3 bodies) — one wraps a scalar into a one-item list, one unwraps
- *     a `Map`, one returns `[]`.
- *   - `normalizeIdList` (3 sites, 2 bodies) — one requires an array, one accepts a scalar.
- *
- * Merging those behind one implementation would change behaviour at some call site, silently, in
- * migration and runtime paths. Each needs its own proof that the differing inputs cannot reach it,
- * or a distinctly-named export — which is work, not a rename, and it is not in this change.
- *
- * So this gate covers the six that merged, and records the other five as measured divergence with
- * their site counts pinned. The pin is what makes the list shrink rather than drift: fixing one is
- * a visible edit to a number.
+ * `numberOrNull` (5 sites, 3 bodies) — two have no empty-string or null guard, so `''` and `null`
+ * come back as `0` rather than `null`, because `Number('')` is `0`.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -47,21 +23,15 @@ const CONSOLIDATED = {
   normalizeConditionId: [CANONICAL],
   normalizeTagList: [CANONICAL],
   trimString: [CANONICAL],
-  // `TagsCategoriesView.svelte` keeps its own `normalizeTag`, and the exception is recorded
-  // rather than merged because it DIVERGES: it spells the guard `String(value || '')` where
-  // `scalars.js` spells it `String(value ?? '')`, so `0` normalises to `''` there and `'0'` here,
-  // and likewise `false` and `NaN`. It reaches a child as a `normalize` prop rather than being
-  // called locally, so proving those inputs cannot arrive means tracing the child — the same
-  // proof the five names in DIVERGENT are waiting on. Until someone does it, this is a seventh
-  // spelling that is written down instead of assumed away.
+  // `TagsCategoriesView.svelte` keeps its own `normalizeTag`, and the exception is recorded rather
+  // than merged because it DIVERGES: it spells the guard `String(value || '')` where `scalars.js`
+  // spells it `String(value ?? '')`, so `0` normalises to `''` there and `'0'` here, and likewise
+  // `false` and `NaN`.
   normalizeTag: [CANONICAL, 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'],
 };
 
 /**
  * Names still declared per file, with the number of declarations, because their copies disagree.
- *
- * Pinned exactly, not as a ceiling — the same shape as every other baseline in this epic. A
- * ceiling banks a free slot each time one is fixed.
  */
 const DIVERGENT = {
   numberOrNull: 5,
@@ -74,22 +44,12 @@ const DIVERGENT = {
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * Every function declaration of `names` under `src/`, as `name -> ['file:line', …]`.
- *
- * PARSED, not grepped. A regex over `function <name>` misses `const <name> = (…) =>` and matches
- * the word inside a comment or a string, and both errors run in the direction that makes this gate
- * quieter than it should be.
- */
+/** Every function declaration of `names` under `src/`, as `name -> ['file:line', …]`. */
 function declarationsOf(names) {
   const wanted = new Set(names);
   const found = new Map();
-  // `.svelte` INCLUDED, and that is the whole difference between this gate and a comfortable one.
-  // `sourceScan.js` says of its own default that "`.svelte` is load-bearing — real call sites live
-  // there", and `AGENTS.md` records issue 1050, where reasoning that Svelte is invisible to
-  // SonarCloud shipped a duplication failure with 93 of its 98 duplicated lines in a single
-  // `.svelte` file. A first version of this gate scanned `.js` only and was blind to a live,
-  // divergent seventh `normalizeTag`.
+  // `.svelte` INCLUDED, and that is the whole difference between this gate and a comfortable one
+  // (issue 1050).
   for (const file of Object.keys(collectSources(`${repoRoot}/src`))) {
     const source = readFileSync(path.join(REPOSITORY_ROOT, file), 'utf8');
     const ast = file.endsWith('.svelte') ? parseComponent(source) : parseModule(source);

@@ -1,12 +1,4 @@
-/**
- * Phase 7 — the PURE GM scene-control registration seam.
- *
- * Foundry V13 `getSceneControlButtons` passes an OBJECT-of-controls (keyed
- * record), NOT the pre-V13 array, and each control's `tools` is also an object.
- * `addInteractableSceneControl` mutates that record. These tests assert the V13
- * object shape, the GM gate (non-GM ⇒ nothing added), and that the button's
- * handler launches the browser app.
- */
+/** Phase 7 — the PURE GM scene-control registration seam. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

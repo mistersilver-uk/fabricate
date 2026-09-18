@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createRouteChromeChannel } from '../src/ui/svelte/apps/manager/downtime/routeChromeChannel.js';
 
-// A context stands in for the frozen object Core mints per mount. Its identity is the whole
-// point — the channel keys liveness on it — so these are deliberately bare objects: nothing
-// about the real context's FIELDS participates.
+// A context stands in for the frozen object Core mints per mount.
 const contextFor = (tabId) => Object.freeze({ tabId });
 
 function recordingChannel() {
@@ -51,9 +49,7 @@ test('chrome is scoped to one mount and never survives it', () => {
   channel.setChrome(ledger, { title: 'Editing a crew member' });
   assert.equal(channel.chrome.title, 'Editing a crew member');
 
-  // The mount ends — a tab switch, a route exit, a provider swap; the channel does not care
-  // which. What must not happen is a GM arriving on the next screen still reading the editor's
-  // title, because the state that title described was destroyed with the mount.
+  // The mount ends — a tab switch, a route exit, a provider swap; the channel does not care which.
   channel.endMount(ledger);
   assert.equal(channel.chrome, null);
 
@@ -75,11 +71,9 @@ test('chrome is scoped to one mount and never survives it', () => {
   );
 });
 
-// The shipped host always ends a mount before it begins the next one, so `beginMount`'s own
-// clear is defence in depth rather than the load-bearing path — which is exactly why it needs
-// a test of its own. Without one, deleting it is invisible, and the day a caller reaches
-// `beginMount` without a matching `endMount` (a fault path, a reordered effect) the new screen
-// inherits the previous one's title, artwork and Save button.
+// The shipped host always ends a mount before it begins the next one, so `beginMount`'s own clear
+// is defence in depth rather than the load-bearing path — which is exactly why it needs a test of
+// its own.
 test('a mount adopted without a release still starts from its tab’s registered chrome', () => {
   const { channel } = recordingChannel();
   const ledger = contextFor('ledger');
@@ -195,13 +189,6 @@ test('the channel refuses a non-function handler and is itself frozen', () => {
 /**
  * THE COMPATIBILITY GUARANTEE, and the reason it is asserted against `undefined` rather than
  * against a boolean.
- *
- * Every caller of `confirmNavigation` reads `undefined` as "there is nothing to ask" and takes
- * the branch it took before this seam existed: no prompt, no `await`, no extra microtask, and
- * no wrapping of the route-guard promise identity `confirmRouteExit` preserves on purpose. A
- * channel that answered `true` here would be behaviourally identical AND would cost the
- * Manager an await on every close and a composed promise on every route exit, for a question
- * no companion asked. So `undefined` is the contract, not an implementation detail.
  */
 test('a mount that registers no guard is asked nothing at all', () => {
   const { channel, errors } = recordingChannel();
@@ -263,15 +250,7 @@ test('an async guard is awaited, and its answer read the same way', async () => 
   assert.equal(await channel.confirmNavigation('close'), true, 'and an omitted answer allows');
 });
 
-/**
- * A COMPANION DEFECT MUST NEVER TRAP THE GM.
- *
- * A throw is reported and the navigation proceeds. Reading it as a veto instead would leave a
- * GM in a Manager window they cannot close and a rail that does nothing, recoverable only by
- * reloading Foundry — and it would do so for exactly the module least able to notice. Allowing
- * degrades to the behaviour that shipped before this seam existed, where a screen exit neither
- * wrote nor discarded a companion's draft, so nothing is destroyed that was not already.
- */
+/** A COMPANION DEFECT MUST NEVER TRAP THE GM. */
 test('a throwing guard is contained and allows the navigation', async () => {
   const { channel, errors } = recordingChannel();
   const context = contextFor('ledger');
@@ -297,10 +276,7 @@ test('a throwing guard is contained and allows the navigation', async () => {
 
 /**
  * RE-ENTRANCY. A guard is expected to await a dialog, and a GM can click the rail and then the
- * window's close button before answering it. The pending answer is SHARED rather than re-asked
- * (which stacks a second dialog on the first) or refused (which hands the GM a dead click with
- * nothing to explain it) — the same de-duplication `confirmDiscardDirtyToolsDraft` applies to
- * Core's own concurrent prompt.
+ * window's close button before answering it.
  */
 test('a second navigation shares the pending answer instead of asking again', async () => {
   const { channel } = recordingChannel();
@@ -388,15 +364,7 @@ test('the channel refuses a non-function navigation guard', () => {
   assert.throws(() => channel.onBeforeNavigate(context, 'nope'), /requires a function/);
 });
 
-/**
- * WHAT THIS CHANNEL OWNS OF `navigateToTab`, and what it deliberately does not (issue 1332).
- *
- * It owns LIVENESS and the shape of the argument — the same two things it owns for every other
- * member — and nothing else. It knows no tab set and owns no route, so which destinations a
- * caller may reach and what reaching one does are the host's, injected as `onNavigate`. These
- * cases therefore assert what ARRIVES at that edge, which is the only claim this file can make
- * honestly; `tests/components/manager-mounted.test.js` asserts what Core then does with it.
- */
+/** WHAT THIS CHANNEL OWNS OF `navigateToTab`, and what it deliberately does not (issue 1332). */
 function navigatingChannel(answer = true) {
   const asked = [];
   const channel = createRouteChromeChannel({
@@ -420,9 +388,7 @@ test('a live mount reaches the host, and a retired one is refused without reachi
   assert.equal(channel.navigate(ledger, 'crew'), true);
   assert.deepEqual(asked, ['crew'], 'the destination arrives at the host verbatim');
 
-  // The mount that asked has been replaced by the one it navigated to. A companion holding the
-  // retired context — a pending promise, a stray listener — must not be able to move a GM who
-  // has already gone somewhere else.
+  // The mount that asked has been replaced by the one it navigated to.
   channel.beginMount(crew);
   assert.equal(channel.navigate(ledger, 'ledger'), false, 'a retired context moves nobody');
   assert.deepEqual(asked, ['crew'], 'and is refused BEFORE the host could act on it');
@@ -433,10 +399,7 @@ test('a live mount reaches the host, and a retired one is refused without reachi
 });
 
 test('the host’s answer is passed back unchanged, including a pending one', async () => {
-  // The host answers a companion's veto asynchronously, because the veto may be a dialog. The
-  // channel must hand that promise back rather than resolving it into a boolean of its own: a
-  // synchronous `false` here would tell a companion it had been refused while its own dialog
-  // was still open, and a synchronous `true` would be worse.
+  // The host answers a companion's veto asynchronously, because the veto may be a dialog.
   let settle;
   const pending = new Promise((resolve) => {
     settle = resolve;
@@ -480,24 +443,14 @@ test('a malformed tab id throws whoever sent it, and moves nobody', () => {
 });
 
 test('a channel created without a host refuses to navigate rather than pretending to', () => {
-  // Every unit of the three older members constructs a channel with no `onNavigate`. The
-  // default has to be a refusal: a `true` there would let one of those cases silently claim a
-  // GM had been moved by a channel wired to nothing that could move them.
+  // Every unit of the three older members constructs a channel with no `onNavigate`.
   const { channel } = recordingChannel();
   const ledger = contextFor('ledger');
   channel.beginMount(ledger);
   assert.equal(channel.navigate(ledger, 'crew'), false);
 });
 
-/**
- * RE-ENTRANCY FROM INSIDE THE GUARD'S OWN BODY (issue 1332 review).
- *
- * The pending-answer sharing above cannot cover this window: `pendingNavigation` is assigned
- * only AFTER the handler returns, and only when it returned a promise, so throughout the
- * synchronous body of a guard it is still `null`. A `navigateToTab` issued there — the natural
- * shape of "veto this move, and send the GM to Settings instead" — used to re-invoke the very
- * handler it was called from.
- */
+/** RE-ENTRANCY FROM INSIDE THE GUARD'S OWN BODY (issue 1332 review). */
 test('a navigation asked for from inside the guard’s own body is refused, never nested', () => {
   const reached = [];
   const channel = createRouteChromeChannel({

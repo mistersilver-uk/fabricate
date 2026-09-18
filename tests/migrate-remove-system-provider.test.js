@@ -1,11 +1,8 @@
 /**
- * Tests for the 1.3.0 migration (src/migration/migrateRemoveSystemProvider.js):
- * removing the dnd5e/pf2e/macro provider model from gathering gates, checks,
- * tool requirements, and character modifiers (formula-only), deleting macro
- * character modifiers with reference cleanup, and the fail-open/empty-formula
- * edge cases.
- *
- * node:test + node:assert/strict. Pure functions; no Foundry globals.
+ * Tests for the 1.3.0 migration (src/migration/migrateRemoveSystemProvider.js): removing the
+ * dnd5e/pf2e/macro provider model from gathering gates, checks, tool requirements, and character
+ * modifiers (formula-only), deleting macro character modifiers with reference cleanup, and the
+ * fail-open/empty-formula edge cases.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -151,8 +148,7 @@ test('strips provider/macroUuid from task visibility and check, fail-open on mac
 
   // Macro visibility gate with no formula → nulled (fail open).
   assert.equal(tasks['task-macro'].visibility, null);
-  // Macro check with no formula → left as { formula: '' } so the misconfigured
-  // diagnostic flags it.
+  // Macro check with no formula → left as { formula: '' } so the misconfigured diagnostic flags it.
   assert.deepEqual(tasks['task-macro'].check, { formula: '' });
 });
 

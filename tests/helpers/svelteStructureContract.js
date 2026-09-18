@@ -1,21 +1,14 @@
 /**
  * Structural questions about a Svelte component, answered from its AST instead of from its text
  * (issue 1658), so a rename, an import reorder or an extraction does not break a test that never
- * cared how the component was written. Proved from inside the `npm test` glob by
- * `tests/svelte-structure-contract.test.js`.
+ * cared how the component was written. `tests/svelte-structure-contract.test.js` pins the two
+ * paragraphs below, so condense them only together with that test.
  *
  * Do not add a string `includes` on component source to a test. That is the shape
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
  *
- * It parses nothing of its own: `svelteTemplateScan.js` already walks every shipped template with
- * `svelte/compiler`, and a second walker beside it is the duplication both helpers exist to avoid.
- *
- * COVERAGE IS NOT MEASURED HERE. These predicates address the `.svelte`-targeted structural subset
- * of the sites the ratchet counts. No share is stated, because no run has derived one against the
- * ledger this change pins, and the plan-review estimate was taken against a corpus figure this
- * change corrected. #1691 derives it at its own boundary. The residue they deliberately do not
- * address: exact JS expression text, a receiver that is a loop variable rather than a literal,
- * i18n key strings, and `.js`/`.mjs` targets.
+ * The residue they deliberately do not address: exact JS expression text, a receiver that is a
+ * loop variable rather than a literal, i18n key strings, and `.js`/`.mjs` targets.
  */
 import { parse } from 'svelte/compiler';
 
@@ -58,20 +51,13 @@ export function rendersComponent(ast, name) {
   return renderedComponents(ast).includes(name);
 }
 
-/**
- * Every raw element the template draws, lower-cased, in source order.
- *
- * A `<svelte:element this="td">` contributes its literal tag; one whose `this` is an expression
- * cannot be known statically and contributes nothing, so a false from `rendersElement` means
- * "not drawn statically under that name", never "not drawn".
- */
+/** Every raw element the template draws, lower-cased, in source order. */
 export function renderedElements(ast) {
   const named = collect(ast, (node) => node.type === 'RegularElement').map((node) => ({
     start: node.start,
     tag: node.name.toLowerCase(),
   }));
   // `walkElements` visits only RegularElement and Component, so a dynamic tag needs its own pass.
-  // It reuses this change's generic node walk rather than adding a second element walker.
   const dynamic = [];
   for (const node of walkNodes(ast.fragment ?? ast)) {
     if (node.type !== 'SvelteElement') continue;
@@ -93,13 +79,7 @@ export function carriesSpread(node) {
   return (node.attributes || []).some((attribute) => attribute.type === 'SpreadAttribute');
 }
 
-/**
- * Whether one element or component node declares the named attribute, prop or binding.
- *
- * A `class:name`, `style:name`, `use:name`, `on:name` or transition directive shares the name
- * space but passes no prop, so only a binding counts. Pass `directives: false` to require a plain
- * attribute.
- */
+/** Whether one element or component node declares the named attribute, prop or binding. */
 export function declaresAttribute(node, name, { directives = true } = {}) {
   if (attributeNamed(node, name)) return true;
   if (!directives) return false;
@@ -109,12 +89,8 @@ export function declaresAttribute(node, name, { directives = true } = {}) {
 }
 
 /**
- * Whether every occurrence of `componentName` declares `propName`.
- *
- * False when the component is not rendered at all, so a caller cannot read a vacuous true as a
- * satisfied contract. An occurrence carrying a spread is UNDECIDABLE from the template and is
- * reported as not declaring it — do not read a false here as proof of a call-site defect. Use
- * `carriesSpread` to tell the two apart.
+ * Whether every occurrence of `componentName` declares `propName`. False when the component is not
+ * rendered at all, so a caller cannot read a vacuous true as a satisfied contract.
  */
 export function passesProp(ast, componentName, propName) {
   const occurrences = collect(
@@ -127,8 +103,7 @@ export function passesProp(ast, componentName, propName) {
 
 /**
  * Every module specifier the component depends on: both script blocks, static and dynamic imports,
- * and re-exports. A narrower reading would answer `false` for a component that genuinely depends
- * on the module, which is the failure direction this epic exists to prevent.
+ * and re-exports.
  */
 export function importedModules(ast) {
   const specifiers = [];

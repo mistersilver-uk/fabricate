@@ -1,44 +1,4 @@
-/**
- * The coverage gate over the design system's two halves.
- *
- * `openspec/specs/design-system/spec.md` says the shared primitive set is the set the library
- * enumerates, and `AGENTS.md` prohibits adding a component under `src/ui/svelte/components/`
- * without recording it. Until this file existed, nothing read the enumeration: the vocabulary lived
- * in `library.html` as names inside 30 of its 50 `div.spec-head > h4` headings, and the only reader
- * was a whole-file `includes()` in `tests/design-system-primitives.test.js` that cannot tell an
- * ENTRY from a CITATION — a manifest row naming a RULED-OUT primitive passed it.
- *
- * This is issue 1116's defect class in the specification layer: unreachable configuration looks
- * identical to working configuration. A rule binding on an enumeration nothing can read is
- * indistinguishable from a rule being followed.
- *
- * WHAT THE TWO HALVES EACH CARRY
- * ------------------------------
- * The library specimen carries purpose, geometry and API — what a reader needs rendered. The
- * manifest row carries the implementation path and the caller count — what a gate needs to check.
- * Neither is a subset of the other, so the gate below is a correspondence and not a copy: every
- * name the library enumerates is either recorded as shipped in the manifest or recorded here as
- * specified-but-unbuilt, and every name the manifest records resolves to a library entry.
- *
- * WHY THE UNBUILT NAMES ARE A REGISTER HERE AND NOT `path: null` MANIFEST ROWS
- * ---------------------------------------------------------------------------
- * The obvious move is to fill the manifest's empty quadrant with rows carrying a null path. It
- * collides with four properties issue 1378 shipped, two of them silently:
- * `tests/design-system-primitives.test.js:415-422` joins the path against the repo root and
- * `path.join(root, null)` THROWS rather than failing as an assertion; `:474-491` asserts no
- * `targeted` row matches `BROAD_SIGNAL_PATTERN`, and `BROAD_SIGNAL_PATTERN.test(null)` coerces to
- * the string `"null"` and returns false, so 38 null-path rows would pass silently while inflating
- * that property's domain from ~20 real rows to ~59; `:425-457` demands every row carry an
- * `evidence` judgement, which a row with no file has no routing to record; and `:264` pins the row
- * count at 38. A register of names collides with none of them and says what it means.
- *
- * WHY THE HAND-TYPED LISTS BELOW CARRY LENGTH PINS
- * ------------------------------------------------
- * Two of them — the non-primitive heading census and the cited-without-entry residue — are checked
- * by membership rather than only by equality, and membership alone makes the cheapest repair an
- * append. A new `<h4>Toggle</h4>` greens by adding `Toggle` to the census list, which is the exact
- * drift the census exists to catch. The pin makes that repair a deliberate, reviewable edit.
- */
+/** The coverage gate over the design system's two halves (issue 1116). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -61,12 +21,6 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * Order two strings by code point, ascending.
  *
- * Explicit rather than a bare `sort()`, for the reason `scripts/lib/svelteComponentFiles.js`
- * records beside its own copy: `localeCompare` is locale-dependent, so two machines could order
- * the registers below differently and disagree about a set they both measured correctly.
- *
- * @param {string} left
- * @param {string} right
  * @returns {number} negative, zero or positive per the `Array#sort` contract
  */
 const byCodePoint = (left, right) => (left < right ? -1 : Number(left > right));
@@ -82,13 +36,7 @@ const MANIFEST_NAMES = MANIFEST_ROWS.filter((row) => row.library !== null).map((
   row.library.slice(1, -1)
 );
 
-/**
- * The nine name-shaped ruled-out candidates, DERIVED rather than re-typed.
- *
- * `RULED_OUT` holds ten entries and the tenth, `Destructive panel`, is prose rather than a
- * component name — running the same name pattern over the register picks the distinction up
- * without anyone having to remember it.
- */
+/** The nine name-shaped ruled-out candidates, DERIVED rather than re-typed. */
 const RULED_OUT_NAMES = RULED_OUT.flatMap((entry) => primitiveNamesIn(entry.name));
 
 /** Every shipped component, as the repository-relative POSIX path a manifest row names. */
@@ -123,19 +71,8 @@ test('the corpus every property below quantifies over is alive', () => {
 test('the library has the exact structure the parser assumes', () => {
   // EXACT rather than floors. Every one of these is a fact about a hand-authored file that the
   // properties below read as if it were a database, and each moves only when someone edits that
-  // file — at which point the edit should be accepted deliberately rather than absorbed.
-  // 51 as of issue 1371 r17-b: the `<BulkStagingInset>` entry beside `<BulkEditPanel>`'s.
-  // 52 as of issue 1371 r18-colour: the `<EssenceChip>` entry beside the icon chip's (M29).
-  // 53 as of issue 1506: the `<Chip>` entry, written when four status pills retired into that
-  // primitive and the register's highest-traffic row was still pointing at the icon chip's
-  // specimen. RE-MEASURED after the edit rather than incremented: the same change gave two
-  // existing blocks a per-name API section, which moves no count here, and gave section 14 four
-  // routing rows and section 16 three re-measured rows, which move none either.
-  // 59 as of the library's player-run-surfaces revision (issue 1495, 2026-09-09): six new specimen
-  // blocks — `<RunActionBar>`, `<WorldClockChip>`, `<SlotRow> <SlotTile> <ChoiceOptionList>`,
-  // `<EssencePool>`, `<RunProgress> <StageNav> <StageCard>` and `<YieldScale> <OutcomeLadder>` —
-  // carrying eleven names, every one of them target. RE-MEASURED by importing this parser: the
-  // same revision added six routing rows and three migration rows, and moved no other count.
+  // file — at which point the edit should be accepted deliberately rather than absorbed (issue
+  // 1371).
   assert.equal(library.blockCount, 59, 'spec-head block count');
   assert.equal(
     library.headingCount,
@@ -153,9 +90,7 @@ test('the library has the exact structure the parser assumes', () => {
   assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 39, 'naming blocks');
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
-  // The only pair that pins the ANCHOR as narrower than a file-wide scan. If the parser were ever
-  // widened to the whole file these two would collapse to 69 and 0, and every set comparison below
-  // would quietly start counting the ruled-out register as part of the vocabulary.
+  // The only pair that pins the ANCHOR as narrower than a file-wide scan.
   assert.equal(library.fileWideNames.length, 83, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
@@ -163,11 +98,6 @@ test('the library has the exact structure the parser assumes', () => {
 /**
  * The 20 `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
  * decoded text.
- *
- * Encoding: DECODED, which is what `tests/helpers/designLibrary.js` yields and why. The corpus
- * mixes three spellings — three of these carry entities (`&amp;`, `&mdash;`) and four carry a raw
- * U+00B7 — so pinning raw markup would pin an inconsistency and would red on a pure re-escaping
- * that changes nothing a reader sees.
  */
 const NON_PRIMITIVE_HEADINGS = [
   'The five rules that keep screens consistent',
@@ -254,24 +184,7 @@ test('every manifest library name resolves to a library entry', () => {
   }
 });
 
-/**
- * The 28 library entries with no shipped implementation.
- *
- * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
- * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
- * built and gains a manifest row, up when the library specifies a new one. Either way the edit is
- * the same size as the change that caused it.
- *
- * `Kicker`, `Notice` and `StatBox` left it at issue 1505, which built all three. `InfoStrip` STAYS:
- * that change measured five candidate call sites for it and exactly one qualifies, which is below
- * the two-independent-importer membership bar, so it defers rather than shipping on one caller.
- *
- * `Avatar` left it at issue 1506, which built it: the GM Knowledge surface's roster row and its
- * detail header are two independent callers, which is the bar, and both were rendering the icon
- * chip with a person glyph until then. The count above is re-measured on the tree rather than
- * subtracted, and `Rail`, `LogList` and `TierTrack` — the three names sharing its specimen block —
- * all STAY, because building one name in a multi-name block builds one name.
- */
+/** The 28 library entries with no shipped implementation (issue 1505). */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
   'DataTable', 'InfoStrip', 'LogList', 'Menu',
@@ -299,10 +212,7 @@ test('every library entry is either recorded as shipped or recorded as unbuilt',
 
 test('no library entry recorded as unbuilt ships as a component', () => {
   // The clause above compares the register against the MANIFEST; this one compares it against the
-  // DISK. That is the difference between "the two documents agree" and "the two documents describe
-  // the repository", and only the second catches a primitive that shipped without its row: the name
-  // stays in the register, the manifest never learns about it, and the two artifacts go on agreeing
-  // with each other about a set that no longer matches what is built.
+  // DISK.
   assert.deepEqual(
     SPECIFIED_ONLY.filter((name) => SHIPPED_COMPONENT_NAMES.has(name)),
     [],
@@ -313,39 +223,20 @@ test('no library entry recorded as unbuilt ships as a component', () => {
 });
 
 /**
- * The closed status vocabulary, and the two shapes it takes.
- *
- * spec.md requirement "Every entry carries a status" states three values for an ENTRY and adds
- * `prose` for a library block that specifies no primitive at all. The fourth value exists so the
- * attribute is UNIVERSAL: with it, a block carrying no status is always a defect, and the
- * properties below never have to decide whether a silent block was meant to be exempt.
- *
- * Written as two lists rather than one with a filter, because the difference between them is the
- * whole distinction: `prose` is legal on a block and illegal on a name or a manifest row, and one
- * list would make that a comment rather than an assertion.
+ * The closed status vocabulary, and the two shapes it takes. spec.md requirement "Every entry
+ * carries a status" states three values for an ENTRY and adds `prose` for a library block that
+ * specifies no primitive at all.
  */
 const MEMBER_STATUSES = ['target', 'shipped', 'divergent'];
 
 /** @see MEMBER_STATUSES */
 const BLOCK_STATUSES = [...MEMBER_STATUSES, 'prose'];
 
-/**
- * How this corpus writes an issue reference, which a `divergent` entry owes.
- *
- * `issue 1373`, not the hash form — that one is what the colour gate over `src/ui` and `styles`
- * rejects, and these registers follow the same convention so a sentence can move between them.
- */
+/** How this corpus writes an issue reference, which a `divergent` entry owes (issue 1373). */
 const ISSUE_REFERENCE = /\bissue \d+\b/u;
 
 /**
  * A block's own status, derived from the statuses of the names it declares.
- *
- * `divergent` beats `target` beats `shipped`, so a block reads as met only when everything it
- * specifies is met. DERIVED rather than hand-typed: a multi-name block is the one place where a
- * block-level value could be written to disagree with the names under it, and the entry that
- * exercises the rule is live — the field block declares `shipped` for the field shell and
- * `target` for the select and the search, so the roll-up is proved by the corpus and not only
- * by this comment.
  *
  * @param {string[]} statuses every per-name status in one block
  * @returns {string} the block's value
@@ -413,17 +304,7 @@ test('a block that names a primitive gives every name its own status', () => {
   }
 });
 
-/**
- * A naming heading holds its names and NOTHING else, which is what keeps the chip outside it.
- *
- * The prose census above pins its 20 headings by exact text, so a chip moved into one of those reds
- * immediately. The other 30 have no such pin: they are read for the names they yield, and `shipped`
- * or `IconButton · target` yields none, so every property in this file would still pass with the
- * status written inside the `h4` that the parser and the migrations table both describe as sitting
- * beside it. This is the pin for those 30, and it is the whole reason the block carries its heading.
- *
- * Compared DECODED, in the parser's own form, so a pure re-escaping of an entity does not red it.
- */
+/** A naming heading holds its names and NOTHING else, which is what keeps the chip outside it. */
 test('a naming heading is its names and nothing else, so no chip has moved inside it', () => {
   assert.ok(NAMING_BLOCKS.length > 0, 'no block names a primitive, so this has no domain');
   for (const block of NAMING_BLOCKS) {
@@ -469,15 +350,7 @@ test('a block’s own status is the weakest of the names it declares', () => {
   }
 });
 
-/**
- * The ordering itself, over inputs the corpus does not contain.
- *
- * `divergent` has no live instance — no block and no member row declares it — so the property above
- * ranks it against nothing: delete that branch from {@link weakest} and every corpus block still
- * agrees with what is left. The rule is a rule about three values, and the third is exactly the one
- * a maintainer reaches for under pressure, so it is pinned here rather than left to a future entry
- * to discover.
- */
+/** The ordering itself, over inputs the corpus does not contain. */
 test('the roll-up ranks all three values, including the one no entry declares today', () => {
   assert.equal(weakest(['shipped', 'divergent']), 'divergent');
   assert.equal(weakest(['divergent', 'target']), 'divergent');
@@ -488,9 +361,7 @@ test('the roll-up ranks all three values, including the one no entry declares to
 });
 
 test('every shipped-member row carries the status its specimen declares', () => {
-  // The domain is the MEMBER table alone, never `MANIFEST_ROWS`. That constant also spreads
-  // `NOT_A_PRIMITIVE`, whose rows record non-membership rather than a member's fidelity and carry
-  // no status at all — quantifying over it would report eleven absent fields as defects.
+  // The domain is the MEMBER table alone, never `MANIFEST_ROWS`.
   assert.ok(DESIGN_SYSTEM_PRIMITIVES.length > 0, 'the member table is empty, so this is vacuous');
   const named = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.library !== null);
   assert.ok(
@@ -546,10 +417,6 @@ test('a recorded non-member carries no status, because it is not a member', () =
  * The closed `scope` vocabulary, per spec.md requirement "A shared primitive's class family is
  * rooted at the primitive, not at an app" and its scenario "A component that cannot leave its area
  * keeps that area's root".
- *
- * Two words and no third, for the reason the status vocabulary is closed: a field whose values are
- * open is a comment. `manager-only` is a DECISION about where a component may render, which is what
- * makes the clauses below able to check it at all — an omission has nothing to disagree with.
  */
 const SCOPES = ['shared', 'manager-only'];
 
@@ -558,26 +425,8 @@ const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
 
 /**
  * The rows whose family this programme has RE-ROOTED at a class the primitive itself emits, and
- * which therefore owe both a `shared` scope and an entry in the gate that proves the rooting.
- *
- * Hand-typed rather than derived, and the direction matters: this list is the CLAIM, and the two
- * clauses below check it against the manifest and against the area-scope gate independently. Derive
- * it from either one and the check becomes a tautology over that one.
- *
- * Three from issue 1502, six from issue 1508, five from issue 1509, one from issue 1515.
- * `ArmedDangerButton` moved into
- * the shared directory at issue 1509 and is deliberately ABSENT: it gained no root of its own,
- * because the family it writes is `ManagerButton`'s and is already rooted, so it has no area-scope
- * entry to find and a `fabricate-danger-button` would own no rule at all.
- *
- * `ModifierPillSelect` is the issue-1515 arrival, and it is the one row here whose re-root was
- * REFUSED first and recorded as a deferral. Its family was written by the primitive AND
- * hand-written by six manager views at 37 further sites, none of them inside a
- * `ModifierPillSelect`, so a root class on the component would have reached none of them; issue
- * 1515 routed all 37 to their destination primitives and the re-root landed in the same change.
- * The enrolment is what makes the `scope` flip beneath it mean anything: without this row the
- * flip removes the manifest row from the manager-only population above and nothing takes its
- * place, which is a gate the change quietly leaves.
+ * which therefore owe both a `shared` scope and an entry in the gate that proves the rooting (issue
+ * 1502).
  */
 const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ChanceSlider.svelte',
@@ -600,15 +449,7 @@ const RE_ROOTED_ROWS = [
 /** The gate that PROVES a family is not application-rooted, read for its component paths only. */
 const AREA_SCOPE_GATE = 'tests/components/searchable-popover-area-scope.test.js';
 
-/**
- * Every component path the area-scope gate holds an entry for.
- *
- * Read out of that file's `components:` fields rather than imported, because the entries are a
- * local `const` in a test module and exporting them to satisfy this reader would put a second
- * consumer on a list whose whole purpose is to be that gate's own. The slice is bounded by the
- * `PRIMITIVES` literal so a path appearing in a comment or a mutation control cannot enter the set
- * — `SearchablePopover` is written twice in that file and only one of the two is an entry.
- */
+/** Every component path the area-scope gate holds an entry for. */
 function areaScopeGateComponents() {
   const source = readFileSync(path.join(REPO_ROOT, AREA_SCOPE_GATE), 'utf8');
   const opener = 'const PRIMITIVES = Object.freeze([';
@@ -712,9 +553,7 @@ test('every re-rooted family carries a shared scope and an entry in the gate tha
 });
 
 test('every entry recorded as specified-but-unbuilt is declared a target', () => {
-  // DERIVED from the register above rather than restated. That quadrant is already pinned by
-  // exact equality there, so a second hand-typed list of the same names would be a copy free to
-  // disagree with it — and the copy is the one nothing would notice.
+  // DERIVED from the register above rather than restated.
   assert.ok(SPECIFIED_ONLY.length > 0, 'the unbuilt register is empty, so this has no domain');
   for (const name of SPECIFIED_ONLY) {
     assert.ok(
@@ -731,11 +570,7 @@ test('every entry recorded as specified-but-unbuilt is declared a target', () =>
 });
 
 test('a divergent entry names the issue that decided it', () => {
-  // NO DOMAIN GUARD, and that is deliberate rather than an omission. Nothing is `divergent` today:
-  // spec.md requirement "Every entry carries a status" reserves that value for a maintainer
-  // decision and none has been taken, so a guard here would fail on a corpus that is CORRECT.
-  // The property is written now so the first entry moved there arrives with its reason attached,
-  // rather than acquiring the obligation after the fact.
+  // NO DOMAIN GUARD, and that is deliberate rather than an omission.
   const divergentRows = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.status === 'divergent');
   for (const row of divergentRows) {
     assert.match(
@@ -759,70 +594,11 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 33 shipped rows the library does not name.
- *
- * RE-COUNTED at issue 1392 rather than incremented. The heading said 31 while the register
- * held 33, so it was already two out before this change added one — the list itself is pinned
- * by equality against the manifest and never drifted, but the figure a reader trusts without
- * counting had. It is 34, and it is the length of the list below and of the manifest rows
- * carrying `library: null`, which the property beneath asserts are the same set.
- *
- * Pinned by EQUALITY rather than as a ceiling, for the reason
- * `tests/design-system-primitives.test.js` records for its own baselines: a ceiling loosens by one
- * slot every time debt is paid, and it permits a net-zero swap — document one, undocument another,
- * and the count never moves.
- *
- * GROWTH HERE IS NOT ALWAYS DEBT, and `downtime/WorldDowntimeTabs` is the worked example. This
- * list is every manifest row with `library: null`, and `MANIFEST_ROWS` spans BOTH tables — so
- * recording a NON-MEMBER lands here too. That row arrived by being adjudicated against `<TabBar>`
- * and ruled out with its measurements, which is the register doing its job; it is not a primitive
- * that shipped undocumented. The failure message below states the other reading because it is the
- * commoner one, not the only one.
- *
- * `checks/ChecksEditorTabs` was recorded here the same way by issue 1038 and is NOT here now:
- * issue 1429 gave the primitive the Rail Marker Family as a capability and converted that strip,
- * so it is a CALLER rather than a recorded non-member, and a row asserting otherwise would be
- * false. A non-member row is a measurement of the tree, so it expires when the tree changes.
- *
- * `SystemOverviewView` arrived the same way at issue 1444 and is the same kind of growth: it was
- * PROPOSED as an unconverted call site of `EditorValidationSurface` and measured as a different
- * surface, so it is a recorded adjudication rather than a primitive that shipped undocumented.
- *
- * `environment/EnvironmentValidationTab` arrived beside it and LEFT at issue 1517, in a third
- * direction this list can move that neither paragraph above describes. No library entry was
- * written for it and its row did not expire against a changed tree: the ADJUDICATION was
- * overturned. `spec.md` asks for one validation arrangement on every editor, so a tab measured as
- * a second arrangement is what that requirement forbids rather than a tab exempt from it — and
- * the conversion deleted the manifest row this list was reaching through. The entry goes with the
- * row, so this list shrinks without anybody writing a specimen.
- *
- * `components/Medallion` LEFT at issue 1506, in the direction the failure message below calls the
- * right one: a library entry was written for it. It had been here since this register existed, on
- * a row whose own text ruled the correspondence out — and the ground it gave, that the tile
- * "renders a record's linked image with a glyph fallback", is what the icon-chip entry specifies.
- * That change also made the row true in a way it had not been: the tile absorbed both crafting
- * thumbnails, so it is now the app's ONE art tile rather than one of three.
+ * The 33 shipped rows the library does not name. RE-COUNTED at issue 1392 rather than incremented.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
-  // the set that no `library.html` specimen names. Its row records that `<Menu>` was considered
-  // and why the correspondence is not made — that entry is the kind-choice menu `<PickerRow>`'s
-  // `allowAny` opens, which is a `SearchablePopover` today — so this is a stated debt rather than
-  // a primitive that shipped unrecorded.
-  //
-  // Two of the three that arrived together at issue 1458 are adjudicated NON-MEMBERS rather than
-  // undocumented PRIMITIVES, recorded with the measurement that ruled them out of the
-  // `SearchablePopover` conversion — a multi-select checklist in the player window, and two
-  // typeahead comboboxes. That is the register doing its job, and it is the same
-  // growth-is-not-always-debt case `downtime/WorldDowntimeTabs` records below.
-  //
-  // The third, `environment/CompositionList`, is no longer one of them. Issue 1446 measured its
-  // two callers, moved it to `DESIGN_SYSTEM_PRIMITIVES`, and adjudicated its `library` column
-  // against three entries — so it stays on THIS list, and for the ordinary reason: it is a member
-  // of the set that no `library.html` specimen names. Its four `role="menu"` action menus are
-  // still a recorded non-conversion; a component can be a primitive and carry one.
-  // Sorted, and this entry moved rather than arrived: issue 1500 relocated the player top bar from
-  // `components/` to `apps/`, which changes where it sorts and nothing about its adjudication.
+  // the set that no `library.html` specimen names (issue 1458).
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
@@ -833,21 +609,12 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  // The world modifier library's entry row (issue 1373, maintainer round 4). Genuinely
-  // undocumented rather than an adjudicated non-member: it is a MEMBER at two callers, and
-  // `library.html` specifies no row for a library entry at all — `:646`'s `<OptionCards>` is the
-  // card group this row replaced at one of the two call sites, which is the opposite treatment.
-  // That citation read `:626` until issue 1509 re-derived it: issue 1508's five `library.html`
-  // insertions moved the `<OptionCards>` spec-head by twenty lines, and the SECOND copy of the
-  // stale number was in the manifest row, so repairing one and leaving the other would have been
-  // worse than either alone.
+  // The world modifier library's entry row (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
   // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
-  // `library.html` specimen names. Its row adjudicates `<SetPicker>`, the nearest entry, and
-  // records why the correspondence is not made — a vocabulary editor is not one record's
-  // membership of a set.
+  // `library.html` specimen names.
   'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
@@ -883,20 +650,8 @@ test('the shipped rows the library does not name are exactly the known set', () 
 });
 
 /**
- * The clause that makes the prohibition enforceable rather than merely stated.
- *
- * `AGENTS.md` forbids adding a component under `src/ui/svelte/components/` without its specimen and
- * its row, and `spec.md` names this file as the gate that fails on that. Neither was true until this
- * property existed: a five-line stub dropped into that directory with no specimen and no row left
- * the whole file green, and so did the same stub WITH a specimen but no row. Nothing distinguished
- * "specified but unbuilt" from "specified, built, and unrecorded".
- *
- * Requiring the ROW is what closes it, because the row is the only obligation the rest of this file
- * can reason from. A row either names a library entry — which must resolve to a specimen, and must
- * not name a declined candidate — or it is `library: null`, in which case it must appear in
- * {@link UNDOCUMENTED_ROWS}, which is pinned by exact equality. So a new component reaches a green
- * gate only by acquiring a specimen or by being recorded as an accepted debt, and either way an
- * author states which.
+ * The clause that makes the prohibition enforceable rather than merely stated. Requiring the ROW is
+ * what closes it, because the row is the only obligation the rest of this file can reason from.
  */
 test('every component in the primitive directory carries a manifest row', () => {
   const recorded = new Set(MANIFEST_ROWS.map((row) => row.path));
@@ -917,14 +672,7 @@ test('every component in the primitive directory carries a manifest row', () => 
   );
 });
 
-/**
- * Primitives the library CITES normatively without giving them an entry.
- *
- * This register is what the residue check compares against, and it closes the defect CLASS rather
- * than today's two instances: a third orphan citation added later reds here instead of shipping
- * silently. Writing the missing specimens is design work with its own review, so the register
- * records the debt and section 16 of the library points a reader at it.
- */
+/** Primitives the library CITES normatively without giving them an entry. */
 const CITED_WITHOUT_ENTRY = [
   {
     name: 'Locked',
@@ -945,9 +693,7 @@ const CITED_WITHOUT_ENTRY = [
 ];
 
 test('every primitive name in the library is an entry, a declined candidate, or a recorded debt', () => {
-  // The length pin runs FIRST, deliberately. The equality below would also red on an append, but
-  // it would report a set difference; the pin reports that the register grew, which is the fact a
-  // reviewer has to accept.
+  // The length pin runs FIRST, deliberately.
   assert.equal(
     CITED_WITHOUT_ENTRY.length,
     2,
@@ -986,39 +732,6 @@ test('every component the library cites by filename still exists', () => {
 /**
  * A citation of a `spec.md` requirement, written as the words `spec.md requirement` followed by the
  * heading in double quotes.
- *
- * The notation exists because the alternative rotted inside this very change. Amending `spec.md`
- * added six lines above the vocabulary requirement, and that shifted every `spec.md:NNN` citation in
- * `scripts/lib/designSystemPrimitives.js`, in this file and in `library.html` section 16 onto prose
- * that says something else — including the one sentence that carries the whole distinction between
- * a BOUND requirement and a loose citation. A line number cannot be resolved by anything, so nothing
- * reported it; a heading can be, and the property below does.
- *
- * THE NOTATION IS CAPABILITY-SCOPED: it resolves against `design-system` and nothing else, because
- * `SPEC_REQUIREMENTS` below reads that one file. Any other capability's `spec.md` may be cited in
- * these artifacts — `library.html` names `ui-integration/spec.md` nine times, seven of them still by
- * line — but not in THIS notation, which the property below would resolve against the wrong
- * document in both directions: a heading absent from `design-system` reported as dangling when it
- * is present where the citation actually points, and a heading present in `design-system` accepted
- * for a capability whose spec has never carried it.
- *
- * That is why the capability is CAPTURED rather than excluded. A negative lookbehind on `/` would
- * decline a foreign citation by not matching it, which closes the misresolution and reopens the
- * silence one layer down: an unmatched citation is an unchecked citation, and this file exists
- * because unreachable configuration looks exactly like working configuration. Capturing the prefix
- * costs one group, needs no prefix-to-path registry — this change has already priced what a
- * hand-maintained registry costs — and turns a SLASH-ADJACENT foreign prefix into a named failure.
- * Group 1 is the capability, absent when the citation is bare; group 2 is the heading.
- *
- * That qualifier is deliberate rather than modest. Three foreign shapes still read as bare and are
- * still resolved against this capability, and they are described here rather than written out
- * because this file is itself scanned: a capability path closed in backticks before the notation
- * begins, which matters because backticking paths is this corpus's own convention; a capability
- * named as prose with a space where the slash would be; and a prefix wrapped at the slash across a
- * JSDoc line break, which `unwrapped` rejoins with a space. None is a regression — the capture is
- * a strict superset of the pattern it replaced, so nothing matches less than before — and none was
- * closed by either remedy considered. Dropping the qualifier would be this file committing the
- * defect it exists to report: a claim broader than the check behind it.
  */
 const REQUIREMENT_CITATION = /(?:([A-Za-z0-9._-]+)\/)?spec\.md requirement "([^"]+)"/g;
 
@@ -1028,12 +741,6 @@ const CITED_CAPABILITY = 'design-system';
 /**
  * Collapse a JSDoc line break — newline, optional `*` gutter, indentation — into a single space.
  *
- * Without this the notation would carry a hidden formatting rule: a heading that happened to wrap
- * across two comment lines would read correctly and match nothing, so the guard below would be
- * strictest exactly where prose is longest. The first draft of this change hit that on its own
- * first run.
- *
- * @param {string} prose
  * @returns {string} the same prose on one line
  */
 const unwrapped = (prose) => prose.replaceAll(/\n\s*\*?\s*/g, ' ');
@@ -1046,13 +753,7 @@ const SPEC_REQUIREMENTS = [
   ).matchAll(/^### Requirement: (.+)$/gm),
 ].map((match) => match[1]);
 
-/**
- * Every body of prose that cites `spec.md` by requirement, as `[label, text]`.
- *
- * The manifest enters as its PARSED `why` strings rather than as raw JSON, because JSON escapes the
- * quotes the notation uses and a raw scan would miss a citation it should have checked — the failure
- * mode this whole file exists to prevent.
- */
+/** Every body of prose that cites `spec.md` by requirement, as `[label, text]`. */
 const CITING_PROSE = [
   [
     'scripts/lib/designSystemPrimitives.js',
@@ -1076,8 +777,7 @@ test('every spec.md citation names a design-system requirement that still exists
       heading: match[2],
     }));
     // Before anything is resolved: every citation has to be ABOUT the capability this property can
-    // resolve. A foreign one is not a dangling heading and must not be reported as one — it is a
-    // citation written in a notation that cannot check it, which is the silence this file closes.
+    // resolve.
     for (const { capability, heading } of citations) {
       assert.equal(
         capability,
@@ -1118,22 +818,7 @@ test('no declined candidate ships as a component', () => {
   }
 });
 
-/**
- * A rule's whole selector list, for every rule in a stylesheet.
- *
- * `postcss` is not a declared dependency of this repository — `postcss-scss` is, and reaching
- * through it for a transitive peer would make a gate depend on a package nothing lists. A rule is
- * recognisable without a parser: it is the text between the previous statement boundary and a `{`.
- * Proved rather than assumed — this scanner was compared against `postcss` over the whole style
- * corpus, all 185 files carrying CSS, and agreed on the multiset of selector lists in every one,
- * including this stylesheet's 2645 rules.
- *
- * THE FIRST CHARACTER CLASS EXCLUDES WHITESPACE AS WELL AS `@`, and that is the one non-obvious
- * part. `\s*` is free to backtrack, so a class that merely excluded `@` still matched by starting
- * the capture ON a whitespace character and swallowing the at-rule behind it — which counted every
- * `@container` prelude as a rule, silently, and made one measured count read 31 instead of 30. A
- * nested rule INSIDE an at-rule is still counted, because its prelude follows the at-rule's `{`.
- */
+/** A rule's whole selector list, for every rule in a stylesheet. */
 const SELECTOR_LIST = /(?:^|[{};])\s*([^{};\s@][^{};]*)\{/g;
 
 /**
@@ -1162,16 +847,8 @@ const STYLESHEET_SELECTORS = selectorListsIn(
 
 /**
  * A claim that the manifest makes about a class family in the shipped stylesheet.
- *
  * `scripts/lib/designSystemPrimitives.js` states the notation and why a count stays inside `why`
- * rather than becoming a field. Group 1 is the count, group 2 the family without its trailing
- * `-*`, group 3 the optional root the rules must additionally sit under.
- *
- * The notation is deliberately the one the FALSE sentences already used. Three rows said
- * "113 `.manager-travel-*` rules in `styles/fabricate.css`", two of them to rule a conversion
- * structurally impossible, and it had been wrong since thirteen minutes before the first of them
- * merged. This pattern matches that sentence as it was written, so this property is not a rule
- * that only binds on prose authored after it.
+ * rather than becoming a field.
  */
 const FAMILY_RULE_CLAIM =
   /(\d+) `\.([a-z][a-z\d-]*)-\*` rules(?: under `\.([a-z][a-z\d-]*)`)? in `styles\/fabricate\.css`/gu;

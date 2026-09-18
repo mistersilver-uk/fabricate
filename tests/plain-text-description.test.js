@@ -1,10 +1,4 @@
-/**
- * `src/utils/plainTextDescription.js` NORMALIZES already-resolved description text.
- * It does not resolve — resolution is the async `enrichToHtml` seam, exercised in
- * `tests/enricher-resolution.test.js`. These tests therefore feed it ENRICHED HTML
- * (what Foundry's enricher produces), never raw directives, except where the point is
- * exactly what happens to an unresolvable residue.
- */
+/** `src/utils/plainTextDescription.js` NORMALIZES already-resolved description text. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -20,9 +14,7 @@ import {
   withCoreAnchorProbe,
 } from './helpers/enricherDescriptionFixtures.js';
 
-// ---------------------------------------------------------------------------
 // Roll expressions — flattened, NEVER evaluated
-// ---------------------------------------------------------------------------
 
 test('renders a labelled roll expression as its label', () => {
   assert.equal(plainTextDescription('[[/r 1d20+5]]{Attack}'), 'Attack');
@@ -39,23 +31,18 @@ test('renders a label-less roll expression as its bare formula, stripping comman
 });
 
 test('a bare, COMMAND-LESS inline roll survives as its formula and is never evaluated', () => {
-  // This is the form `rolls: true` would EAGERLY evaluate, freezing a literal "4"
-  // into the stored description forever. The deferred `[[/r …]]` forms above are
-  // safe even with `rolls: true` and so cannot detect a regression — only this one
-  // can, which is why it is asserted on its own.
+  // This is the form `rolls: true` would EAGERLY evaluate, freezing a literal "4" into the stored
+  // description forever.
   assert.equal(plainTextDescription('[[1d6]]'), '1d6');
   assert.equal(plainTextDescription('[[1d20+5]]'), '1d20+5');
   assert.equal(plainTextDescription('Burns for [[1d6]] rounds.'), 'Burns for 1d6 rounds.');
 });
 
-// ---------------------------------------------------------------------------
 // Post-resolution label mop-up — a directive nothing registered an enricher for
-// ---------------------------------------------------------------------------
 
 test('renders an unregistered LABELLED directive as its authored label', () => {
-  // Reached only after resolution, so nothing here still has a referent to lose:
-  // every resolvable @UUID is already an anchor. What is left belongs to a system or
-  // module that registered no enricher for it.
+  // Reached only after resolution, so nothing here still has a referent to lose: every resolvable
+  // @UUID is already an anchor.
   assert.equal(plainTextDescription('@Check[ability=dex dc=15]{DC 15 Dexterity}'), 'DC 15 Dexterity');
   assert.equal(plainTextDescription('@Damage[2d6]{2d6 fire}'), '2d6 fire');
   assert.equal(plainTextDescription('&Reference[prone]{Prone}'), 'Prone');
@@ -70,9 +57,7 @@ test('leaves an unregistered LABEL-LESS directive verbatim rather than dropping 
   assert.equal(plainTextDescription('&Reference[prone]'), '&Reference[prone]');
 });
 
-// ---------------------------------------------------------------------------
 // Broken anchors — authored label PRESERVED, placeholder REMOVED
-// ---------------------------------------------------------------------------
 
 test('broken anchor: an AUTHORED LABEL is preserved and the PLACEHOLDER is removed', async (t) => {
   setupDOM();
@@ -99,19 +84,9 @@ test('broken anchor: an AUTHORED LABEL is preserved and the PLACEHOLDER is remov
   );
 });
 
-// ---------------------------------------------------------------------------
-// Broken anchors ACROSS FOUNDRY GENERATIONS.
-//
-// Core's placeholder key moved: V13 localizes a bare `Unknown` (its en.json has a
-// top-level "Unknown" and no COMMON namespace); V14 localizes `COMMON.Unknown`.
-// `Localization#localize` ECHOES a missing key in BOTH, so asking for one key only
-// returns the literal key string on the other generation, never matches the anchor
-// text, and sends EVERY broken anchor down the unwrap branch — leaking the placeholder
-// into stored, player-visible text.
-//
-// The suite previously mocked only V14 semantics, which is precisely why that reached
-// the smoke harness. Both generations are pinned here.
-// ---------------------------------------------------------------------------
+// Broken anchors ACROSS FOUNDRY GENERATIONS. Core's placeholder key moved: V13 localizes a bare
+// `Unknown` (its en.json has a top-level "Unknown" and no COMMON namespace); V14 localizes
+// `COMMON.Unknown`.
 
 for (const generation of [13, 14]) {
   test(`broken anchor: the placeholder is REMOVED under V${generation} localization semantics`, async (t) => {
@@ -147,9 +122,7 @@ for (const generation of [13, 14]) {
 
 test('broken anchor: core\'s own createAnchor probe wins over the key list', async (t) => {
   setupDOM();
-  // A non-English world, where NEITHER known key's English value would match. Asking
-  // core for its own placeholder is what makes this work — and what keeps working when
-  // the key moves again, or when a system subclass supplies its own.
+  // A non-English world, where NEITHER known key's English value would match.
   const restoreI18n = withUnknownPlaceholder({ generation: 14 });
   const restoreProbe = withCoreAnchorProbe('Unbekannt');
   t.after(() => {
@@ -164,9 +137,7 @@ test('broken anchor: core\'s own createAnchor probe wins over the key list', asy
   );
 });
 
-// ---------------------------------------------------------------------------
 // Privacy scrub — visibility-gated and secret markup never reaches stored text
-// ---------------------------------------------------------------------------
 
 test('privacy scrub removes gated and unrevealed-secret markup, keeps everything else', async (t) => {
   setupDOM();
@@ -221,9 +192,7 @@ test('privacy beats label preservation: a LABELLED broken anchor inside a gated 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Separator / bracket tidy
-// ---------------------------------------------------------------------------
 
 test('tidies separators and brackets orphaned by a removed reference', async (t) => {
   setupDOM();
@@ -267,9 +236,8 @@ test('a separator stranded against sentence punctuation is absorbed, not left as
     teardownDOM();
   });
 
-  // The COMMON shape, not an edge case: an authored list whose last entry is a
-  // reference ends `<ref>.`, which is exactly what both the reporter's string and the
-  // smoke fixture look like.
+  // The COMMON shape, not an edge case: an authored list whose last entry is a reference ends
+  // `<ref>.`, which is exactly what both the reporter's string and the smoke fixture look like.
   assert.equal(plainTextDescription('Acid, <a class="content-link broken">Unknown</a>.'), 'Acid.');
   assert.equal(
     plainTextDescription('Contains: <a class="content-link broken">Unknown</a>. Then mix.'),
@@ -285,10 +253,7 @@ test('a separator stranded against sentence punctuation is absorbed, not left as
 });
 
 test('ACCEPTED: an authored trailing colon or dash is trimmed even with no references', () => {
-  // Named explicitly rather than left as a surprise. The trailing-edge trim cannot
-  // distinguish an authored lead-in from one whose list a removal emptied, and a
-  // dangling "Contains:" is the worse of the two outputs. If this ever stops being an
-  // acceptable trade, the fix is to track removals structurally, not to widen a regex.
+  // Named explicitly rather than left as a surprise.
   assert.equal(plainTextDescription('Ingredients:'), 'Ingredients');
   assert.equal(plainTextDescription('Aged —'), 'Aged');
   // A colon INSIDE the text is untouched; only the string edge is trimmed.
@@ -304,9 +269,7 @@ test('leaves legitimate author punctuation in prose untouched', () => {
   assert.equal(plainTextDescription('Aged (very) well.'), 'Aged (very) well.');
 });
 
-// ---------------------------------------------------------------------------
 // hasUnresolvedDirectives — the DETECTOR predicate
-// ---------------------------------------------------------------------------
 
 test('hasUnresolvedDirectives detects only what a reader actually sees raw', () => {
   // LABEL-LESS: nothing renders it, so the reader sees the directive. Repairable.
@@ -337,9 +300,7 @@ test('hasUnresolvedDirectives detects only what a reader actually sees raw', () 
   assert.equal(hasUnresolvedDirectives(42), false);
 });
 
-// ---------------------------------------------------------------------------
 // HTML, objects, idempotence, malformed safety
-// ---------------------------------------------------------------------------
 
 test('strips markup around resolved anchors', () => {
   assert.equal(
@@ -383,14 +344,11 @@ test('handles non-string input defensively', () => {
   assert.equal(plainTextDescription(''), '');
 });
 
-// ---------------------------------------------------------------------------
 // ReDoS adversarial-length safety
-// ---------------------------------------------------------------------------
 
 test('returns adversarial-length unterminated runs verbatim and fast', () => {
-  // A future swap of a bounded inner class back to an unbounded `[^\]]*` makes this
-  // O(n^2): the same run took ~20s unbounded vs ~0.3s bounded. The 5s budget cleanly
-  // separates linear from quadratic on any CI machine.
+  // A future swap of a bounded inner class back to an unbounded `[^\]]*` makes this O(n^2): the
+  // same run took ~20s unbounded vs ~0.3s bounded.
   for (const adversarial of ['[['.repeat(100000), '@UUID['.repeat(100000)]) {
     const start = performance.now();
     const out = plainTextDescription(adversarial);

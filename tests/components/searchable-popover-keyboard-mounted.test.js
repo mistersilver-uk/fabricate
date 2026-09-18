@@ -1,32 +1,4 @@
-/**
- * THE PICKER KEEPS DOM FOCUS ON ONE ELEMENT (issue 1503).
- *
- * `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
- * the HOLDER — and drive selection with `aria-activedescendant`, and forbids roving focus onto
- * the option rows because it re-arms Foundry's canvas bindings: with focus on a row, Space pauses
- * the game and the arrows pan the map behind the open window. There is a second, independent
- * reason the rows must not take focus, and it is visual: `styles/fabricate.css` rings any focused
- * `[tabindex]` under `.fabricate` with a 2px accent outline at a POSITIVE offset, and every
- * option row is now a `[tabindex]` element, so a row that took focus would draw a competing ring
- * around the keyboard cursor's own inset one.
- *
- * ── WHY THESE ASSERTIONS AND NOT "THE ARROWS WORK" ──────────────────────────────────────────
- * The arithmetic — wrap, the ends, the grid axes, the -1 sentinel — is proved in
- * `tests/util/listbox-navigation.test.js` against the pure module, without a compile or a DOM.
- * What only a mount can prove is the WIRING, and each clause here is a different way for the
- * wiring to be wrong while the arithmetic is right:
- *
- *   - focus INVARIANCE across a long run of presses, dispatched on `document.activeElement` so
- *     the test cannot accidentally keep addressing an element the model has already left;
- *   - the holder's `aria-activedescendant` naming a row that EXISTS, which is the whole
- *     substitute for focus as far as a screen reader is concerned;
- *   - the -1 sentinel being observable — no row marked before the first arrow key, and Enter
- *     doing NOTHING until one is;
- *   - the pointer path suppressing focus, which happy-dom cannot show as a focus move at all
- *     (it never moves focus on `mousedown`), so the assertion is on `defaultPrevented`;
- *   - the empty branch omitting BOTH activedescendant attributes, because the `role="listbox"`
- *     element they would point at does not render there.
- */
+/** THE PICKER KEEPS DOM FOCUS ON ONE ELEMENT (issue 1503). */
 
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -48,14 +20,7 @@ const TAGS = [
   { id: 'cloth', label: 'Cloth', icon: 'fas fa-tag' },
 ];
 
-/**
- * Four labels chosen so a typed prefix can be wrong in every way that matters (issue 1504).
- *
- * TWO begin with `P`, so a repeated character has somewhere to cycle to and a two-character
- * prefix has something to refine towards; `Routed by check` carries a SPACE, which is the one
- * printable character the trigger's own keyboard contract already spends; and no label begins
- * with `z`, which is the no-match branch.
- */
+/** Four labels chosen so a typed prefix can be wrong in every way that matters (issue 1504). */
 const TIERS = [
   { id: 'simple', label: 'Simple' },
   { id: 'routed', label: 'Routed by check' },
@@ -67,10 +32,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-picker-keyboard-',
   rawModules: SEARCHABLE_POPOVER_RAW_MODULES,
-  // The hoisted list, which is exactly what this suite needs: the popover plus the three
-  // primitives it renders. Naming them again here would be the second copy that constant's own
-  // header exists to prevent, and issue 1371's `ManagerButton` trigger form is the entry that
-  // proves the point — a `.svelte` this tree renders but a manifest omits CANCELS the suite.
+  // The hoisted list, which is exactly what this suite needs.
   compiledModules: SEARCHABLE_POPOVER_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/components/SearchablePopover.svelte',
 });
@@ -94,13 +56,7 @@ const mountPicker = (props) =>
 /** The trigger button, which is the picker root's own first button. */
 const trigger = () => harness.target.querySelector('.fabricate-picker button');
 
-/**
- * Open the picker and settle the focus move.
- *
- * The primitive focuses its query field from a `queueMicrotask` inside an effect, and returns
- * focus to the trigger from a `tick().then(...)`, so both directions need a real turn of the
- * loop rather than a `flushSync`.
- */
+/** Open the picker and settle the focus move. */
 async function openPanel() {
   trigger().click();
   flushSync();
@@ -115,14 +71,7 @@ async function settle() {
   flushSync();
 }
 
-/**
- * Press a key ON THE ELEMENT THAT CURRENTLY HOLDS FOCUS.
- *
- * Addressing `document.activeElement` rather than a captured node is the point: a model that
- * moved focus onto a row would have this test's own keystrokes follow it, and a run that kept
- * dispatching at the original holder could report an unchanged `activeElement` while the browser
- * had in fact moved on.
- */
+/** Press a key ON THE ELEMENT THAT CURRENTLY HOLDS FOCUS. */
 function pressKey(key, modifiers = {}) {
   const event = new window.KeyboardEvent('keydown', {
     key,
@@ -153,16 +102,7 @@ function search(panel, term) {
   return field;
 }
 
-/**
- * Press a key AT A STATED CLOCK (issue 1504).
- *
- * The type-ahead's buffer expires after ~500ms of inactivity, and `util/listboxNavigation.js`
- * reads that clock through `Date.now()` when its caller states none — which this component
- * deliberately does not, so the picker has no timer to leak. Stating it here is what makes the
- * window observable in BOTH directions: a real wait could prove the reset but never prove that a
- * keystroke INSIDE the window extends rather than restarts, because a slow machine between two
- * synchronous dispatches would look identical to the defect.
- */
+/** Press a key AT A STATED CLOCK (issue 1504). */
 function pressKeyAt(key, at) {
   const realNow = Date.now;
   Date.now = () => at;
@@ -291,12 +231,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       pressKey('ArrowDown');
       assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'the cursor is on Wood');
 
-      // THE DEFECT THIS REFUSES IS A WINDOW, NOT A STATE, so the assertion is on the DOM's own
-      // record of what happened rather than on what is there afterwards. Cleared from an
-      // `$effect`, the cursor is reset AFTER the derived pass that rebuilt the list — so index 1
-      // is written onto the new row at index 1 (Cloth) and taken off again in the same
-      // `flushSync`, and every assertion in this file that reads the settled DOM reports clean.
-      // A `MutationObserver` sees both writes; `oldValue === null` is the one that says GAINED.
+      // THE DEFECT THIS REFUSES IS A WINDOW, NOT A STATE.
       const observer = new window.MutationObserver(() => {});
       observer.observe(panel, {
         subtree: true,
@@ -334,10 +269,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       pressKey('ArrowDown');
       assert.equal(activeDescendant(holder), optionRows(panel)[1].id, 'the cursor is on Wood');
 
-      // The third input that rebuilds the list, and the only one that reaches neither `toggle`
-      // nor a keystroke: a caller swapping `options` while the panel is open with the query
-      // unchanged. Same COUNT, different vocabulary — so a generation keyed on the query alone
-      // would carry index 1 over onto a row the GM has never seen, and Enter would choose it.
+      // The third input that rebuilds the list.
       await harness.setProps({
         options: [
           { id: 'iron', label: 'Iron' },
@@ -415,13 +347,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const panel = await openPanel();
       const holder = panel.querySelector('.manager-travel-popover-search input');
 
-      // THE MODIFIER GUARD IS GENERAL, and the caret boundary cannot stand in for it: ArrowUp and
-      // ArrowDown are not caret keys at all, so `caretOwnsKey` returns false for them at every
-      // offset and a widget that only consulted the boundary would take `Shift+ArrowDown` and
-      // move the cursor. `Shift+ArrowDown` in a text field extends the selection to the end of
-      // the value in every browser, and `Ctrl+ArrowUp` is a paragraph jump — neither is anything
-      // this list has an answer for. The spec states the rule over EVERY key the holder consumes
-      // for exactly this reason, `Enter` alone excepted.
+      // THE MODIFIER GUARD IS GENERAL, and the caret boundary cannot stand in for it.
       for (const [key, modifiers] of [
         ['ArrowDown', { shiftKey: true }],
         ['ArrowUp', { ctrlKey: true }],
@@ -434,8 +360,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         assert.equal(activeDescendant(holder), null, `${name} moved the cursor`);
       }
 
-      // AND THE CONTROL IS THE SAME KEY UNMODIFIED, so the loop above cannot be passing because
-      // the arrows stopped working altogether.
+      // AND THE CONTROL IS THE SAME KEY UNMODIFIED.
       assert.ok(pressKey('ArrowDown').defaultPrevented);
       assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
       harness.remount();
@@ -448,10 +373,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const holder = panel.querySelector('.manager-travel-popover-search input');
       const row = optionRows(panel)[1];
 
-      // happy-dom never moves focus on `mousedown`, so an assertion that `activeElement` is
-      // unchanged here would pass whether or not the component suppressed anything. The
-      // suppression itself is what is asserted, because that is the mechanism a real browser
-      // acts on.
+      // happy-dom never moves focus on `mousedown`.
       const mousedown = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true });
       row.dispatchEvent(mousedown);
       flushSync();
@@ -501,12 +423,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       await settle();
       assert.ok(!harness.target.querySelector('.fabricate-picker-popover'), 'the panel is shut');
 
-      // A CURSOR CANNOT OUTLIVE ITS PANEL EITHER, and the generation stamp alone cannot see this
-      // one: with the same `options` and the query reset to empty, the string this reopen builds
-      // is BYTE-IDENTICAL to the one the abandoned index was stamped under, so a cursor kept
-      // across the close reads as live again. Three presses reach it — arrow, Escape, reopen —
-      // and the panel would come back with a row marked, the holder naming it, the list scrolled
-      // to it and Enter choosing it without the GM ever arrowing into this pass.
+      // A CURSOR CANNOT OUTLIVE ITS PANEL EITHER.
       const reopened = await openPanel();
       const reopenedHolder = reopened.querySelector('.manager-travel-popover-search input');
 
@@ -614,13 +531,6 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
   });
 
   // ── THE OPENING KEYS (issue 1504) ─────────────────────────────────────────────────────────
-  //
-  // A native `<select>` a GM has tabbed to answers ArrowDown, ArrowUp, Home and End by
-  // changing its value, and Alt+ArrowDown by dropping its list open. The search-suppressed
-  // trigger holder is the shape that replaced it, so the keys are its obligation rather than
-  // an enhancement — and until issue 1504 it answered none of them, leaving the browser to
-  // scroll the page instead. What only a mount can show is that the key OPENS and seeds the
-  // cursor in one press, which is a wiring claim rather than an arithmetic one.
   describe('the opening keys of a CLOSED trigger holder', () => {
     /** The search-suppressed shape, focused, panel shut — the state a GM tabs into. */
     async function mountClosedHolder(props = {}) {
@@ -666,9 +576,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         'true',
         'the panel opened, or the focus claim below is about a control that did nothing'
       );
-      // The holder does not change because the panel opened from a key rather than a click: the
-      // search-suppressed shape renders no field for focus to move into, and a row must never
-      // take it. Asserted as a boolean, never as a node — see this file's own note on why.
+      // The holder does not change because the panel opened from a key rather than a click.
       assert.ok(
         document.activeElement === button,
         'the trigger is still the holder, and no row took DOM focus'
@@ -677,8 +585,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
 
     it('does not answer an opening key in the SEARCH shape', async () => {
-      // The 17 callers that render a query field are untouched: with a field rendered the trigger
-      // is not the holder, and this branch must stay the search-suppressed shape's alone.
+      // The 17 callers that render a query field are untouched.
       chosen.length = 0;
       await mountPicker({ options: TIERS });
       trigger().focus();
@@ -693,12 +600,6 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
   });
 
   // ── THE TYPE-AHEAD (issue 1504) ───────────────────────────────────────────────────────────
-  //
-  // A native `<select>` jumps to the option a typed character names, and a GM who tabs to a page
-  // size control and types `2` today gets 25 rows. The arithmetic is proved against the pure
-  // module in `tests/util/listbox-navigation.test.js`; what only a mount can show is the WIRING,
-  // and the CLOSED trigger is the primary case because it is the branch nobody has written: the
-  // trigger had no key handling at all before issue 1503 routed keys to it.
   describe('the type-ahead, whose primary case is a CLOSED trigger', () => {
     /** The search-suppressed shape, focused, with the panel shut — the state a GM tabs into. */
     async function mountClosedTrigger() {
@@ -758,10 +659,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
 
     it('COMMITS NOTHING when the GM dismisses the panel they typed open', async () => {
-      // THE ACTIVE OPTION IS NOT THE VALUE. Escape, an outside click and focus leaving the
-      // trigger all close through the primitive's own `close()`, which calls no `onChoose` — so
-      // a type-ahead followed by any of them leaves the value exactly as it was. A model that
-      // committed the active option on dismissal would fire `onChoose('progressive')` here.
+      // THE ACTIVE OPTION IS NOT THE VALUE. Escape.
       const button = await mountClosedTrigger();
       pressKeyAt('p', 1000);
       await settle();
@@ -885,11 +783,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
 
     it('does not let a prefix outlive the panel it was typed into', async () => {
-      // A GM who dismisses a panel and immediately types again is starting a new search, not
-      // continuing the one they just abandoned. The inactivity window would expire the prefix a
-      // half-second later anyway, which is exactly why this case types INSIDE it: `v` on its own
-      // names nothing, while a `pre` that survived the dismissal would make `prev` open the panel
-      // on Preview only.
+      // A GM who dismisses a panel and immediately types again is starting a new search.
       const button = await mountClosedTrigger();
       pressKeyAt('p', 1000);
       pressKeyAt('r', 1050);
@@ -910,9 +804,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
 
     it('leaves SPACE to the trigger until there is a prefix for it to continue', async () => {
-      // Space activates a focused `<button>`, which is how a keyboard user opens the panel. A
-      // type-ahead that swallowed it would take that away; one that never took it could not
-      // reach `Routed by check`.
+      // Space activates a focused `<button>`.
       const button = await mountClosedTrigger();
 
       const bare = pressKeyAt(' ', 1000);
@@ -956,9 +848,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     });
 
     it('is not armed at all where a query field is rendered', async () => {
-      // THE COMPATIBILITY CONTRACT. Seventeen shipped callers render a query field, and for them
-      // a printable character IS the query. The condition is `showSearch`, the same one that
-      // decides which element is the holder, so none of them can be reached by this branch.
+      // THE COMPATIBILITY CONTRACT. Seventeen shipped callers render a query field.
       chosen.length = 0;
       await mountPicker({ options: TIERS });
       const panel = await openPanel();
@@ -1033,11 +923,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
   });
 
   describe('the caret boundary, where the holder is a TEXT FIELD', () => {
-    // Four keys are the caret's before they are the cursor's, and the component hands each of
-    // them over only from the edge at which the caret would not move. Every clause below fixes
-    // the same query — `o`, which matches Wood and Cloth — and varies ONLY where the caret sits,
-    // so a clause that passed for a reason other than the boundary would have to pass for both
-    // positions and the pair would collapse.
+    // Four keys are the caret's before they are the cursor's.
 
     it('takes End for the cursor when the caret is already at the end of the query', async () => {
       await mountPicker({});
@@ -1151,8 +1037,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const panel = await openPanel();
       const rows = optionRows(panel);
 
-      // A `<button>` has no `selectionStart` at all, so the boundary predicate is false for it by
-      // construction and the seven search-suppressed call sites keep exactly today's key map.
+      // A `<button>` has no `selectionStart` at all.
       const pressed = pressKey('End');
       assert.ok(
         pressed.defaultPrevented,
@@ -1169,8 +1054,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const panel = await openPanel();
       const holder = panel.querySelector('.manager-travel-popover-search input');
 
-      // Both edges of an empty field are the same position, so nothing is owed to the caret —
-      // and this is the state a GM is in when they actually arrow through a list.
+      // Both edges of an empty field are the same position.
       assert.equal(holder.value, '', 'the panel opens with no query');
       assert.ok(pressKey('End').defaultPrevented);
       assert.equal(activeDescendant(holder), optionRows(panel)[2].id);
@@ -1186,14 +1070,12 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const panel = await openPanel();
       const holder = panel.querySelector('.manager-travel-popover-search input');
 
-      // ArrowLeft/Right are not a convenience here: with two columns ArrowDown steps +2 over the
-      // flat order, so on an even filtered count half the tiles are unreachable without them.
+      // ArrowLeft/Right are not a convenience here.
       searchWithCaret(panel, 'o', 1);
       assert.ok(pressKey('ArrowRight').defaultPrevented, 'at the end of the query the grid has it');
       assert.equal(activeDescendant(holder), optionRows(panel)[0].id);
 
-      // The query is UNCHANGED, so the list — and therefore the cursor — is the same one; only
-      // the caret moved. That is what makes the pair a controlled comparison.
+      // The query is UNCHANGED, so the list — and therefore the cursor — is the same one.
       searchWithCaret(panel, 'o', 0);
       const left = pressKey('ArrowRight');
       assert.ok(!left.defaultPrevented, 'with text to its right the caret keeps it');
@@ -1239,11 +1121,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const panel = await openPanel();
       const holder = panel.querySelector('.manager-travel-popover-search input');
 
-      // The panel is `role="dialog" tabindex="-1"`, so it is the nearest focusable ancestor of
-      // its own inset, its inter-row gaps, its header and its empty note. A click landing on any
-      // of them would focus the DIALOG — and the key map is bound to the holder, so the arrows
-      // would stop moving and typing would go nowhere, with no ring drawn to explain it because
-      // the module root rings `:focus-visible` only and a mouse click does not match it.
+      // The panel is `role="dialog" tabindex="-1"`.
       const onPanel = new window.MouseEvent('mousedown', { bubbles: true, cancelable: true });
       panel.dispatchEvent(onPanel);
       flushSync();
@@ -1268,11 +1146,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
 
   describe('the caller seam that feeds the cursor its list', () => {
     it('renders the empty branch when `filterOptions` returns something that is not an array', async () => {
-      // Everything downstream INDEXES what the seam returns — the cursor arithmetic, the option
-      // ids, `renderedOptions[activeIndex]` — so a seam returning a bare object or a string would
-      // throw inside a `$derived` and take the whole panel down, with a stack that names this
-      // component rather than the caller that misread the contract. The coercion belongs here
-      // because this is where the assumption is made.
+      // Everything downstream INDEXES what the seam returns — the cursor arithmetic.
       await mountPicker({ filterOptions: () => 'not an array' });
       const panel = await openPanel();
 

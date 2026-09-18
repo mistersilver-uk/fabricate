@@ -1,25 +1,6 @@
 /**
- * Retained runtime definition indexes — bounds, precedence, staleness and revision tokens
- * (issue 1076, under the performance programme #1070).
- *
- * ## Why every bound here is a count
- *
- * The field report behind this programme is a 7.5 s crafting-menu open on a character
- * carrying hundreds of salvageable materials against a 1,080-component library. The scaling
- * term is `items x components`, and a product term is exactly a count that moves when the
- * axis it should be independent of is scaled. A wall-clock assertion could not tell that
- * apart from a busy CI runner; a count is identical on every machine and every Node build.
- *
- * These guards extend issue 1072's vocabulary rather than starting a third mechanism: they
- * assert UPPER BOUNDS and INDEPENDENCE RELATIONS, and they get their sensitivity from
- * scaling ONE axis and comparing two runs, never from fixture size.
- *
- * The counter itself is `definitionIndex`'s own `candidatesExamined`, which counts candidate
- * definitions inspected INCLUDING the ones walked while an index is built. Counting the
- * build is what stops the guard being vacuous: a counter that only saw lookups would report
- * a triumphant zero for a path that rebuilt the whole index on every call. Every bound below
- * is therefore stated against a WARM index, with an explicit cold-build control proving the
- * counter can still move.
+ * Retained runtime definition indexes — bounds, precedence, staleness and revision tokens (issue
+ * 1076, under the performance programme #1070).
  */
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,9 +48,6 @@ function examined() {
 /**
  * A component library whose entries carry source references, so the source-reference tier is
  * genuinely populated rather than trivially empty.
- *
- * @param {number} count
- * @returns {object[]}
  */
 function library(count) {
   return makeComponentLibrary(count).map((component) => ({
@@ -79,12 +57,7 @@ function library(count) {
   }));
 }
 
-/**
- * An owned item bearing the durable per-system role claim for `componentId`.
- *
- * @param {string} componentId
- * @returns {object}
- */
+/** An owned item bearing the durable per-system role claim for `componentId`. */
 function durableItem(componentId) {
   return roleItem({
     uuid: `Actor.a.Item.owned-${componentId}`,
@@ -95,26 +68,14 @@ function durableItem(componentId) {
 }
 
 /**
- * An owned item that carries no Fabricate flags and no source references — the branch a real
- * player inventory spends most of its time in.
- *
- * @param {string} name
- * @returns {object}
+ * An owned item that carries no Fabricate flags and no source references — the branch a real player
+ * inventory spends most of its time in.
  */
 function unstampedItem(name) {
   return roleItem({ uuid: `Actor.a.Item.${name}`, name, quantity: 1 });
 }
 
-/**
- * Warm the index for a candidate set, then zero the counters.
- *
- * Every bound in this file is about the WARM path, and the cold build is genuinely
- * O(library) — so measuring without warming would measure the build and report a bound
- * nobody could ever meet.
- *
- * @param {object[]} components
- * @returns {void}
- */
+/** Warm the index for a candidate set, then zero the counters. */
 function warm(components) {
   getDefinitionIndex(components);
   resetIdentityCounters();
@@ -125,9 +86,7 @@ beforeEach(() => {
   resetNameOnlyMatchTelemetry();
 });
 
-// ---------------------------------------------------------------------------
 // Bounds
-// ---------------------------------------------------------------------------
 
 describe('issue 1076 bound — identity resolution is independent of library size', () => {
   it('examines exactly one candidate on the durable-id path against a 5,000-component system', () => {
@@ -160,9 +119,7 @@ describe('issue 1076 bound — identity resolution is independent of library siz
   });
 
   it('bounds the item that matches NOTHING — no flags, no source refs, no name match', () => {
-    // The branch the field report hit. A criterion covering only successful matches does not
-    // cover it: the miss used to pay a full library scan on the source-reference tier and a
-    // SECOND full scan in the name fallback before returning null.
+    // The branch the field report hit.
     const components = library(LIBRARY);
     warm(components);
 
@@ -178,11 +135,9 @@ describe('issue 1076 bound — identity resolution is independent of library siz
   });
 
   it('runs NO array scan at all on the miss path, by the independent fixture-side counter', () => {
-    // `readIdentityCounters` only sees what `definitionIndex` itself inspects, so on its own
-    // it cannot notice a linear `candidates.find()` reintroduced beside the index — the count
-    // would simply stay at zero. Issue 1072's `countingCandidates` array counts the other
-    // half: every per-element predicate the candidate array is handed. Both at once is what
-    // makes "bounded" mean bounded.
+    // `readIdentityCounters` only sees what `definitionIndex` itself inspects, so on its own it
+    // cannot notice a linear `candidates.find()` reintroduced beside the index — the count would
+    // simply stay at zero (issue 1072).
     const counters = createOperationCounters();
     const components = countingCandidates(library(LIBRARY), counters, 'componentCandidates');
     warm(components);
@@ -233,22 +188,16 @@ describe('issue 1076 bound — identity resolution is independent of library siz
   });
 });
 
-// ---------------------------------------------------------------------------
 // The craft/salvage execution matcher
-// ---------------------------------------------------------------------------
 
 /**
- * A system plus an engine, with a held inventory whose composition mirrors a real sheet:
- * most items resolve to no component at all.
- *
- * @param {object} [options]
- * @returns {object}
+ * A system plus an engine, with a held inventory whose composition mirrors a real sheet: most items
+ * resolve to no component at all.
  */
 function craftWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
-  // Both counters at once, for the reason the miss-path guard above states: the identity
-  // counter cannot see a linear `find`/`filter` reintroduced beside the index, and the
-  // fixture-side probe cannot see the index build. Either alone is satisfiable by a
-  // regression the other catches.
+  // Both counters at once, for the reason the miss-path guard above states: the identity counter
+  // cannot see a linear `find`/`filter` reintroduced beside the index, and the fixture-side probe
+  // cannot see the index build.
   const counters = createOperationCounters();
   const components = countingCandidates(library(componentCount), counters, 'componentCandidates');
   const system = { id: SYSTEM_ID, name: 'Index System', components };
@@ -326,28 +275,18 @@ describe('issue 1076 bound — findComponentItems is independent of component-li
   });
 });
 
-// ---------------------------------------------------------------------------
 // The bulk services — the paths the per-row scans actually live on
-// ---------------------------------------------------------------------------
 
-/**
- * How many bulk rows one measurement runs. CONSTANT across library sizes, because the
- * relation under test is "cost is independent of the library", and a fixture that scaled
- * both axes at once could not attribute a movement to either.
- */
+/** How many bulk rows one measurement runs. */
 const BULK_ROWS = 5;
 
 /** Units per owned stack: enough for salvage to take one and destroy to take the rest. */
 const STACK_QUANTITY = 4;
 
 /**
- * An owned Item document stand-in carrying the durable per-system role claim for
- * `componentId`, plus the mutating surface the salvage and destroy pipelines actually use
- * (`delete`, `update`, `toObject`).
- *
- * @param {string} componentId
- * @param {number} index
- * @returns {object}
+ * An owned Item document stand-in carrying the durable per-system role claim for `componentId`,
+ * plus the mutating surface the salvage and destroy pipelines actually use (`delete`, `update`,
+ * `toObject`).
  */
 function ownedStack(componentId, index) {
   const id = `owned-${componentId}-${index}`;
@@ -378,29 +317,13 @@ function ownedStack(componentId, index) {
 }
 
 /**
- * A world wired for a REAL bulk run: a library, a salvage-capable system, an actor holding
- * one stack per bulk row, and the engine both services delegate to.
- *
- * ## The targets sit at the END of the library, and that is the fixture's whole point
- *
- * The guard this replaces put its five targets at positions 7–11, so every `.find()` it was
- * supposed to catch terminated after eleven comparisons — 50 scans at 5,000 components rather
- * than the 24,990 the defect actually costs — and the bound it asserted was satisfied by the
- * unfixed code. Anchoring the targets (and the salvage OUTPUT component, which
- * `_createSingleResult` resolves separately) at the end makes every surviving scan pay its
- * full length, so the difference between a warm-index lookup and a scan is the difference
- * between a constant and `rows x components`.
- *
- * @param {object} [options]
- * @returns {object}
+ * A world wired for a REAL bulk run: a library, a salvage-capable system, an actor holding one
+ * stack per bulk row, and the engine both services delegate to.
  */
 function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
   const counters = createOperationCounters();
   const authored = library(componentCount);
-  // Targets last, their salvage OUTPUTS immediately before them. Distinct outputs per row,
-  // because `_createSingleResult` merges a second award of the SAME component into the
-  // existing stack — one shared output would make four of the five rows create nothing and
-  // the non-vacuity check would be measuring one row, not five.
+  // Targets last, their salvage OUTPUTS immediately before them.
   const outputs = authored.slice(-2 * BULK_ROWS, -BULK_ROWS);
   const targets = authored.slice(-BULK_ROWS);
   for (const [index, component] of targets.entries()) {
@@ -418,11 +341,8 @@ function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
     };
   }
 
-  // BOTH counting layers, because they see different reintroductions and each alone is
-  // satisfiable by the shape the other catches. `countingCandidates` sees
-  // `components.find((c) => c.id === id)`; `countingEnumerations` sees
-  // `for (const c of components) { if (c.id === id) ... }`, which is the idiom this
-  // repository actually writes and the one a `.find()`-only guard is blind to.
+  // BOTH counting layers, because they see different reintroductions and each alone is satisfiable
+  // by the shape the other catches.
   const components = countingEnumerations(
     countingCandidates(authored, counters, 'componentPredicates'),
     counters,
@@ -499,16 +419,7 @@ function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
   };
 }
 
-/**
- * Install the globals a real salvage needs, returning a restore function.
- *
- * `installFoundryEnv()` owns `globalThis.game` for the whole file, so this snapshots and
- * restores rather than overwriting: the staleness and revision-token suites below build their
- * own environment and must not inherit this one.
- *
- * @param {object} world
- * @returns {() => void}
- */
+/** Install the globals a real salvage needs, returning a restore function. */
 function installBulkGame(world) {
   const previous = { game: globalThis.game, fromUuid: globalThis.fromUuid };
   globalThis.game = {
@@ -524,9 +435,8 @@ function installBulkGame(world) {
   };
   globalThis.fromUuid = async (uuid) => {
     if (uuid === world.actor.uuid) return world.actor;
-    // Every library entry carries `registeredItemUuid`, which `_createSingleResult` resolves
-    // for the salvage OUTPUT. Answering it keeps the fixture on the ordinary source-item
-    // branch rather than the "could not be resolved" fallback.
+    // Every library entry carries `registeredItemUuid`, which `_createSingleResult` resolves for
+    // the salvage OUTPUT.
     if (typeof uuid === 'string' && uuid.startsWith('Compendium.pack.Item.')) {
       const name = `Source ${uuid.slice('Compendium.pack.Item.'.length)}`;
       return {
@@ -545,15 +455,8 @@ function installBulkGame(world) {
 }
 
 /**
- * Run ONE bulk salvage and ONE bulk destroy over the same `BULK_ROWS` targets against a
- * library of `componentCount`, and report every way the library could have been walked.
- *
- * Salvage runs first and destroy second, so both do real work on the same stacks: salvage
- * consumes one unit of each and destroy removes what is left. A destroy-first order would
- * leave salvage with nothing to find and would measure the cheap `depleted` branch.
- *
- * @param {number} componentCount
- * @returns {Promise<object>}
+ * Run ONE bulk salvage and ONE bulk destroy over the same `BULK_ROWS` targets against a library of
+ * `componentCount`, and report every way the library could have been walked.
  */
 async function measureBulkRun(componentCount) {
   const world = bulkWorld({ componentCount });
@@ -584,9 +487,7 @@ async function measureBulkRun(componentCount) {
       componentId: component.id,
     }));
 
-    // WARM, then zero both counter sets. Every bound here is about the warm path; measuring
-    // the one-off `O(components)` build would report a bound nobody could meet, and the
-    // cold-build control above already proves the counter can move.
+    // WARM, then zero both counter sets.
     warm(world.components);
     world.counters.reset();
 
@@ -597,9 +498,8 @@ async function measureBulkRun(componentCount) {
     return {
       predicates: world.counters.get('componentPredicates'),
       enumerations: world.counters.get('componentEnumerations'),
-      // Net of the index build's own `definitions.entries()` walk, which `definitionIndex`
-      // already counts on its own seam. Clamped at zero so a build of some OTHER array can
-      // only under-report a surplus, never invent one.
+      // Net of the index build's own `definitions.entries()` walk, which `definitionIndex` already
+      // counts on its own seam.
       entries: Math.max(0, world.counters.get('componentEntries') - identity.indexBuilds * componentCount),
       identity: identity.candidatesExamined,
       salvagedRows: salvaged.items.filter((item) => item.outcome === 'succeeded').length,
@@ -620,10 +520,6 @@ function libraryExaminations(measured) {
 describe('issue 1202 bound — a bulk run is independent of component-library size', () => {
   it('charges a bulk salvage and a bulk destroy per ROW only, never per row x library', async () => {
     // This is the guard the issue exists for, and the shape of its predecessor is the reason.
-    // That one was titled for bulk runs but called `findComponentItems` five times in a loop,
-    // so it entered NO bulk service and could not reach a single one of the per-row scans it
-    // was named for — including `CraftingEngine.salvage`'s own, which only a FULL salvage row
-    // reaches (a pre-flight-only test misses it by construction).
     const small = await measureBulkRun(50);
     const large = await measureBulkRun(LIBRARY);
 
@@ -652,12 +548,7 @@ describe('issue 1202 bound — a bulk run is independent of component-library si
   });
 
   it('runs NO array scan over the library, in EITHER reintroduction shape', async () => {
-    // The two counters are separated on purpose. `componentPredicates` sees a scan written as
-    // `components.find((c) => c.id === id)`; `componentEnumerations` sees one written as
-    // `for (const c of components) { if (c.id === id) return c; }` — and only the second is
-    // the idiom this repository reaches for by default. A guard carrying only the first would
-    // be falsifiable against the shape being fixed and blind to the shape most likely to
-    // reintroduce it.
+    // The two counters are separated on purpose.
     const large = await measureBulkRun(LIBRARY);
 
     assert.equal(
@@ -683,9 +574,7 @@ describe('issue 1202 bound — a bulk run is independent of component-library si
   });
 });
 
-// ---------------------------------------------------------------------------
 // Precedence and telemetry — unchanged semantics
-// ---------------------------------------------------------------------------
 
 describe('issue 1076 — name-match precedence and case semantics are unchanged', () => {
   const twins = () => [
@@ -825,15 +714,9 @@ describe('issue 1076 — id and source-reference precedence are unchanged', () =
   });
 });
 
-// ---------------------------------------------------------------------------
 // Staleness — the invalidation rule, proved
-// ---------------------------------------------------------------------------
 
-/**
- * A GM environment with a real `CraftingSystemManager` over a small library.
- *
- * @returns {Promise<{manager: object, systemId: string}>}
- */
+/** A GM environment with a real `CraftingSystemManager` over a small library. */
 async function managerWithSystem() {
   installFoundryEnv();
   const manager = new CraftingSystemManager(new RecipeManager({}));
@@ -927,15 +810,9 @@ describe('issue 1076 staleness — an index is a cache, so its invalidation is t
   });
 });
 
-// ---------------------------------------------------------------------------
 // The revision-token contract
-// ---------------------------------------------------------------------------
 
-/**
- * A GM recipe manager with a Map-backed settings store, so `save()` and `reload()` are real.
- *
- * @returns {{manager: object, settings: Map<string, any>}}
- */
+/** A GM recipe manager with a Map-backed settings store, so `save()` and `reload()` are real. */
 function recipeManagerWithSettings() {
   const { settings } = installFoundryEnv();
   return { manager: new RecipeManager({}), settings };
@@ -1024,9 +901,8 @@ describe('issue 1076 — the revision-token contract', () => {
   });
 
   it('detects change without serializing the corpus', () => {
-    // The literal criterion: neither manager's `reload()` may use `JSON.stringify` over the
-    // whole collection to answer a boolean. Read off the shipped function bodies rather than
-    // a source file, so a helper that reintroduced it under another name still shows up here.
+    // The literal criterion: neither manager's `reload()` may use `JSON.stringify` over the whole
+    // collection to answer a boolean.
     for (const [label, body] of [
       ['RecipeManager.reload', RecipeManager.prototype.reload.toString()],
       ['CraftingSystemManager.reload', CraftingSystemManager.prototype.reload.toString()],
@@ -1040,9 +916,8 @@ describe('issue 1076 — the revision-token contract', () => {
   });
 
   it('is consumed by a memo standing in for #1074 / #1077 / #1078', async () => {
-    // The contract is only worth defining if a consumer can actually build on it. This is
-    // the shape all three downstream issues need: hold a token, compare with ===, rebuild
-    // only when it moved.
+    // The contract is only worth defining if a consumer can actually build on it. This is the shape
+    // all three downstream issues need: hold a token, compare with ===, rebuild only when it moved.
     const { manager } = recipeManagerWithSettings();
     let rebuilds = 0;
     let cache = { token: null, value: null };
@@ -1081,9 +956,7 @@ describe('issue 1076 — the revision-token contract', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getRecipes cohorts
-// ---------------------------------------------------------------------------
 
 describe('issue 1076 — getRecipes starts from the indexed cohort', () => {
   it('returns the same recipes, in the same order, as the whole-corpus filter did', async () => {

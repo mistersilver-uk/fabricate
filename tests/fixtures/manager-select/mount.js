@@ -1,34 +1,6 @@
 /**
- * Mount the REAL converted manager settings/tab controls, and the three caption SHAPES, for
- * issue 1510.
- *
- * Everything except the window frame around it is production code, reached through the real
- * Svelte plugin: each component is imported from `src/`, its own `<style>` is compiled and
- * injected exactly as the shipped bundle injects it, and `styles/fabricate.css` is served raw.
- * That matters more than usual here, because none of the three questions the suite asks can be
- * reproduced by hand-written markup — the listeners a caption click meets, a `min-width` that
- * only exists in a compiled scoped block, and a panel width `anchoredPopover` writes inline
- * from a run-time measurement.
- *
- * `?subject=` picks one of seven:
- *
- *   label         a bare `Select` re-wrapped in the `<label>` the demotion rule removes — the
- *                 shipped `Pagination` shape, whose own wrapper this rule already demoted at
- *                 issue 1504, restored here so the defect has a subject
- *   span          the same control in the `<span>` that shape ships as
- *   field         the primitive's OWN labelled form (`Select label=`), which is the subject the
- *                 maintainer ruled repaired inside the primitive at this issue
- *   prerequisites `CharacterPrerequisitesCard`, whose operator select demotes onto
- *                 `Field as="div"` behind a `visually-hidden` caption
- *   currency      `WorldCurrencyTab`, which carries one demote-and-point site with a VISIBLE
- *                 caption and one exception-(a) `label=` adoption beside it
- *   import        `ImportFolderMappingModal`, the one site whose row is `flex-wrap` rather than
- *                 a column, so its trigger hugs
- *   economy       `GatheringEconomyView`, whose two regeneration controls are exception-(a)
- *                 `label=` adoptions in a two-column grid
- *
- * `?value=` picks which option starts selected, so the same subject can be measured on its
- * shortest and its longest label without remounting into a different tree.
+ * Mount the REAL converted manager settings/tab controls, and the three caption SHAPES, for issue
+ * 1510.
  */
 import { mount } from 'svelte';
 
@@ -56,10 +28,8 @@ document.body.append(frame);
 
 /**
  * The three caption shapes around one bare `Select`, hosted the way the manager's `Pagination`
- * page-size row hosts its control (the wrapper class is the difference under test); the
- * `showTick` refusal matches that shipped row.
- *
- * @returns {void}
+ * page-size row hosts its control (the wrapper class is the difference under test); the `showTick`
+ * refusal matches that shipped row.
  */
 function mountShape() {
   mountCaptionShape({
@@ -101,7 +71,6 @@ const IMPORT_FOLDERS = [
  * The gathering services seam, reduced to the four reads this view makes on mount.
  *
  * @param {string} unit The regeneration unit the economy starts on.
- * @returns {object}
  */
 function economyServices(unit) {
   const economy = {

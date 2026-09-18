@@ -1,39 +1,6 @@
 /**
  * A COMMENT-ONLY EDIT TO `src/ui/svelte/components/` CHANGES NO EXECUTABLE CONSTRUCT (issue 1678).
- *
- * Epic 1656 rewrites the headers of 37 components at once. No diff review of that establishes
- * that nothing executable moved, so the property is asserted mechanically instead: for every
- * component in the directory, the projection of its `svelte/compiler` AST is invariant under
- * removing 100% of its comments AND under reformatting the result with the repository's own
- * Prettier configuration. Measured here: 37 of 37 invariant both ways.
- *
- * Prettier is in the invariance because deleting a comment LICENSES a reformat. Three components
- * carry a comment inside their `$props()` destructure, and removing it lets Prettier collapse the
- * pattern onto one line — real movement of executable lines that a line-level diff cannot clear.
- *
- * ── WHY THE THREE ALTERNATIVES LOSE ───────────────────────────────────────────────────────
- * Recorded so nobody simplifies this back into one of them.
- *
- *   - STRIP AND BYTE-COMPARE reds on `Field`, `InspectorCard` and `ManagerToolbar`, where the
- *     collapse above is legitimate, and it needs its own comment classifier — a second copy of
- *     `tests/comment-share-ratchet.test.js`'s.
- *   - `tests/helpers/svelteStructureContract.js` is the obvious candidate and cannot do it. Its
- *     own header says so: it answers structural questions about the TEMPLATE, and cannot see a
- *     `<script>` body, a `$derived` expression, a prop default or the `<style>` block at all. A
- *     comparison built on its predicates passes a rewritten function body.
- *   - RENDERED-OUTPUT comparison needs a fixture per prop permutation and never sees CSS no
- *     permutation triggers.
- *
- * ── THE ONE HOLE, STATED RATHER THAN HIDDEN ───────────────────────────────────────────────
- * The projection drops `css.content.styles` — the raw `<style>` source string, which any
- * reformat rewrites — and compares `css.children`, the PARSED rule tree, instead. So anything
- * Svelte's CSS parser does not model is invisible here. Declaration values, whole rules and
- * property names are all caught through `css.children` and are pinned below. At-rule preludes
- * are NOT: no component in this directory carries an `@media` or `@supports` block today, so
- * that leg is untested rather than proved.
- *
- * The shape is `tests/markdown-wraps.test.js` + `scripts/lib/markdownWraps.js`'s: a corpus-wide
- * invariance beside a mutation table that proves the comparison can fail.
+ * Epic 1656 rewrites the headers of 37 components at once.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -52,11 +19,7 @@ const repoRoot = resolve(import.meta.dirname, '..');
 /** 37 components live here today; a walk that stopped recursing or filtering reads far below it. */
 const CORPUS_FLOOR = 30;
 
-/**
- * Keys that carry position, formatting or comments rather than meaning. `raw` goes because it is
- * a literal's SOURCE spelling beside the `value` this keeps; `comments`, `leadingComments` and
- * `trailingComments` are the comment carriers the whole proof is about.
- */
+/** Keys that carry position, formatting or comments rather than meaning. */
 const DROPPED_KEYS = Object.freeze(
   new Set([
     'start',
@@ -185,13 +148,7 @@ test('every component in the directory survives a 100% comment strip unchanged',
   );
 });
 
-/**
- * A fixture the mutation table below perturbs. It is deliberately a string rather than a tracked
- * `.svelte` file: `UI_PATH_PATTERN` in `scripts/lib/viewLabCases.js` matches any path ending
- * `.svelte`, so a committed fixture would arm the screenshot-evidence gate for a change that
- * renders nothing. `tests/style-block-scan.test.js` takes its fixtures as strings for the same
- * reason.
- */
+/** A fixture the mutation table below perturbs. */
 const FIXTURE = `<script>
   let {
     size = 34,

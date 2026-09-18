@@ -1,26 +1,16 @@
 /**
  * THE FACT GROUP IS A DOM UNIT (issue 1371).
- *
  * `ScopedEntityPreview` draws each kickered fact group as a kicker `<p>` followed by a sibling
  * `<ul>` of rows, and it put the group's own `hookAttribute` on the `<ul>`. So the hook named the
  * ROWS, not the group: no selector reached the kicker, and a parity lane measuring the reference's
  * `USED BY` / `PRODUCED BY` rails had to report both kicker regions as unmeasurable rather than as
  * matching or drifting (`handoff-r5b.md` §4, "still unresolvable").
- *
- * The fix is the smallest one that makes the claim true: kicker and rows are wrapped in one
- * element and the hook moves onto the wrapper, so `[hook]` means the group and `[hook] .manager-
- * kicker` reaches its label.
- *
- * ── WHY THE WRAPPER IS `display: contents`, AND WHY THAT IS AN INLINE STYLE ────────────────────
- * The rail is a column flexbox with a `--fab-space-3` gap, so a wrapper that generated a box would
- * make each group ONE flex item and collapse the gap between a kicker and its own rows to zero.
  * `display: contents` makes the wrapper generate no box at all: both children stay direct
  * participants in the rail's flex layout and every rendered pixel is unchanged. It is written
  * INLINE rather than in a scoped `<style>` because this component's class stem is a prop — its own
  * docblock records that a scoped selector over a dynamic class cannot be proven used, and
  * `lint:svelte:warnings` fails on the unused-selector warning that follows — and the shell's
  * stylesheet is closed to this lane.
- *
  * The consequence a consumer has to know about is asserted below: a selector written
  * `[hook] > li` no longer resolves, because the rows are now a grandchild of the hook.
  */
@@ -91,9 +81,7 @@ describe('ScopedEntityPreview fact groups (mounted)', () => {
   });
 
   it('hooks an EMPTY group the same way, so both states answer one selector', async () => {
-    // An absent group and an empty one say different things, and only the second is ever true
-    // here. A hook that reached only the populated shape would make the empty sentence
-    // unmeasurable in exactly the state a parity run needs to photograph.
+    // An absent group and an empty one say different things.
     const root = await harness.mount({ factGroups: GROUPS });
     const group = root.querySelector('[data-rail-produced-by]');
     assert.ok(Boolean(group), 'the empty group renders under its own hook too');
@@ -106,9 +94,7 @@ describe('ScopedEntityPreview fact groups (mounted)', () => {
   });
 
   it('generates no box, so the rail’s own gap still separates kicker from rows', async () => {
-    // The regression this guards is not visible in the DOM: a wrapper that generated a box would
-    // turn each group into ONE flex item of the rail and collapse the `--fab-space-3` between a
-    // kicker and its list to nothing. Nothing else in the repository would fail.
+    // The regression this guards is not visible in the DOM.
     const root = await harness.mount({ factGroups: GROUPS });
     const group = root.querySelector('[data-rail-used-by]');
     assert.match(

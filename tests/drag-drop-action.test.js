@@ -1,10 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
-// Set up globalThis.foundry so getDragEventData has a working implementation
-// before the module is imported and cached.
-// ---------------------------------------------------------------------------
+// Set up globalThis.foundry so getDragEventData has a working implementation before the module is
+// imported and cached.
 globalThis.foundry = {
   applications: {
     ux: {
@@ -26,9 +24,7 @@ globalThis.foundry = {
 
 const { dragDrop } = await import('../src/ui/svelte/actions/dragDrop.js');
 
-// ---------------------------------------------------------------------------
 // Mock DOM node factory
-// ---------------------------------------------------------------------------
 
 function makeNode(children = []) {
   const listeners = {};
@@ -78,9 +74,7 @@ function fire(node, type, event) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Test 1: Attaches dragover, dragleave, drop listeners on init
-// ---------------------------------------------------------------------------
 test('attaches dragover, dragleave, and drop listeners on init', () => {
   const node = makeNode();
   dragDrop(node, { onDrop: () => {} });
@@ -90,9 +84,7 @@ test('attaches dragover, dragleave, and drop listeners on init', () => {
   assert.equal(node._listeners['drop']?.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Test 2: Dragover adds activeClass to node
-// ---------------------------------------------------------------------------
 test('dragover adds activeClass to node classList', () => {
   const node = makeNode();
   dragDrop(node, { onDrop: () => {}, activeClass: 'drop-active' });
@@ -102,9 +94,7 @@ test('dragover adds activeClass to node classList', () => {
   assert.ok(node._classes.has('drop-active'));
 });
 
-// ---------------------------------------------------------------------------
 // Test 3: Dragleave removes activeClass when truly leaving node
-// ---------------------------------------------------------------------------
 test('dragleave removes activeClass when relatedTarget is outside node', () => {
   const node = makeNode(); // no children — contains() always false
   dragDrop(node, { onDrop: () => {}, activeClass: 'drop-active' });
@@ -116,9 +106,7 @@ test('dragleave removes activeClass when relatedTarget is outside node', () => {
   assert.ok(!node._classes.has('drop-active'));
 });
 
-// ---------------------------------------------------------------------------
 // Test 4: Dragleave does NOT remove class when relatedTarget is a child
-// ---------------------------------------------------------------------------
 test('dragleave does not remove activeClass when relatedTarget is a child of node', () => {
   const child = {};
   const node = makeNode([child]); // contains(child) === true
@@ -132,9 +120,7 @@ test('dragleave does not remove activeClass when relatedTarget is a child of nod
   assert.ok(node._classes.has('drop-active'));
 });
 
-// ---------------------------------------------------------------------------
 // Test 5: Drop removes activeClass and calls onDrop with extracted data
-// ---------------------------------------------------------------------------
 test('drop removes activeClass and calls onDrop with the extracted drag data', () => {
   const node = makeNode();
   const received = [];
@@ -151,9 +137,7 @@ test('drop removes activeClass and calls onDrop with the extracted drag data', (
   assert.deepEqual(received[0], payload);
 });
 
-// ---------------------------------------------------------------------------
 // Test 6: Drop with null drag data does not call onDrop
-// ---------------------------------------------------------------------------
 test('drop with null drag data does not call onDrop', () => {
   const node = makeNode();
   let called = false;
@@ -165,9 +149,7 @@ test('drop with null drag data does not call onDrop', () => {
   assert.ok(!called);
 });
 
-// ---------------------------------------------------------------------------
 // Test 7: Drop with no onDrop callback does not throw
-// ---------------------------------------------------------------------------
 test('drop with no onDrop callback does not throw', () => {
   const node = makeNode();
   dragDrop(node, {}); // no onDrop
@@ -178,9 +160,7 @@ test('drop with no onDrop callback does not throw', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Test 8: disabled=true prevents listener attachment
-// ---------------------------------------------------------------------------
 test('disabled=true prevents listener attachment', () => {
   const node = makeNode();
   dragDrop(node, { onDrop: () => {}, disabled: true });
@@ -190,9 +170,7 @@ test('disabled=true prevents listener attachment', () => {
   assert.equal((node._listeners['drop'] ?? []).length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Test 9: update() toggles listeners when disabled changes
-// ---------------------------------------------------------------------------
 test('update toggles listeners when disabled changes', () => {
   const node = makeNode();
   const action = dragDrop(node, { onDrop: () => {}, disabled: false });
@@ -209,9 +187,7 @@ test('update toggles listeners when disabled changes', () => {
   assert.equal(node._listeners['drop']?.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Test 10: destroy() removes all listeners and clears activeClass
-// ---------------------------------------------------------------------------
 test('destroy removes all listeners and clears activeClass', () => {
   const node = makeNode();
   const action = dragDrop(node, { onDrop: () => {}, activeClass: 'drop-active' });

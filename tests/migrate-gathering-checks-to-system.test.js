@@ -4,9 +4,7 @@ import assert from 'node:assert/strict';
 import { migrateGatheringChecksToSystem } from '../src/migration/migrateGatheringChecksToSystem.js';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 
-// ---------------------------------------------------------------------------
 // Pure function
-// ---------------------------------------------------------------------------
 
 function configWith(systemId, tasks) {
   return { systems: { [systemId]: { tasks } } };
@@ -154,9 +152,7 @@ test('preserves an existing (not-yet-enabled) sibling check config when seeding'
   assert.equal(check.routed.relativeOutcomes[0].name, 'Find', 'pre-existing routed sibling preserved');
 });
 
-// ---------------------------------------------------------------------------
 // MigrationRunner integration
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries(initial));

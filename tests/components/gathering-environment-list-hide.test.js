@@ -12,9 +12,6 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 // GatheringEnvironmentList mounts the shared Pagination + EnvironmentCard tree.
-// EnvironmentCard pulls in the scene-image, gathering-format, and image-default
-// helpers; every rendered `.svelte`/`.js` must be in the harness allowlist or
-// the mount HANGS (reported as `# cancelled`, never `# fail`).
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-env-hide-',
@@ -35,8 +32,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'
   ],
-  // `EmptyState` arrives through the `SELECT_COMPILED_MODULES` spread above, which is what
-  // both converted empty branches render now (issue 1514).
+  // `EmptyState` arrives through the `SELECT_COMPILED_MODULES` spread above.
 
   // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
   // `Pagination`, whose page-size control is a shared `<Select>` now, and a picker resolves its
@@ -82,14 +78,12 @@ function toggle(target) {
   return target.querySelector('[data-gathering-env-hide-toggle]');
 }
 
-// The pill switch is a <button aria-pressed>, not a checkbox — read its state
-// from aria-pressed.
+// The pill switch is a <button aria-pressed>, not a checkbox.
 function isOn(target) {
   return toggle(target).getAttribute('aria-pressed') === 'true';
 }
 
-// A mixed listing: one available, one disabled-locked, one out-of-realm-locked,
-// one blind-but-locked, and one merely-blind (masked, reachable, NOT locked).
+// A mixed listing: one available, one disabled-locked.
 function mixedListing() {
   return [
     environment({ id: 'env-open', name: 'Open Field' }),
@@ -175,8 +169,7 @@ describe('GatheringEnvironmentList hide-unavailable toggle', () => {
   });
 
   it('shows the cause-specific all-unavailable empty state (distinct from no-matches) with a recovery control', async () => {
-    // Every environment is locked; with the toggle seeded on, the filtered set is
-    // non-empty but the visible set is empty -> the toggle-emptied branch.
+    // Every environment is locked; with the toggle seeded on.
     const { calls, ...services } = makeServices(true);
     const lockedOnly = [
       environment({ id: 'env-a', name: 'Sealed A', locked: true }),

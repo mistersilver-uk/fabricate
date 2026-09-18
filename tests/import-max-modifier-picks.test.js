@@ -1,11 +1,7 @@
 /**
- * Issue 1055 — the check-modifier pick cap across export -> import.
- *
- * The world-side `1.20.0` migration cannot help a bundle: an import arrives as JSON and
- * never passes through the settings the runner reads. `migrateExportPayload` mirrors the
- * stamp for the import path, and this drives the whole chain a GM actually takes —
- * `buildExportPayload` -> `prepareForImport` -> `CompendiumImporter.importFromPackData` —
- * rather than the derivation in isolation.
+ * Issue 1055 — the check-modifier pick cap across export -> import. The world-side `1.20.0`
+ * migration cannot help a bundle: an import arrives as JSON and never passes through the settings
+ * the runner reads.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -98,9 +94,7 @@ function makeRecipeManager({ created = [], updated = [], persisted = [] } = {}) 
   };
 }
 
-// ---------------------------------------------------------------------------
 // prepareForImport stamps the cap before the importer ever sees the payload
-// ---------------------------------------------------------------------------
 
 test('prepareForImport caps a legacy playerPicks bundle at one pick', () => {
   const packData = prepareForImport(
@@ -141,9 +135,7 @@ test('validateImportData accepts a bundle carrying the new cap field', () => {
   assert.equal(result.valid, true, result.errors.join('; '));
 });
 
-// ---------------------------------------------------------------------------
 // The importer itself
-// ---------------------------------------------------------------------------
 
 test('importing a legacy playerPicks bundle creates a system carrying the stamped cap', async () => {
   const created = [];
@@ -181,11 +173,8 @@ test('importing a subject-selecting bundle creates it unbounded', async () => {
 });
 
 test('an OVERWRITE import replaces the existing check block wholesale (issue 1055, accepted)', async () => {
-  // `updateSystem` shallow-merges only the TOP level, so an incoming `craftingCheck`
-  // replaces the existing one entirely. The incoming block carries whatever cap the
-  // bundle resolved to, so the GM's local cap is superseded by the bundle's — accepted,
-  // because the cap is a property of the bundle's own rule and is re-authorable in one
-  // click.
+  // `updateSystem` shallow-merges only the TOP level, so an incoming `craftingCheck` replaces the
+  // existing one entirely.
   const updated = [];
   const existing = {
     id: 'sys-legacy',
@@ -227,9 +216,7 @@ test('a non-overwrite import of an existing system writes nothing at all', async
   assert.deepEqual([created.length, updated.length], [0, 0]);
 });
 
-// ---------------------------------------------------------------------------
 // Round trip
-// ---------------------------------------------------------------------------
 
 test('export -> import round-trips the authored cap, the bySubject rule and every subject pick', async () => {
   const source = {
@@ -272,8 +259,7 @@ test('export -> import round-trips the authored cap, the bySubject rule and ever
   const created = [];
   const createdRecipes = [];
   // The library is WORLD scope since issue 1308, so it round-trips through the envelope's
-  // `characterLibraries` slice and lands in a SETTING rather than on the created system. The
-  // importer therefore needs the two settings seams to have anywhere to put it.
+  // `characterLibraries` slice and lands in a SETTING rather than on the created system.
   const worldSettings = {};
   const importer = new CompendiumImporter(
     makeSystemManager({ created }),

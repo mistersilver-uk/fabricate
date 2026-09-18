@@ -1,11 +1,4 @@
-/**
- * Tests for the recipe editor ingredient-set essence requirements section.
- *
- * Mirrors the component editor card-roster interaction model:
- * - render every system essence definition
- * - edit quantities inline with steppers and direct numeric input
- * - treat 0 as the neutral "not required" state
- */
+/** Tests for the recipe editor ingredient-set essence requirements section. */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';

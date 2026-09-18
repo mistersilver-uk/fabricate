@@ -102,8 +102,7 @@ describe('resolveScopedGatheringSelection', () => {
       environments,
       scopedEnvironmentId: 'env-new',
       scopedTaskId: 'task-new',
-      // A previous interactable scope is recorded; the window re-opened against a
-      // new env+task, so the new scope must win.
+      // A previous interactable scope is recorded.
       appliedScopeKey: 'env-old|task-old',
       currentSelectedId: 'env-old',
       currentTaskId: 'task-old'
@@ -127,8 +126,7 @@ describe('resolveScopedGatheringSelection', () => {
       currentSelectedId: null,
       currentTaskId: null
     });
-    // The default resolver's non-locked filter would skip env-scoped; the scope
-    // overrides that and selects the locked env regardless.
+    // The default resolver's non-locked filter would skip env-scoped.
     assert.equal(decision.selectedEnvironmentId, 'env-scoped');
     assert.equal(decision.taskPreferenceId, 'task-scoped');
     assert.equal(decision.switchToTasksTab, true);
@@ -145,9 +143,7 @@ describe('resolveScopedGatheringSelection', () => {
       currentSelectedId: null,
       currentTaskId: 'task-cur'
     });
-    // No matching env: default to the first non-locked env, keep current task,
-    // no tab switch, and leave appliedScopeKey null so the scope can still apply
-    // once the env appears in a later listing.
+    // No matching env: default to the first non-locked env.
     assert.equal(decision.selectedEnvironmentId, 'env-a');
     assert.equal(decision.taskPreferenceId, 'task-cur');
     assert.equal(decision.switchToTasksTab, false);
@@ -195,9 +191,7 @@ describe('resolveScopedGatheringSelection', () => {
       currentTaskId: null
     });
     assert.equal(decision.selectedEnvironmentId, 'env-scoped');
-    // The preference is still the scoped task id; the env's visible-task list is
-    // not the helper's concern, so a downstream resolveDefaultTaskSelection with a
-    // task list lacking this id will fall back to the first attemptable task.
+    // The preference is still the scoped task id.
     assert.equal(decision.taskPreferenceId, 'task-not-in-env');
     assert.equal(decision.switchToTasksTab, true);
     assert.equal(decision.appliedScopeKey, 'env-scoped|task-not-in-env');

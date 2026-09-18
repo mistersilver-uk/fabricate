@@ -1,9 +1,4 @@
-/**
- * Fixtures and rendered-geometry readers for `manager-layout-tools.js` (issue 1670).
- *
- * Tool Studio, Checks Studio, modifier and outcome-band layout: the markup, the component sources and the
- * page readers that surface's tests measure through. Nothing here asserts.
- */
+/** Fixtures and rendered-geometry readers for `manager-layout-tools.js` (issue 1670). */
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -124,19 +119,6 @@ export const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } =
   await import('../../src/ui/svelte/apps/manager/checks/checksNav.js');
 
 // The Difficulty card and the recipe-tier list beneath it (issue 1096 follow-up, "The roll").
-// Both card contracts render into `.manager-checks-card-body` — Difficulty's plain (14px each
-// side) and the tier list's `is-stack` (12px 14px) — so a row that fills its OWN list should
-// already land at the same 14px inset as the radio cards above. The routed editor's tier
-// section broke that by wrapping `CheckRecipeTiers` in the bare shared `.manager-inspector-card`
-// shell instead of `.manager-inspector-card.manager-checks-card`: the bare shell carries its
-// OWN `padding: var(--fab-space-3)` (12px) plus a border and background the card-with-padding-0
-// override exists to strip, so the tier row's edges landed 12px further in on both sides than
-// the Difficulty card's radio cards. Real Chromium + the real stylesheet, because happy-dom
-// applies no cascade and could not see either the extra padding or the fix.
-//
-// ONE shared page for both the fixed and the reintroduced-defect measurement below — a second
-// `page.setContent()` on the same page is all a second measurement ever needed, whether the
-// browser behind it is this file's shared one or a fresh one.
 export async function checksRollEdges(page, tiersWrapperClass) {
   const difficultyCard = `
     <section class="fabricate-card manager-inspector-card manager-checks-card" data-check-difficulty-card>
@@ -270,15 +252,7 @@ export async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
   });
 }
 
-// ── The outcome band strip's fill, its swatch key, and the AA the names need (issue 1096) ──
-//
-// Everything below is measured in a real browser, and the reason is that NOTHING else in the
-// repo can see these facts. The mounted suites assert the inline custom property the editor
-// emits, which stays true after the rule that CONSUMES it is renamed or deleted: renaming
-// `.fab-band-strip-band` to `.fab-band-strip-band-unused` — a total visual break, since that
-// rule carries `position`, `width`, `overflow` AND the background — left the mounted suite
-// green. And `color-mix()` cannot be evaluated at all outside a browser, so the contrast the
-// band names actually get was invisible to every gate here until this one.
+// ── The outcome band strip's fill, its swatch key.
 const bandStripPath = resolve(
   __dirname,
   '../../src/ui/svelte/components/ThresholdBandStrip.svelte'
@@ -304,12 +278,6 @@ export async function withBandStripPage(run) {
 /**
  * The strip's fixture, stamped with the real scope hash on EVERY class the component's own
  * `<style>` addresses — not just the band.
- *
- * `withScopeHash` matches a whole class token, so stamping only `fab-band-strip-band` left
- * `fab-band-strip-band-name` unstamped and its scoped rule matching nothing. That was
- * invisible while the rule declared `color: var(--fab-text)`, because an unmatched rule and
- * an inherited `--fab-text` paint the same pixels; it stops being invisible the moment the
- * name takes an ink of its own, which is exactly the change this fixture now has to see.
  */
 export function bandStripFixture(body) {
   const stamped = [
@@ -326,40 +294,12 @@ export function bandStripFixture(body) {
 export const AUTHORITY_PROBES = ['primary', 'danger'];
 
 // ── The Checks rail's CONTROL TYPE SCALE (issue 1097 follow-up) ────────────────────────────
-//
-// Three reported defects, one measurement, because all three are the same failure: a control
-// that matched no rule stating its type and silently took whatever it inherited.
-//
-//  - The two "Preview as" controls sat in a `.manager-field`, so they took that wrapper's
-//    0.82rem/700 BY INHERITANCE. Inheritance is invisible to every gate this repo has: no
-//    rule declares it, so a source-text pin cannot see it and a per-region parity comparison
-//    has no region to compare. They rendered at 13.12px/700 against the prototype's 11.5/500.
-//  - The simulator's roll action was a hand-written `manager-button is-primary`, and the base
-//    `.manager-button` rule states no `font-size` at all — so it landed on Foundry's own 14px
-//    app base, larger still, next to a studio whose every other button reads at 11.52px.
-//
-// MEASURED, in Chromium, under the real Foundry core sheet, because that last one only
-// happens when Foundry's stylesheet is present. The two NEGATIVE CONTROLS below are what
-// stop this passing vacuously: they are the exact class strings the defect shipped with, and
-// each must still measure WRONG, or the rules being asserted are doing nothing.
 export const CHECKS_RAIL_FOUNDRY_CSS = readFileSync(
   resolve(__dirname, '../fixtures/foundry-core-min.css'),
   'utf8'
 );
 
 // ── The bounds steppers must render "Unbounded" in full (issue 1096) ───────────────────────
-//
-// Reported from a live build: with icon and label taking the row's growth, the two bound
-// steppers collapsed to roughly 70px each and the `Unbounded` placeholder truncated to
-// `Unb`. That placeholder is the ONLY thing on the control that says an empty bound means
-// no limit rather than a limit of zero, so a truncation there is not cosmetic — it deletes
-// the field's meaning. `empty is not zero` is a documented product rule, and this is where a
-// GM reads it.
-//
-// It is MEASURED rather than eyeballed, and measured the only way an `<input>` placeholder
-// can be: an input's `scrollWidth` always equals its `clientWidth`, so overflow is invisible
-// to the DOM. The text is measured against the input's own computed font with a canvas
-// metric and compared to the content box.
 export const MODIFIER_BOUNDS_ROW_WIDTHS = [1280, 1120, 960, 831, 680];
 
 export function withStepperHash(markup) {
@@ -370,15 +310,6 @@ export function withStepperHash(markup) {
 }
 
 // ── The simulator's face tile and the odds row (issue 1097) ─────────────────────────────
-//
-// Both are surfaces a mounted assertion CANNOT judge. `CheckOutcomePreview` layers the
-// rolled face over a `Medallion` with `position: absolute; inset: 0`, and `CheckOddsPanel`
-// lays its rows out on a three-track grid — neither of which happy-dom computes, so a
-// scoped selector renamed out from under either rule would leave every mounted assertion
-// green while the tile printed its digit beside the medallion instead of on it. That is
-// not hypothetical: the FIRST version of the face tile omitted the offsets, so the digit
-// landed at its static position to the RIGHT of the medallion and underneath the breakdown
-// line. It rendered, it was in the DOM, and it was invisible in the published frame.
 export const previewScoped = scopedComponentCss(
   resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte')
 );

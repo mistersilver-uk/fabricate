@@ -1,24 +1,4 @@
-/**
- * THE PILL FAMILY IS ROUTED, PER DESTINATION (issue 1515).
- *
- * The `.manager-availability-*` family was one CSS vocabulary standing in for seven different
- * things — a removable membership token, a read-only fact chip, an empty state, a container, a
- * field wrapper, a popover trigger and a number editor — and each of those has a shipped answer.
- * Retiring the family is therefore a ROUTING problem and not a rename, which is why this file
- * asserts a destination per site class rather than one blanket "they are all chips": a single
- * class-absence assertion would pass just as well if every site had been deleted, or if the four
- * read-only fact chips had grown a remove control the screen cannot honour.
- *
- * THE HAYSTACK IS THE SIX VIEWS' SOURCE TEXT, MARKUP AND JAVASCRIPT ALIKE, COMMENTS STRIPPED.
- * Three of the sites were never markup at all — the events browser built its chips as data and
- * carried the class on a `pillClass:` string literal — so a markup-only scan would have reported
- * the family retired while three sites still emitted it. Comments are stripped because two of the
- * thirty-nine occurrences are prose recording that a wrapper is GONE, and a check that cannot
- * tell a rendered class from a sentence about one is a check that forbids writing the sentence.
- *
- * EVERY COUNT HAS A FLOOR, and that is the whole reason this file is not a set of `!includes`
- * assertions. An emptied view emits no family class either.
- */
+/** THE PILL FAMILY IS ROUTED, PER DESTINATION (issue 1515). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -38,9 +18,7 @@ const VIEWS = Object.freeze({
 });
 
 /**
- * The view's source with comments removed: HTML comment blocks, block comments, and whole lines
- * that are a line comment or the continuation of a block one. Deliberately conservative — a `//`
- * inside a string (a URL) is left alone, because only whole comment LINES are dropped.
+ * The view's source with comments removed: HTML comment blocks, block comments.
  *
  * @param {string} source
  * @returns {string}
@@ -55,10 +33,7 @@ function withoutComments(source) {
 }
 
 /**
- * Every `<Element …>…</Element>` occurrence as its own text span, so a per-site assertion reads
- * one element rather than the whole file. Slicing to the closing tag rather than to the end of
- * the open tag is deliberate: an attribute list broken across lines has no single delimiter that
- * survives `{…}` expressions, and a chip's children never contain the prop names asserted below.
+ * Every `<Element …>…</Element>` occurrence as its own text span.
  *
  * @param {string} source
  * @param {string} name
@@ -78,8 +53,7 @@ function elements(source, name) {
 }
 
 /**
- * Self-closing `<Element … />` occurrences, which `elements` cannot see because they have no
- * closing tag.
+ * Self-closing `<Element … />` occurrences.
  *
  * @param {string} source
  * @param {string} name
@@ -103,9 +77,7 @@ test('the routing scan is alive, so every assertion below can fail', () => {
       `${path} scanned to only ${sources[key].length} characters, so this file is asserting about nothing`
     );
   }
-  // The family is a real vocabulary in this tree, not a name nothing ever used: the primitive
-  // that KEEPS it still emits it. Without this the "no view emits it" assertions below would
-  // read the same on a repo where the class had never existed.
+  // The family is a real vocabulary in this tree, not a name nothing ever used.
   const modifierPillSelect = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/components/ModifierPillSelect.svelte'),
     'utf8'
@@ -130,8 +102,7 @@ test('none of the six views emits the availability family any more', () => {
 });
 
 test('the editable sets render removable chips, each with a name for the member it removes', () => {
-  // The membership tokens, per view. A removable chip REFUSES to render without a name, so the
-  // floor is what makes the refusal reachable rather than hypothetical.
+  // The membership tokens, per view. A removable chip REFUSES to render without a name.
   const expected = { taskEdit: 3, eventEdit: 1, environmentOverview: 2, worldCurrency: 1 };
   for (const [key, floor] of Object.entries(expected)) {
     const removable = elements(sources[key], 'Chip').filter((span) => /\n\s*removable\b/.test(span));
@@ -165,9 +136,7 @@ test('the read-only fact chips are chips and are NOT removable', () => {
         `a row fact chip in ${VIEWS[key]} is removable; a chip a GM cannot delete must never offer the control`
       );
     }
-    // The face each facet asks for: a biome carries an authored colour and takes the tint, and
-    // the two conditions take a tone. Asserting the props rather than the rendered colour is the
-    // point — the colour is the theme's, the ROUTE is this view's.
+    // The face each facet asks for: a biome carries an authored colour and takes the tint.
     assert.ok(/\btint: entry\.colorToken \|\| 'sage'/.test(sources[key]), `${VIEWS[key]} drops the biome's authored colour`);
     assert.ok(/tone: 'tag'/.test(sources[key]), `${VIEWS[key]} drops the time-of-day facet's tone`);
     assert.ok(/tone: 'warning'/.test(sources[key]), `${VIEWS[key]} drops the weather facet's tone`);
@@ -232,9 +201,7 @@ test('the sub-unit amount is still an editable number, under a name outside the 
 });
 
 test('every host row that lost its hand-written control books a live region', () => {
-  // The obligation is the CALLER'S — a chip primitive cannot own one — and it is one region per
-  // ROW, never one per chip: a region wrapped around the row announces each added chip's whole
-  // subtree and nothing at all on a removal.
+  // The obligation is the CALLER'S — a chip primitive cannot own one.
   const expected = {
     taskEdit: 2,
     eventEdit: 2,

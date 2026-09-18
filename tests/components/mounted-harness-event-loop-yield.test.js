@@ -22,8 +22,7 @@ describe('createMountedComponentHarness event-loop yield', () => {
     });
     await harness.setup();
 
-    // Queued BEFORE mount(). `flushSync()` and `tick()` are microtasks, so this only runs
-    // during mount() if mount() genuinely yields to a new event-loop turn first.
+    // Queued BEFORE mount(). `flushSync()` and `tick()` are microtasks.
     let macrotaskRan = false;
     setImmediate(() => {
       macrotaskRan = true;

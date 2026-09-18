@@ -1,15 +1,5 @@
 /**
  * THE RUNNER, TEAR RECOVERY, THE GM NOTICE AND THE DOWNGRADE DECLARATION (issue 1363, epic 1357).
- *
- * `1.30.0` writes SEVEN legs through THREE DIFFERENT SEAMS — `recipeCorpus.createOrUpdateAll`,
- * `craftingSystemCorpus.createOrUpdateAll` and `_setSetting` for the rest — so a harness that
- * wraps only `setSetting` never tears two of them while still reporting seven. Every arm below
- * tears through the leg's REAL seam.
- *
- * EACH ARM ASSERTS ITS CHANGE GATE IS TRUE BEFORE THE TEAR. Every leg is change-gated
- * (`if (recipesChanged)`, `if (systemsChanged)`, …), so a byte-identical payload skips the branch
- * and produces a "tear and recover" that never entered the code — a spurious green that reads
- * exactly like a real one.
  */
 
 import assert from 'node:assert/strict';
@@ -49,8 +39,6 @@ class TornWrite extends Error {}
  * A runner over an in-memory store, with an optional tear on ONE leg through its REAL seam.
  *
  * @param {object} initial The pre-run store contents.
- * @param {{key?: string, seam?: string}} [tear]
- * @returns {object}
  */
 function makeRunner(initial, tear = {}) {
   const store = new Map(Object.entries(initial));
@@ -87,26 +75,14 @@ function makeRunner(initial, tear = {}) {
 
 const worldCache = new Map();
 
-/**
- * The index of one named scenario.
- *
- * BY NAME, NOT BY POSITION: `scenarioSpecs()` grows, and a positional selector silently retargets
- * a different corpus when it does — which is how this arm came to assert on one that carries no
- * dangling reference at all.
- */
+/** The index of one named scenario. */
 function scenarioIndex(name) {
   const index = scenarioSpecs().findIndex((scenario) => scenario.name === name);
   assert.ok(index >= 0, `no scenario named ${name}`);
   return index;
 }
 
-/**
- * A world sitting at `1.29.0`, so only the `1.30.0` entry is pending.
- *
- * MEMOIZED AND DEEP-CLONED. `_normalizeSystem` mints an id for a record that lacks one, from a
- * monotonic stub counter, so building the corpus twice would produce two corpora that differ by
- * exactly those minted ids — and every tear arm compares a torn re-run against an untorn baseline.
- */
+/** A world sitting at `1.29.0`, so only the `1.30.0` entry is pending. */
 function worldAt129(scenarioIndex = 0) {
   if (!worldCache.has(scenarioIndex)) {
     worldCache.set(
@@ -134,14 +110,6 @@ const equivalentEssenceCache = [];
  * A world at `1.29.0` whose two systems share a source item and whose two essences share a name
  * under different ids — so `1.30.0` re-keys a component and lifts two world essences, and `1.34.0`
  * then merges them.
- *
- * No `scenarioSpecs()` corpus writes both decision records, and `worldEssenceMergeMap` being the
- * second leg is only observable on a pass that writes both. Built through the shared raw-corpus
- * factory; only the per-system declaration differs.
- *
- * Memoized and deep-cloned for the reason {@link worldAt129} is: `_normalizeSystem` mints a missing
- * id from a monotonic stub counter, so building the corpus twice yields two corpora differing by
- * those ids — and the tear arm compares a torn re-run against an untorn baseline.
  */
 function worldAt129WithEquivalentEssences() {
   if (equivalentEssenceCache.length === 0) {
@@ -202,9 +170,7 @@ function finalState(store) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // The untorn baseline, and the leg order
-// ---------------------------------------------------------------------------
 
 test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the three scope legs before craftingSystems', async () => {
   const { runner, store, writes } = makeRunner(worldAt129());
@@ -223,9 +189,8 @@ test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the t
     );
   }
   assert.equal(store.get('migrationVersion'), '1.34.0');
-  // The `defaults` sub-key is WRITTEN and POPULATED: since the maintainer's donor ruling it
-  // carries one record per entity whose oldest contributing system authored a liftable section.
-  // Seededness still keys on key PRESENCE, so the key must be written either way.
+  // The `defaults` sub-key is WRITTEN and POPULATED: since the maintainer's donor ruling it carries
+  // one record per entity whose oldest contributing system authored a liftable section.
   const componentDefaults = store.get('componentScope').defaults;
   assert.equal(typeof componentDefaults, 'object');
   assert.ok(
@@ -238,9 +203,7 @@ test('the untorn pass writes all SEVEN legs, with the re-key map FIRST and the t
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 5 — tear recovery, all seven legs, through their real seams
-// ---------------------------------------------------------------------------
 
 for (const leg of LEGS) {
   test(`tear recovery: the ${leg.key} leg (${leg.seam} seam)`, async () => {
@@ -364,16 +327,10 @@ test('the map-clear gate uses compareSemver, so a LEXICOGRAPHIC compare cannot d
   assert.equal(mayClearWorldScopeRekeyMap(undefined), false);
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 4(d) — the runner's version gate blocks re-entry
-// ---------------------------------------------------------------------------
 
 test('a persisted world tool-breakage authority SURVIVES the migration', async () => {
-  // The FOURTH `toolScope` sibling. Narrowing the payload to the three sub-keys would destroy it
-  // on any world this pass lifts — and the registry label rests `downgradeLosesData: false` on
-  // the promise that the three scope settings "survive untouched and a re-upgrade finds them
-  // intact". Nothing authors an authority at `1.30.0`, but import/export ships in this release
-  // and the catalogue editors follow it.
+  // The FOURTH `toolScope` sibling.
   const initial = worldAt129();
   initial.toolScope = {
     entities: [],
@@ -397,8 +354,7 @@ test('idempotence (d): a world already at 1.30.0 never re-enters the migration',
   const { runner, writes } = makeRunner(initial);
   const summary = await runner.run();
   // Four entries are pending and none is this one: `1.31.0`, `1.32.0`, `1.33.0` and `1.34.0` all
-  // sit above `1.30.0` on the ladder. What this measures is that the world-scope lift does not
-  // re-enter, and the empty write list proves it: no pass above it finds anything here to change.
+  // sit above `1.30.0` on the ladder.
   assert.equal(summary.ran, 4, 'only the four passes above it are pending');
   assert.deepEqual(
     writes,
@@ -407,9 +363,7 @@ test('idempotence (d): a world already at 1.30.0 never re-enters the migration',
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 11 — the transient report reaches the summary and is never persisted
-// ---------------------------------------------------------------------------
 
 test('the report is threaded through all four legs and is NEVER persisted', async () => {
   const { runner, store } = makeRunner(worldAt129());
@@ -484,9 +438,7 @@ test('a world with nothing to lift produces NO notice and writes NO scope settin
   }
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 13 — the downgrade declaration is CHECKED, not copied
-// ---------------------------------------------------------------------------
 
 test('downgrade (a): 1.29.0 neither reads nor writes the three scope settings', () => {
   // The executable form of the claim. The double is POPULATED and carries write spies — a bare
@@ -580,9 +532,7 @@ test('the 1.30.0 registry entry declares downgradeTo 1.29.0, downgradeLosesData 
   assert.match(entry.label, /tool specific/);
 });
 
-// ---------------------------------------------------------------------------
 // The remap pass is a NO-OP without a map, so an unmigrated world is untouched
-// ---------------------------------------------------------------------------
 
 test('the identity-flag remap does nothing at all without a re-key map', async () => {
   const summary = await remapWorldScopeIdentityFlags({
@@ -596,9 +546,7 @@ test('the identity-flag remap does nothing at all without a re-key map', async (
   assert.equal(summary.scannedActors, 0);
   assert.equal(summary.remappedLeaves, 0);
 });
-// ---------------------------------------------------------------------------
 // 1.34.0 — the essence merge map is the second leg, and tears like the first
-// ---------------------------------------------------------------------------
 
 test('the merge map is the SECOND leg: after the re-key map, before recipes and every scope leg', async () => {
   const { runner, store, writes } = makeRunner(worldAt129WithEquivalentEssences());

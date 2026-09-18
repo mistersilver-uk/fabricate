@@ -1,23 +1,6 @@
 /**
- * Count the source-text pin sites in one test module (issue 1658). Proved from inside the
- * `npm test` glob by `tests/source-pin-ratchet.test.js`.
- *
- * A site is an AST CALL NODE, never a line match, and that is what makes the gate countable at
- * all: a pattern written as a string or regex literal is a `Literal` rather than a
- * `CallExpression`, and a token in a docblock is not a node, so this file and the ratchet's own
- * file count their true call sites even though both spell the tokens they hunt.
- *
- * The matchers counted are `includes`, `assert.match` and a regex `test`, which are the three ways
- * this suite asserts the shape of source text.
- *
- * Bindings resolve through the SCOPE MANAGER, not by name: two functions in one file may both bind
- * `source`, one from a read of `src/` and one from joining rows.
- *
- * READS RESOLVE THROUGH LOCAL WRAPPERS, because the commonest shape here is a one-line `read()`
- * that calls `readFileSync`. A closed set of reader names both missed those pins and mis-filed the
- * binding as a path — measured at 303 sites across 19 files.
- *
- * MEASURED RESIDUE, deliberately uncounted: text a helper returns that its caller matches inline.
+ * Count the source-text pin sites in one test module (issue 1658). Proved from inside the `npm
+ * test` glob by `tests/source-pin-ratchet.test.js`.
  */
 import { calledName, identifierNames, literalStrings, walkNodes } from './moduleAst.js';
 
@@ -107,21 +90,14 @@ function referencesKnown(node, known, keyFor, seedPaths) {
   return false;
 }
 
-/**
- * Whether a read call names a `src/` path directly or through a path binding.
- *
- * `seedPaths` is honoured while RESOLVING a binding but not when scoring the read itself: a seeded
- * name is a claim about another module, and letting it score a call site directly counted reads of
- * `lang/` and `scripts/` as source. The two call sites pass `seedPaths` accordingly.
- */
+/** Whether a read call names a `src/` path directly or through a path binding. */
 const readsSrc = (call, paths, keyFor, seedPaths) =>
   spellsSrcPath(call) ||
   call.arguments.some((argument) => referencesKnown(argument, paths, keyFor, seedPaths));
 
 /**
  * Classify one declaration: a PATH binding spells a `src/` path without reading it, and a SOURCE
- * binding holds text a reader returned. A binding whose initialiser CALLS a reader is a source
- * even when it also spells the path, which is the case a path-first rule mis-files.
+ * binding holds text a reader returned.
  */
 function classifyDeclaration(declaration, context) {
   const { readers, paths, sources, keyFor, seedPaths } = context;

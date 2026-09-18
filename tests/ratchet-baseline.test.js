@@ -1,28 +1,4 @@
-/**
- * Direct proof for the shared ratchet in `tests/helpers/ratchetBaseline.js` (issue 1391).
- *
- * A ratchet's whole value is in the cases where it FAILS, and none of those cases is reachable
- * from the gate that uses it while the tree is clean — which is the state the tree is in on every
- * run that matters. Proving it through a consumer would mean deliberately breaking the product to
- * see the message, once, by hand, and never again. So each failure mode is proved here against a
- * literal baseline instead, and each is a mode this repository has actually needed:
- *
- *   - APPEARED is the regression the gate exists to stop.
- *   - GREW is the same regression hiding inside an existing entry.
- *   - SHRANK is the one people are surprised by. Paying debt down without banking it leaves the
- *     slot open for the next author to fill for free, so the ratchet never tightens.
- *     `scripts-lint-gate-coverage.test.js` says the same thing about its own pinned count: "a
- *     ceiling would silently grant a free slot on every payment".
- *   - VANISHED is a standing permission nobody is using, which the next author gets to cite.
- *   - A PINNED TOTAL that disagrees with the sum is a baseline that has stopped describing the
- *     tree it claims to describe, usually because one row was edited and the headline was not.
- *   - A BREACHED FLOOR is a broken scan reported as a clean tree. It is the only failure here
- *     that looks like success from the outside, which is why the floor is stated over the
- *     population scanned rather than over the findings.
- *
- * `tests/helpers/` is outside the `npm test` glob and `tests/*.test.js` is inside it, which is why
- * this file exists — the same arrangement as `tests/source-scan.test.js`.
- */
+/** Direct proof for the shared ratchet in `tests/helpers/ratchetBaseline.js` (issue 1391). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

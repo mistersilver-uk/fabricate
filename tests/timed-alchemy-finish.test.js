@@ -1,20 +1,7 @@
 /**
- * Regression tests for issue 966: a MATURED time-gated alchemy brew must resolve
- * through the same alchemy tail an immediate brew does.
- *
- * A brew starts through `craftAlchemy`, which is the only place that sets
- * `options.isAlchemyAttempt`. A time-gated brew does NOT resolve in that call: it
- * consumes at START, arms the gate, and returns. It resolves LATER, through
- * `Fabricate#advanceCraftingRun` → `craft(actor, recipeId, { runId })`, which
- * cannot carry that flag. Gating the alchemy tail on it therefore meant a matured
- * brew silently:
- *   - never recorded brew-discovery (`learnRecipeOnCraft`), and
- *   - degraded a matched Simple-check FAILURE to a generic fizzle instead of
- *     producing the reserved `role: 'failure'` result group.
- * Both gates now derive alchemy-ness from the recipe's own system.
- *
- * Also covers the START result's `disposition`, which tells the alchemy workbench
- * that the brew began rather than fizzled.
+ * Regression tests for issue 966: a MATURED time-gated alchemy brew must resolve through the same
+ * alchemy tail an immediate brew does. A brew starts through `craftAlchemy`, which is the only
+ * place that sets `options.isAlchemyAttempt`.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,9 +10,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 
-// ---------------------------------------------------------------------------
 // Foundry / game globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -56,9 +41,7 @@ globalThis.foundry = {
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, name, quantity = 1) {
@@ -167,9 +150,7 @@ function buildRecipeManager(ingredientSet) {
   };
 }
 
-/**
- * A visibility-service spy shaped like the two methods the crafting tail calls.
- */
+/** A visibility-service spy shaped like the two methods the crafting tail calls. */
 function buildVisibilitySpy() {
   const calls = { learn: [], use: [] };
   return {
@@ -266,9 +247,7 @@ function buildTimedAlchemyRecipe(craftingSystemId, resultGroups) {
   return { recipe, set };
 }
 
-// ---------------------------------------------------------------------------
 // 1. START reports a distinct disposition, not a bare failure
-// ---------------------------------------------------------------------------
 
 test('a time-gated brew START reports disposition "timed-start", not a fizzle-shaped failure', async () => {
   const system = buildAlchemySystem({ id: 'sys-brew-start' });
@@ -297,9 +276,7 @@ test('a time-gated brew START reports disposition "timed-start", not a fizzle-sh
   assert.deepEqual(spy.calls.learn, [], 'START does not learn — discovery lands at FINISH');
 });
 
-// ---------------------------------------------------------------------------
 // 2. The matured FINISH learns, with no `isAlchemyAttempt` in sight
-// ---------------------------------------------------------------------------
 
 test('a matured brew records discovery even though the resume carries no isAlchemyAttempt', async () => {
   const system = buildAlchemySystem({ id: 'sys-brew-learn' });
@@ -332,9 +309,7 @@ test('a matured brew records discovery even though the resume carries no isAlche
   assert.equal(crafter.createdItems.length, 1, 'the success result was produced');
 });
 
-// ---------------------------------------------------------------------------
 // 3. A non-alchemy timed craft must NOT reach the alchemy learn
-// ---------------------------------------------------------------------------
 
 test('a matured NON-alchemy timed craft never calls learnRecipeOnCraft', async () => {
   const system = {
@@ -365,9 +340,7 @@ test('a matured NON-alchemy timed craft never calls learnRecipeOnCraft', async (
   assert.deepEqual(spy.calls.learn, [], 'learn-on-craft is alchemy-only');
 });
 
-// ---------------------------------------------------------------------------
 // 4. A matured Simple-check FAILURE produces the reserved failure group
-// ---------------------------------------------------------------------------
 
 test('a matured Simple brew that fails its check produces the reserved failure result', async () => {
   const system = buildAlchemySystem({ id: 'sys-brew-fail', checkMode: 'simple' });
@@ -413,17 +386,8 @@ test('a matured Simple brew that fails its check produces the reserved failure r
   );
 });
 
-// ---------------------------------------------------------------------------
-// 5. A matured NON-ALCHEMY timed craft awards its failure result too (issue 1098)
-//
-// The alchemy twin above has produced on failure since issue 966, through
-// `_finishAlchemySimpleFailure`. The GENERIC timed failure recorder had no such path at
-// all: like the immediate branch it recorded the failure and returned `results: null`.
-//
-// This is the arm a mutation proved unasserted — deleting the timed producer call left the
-// whole suite green — so it is pinned on the same three seams the immediate branch is.
-// The delay is a scheduling property, not a different set of outcomes.
-// ---------------------------------------------------------------------------
+// 5. A matured NON-ALCHEMY timed craft awards its failure result too (issue 1098). The alchemy twin
+// above has produced on failure since issue 966, through `_finishAlchemySimpleFailure`.
 
 /** A plain `simple`-mode system whose failure-result policy is the argument. */
 function buildTimedSimpleSystem(id, failureResultPolicy) {

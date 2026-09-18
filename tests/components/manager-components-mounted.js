@@ -1,12 +1,4 @@
-/**
- * The component routes: the browser, the editor, salvage authoring and card hydration.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The component routes: the browser, the editor, salvage authoring and card hydration. */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,8 +20,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { assertHeaderBackIsGhost, gatheringSubitem, gatheringToggle, navButton } = queries;
 const { mountManager } = createManagerMounts({
@@ -86,10 +77,7 @@ export function registerComponentsCases() {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
-    // The view renders NO page header of its own (issue 676): the shell already renders
-    // the breadcrumb / "Components" / subtitle block, and a second kicker + "Component
-    // directory" + subtitle under it was ~74px of duplicated chrome. The Recipe Studio
-    // deleted exactly this, and ruling 1 says it wins.
+    // The view renders NO page header of its own (issue 676).
     assert.equal(
       target.querySelector('.manager-main .manager-section-header'),
       null,
@@ -98,8 +86,6 @@ export function registerComponentsCases() {
     assert.ok(target.textContent.includes('Drop items to add components'));
     assert.ok(target.textContent.includes('Iron Ore'));
     // THE SOURCE-ORIGIN PILL IS GONE FROM THE ROW (issue 1371, parity round 4; gap-list row 114).
-    // The reference's system row carries ONE state pill — `Salvage` — because the source belongs
-    // to the world catalogue and the category is the group band's job.
     assert.ok(
       !target.querySelector('[data-component-id="c1"] .manager-chip.is-accent'),
       'no `Compendium` / `Items Directory` pill on a system rules row'
@@ -129,9 +115,7 @@ export function registerComponentsCases() {
     search.value = 'iron';
     search.dispatchEvent(new Event('input', { bubbles: true }));
 
-    // Issue 676: components group and filter by CATEGORY, not by tag. Tags are a
-    // many-valued field that was being asked to do a single-valued job; they are now
-    // edited only in the component editor and render nowhere in the browser.
+    // Issue 676: components group and filter by CATEGORY.
     assert.equal(
       target.querySelector('[aria-label="Filter components by tag"]'),
       null,
@@ -219,10 +203,7 @@ export function registerComponentsCases() {
       'raw source UUID should not render as inspector text'
     );
 
-    // Copy, Unlink and Delete are HOSTED here (issue 676) — they were rehomed off the row,
-    // whose three ghost icons had turned it into a toolbar. Since issue 1371's parity round 4
-    // they sit behind the inspector's kebab rather than in a four-button stack (gap-list row
-    // 123), so the inspector is still the reason the row can carry one action.
+    // Copy, Unlink and Delete are HOSTED here (issue 676).
     target.querySelector('[data-component-inspector-menu]').click();
     flushSync();
     const menuLabels = [...target.querySelectorAll('[role="menuitem"]')].map((item) =>
@@ -246,8 +227,7 @@ export function registerComponentsCases() {
       componentInspector.querySelector('.manager-component-inspector-identity .fab-medallion'),
       'the inspector identity renders the shared Medallion, not a bespoke preview img'
     );
-    // THE TWO STAT TILES ARE GONE (gap-list row 118): the subline states both numbers, and a
-    // tile per number over a panel about to list them is the same fact three times.
+    // THE TWO STAT TILES ARE GONE (gap-list row 118): the subline states both numbers.
     assert.equal(componentInspector.querySelectorAll('[data-component-fact]').length, 0);
     assert.equal(
       componentInspector.querySelector('[data-component-inspector-subline]').textContent.trim(),
@@ -270,8 +250,7 @@ export function registerComponentsCases() {
       'component-edit',
       'row Edit action should route into the manager component-edit view'
     );
-    // 'Component Rules' since issue 1362: the crumb takes the screen's own title, so the
-    // trail's leaf and the heading below it read the same.
+    // 'Component Rules' since issue 1362: the crumb takes the screen's own title.
     Array.from(target.querySelectorAll('.manager-breadcrumbs button'))
       .find((button) => button.textContent.trim() === 'Component Rules')
       .click();
@@ -334,8 +313,7 @@ export function registerComponentsCases() {
     await tick();
     flushSync();
 
-    // The badge reads as the VALUE alone and names itself through its TOOLTIP, so the words
-    // are asserted on the title rather than in the row's text (issue 1286, maintainer request).
+    // The badge reads as the VALUE alone and names itself through its TOOLTIP.
     const difficultyChip = target.querySelector('[data-component-difficulty]');
     assert.equal(
       difficultyChip?.getAttribute('title'),
@@ -348,17 +326,12 @@ export function registerComponentsCases() {
       'the words belong in the tooltip only: repeating them on every row crowded the description'
     );
     // THE DANGLING LINK IS STATED IN THE INSPECTOR, NOT ON THE ROW (issue 1371, parity round 4).
-    // The row's source-origin pill went with the rest of the source register (gap-list row 114);
-    // the remediation paragraph stays, because a component claiming a document that no longer
-    // exists is the one thing on this screen a GM has to act on.
     assert.ok(
       Boolean(target.querySelector('[data-component-inspector] [data-component-source-missing]')),
       'a missing source still reaches the GM, one pane over'
     );
 
-    // Issue 676: the rebuilt browser is a LIST, so difficulty is no longer its own
-    // COLUMN — it rides in the row's badge run. The read-only parity it gives the GM
-    // (issue 651) is preserved rather than dropped with the table scaffolding.
+    // Issue 676: the rebuilt browser is a LIST.
     const c1Difficulty = target.querySelector(
       '[data-component-id="c1"] [data-component-difficulty]'
     );
@@ -424,10 +397,7 @@ export function registerComponentsCases() {
       'component-edit',
       'row Edit should land on the component-edit route'
     );
-    // Issue 676, decision 4: the editor header is the COMPONENT's identity, matching the
-    // recipe editor's exactly — its image, its NAME as the h1, and a
-    // "<category> · Linked <source>" subline. This route used to fall through to the
-    // generic static "Edit component" heading, which the decision required it not to.
+    // Issue 676, decision 4: the editor header is the COMPONENT's identity.
     const editHeading = target.querySelector('[data-component-edit-heading]');
     assert.ok(editHeading, 'the component editor renders its own identity heading');
     assert.equal(
@@ -451,8 +421,7 @@ export function registerComponentsCases() {
       'Alchemy rules · Reagent · Simple',
       'the subline reads "{system} rules · {category} · {mode}"'
     );
-    // The breadcrumb names the component too — not the generic string the recipe
-    // breadcrumb's own comment rejects.
+    // The breadcrumb names the component too.
     assert.ok(
       Array.from(target.querySelectorAll('.manager-breadcrumbs span')).some(
         (node) => node.textContent.trim() === 'Iron Ore'
@@ -519,8 +488,7 @@ export function registerComponentsCases() {
       /no world catalogue entry/
     );
 
-    // Tags and essences are cards on the `Component rules` tab, which is the tab a fresh editor
-    // opens on, so they render immediately.
+    // Tags and essences are cards on the `Component rules` tab.
     assert.ok(
       target.querySelector('[data-component-edit-section="tags"]'),
       'Tags section should render'
@@ -530,10 +498,7 @@ export function registerComponentsCases() {
       'Essences section should render'
     );
 
-    // Tags are TOGGLE PILLS (issue 676): the system's whole tag vocabulary renders as
-    // pills and the pill IS the control, so the vocabulary and the answer are both
-    // visible without opening anything. This replaced an add-menu + removable-pill-row,
-    // which hid the vocabulary and cost two interactions per tag.
+    // Tags are TOGGLE PILLS (issue 676).
     const mineral = target.querySelector('[data-component-edit-tag-toggle="mineral"]');
     assert.ok(mineral, 'every system itemTag renders as a pill, selected or not');
     assert.equal(
@@ -563,16 +528,7 @@ export function registerComponentsCases() {
     assert.ok(saveButton, 'header save submit should target the edit form');
     assert.equal(saveButton.disabled, false, 'save should be enabled when the draft is dirty');
 
-    // `ComponentEditorHeader`'s conversion, asserted where it RENDERS (issue 1118). Nothing
-    // measured this pair before: the header's three `data-*` hooks are PROPS spread through a
-    // computed key (`dirtyAttr` / `backAttr` / `saveAttr`, so a second studio can wear its own),
-    // which means no literal `data-*` string sits on either tag and no source scan could ever
-    // have named one of them. Its own docblock is the AUTHORITY for the ghost-Back ruling the
-    // other five Backs in this sweep were repaired against, so the pair it describes should be
-    // the one pair a regression cannot reach — and it was the only one with no assertion at all.
-    //
-    // Both halves matter and each is the other's mutation proof: swapping the two roles reds
-    // this, and so does dropping either.
+    // `ComponentEditorHeader`'s conversion.
     assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
     assert.ok(
       saveButton.classList.contains('fab-manager-button'),
@@ -763,10 +719,6 @@ export function registerComponentsCases() {
     // became the shared `Stepper`: the stepper's input deliberately ignores an empty
     // string (so a half-typed value is never coerced to 0 mid-keystroke) and re-asserts
     // the model value on blur, so blanking is structurally not expressible through it.
-    //
-    // Zero is the clear, and it is not a special case invented here: the root's
-    // `normalizeComponentDifficulty` ALREADY maps every value below 1 to null, so 0 has
-    // always meant "no difficulty" everywhere this value is read.
     const calls = [];
     await openComponentEditor(calls, { alchemyResolutionMode: 'progressive' });
 
@@ -870,11 +822,7 @@ export function registerComponentsCases() {
       'add group should render an editable result group'
     );
 
-    // Issue 676: the per-component salvage gate now defaults OFF (decision 6), and the
-    // routing/DC chrome collapses while it is (Ruling A). This fixture's component has
-    // no authored salvage, so it opens disabled — walking the real GM path from zero
-    // groups to enabled here is also the end-to-end proof that the deadlock (AC12)
-    // cannot form in the assembled manager tree, not just in the isolated view.
+    // Issue 676: the per-component salvage gate now defaults OFF (decision 6).
     const enableToggle = target.querySelector('[data-recipe-field="salvageEnabled"]');
     assert.equal(enableToggle.disabled, false, 'one result group enables the salvage toggle');
     enableToggle.click();
@@ -959,23 +907,10 @@ export function registerComponentsCases() {
   });
 
   it('the salvage yield picker is NOT filtered by the component browser search', async () => {
-    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`, and
-    // `itemCards` is the SEARCH-FILTERED list —
-    //   itemCards ← _buildItemCards(…, itemSearchTerm, …) ← getItems(systemId, search)
-    // with `itemSearchTerm: get(itemSearch)`, the component BROWSER's search store. So
-    // typing "iron" in the browser and then opening any component silently narrowed the
-    // salvage yield picker to components matching "iron". The GM was authoring yields
-    // from a list filtered by a search box that is not even on screen.
-    //
-    // The recipe editor never had this: it already reads `selectedSystem.managedItemOptions`,
-    // built from the UNFILTERED managed items. The fix makes salvage read the same list.
-    //
-    // No screenshot could have caught this — the smoke harness never types in the search
-    // box before opening an editor.
+    // THE DEFECT (issue 676): `salvageComponentOptions` projected from `itemCards`.
     const calls = [];
     await openComponentSalvageEditor(calls, {
-      // Matches ONLY "Iron Ore" (c1) — the component being edited — and excludes Glass
-      // Vial, Nightshade and Coal from `itemCards`.
+      // Matches ONLY "Iron Ore" (c1) — the component being edited.
       itemSearchTerm: 'iron',
       salvageResolutionMode: 'progressive',
       componentSalvage: {
@@ -1020,8 +955,7 @@ export function registerComponentsCases() {
       },
     });
 
-    // c4 (Coal) has difficulty 3 and is EXCLUDED by the "iron" search — so this also
-    // proves the badge resolves through the unfiltered list rather than reading "DC —".
+    // c4 (Coal) has difficulty 3 and is EXCLUDED by the "iron" search.
     assert.equal(
       target
         .querySelector('[data-salvage-result-difficulty]')
@@ -1099,9 +1033,7 @@ export function registerComponentsCases() {
     await tick();
     flushSync();
 
-    // Issue 676: the facet is CATEGORY now, not tag. `Reagent` exists only in this
-    // system's vocabulary, so carrying it across a system switch would hide every row
-    // of the new system behind a filter naming something it has never heard of.
+    // Issue 676: the facet is CATEGORY now.
     const categoryFilter = target.querySelector('[data-component-category-filter]');
     categoryFilter.value = 'Reagent';
     categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1125,16 +1057,6 @@ export function registerComponentsCases() {
   });
 
   // ── The selected and edited component card hydrate too (issue 1081) ──────────────────
-  //
-  // A component card arrives cheap and resolves its linked source document — the "Missing"
-  // verdict and the live description fallback — only when a view asks it to.
-  // `ComponentsBrowserView` asks for the page it renders, and that is the ONLY ask in the
-  // application. But the inspector's selection and the editor's subject are both resolved
-  // from the WHOLE cohort rather than from that page, so without an ask here they render the
-  // pre-hydration reading permanently: "No description has been added." for a
-  // compendium-linked component whose prose lives on its source document, which is the
-  // regression issue 676 filed and issue 800 preserved, and an accent "Linked" pill telling
-  // the GM a dangling link is healthy.
   describe('component hydration reaches the selected and edited card (issue 1081)', () => {
     /** 30 cards in their own category, so they fill page 1 and push the stored-first card off it. */
     const AETHER_LIBRARY = Array.from({ length: 30 }, (_, index) => ({
@@ -1184,10 +1106,7 @@ export function registerComponentsCases() {
       await tick();
       flushSync();
 
-      // The fixture's point: `selectedComponentId` starts empty, so the inspector falls back
-      // to `itemCards[0]` — the manager's STORED order — while the browser renders the
-      // name-sorted, category-major page 1. On any library past one page those are different
-      // cards, which is why the default selection is off-page from the moment the studio opens.
+      // The fixture's point: `selectedComponentId` starts empty.
       const rendered = renderedComponentIds();
       assert.equal(rendered.length, 25, 'page 1 holds 25 rows');
       assert.equal(rendered.includes('c1'), false, 'and the stored-first card is NOT among them');
@@ -1198,9 +1117,7 @@ export function registerComponentsCases() {
         'the off-page default selection was asked to hydrate — the inspector renders it, so ' +
           'nothing else in the application will ask'
       );
-      // The negative half, in the same fixture against the same spy: an off-page card that is
-      // NOT the selection costs nothing. Without it, a cohort-wide hydrate would satisfy the
-      // assertion above and defeat the page scoping entirely.
+      // The negative half, in the same fixture against the same spy.
       assert.equal(requests.has('c2'), false, 'an off-page card that is not selected is not asked');
       for (const id of rendered) {
         assert.equal(requests.has(id), true, `the rendered row ${id} was asked`);
@@ -1211,8 +1128,7 @@ export function registerComponentsCases() {
       const requests = new Set();
       mountManager({ componentHydrationRequests: requests });
 
-      // The essence-usage thumbnail routes straight into `component-edit`, so the components
-      // browser — the application's only other ask — is never mounted on this path at all.
+      // The essence-usage thumbnail routes straight into `component-edit`.
       navButton('Essence Rules').click();
       await tick();
       flushSync();
@@ -1248,12 +1164,7 @@ export function registerComponentsCases() {
       );
     });
 
-    // The gathering task editor's component picker paginates the SAME `itemCards`, and it
-    // renders the very "No description has been added." fallback that an un-hydrated
-    // compendium-linked component produces. It never mounts the components browser, so
-    // without its own ask a GM who comes straight here sees that fallback permanently. This
-    // is a regression THIS change would otherwise cause on a gathering surface, so the repair
-    // is scoped to that picker's own page and nothing else about gathering moves.
+    // The gathering task editor's component picker paginates the SAME `itemCards`.
     it('asks the gathering task picker page to hydrate, on a route with no components browser', async () => {
       const requests = new Set();
       mountManager({ componentHydrationRequests: requests });
@@ -1287,28 +1198,12 @@ export function registerComponentsCases() {
       );
       assert.ok(picked.includes('c2'), 'pre-condition: the picker rendered the second component');
 
-      // `c2` is never the inspector's selection and never the editor's subject, so the picker
-      // is the only thing in this tree that can have asked for it.
+      // `c2` is never the inspector's selection and never the editor's subject.
       assert.equal(requests.has('c2'), true, 'the picker asked its own rendered page to hydrate');
     });
   });
 
   // ── A hydrated card actually REACHES the screen (issue 1081) ─────────────────────────
-  //
-  // Every other assertion about hydration in this repo is a spy: it proves `hydrate()` was
-  // CALLED. All of them stay green while the answer never reaches a pixel, because the card
-  // fills itself IN PLACE and the store publishes through a `writable`, which does not proxy
-  // — so Svelte compares by `===` at `selectedComponent`, at the browser model, and at the
-  // keyed `{#each}`, and a card whose identity did not move stops at the first of them.
-  //
-  // These read the DOM, and they use the SAME fixture for the pre-hydration reading, which
-  // is the control: the "before" strings are what a defect leaves on the screen for ever,
-  // not for a beat. The republish is driven through the shipped
-  // `republishHydratedItemCards`, so reverting it to a re-wrap of the same objects turns
-  // these red.
-  //
-  // Do NOT restate this against a `$state` fixture. `$state` deep-proxies, so a fresh proxy
-  // has fresh per-property sources and the defect disappears; production does not proxy.
   describe('a hydrated component card reaches the rendered surfaces (issue 1081)', () => {
     /** The resolution `hydrate()` produces for a linked component whose document is gone. */
     const RESOLVED = Object.freeze({
@@ -1404,11 +1299,6 @@ export function registerComponentsCases() {
     }
 
     // THE INSPECTOR'S HYDRATED SURFACE IS ITS REMEDIATION PARAGRAPH (issue 1371, parity round 4).
-    // It used to be the description paragraph and the source-origin pill, and `rebuild-spec.md`
-    // C7 removes both: the reference's inspector states shared identity, tags, category and
-    // salvage, and the source register belongs to the world catalogue. What a dangling link
-    // still has to reach is the sentence telling the GM to act, and THAT is what hydration must
-    // deliver — a fill the GM never sees is the whole defect this suite exists for.
     const inspectorRemediation = () =>
       target.querySelector('[data-component-inspector] [data-component-source-missing]');
     const rowDescription = () =>

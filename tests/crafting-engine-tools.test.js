@@ -1,13 +1,4 @@
-/**
- * CraftingEngine recipe-level Tool support.
- *
- * Covers:
- *   - _validateTools matched / missing (and broken-item rejection);
- *   - tool usage/breakage application via the shared toolBreakageRuntime
- *     (limitedUses increments toolUsage; breakageChance honored; diceExpression
- *     honored; onBreak destroy / flagBroken / replaceWith);
- *   - usedTools recorded on the success run record.
- */
+/** CraftingEngine recipe-level Tool support. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -15,9 +6,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { resolveToolForItem, itemIsToolByDurableIdentity } from '../src/utils/sourceUuid.js';
 import { nativeCraftRunManager } from './helpers/native-run-manager.js';
 
-// ---------------------------------------------------------------------------
 // Globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -59,9 +48,7 @@ function replacementEngine(resolveItemUuid = async () => null) {
   });
 }
 
-// ---------------------------------------------------------------------------
 // FakeItem with dot-path flag storage (matches getFabricateFlag conventions)
-// ---------------------------------------------------------------------------
 
 function getPath(obj, path) {
   return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj);
@@ -118,9 +105,7 @@ function toolMatcherManager() {
   };
 }
 
-// ---------------------------------------------------------------------------
-// _validateTools
-// ---------------------------------------------------------------------------
+// validateTools
 
 test('_validateTools: returns matched { tool, item } pairs when present', async () => {
   installSystem();
@@ -204,9 +189,7 @@ test('_validateTools: no tools is trivially valid', async () => {
   assert.deepEqual(result.tools, []);
 });
 
-// ---------------------------------------------------------------------------
-// _applyToolBreakage
-// ---------------------------------------------------------------------------
+// applyToolBreakage
 
 test('_applyToolBreakage: limitedUses increments toolUsage and records usedTools', async () => {
   installSystem();
@@ -318,12 +301,9 @@ test('_applyToolBreakage: direct Item replacement preserves source identity with
   assert.equal(created[0].flags.fabricate?.fabricate?.roles, undefined);
 });
 
-// ---------------------------------------------------------------------------
-// Issue 780: the crafting-engine tool-replacement creator stamps the replacement's
-// durable per-system identity onto the created item's payload (parity with the
-// gathering-surface makeCreateReplacement). Asserts on the captured
-// createEmbeddedDocuments payload.
-// ---------------------------------------------------------------------------
+// Issue 780: the crafting-engine tool-replacement creator stamps the replacement's durable
+// per-system identity onto the created item's payload (parity with the gathering-surface
+// makeCreateReplacement).
 
 function asOwnedItem(itemData) {
   return {
@@ -406,9 +386,7 @@ test('780 replacement (crafting): an unresolvable replacement component stamps n
   assert.equal(created.length, 0, 'no replacement created when the component does not resolve');
 });
 
-// ---------------------------------------------------------------------------
 // Full craft() flow — usedTools recorded on the success run record
-// ---------------------------------------------------------------------------
 
 function fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet }) {
   return {
@@ -604,9 +582,7 @@ test('craft(): one overlapping physical item blocks before ingredient mutation',
   assert.equal(onlyVial.deleted, false, 'validation fails before any ingredient mutation');
 });
 
-// ---------------------------------------------------------------------------
 // Virtual-present tools (Phase 4: activeCanvasTool injection)
-// ---------------------------------------------------------------------------
 
 test('_validateTools: an unowned tool present as activeCanvasTool is satisfied and marked virtual', async () => {
   installSystem();
@@ -712,9 +688,7 @@ test('craft(): missing required tool blocks the craft before consuming ingredien
   assert.match(result.message, /Missing required tool/);
 });
 
-// ---------------------------------------------------------------------------
-// _applyToolBreakage under checkDriven authority (issue 419)
-// ---------------------------------------------------------------------------
+// applyToolBreakage under checkDriven authority (issue 419)
 
 const checkDrivenOpts = (overrides = {}) => ({ forceBreak: true, authority: 'checkDriven', reason: '1d20 group rolled 1', triggerId: 'natural1', ...overrides });
 
@@ -823,16 +797,10 @@ test('_applyToolBreakage toolSpecific: immune tool never breaks even with a lega
   assert.equal(getPath(anvil._flags.fabricate, 'fabricate.toolBroken'), undefined);
 });
 
-// ---------------------------------------------------------------------------
-// Criterion 10: a matched checkDriven trigger on a FAILED attempt breaks tools
-// only when consumption.breakToolsOnFail === true. This drives the full
-// craft() failure path (not _applyToolBreakage directly) so the policy gate that
-// wraps the shared seam is exercised end to end.
-// ---------------------------------------------------------------------------
+// Criterion 10: a matched checkDriven trigger on a FAILED attempt breaks tools only when
+// consumption.breakToolsOnFail === true.
 
-// A natural-1 checkDriven trigger on the simple crafting check. install* wires a
-// resolution-mode service that returns null, so _resolveCraftingCheckBreakage
-// falls back to system.resolutionMode and reads craftingCheck.simple.checkBreakage.
+// A natural-1 checkDriven trigger on the simple crafting check.
 const NATURAL_ONE_TRIGGER = {
   triggers: [
     {
@@ -927,13 +895,8 @@ test('craft() checkDriven FAIL: a matched trigger breaks the non-immune tool whe
   assert.equal(used[0].triggerId, 'natural1');
 });
 
-// ---------------------------------------------------------------------------
-// Criterion 9: salvage breaks required tools under checkDriven on both the
-// success path and the breakToolsOnFail failure path. Drives the REAL
-// _resolveSalvageBreakageDecision → _applyToolBreakage wiring (exactly how the
-// salvage success/failure paths apply breakage) so a tool actually breaks — not
-// just that the decision reports forceBreak.
-// ---------------------------------------------------------------------------
+// Criterion 9: salvage breaks required tools under checkDriven on both the success path and the
+// breakToolsOnFail failure path.
 
 function salvageCheckDrivenSystem() {
   return {

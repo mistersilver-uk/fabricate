@@ -1,13 +1,6 @@
 /**
- * Issue 1095 — the check-modifier seam on SALVAGE and GATHERING, and the eval==display
- * invariant on crafting.
- *
- * Every assertion here reads the ROLLED FORMULA STRING a real runner produced. That is
- * deliberate and it is the only observable that can fail for the right reason: a
- * resolver-level assertion cannot see a runner that never threads the context, and a
- * context-level assertion cannot see the arithmetic that reaches Foundry's `Roll`. Salvage
- * and gathering had NO modifier seam before this change, so a missing thread here is not a
- * regression — it is the feature failing to ship, silently, under a green suite.
+ * Issue 1095 — the check-modifier seam on SALVAGE and GATHERING, and the eval==display invariant on
+ * crafting. Every assertion here reads the ROLLED FORMULA STRING a real runner produced.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -27,13 +20,7 @@ const CATALOGUE = [
 ];
 const ACTOR = { getRollData: () => ({ med: 3, alch: 2 }) };
 
-/**
- * A deterministic `Roll` double that RECORDS the formula it was handed.
- *
- * The formula is the whole observable: `+ 3[Modifiers]`, `+ 5[Modifiers]` and no term at
- * all are three distinct strings and no two of them can coincide, so a runner that never
- * threaded the context cannot pass by accident.
- */
+/** A deterministic `Roll` double that RECORDS the formula it was handed. */
 class StubRoll {
   static replaceFormulaData(formula, data) {
     return String(formula).replaceAll(/@(\w+)/g, (_match, key) => String(data?.[key] ?? 0));
@@ -181,12 +168,10 @@ test('salvage under an AUTHORED EMPTY component pick appends nothing at all', as
   assert.equal(rolled.at(-1), '1d20', 'a real pick of zero appends no term, not a `+ 0`');
 });
 
-// ── gathering (DORMANT: driven directly, because nothing else can reach it) ────
-//
-// `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` pending issue 683 and the
-// economy editor renders both formula-rolled modes `disabled`, so NO GM-selectable
-// configuration reaches these two runners today (decision 8). These tests drive them
-// directly and say so, rather than implying a live path that does not exist.
+// gathering (DORMANT: driven directly, because nothing else can reach it).
+// `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` pending issue 683 and the economy
+// editor renders both formula-rolled modes `disabled`, so NO GM-selectable configuration reaches
+// these two runners today (decision 8).
 
 const GATHERING_TASK = { id: 't1', name: 'Forage', img: '', checkModifierIds: undefined };
 
@@ -270,19 +255,9 @@ test('gathering bySubject honours the TASK’s own pick, including an authored e
   }
 });
 
-// ── the pick has to SURVIVE COMPOSITION to reach any of the above ─────────────
-//
-// Every gathering test above hands the engine a hand-built task literal, and that is the
-// one thing they cannot prove: the engine never receives a library task. It receives a
-// COMPOSED one, rebuilt field by field by `_libraryTaskToRuntimeTask` on the way through
-// `composeEnvironment` → `_findStartTask` → `_resolveStartContext`. That literal is a THIRD
-// whitelist rebuild beside the two mirrored library normalizers, and it omitted
-// `checkModifierIds` — so `readSubjectModifierIds` found nothing, every composed task
-// silently INHERITED the default set, and `bySubject` could not work on gathering at all
-// while both library normalizers were correct and the pick sat intact on disk.
-//
-// The composed task is fed to the SAME runner the tests above drive, so the observable is
-// the same formula string and the two cannot disagree about what a pick means.
+// the pick has to SURVIVE COMPOSITION to reach any of the above. Every gathering test above hands
+// the engine a hand-built task literal, and that is the one thing they cannot prove: the engine
+// never receives a library task.
 
 const { GatheringRichStateService } = await import('../src/systems/GatheringRichStateService.js');
 const { SETTING_KEYS } = await import('../src/config/settings.js');
@@ -357,14 +332,8 @@ test('a task’s pick survives COMPOSITION and reaches the rolled formula', asyn
 // ── gathering d100 is PROVEN untouched, capably ───────────────────────────────
 
 test('the d100 branch consults NO check-modifier context, and the proof can fail', () => {
-  // `d100` rolls a fixed percentage against each drop's chance and authors no formula, so
-  // the check-modifier catalogue is inert under it with cause `noCheck`. The assertion is
-  // a SOURCE-TEXT scan of the d100 resolution path rather than a behavioural one, because
-  // "this code never calls that function" is not observable from a return value.
-  //
-  // Its capability is demonstrated inline: the same scan applied to the ROUTED path, which
-  // DOES consult the context, must find it — so a scan that could never match anything
-  // would fail here rather than passing silently over both.
+  // `d100` rolls a fixed percentage against each drop's chance and authors no formula, so the
+  // check-modifier catalogue is inert under it with cause `noCheck`.
   const source = readFileSync('src/systems/GatheringEngine.js', 'utf8');
   const slice = (from, to) => source.slice(source.indexOf(from), source.indexOf(to));
   const d100Path = slice('async _resolveD100Outcome', 'async _resolveProgressiveOutcome');
@@ -412,11 +381,10 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
 });
 
 test('the listing builder calls the context builder with an ACTIVITY, not at arity 2', () => {
-  // A source pin, because the arity error is invisible from a return value: an arity-2
-  // call resolves `activity` to `undefined`, `ACTIVITY_CHECK_KEYS.get(undefined)` misses,
-  // and the context silently reads NO selection at all — every rule collapses to `addAll`
-  // over an empty set, which is a scalar of 0 and an appended term of nothing. The listed
-  // formula would then show a number the roll does not use, on the player-facing card.
+  // A source pin, because the arity error is invisible from a return value: an arity-2 call
+  // resolves `activity` to `undefined`, `ACTIVITY_CHECK_KEYS.get(undefined)` misses, and the
+  // context silently reads NO selection at all — every rule collapses to `addAll` over an empty
+  // set, which is a scalar of 0 and an appended term of nothing.
   const source = readFileSync('src/systems/CraftingListingBuilder.js', 'utf8');
   assert.match(
     source,

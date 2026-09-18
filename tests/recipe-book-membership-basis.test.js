@@ -1,21 +1,6 @@
 /**
- * Recipe-book membership BASIS — the monotonic `system.membershipResolvesByRecipeIds`
- * marker (issue 1011, absorbed by and landed with issue 1010).
- *
- * Five readers choose between the canonical `RecipeItemDefinition.recipeIds[]` array and
- * the legacy per-recipe scalar (`recipe.recipeItemId`, plus a `linkedRecipeItemUuid →
- * definition.originItemUuid` leg). They used to choose with the same INFERRED,
- * system-wide, BIDIRECTIONAL predicate — "any definition has a non-empty recipeIds" —
- * which is not a migration marker but a live inference redone on every read, so it
- * flipped both ways: the first membership write to a legacy system orphaned every
- * scalar-only member, and emptying the last array reverted the whole system and
- * resurrected phantom memberships. Two of the five readers are player-facing.
- *
- * This suite is written as ONE reader table iterated per scenario rather than five
- * near-identical setup+assert blocks per scenario: the readers have five different call
- * shapes, and the natural writing would blow the SonarCloud new-code duplication budget
- * on its own. Every reader resolves to the same comparable — the sorted ids of the books
- * that contain a given recipe — so one expectation map covers all five.
+ * Recipe-book membership BASIS — the monotonic `system.membershipResolvesByRecipeIds` marker (issue
+ * 1011, absorbed by and landed with issue 1010).
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,8 +21,6 @@ function getProperty(object, path) {
 }
 
 // The world-settings store the manager reads and writes through `src/config/settings.js`.
-// Cloning on write is what makes the round-trip honest: a persisted setting is data, so a
-// field the normalizer's allowlist literal forgets to emit is genuinely lost here.
 let worldSettings = new Map();
 
 globalThis.foundry = {
@@ -71,9 +54,7 @@ const BOOK_B_UUID = 'Item.bookB';
 // Explicit comparator (never the default lexicographic `.sort()` — Sonar S2871).
 const byId = (left, right) => String(left).localeCompare(String(right));
 
-// ---------------------------------------------------------------------------
 // Fixture
-// ---------------------------------------------------------------------------
 
 function persistedSystem({ aRecipeIds = [], bRecipeIds = [], marker } = {}) {
   const system = {
@@ -128,14 +109,7 @@ const LEGACY_MEMBERSHIPS = {
   'r-none': [],
 };
 
-// There is no longer a per-reader expectation map. Until issue 1155 the two `adminStore`
-// readers needed one — the store's own membership helper had no `linkedRecipeItemUuid`
-// leg, so under the LEGACY basis it resolved a strict SUBSET (`r-uuid-a` came back
-// empty), and that subset was pinned here as current behaviour. It was a pin of a defect:
-// on an un-migrated world the GM browser's book column and the delete card's impact
-// statement could name different books for one recipe. Every reader now asks the one
-// implementation in `utils/recipeItemMembership.js`, so one map covers all six and a
-// reader that grew its own copy of the rule again would fail here.
+// There is no longer a per-reader expectation map (issue 1155).
 
 const NO_MEMBERSHIPS = { 'r-scalar-a': [], 'r-scalar-b': [], 'r-uuid-a': [], 'r-none': [] };
 
@@ -150,15 +124,8 @@ function bookItem(uuid) {
 }
 
 /**
- * One real `CraftingSystemManager` loaded from the world-settings fake, with all five
- * readers wired to it, so every reader sees exactly the same live system object.
- *
- * Loads through `reload()` rather than `initialize()` by default. `initialize()` also
- * runs the un-versioned `_migrateLegacyRecipeItems`, whose first half re-stamps
- * `recipe.recipeItemId` from a surviving `linkedRecipeItemUuid` — which would rewrite
- * the uuid-leg fixture into a scalar one and silently erase the branch under test.
- * `reload()` is the real socket-bridge load path on every client, so this is not a
- * contrived entry point; the scenarios that care about the migration opt in explicitly.
+ * One real `CraftingSystemManager` loaded from the world-settings fake, with all five readers wired
+ * to it, so every reader sees exactly the same live system object.
  */
 async function makeFixture({ system = persistedSystem(), recipes = legacyRecipes() } = {}) {
   worldSettings = new Map([[SETTING_KEYS.CRAFTING_SYSTEMS, structuredClone([system])]]);
@@ -215,9 +182,7 @@ function persistedRecipeIds(fixture, definitionId) {
   return fixture.manager.getRecipeItemDefinition(SYSTEM_ID, definitionId).recipeIds;
 }
 
-// ---------------------------------------------------------------------------
 // The reader table — five call shapes, one comparable result
-// ---------------------------------------------------------------------------
 
 const READERS = [
   {
@@ -278,28 +243,9 @@ const READERS = [
     },
   },
   {
-    // The SIXTH reader, and the second one inside `adminStore`: `_enrichRecipeItemLibrary`
-    // derives each book's `recipes[]` — what Books & Scrolls counts and lists — on the
-    // OTHER side of the same many-to-many.
-    //
-    // THIS ROW IS A PIN, NOT FAILING-FIRST EVIDENCE, and it is worth being exact about
-    // what it can and cannot see. It cannot catch a basis inference reintroduced INSIDE
-    // `_enrichRecipeItemLibrary` — reverting its `membershipResolvesByRecipeIds === true`
-    // guard to a per-definition "this book's `recipeIds` is empty, so fall back" leaves
-    // all five scenarios below green. That is not a gap in the scenarios: the enrichment
-    // is handed the PROJECTED recipe rows, and `_buildRecipeList` derives their
-    // `recipeItemId` from the shared `recipeItemDefinitionsContaining` rather than copying
-    // the raw legacy scalar, so on a marked system an emptied book's former members
-    // already carry `recipeItemId: ''` and the legacy reverse index has nothing to
-    // resurrect.
-    //
-    // What it DOES hold is that the book-side answer and the recipe-side answer agree
-    // across every scenario while both are read off that one upstream projection. So it
-    // fails on a change to what `_buildRecipeList` projects, or to how the enrichment
-    // resolves member ids against it — the fifth reader's territory, approached from the
-    // opposite side, where a disagreement would be a book reporting contents the Contents
-    // tab and both player-facing readers say it does not have. It is not vacuous either:
-    // three of the five scenarios expect a non-empty result from it.
+    // The SIXTH reader, and the second one inside `adminStore`: `_enrichRecipeItemLibrary` derives
+    // each book's `recipes[]` — what Books & Scrolls counts and lists — on the OTHER side of the
+    // same many-to-many.
     name: 'adminStore Books & Scrolls library (recipeItemDefinitions[].recipes)',
     async resolve(fixture, recipeId) {
       await fixture.store.refresh();
@@ -327,12 +273,7 @@ async function assertMemberships(fixture, reader, expected, label) {
   return entries.length;
 }
 
-/**
- * Run one assertion body against every reader, as its own test case. Every body here
- * routes its real assertions through `assertMemberships` and returns its count, so this
- * is a genuine anti-vacuity guard rather than a satisfied-the-analyser dummy: a body
- * that stopped asserting would fail here, not just read green.
- */
+/** Run one assertion body against every reader, as its own test case. */
 function forEachReader(title, body) {
   for (const reader of READERS) {
     it(`${title} — ${reader.name}`, async () => {
@@ -363,9 +304,7 @@ describe('recipe-book membership basis — a legacy-basis system', () => {
 });
 
 describe('recipe-book membership basis — the first membership write', () => {
-  // The Contents tab saving book A's currently-resolved membership. Without the seed the
-  // marker would close the revert direction but make the ORPHANING direction permanent:
-  // book B's scalar-only member would be stranded by a write that never named book B.
+  // The Contents tab saving book A's currently-resolved membership.
   async function writeBookA(fixture) {
     await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-a', {
       recipeIds: ['r-scalar-a', 'r-uuid-a'],
@@ -377,9 +316,8 @@ describe('recipe-book membership basis — the first membership write', () => {
     await writeBookA(fixture);
 
     assert.equal(marker(fixture), true, 'the write set the marker');
-    // Every reader agrees here for a second, independent reason: once the basis is
-    // `recipeIds`, the seed has carried that membership across, so no legacy leg is
-    // consulted at all.
+    // Every reader agrees here for a second, independent reason: once the basis is `recipeIds`, the
+    // seed has carried that membership across, so no legacy leg is consulted at all.
     return assertMemberships(fixture, reader, LEGACY_MEMBERSHIPS, 'after the first write');
   });
 
@@ -431,14 +369,10 @@ describe('recipe-book membership basis — the first membership write', () => {
 });
 
 describe('recipe-book membership basis — the dangling-id resolution order (issue 1010)', () => {
-  // `resolveLegacyMembershipDefinition` (`utils/recipeItemMembership.js`, which the seed
-  // in `_seedMembershipFromLegacyScalars` now asks rather than restating — issue 1155)
-  // deliberately does NOT fall through to the `linkedRecipeItemUuid` leg when
-  // `recipeItemId` is PRESENT but names no definition: only an ABSENT `recipeItemId` falls
-  // through. Pin BOTH directions through the real seeding write (`updateRecipeItemDefinition`,
-  // not the extracted helper in isolation, so a caller that stops consulting it is also
-  // caught): a fix that disabled the uuid branch entirely would satisfy the first half alone,
-  // and the second half is what proves the resolution can fire at all.
+  // `resolveLegacyMembershipDefinition` (`utils/recipeItemMembership.js`, which the seed in
+  // `_seedMembershipFromLegacyScalars` now asks rather than restating — issue 1155) deliberately
+  // does NOT fall through to the `linkedRecipeItemUuid` leg when `recipeItemId` is PRESENT but
+  // names no definition: only an ABSENT `recipeItemId` falls through.
   it('does NOT seed a recipe whose PRESENT recipeItemId is dangling, even with a matching uuid', async () => {
     const fixture = await makeFixture({
       recipes: [
@@ -595,10 +529,9 @@ describe('recipe-book membership basis — the write choke point', () => {
   });
 
   it('normalizes the written membership ids (trimmed, deduped, non-empty)', async () => {
-    // Membership matches by exact string equality, and the index-backed lookup the
-    // player-facing readers use keys the retained `recipeId -> definitions` buckets on the
-    // STORED id verbatim, so a whitespace-padded id written by a second path would simply
-    // stop matching. Normalizing at the write is what makes that unreachable.
+    // Membership matches by exact string equality, and the index-backed lookup the player-facing
+    // readers use keys the retained `recipeId -> definitions` buckets on the STORED id verbatim, so
+    // a whitespace-padded id written by a second path would simply stop matching.
     const fixture = await makeFixture();
     await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-a', {
       recipeIds: ['  r-scalar-a  ', 'r-scalar-a', '', null, 'r-uuid-a'],
@@ -610,14 +543,8 @@ describe('recipe-book membership basis — the write choke point', () => {
 
 describe('recipe-book membership basis — the bulk panel book counts (issue 1010)', () => {
   /**
-   * The Recipe Studio's bulk edit states `holds n of {total} selected` per book, and
-   * derives both the Add / Remove labels and their disabled states from it.
-   *
-   * It is a SIXTH consumer of this basis, and the one where getting it wrong is silent:
-   * a count read from `definition.recipeIds` reports "holds none selected" on a
-   * legacy-basis system, which DISABLES Remove and makes the axis one-way on exactly the
-   * worlds it exists to fix. Both surfaces below are asserted in the same case, so the
-   * fixture cannot drift out from under the claim.
+   * The Recipe Studio's bulk edit states `holds n of {total} selected` per book, and derives both
+   * the Add / Remove labels and their disabled states from it.
    */
   it('counts the selection basis-aware, though every definition array is empty', async () => {
     const fixture = await makeFixture();

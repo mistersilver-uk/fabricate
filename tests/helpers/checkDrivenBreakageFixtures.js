@@ -1,20 +1,8 @@
-/**
- * Shared fixtures for check-driven tool-breakage tests (issue 419).
- *
- * Both the runtime-level suite (tests/toolBreakageRuntime.test.js) and the
- * gathering-engine suite (tests/gathering-tool-runtime.test.js) drive the same
- * single shared evaluator seam from a persisted `checkDriven` system, an
- * engine-evaluated check result, and a "natural 1 on the first d20" trigger.
- * Keeping these in one module avoids the SonarCloud new-code duplication gate and
- * guarantees the two surfaces are compared against identical inputs in the drift
- * test.
- */
+/** Shared fixtures for check-driven tool-breakage tests (issue 419). */
 
 /**
- * Build an engine-evaluated check result with the fields the breakage seam reads:
- * `value`, `data.total`, `data.diceGroups`, `data.outcomeId`, `outcome`, and the
- * legacy `data.breakTools`. `engineEvaluated: true` so the non-engine-evaluated
- * guard does not short-circuit it.
+ * Build an engine-evaluated check result with the fields the breakage seam reads: `value`,
+ * `data.total`, `data.diceGroups`, `data.outcomeId`, `outcome`, and the legacy `data.breakTools`.
  */
 export function engineCheckResult({
   total = null,
@@ -32,9 +20,8 @@ export function engineCheckResult({
   };
 }
 
-// The default "natural 1 on the first d20" trigger and the matching roll: the
-// first dice group rolled a 1, so `anyDie == 1` matches. The trigger opts into
-// breakage (`breakTools: true`) — only break-tools triggers force a break.
+// The default "natural 1 on the first d20" trigger and the matching roll: the first dice group
+// rolled a 1, so `anyDie == 1` matches.
 export const NATURAL_ONE_TRIGGER = Object.freeze({
   triggers: [
     {
@@ -54,9 +41,8 @@ export const NATURAL_ONE_RESULT = Object.freeze(
 export const CHECK_DRIVEN_SYSTEM = Object.freeze({ toolBreakage: { authority: 'checkDriven' } });
 
 /**
- * A minimal item double with dot-path getFlag/setFlag storage, mirroring the
- * project's getFabricateFlag/setFabricateFlag conventions, plus delete()/update().
- * Used by both suites to back checkDriven plan/apply runs.
+ * A minimal item double with dot-path getFlag/setFlag storage, mirroring the project's
+ * getFabricateFlag/setFabricateFlag conventions, plus delete()/update().
  */
 export class BreakageFakeItem {
   constructor(uuid = 'Item.x') {

@@ -1,26 +1,10 @@
 /**
- * Regression guard for issue #699: the PUBLIC import surface
- * (`game.fabricate.importSystemFromFile` / `importFromPack` /
- * `getCompendiumImporter`) silently dropped the gathering authoring bundle because
- * `src/main.js` built the SHARED `CompendiumImporter` with no persistence seams —
- * `_persistEnvironments` and `_persistGatheringConfig` early-return without them,
- * yet `_importGatheringAuthoring` still pushed the gathering reference dispositions
- * into the report, implying the bundle was processed while both persists no-op.
- *
- * The GM UI path (SvelteCraftingSystemManagerApp) wires the seams and works, so the
- * fix wires the same seams into the shared importer. The construction-order trap
- * (the environment store is built AFTER the importer in `src/main.js`) is resolved
- * with a thin delegating object that resolves the store lazily, mirroring the
- * exportSystem lazy-read idiom.
- *
- * WHY NOT `import '../src/main.js'`: `src/main.js` imports the global stylesheet and
- * the compiled Svelte apps at module load, so it cannot be imported under plain
- * `node --test`. This suite therefore combines:
- *   1. a BEHAVIOURAL test that drives the REAL GatheringEnvironmentStore through a
- *      thin delegating seam assigned AFTER the importer is constructed (the exact
- *      construction-order trap), proving persistence still runs; and
- *   2. a SOURCE-CONTRACT guard pinned to `src/main.js`'s actual importer
- *      construction — the assertion that FAILS on the pre-fix seamless code.
+ * Regression guard for issue #699: the PUBLIC import surface (`game.fabricate.importSystemFromFile`
+ * / `importFromPack` / `getCompendiumImporter`) silently dropped the gathering authoring bundle
+ * because `src/main.js` built the SHARED `CompendiumImporter` with no persistence seams —
+ * `_persistEnvironments` and `_persistGatheringConfig` early-return without them, yet
+ * `_importGatheringAuthoring` still pushed the gathering reference dispositions into the report,
+ * implying the bundle was processed while both persists no-op.
  */
 
 import test from 'node:test';
@@ -108,9 +92,8 @@ test('#699 API-path import persists gatheringEnvironments + gatheringConfig thro
   assert.equal(persistedTask.resolutionMode, 'straight');
   assert.deepEqual(persistedTask.resultGroups, sourceTask.resultGroups);
 
-  // Report honesty: the gathering source-item references the report claims were
-  // handled correspond to a run that actually persisted (no processed-looking
-  // report over a no-op persist).
+  // Report honesty: the gathering source-item references the report claims were handled correspond
+  // to a run that actually persisted (no processed-looking report over a no-op persist).
   assert.ok(Array.isArray(summary.unresolvedReferences), 'summary carries a reference report');
 });
 

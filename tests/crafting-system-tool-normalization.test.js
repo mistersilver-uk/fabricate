@@ -1,13 +1,4 @@
-/**
- * Unit tests for system-owned library Tool normalization in CraftingSystemManager.
- *
- * Tools are now the single canonical source on the crafting system:
- * `_normalizeSystem` populates `system.tools` (mirroring `components`) so every
- * consumer that reads `getSystem(id).tools` — the recipe tool gate, salvage, the
- * canvas interactable browser, item-drop resolution, and gathering composition —
- * sees the same normalized library. These tests cover `_normalizeTool` shape +
- * field coercion and the `_normalizeSystem` tools seam.
- */
+/** Unit tests for system-owned library Tool normalization in CraftingSystemManager. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { effectiveToolBreakageAuthority } from '../src/systems/toolBreakageAuthority.js';
@@ -30,9 +21,7 @@ function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
 }
 
-// ---------------------------------------------------------------------------
-// _normalizeTool — shape + field coercion
-// ---------------------------------------------------------------------------
+// normalizeTool — shape + field coercion
 
 test('_normalizeTool produces the canonical Tool shape with defaults for a sparse tool', () => {
   const manager = makeManager();
@@ -142,9 +131,7 @@ test('_normalizeTool normalizes a requirement gate to a formula-only shape', () 
   assert.equal(nullReq.requirement, null);
 });
 
-// ---------------------------------------------------------------------------
-// _normalizeSystem tools seam
-// ---------------------------------------------------------------------------
+// normalizeSystem tools seam
 
 test('_normalizeSystem populates a normalized tools array', () => {
   const manager = makeManager();
@@ -194,9 +181,7 @@ test('_normalizeSystem round-trips tools through normalization (re-normalize is 
   assert.deepEqual(twice.tools, once.tools);
 });
 
-// ---------------------------------------------------------------------------
 // issue 561: first-class tool source refs + name/img snapshot preservation
-// ---------------------------------------------------------------------------
 
 test('_normalizeTool preserves source refs + name/img snapshot and never clobbers label (C3)', () => {
   const manager = makeManager();
@@ -227,9 +212,7 @@ test('_normalizeTool preserves source refs + name/img snapshot and never clobber
   assert.deepEqual(twice, tool);
 });
 
-// ---------------------------------------------------------------------------
 // issue 419: immune breakage mode, toolBreakage.authority, checkBreakage
-// ---------------------------------------------------------------------------
 
 test('_normalizeToolBreakage reads legacy immune forward exactly like the Tool model', () => {
   const manager = makeManager();
@@ -328,13 +311,7 @@ test('_normalizeSystem preserves the complete canonical Tool shape and strips Ki
   assert.equal('kind' in tool, false);
 });
 
-// THE FLIP (issue 1363, epic 1357, PR 3). This normalizer used to MINT `toolSpecific` for an
-// absent or unrecognised authority on every normalize, which meant every persisted system carried
-// a concrete value and the WORLD half of `resolveToolBreakageAuthority` was provably unreachable.
-// It is ABSENCE-PRESERVING now: no key at all. The shipped read-shape guarantee that a system with
-// no persisted `toolBreakage` READS AS `toolSpecific` is preserved — but by the RESOLVER, which is
-// where the world value can be consulted, rather than by minting a value the corpus cannot tell
-// apart from a GM's deliberate choice.
+// THE FLIP (issue 1363, epic 1357, PR 3).
 test('_normalizeSystem emits NO toolBreakage key at all when none was authored', () => {
   const manager = makeManager();
   const system = manager._normalizeSystem({ id: 's', name: 'S' });
@@ -368,24 +345,9 @@ test('_normalizeSystem preserves a checkDriven toolBreakage.authority', () => {
   assert.deepEqual(system.toolBreakage, { authority: 'checkDriven' });
 });
 
-// ── THE ABSENCE ROUND TRIP (issue 1374, epic 1357) ──────────────────────────────────────────
-//
-// The world-scope write path now treats any argument that is neither authority token as a
-// CLEAR of the per-system override, and writes `{ toolBreakage: {} }`. That only clears
-// anything because NOTHING ON THE PATH MERGES: `updateSystem` builds `{...current, ...updates}`,
-// a SHALLOW merge, so the empty block REPLACES the stored one; and the normalizer above is
-// absence-preserving, so it emits no key for an unrecognized block. Break either half and the
-// key survives — holding the ORIGINAL token after a deep merge, and a SUBSTITUTED `toolSpecific`
-// after a re-minting normalizer.
-//
-// IT NEEDS THE REAL MANAGER, which is why it is here rather than beside the store action that
-// performs the write. The admin-store suite's system-manager double ends its `updateSystem` in
-// `Object.assign`, which cannot delete a key, so a correct clear leaves the key present there
-// and this property is not expressible against it. That suite asserts the FORWARDED PATCH; this
-// one asserts what the patch does.
-//
-// THE PRE-STATE ASSERTION IS NOT CEREMONY. Every other fixture in this file authors no
-// `toolBreakage` at all, so the post-state would hold trivially with no clear having happened.
+// THE ABSENCE ROUND TRIP (issue 1374, epic 1357). The world-scope write path now treats any
+// argument that is neither authority token as a CLEAR of the per-system override, and writes `{
+// toolBreakage: {} }`.
 
 // A manager holding real, normalized systems with `save()` stubbed — the house pattern, so the
 // REAL `updateSystem` runs rather than a hand-rebuilt imitation of it.
@@ -524,9 +486,7 @@ test('_normalizeUnifiedTriggers drops a crit keyed to a modified pool, and is id
   assert.deepEqual(twice, once, 'normalization is idempotent');
 });
 
-// ---------------------------------------------------------------------------
 // issue 975: `tierStep`, the third trigger effect alongside outcome + breakTools
-// ---------------------------------------------------------------------------
 
 const INERT_TIER_STEP = Object.freeze({ mode: 'none', steps: 1, tierId: null });
 
@@ -646,8 +606,6 @@ test('tierStep is NOT pinned to none for an outcomeTier condition, unlike outcom
 test('a tierStep alone does not stop a legacy break-only trigger migrating to breakTools true', () => {
   const manager = makeManager();
   // `isLegacyBreakOnly` keys on `outcome === undefined && breakTools === undefined`.
-  // Adding tierStep to that test would silently flip every pre-recombine break-only
-  // trigger into a NON-breaking one.
   const [legacy] = manager._normalizeCheckBreakage({
     triggers: [{ id: 'legacy', condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
   }).triggers;
@@ -739,10 +697,8 @@ test('_normalizeSimpleCraftingCheck carries a unified checkBreakage block and dr
   assert.equal(simple.checkBreakage.triggers[0].breakTools, true);
 });
 
-// ---------------------------------------------------------------------------
-// Issue 560 — normalizers accept BOTH the legacy source-uuid field names and the
-// renamed names, emitting the new names (no silent drop of the renamed fields).
-// ---------------------------------------------------------------------------
+// Issue 560 — normalizers accept BOTH the legacy source-uuid field names and the renamed names,
+// emitting the new names (no silent drop of the renamed fields).
 
 test('_normalizeTool preserves the renamed source fields from a NEW-named input', () => {
   const manager = makeManager();

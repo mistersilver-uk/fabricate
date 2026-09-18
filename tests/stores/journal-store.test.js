@@ -1,10 +1,7 @@
 /**
  * Coverage for the player-facing journalStore runes factory
- * (`src/ui/svelte/stores/journalStore.svelte.js`). Compiled like the actor-bar
- * store so the `$state`/`$derived` runes evaluate. Asserts the explicit
- * comparators (soonest-ready vs newest), history pagination, the selectedRun
- * completion fallback, advance notify-on-failure + refetch, navCount, and the
- * recent-terminal mini-history.
+ * (`src/ui/svelte/stores/journalStore.svelte.js`). Compiled like the actor-bar store so the
+ * `$state`/`$derived` runes evaluate.
  */
 
 import { describe, it, before, after } from 'node:test';
@@ -197,10 +194,7 @@ describe('journalStore', () => {
     });
   }
 
-  // Issue 1648: manual setup is GONE. The ledger is provisioned automatically, so the only
-  // run the setup button could ever appear on is one no world reaches, and a store seam for it
-  // would be an affordance for an impossible state. What the store still owes a blocked run is
-  // its REASON, passed through untouched for the shared vocabulary to word.
+  // Issue 1648: manual setup is GONE.
   it('offers no manual authority setup and passes a blocked run its reason untouched', async () => {
     const blocked = run({
       lifecycleContract: 'current',
@@ -314,10 +308,7 @@ describe('journalStore', () => {
   });
 
   // Issue 1648, D-029/M19. `Waiting` and `In progress` collapse into one badge, and the filter
-  // vocabulary must not diverge from the badge vocabulary. This is a MERGE rather than a rename:
-  // before it there was no tab for `inProgress` at all, so a run between stages — or any unbegun
-  // stage — matched nothing but `All`, which is why the maintainer's own frame reads
-  // `Active (1)` beside `Ready 0, Waiting 0, Paused 0`.
+  // vocabulary must not diverge from the badge vocabulary.
   it('selects both merged statuses from the one In progress tab, and counts them together', async () => {
     const activeRuns = [
       run({ id: 'craft-ready', derivedStatus: 'ready' }),
@@ -694,9 +685,8 @@ describe('journalStore', () => {
     assert.equal(setup.calls.command.length, 2);
   });
 
-  // Issue 1648: a versioned-run authority refusal is `{success:false, reason}` with no
-  // `message`, so `safeCommandMessage` produced '' — an EMPTY command-error notice and
-  // no toast at all.
+  // Issue 1648: a versioned-run authority refusal is `{success:false, reason}` with no `message`,
+  // so `safeCommandMessage` produced '' — an EMPTY command-error notice and no toast at all.
   it('words a reason-only command refusal in both the notice and the toast', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
     const setup = makeServices({
@@ -741,10 +731,8 @@ describe('journalStore', () => {
     }
   });
 
-  // Issue 1648: finishing a timed run from the Journal whose CHECK fails is an outcome the
-  // run's own history records, not a command error. It used to fall through the refusal
-  // chain to the generic "Something went wrong while crafting. Nothing was consumed." and
-  // park a persistent error notice on the row.
+  // Issue 1648: finishing a timed run from the Journal whose CHECK fails is an outcome the run's
+  // own history records, not a command error.
   it('reports a resolved failed check as an outcome, not as a command error', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
     const setup = makeServices({
@@ -800,12 +788,8 @@ describe('journalStore', () => {
     assert.equal(setup.calls.list, 2, 'the cancelled command does not trigger another refresh');
   });
 
-  // Issue 1648, M25. A versioned cancel SUCCEEDS with `cancelled: true` — the run was
-  // cancelled — and the store used to read that as "the user dismissed a prompt" and return
-  // before its refresh. The listing the view kept was the one the cancel's own actor write had
-  // just triggered, taken while the command still held the execution claim, so every OTHER run
-  // stayed painted `claim-held` against a claim that no longer existed. The maintainer could not
-  // cancel the rest without reloading Foundry.
+  // Issue 1648, M25. A versioned cancel SUCCEEDS with `cancelled: true` — the run was cancelled —
+  // and the store used to read that as "the user dismissed a prompt" and return before its refresh.
   it('refreshes after a successful versioned cancel, so a mid-command claim cannot outlive it', async () => {
     const target = run({ id: 'target', lifecycleContract: 'current', lifecycleVersion: 1 });
     const other = run({ id: 'other', lifecycleContract: 'current', lifecycleVersion: 1 });

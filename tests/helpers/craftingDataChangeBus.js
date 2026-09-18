@@ -1,20 +1,6 @@
 /**
- * A `globalThis.Hooks` fake with the five shipped store subscriptions already attached
- * (issue 1078 part B1).
- *
- * ## Why the subscribers are the REAL ones
- *
- * Every seam downstream of publication passes with the emit exported and called from nowhere.
- * So these fixtures subscribe through the shipped `subscribeCraftingDataChange` with the
- * shipped `STORE_DOMAINS[store]` and count deliveries: the entry point of every case that uses
- * this is a real mutation, the exit point is a real subscription, and deleting a publish call
- * takes a counter to zero.
- *
- * ## Why it is a bus rather than a spy
- *
- * A simulated multi-client fixture gives each client its OWN instance, because `globalThis.Hooks`
- * is read at call time by every publisher. That is the whole reason the signal is a
- * `Hooks.callAll` rather than a module-local emitter.
+ * A `globalThis.Hooks` fake with the five shipped store subscriptions already attached (issue 1078
+ * part B1).
  */
 import { INVALIDATION_STORES, STORE_DOMAINS } from '../../src/systems/invalidationDomains.js';
 import {
@@ -30,9 +16,8 @@ export const TAXONOMY_STORES = Object.freeze(Object.values(INVALIDATION_STORES))
 /**
  * Install a Hooks fake on `globalThis` and attach one shipped subscription per store.
  *
- * @param {object} [options]
  * @param {boolean} [options.subscribe=true] Attach the store subscriptions. `false` gives a bare
- *   bus, for a case that wants to observe emissions without any consumer.
+ * bus, for a case that wants to observe emissions without any consumer.
  * @returns {object} The bus handle.
  */
 export function installCraftingDataBus({ subscribe = true } = {}) {

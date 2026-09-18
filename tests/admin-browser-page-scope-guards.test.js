@@ -1,27 +1,4 @@
-/**
- * Page-scope guards for the two GM browsers (issue 1081, under #1070).
- *
- * The claim these defend is not "it got faster" — it is that the work a browser open
- * performs is bounded by what the GM can see, and that counting, filtering and sorting the
- * WHOLE filtered cohort does not drag the expensive tier along with it.
- *
- * ## Every negative assertion here is paired with a positive control
- *
- * A counter that reads zero because the optimisation worked is indistinguishable from a
- * counter that reads zero because the path was never invoked, the method was renamed, or the
- * fixture filtered to nothing. `scaleProbes.countingFacade` throws on a missing method for
- * exactly that reason. The same standard is held here at the assertion level: every "this
- * did not happen" is followed, in the SAME fixture and against the SAME counter, by the
- * step that makes it happen. If the seam were dead, the control would read zero too and the
- * test would fail.
- *
- * ## Counts, not clocks
- *
- * The same fixture performs the same number of operations on every machine and every Node
- * build, so a count is a value a reviewer can read in a diff. The bounds are stated as
- * EXACT numbers rather than upper bounds because the quantity being pinned is a page size:
- * "at most the page" and "exactly the page" differ by a defect where a row is skipped.
- */
+/** Page-scope guards for the two GM browsers (issue 1081, under #1070). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -61,23 +38,17 @@ const PAGE_SIZE = 25;
  */
 const PLACEHOLDER_TAGS = ['metal', 'herb', 'reagent'];
 /**
- * A search term matching recipes `Recipe 000`–`Recipe 009` and nothing else, so
- * `buildRecipeList`'s search-filtered subset is a strict, known subset of the roster. The
- * pre-counted tag record must follow that subset, because the rows it accompanies do.
+ * A search term matching recipes `Recipe 000`–`Recipe 009` and nothing else, so `buildRecipeList`'s
+ * search-filtered subset is a strict, known subset of the roster.
  */
 const SEARCH_TERM = '00';
 const SEARCHED_COHORT = 10;
 
-// ---------------------------------------------------------------------------
 // The GM recipe browser
-// ---------------------------------------------------------------------------
 
 /**
- * A real `RecipeManager` over an ALCHEMY system holding `COHORT` recipes, with the two
- * expensive per-row seams counted.
- *
- * Alchemy deliberately, because that is the mode whose activation gate reaches the signature
- * audit; every other mode short-circuits before it and could not show the audit count at all.
+ * A real `RecipeManager` over an ALCHEMY system holding `COHORT` recipes, with the two expensive
+ * per-row seams counted.
  */
 function makeRecipeWorld(counters) {
   const system = makeCraftingSystem({ componentCount: 8, resolutionMode: 'alchemy' });
@@ -86,10 +57,7 @@ function makeRecipeWorld(counters) {
       ...makeSignatureRecipe({
         id: `r-${String(index).padStart(3, '0')}`,
         componentId: `c-${index % 8}`,
-        // Every recipe carries a tag placeholder (issue 1081). Without one the whole cohort
-        // matches only on `{type: 'component'}`, and the tag-count guards below compare a
-        // pre-counted empty map against a walked empty map — an agreement that holds however
-        // broken either producer is.
+        // Every recipe carries a tag placeholder (issue 1081).
         tagPlaceholders: [PLACEHOLDER_TAGS[index % PLACEHOLDER_TAGS.length]],
       }),
       name: `Recipe ${String(index).padStart(3, '0')}`,
@@ -100,14 +68,8 @@ function makeRecipeWorld(counters) {
   const manager = new RecipeManager({ getCraftingSystemManager: () => systemManager });
   for (const recipe of recipes) manager.recipes.set(recipe.id, recipe);
 
-  // The DETAIL-tier probe. `validate()` is called on the STORED recipe by exactly one thing
-  // — `_isRecipeIncomplete`, inside the detail bundle. The activation gate validates a
-  // `Recipe.fromJSON` CLONE with `enabled: true`, a different instance, so it cannot bump
-  // this counter; that is what keeps the two tiers separately observable. (A `toJSON`
-  // counter would NOT: the gate clones the body too, so it reads 2 per rendered row.)
-  //
-  // Per INSTANCE, never on the prototype: a prototype patch would leak into every other
-  // case in this process and turn a per-fixture count into a running total.
+  // The DETAIL-tier probe. `validate()` is called on the STORED recipe by exactly one thing —
+  // `_isRecipeIncomplete`, inside the detail bundle.
   const disposers = recipes.map((recipe) =>
     countCalls(recipe, 'validate', counters, 'recipeDetailProjections')
   );
@@ -223,10 +185,7 @@ describe('GM recipe browser: off-page definitions are not richly projected', () 
         'and still builds no detail bundle'
       );
 
-      // SECOND POSITIVE CONTROL, against the DETAIL counter itself. The control above moves
-      // `gateCanActivateRecipe`, which is a different counter — so on its own it leaves
-      // `recipeDetailProjections` never shown to be live within this test, and a zero that
-      // is never shown to be able to be non-zero is not evidence.
+      // SECOND POSITIVE CONTROL, against the DETAIL counter itself.
       for (const row of browseRecipes(list.recipes).page) renderRecipeRow(row);
       assert.equal(
         counters.get('recipeDetailProjections'),
@@ -272,17 +231,10 @@ describe('GM recipe browser: off-page definitions are not richly projected', () 
   });
 });
 
-// ---------------------------------------------------------------------------
 // The GM component browser
-// ---------------------------------------------------------------------------
 
 /**
- * A component library whose every member carries a compendium link and an EMPTY stored
- * description.
- *
- * Both halves are load-bearing. The link is what makes `fromUuid` reachable at all, and the
- * empty stored description is what makes the enrichment fallback reachable — a fixture with
- * stored prose would measure the branch that never enriches and report a comfortable zero.
+ * A component library whose every member carries a compendium link and an EMPTY stored description.
  */
 function makeComponentLibrary(size, essences = {}) {
   return Array.from({ length: size }, (_, index) => ({
@@ -297,13 +249,7 @@ function makeComponentLibrary(size, essences = {}) {
   }));
 }
 
-/**
- * Project a component cohort with `fromUuid`, `enrichToHtml` and the memo all counted.
- *
- * The memo probe is what makes the SIGNATURE claim testable from outside: a cache read
- * happens once per `itemCardSignature` computation and never otherwise, so `memoGet` is the
- * number of deep record serializations performed.
- */
+/** Project a component cohort with `fromUuid`, `enrichToHtml` and the memo all counted. */
 async function projectComponents(
   counters,
   { showEssences = true, essenceDefinitionById = new Map(), componentEssences = {} } = {}
@@ -384,22 +330,7 @@ describe('GM component browser: async fan-out and signature cost are bounded by 
     }
   });
 
-  /**
-   * The SIGNATURE, counted directly rather than through the memo.
-   *
-   * `memoGet` above counts `cache.get` calls, and the prose beside it reasons from "a cache
-   * read happens once per signature computation" to "so `memoGet` IS the signature count".
-   * That coupling is stated, not enforced: hoisting `itemCardSignature` back out of
-   * `resolve()` into the card build — a deep `_stableStringify` of every component's whole
-   * record, cohort-wide, on every refresh, which is the original defect — leaves every
-   * `cache.get` exactly where it is and every counter in this file unmoved.
-   *
-   * `itemCardSignature` reads `essenceDefinitionById.get(id)` UNCONDITIONALLY, once per
-   * essence (issue 1371 r18-colour folded the name, icon and colour reads into one; it was twice),
-   * while the cheap card build reads that map only when
-   * `showEssences` is true. So with essences DISPLAYED OFF and each component carrying one,
-   * a counting facade on that map counts signature computations and nothing else.
-   */
+  /** The SIGNATURE, counted directly rather than through the memo (issue 1371). */
   it('computes NO card signature for the cohort — the deep serialization is page-scoped', async () => {
     const counters = createOperationCounters();
     const world = await projectComponents(counters, {
@@ -479,16 +410,9 @@ describe('GM component browser: async fan-out and signature cost are bounded by 
   });
 });
 
-// ---------------------------------------------------------------------------
 // The consumers of the cohort — the guards the store-level ones do not cover
-// ---------------------------------------------------------------------------
 
-/**
- * A `tags` placeholder ingredient set: the shape `countRecipeTagPlaceholders` exists to find.
- *
- * @param {string} id
- * @param {string[]} tags
- */
+/** A `tags` placeholder ingredient set: the shape `countRecipeTagPlaceholders` exists to find. */
 function tagPlaceholderSet(id, tags) {
   return {
     id,
@@ -499,14 +423,8 @@ function tagPlaceholderSet(id, tags) {
 
 describe('the Tags & Categories reference count reads the cohort without materialising it', () => {
   /**
-   * The nav badge is a SIBLING of the view switch, so it re-derives on every render of the
-   * manager in every view — which makes it the one consumer that must never touch the detail
-   * tier. Counting a projected row's tag placeholders reads `ingredientSets` and `steps`,
-   * both detail-tier fields sharing one memoized producer, so a badge that walked the rows
-   * deep-cloned the entire library before first paint.
-   *
-   * The pure helpers were pinned by the first revision of this file; this pins the
-   * COMPOSITION that consumes them, which is where the cost actually lived.
+   * The nav badge is a SIBLING of the view switch, so it re-derives on every render of the manager
+   * in every view — which makes it the one consumer that must never touch the detail tier.
    */
   it('answers the nav badge from pre-counted data, touching no detail tier', () => {
     const counters = createOperationCounters();
@@ -533,10 +451,9 @@ describe('the Tags & Categories reference count reads the cohort without materia
         'the counter CAN go up — walking the rows for their placeholders is what does it'
       );
 
-      // ANTI-VACUITY, before the agreement is claimed. Both sides of the comparison below
-      // are maps, and two empty maps agree — so the pre-counted side is stated as an exact,
-      // non-empty record first. Delete `countRecipeTagPlaceholderUsage` from the projection
-      // and this is what goes red; the `deepEqual` alone would not.
+      // ANTI-VACUITY, before the agreement is claimed. Both sides of the comparison below are maps,
+      // and two empty maps agree — so the pre-counted side is stated as an exact, non-empty record
+      // first.
       assert.deepEqual(
         Object.fromEntries(scoped.tagUsage),
         { metal: 20, herb: 20, reagent: 20 },
@@ -555,17 +472,10 @@ describe('the Tags & Categories reference count reads the cohort without materia
   });
 
   /**
-   * WHICH cohort the pre-count is folded over is a rendered number, not an implementation
-   * detail: `buildRecipeList` counts the SEARCH-FILTERED subset, the same array the rows are
-   * projected from, and moving it to the unfiltered roster would change what the Tags &
-   * Categories screen reports without failing anything.
-   *
-   * The empty-search case above cannot see that choice at all — filtered and roster are the
-   * same 60 recipes there — so this drives a NON-EMPTY term. It is also what makes the
-   * counting live end to end: with the term applied, the pre-counted record and the walk over
-   * the rows it accompanies must still be the same record, and either of the two ways the
-   * threading can be severed (the projection folding nothing, or the count being taken over
-   * the wrong cohort) breaks that equality.
+   * WHICH cohort the pre-count is folded over is a rendered number, not an implementation detail:
+   * `buildRecipeList` counts the SEARCH-FILTERED subset, the same array the rows are projected
+   * from, and moving it to the unfiltered roster would change what the Tags & Categories screen
+   * reports without failing anything.
    */
   it('folds the pre-count over the SAME search-filtered cohort the rows come from', () => {
     const counters = createOperationCounters();
@@ -622,15 +532,8 @@ describe('the Tags & Categories reference count reads the cohort without materia
   });
 
   /**
-   * The fallback the pre-count's JSDoc advertises — "omit it and the walk runs here as it
-   * always did" — has to be REACHABLE, and an empty record has to stay authoritative.
-   *
-   * Those two pull in opposite directions under a truthiness test, because `{}` is truthy:
-   * a caller defensively passing `counts || {}` turned "the counts were never published"
-   * into "there are none". A tag referenced only by a recipe ingredient placeholder then
-   * reads `0 references` on the Tags & Categories screen, renders the `Unused` chip, and is
-   * deletable in ONE CLICK with no confirm strip — breaking ingredient matching in every
-   * recipe whose placeholder named it.
+   * The fallback the pre-count's JSDoc advertises — "omit it and the walk runs here as it always
+   * did" — has to be REACHABLE, and an empty record has to stay authoritative.
    */
   it('walks when the pre-count is absent, and trusts an EMPTY pre-count as an answer', () => {
     const counters = createOperationCounters();
@@ -661,19 +564,7 @@ describe('the Tags & Categories reference count reads the cohort without materia
 
   /**
    * The pre-counted record is folded off the recipe MODELS; the walk it replaces read the
-   * `toJSON()`-sourced projection. The two shapes are not guaranteed identical by anything
-   * other than this assertion, and a divergence would change tag counts silently rather than
-   * fail — so both branches of `ingredientSetsFor` (top-level sets and per-step sets) are
-   * crossed here, with a recipe authored in the legacy bare-`ingredients[]` shape as a third.
-   *
-   * That third recipe does NOT reach `matchesOf`'s legacy branch, and the docstring used to
-   * claim it did. `IngredientSet._legacyIngredientsToGroups` converts the bare list at
-   * CONSTRUCTION, so the recipe carries `ingredientGroups.length === 1` on the model and on
-   * its `toJSON()` alike, and both sides return from the grouped branch. Proven: neutering
-   * the legacy branch leaves this whole file green. It carries its weight as a legacy
-   * AUTHORING-shape case — the conversion is what this asserts about it — and the branch
-   * itself is covered repo-wide by `tests/vocabulary-cascade-icons.test.js`, which does go
-   * red under that mutation.
+   * `toJSON()`-sourced projection.
    */
   it('counts the same placeholders off a recipe MODEL as off its serialized projection', () => {
     const recipes = [

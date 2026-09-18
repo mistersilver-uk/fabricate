@@ -186,10 +186,9 @@ describe('buildRequirementSlots', () => {
     assert.equal(without.issue, '', 'a slot with no reason carries the empty string, never undefined');
   });
 
-  // A currency slot is binary by construction — `satisfied` IS the affordability verdict
-  // — so the fixed branch's `satisfied ? met : short` is already the right answer and the
-  // numbers are never consulted. Asserted because the omitted pip means nothing else on
-  // the surface would notice if the state stopped tracking affordability.
+  // A currency slot is binary by construction — `satisfied` IS the affordability verdict — so the
+  // fixed branch's `satisfied ? met : short` is already the right answer and the numbers are never
+  // consulted.
   it('states a currency slot from its affordability verdict, not from its numbers', () => {
     assert.equal(
       buildRequirementSlots({ ingredientStates: [currencyState()] })[0].state,
@@ -261,10 +260,7 @@ describe('resolveOpenSlotId', () => {
     assert.equal(composeSlotKey('set-a', null), null);
   });
 
-  // The disclosure must be genuinely COLLAPSIBLE. Every openable rail otherwise
-  // resolves something open on every read, so clicking the open tile re-stored a key
-  // that resolved back to the same slot — a control reporting `aria-expanded="true"`
-  // that could not be closed.
+  // The disclosure must be genuinely COLLAPSIBLE.
   it('closes the chooser for a remembered CLOSED sentinel in this scope', () => {
     assert.equal(
       resolveOpenSlotId({
@@ -321,9 +317,8 @@ describe('buildConsumptionPlan', () => {
     );
   });
 
-  // One row per ITEM KEY however many requirements that item funds — the block
-  // contributes at most one plan entry per item, and a second row would imply a
-  // second draw on the same units.
+  // One row per ITEM KEY however many requirements that item funds — the block contributes at most
+  // one plan entry per item, and a second row would imply a second draw on the same units.
   it('emits ONE row for a dual-essence carrier funding two requirements', () => {
     const plan = buildConsumptionPlan({
       ingredientStates: [essenceState(), essenceState({ groupId: 'g-shadow', name: 'Shadow' })],
@@ -362,11 +357,7 @@ describe('buildConsumptionPlan', () => {
     );
   });
 
-  // A resolved-but-unaffordable requirement is NOT withheld. There is nothing to choose
-  // for it, so it cannot move to the pending line, and dropping the row would leave the
-  // requirement absent from the surface entirely while the craft still needs it. The row
-  // states the shortfall instead: `sufficient: false` plus the held count, which the
-  // panel renders as the danger-toned quantity beside "You own N".
+  // A resolved-but-unaffordable requirement is NOT withheld.
   it('keeps a row for a short requirement and marks it insufficient', () => {
     const plan = buildConsumptionPlan(
       {
@@ -451,19 +442,12 @@ describe('suggestChoiceOverrides', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 (revision 2) — a currency PLAN ROW carries the discriminator the panel
-// branches on. The row keeps its place (a currency cost IS spent by the craft) but its
-// `quantity` is the price and its `owned` is the evaluation's placeholder, so the panel
-// rendered "100 gp … You own 0 … ×100" — a balance nobody measured beside a restatement
-// of the price the name already spells out.
-// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2) — a currency PLAN ROW carries the discriminator the panel branches on.
 
 describe('buildConsumptionPlan currency rows (issue 1493)', () => {
-  // The module-level `currencyState()` factory, NOT a second literal shadowing it: a
-  // block-scoped copy of the same fixture drifts silently from the one every other test in
-  // this file asserts against, and a reader has no way to tell which one a failure came
-  // from.
+  // The module-level `currencyState()` factory, NOT a second literal shadowing it: a block-scoped
+  // copy of the same fixture drifts silently from the one every other test in this file asserts
+  // against, and a reader has no way to tell which one a failure came from.
   it('keeps the currency row in the plan and marks it as currency', () => {
     const { rows } = buildConsumptionPlan({
       ingredientStates: [fixedState(), currencyState({ img: 'icons/coin.webp' })],

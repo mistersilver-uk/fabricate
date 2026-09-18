@@ -1,27 +1,6 @@
 /**
- * game.fabricate.resetActorKnowledge — the GM-only knowledge-reset access path
- * (issue 773), the macro/console lever beside the Knowledge tab's own reset control.
- *
- * WHY A REPRODUCTION (and not the real `Fabricate` class): `src/main.js` imports the
- * global stylesheet and Svelte UI at module load, so it cannot be imported under
- * plain `node --test`. This suite drives a faithful reproduction of the facade method
- * against a spy `recipeVisibilityService` + a mock `game`, then a SOURCE-CONTRACT
- * guard pins the real `src/main.js` method so weakening the GM gate, the
- * actorId-not-uuid resolution, the per-system/all delegation, or the never-throw
- * `{ success, message }` shape fails this suite.
- *
- * ## What issue 1289 changed here, and what it deliberately did not
- *
- * The GM gate and the actor resolution moved OUT of this method into the shared
- * `_requireGmActor` preamble, so that one authorization rule exists once rather than a
- * third time. The four behavioural cases below are UNCHANGED by that refactor — which is
- * the whole proof that it was behaviour-preserving, and why they are worth reading before
- * the source-contract guard.
- *
- * The reproduction therefore extends the shared facade harness rather than carrying its own
- * copy of the preamble: a second copy in this file would be the very duplication the
- * refactor removed, and it could drift from production while these four cases stayed green.
- * The guard at the foot of the file is what pins the delegation itself.
+ * game.fabricate.resetActorKnowledge — the GM-only knowledge-reset access path (issue 773), the
+ * macro/console lever beside the Knowledge tab's own reset control.
  */
 
 import assert from 'node:assert/strict';
@@ -132,20 +111,17 @@ test('773 facade: no systemId delegates to the all-systems reset', async () => {
   assert.equal(result.messageData.systemId, null);
 });
 
-// ---------------------------------------------------------------------------
 // SOURCE-CONTRACT guard — pin the real src/main.js method.
-// ---------------------------------------------------------------------------
 
 const RESET =
   'async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {';
 const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
 
 test('SOURCE CONTRACT: resetActorKnowledge delegates its gate and delegates by scope', () => {
-  // BOUNDED to this method alone. The previous form sliced `MAIN_SOURCE` from the method's
-  // first character to the END OF THE FILE, which is harmless for a "must contain" claim and
-  // silently vacuous for a "must NOT contain" one — every helper the rest of the class
-  // legitimately uses is inside an unbounded slice. The absence assertions below are the
-  // reason this suite could not keep that form once the gate moved out of the method.
+  // BOUNDED to this method alone. The previous form sliced `MAIN_SOURCE` from the method's first
+  // character to the END OF THE FILE, which is harmless for a "must contain" claim and silently
+  // vacuous for a "must NOT contain" one — every helper the rest of the class legitimately uses is
+  // inside an unbounded slice.
   const body = mainMethodSource(RESET);
 
   assert.ok(

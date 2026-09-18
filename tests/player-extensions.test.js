@@ -6,10 +6,8 @@ import { createPlayerExtensionsRegistry } from '../src/ui/playerExtensions.js';
 
 const SURFACE = 'downtime';
 
-// The registry validates SHAPE, never membership, so a fixture must be free to declare any
-// ids it likes. `ids` is the whole tab set; nothing here mirrors a Core list. A player tab
-// requires only id + label + icon — `accessibleName` and `tooltip` are optional, which is
-// the first place this shape diverges from the Manager provider's.
+// The registry validates SHAPE, never membership, so a fixture must be free to declare any ids it
+// likes. `ids` is the whole tab set; nothing here mirrors a Core list.
 function playerProvider({ id = SURFACE, ids = ['board'], ...overrides } = {}) {
   return {
     apiVersion: 1,
@@ -173,10 +171,9 @@ test('registerPlayerNavProvider rejects malformed providers deterministically', 
   assert.throws(() => register(null), /Fabricate player navigation provider must be an object/);
 });
 
-// D1: `accessibleName` and `tooltip` are the two optional tab fields, and they are optional
-// because Core RENDERS both when supplied — the accessible name replaces the button's name
-// and the tooltip is its `aria-describedby` target. So a present-but-empty value would
-// produce an unnamed control rather than a defaulted one, and must be rejected.
+// D1: `accessibleName` and `tooltip` are the two optional tab fields, and they are optional because
+// Core RENDERS both when supplied — the accessible name replaces the button's name and the tooltip
+// is its `aria-describedby` target.
 test('accessibleName and tooltip are accepted when supplied and rejected when present-but-empty', () => {
   const registry = quietRegistry();
   const described = playerProvider({ ids: ['board'] });
@@ -208,9 +205,7 @@ test('accessibleName and tooltip are accepted when supplied and rejected when pr
   }
 });
 
-// D1: charset validation, NOT id enumeration. Core still never says which ids it accepts —
-// only what an id may be spelled with, because the composed route key is rendered into an
-// HTML id, an IDREF token list (space-separated), a `data-` attribute and a query param.
+// D1: charset validation, NOT id enumeration.
 test('the permitted id charset is enforced on both the surface id and every tab id', () => {
   const permitted = ['downtime', 'a', 'crew-quarters-2', '0', 'a'.repeat(64)];
   for (const id of permitted) {
@@ -246,11 +241,8 @@ test('the permitted id charset is enforced on both the surface id and every tab 
   }
 });
 
-// The player window has no route header, breadcrumb trail or header-action group, so Core
-// cannot render route chrome or header actions. Validating them would be validation
-// theatre. They are NOT RECOGNISED: values the Manager validator rejects outright pass
-// through here untouched, and the nav model's allowlist projection (proved in
-// tests/player-nav-model.test.js) is what stops them reaching the rail.
+// The player window has no route header, breadcrumb trail or header-action group, so Core cannot
+// render route chrome or header actions. Validating them would be validation theatre.
 test('no route chrome or action fields are recognised on a player provider', () => {
   const registry = quietRegistry();
   const chromed = playerProvider({ ids: ['board'] });

@@ -37,10 +37,7 @@ const listSource = read('CompositionList.svelte');
 const modeControlSource = read('CompositionModeControl.svelte');
 const inspectorSource = read('RecordInspector.svelte');
 const tabsSource = read('EnvironmentEditorTabs.svelte');
-// The tab strip is a caller of the promoted `EditorTabs` primitive since issue 1362, so the
-// tablist semantics, the keyboard handling and the badge normalisation are asserted against the
-// component that RENDERS them. Left pointed at the caller they would have gone green over an
-// empty file: `EnvironmentEditorTabs.svelte` no longer contains a single one of those tokens.
+// The tab strip is a caller of the promoted `EditorTabs` primitive since issue 1362.
 const editorTabsSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/components/EditorTabs.svelte'),
   'utf8'
@@ -54,23 +51,7 @@ const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
 const rightInspectorSource = read('EnvironmentRightInspector.svelte');
 const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 // The four-state "included" composition vocabulary has ONE home (issue #1321):
-// `ENVIRONMENT_INCLUDED_COMPOSITION_STATES` in `src/systems/gatheringComposition.js`. The editor
-// shell and the composition list both import it instead of re-listing its members, so the
-// assertions that used to mirror those four state literals pin the IMPORT instead. Written as a
-// whitespace-tolerant regex because Prettier prints an import list on one line or several
-// depending on the importing file's path depth, and a needle that only matched one of those
-// spellings would go quietly green the day the other one was printed.
-/**
- * The slice of `CompositionList.svelte` belonging to one `data-section`, from its marker to the
- * next section's (or end of file).
- *
- * Force add is ONE verb rendered from two places in that file, and since issue #1315 both live in
- * the same section — the automatic-mode Non-matching list — while the manual Available-to-add list
- * has none at all. A file-wide `includes('data-action="force-include"')` therefore cannot tell the
- * surviving control from the deleted one, and an assertion carrying a manual-mode message would go
- * on passing on the automatic-mode twin. Every assertion about where a composition control lives
- * is scoped through here.
- */
+/** The slice of `CompositionList.svelte` belonging to one `data-section`. */
 function listSection(name) {
   const start = listSource.indexOf(`data-section="${name}"`);
   assert.ok(start !== -1, `CompositionList.svelte should still render a ${name} section`);
@@ -81,12 +62,6 @@ function listSection(name) {
 
 /**
  * The body of one of `CompositionList.svelte`'s four menu-item builders.
- *
- * Issue 1477 moved the four hand-rolled `role="menu"` blocks onto the shared `<ActionMenu>`
- * primitive, so the verbs a menu offers are no longer markup inside a `data-section` — they are
- * an item list built in the `<script>`. {@link listSection} still answers WHICH builder each
- * section renders, and this answers what that builder puts in the menu, so the two together pin
- * exactly what one section-scoped markup assertion used to.
  *
  * @param {string} name The builder function's name.
  * @returns {string} Its source, from the declaration to its closing brace.
@@ -133,11 +108,6 @@ describe('environment editor localization', () => {
     }
     assert.equal(editor.Events.DangerTag.deadly, 'Deadly');
     // THE SEVERITY WORDS ARE GONE, and pinned absent rather than merely unread (issue 1517).
-    // `Severity.critical` / `Severity.warning` named the summary inspector's two chips while
-    // those chips counted two of the three severities; the chips now report the same BLOCKING
-    // and WARNINGS numbers the Validation tab's rail and the tab strip's badge do, through one
-    // accessor, and take that vocabulary's shared words. A stale key left behind would be read
-    // by nothing and would invite the next reader to reintroduce a third answer.
     assert.equal(editor.Validation.Severity, undefined, 'the severity chip words are retired');
     const shared = lang.FABRICATE.Admin.Manager.Validation;
     assert.equal(shared.CountBlocking, 'Blocking');
@@ -164,10 +134,7 @@ describe('environment editor localization', () => {
       ['Composition.ColEvent', 'Event'],
       ['Composition.QuickRemove', 'Remove'],
       ['Composition.Remove', 'Remove from environment'],
-      // BOTH modes are pinned (issue #1315), because the sentences are a matched pair and the
-      // defect being guarded is a mode learning the other's affordance: manual must not offer a
-      // force add, and automatic must say it has one. Pinning only the mode that changed would
-      // leave the other free to drift back.
+      // BOTH modes are pinned (issue #1315).
       ['Composition.ManualHint', 'Only the tasks and events you add are available, whether or not they match this environment.'],
       ['Composition.AutomaticHint', 'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.'],
       ['Inspector.OverridesHintTask', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source task.'],
@@ -191,10 +158,7 @@ describe('environment editor localization', () => {
       assert.equal(path.split('.').reduce((node, part) => node?.[part], editor), value, `EnvironmentEditor.${path}`);
     }
 
-    // The mutation-proof half of the pair above: no manual-mode sentence may offer a force add,
-    // and every automatic-mode one must. A re-word that reintroduced the retired affordance into
-    // the manual copy would satisfy every byte-equality assertion above by simply being updated
-    // alongside them; this reds on the WORDS, wherever the sentence is re-written next.
+    // The mutation-proof half of the pair above.
     for (const path of ['Composition.ManualHint', 'Tasks.ManualIntro', 'Events.ManualIntro']) {
       const value = path.split('.').reduce((node, part) => node?.[part], editor);
       assert.ok(
@@ -210,8 +174,7 @@ describe('environment editor localization', () => {
       );
     }
 
-    // Region is no longer a composition axis; the readiness check and its
-    // localized label were removed with the gathering-regions unification.
+    // Region is no longer a composition axis.
     assert.equal(editor.Validation.CheckRegion, undefined, 'CheckRegion label should be removed');
   });
 
@@ -236,9 +199,7 @@ describe('environment editor localization', () => {
       !validationSource.includes('CheckRegion') && !validationSource.includes('hasRegion'),
       'the region readiness check and its dynamic fallback should be removed'
     );
-    // Prettier prints these two entries across several lines once the sentence grows, so they are
-    // matched as whitespace-tolerant patterns rather than as one-line needles that would silently
-    // stop matching (and read green) the next time the copy is re-wrapped.
+    // Prettier prints these two entries across several lines once the sentence grows.
     for (const pattern of [
       /'IssueStaleIncludedTask',\s*'The task "\{name\}" does not match this environment, and composes anyway\.'/,
       /'IssueStaleIncludedEvent',\s*'The event "\{name\}" does not match this environment, and composes anyway\.'/,
@@ -292,9 +253,7 @@ describe('environment multi-realm selector', () => {
   it('sources realm options from GatheringRealm records, not the removed vocabulary', () => {
     assert.ok(overviewSource.includes('realmRecords'), 'overview consumes realmRecords (GatheringRealm records)');
     assert.equal(shellSource.includes("realmOptions={gatheringVocabularyOptions('realms')}"), false, 'no longer sources realm from the vocabulary');
-    // `worldRealms` since issue 1282, and the key rename is why this assertion is not merely
-    // cosmetic: it pinned the OLD view-model key, so a root left reading it would have handed
-    // the editor `undefined`, emptied the realm picker, and kept this guard green.
+    // `worldRealms` since issue 1282.
     assert.ok(managerRootSource.includes('realmRecords={worldRealms}'), 'root threads the world realm records into the editor');
     assert.ok(managerRootSource.includes('realmsEnabled={gatheringRealmsEnabled}'), 'root threads the toggle gate into the editor');
   });
@@ -342,11 +301,7 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('active={entry.hasDropRateAdjustment === true}'), 'override chips are driven by drop-rate adjustment state');
     assert.ok(!listSource.includes('compositionState={entry.compositionState}'), 'override chips are not driven by composition state');
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
-    // Issue 1477 moved the overflow menu into the shared `<ActionMenu>` primitive, which owns the
-    // dismiss-on-outside-click wiring, the menu ARIA and the keyboard contract this file used to
-    // check by looking for a class name. The class is gone from this component on purpose — the
-    // family is rooted at the primitive now — so what is pinned here is that the rows still reach
-    // for the shared control rather than hand-rolling a menu again.
+    // Issue 1477 moved the overflow menu into the shared `<ActionMenu>` primitive.
     assert.ok(listSource.includes('<ActionMenu'), 'rows expose an overflow action menu');
     assert.ok(
       !listSource.split('</script>')[1].includes('role="menu"'),
@@ -404,19 +359,14 @@ describe('environment composition editor structure', () => {
 
   it('collapses task row actions into the overflow menu while preserving event row controls', () => {
     assert.ok(listSource.includes("{#if kind === 'task'}"), 'composition list branches task rows for compact action menus');
-    // WHICH MENU EACH SECTION RENDERS, then WHAT THAT MENU OFFERS. Before issue 1477 one
-    // section-scoped markup match answered both at once; the primitive took the markup, so the
-    // pair is written out. Dropping either half loses the discrimination the section scoping
-    // exists for — a file-wide `force-include` match cannot tell the automatic-mode control from
-    // a manual-mode one, which is the mistake issue #1315 was opened on.
+    // WHICH MENU EACH SECTION RENDERS.
     assert.ok(listSection('available-to-add').includes('items={availableMenuItems(entry)}'), 'the manual Available to add rows render the available menu');
     assert.ok(/'data-action': 'include'/.test(menuBuilder('availableMenuItems')), 'the manual Available to add menu offers a plain include');
     assert.ok(listSection('non-matching').includes('items={nonMatchingMenuItems(entry)}'), 'the automatic Non-matching rows render the non-matching menu');
     assert.ok(/'data-action': 'force-include'/.test(menuBuilder('nonMatchingMenuItems')), 'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)');
     assert.ok(/'data-action': 'restore'/.test(menuBuilder('excludedMenuItems')), 'task restore action is available from a menu item');
     assert.ok(/'data-action': 'exclude'/.test(menuBuilder('includedMenuItems')), 'task remove/exclude action remains available from a menu item');
-    // The verbs still reach the props they always did. One dispatcher serves all four menus, so
-    // this is where a mis-wired item id would land rather than in the markup.
+    // The verbs still reach the props they always did. One dispatcher serves all four menus.
     assert.ok(/id === 'include'\) onInclude\(kind, entry\.id\)/.test(listSource), 'the include item calls onInclude');
     assert.ok(/id === 'force-include'\) onForceInclude\(kind, entry\.id\)/.test(listSource), 'the force-add item calls onForceInclude');
     assert.ok(/id === 'exclude'\) onExclude\(kind, entry\.id\)/.test(listSource), 'the exclude item calls onExclude');
@@ -532,12 +482,7 @@ describe('environment composition editor structure', () => {
   });
 
   it('manual mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {
-    // The included section must never surface addable/non-matching records; those
-    // belong to the Available-to-add list in manual mode.
-    // Was two literal-state needles (`includedByMatch`, `forceIncluded`). The list no longer
-    // spells its four states out, so what is pinned here is that it reads the shared set —
-    // and MEMBERSHIP of that set, including force-included records, is asserted exactly in
-    // `tests/systems/gatheringComposition.test.js`.
+    // The included section must never surface addable/non-matching records.
     assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(listSource), 'included section keys off the shared four-state included vocabulary');
     assert.ok(listSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)'), 'included section filters records through that shared set');
     assert.ok(listSource.includes("availableToAddMatching"), 'manual mode has a matching available-to-add group');
@@ -598,11 +543,7 @@ describe('environment composition editor structure', () => {
     assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('onTaskAdjustmentInput'), 'task override text input should preserve transient signed editing states');
     assert.ok(inspectorSource.includes('DropRateAdjustmentRange'), 'task override text input should expose its bounded range in accessible copy');
-    // The plain numeric input this replaced, as a whitespace-tolerant pattern. It used to be a
-    // ~200-character three-attribute needle on ONE line, which Prettier (issue 923) can no longer
-    // produce — it prints an element with several attributes one per line — so the guard could
-    // never match again and would have read green forever. The control below keeps it honest:
-    // the same markup, printed the way Prettier prints it, must still trip the pattern.
+    // The plain numeric input this replaced.
     const plainNumericAdjustmentInput =
       /value=\{row\.adjustment\}\s+aria-label=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.DropRateAdjustment',\s*'Drop-rate adjustment',?\s*\)\}\s+onchange=\{\(?event\)? =>\s*setTaskDropAdjustment\(\s*row\.id,\s*event\.currentTarget\.value,?\s*\)\}/;
     assert.ok(
@@ -692,12 +633,7 @@ describe('environment composition editor structure', () => {
     assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(shellSource), 'badge count imports the shared four-state included vocabulary');
     assert.ok(shellSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)'), 'badge count filters composition records through that shared set');
     assert.ok(!shellSource.includes('const INCLUDED_COMPOSITION_STATES'), 'the shell no longer keeps a second copy of the included vocabulary');
-    // THE BADGE READS THE ONE ACCESSOR, NOT SEVERITIES (issue 1517, review r1). It counted
-    // `severity === 'critical'` and `severity === 'warning'` here while the Validation tab it
-    // badges counted `!== 'critical'` inside — so an `info`-only environment showed NO badge over
-    // a rail reading "Warnings: 2", and an unsatisfied readiness check with no issue behind it
-    // was badged by nothing at all. The negatives are what make this a real swap rather than an
-    // addition: reintroducing either severity filter here reds this clause.
+    // THE BADGE READS THE ONE ACCESSOR.
     assert.ok(shellSource.includes('countReadiness(readiness)'), 'the badge reads the shared readiness accessor');
     assert.ok(!shellSource.includes("issue.severity === 'critical'"), 'the badge no longer counts a severity of its own');
     assert.ok(!shellSource.includes("issue.severity === 'warning'"), 'nor a second one beside it');
@@ -709,8 +645,7 @@ describe('environment composition editor structure', () => {
     assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
     assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
     assert.ok(editorTabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
-    // The badge is a shared `Chip` since issue 883, so the tab strip hands it a tone NAME
-    // rather than an `is-` class; the mapping still has to exist.
+    // The badge is a shared `Chip` since issue 883.
     assert.ok(editorTabsSource.includes("if (tone === 'warning') return 'warning'"), 'tabs should render warning-toned badge chips');
   });
 });
@@ -732,8 +667,7 @@ describe('evaluateEnvironmentReadiness', () => {
   it('treats a disabled draft with no available tasks as a non-blocking warning', () => {
     const disabled = { enabled: false, name: 'Mines', biomes: ['cave'], dangerTags: ['hazardous'], sceneUuid: '' };
     const { issues } = evaluateEnvironmentReadiness(disabled, { counts: { availableTasks: 0 }, tasks: [], events: [] });
-    // The disabled draft now saves fine, so noAvailableTasks downgrades to a warning
-    // but still flags that the environment cannot be enabled yet.
+    // The disabled draft now saves fine.
     const noAvailable = issues.find(issue => issue.id === 'noAvailableTasks');
     assert.ok(noAvailable, 'should still surface the no-available-tasks issue');
     assert.equal(noAvailable.severity, 'warning');
@@ -800,18 +734,6 @@ describe('evaluateEnvironmentReadiness', () => {
 // no focus move, no live region, and a tab panel with no `tabindex`, so activating a row unmounted
 // the View button that was pressed and dropped focus onto `<body>`, where Space pauses the game
 // and the arrows pan the canvas behind the window.
-//
-// THE SHAPE IS READ FROM SOURCE, and the clauses are the same five the other five hosts satisfy —
-// written once in `tests/helpers/validationAddressContracts.js` and parameterised by this host's
-// own facts. There is no `describeValidationAddressPairing` beside it, and the absence is the
-// point: that guard resolves a producer's `focusTarget` against the control that carries it, and
-// this producer emits `recordId` — a record the route SELECTS — so there is no
-// `data-validation-target` anywhere to pair with. What the pairing gate proves for the other five
-// is proved here by the mounted clause in `manager-mounted.test.js` that activates a row and reads
-// the panel back off `document.activeElement`.
-//
-// `tabProp` is this editor's own spelling: the tab's callback takes `(kind, id)` and is named for
-// what it is handed, which is a record rather than an issue address.
 describeValidationHostContract({
   title: 'EnvironmentEditView wires the row action in the order the mechanism needs',
   hostFile: 'EnvironmentEditView.svelte',

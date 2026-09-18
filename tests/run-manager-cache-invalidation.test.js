@@ -17,10 +17,8 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// Issue 739 (read side): the run managers cache an actor's runs in memory and never
-// learn about a write another client (or the primary-GM world-time resume) makes to the
-// actor's run flags. `invalidateCache(actorId)` — wired to the `updateActor` hook in
-// main.js — drops the stale cache so the next read reflects the synced document.
+// Issue 739 (read side): the run managers cache an actor's runs in memory and never learn about a
+// write another client (or the primary-GM world-time resume) makes to the actor's run flags.
 
 function stepRecipe(id) {
   return {
@@ -30,10 +28,9 @@ function stepRecipe(id) {
   };
 }
 
-// Simulate a remote (player) client's replicated write landing on the GM's client:
-// Foundry replaces the actor's flag with a FRESH merged object on sync, so deep-clone
-// the stored container into a NEW object and add the player's run WITHOUT going through
-// the GM manager's in-memory cache.
+// Simulate a remote (player) client's replicated write landing on the GM's client: Foundry replaces
+// the actor's flag with a FRESH merged object on sync, so deep-clone the stored container into a
+// NEW object and add the player's run WITHOUT going through the GM manager's in-memory cache.
 function remoteWriteActiveCraftingRun(actor, run) {
   const prev = actor._flags?.fabricate?.['fabricate.craftingRuns'] ?? { active: {}, history: [] };
   actor._flags.fabricate = actor._flags.fabricate || {};
@@ -164,14 +161,9 @@ test('runContainersChanged: matches the doubly-nested crafting/salvage and singl
   assert.deepEqual(runContainersChanged(hpTick, has), []);
 });
 
-// ---------------------------------------------------------------------------
-// Update-operator spellings (issue 1654)
-//
-// An update operator is part of the last path segment, so a write using one arrives under a
-// different key: the `1.34.0` remap force-replaces each run container (`==<container>`) and
-// `deleteRemovedActiveRunFlags` uses `-=`. A bare-spelling probe matches neither, so no
-// manager drops its cache and every client goes on serving runs it was told are stale.
-// ---------------------------------------------------------------------------
+// Update-operator spellings (issue 1654). An update operator is part of the last path segment, so a
+// write using one arrives under a different key: the `1.34.0` remap force-replaces each run
+// container (`==<container>`) and `deleteRemovedActiveRunFlags` uses `-=`.
 
 /** The segment-walking probe `foundry.utils.hasProperty` implements at runtime. */
 function hasSegmentPath(object, path) {

@@ -21,8 +21,7 @@ describe('resolveDefaultSelection', () => {
       env({ id: 'env-a' }),
       env({ id: 'env-b' })
     ];
-    // selectedId points at the SECOND (non-locked) env; it must survive, not
-    // get clobbered back to the first.
+    // selectedId points at the SECOND (non-locked) env; it must survive.
     assert.equal(resolveDefaultSelection(list, 'env-b'), 'env-b');
   });
 

@@ -1,10 +1,4 @@
-/**
- * Unit tests for the default world-setting-backed party learn pool (issue 773).
- *
- * Covers the new GM-authoritative `decrement` that frees a shared learn slot on
- * knowledge reset/erase: it floors at 0, mutates only for a GM, and degrades safely
- * (skipped, reported failed) for a non-GM — symmetric with `increment`.
- */
+/** Unit tests for the default world-setting-backed party learn pool (issue 773). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -69,9 +63,6 @@ test('773 pool.decrement is symmetric with increment across a round-trip', async
 });
 
 // A `total`-scope budget lives in a WORLD setting, so a player cannot reserve a slot.
-// `writable()` exposes that refusal so the caller can report the real reason instead of
-// collapsing it into "no learning uses left" — which told players their shared budget
-// was spent while it sat untouched, silently blocking every `total`-scope book.
 
 test('pool.writable reports whether THIS client may mutate the shared budget', () => {
   installGame({ isGM: true });

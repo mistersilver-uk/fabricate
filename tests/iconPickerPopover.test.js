@@ -77,12 +77,9 @@ test('icon picker popover width shrinks to fit very small viewports', () => {
   assert.equal(layout.left, 16);
 });
 
-// --- Whole-row flooring (issue 1280) ----------------------------------------------------
-// The popover's max height comes from the viewport, so the space left for the list after the
-// search field and the popover's padding is an arbitrary number of pixels. Filling it slices the
-// last row in half against the popover's bottom padding, which reads as a rendering fault rather
-// than as "more below". These pin the floor, and pin that a caller which measures nothing keeps
-// the previous behaviour rather than getting a guessed height.
+// Whole-row flooring (issue 1280) ---------------------------------------------------- The
+// popover's max height comes from the viewport, so the space left for the list after the search
+// field and the popover's padding is an arbitrary number of pixels.
 
 const TRIGGER = { top: 120, bottom: 152, left: 220, right: 420, width: 200, height: 32 };
 const VIEWPORT = { width: 1280, height: 900 };
@@ -148,17 +145,10 @@ test('the flooring rides both placements, since either can be the short one', ()
   );
 });
 
-// --- HEIGHT RENDERED INSIDE THE LIST (issue 1503) ---------------------------------------
-// `rowPitch` is a row's BORDER BOX plus the list's `row-gap`, so a box the sheet puts between
-// the rows that sits OUTSIDE a border box — an outer margin, which is how the icon picker
-// separates its pinned resolved row from the alphabetical list — is height the list renders and
-// the pitch cannot see. Counting it as popover chrome does only half the job: it shrinks the
-// budget the floor divides, which can change the row COUNT, but `floorListToWholeRows` returns
-// `rows * rowPitch - trailingGap` and has no term for it, so the list's own max-height never
-// grows to hold it and the panel clips the last row by exactly that margin.
-//
-// So it is subtracted BEFORE the floor, because it competes with the rows for the same space,
-// and added back AFTER it, because the list's box is what has to contain it.
+// HEIGHT RENDERED INSIDE THE LIST (issue 1503) --------------------------------------- `rowPitch`
+// is a row's BORDER BOX plus the list's `row-gap`, so a box the sheet puts between the rows that
+// sits OUTSIDE a border box — an outer margin, which is how the icon picker separates its pinned
+// resolved row from the alphabetical list — is height the list renders and the pitch cannot see.
 
 // The SHIPPED pinned-row case, measured off the composed panel rather than invented: a 38px row
 // at a 6px gap (pitch 44), 6+6 panel padding, a 4px column gap and a 30px search field (chrome
@@ -175,11 +165,7 @@ test('a margin rendered INSIDE the list is counted once, and the list is tall en
 });
 
 test('the shipped pinned-row panel resolves to seven whole rows plus the margin, exactly', () => {
-  // THE EXACT NUMBER, not merely a divisible one. Integrality alone survives a sign inversion in
-  // either half — subtracting the margin twice, or adding it before the floor as well as after —
-  // and each of those is a real way to write this wrong. 380 - 46 - 8 = 326 of budget, which
-  // floors to 7 pitches; the list is then 7 * 44 - 6 + 8 = 310, which is exactly the seven rows'
-  // content plus the gap between the first two groups. The panel totals 356 of its 380.
+  // THE EXACT NUMBER, not merely a divisible one.
   const layout = computeIconPickerPopoverLayout(TRIGGER, VIEWPORT, PINNED_METRICS);
 
   assert.equal(layout.maxHeight, 380, 'the shipped panel ceiling, which the arithmetic is over');
@@ -196,10 +182,7 @@ test('the shipped pinned-row panel resolves to seven whole rows plus the margin,
 });
 
 test('the in-list margin can cost a ROW as well as gaining the list its own height', () => {
-  // The two halves are not the same statement. Subtracting before the floor is what stops the
-  // list claiming a row the panel cannot hold; adding back after is what stops it slicing the one
-  // it kept. With a margin large enough to cross a pitch boundary the row count itself moves, and
-  // a version that only added back would floor to 7 and overflow the panel by 42.
+  // The two halves are not the same statement.
   const layout = computeIconPickerPopoverLayout(TRIGGER, VIEWPORT, {
     ...PINNED_METRICS,
     listExtra: 40,

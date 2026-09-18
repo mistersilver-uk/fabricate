@@ -1,10 +1,4 @@
-/**
- * Cascade-safe vocabulary deletion + per-category icon persistence in adminStore
- * (issue 689). Deleting a referenced recipe/component category reassigns the
- * affected records to `general`; deleting a referenced tag strips it from every
- * component that carries it; category icons round-trip through the store's write
- * ops. The mock manager tracks the record + system writes the store issues.
- */
+/** Cascade-safe vocabulary deletion + per-category icon persistence in adminStore (issue 689). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

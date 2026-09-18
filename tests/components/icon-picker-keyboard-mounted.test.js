@@ -1,28 +1,4 @@
-/**
- * THE ICON PICKER KEEPS DOM FOCUS ON ONE ELEMENT (issue 1503).
- *
- * `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
- * the HOLDER — and drive selection with `aria-activedescendant`, and forbids roving focus onto
- * the option rows because it re-arms Foundry's canvas bindings: with focus on a row, Space pauses
- * the game and the arrows pan the map behind the open window. There is a second, independent
- * reason the rows must not take focus, and it is visual: `styles/fabricate.css` rings any focused
- * `[tabindex]` under `.fabricate` with a 2px accent outline at a POSITIVE offset
- * (`.fabricate [tabindex]:focus-visible`), and every option row is now a `[tabindex]` element, so
- * a row that took focus would draw a competing ring around the keyboard cursor's own inset one.
- *
- * ── WHY THIS PICKER'S OWN SUITE, AND WHAT ONLY IT CAN SHOW ───────────────────────────────────
- * The arithmetic is proved in `tests/util/listbox-navigation.test.js` against the pure module,
- * with no compile and no DOM; the shared driver these cases run through lives in
- * `tests/helpers/listboxKeyboardDriver.js`. `icon-picker-mounted.test.js` owns this component's
- * SELECTION semantics — which row is current for an aliased or retired stored value.
- *
- * What is specific to THIS component is the PINNED ROW. The list is 750 rows long and the row the
- * stored value resolves to is rendered once at the TOP, outside the alphabetical `each`. The
- * cursor and the option `id`s are therefore numbered over the FLAT RENDERED order — the pinned
- * row first, then the alphabetical remainder — and this suite is what proves it: an index that
- * counted only the `each` would put row 0's id on the second row a GM sees, so
- * `aria-activedescendant` would name one row while another drew the cursor.
- */
+/** THE ICON PICKER KEEPS DOM FOCUS ON ONE ELEMENT (issue 1503). */
 
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -65,14 +41,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
   ],
-  // The picker renders through the shared primitive, which renders `Chip` and `EmptyState`
-  // (issue 1503). Omitting any of the three does not FAIL this suite — the closure validator
-  // throws in `before()` and `node --test` reports every test here as `# cancelled`.
+  // The picker renders through the shared primitive.
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    // Rendered by `SearchablePopover`'s `triggerButton` form (issue 1371), so it is in this
-    // tree's closure even though no picker asks for that form.
+    // Rendered by `SearchablePopover`'s `triggerButton` form (issue 1371).
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     ICON_PICKER,
@@ -109,13 +82,7 @@ async function openPanel(props = {}) {
   return { root, panel };
 }
 
-/**
- * Open the panel and narrow it to four rows.
- *
- * Narrowing is not a shortcut around the pinned row — the case below addresses that directly —
- * it is what makes a WRAP affordable: the unfiltered list is 750 rows, so proving the ring closes
- * would otherwise cost 751 synthesized keydowns per case.
- */
+/** Open the panel and narrow it to four rows. */
 async function openFourRowPanel() {
   const { root, panel } = await openPanel();
   typeQuery(holderOf(panel), FOUR_ROW_QUERY);
@@ -202,11 +169,7 @@ describe('1503 IconPicker — the listbox focus model', () => {
     const { panel, rows } = await openFourRowPanel();
     const holder = holderOf(panel);
 
-    // HOME AND END ARE THE CARET'S FIRST, and this picker is where that matters most: its query
-    // field is the one a GM types a whole icon name into, so the keys that jump to the ends of
-    // that text cannot be taken unconditionally. The component hands each of them to the cursor
-    // only from the edge at which the caret would not move — so after typing, End (the caret is
-    // already at the end of `bolt`) is the list's, and Home is not until the caret is at 0.
+    // HOME AND END ARE THE CARET'S FIRST, and this picker is where that matters most.
     pressKey('End');
     assert.equal(activeDescendant(holder), rows[3].id, 'End reaches the last row');
 
@@ -328,11 +291,7 @@ describe('1503 IconPicker — the listbox focus model', () => {
       null,
       'a holder cannot name a row when there is no row to name'
     );
-    // THE LIST ELEMENT IS GONE, NOT MERELY EMPTY, since the picker was re-platformed onto the
-    // shared primitive: the empty note is a SIBLING of the `role="listbox"` box rather than a
-    // child of it, because a listbox's only valid children are its options. So the holder drops
-    // `aria-controls` too — an `aria-controls` pointing at an id that resolves to no element is a
-    // defect, and it is conditioned on exactly the predicate the list is.
+    // THE LIST ELEMENT IS GONE, NOT MERELY EMPTY.
     assert.ok(
       !panel.querySelector('[role="listbox"]'),
       'the list is replaced by the note, not filled with it'

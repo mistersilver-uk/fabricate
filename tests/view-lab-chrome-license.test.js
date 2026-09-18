@@ -1,19 +1,6 @@
 /**
  * The View Lab draws real Foundry window chrome, harvested from the maintainer's own licensed
- * Foundry. Those bytes are proprietary — Foundry's own, plus Font Awesome Pro and Modesto
- * Condensed, which Foundry licenses from third parties. This repository is public.
- *
- * So the rule is deliberately absolute and mechanically checked: NOTHING harvested is ever
- * tracked. Not "nothing except the OFL faces" — Signika, Amiri, and Bruno Ace are open-licensed
- * and technically redistributable, but they arrive through the same code path from the same tree,
- * and one rule is auditable where a per-file licence exception matrix is not.
- *
- * What IS fine, and must stay fine: the captured PNGs. A screenshot of an application for review
- * is normal, and the live smoke already publishes exactly such frames to S3. Nobody should
- * "solve" the licensing question by deleting the publish path.
- *
- * This test never skips. It is the enforcement, so it has to be red on a machine that has never
- * run a harvest.
+ * Foundry. What IS fine, and must stay fine: the captured PNGs.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -26,11 +13,7 @@ import { CHROME_CACHE_DIRNAME, PROVENANCE_PATH } from '../scripts/lib/foundryChr
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * Paths that may never be tracked. Written as patterns over the whole repo rather than as a list
- * of expected cache paths, so a harvested file copied ANYWHERE — including a well-meaning
- * "let's just commit the stylesheet so CI works" — is caught, not only one left in the cache.
- */
+/** Paths that may never be tracked. */
 const FORBIDDEN_TRACKED_PATTERNS = [
   { pattern: /(^|\/)foundry2(\.min)?\.css$/i, why: "Foundry core stylesheet" },
   { pattern: /(^|\/)fa-[a-z0-9-]+\.(woff2?|ttf|eot|otf)$/i, why: 'Font Awesome Pro webfont' },
@@ -39,19 +22,14 @@ const FORBIDDEN_TRACKED_PATTERNS = [
   { pattern: /(^|\/)(amiri|bruno-ace)[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Foundry-bundled face' },
   { pattern: /^\.foundry-chrome\//, why: 'the harvested chrome cache' },
   // Both harvested client modules, named individually rather than by a directory glob so that
-  // adding a third is a deliberate act. `application.mjs` supplies the window frame and
-  // `dialog.mjs` the DialogV2 frame; both are transcribed into `foundryChromeSpec.js` and neither
-  // may be committed. The `.foundry-chrome/` rule above already covers the cache location — these
-  // catch a copy taken anywhere else in the tree, which is how licensed source usually escapes.
+  // adding a third is a deliberate act.
   { pattern: /(^|\/)client\/applications\/api\/application\.mjs$/, why: 'Foundry client source' },
   { pattern: /(^|\/)client\/applications\/api\/dialog\.mjs$/, why: 'Foundry client source' },
 ];
 
 /**
  * The previous View Lab attempt committed Font Awesome FREE plus OFL Signika under `assets/fonts/`,
- * believing that was the same artifact Foundry serves. It is not: Foundry ships Font Awesome PRO,
- * a different glyph set, so those files would silently render the wrong icons while looking
- * legitimate. They must not come back with a cherry-pick.
+ * believing that was the same artifact Foundry serves.
  */
 const FORBIDDEN_TRACKED_PREFIXES = [
   { prefix: 'assets/fonts/fontawesome/', why: 'Font Awesome is harvested, never vendored' },

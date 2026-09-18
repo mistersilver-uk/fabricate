@@ -12,9 +12,7 @@ import { toAlchemyRecords } from '../helpers/alchemySubmissionRecords.js';
 let compiler;
 let createAlchemyStore;
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 function concreteRecipe(id, name, concrete, resultName = 'Result') {
   const groups = Object.entries(concrete).map(([componentId, quantity]) => ({
@@ -238,9 +236,8 @@ describe('alchemyStore', () => {
   });
 
   it('duplicate/identical learned signatures fail safe to `untried` (issue 774 — engine fizzles)', async () => {
-    // Identical signatures are now rejected at enable time and, if two ever both
-    // match, the engine fizzles (a non-unique maximum). The client mirrors that: it
-    // does NOT promise a `ready` brew by iteration order, it fails safe to `untried`.
+    // Identical signatures are now rejected at enable time and, if two ever both match, the engine
+    // fizzles (a non-unique maximum).
     const listing = baseListing({
       recipes: [
         concreteRecipe('first', 'First Brew', { emberroot: 1 }, 'A'),
@@ -274,8 +271,6 @@ describe('alchemyStore', () => {
   });
 
   // The client prediction MUST name the same recipe the engine brews (issue 774).
-  // We drive the ACTUAL engine matcher and the ACTUAL store over parallel recipe
-  // definitions and assert they agree for every bench in a subset/superset family.
   it('the store prediction agrees with the engine most-specific pick', async () => {
     const componentIds = ['c1', 'c2', 'c3'];
     // Engine side.
@@ -496,9 +491,7 @@ describe('alchemyStore', () => {
     assert.deepEqual(harness.calls.notify, [expected], 'a refused brew is never silent');
   });
 
-  // Issue 1648: a failed CHECK is an outcome, not "no reaction" and not an error. The
-  // versioned stage mints `disposition: 'failed'`; the banner must say the check failed
-  // and claim nothing about what the failure policy spent.
+  // Issue 1648: a failed CHECK is an outcome, not "no reaction" and not an error.
   it('banners a resolved failed check as its own outcome rather than a fizzle', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({

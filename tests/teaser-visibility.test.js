@@ -1,6 +1,4 @@
-/**
- * Tests for teaser mode visibility logic in RecipeVisibilityService
- */
+/** Tests for teaser mode visibility logic in RecipeVisibilityService */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

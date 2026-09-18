@@ -1,12 +1,6 @@
 // The WORLD character-libraries import merge (issue 1308), and the ORDERING that makes copy-mode
-// import work at all.
-//
-// WHY THIS SUITE EXISTS. `CompendiumImporter._persistCharacterLibraries` shipped with no test.
-// Its two siblings — the currency ladder (issue 1278) and the realm library (issue 1282) — are
-// each covered by a merge suite standing over `importerOverSettings`; this one was missed, and the
-// gap is not academic. The merge is deliberately placed BEFORE the system is created, unlike both
-// siblings, and moving it back below `createSystem` turns nothing red today, because every
-// importer test stands over a mock system manager that never normalizes.
+// import work at all. WHY THIS SUITE EXISTS. `CompendiumImporter._persistCharacterLibraries`
+// shipped with no test.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -31,9 +25,7 @@ test('seeds both libraries into a world that has none', async () => {
   assert.deepEqual(settings[KEY].modifiers.map((e) => e.id), ['med']);
 });
 
-// DESTINATION WINS, exactly as the currency and realm merges do. An id already in this world keeps
-// its own definition: that is what makes an import safe to run twice, and what keeps every book,
-// tool, check and drop row that references the id resolving to the rule its author meant.
+// DESTINATION WINS, exactly as the currency and realm merges do.
 test('an id the destination already holds keeps the DESTINATION’s definition', async () => {
   const { importer, settings } = importerOverSettings({
     [KEY]: { characterPrerequisites: [{ ...SMITH, value: 5 }], modifiers: [] },
@@ -57,9 +49,7 @@ test('appends only genuinely new entries, preserving destination order', async (
   assert.deepEqual(settings[KEY].modifiers.map((e) => e.id), ['med', 'alch']);
 });
 
-// THE PER-KEY MERGE, and the reason it cannot be one object-level destination-wins. The two lists
-// share a setting key for persistence economy and share no invariant, so a destination holding
-// only prerequisites must not win the whole slice and silently discard every incoming modifier.
+// THE PER-KEY MERGE, and the reason it cannot be one object-level destination-wins.
 test('merges the two libraries INDEPENDENTLY', async () => {
   const { importer, settings } = importerOverSettings({
     [KEY]: { characterPrerequisites: [SMITH] },
@@ -85,8 +75,7 @@ test('a destination whose setting is absent, empty, or one-list-only all merge c
   }
 });
 
-// No new entries means no write. Without the short-circuit every re-import rewrites the setting,
-// which fires the replication bridge and re-announces an invalidation for a change that is not one.
+// No new entries means no write.
 test('writes NOTHING when the import adds no new entry', async () => {
   const { importer, settings } = importerOverSettings({
     [KEY]: { characterPrerequisites: [SMITH], modifiers: [MED] },
@@ -110,10 +99,6 @@ test('ignores a malformed or absent payload rather than throwing', async () => {
 // THE ORDERING, pinned on the SOURCE because no behavioural fixture can reach it: every importer
 // test stands over a mock system manager that does not normalize, so moving the call below
 // `createSystem` leaves the whole suite green while breaking copy-mode import in production.
-//
-// It matters because `_normalizeSystem` derives its Valid Id Basis from these libraries. A system
-// created while the incoming entries are still only in the payload has every tool prerequisite
-// reference and every `defaultModifierIds` pruned against a basis that cannot yet see them.
 test('the merge is ordered BEFORE the system create/update, unlike currency and travel', () => {
   const source = readFileSync(
     resolve(repoRoot, 'src/systems/CompendiumImporter.js'),
@@ -135,9 +120,7 @@ test('the merge is ordered BEFORE the system create/update, unlike currency and 
   );
 });
 
-// The store caches what it read. `_setSetting` writes the setting directly, so without an explicit
-// reload the manager goes on deriving its basis from the pre-import libraries for the rest of the
-// session — which is the same failure the ordering above prevents, arriving one step later.
+// The store caches what it read.
 test('republishes the store after writing, so the manager’s basis is not stale', () => {
   const source = readFileSync(
     resolve(repoRoot, 'src/systems/CompendiumImporter.js'),

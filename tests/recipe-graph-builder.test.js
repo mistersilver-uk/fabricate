@@ -1,7 +1,4 @@
-/**
- * Tests for recipeGraphBuilder.js (T-057)
- * Uses node:test + node:assert/strict
- */
+/** Tests for recipeGraphBuilder.js (T-057) Uses node:test + node:assert/strict */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -16,9 +13,7 @@ import {
 } from '../src/ui/svelte/util/recipeGraphBuilder.js';
 import { createOperationCounters } from './helpers/scale/scaleProbes.js';
 
-// ---------------------------------------------------------------------------
 // Helper factories
-// ---------------------------------------------------------------------------
 
 function makeRecipe({ id, name = id, category = '', inputComponentIds = [], outputComponentIds = [] } = {}) {
   return {
@@ -51,9 +46,7 @@ function makeRecipeLegacy({ id, name = id, inputComponentIds = [], outputCompone
   };
 }
 
-// ---------------------------------------------------------------------------
 // extractComponentIds tests
-// ---------------------------------------------------------------------------
 
 describe('extractComponentIds', () => {
   it('returns empty sets for recipe with no ingredients or results', () => {
@@ -83,9 +76,7 @@ describe('extractComponentIds', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // buildRecipeGraph tests
-// ---------------------------------------------------------------------------
 
 describe('buildRecipeGraph — construction', () => {
   it('1. Empty recipe list produces empty graph', () => {
@@ -222,9 +213,7 @@ describe('buildRecipeGraph — construction', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // layoutGraph tests
-// ---------------------------------------------------------------------------
 
 describe('layoutGraph — layout', () => {
   it('11. Root nodes (no inputs) are assigned layer 0', () => {
@@ -282,9 +271,7 @@ describe('layoutGraph — layout', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // filterGraph tests
-// ---------------------------------------------------------------------------
 
 describe('filterGraph — filtering', () => {
   function buildTestGraph() {
@@ -336,9 +323,7 @@ describe('filterGraph — filtering', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Deep-chain regression — issue 1082
-// ---------------------------------------------------------------------------
 
 /**
  * A strictly linear producer/consumer chain: recipe `i` consumes `c<i-1>` and produces `c<i>`.
@@ -365,16 +350,7 @@ function makeChainIndex(depth) {
   return createRecipeGraphIndex(makeChain(depth));
 }
 
-/**
- * The chain depth every test below runs at.
- *
- * The recursive `dfs` this replaced threw `RangeError: Maximum call stack size exceeded` at a
- * measured depth of 8,193 on this checkout (bisected in a bare Node 22 process; under a test
- * runner, whose own frames are already on the stack, it fails shallower still). 20,000 is
- * comfortably past that on both, and short of it the assertions below would pass against the
- * ORIGINAL implementation and prove nothing. The parent programme's target scale is a
- * 10,000-recipe corpus, so the overflow depth sat inside supported territory.
- */
+/** The chain depth every test below runs at. */
 const OVERFLOWING_CHAIN_DEPTH = 20_000;
 
 describe('layoutGraph — deep dependency chains (issue 1082)', () => {
@@ -410,9 +386,7 @@ describe('layoutGraph — deep dependency chains (issue 1082)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Retained index + bounded query — issue 1082
-// ---------------------------------------------------------------------------
 
 describe('createRecipeGraphIndex', () => {
   it('22. Indexes producers and consumers by component id', () => {
@@ -448,9 +422,8 @@ describe('createRecipeGraphIndex', () => {
 
 describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
   /**
-   * A hub corpus: `producers` recipes all produce one component and `consumers` recipes all
-   * consume it. Its complete graph has `producers x consumers` edges, which is the explosion
-   * this bound exists to stop.
+   * A hub corpus: `producers` recipes all produce one component and `consumers` recipes all consume
+   * it.
    */
   function makeHub({ producers, consumers }) {
     const recipes = [];
@@ -477,9 +450,8 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
   });
 
   it('26. An unscoped corpus over the bound returns NOTHING and asks for a scope', () => {
-    // The load-bearing decision: no arbitrary 500-recipe slice of an unscoped corpus, because
-    // a GM would read the slice as their system. Silence plus `requiresScope` is honest; a
-    // plausible partial is not.
+    // The load-bearing decision: no arbitrary 500-recipe slice of an unscoped corpus, because a GM
+    // would read the slice as their system.
     const graph = buildBoundedRecipeGraph(makeChainIndex(40), { maxNodes: 10 });
     assert.equal(graph.nodes.length, 0);
     assert.equal(graph.edges.length, 0);
@@ -591,16 +563,12 @@ describe('buildBoundedRecipeGraph — bounds and scopes (issue 1082)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Layout adjacency instrumentation — issue 1082
-// ---------------------------------------------------------------------------
 
 describe('layoutGraph — adjacency instrumentation (issue 1082)', () => {
   it('35. Examines each edge at most once across the whole ordering pass', () => {
-    // The acceptance criterion "layout performs no repeated whole-edge filtering per node",
-    // as a counter rather than a code-review note. The original filtered ALL edges once per
-    // node per layer; on this fixture that was 20 layers x 5 nodes x ~95 edges. The bound
-    // below is violated by any implementation that reintroduces it.
+    // The acceptance criterion "layout performs no repeated whole-edge filtering per node", as a
+    // counter rather than a code-review note.
     const recipes = [];
     for (let layer = 0; layer < 20; layer++) {
       for (let slot = 0; slot < 5; slot++) {

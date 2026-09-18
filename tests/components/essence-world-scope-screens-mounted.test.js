@@ -1,25 +1,4 @@
-/**
- * The two WORLD essence screens, mounted (issue 1372, epic 1357).
- *
- * ── WHAT ONLY A MOUNT CAN ANSWER ──────────────────────────────────────────────────────────────
- * Two questions here are about the rendered DOM and nothing else:
- *
- *  - an essence catalogue renders NO source-item affordance and no `<img>` at all, because an
- *    essence's lifted identity is `name` / `icon` / `colorToken` / `description` and carries no
- *    source link. That is an ABSENCE, and an absence is the assertion most easily satisfied by a
- *    screen that rendered nothing — so it is paired with a positive control on the same shell fed
- *    a COMPONENT scope, which does render the badge and the image;
- *  - the per-system indicator distinguishes THREE states. `enabled: false` keeps the membership
- *    record and its overrides, so "not a member" and "a member that is off" are different
- *    authored states with different repairs. A shell modelled on the component pair cannot say
- *    which of the two a GM is looking at.
- *
- * ── TWO HARNESSES, ONE FIXTURE FACTORY ────────────────────────────────────────────────────────
- * The page and the shell are mounted separately because the positive control has to reach the
- * shell with a scope the PAGE would never pass it. Both take a projection built by
- * `projectWorldScopeEntity` from a corpus this file states outright, so neither is asserting
- * against a hand-written projection that could disagree with the shipped one.
- */
+/** The two WORLD essence screens, mounted (issue 1372, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
@@ -79,9 +58,6 @@ const SHELL_MODULES = [
   // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // THE manager's icon-only push-button (issue 1422). Not mounted directly by anything here:
-  // it arrives through `EntityListInspectorFrame` and through `Pagination`, both of which
-  // converted to it, so it is a TRANSITIVE dependency of the shell rather than a new control
-  // on these screens. Listed before `Pagination.svelte` for that reason.
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
@@ -92,14 +68,10 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
-  // THE manager's on/off switch (issue 1040). Not mounted directly by anything here: it arrives
-  // through `MembershipActions`, which converted to it, so it is a TRANSITIVE dependency of the
-  // shell rather than a new control on these screens. Listed before `MembershipActions.svelte`
-  // for that reason, exactly as `IconButton` is listed before `Pagination`.
+  // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
-  // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, so the essence
-  // trees that render the frame carry it in their static graph too. An omission HANGS the suite.
+  // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373.
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
@@ -120,14 +92,7 @@ const pageHarness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte',
 });
 
-/**
- * The ENTRY editor's own harness (issue 1372, maintainer parity round 4).
- *
- * Separate from the two above because it mounts a different component with a different graph —
- * the identity controls, the drop zones and the player preview — and because the question it
- * answers is one only a mount can: that an edit accumulates LOCALLY and reaches the world-scope
- * write family on Save and not before.
- */
+/** The ENTRY editor's own harness (issue 1372, maintainer parity round 4). */
 const entryHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-essence-entry-',
@@ -187,10 +152,6 @@ const ROSTER = [
 /**
  * An ESSENCE projection with one entity whose three per-system rows are in the three states.
  *
- * `sys-a` holds it and has it ON, `sys-b` holds it and has it OFF, `sys-c` does not hold it. That
- * is the whole three-state vocabulary, in one entry, so the assertion is a SET equality rather
- * than three separate existence checks that would each pass on a screen rendering one state.
- *
  * @returns {object}
  */
 function essenceScope() {
@@ -214,9 +175,6 @@ function essenceScope() {
 
 /**
  * A COMPONENT projection over the SAME shape, for the positive control.
- *
- * Each entry carries an `img` and a source link, which is exactly the pair an essence lacks — so
- * the shell rendering them here is what makes their absence on the essence screen a measurement.
  *
  * @returns {object}
  */
@@ -262,11 +220,6 @@ describe('criterion 4 — the essence catalogue renders NO source-item affordanc
 
     // THE POSITIVE HALF FIRST, so the two negatives below are known to be measured over a screen
     // that actually rendered rows.
-    // MEASURED ON THE MEDALLION THE ROW ACTUALLY RENDERS, not on a second hook beside it. The
-    // catalogue used to draw its own tinted glyph in the meta run purely to carry this assertion,
-    // which put two identity glyphs on every row where the prototype has one. `Medallion`
-    // publishes `data-medallion="glyph"` exactly when it fell back from an image, so this is the
-    // same claim measured one element closer to the GM.
     const glyphs = root.querySelectorAll('[data-scoped-list-row] [data-medallion="glyph"]');
     assert.equal(glyphs.length, 2, 'both world essences render their own identity glyph');
     assert.ok(glyphs[0].querySelector('i'), 'and the glyph is a Font Awesome class, not a path');
@@ -310,12 +263,6 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
     // spent on six identical circles whose system and state were reachable only by hovering one
     // of them. The three states are now stated on the inspector's system rows, each of which links
     // to that system's own Essence Rules screen, where the controls that change them live.
-    //
-    // So the cells are read from the inspector, which means the row has to be SELECTED first —
-    // and that is also why the View Lab case for this screen now clicks a row before capturing.
-    // SELECTED BY CLICKING THE ROW, not by a prop: the page owns `selectedId` internally and
-    // binds it into the shell, so a prop of that name on the page is not read at all and a test
-    // that passed one would silently measure the resting inspector.
     const root = await pageHarness.mount(pageProps());
     root.querySelector('[data-scoped-list-inspect="ash"]').click();
     flushSync();
@@ -342,8 +289,7 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
     assert.equal(bySystem.get('sys-b'), 'disabled');
     assert.equal(bySystem.get('sys-c'), 'absent');
 
-    // NON-VACUITY, and the deletion half: the ROW must no longer carry a pip strip, or this case
-    // would go on passing over a screen that draws both.
+    // NON-VACUITY, and the deletion half: the ROW must no longer carry a pip strip.
     const row = root.querySelector('[data-scoped-list-row="ash"]');
     assert.ok(row, 'the fixture entity still has a row');
     assert.equal(
@@ -401,15 +347,6 @@ describe('the catalogue owns no create affordance; the page header does', () => 
     // title line (`essences.png`). This page shipped a full-width band above the list carrying a
     // `New essence name` label, a text input and the button — about 60px of chrome that read as a
     // form a GM had to fill in before anything else on the screen was available.
-    //
-    // The header band is rendered by `CraftingSystemManagerRoot.svelte`, which no page can reach,
-    // so the affordance moved there and nothing about it is left here. Its evidence moved with
-    // it: `essence-world-scope-screens.test.js` asserts the header branch, the handler's two
-    // delegations and the bounded import, and unit-tests `mintEssenceId`'s slug and its
-    // suffix collision resolution directly.
-    //
-    // THIS CASE IS THE DELETION HALF. Without it the old band could be reintroduced beside the
-    // header button and every other assertion in this file would stay green.
     const root = await pageHarness.mount(pageProps({ actions: { createEntity: () => {} } }));
     assert.equal(
       root.querySelectorAll('[data-scoped-essence-new-name]').length,
@@ -421,8 +358,7 @@ describe('the catalogue owns no create affordance; the page header does', () => 
       0,
       'and so is the button beside it'
     );
-    // NON-VACUITY: the page did mount and did render its list, so the two zeroes above are
-    // measurements rather than the result of an empty tree.
+    // NON-VACUITY: the page did mount and did render its list.
     assert.ok(
       root.querySelector('[data-scoped-list-row]'),
       'the page rendered its list, so the absences above are measured against a real screen'
@@ -432,18 +368,6 @@ describe('the catalogue owns no create affordance; the page header does', () => 
 });
 
 // ── THE ENTRY EDITOR BUFFERS ITS EDIT (issue 1372, maintainer parity round 4) ────────────────
-//
-// The prototype heads this screen with `Save essence` (`essEntry.png`) and this shipped with no
-// save action at all, because `patchIdentity` wrote through on change. The screen buffers now, so
-// three things are true that a source read cannot answer and a spy would answer dishonestly:
-//
-//  - an edit reaches NOTHING until Save. Asserted as "the write family was not called", against a
-//    recording family, which is the only place a spy is the subject rather than a substitute;
-//  - the edit RENDERS. An editor that buffers an edit it does not show is worse than one that
-//    writes through, and the control the GM acted on is the wrong place to read that: an `<input>`
-//    holds whatever was typed into it whether or not the draft took it. So the proof is a DERIVED
-//    readout — the world-default card's own `set`/`unset` state, computed from the draft;
-//  - Save flushes exactly the difference, and discard puts the screen back.
 
 describe('the world essence entry editor buffers its edit until Save', () => {
   /** A recording world-scope essence action family. */
@@ -462,12 +386,7 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     };
   }
 
-  /**
-   * Mount the entry editor on `ash`, which carries a world `effectSource` in `essenceScope()`.
-   *
-   * The handle and the reported dirty flag are captured exactly as the manager shell captures
-   * them, so what the assertions read is what the header button and the route-exit guard read.
-   */
+  /** Mount the entry editor on `ash`, which carries a world `effectSource` in `essenceScope()`. */
   async function mountEntry() {
     const actions = recordingActions();
     const reported = { handle: null, dirty: [] };
@@ -560,22 +479,12 @@ describe('the world essence entry editor buffers its edit until Save', () => {
 
     reported.handle.discard();
     await entryHarness.setProps({});
-    // The input is the one control whose value the test set itself, so this is a real read: Svelte
-    // writes the reverted draft value back over it, and a discard that only cleared a flag would
-    // leave `Aether` standing in the field.
+    // The input is the one control whose value the test set itself, so this is a real read.
     assert.equal(root.querySelector('[data-scoped-entry-name]').value, 'Ash');
     assert.equal(reported.handle.isDirty(), false);
   });
 
-  // ── A FOUNDRY-REFUSED WRITE REJECTS, AND THIS SCREEN NOW SAYS SO (issue 1371 r20-entry3,
-  // Foundry review round 6 finding 4) ──────────────────────────────────────────────────────────
-  // `Save essence` stages a MULTI-SECTION sequence off `scope.sections`, and a world-setting write
-  // that Foundry's socket layer refuses posts its own raw `error.message` and then REJECTS. r19
-  // caught the rejection here — the route-exit guard declines the exit rather than rejecting — but
-  // passed no `onRefused`, so a rejection at write *k* left `1..k-1` landed DURABLY with the GM
-  // told only Foundry's sentence, which cannot say which step stopped or which had landed. And the
-  // store publishes its cache before awaiting the write, so every open manager surface shows all of
-  // them as saved until a reload.
+  // ── A FOUNDRY-REFUSED WRITE REJECTS.
   it('a REJECTING section write answers false and names the step that stopped and the one that had landed', async () => {
     const notified = [];
     const previousUi = globalThis.ui;
@@ -603,8 +512,7 @@ describe('the world essence entry editor buffers its edit until Save', () => {
       });
       assert.ok(reported.handle, 'the editor reported no draft handle, so nothing below is measured');
 
-      // The IDENTITY patch lands first and the sections after it, so staging both is what puts a
-      // landed write behind the refused one.
+      // The IDENTITY patch lands first and the sections after it.
       const name = root.querySelector('[data-scoped-entry-name]');
       name.value = 'Aether';
       name.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
@@ -642,16 +550,6 @@ describe('the world essence entry editor buffers its edit until Save', () => {
 });
 
 // ── AN ESSENCE ROW MAY NOT BORROW THE COMPONENT'S CASCADE (issue 1371 r10, r9-cat finding 5b) ──
-//
-// `MembershipActions` is shared by all three scoped entity types, and revision 9 disclosed the
-// COMPONENT removal cascade on the shared `Scoped.Membership.RemoveConsequence` key. That made
-// this screen's Remove announce a repair `partEssenceFromSystem` does not perform: it filters
-// `essenceDefinitions` and writes, with no reference repair and no recipe disable anywhere in it.
-//
-// PINNED HERE, ON THE SCREEN, rather than only on the copy. The component half of the same rule
-// is pinned in `world-component-entry-mounted.test.js` and the descriptor split itself in
-// `scoped-entity-patterns-mounted.test.js`; what only this mount can answer is that the ESSENCE
-// entry — the shared cluster's own caller — renders the honest sentence after the split.
 
 describe('the essence entry row states what an essence removal actually does', () => {
   afterEach(() => entryHarness.remount());
@@ -663,9 +561,7 @@ describe('the essence entry row states what an essence removal actually does', (
       entityId: 'ash',
       onBackToCatalogue: () => {},
     });
-    // `ash` holds a record in `sys-a`, so that row renders the member branch and its armed
-    // Remove. The POSITIVE half first: a `doesNotMatch` over a row that never rendered is the
-    // vacuous shape this file's header refuses.
+    // `ash` holds a record in `sys-a`.
     const remove = root
       .querySelector('[data-scoped-entry-system="sys-a"]')
       ?.querySelector('[data-arm-token]');

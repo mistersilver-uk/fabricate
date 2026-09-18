@@ -266,9 +266,6 @@ describe('adminStore travel section', () => {
     });
     assert.equal(state.actorOptions.length, 2);
     // Issue 1024: the projected `isPlayerCharacter` flag must SURVIVE `_clonePlain`.
-    // That clone is the seam where a projected field goes missing without a word, and
-    // the party member picker filters on this flag with a strict `=== true`, so a
-    // dropped field silently empties the picker rather than erroring.
     assert.deepEqual(
       state.actorOptions.map((actor) => [actor.uuid, actor.isPlayerCharacter]),
       [['Actor.a', true], ['Actor.n', false]]
@@ -400,10 +397,8 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
-  // The party store emits ONE composite uniqueness message for both member and
-  // travel-actor conflicts: `Actor "<uuid>" is associated with more than one
-  // enabled party`. The adminStore therefore routes the duplicate-actor error by
-  // operation context (which mutator was invoked), not by message text.
+  // The party store emits ONE composite uniqueness message for both member and travel-actor
+  // conflicts: `Actor "<uuid>" is associated with more than one enabled party`.
   it('routes the composite uniqueness error to the travelActor field when setPartyTravelActor fails', async () => {
     const { services } = createServices({
       parties: [
@@ -557,12 +552,9 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
-  // `ApplicationV2` assigns the window title through `innerText`, so an already-escaped
-  // string surfaces its entity literally: a party named `Dragon's Lair` would open a
-  // window titled `Delete Dragon&#39;s Lair?` (issue 1154 review). The name must be RAW in
-  // the title and escaped only in the HTML content. Localize is forced to fall through to
-  // the hardcoded English template for just these two keys so the raw name reaches the
-  // fallback string this assertion is pinning.
+  // `ApplicationV2` assigns the window title through `innerText`, so an already-escaped string
+  // surfaces its entity literally: a party named `Dragon's Lair` would open a window titled `Delete
+  // Dragon&#39;s Lair?` (issue 1154 review).
   it('deleteParty puts a raw, unescaped party name in the confirm title', async () => {
     const { services, confirmCalls } = createServices({
       parties: [{ id: 'p1', name: "Dragon's Lair", enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverride: { mode: 'none', realmIds: [] } }]
@@ -622,8 +614,7 @@ describe('adminStore travel section', () => {
   });
 
   // Participation is a CRAFTING SYSTEM flag since issue 1282, so this writes the system through
-  // `updateSystem` — never the world travel config, which carries no `enabled` at all. A version
-  // of this routed through the realm store would leave the toggle permanently false.
+  // `updateSystem` — never the world travel config, which carries no `enabled` at all.
   it('setGatheringRealmsEnabled writes the participation flag onto the crafting system', async () => {
     const { services, calls, system } = createServices();
     const store = createAdminStore(services);

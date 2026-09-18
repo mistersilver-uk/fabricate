@@ -1,14 +1,6 @@
 /**
- * View Lab mount entry.
- *
- * Vite serves this module into `index.html`. It builds a real Foundry V13 application frame (see
- * `foundryFrame.js`), boots the real Fabricate runtime against a fixture world (see
- * `world/labWorld.js`), and mounts the real app root inside the frame's `.window-content`. The
- * captured PNG is therefore a whole application window, drawn by the same code and the same
- * cascade production uses.
- *
- * The page signals completion with `data-view-lab-ready` / `data-view-lab-error` on `<body>`; the
- * driver waits on those and never on a timer.
+ * View Lab mount entry. The page signals completion with `data-view-lab-ready` /
+ * `data-view-lab-error` on `<body>`; the driver waits on those and never on a timer.
  */
 import { flushSync, mount } from 'svelte';
 
@@ -67,13 +59,7 @@ function applyLongDowntimeLocalization(world) {
     );
 }
 
-/**
- * Kill animations, transitions, the caret, and smooth scrolling document-wide.
- *
- * Document-wide and unlayered on purpose: the chrome has transitions of its own
- * (`.application.minimizing`, `.controls-dropdown`, the `--ui-fade-*` variables), and the first
- * View Lab attempt scoped its kill-switch inside the mount root, which missed all of them.
- */
+/** Kill animations, transitions, the caret, and smooth scrolling document-wide. */
 function installDeterminismStyles() {
   const style = document.createElement('style');
   style.dataset.viewLab = 'determinism';
@@ -118,79 +104,32 @@ function readParams() {
     caseId: params.get('case') ?? null,
     tab: params.get('tab') ?? null,
     // DARK by default, because that is what the smoke renders and the smoke is the fidelity
-    // authority. Foundry's configureUI prefers the world's core.uiConfig.colorScheme.applications
-    // over the browser's prefers-color-scheme, so reasoning from Playwright's default (light) gets
-    // this wrong - as an earlier version of this file did. It matters more than it sounds, though
-    // not for the reason this comment used to give: Fabricate's own surfaces are theme-invariant
-    // (see the coverage-theme-light-* pair and its comment in scripts/lib/viewLabCases.js), so a
-    // wrong default does not recolour the surfaces a Fabricate root covers - what it does do is
-    // quietly repaint the Foundry window CHROME of every published frame away from what the smoke
-    // renders. That comment also lists what theme-invariance does NOT cover, so read it before
-    // treating a light frame as evidence that nothing leaks.
+    // authority.
     colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',
-    // Which crafting system the manager opens on. A seeded setting rather than a click, because
-    // three manager surfaces exist only for a system in the right visibility mode - clicking to
-    // them is impossible when the rail entry is not rendered at all.
+    // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
     journalCaseState: params.get('journalCaseState') ?? null,
-    // TWO things, and the name says only the second: a world seeded with NO crafting systems,
-    // and the persisted selection cleared through the real admin store after construction. Both
-    // halves are needed, because a Manager refresh resolves an empty selection back to the first
-    // available system — so only an empty LIBRARY makes 'nothing selected' stable. `buildLabWorld`
-    // is where the first half happens (`content.systems = []`), and clearing through the store
-    // rather than by seeding reaches the second without weakening production's
-    // persisted-selection normalization.
-    //
-    // So this IS the lab's suppress-the-seeded-systems input, as well as its clear-the-selection
-    // one: `manager-world-parties-no-selection` photographs the second half and
-    // `manager-systems-empty` the first. Before adding a param that means the same thing, note
-    // what it would cost — a new param here sits outside every marked region below, so a change
-    // to this file would select surface coverage rather than the frames it moved.
+    // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
+    // the persisted selection cleared through the real admin store after construction.
     clearSystem: params.get('clearSystem') === '1',
-    // Seed an EMPTY party list, for the World > Parties empty state. It takes no
-    // post-construction store call the way `clearSystem` does: the pane's empty state is a
-    // function of the persisted `gatheringParties` setting, so the fixture seeds `[]` and
-    // the real store reads it exactly as it reads a populated one.
+    // Seed an EMPTY party list, for the World > Parties empty state.
     noParties: params.get('noParties') === '1',
-    // Build a world with NO Tools at all, for the world Tools Catalogue's empty state. It takes
-    // more than an empty `toolScope` setting: the lab runs every migration on every build and the
-    // world-scope pass LIFTS each crafting system's own tools into world records, so the systems'
-    // libraries have to go with the corpus. `stripTools` in `labWorld.js` owns that and says why.
+    // Build a world with NO Tools at all, for the world Tools Catalogue's empty state.
     noTools: params.get('noTools') === '1',
-    // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty
-    // and — with `clearSystem` beside it — its component catalogue is too (issue 1540). It is a
-    // SECOND flag rather than a widening of `clearSystem` because the corpus has two independent
-    // sources: the migration lifts one world record per crafting system component, which
-    // `clearSystem` already removes, and the fixture authors one world-only record that no
-    // deletion of systems can reach. `stripAuthoredWorldComponents` in `labWorld.js` owns that
-    // and says why folding the two together would state something false.
+    // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty and
+    // — with `clearSystem` beside it — its component catalogue is too (issue 1540).
     noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
     // Grow the world's non-GM roster to eight, for the two Access frames whose subject is the
-    // Players roster's own pager and its no-match line (issue 1515). It is a SHIM call rather
-    // than a `buildLabWorld` argument, because the roster is `game.users` and nothing in the
-    // world fixture owns it; `installFoundryShim.js` holds the table and says why it is seven
-    // added rather than any other number.
-    //
-    // A SEPARATE FLAG rather than a widening of anything above, for the reason `clearSystem`
-    // records about itself: every other frame in the corpus is photographed against the
-    // two-seat table a resting lab world has, and a roster that grew for all of them would
-    // repaint the Knowledge roster and the recipe editor's context rail without saying so.
-    //
-    // Its COST is stated rather than discovered. Like every param here it sits outside the
-    // marked regions below, so a hunk touching it selects surface coverage rather than the two
-    // frames it moved — and the shim it calls is an unattributed lab input, which resolves the
-    // same way, so narrowing this one line would buy nothing while the other half of the change
-    // is in the same commit.
+    // Players roster's own pager and its no-match line (issue 1515).
     manyPlayers: params.get('manyPlayers') === '1',
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
     longDowntimeLabels: params.get('longDowntimeLabels') === '1',
-    // Register a stand-in companion World-nav provider before the manager mounts, so the
-    // frames can photograph the PREMIUM-INSTALLED chrome: the title bar's gold badge and the
-    // rail's muted Downtime chip. Nothing shipped changes — the provider lives here, and the
-    // registry it registers with is the production one the manager app hands to the root.
+    // Register a stand-in companion World-nav provider before the manager mounts, so the frames can
+    // photograph the PREMIUM-INSTALLED chrome: the title bar's gold badge and the rail's muted
+    // Downtime chip.
     downtimeProvider: params.get('downtimeProvider') === '1',
     // view-lab-region:player-extension-params
     // Register a stand-in companion PLAYER navigation provider before the player app mounts, so
@@ -204,9 +143,7 @@ function readParams() {
     playerProvider: params.get('playerProvider') === '1',
     // Make that provider's mount throw, for Core's own fault state.
     playerProviderFault: params.get('playerProviderFault') === '1',
-    // Evidence-only label stress for the rail's truncation rule. A provider's `label` is FINAL
-    // display text rendered verbatim, so the stress belongs on the provider rather than on the
-    // localizer Core's own five tab labels read.
+    // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
     // view-lab-region:end
     // view-lab-region:canvas-mount-params
@@ -237,30 +174,18 @@ function readParams() {
         : null,
     chromeOnly: params.get('chromeOnly') === '1',
     // Who is looking. Defaults below to the viewer each window is normally used by — player for the
-    // player app, GM for the manager — because that is what every existing case assumes. A case
-    // OVERRIDES it only when the difference between the two viewers IS the thing photographed: a
-    // GM opening the player app is an ordinary state (they own the same tabs), and issue 901's
-    // Journal redaction has no frame at all unless both halves can be captured.
+    // player app, GM for the manager — because that is what every existing case assumes (issue
+    // 901).
     viewer: VIEWER_ROLES.has(params.get('viewer')) ? params.get('viewer') : null,
     // How the lab answers a Foundry DialogV2: `open` to leave it standing for the screenshot,
     // `enter` (the default) to press whichever button Foundry marks default, or a button action by
-    // name. A case that wants a dialog IN FRAME must ask for `dialog=open` — see `foundryDialog.js`
-    // for why leaving every dialog open by default silently rewrote a shipped frame.
+    // name.
     dialog: params.get('dialog') ?? DEFAULT_LAB_DIALOG_ANSWER,
   };
 }
 
 /**
  * Build a stand-in application instance without constructing one.
- *
- * `Object.create(AppClass.prototype)` gives an object that HAS every method the class defines —
- * `_buildServices`, `_prepareSvelteProps`, and the dozens of private helpers those call — while
- * skipping the constructor, which would drag in the ApplicationV2 machinery the lab has no use for.
- *
- * The alternative, hand-listing the methods a props build happens to touch, is how the seam layer
- * drifts: it works until someone adds a call, and then it fails with a `not a function` that looks
- * like a lab bug rather than a missing stub. Borrowing the whole prototype means the lab renders
- * from production's real service bag, so there is nothing to keep in sync.
  *
  * @param {Function} AppClass The application class (never constructed).
  * @param {object} fields Instance fields the borrowed methods read off `this`.
@@ -271,24 +196,11 @@ function borrowInstance(AppClass, fields) {
 }
 
 // view-lab-region:lab-player-provider
-/**
- * The exact report Core makes when it contains a player companion's mount fault.
- *
- * Written once and matched by PREFIX, because the shipped host appends the thrown error. See
- * `mountPlayerApp` for why the fault frame swallows this one message and nothing else.
- */
+/** The exact report Core makes when it contains a player companion's mount fault. */
 const EXPECTED_PLAYER_FAULT_REPORT = 'Fabricate | Player extension mount failed:';
 
 /**
  * A stand-in companion PLAYER navigation provider, for the companion-surface frames.
- *
- * It declares its OWN tab ids on purpose, and never a copy of Core's five: the seam's whole
- * claim is that a provider tab id can never collide with a Core one, so a lab provider that
- * borrowed `crafting` or `journal` would photograph the one case that proves least.
- *
- * `label` is final display text — Core renders a provider's label verbatim and localizes only
- * its own — so the long-label variant stresses the rail's truncation rule from here rather
- * than through the localizer.
  *
  * @param {object} [options] Which variant to build.
  * @param {boolean} [options.fault] Throw from `mount`, for Core's fault state.
@@ -352,17 +264,7 @@ async function mountPlayerApp(content, params) {
   ]);
 
   // Core CONTAINS a companion mount fault by REPORTING it, so the fault frame's own subject
-  // produces a `console.error` — and the capture driver fails any frame that logs one. The
-  // narrowest honest answer is here rather than in that gate: this page swallows exactly the one
-  // message the frame is evidence FOR, only when a case asked for a fault, and forwards every
-  // other report untouched, so any second or unrelated error still fails the render. Widening the
-  // driver's gate instead would relax it for every frame in the corpus — and editing the driver
-  // at all would select every frame in the corpus for capture, which is the cost this file's own
-  // region attribution exists to avoid.
-  //
-  // Nothing here stands in for the assertion: the case's `expectSelector` names Core's fault
-  // stamp, which is rendered only from the shell's faulted-provider branch, so a frame whose
-  // fault never fired fails the capture rather than publishing a healthy panel under its name.
+  // produces a `console.error` — and the capture driver fails any frame that logs one.
   if (params.playerProviderFault) {
     const reportedError = console.error.bind(console);
     console.error = (...args) => {
@@ -371,10 +273,8 @@ async function mountPlayerApp(content, params) {
     };
   }
 
-  // Registered BEFORE the props bag is built, because the snapshot below is derived once and
-  // this borrowed instance has no subscription to refresh it. The registry is the production
-  // page-session singleton — the same module instance `SvelteFabricateApp` imports — so this is
-  // the real registration path and not a lab-shaped imitation of one.
+  // Registered BEFORE the props bag is built, because the snapshot below is derived once and this
+  // borrowed instance has no subscription to refresh it.
   if (params.playerProvider) {
     playerExtensions.publicApi.registerPlayerNavProvider(
       labPlayerProvider({ fault: params.playerProviderFault, longLabels: params.longPlayerLabels })
@@ -406,16 +306,7 @@ async function mountPlayerApp(content, params) {
     scopedEnvironmentId: null,
     scopedTaskId: null,
     scopedActorId: null,
-    // DERIVED, and not `playerExtensions` alone. The player window's single subscriber is the
-    // APPLICATION (`SvelteFabricateApp._prepareSvelteProps` seeds this and `_registerHooks`
-    // refreshes it), and this file borrows the instance from the prototype and hand-writes the
-    // props bag — so nothing here runs `_registerHooks()` and nothing else would compute the
-    // snapshot. Handing over the registry and expecting the shell to derive its own would render
-    // an empty rail, because the shell subscribes to nothing by design. `deriveExtensionSurfaces`
-    // is the one function production calls too, so the lab cannot drift from it.
-    // The gate the production host reads off `fabricate.experimentalFeatures` is stated from the
-    // same lab param that seeds that setting into the lab world, so a `?experimental=0` frame
-    // photographs the withheld surface rather than a world whose setting and rail disagree.
+    // DERIVED, and not `playerExtensions` alone.
     extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {
       experimentalFeaturesEnabled: params.experimental,
     }),
@@ -475,17 +366,11 @@ function installJournalCaseServiceSeam(services, state) {
 /**
  * A stand-in companion Downtime provider, for the premium-installed frames.
  *
- * It declares its OWN tab ids on purpose: Core must give an arbitrary tab set exactly the
- * treatment it gives its own four, so a lab provider that copied Core's ids would photograph
- * the one case that proves least.
- *
  * @returns {object} An API-v1 World navigation provider.
  */
 function labDowntimeProvider() {
-  // NAMED ONCE, then used twice: as the provider's tab set, and as the source the
-  // cross-navigation control below reads its destination's real label out of (issue 1332). A
-  // second literal for that label would be a mirror inside one function, and the frame it
-  // captions is published as evidence.
+  // NAMED ONCE, then used twice: as the provider's tab set, and as the source the cross-navigation
+  // control below reads its destination's real label out of (issue 1332).
   const tabs = [
     {
       id: 'ledger',
@@ -524,14 +409,8 @@ function labDowntimeProvider() {
     apiVersion: 1,
     id: 'downtime',
     tabs,
-    // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is
-    // about and the frame has to be able to show it. The old stand-in mounted a short padded
-    // div, which renders identically in a 689px target and a 528px one — so the frame could
-    // not distinguish the panel handing over its whole height from the panel not doing so.
-    //
-    // Full height, its own inset, a VISIBLE EDGE and its own scroller between a pinned header
-    // and a pinned footer: the footer sitting on the bottom edge is the part that is only
-    // reachable when the target really is the pane's whole content box.
+    // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is about
+    // and the frame has to be able to show it.
     mount({ target: mountTarget, tabId, context }) {
       const doc = mountTarget.ownerDocument;
       const element = (tag, cssText, textContent) => {
@@ -542,12 +421,6 @@ function labDowntimeProvider() {
       };
 
       // THE DRILL-DOWN, and the only reason this stand-in has an interactive control at all.
-      // A companion that owns its layout was already photographable; a companion driving
-      // CORE'S header was not, and a frame of the resting list screen cannot distinguish a
-      // seam that carries runtime chrome from one that does not. So the lab reaches the state:
-      // pressing this restates the whole route chrome — artwork, title, subtitle, leaf crumb,
-      // the staged-changes chip and Core's own ghost/danger/primary trio — with no remount,
-      // and registers the re-activation handler that pops back out of it.
       const openEditor = element(
         'button',
         'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
@@ -589,10 +462,7 @@ function labDowntimeProvider() {
             },
             {
               // NOT `closeEditor`. The case asserts this control accepts a real click, and the
-              // harness does that by clicking it and then re-reading the element it clicked. A
-              // handler that tears down the chrome takes the button with it, so the re-read
-              // waits for a locator that will never resolve again. Saving should not pop the
-              // route anyway -- only Back does.
+              // harness does that by clicking it and then re-reading the element it clicked.
               id: 'lab-save',
               label: 'Save crew member',
               tone: 'primary',
@@ -606,13 +476,9 @@ function labDowntimeProvider() {
         context?.onRouteReselect?.(closeEditor);
       });
 
-      // Item 2 (issue 1332): A COMPANION SENDING THE GM TO ANOTHER OF ITS OWN TABS, which is
-      // the control the seam was widened for — a setting shown where the GM feels its effect,
-      // with a way to reach the screen where it is changed. Until Core published
-      // `navigateToTab` a companion could NAME another of its screens and not reach it, so this
-      // button was either absent or dead, and no frame could tell those two apart from a
-      // working one. Pressing it moves the panel AND the rail's current sub-item with no rail
-      // click, which is a claim about behaviour a photograph can carry.
+      // Item 2 (issue 1332): A COMPANION SENDING THE GM TO ANOTHER OF ITS OWN TABS, which is the
+      // control the seam was widened for — a setting shown where the GM feels its effect, with a
+      // way to reach the screen where it is changed.
       const destination = nextTab(tabId);
       const crossLink = element(
         'button',
@@ -633,16 +499,7 @@ function labDowntimeProvider() {
           'padding:16px;border:2px dashed var(--fab-accent);border-radius:12px;' +
           'background:var(--fab-bg-2)'
       );
-      // THE BANNER, AND IT IS FOR THE PHOTOGRAPH RATHER THAN FOR THE TEST (issue 1324). Every
-      // frame that registers this provider is published to a PR body on a PUBLIC repository, and
-      // a reader has nothing but the picture. A stand-in whose tabs look like a product's reads
-      // as a feature -- and to a reader who KNOWS those tabs are in neither the free module nor
-      // Premium it reads as a feature that leaked, which is the question this banner exists to
-      // answer before it is asked.
-      //
-      // In the PANEL rather than only in the rail, because the panel is the largest thing in the
-      // frame and the one a reader looks at. The rail's labels say it too; this says it where
-      // the eye already is.
+      // THE BANNER, AND IT IS FOR THE PHOTOGRAPH RATHER THAN FOR THE TEST (issue 1324).
       const banner = element(
         'div',
         'flex:0 0 auto;padding:8px 12px;border:1px solid var(--fab-warning);border-radius:8px;' +
@@ -688,22 +545,8 @@ function labDowntimeProvider() {
 
 // view-lab-region:mount-canvas-app
 /**
- * The three GM canvas windows, each keyed by its own {@link APP_CHROME} id.
- *
- * A TABLE plus one mount function rather than three near-identical mount functions. All three
- * applications expose the SAME seam `mountManagerApp` uses — `_prepareSvelteProps()` returning
- * `{ services }` off a lazily-built `_services` — so three copies would differ only in two import
- * specifiers each, which is a duplicated block wearing three names (and one the new-code
- * duplication gate would fail).
- *
- * `load` is a pair of literal dynamic imports rather than an interpolated path because Vite
- * resolves the lab's module graph statically: a computed specifier yields a runtime 404 in the
- * browser, not a build error here.
- *
- * `ref` is the one thing this table has that `mountManagerApp` has no analogue for. The config
- * panel is opened AGAINST a behaviour — production constructs it with `{ ref }` and stores
- * `this._ref` — so the lab must supply that instance field or `_resolveBehavior` answers null and
- * the window renders its own "no behaviour" body as if it were the screen.
+ * The three GM canvas windows, each keyed by its own {@link APP_CHROME} id. `ref` is the one thing
+ * this table has that `mountManagerApp` has no analogue for.
  */
 const CANVAS_APP_MOUNTS = Object.freeze({
   'fabricate-interactable-browser': Object.freeze({
@@ -794,13 +637,7 @@ async function mountManagerApp(content, params) {
 }
 
 /**
- * The mount path for the window a case names.
- *
- * A three-way choice rather than the player/manager ternary it replaced (issue 1520): the lab now
- * draws five windows, and a binary would have sent every canvas case down the Manager's mount.
- * That failure is silent in the worst way — `borrowInstance` would build a Manager stand-in and
- * `mount` would render the Manager root into a 420px frame — so the fall-through THROWS rather
- * than defaulting.
+ * The mount path for the window a case names (issue 1520).
  *
  * @param {HTMLElement} content The frame's `.window-content`.
  * @param {object} params The parsed query params.
@@ -814,16 +651,8 @@ async function mountAppFor(content, params) {
 }
 
 /**
- * Wait until the window has stopped changing.
- *
- * Real stores do real asynchronous loads, so "rendered" is not a moment the mount call knows about.
- * The gate is: let microtasks and Svelte effects settle, then require the DOM to be quiet for a
- * short window, then let two frames paint. A timeout throws with the case named rather than hanging.
- *
- * Takes a LIST of roots because a Foundry `DialogV2` is a sibling of the application window, not a
- * child of it (`_insertElement` appends to `document.body`) — so a dialog opened by a step is
- * outside the frame's subtree and would otherwise be neither observed nor image-decoded before the
- * capture, even though it lands on top of the frame in the photograph.
+ * Wait until the window has stopped changing. Real stores do real asynchronous loads, so "rendered"
+ * is not a moment the mount call knows about.
  *
  * @param {HTMLElement[]} roots Subtrees to watch.
  * @param {object|null} [services] Player service bag, whose stores are waited on.
@@ -900,22 +729,11 @@ async function settle(roots, services = null) {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }
 
-/**
- * The faces the chrome paints with, matched by PATTERN rather than by name.
- *
- * Foundry 14 moved Font Awesome from Pro 6 to Pro 7, which renames the CSS family from
- * `Font Awesome 6 Pro` to `Font Awesome 7 Pro`. Nothing would have noticed: the stylesheet still
- * returns 200, `document.fonts.ready` still resolves, and every `.fa-solid` element simply falls
- * back to the default sans-serif — so the icons vanish and a blank-iconed PNG publishes as
- * authoritative evidence. `await document.fonts.ready` is not a check; it resolves happily when
- * zero faces loaded. So the family is discovered from the registered `@font-face` set (which keeps
- * this from needing an edit on the next Font Awesome major) and then actually loaded.
- */
+/** The faces the chrome paints with, matched by PATTERN rather than by name. */
 const REQUIRED_CHROME_FACES = [
   {
     // Foundry ships Pro; the header controls, the resize grip and every Fabricate icon are drawn
-    // with it. V14's stylesheet also declares `Font Awesome 5 Pro` as a back-compat alias, and
-    // either resolving proves the webfonts harvested.
+    // with it.
     family: /^Font Awesome \d+ Pro$/,
     probes: ['900 1em', '400 1em'],
     what: 'Font Awesome Pro — every icon in the chrome and in Fabricate',
@@ -937,12 +755,8 @@ const REQUIRED_CHROME_FACES = [
 /**
  * Fail the render when a face the chrome depends on did not load.
  *
- * Runs for chrome-only baselines too: the empty frame is precisely where a missing face is most
- * visible and least excusable.
- *
- * @returns {Promise<void>}
  * @throws {Error} Naming every missing family and probe, because "fonts did not load" is not
- *   actionable and this is the one V14 breakage that is otherwise silent.
+ * actionable and this is the one V14 breakage that is otherwise silent.
  */
 async function assertChromeFontsLoaded() {
   await document.fonts.ready;
@@ -981,14 +795,7 @@ async function assertChromeFontsLoaded() {
 /**
  * Measure content widths that can be compared with the same render minus lab styles.
  *
- * The determinism styles above are the lab's own, and they are the one thing in the page that
- * production does not have — so when one of them changes layout, the frame lies and nothing else
- * would notice. `scrollbar-gutter: stable` on every `.window-content` descendant did exactly that
- * for months: it reserves gutter space on any scroll container, `overflow: hidden` makes one, and
- * so every clipping element rendered ~10px narrower than its own box.
- *
  * @param {HTMLElement} frame The application frame.
- * @returns {Array<{element: Element, boxWidth: number, clientWidth: number}>} Measurements.
  */
 function measureContentWidths(frame) {
   return [...frame.querySelectorAll('*')].flatMap((element) => {
@@ -1116,9 +923,7 @@ async function boot() {
     frame: built.frame,
     journalCaseEvents: world?.fabricate?.journalCaseFixtureEvents ?? [],
     // The dialogs standing in the page, so a case can assert one opened and the driver can settle
-    // it. `frame.screenshot()` clips the PAGE to the frame's box rather than rendering the frame in
-    // isolation, so a dialog centred in the viewport lands on top of the window in the capture —
-    // which is where Foundry puts it.
+    // it.
     dialogs: () => (world ? world.shim.openDialogs() : []),
     settle: () => settle(labSettleRoots(built.frame, world), mounted?.services ?? null),
   };

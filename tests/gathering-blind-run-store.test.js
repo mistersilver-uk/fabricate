@@ -1,14 +1,4 @@
-/**
- * Issue 901 — the world-scoped blind-run store and its GM relay.
- *
- * Two properties matter here and neither is confidentiality (Foundry has no
- * server-side read authorization, so any client can READ a world setting):
- *
- *   - only a GM may WRITE, so a player cannot forge which task their blind run
- *     will yield, and
- *   - the single-writer read-modify-write is safe only because `setSetting`
- *     REPLACES rather than merges and the active GM is the sole writer.
- */
+/** Issue 901 — the world-scoped blind-run store and its GM relay. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

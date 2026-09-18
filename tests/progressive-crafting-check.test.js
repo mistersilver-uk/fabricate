@@ -1,8 +1,7 @@
-// Engine integration tests for the progressive crafting check
-// (CraftingEngine._runProgressiveCheck via _runCraftingCheck dispatch): the roll
-// total becomes the numeric `value` progressive result-awarding spends, per-die
-// crits force award-all/award-none, and a formula-less progressive check fails
-// loudly (the legacy macro check source is gone).
+// Engine integration tests for the progressive crafting check (CraftingEngine._runProgressiveCheck
+// via _runCraftingCheck dispatch): the roll total becomes the numeric `value` progressive
+// result-awarding spends, per-die crits force award-all/award-none, and a formula-less progressive
+// check fails loudly (the legacy macro check source is gone).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -221,15 +220,8 @@ test('checkDriven progressive: surfaces data.diceGroups for the DSL', async () =
   assert.deepEqual(r.data.diceGroups, [{ groupId: 0, group: '2d6', sum: 7, results: [3, 4] }]);
 });
 
-// ---------------------------------------------------------------------------
-// Progressive component complications: the crafting call site (issue 1286)
-//
-// The load-bearing claim is EXACTLY ONCE. `resolveResultGroups` is called up to three
-// times for one craft — the pre-consumption misconfiguration gate, the failure-award
-// preflight, and again inside `_createResultItems` — and a complication must fire for
-// the LAST of those and for none of the others. These drive the whole `craft()` flow
-// through a real `ResolutionModeService` so the count is of real calls.
-// ---------------------------------------------------------------------------
+// Progressive component complications: the crafting call site (issue 1286). The load-bearing claim
+// is EXACTLY ONCE.
 
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
@@ -254,13 +246,7 @@ function craftComplication({
   };
 }
 
-/**
- * A progressive crafting world driven end to end through `craft()`.
- *
- * `_createSingleResult` is the ONLY engine method stubbed, and deliberately: it is the
- * Foundry document-creation edge, and stubbing `_createResultItems` instead would remove
- * the very `resolveResultGroups` call this test exists to count.
- */
+/** A progressive crafting world driven end to end through `craft()`. */
 function progressiveCraftWorld({
   value = 10,
   complicationsIron = [craftComplication()],
@@ -427,9 +413,8 @@ test('craft(): the halted stage fires its own complication, from the SAME single
 });
 
 test('craft(): NEGATIVE CONTROL — a craft aborted by the misconfiguration gate fires NOTHING', async () => {
-  // The gate resolves BEFORE any consumption precisely so a misconfigured recipe can
-  // abort having consumed nothing. A complication fired from there would be a consequence
-  // of a craft that never happened, which is why the firing site is after the award.
+  // The gate resolves BEFORE any consumption precisely so a misconfigured recipe can abort having
+  // consumed nothing.
   const world = progressiveCraftWorld();
   const real = world.service.resolveResultGroups;
   let seen = 0;
@@ -547,9 +532,7 @@ test('_resolveProgressiveResultGroups: the flat meta reports all five stage fact
 });
 
 test('_finishTimedStep(): the matured FINISH fires exactly once, after the run is completed', async () => {
-  // The timed path is the SECOND crafting call site. It is driven directly because the
-  // only route to it is a matured world-time gate, and a `craft()`-shaped test of it
-  // would be a test of the run manager rather than of the firing site.
+  // The timed path is the SECOND crafting call site.
   const world = progressiveCraftWorld();
   const completed = [];
   const runManager = {
@@ -587,16 +570,9 @@ test('_finishTimedStep(): the matured FINISH fires exactly once, after the run i
   );
 });
 
-// ---------------------------------------------------------------------------
-// The COLLAPSED CHAIN: three steps, one `craft()` call, three firings
-//
+// The COLLAPSED CHAIN: three steps, one `craft()` call, three firings.
 // `_fireComponentComplications`'s own docblock states it: "a collapsed chain recurses into
-// `craft()` per step, so a three-step chain fires three times. That is correct — three steps
-// are three progressive resolutions with three separate awards." Every other assertion in
-// this file is about firing ONCE or NOT AT ALL, so nothing anywhere held the positive claim
-// — and a chain that fired once would silently drop two thirds of an authored complication's
-// beats on the one recipe shape where the player sees a single atomic action.
-// ---------------------------------------------------------------------------
+// `craft()` per step, so a three-step chain fires three times.
 
 const { CraftingRunManager } = await import('../src/systems/CraftingRunManager.js');
 
@@ -616,9 +592,8 @@ function chainStep(index, ingredientSet, componentId) {
 }
 
 /**
- * A PROGRESSIVE recipe of three authored steps on a system with `multiStepRecipes: false` —
- * which is exactly what a collapsed chain is. The chain runs every step back to back inside
- * one `craft()` call, by recursing into `craft()` itself.
+ * A PROGRESSIVE recipe of three authored steps on a system with `multiStepRecipes: false` — which
+ * is exactly what a collapsed chain is.
  */
 function collapsedChainWorld({ stepCount = 3 } = {}) {
   const componentIds = Array.from({ length: stepCount }, (_, index) => `c-${index + 1}`);
@@ -787,8 +762,7 @@ test('craft(): a 3-step COLLAPSED chain fires complications once per step, not o
 
 test('craft(): each step of a collapsed chain relays under its OWN resolution id', async () => {
   // The writer mints one id per `deliver` call, and the GM-side de-duplication key is
-  // `(resolutionId, resultId, complicationId)`. Three steps sharing one id would be three
-  // deliveries the GM client legitimately de-duplicated down to one.
+  // `(resolutionId, resultId, complicationId)`.
   const world = collapsedChainWorld();
   await world.engine.craft(world.craftingActor, [world.sourceActor], world.recipe, null, {});
 

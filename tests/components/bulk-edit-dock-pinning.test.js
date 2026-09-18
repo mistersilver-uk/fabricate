@@ -1,6 +1,5 @@
 /*
  * THE BULK EDIT DOCK'S RENDERED PIN (issue 1015).
- *
  * ── WHY THIS FILE EXISTS AT ALL ──────────────────────────────────────────────────
  * The dock is the whole deliverable of issue 1015, and when it shipped it SURVIVED EVERY
  * MUTATION. `npm test` stayed green with `position: sticky` deleted from
@@ -13,10 +12,6 @@
  * mention `fab-bulk-edit-dock` but assert nothing about it, so the wrapper could leave the
  * product while both mirrors went on measuring markup nothing renders. That is exactly the
  * rot both of those fixture headers warn about in capitals.
- *
- * So this gate asserts the four things that ARE the dock, and each assertion is chosen to
- * kill one of those four mutations:
- *
  *   (a) the dock's border-box bottom sits on the inspector's PADDING box bottom, at every
  *       scroll offset  — kills `bottom: 0` AND the deletion of `position: sticky`;
  *   (b) the dock's left and right sit on the inspector's padding-box left and right
@@ -33,69 +28,13 @@
  *                        the padding "puts the button back exactly where it was" is
  *                        unmeasured, and deleting either declaration ships green with Apply
  *                        12px out of column or missing its bottom gutter.
- *
- * (b) and (e) are the two halves of one bleed and are asserted against DIFFERENT boxes on
- * purpose: the dock's fill runs to the rail's padding box, the button it wraps stays on the
- * rail's content box, and the padding is exactly that difference.
- *
- * ── THE MARKUP IS THE PRODUCT'S, NOT A FIXTURE'S ─────────────────────────────────
- * (d) is only worth anything if the markup under test comes from the component. So this
- * gate MOUNTS `BulkEditPanelShell.svelte` through `createMountedComponentHarness` and ships
- * the mounted tree's real `innerHTML` into Chromium. Nothing here hand-writes a
- * `.fab-bulk-edit-dock`; deleting the wrapper from the shell empties this gate's markup and
- * (d) fails on the spot.
- *
- * The shell is mounted DIRECTLY rather than through one of its three studio callers. The
- * dock is the shell's, the shell's only dependency is `foundryBridge.js`, and mounting
- * `ComponentBulkEditPanel` instead would copy that suite's nine-entry module closure into a
- * second file for no assertion this gate makes.
- *
- * The staged axes arrive as `children` — that is the shell's actual contract, the rows are
- * the CALLER's and differ per studio — so this gate supplies its own through a snippet.
- * They exist only to make the rail overflow and are never measured; `MIN_OVERFLOW_PX`
- * below is what stops them quietly ceasing to do even that.
- *
- * ── WHY CHROMIUM, AND WHY BOTH STYLESHEETS ───────────────────────────────────────
- * happy-dom computes no cascade, no layout and no scrolling, so a mounted test can state
- * that the dock EXISTS but never that it is PINNED. And the two sheets are both
- * load-bearing in opposite directions: `.manager-inspector` (the scrollport, its padding
- * and its `overflow-y: auto`) is in the global `styles/fabricate.css`, while
- * `.fab-bulk-edit-dock` is Svelte-scoped and appears nowhere in that file. Injecting only
- * one of the two would leave half the geometry unstyled and the measurement meaningless.
- *
- * ── THE CONTAINER IS DELIBERATELY WIDE ───────────────────────────────────────────
- * At a `fabricate-manager` container width of 1120px or less, `styles/fabricate.css` gives
- * `.manager-body` `grid-auto-rows: max-content` + `overflow-y: auto`, which makes the BODY
- * the scrollport and leaves `.manager-inspector` sized to its content — so the inspector
- * never overflows and the dock never pins. That is pre-existing behaviour, identical on
- * `main`, out of scope here, and recorded in the dock's own comment in
- * `BulkEditPanelShell.svelte`. This gate measures the configuration the dock is FOR, so
- * `CONTAINER_WIDTH_PX` sits above that breakpoint on purpose. Lower it and this gate goes
- * vacuous rather than red, which is why `MIN_OVERFLOW_PX` is asserted first.
- *
- * ── TWO KNOWN LIMITS OF THE MEASUREMENT ──────────────────────────────────────────
- * HEADLESS CHROMIUM HAS NO CLASSIC SCROLLBAR. The rail scrolls here with an overlay
- * scrollbar, so its padding box is its full border-box width and (b) can hold exactly. A
- * classic scrollbar in a Foundry client insets the scrollport, and the dock's right edge
- * would sit that gutter short of the border box. That is pre-existing product behaviour of
- * every `overflow-y: auto` column in `styles/fabricate.css`, not something the dock
- * introduced, and it is not what this gate is measuring.
- *
- * THE PIN IS CHROMIUM-MEASURED. `bottom` is set from the scroll container's CONTENT box
- * here, which is what makes the negative inset necessary at all (see the two-clamp note in
- * `BulkEditPanelShell.svelte`). On an engine that measures the sticky inset from the PADDING
- * box instead, that inset would instead push the dock's own bottom padding under the rail's
- * edge — Apply stays fully visible and pinned, so the degradation is cosmetic and still
- * strictly better than `main`, where Apply scrolled away outright.
  */
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
-// Same import path the mounted suites use for `flushSync`: the harness drives the compiled
-// component with THIS copy of the client runtime, and a snippet built from a second copy
-// would not be the same snippet type.
+// Same import path the mounted suites use for `flushSync`.
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
@@ -114,15 +53,10 @@ const cardCss = scopedComponentCss(resolve(repoRoot, CARD_PATH));
 // catch: every mutation this gate exists to kill moves an edge by `--fab-space-3` (12px) or
 // by the rail's whole overhang.
 const EPSILON_PX = 1;
-// Anti-vacuity. A rail that does not overflow cannot prove anything about a sticky box: all
-// three scroll offsets collapse onto one, and every assertion below passes for a dock that
-// is merely the last element in a short column. If the shell's chrome or the filler rows
-// ever stop producing a real scroll range, this fails LOUDLY instead.
+// Anti-vacuity. A rail that does not overflow cannot prove anything about a sticky box.
 const MIN_OVERFLOW_PX = 48;
 const CONTAINER_WIDTH_PX = 1200;
-// The height of the whole manager HOST, not a declaration on `.manager-inspector` — the rail
-// takes it through `.fabricate-manager`'s `height: 100%` and its `1fr` body row, minus the
-// two band rows below. It is named for the box whose scroll range it decides.
+// The height of the whole manager HOST, not a declaration on `.manager-inspector`.
 const INSPECTOR_HOST_HEIGHT_PX = 520;
 const AXIS_ROW_COUNT = 18;
 
@@ -139,10 +73,7 @@ const shell = createMountedComponentHarness({
   componentPath: SHELL_PATH,
 });
 
-// A SECOND harness rather than a second `componentPath`: the harness mounts one component, and
-// the sibling case needs the shell's markup AND the card's, mounted independently and then laid
-// out together in the page. The card's closure is two files — it imports only
-// `ArmedDangerButton`, which imports nothing — so this costs nothing like the studio suites'.
+// A SECOND harness rather than a second `componentPath`: the harness mounts one component.
 const card = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-delete-card-',
@@ -165,21 +96,7 @@ const stagedAxes = createRawSnippet(() => ({
     ).join('')}</div>`,
 }));
 
-/**
- * The shell's real rendered markup, dropped into the rail it actually ships in.
- *
- * The three wrapper levels are the shipped ones — `.fabricate-manager` is the area root and
- * carries the `fabricate-manager` container the width branch above reads, `.manager-body`
- * supplies the three-column grid, and `.manager-inspector` is the scrollport whose padding box
- * the dock is asserted against. The area's own custom properties are declared INSIDE it, on
- * descendants, not on this element; none of them is read here.
- *
- * The two empty `.probe-shell-band` divs are load-bearing, not filler. `.fabricate-manager`
- * is `grid-template-rows: auto auto 1fr`, and the app fills the first two rows with its
- * header and toolbar; without them `.manager-body` lands in the first `auto` row, is sized
- * to its content instead of the leftover height, and the rail never overflows — the vacuous
- * configuration `MIN_OVERFLOW_PX` exists to catch.
- */
+/** The shell's real rendered markup, dropped into the rail it actually ships in. */
 function inspectorPage(productMarkup) {
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${fabricateCss}</style>
@@ -206,21 +123,13 @@ function inspectorPage(productMarkup) {
     </body></html>`;
 }
 
-/**
- * Measures the dock against the inspector's padding box at the top, middle and bottom of
- * the rail's scroll range.
- *
- * Runs wholly inside the page: `getBoundingClientRect` is only meaningful after the layout
- * the scroll assignment forces, so each offset is read back rather than assumed.
- */
+/** Measures the dock against the inspector's padding box at the top. */
 function measureDock() {
   const inspector = document.querySelector('[data-probe-inspector]');
   const dock = inspector.querySelector('.fab-bulk-edit-dock');
   if (!dock) return { dockRendered: false };
 
-  // The fill and the element's own alpha are read before the geometry, so a dock that lost
-  // its Apply button still reports them and (c) fails on its own terms rather than on an
-  // undefined it never asked about.
+  // The fill and the element's own alpha are read before the geometry.
   const dockStyle = getComputedStyle(dock);
   const paint = { backgroundColor: dockStyle.backgroundColor, opacity: dockStyle.opacity };
 
@@ -244,8 +153,7 @@ function measureDock() {
     const rail = inspector.getBoundingClientRect();
     const box = dock.getBoundingClientRect();
     const applyBox = apply.getBoundingClientRect();
-    // The scrollport is the inspector's PADDING box, which is the edge the dock covers
-    // out to; its border box is one hairline wider on the left.
+    // The scrollport is the inspector's PADDING box.
     const padBottom = rail.bottom - border.bottom;
     const padLeft = rail.left + border.left;
     const padRight = rail.right - border.right;
@@ -255,8 +163,7 @@ function measureDock() {
       padBottom,
       padLeft,
       padRight,
-      // The rail's CONTENT box — where every OTHER item in this column sits, and therefore
-      // where Apply has to keep sitting for the dock to be invisible to the button.
+      // The rail's CONTENT box — where every OTHER item in this column sits.
       contentBottom: padBottom - padding.bottom,
       contentLeft: padLeft + padding.left,
       contentRight: padRight - padding.right,
@@ -288,7 +195,6 @@ function measureDock() {
 
 /**
  * The same rail, with a real `BulkDeleteCard` rendered AFTER the shell.
- *
  * Measures a DIFFERENT invariant from `measureDock`, because the sibling breaks that one BY
  * DESIGN: it shortens `.fab-bulk-edit-panel`, which is the dock's containing block, so at
  * maximum scroll the dock clamps to the PANEL's box rather than the rail's. What survives is
@@ -315,8 +221,7 @@ function measureSiblingCard() {
     top: parseFloat(inspectorStyle.borderTopWidth),
     bottom: parseFloat(inspectorStyle.borderBottomWidth),
   };
-  // The dock's own negative bottom margin. Read rather than hard-coded, so the clamp assertion
-  // below stays an assertion about the CONTAINING-BLOCK RULE and not about a magic 12.
+  // The dock's own negative bottom margin. Read rather than hard-coded.
   const dockMarginBottom = parseFloat(getComputedStyle(dock).marginBottom);
 
   const sampleAt = (label, scrollTop) => {
@@ -395,9 +300,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   });
 
   it('ships the dock as Apply\'s wrapper in the rendered product markup', () => {
-    // (d). Read off the MOUNTED component, so deleting the wrapper from
-    // `BulkEditPanelShell.svelte` fails here however faithfully the studio fixtures still
-    // mirror it.
+    // (d). Read off the MOUNTED component.
     assert.ok(
       rendered.dockInMountedMarkup,
       `${SHELL_PATH} rendered no .fab-bulk-edit-dock — the sticky dock issue 1015 added is gone from the product, and the studio font-size fixtures cannot see that because they hand-write their own copy of it`
@@ -409,21 +312,18 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   });
 
   it('breathes the reference`s 13px above Apply and pins the delete at one 11px line (M24, both bulk panels)', async () => {
-    // `proto:791` / `proto:1270` pad the foot `13px 17px`; Apply sat 4px under the hairline (its own
+    // `proto:791` / `proto:1270` pad the foot `13px 17px`.
     // `margin-top`) and the delete wore the host button's 14px type on a 6px corner, wrapping the
     // system panel's `Remove 2 components from The Herbalist's Compendium…` to two lines. Both are
     // the SHELL's and the sheet's, so one measurement covers the world and the system panel alike.
     const browser = await chromium.launch();
     try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      // Spliced before the LAST `</div></section>`, which closes the dock and the panel: the probe
-      // is a `.manager-button.is-danger` INSIDE the dock, exactly where both panels pin theirs.
+      // Spliced before the LAST `</div></section>`, which closes the dock and the panel.
       const dockClose = rendered.markup.lastIndexOf('</div></section>');
       const probe =
         '<div class="fab-bulk-inset-danger-probe"><button type="button" class="manager-button is-danger" data-danger-probe=""><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Remove 2 components from The Herbalist\u{2019}s Compendium of Forgotten Remedies and Sundries…</span></button></div>';
-      // AND THE DOCK IS GIVEN ITS FOOT COLUMN (`has-foot`), which is what a panel with a delete leg
-      // renders: the column stretches its children to the rail, which is what makes a long label a
-      // CLIPPED label rather than a content-width button.
+      // AND THE DOCK IS GIVEN ITS FOOT COLUMN (`has-foot`).
       const markupWithFoot = (
         dockClose === -1
           ? rendered.markup
@@ -516,13 +416,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   });
 
   it('leaves the Apply button on the rail content box the dock bled out of', () => {
-    // (e). The dock's three bleeds are paid back by matching padding, and the shell's own
-    // comment calls that padding load-bearing: it "puts the button back exactly where it
-    // was". Nothing measured it, so `padding-inline` deleted (Apply spills 12px past the
-    // content edge on each side) and `padding-bottom` deleted (Apply loses its bottom
-    // gutter) both shipped green. Apply's own box is what the swap with
-    // `.manager-component-browser-inspector-edit` depends on, so it is asserted against the
-    // rail's CONTENT box — the column every sibling in the panel is laid out on.
+    // (e). The dock's three bleeds are paid back by matching padding.
     assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
     assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
 
@@ -541,14 +435,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   });
 
   it('fills the dock opaquely so staged rows cannot read through it', () => {
-    // (c). The dock's only job while it covers the rail is to be a surface: at less than
-    // full alpha the staged rows scroll visibly UNDER the primary action, which is the
-    // symptom issue 1015 was filed for wearing a sticky position.
-    //
-    // BOTH channels, because `background-color` alone is only half the question: an
-    // `opacity: 0.4` on `.fab-bulk-edit-dock` leaves the fill's own alpha at 1 and still
-    // makes the whole dock — border, shadow, Apply and all — see-through, and that mutation
-    // passed every other assertion in this file.
+    // (c). The dock's only job while it covers the rail is to be a surface.
     assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
     assert.equal(
       alphaOf(measured.backgroundColor),
@@ -565,13 +452,6 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
 
 /*
  * ── THE ACCEPTED NON-PIN: A SIBLING CARD AFTER THE SHELL (issue 1132) ────────────────
- *
- * The suite above mounts `BulkEditPanelShell` ALONE, with nothing after it, so it cannot see
- * the one shipped configuration in which the dock does not pin — and two studios have shipped
- * in exactly that configuration since issue 1036 and issue 1129. The shell's own comment
- * enumerates the shape and calls it accepted; until now that acceptance was prose, and prose
- * cannot tell an accepted un-pin from a reachability regression.
- *
  * WHY THE INVARIANT IS A DIFFERENT ONE, AND NOT A WEAKENED ONE. `.fab-bulk-edit-dock` is
  * `position: sticky` inside `.fab-bulk-edit-panel`, so the PANEL is its containing block, and a
  * sticky box may not escape its containing block. A sibling rendered after the shell shortens
@@ -579,22 +459,6 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
  * lifted off the rail's bottom edge — measured at −142px on a staged recipe panel and −154px on
  * a component panel. Asserting (a) from the suite above here would therefore be asserting that
  * the shipped layout is a bug.
- *
- * What is genuinely required is REACHABILITY, which is what issue 1015 was actually filed for:
- * Apply's border box stays wholly inside the scrollport at every scroll offset. That is a
- * strictly weaker claim about the DOCK and exactly the right claim about the BUTTON, and it is
- * the claim that stops being true if the sibling grows — a card TALLER than the scrollport
- * scrolls Apply off the TOP, which is a reachability failure and is NOT accepted. So the bound
- * is asserted first, in the manner of `MIN_OVERFLOW_PX`: this gate is only evidence for the
- * region in which the guarantee holds, and it says so rather than implying it.
- *
- * The clamp itself is pinned too, against the dock's MARGIN box and the dock's own computed
- * `margin-bottom` rather than a literal 12 — otherwise "un-pinned" would be satisfied by a dock
- * that had stopped being sticky at all, which is the mutation the suite above exists to kill.
- *
- * THE SIBLING IS THE REAL `BulkDeleteCard`, not a stand-in div. A fixture sibling would keep
- * passing after the card's box changed — its `margin-top`, its padding, its button height —
- * which is the whole class of rot this file's header already records.
  */
 describe('the bulk edit dock with a sibling card after the shell', () => {
   const rendered = { shell: '', card: '' };
@@ -696,9 +560,7 @@ describe('the bulk edit dock with a sibling card after the shell', () => {
       Math.abs(max.dockMarginBoxBottom - max.panelBottom) <= EPSILON_PX,
       `at max scroll the dock's margin-box bottom is ${max.dockMarginBoxBottom}px but the panel's bottom is ${max.panelBottom}px — the dock is no longer clamped to its containing block, so it is neither pinned nor accepted-un-pinned but something new`
     );
-    // And it is genuinely OFF the rail's bottom edge, which is what makes this a different case
-    // from the suite above rather than a second copy of it. Without this a fixture whose sibling
-    // displaced nothing would pass every assertion here.
+    // And it is genuinely OFF the rail's bottom edge.
     assert.ok(
       max.railPadBottom - max.dockBottom > EPSILON_PX,
       `at max scroll the dock's bottom is ${max.dockBottom}px against a rail padding-box bottom of ${max.railPadBottom}px — the dock is still pinned to the rail, so the sibling is not shortening the panel and this case is measuring nothing`
@@ -706,9 +568,7 @@ describe('the bulk edit dock with a sibling card after the shell', () => {
   });
 
   it('keeps Apply wholly inside the scrollport at every scroll offset', () => {
-    // THE INVARIANT THAT SURVIVES. Issue 1015's symptom was Apply being unreachable; the
-    // accepted un-pin is Apply floating 142px above the rail's bottom edge, which is a rhythm
-    // regression and not that. This is the assertion that tells the two apart.
+    // THE INVARIANT THAT SURVIVES. Issue 1015's symptom was Apply being unreachable.
     for (const sample of measured.samples) {
       assert.ok(
         sample.applyTop >= sample.railPadTop - EPSILON_PX,

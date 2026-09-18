@@ -20,9 +20,6 @@ function target(root) {
 /**
  * A companion provider that records what Core did to it.
  *
- * `mount` is a real function returning a real cleanup, so cleanup-count assertions are about
- * the seam rather than about a spy shape.
- *
  * @param {object} [options] Fixture behaviour.
  * @returns {object} `{ provider, calls }`.
  */
@@ -230,8 +227,7 @@ describe('PlayerExtensionHost (mounted)', () => {
     const context = calls.contexts[0];
     assert.ok(Object.isFrozen(context), 'the context is frozen');
     assert.equal(context.schemaVersion, 1);
-    // Pinned TOGETHER with the version: a key added or removed without a version bump is a
-    // silent contract change for every companion already built against it.
+    // Pinned TOGETHER with the version.
     assert.deepEqual(Object.keys(context).sort(), [
       'actorId',
       'isGM',

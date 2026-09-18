@@ -78,13 +78,7 @@ function validateEnvironmentForFakeCreate(environment) {
   const reservedResultGroups = new Set(['f', 'fail', 'failed', 'failure', 'miss', 'missed', 'm', 'none', 'nothing', 'whiff', 'whiffed', 'hazard', 'danger', 'complication', 'trap', 'oops']);
   // Mirrors GatheringEnvironmentStore#_environmentHasTaskSource (the ENABLE gate — "may this
   // environment be turned on" — not the composition rule in src/systems/gatheringComposition.js,
-  // which answers a different question, "does this record compose"). enabledTaskIds counts as a
-  // task source in MANUAL mode only, because manual composition IS that list. Automatic mode
-  // ignores it and asks the composition predicate instead; that branch needs a gathering-library
-  // fixture this suite does not wire up, so it is intentionally not replicated here and the
-  // `.tasks` stand-in below covers those fixtures. A force list is not a task source in either
-  // mode: issue 1315 moved force add into automatic, where the predicate honours it, and manual
-  // never consults it.
+  // which answers a different question, "does this record compose") (issue 1315).
   const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
   const hasIdTaskSource =
     compositionMode === 'manual' &&
@@ -92,11 +86,7 @@ function validateEnvironmentForFakeCreate(environment) {
     environment.enabledTaskIds.length > 0;
   // Real environments never carry an embedded `tasks` array as a task source — the production gate
   // above does not read `.tasks` at all, and an automatic-mode environment with no ids populated
-  // instead falls to matching against the system's gathering library. This fixture predates that:
-  // most environments here are still built with `makeEnvironment()`'s embedded `tasks` default and
-  // no gathering-library fixture, so a non-empty `.tasks` array is accepted here as a TEST-ONLY
-  // stand-in for "this environment has a real task source" — a shape production never produces or
-  // recognizes for this purpose.
+  // instead falls to matching against the system's gathering library.
   const hasTaskSource = hasIdTaskSource || (Array.isArray(environment.tasks) && environment.tasks.length > 0);
   // A task source is only required to ENABLE an environment; a disabled draft may
   // be saved without one (issue #298).
@@ -440,11 +430,9 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(services._confirmCalls[0].no.label, 'Keep Editing');
   });
 
-  // `createSystem` reports its outcome so the manager root can open the new system's
-  // System Overview, and the root routes that through a helper which treats ONLY `false`
-  // as "did not happen". A declined confirm must therefore return `false` and not a merely
-  // falsy `null` — otherwise the root reads it as success and navigates away from the very
-  // environment edit the GM just chose to keep.
+  // `createSystem` reports its outcome so the manager root can open the new system's System
+  // Overview, and the root routes that through a helper which treats ONLY `false` as "did not
+  // happen".
   it('returns false from createSystem when a dirty environment draft is kept', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
@@ -1194,10 +1182,9 @@ describe('adminStore gathering environments tab state', () => {
     assert.deepEqual(services._environments.map(environment => environment.id), ['environment-a']);
   });
 
-  // `ApplicationV2` assigns the window title through `innerText`, so an already-escaped
-  // string surfaces its entity literally: an environment named `Traveler's Wood` would
-  // open a window titled `Delete Traveler&#39;s Wood?` (issue 1154 review). The name must
-  // be RAW in the title and escaped only in the HTML content.
+  // `ApplicationV2` assigns the window title through `innerText`, so an already-escaped string
+  // surfaces its entity literally: an environment named `Traveler's Wood` would open a window
+  // titled `Delete Traveler&#39;s Wood?` (issue 1154 review).
   it('puts a raw, unescaped environment name in the delete confirm title', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
@@ -1349,9 +1336,7 @@ describe('adminStore gathering library match-loss handling', () => {
   });
 
   it('classifies a forced non-matching task as forceIncluded in automatic mode and notMatching in manual', async () => {
-    // The mode split, in the layer that decides what the GM sees on the row (issue #1315). There
-    // was no automatic-mode `forceIncluded` case anywhere in this suite, so a flip that made the
-    // state unreachable in BOTH modes would have shipped green.
+    // The mode split, in the layer that decides what the GM sees on the row (issue #1315).
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [
@@ -1378,10 +1363,7 @@ describe('adminStore gathering library match-loss handling', () => {
   });
 
   it('warns and enumerates only the environments that can actually lose the record to a match edit', async () => {
-    // Only a mode with a match filter can lose a record to a match edit (issue #1315). Automatic
-    // composes by matching, so it loses one; manual composes exactly the GM's picked list with no
-    // match filter, so a picked record survives any edit to its tags and its environment must NOT
-    // be named — warning a GM about a loss that will not happen is the defect this inverts.
+    // Only a mode with a match filter can lose a record to a match edit (issue #1315).
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
       environments: [
@@ -1500,9 +1482,7 @@ describe('adminStore gathering library match-loss handling', () => {
   it('lists a manual environment whose picked record does not match, because it composes anyway', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
-      // The manual environment picked a task that does not match its biome. Since issue #1315 that
-      // is not a stale entry at all — manual mode has no match filter, the task composes, and
-      // deleting it really would take it out of this environment.
+      // The manual environment picked a task that does not match its biome (issue 1315).
       environments: [makeEnvironment({ id: 'manual', name: 'Manual Cavern', compositionMode: 'manual', biomes: ['cavern'], enabledTaskIds: ['lib-task'] })],
       gatheringConfig: gatheringConfigWithTask(),
       confirmResult: false
@@ -1626,17 +1606,9 @@ describe('adminStore gathering library match-loss handling', () => {
     assert.equal(services._notify.warn.length, 0);
   });
 
-  // Regression guard for the "Broken Workshop" smoke fixture (issue 429 PR-2):
-  // the GM system-overview view must render populated rows for a system seeded
-  // with BOTH a live system-blocker AND a task-kind issue. This mirrors the smoke
-  // config exactly so the screenshot capture cannot silently go empty:
-  //   - progressive resolution mode with the crafting check DISABLED and no
-  //     progressive rollFormula → a `progressiveNoCheck` system-blocker; and
-  //   - a manual environment that explicitly includes a non-matching library task
-  //     (biome mismatch) → an `includedNotMatching` record → a `staleIncluded`
-  //     task-kind issue that deep-links to the owning environment. Since issue #1315 that
-  //     record COMPOSES and the issue is an `info` note rather than a critical blocker, but
-  //     it is still the fixture's task-kind row and the smoke capture still needs it.
+  // Regression guard for the "Broken Workshop" smoke fixture (issue 429 PR-2): the GM
+  // system-overview view must render populated rows for a system seeded with BOTH a live
+  // system-blocker AND a task-kind issue.
   it('builds a populated system-validation report for the broken-system fixture', async () => {
     const brokenGatheringConfig = {
       systems: {

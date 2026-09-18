@@ -1,9 +1,6 @@
 /**
- * #99 — `CraftingSystemManager.updateSystem` revalidates alchemy ingredient signature
- * uniqueness (spec 007 §"Alchemy Uniqueness Revalidation"). Editing an already-alchemy
- * system so that its component list introduces a signature collision must BLOCK the save
- * (throw) BEFORE persisting, leaving the prior system state intact. A non-alchemy system
- * update must not run signature validation at all.
+ * 99 — `CraftingSystemManager.updateSystem` revalidates alchemy ingredient signature uniqueness
+ * (spec 007 §"Alchemy Uniqueness Revalidation").
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

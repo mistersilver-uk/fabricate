@@ -2,10 +2,8 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-// ---------------------------------------------------------------------------
 // Set up globalThis.foundry so getDragEventData has a working implementation
 // before the module is imported and cached.
-// ---------------------------------------------------------------------------
 globalThis.foundry = {
   applications: {
     ux: {
@@ -27,9 +25,7 @@ globalThis.foundry = {
 
 const { dragDrop } = await import('../../src/ui/svelte/actions/dragDrop.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeNode(children = []) {
   const listeners = {};
@@ -71,10 +67,7 @@ function fire(node, type, event) {
   }
 }
 
-/**
- * Build a DropZone-like node wired with the dragDrop action.
- * Mirrors what DropZone.svelte produces at runtime.
- */
+/** Build a DropZone-like node wired with the dragDrop action. */
 function buildDropZone({ onDrop, disabled = false, activeClass = 'drop-active' } = {}) {
   const div = makeNode();
   const action = dragDrop(div, { onDrop, disabled, activeClass });

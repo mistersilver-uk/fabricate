@@ -1,10 +1,6 @@
 /**
  * Ratchets the oversized files and functions under `src/` (issue 1659), so every Phase 4 and 5
  * extraction lowers a number rather than reporting a win nothing checked.
- *
- * Lines are PHYSICAL, comments and blanks included, which is the measure the issue's own figures
- * use. A change that only edits comments can therefore push a unit across a threshold; it re-pins
- * here in the same commit.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -30,11 +26,7 @@ const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte']);
 
 const extensionOf = (file) => file.slice(file.lastIndexOf('.'));
 
-/**
- * `path` for an oversized file, `path::qualified>symbol` for an oversized function. A component's
- * file size is the whole file — markup, script and style — matching the figures the issue quotes,
- * while its functions are read from the script blocks.
- */
+/** `path` for an oversized file, `path::qualified>symbol` for an oversized function. */
 function buildLedger() {
   const corpus = collectSources(resolve(repoRoot, 'src'), { extensions: [...SCANNED_EXTENSIONS] });
   const entries = [];
@@ -230,42 +222,6 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
   // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
   // `deleteEmbeddedDocuments` throw and stranded a run.
-  //
-  // Recorded as debt rather than absorbed: the epic tracks these two figures so a rise is
-  // visible, and this one is. The obvious remedy is to re-home the three claim-PAGE adapters
-  // (`createClaim`/`readClaim`/`deleteClaim`) beside arbitration in `journalRunLedger.js`,
-  // which is where the knowledge that a claim is an embedded page with a fixed `_id` belongs;
-  // that is a pure move and it takes the file back under. It is deliberately NOT bundled into
-  // the defect fix a blocked maintainer was waiting on.
-  // 128 as of the consumption-record repair: `src/ui/svelte/apps/journal/StepDetails.svelte`
-  // crossed at 535. A started stage now renders its recorded RECEIPT where it used to render a
-  // live held-against-needed probe of an inventory the stage had already emptied, so the file
-  // carries both surfaces and the rule that picks between them.
-  //
-  // Recorded as debt rather than absorbed, and the remedy is the seam the change already drew:
-  // the receipt is a self-contained surface reading `consumptionRecord` alone, so it lifts into
-  // its own component without a prop thread back. That move also gains it a mount test of its
-  // own, which the block cannot have while it is one branch inside a larger file. Not bundled
-  // here, because a blocked maintainer is waiting on the defect this commit fixes, and a new
-  // `.svelte` child additionally has to join `writeCompiledSvelte` and four mount harnesses.
-  // 126 after merging origin/main, which condensed 38 component headers and took Chip and
-  // IconButton back under the .svelte threshold -- two of this branch's entries removed by
-  // someone else's work rather than by ours.
-  //
-  // 123/123 after merging #1682's sweep, which took `src/models/Recipe.js` under the 800-line
-  // file threshold and its constructor under the 100-line function threshold. Regenerated from
-  // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
-  // of the conflict would have pinned a figure no tree actually has.
-  //
-  // 122/120 on this branch. Four rows leave the ledger with its comment mass --
-  // `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
-  // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
-  // main carries.
-  //
-  // 117/120 here: on top of everything main now carries, the scoped-pages sweep takes five more
-  // `.svelte` files under the threshold on comment lines alone. Regenerated from the merged tree
-  // rather than reconciled by hand -- these counts are derived, so picking a side of the conflict
-  // would have pinned a figure no tree actually has.
   assert.equal(files, 109, 'oversized files');
   assert.equal(keys.length - files, 116, 'oversized functions');
 });

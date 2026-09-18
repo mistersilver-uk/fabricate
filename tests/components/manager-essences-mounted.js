@@ -1,12 +1,4 @@
-/**
- * The essence routes: the browser, the dedicated edit route and its exit guards.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The essence routes: the browser, the dedicated edit route and its exit guards. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,8 +12,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { craftingParent, navButton } = queries;
 
@@ -78,9 +69,7 @@ export function registerEssencesCases() {
     assert.ok(target.textContent.includes('Earth'));
     assert.equal(target.querySelector('.manager-essence-action-band'), null);
 
-    // The DISABLED essence is marked in words, not by dimming alone, and its capability
-    // pills are absent because it has neither a source nor a macro — the ENABLED row is
-    // the negative control that the pills render at all.
+    // The DISABLED essence is marked in words, not by dimming alone.
     const waterRow = target.querySelector('.manager-essence-row[data-essence-id="water"]');
     const earthRow = target.querySelector('.manager-essence-row[data-essence-id="earth"]');
     assert.equal(waterRow.dataset.essenceEnabled, 'false');
@@ -108,8 +97,7 @@ export function registerEssencesCases() {
       'and, separately, how many recipes require it'
     );
 
-    // The FIRST `.manager-icon-button` in the row must remain the Edit pencil: the View Lab
-    // case `manager-essence-edit-first-state` navigates by exactly that selector.
+    // The FIRST `.manager-icon-button` in the row must remain the Edit pencil.
     assert.equal(
       earthRow.querySelector('.manager-icon-button').getAttribute('data-essence-edit'),
       'earth',
@@ -320,11 +308,7 @@ export function registerEssencesCases() {
       )
     );
 
-    // THE SOURCE-STATE FILTER IS GONE (issue 1372, maintainer parity round 8), with the status
-    // segment beside it: the reference's bar carries ONE filter, the membership pair. What it
-    // found is still findable — the row's summary line names the source and marks a broken link,
-    // and the search box reads that name — so the SEARCH is exercised here in its place, over
-    // the same fixture, which is the negative control the removed filter used to provide.
+    // THE SOURCE-STATE FILTER IS GONE (issue 1372, maintainer parity round 8).
     assert.ok(
       !target.querySelector('[aria-label="Filter essences by source state"]'),
       'the source-state select is not on the bar'
@@ -419,11 +403,7 @@ export function registerEssencesCases() {
     document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
     await tick();
     flushSync();
-    // ONE card once linked (issue 1036, maintainer round 2), and it is the shared
-    // `ItemDropZone` the Tool Studio's LINKED ITEM renders — not a hand-rolled summary with
-    // a second drop zone still sitting under it. Asserting the zone's ABSENCE is the half
-    // that pins the maintainer's actual complaint: the card and the zone said the same
-    // thing twice.
+    // ONE card once linked (issue 1036, maintainer round 2).
     const linkedSource = target.querySelector('[data-item-drop-zone="essence-source"]');
     assert.ok(linkedSource, 'the linked source renders through the shared item drop zone');
     assert.ok(linkedSource.textContent.includes('Glass Vial'), 'naming the linked component');
@@ -436,11 +416,7 @@ export function registerEssencesCases() {
       null,
       'and no second drop zone renders beneath it'
     );
-    // The Tool Studio's grouped icon pair, not one square clear button. `Glass Vial` (c2)
-    // carries no `originItemUuid`, so the pair is correctly one here: copy-uuid renders only
-    // when there IS a uuid to copy, which is the drop zone's own `onCopy`-is-null contract
-    // and is honest in a way a permanently inert copy button would not be. What matters is
-    // that both are the primitive's rounded icon buttons in its own right-aligned group.
+    // The Tool Studio's grouped icon pair.
     const linkedActions = linkedSource.querySelectorAll(
       '.manager-item-drop-zone-actions .manager-icon-button'
     );
@@ -464,7 +440,6 @@ export function registerEssencesCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
 
     // The DELETE lives in the inspector now, and is WARNED, not blocked (maintainer round):
-    // it fires for a carried essence too, with an impact note stating the cascade's reach.
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
@@ -490,11 +465,6 @@ export function registerEssencesCases() {
     // straight into `system.essenceDefinitions` — a system-owned essence with its own name, icon
     // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
     // reference's Essence Rules header carries nothing on the right at all.
-    //
-    // The palette, the create save call and the six-argument `addEssence` contract this block
-    // used to walk are not lost: the world Essence Catalogue's `+ New essence` is the create now,
-    // and `essence-world-scope-screens-mounted.test.js` walks the world entry editor's identity
-    // form. What is asserted here is that the entry point is gone rather than merely hidden.
     assert.ok(
       !target.querySelector('.manager-header-actions .manager-button'),
       'the Essence Rules header carries no action'
@@ -606,7 +576,6 @@ export function registerEssencesCases() {
     assert.equal(target.textContent.includes('Linked source'), false);
     assert.equal(target.textContent.includes('Source evidence'), false);
     // The capability pills are GATED by the feature, not merely by the card's own fields:
-    // `earth` carries both, and neither renders.
     assert.equal(
       target.querySelectorAll('[data-essence-capability]').length,
       0,
@@ -851,7 +820,7 @@ export function registerEssencesCases() {
     unmount(mounted);
     target.remove();
 
-    // THE THIRD CASE — A FAILED CREATE — IS RETIRED WITH ITS ROUTE (issue 1372, round 8). It
+    // THE THIRD CASE — A FAILED CREATE.
     // walked the system-scope create draft, whose only entry point was the Essence Rules header's
     // `+ Create essence`; an essence's identity is a world record and the create that authors one
     // is the Essence Catalogue's. The two cases above still cover what this file is about — a

@@ -55,9 +55,8 @@ describe('Fabricate theme management', () => {
     assert.deepEqual(configurableKeys, [
       SETTING_KEYS.EXPERIMENTAL_FEATURES,
       SETTING_KEYS.INTERACTION_PROMPT_POSITION,
-      // Issue 1024: free text, deliberately — the design refuses to auto-append a
-      // `.value` leaf and the set of real per-system paths is open-ended, so a
-      // `choices` dropdown would be wrong.
+      // Issue 1024: free text, deliberately — the design refuses to auto-append a `.value` leaf and
+      // the set of real per-system paths is open-ended, so a `choices` dropdown would be wrong.
       SETTING_KEYS.ITEM_STACK_QUANTITY_PATH,
       SETTING_KEYS.THEME
     ].sort());
@@ -117,10 +116,8 @@ describe('Fabricate theme management', () => {
   });
 
   it('registers the progressive result order preference as USER-scoped, not client-scoped', () => {
-    // Issue 651 flipped this from `client` to `user`: a player's chosen stage order must
-    // follow their account across devices, not sit in one browser's localStorage. Pinned
-    // because the flip is a one-word change that can otherwise be silently reverted —
-    // and because `user` scope makes `set` an async, replicated document write.
+    // Issue 651 flipped this from `client` to `user`: a player's chosen stage order must follow
+    // their account across devices, not sit in one browser's localStorage.
     const registrations = [];
     globalThis.game.settings.register = (namespace, key, definition) => {
       registrations.push({ namespace, key, definition });

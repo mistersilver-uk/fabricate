@@ -120,10 +120,7 @@ test('validateGatheringRealmList rejects duplicate realm ids', () => {
 
 test('normalizeGatheringRealmSettings emits PARTICIPATION ONLY', () => {
   // `revealMode` and `modifierVisibility` describe the world's realms, not one system's
-  // relationship to them, and moved to `travelConfig` (issue 1282). They are DROPPED here
-  // rather than passed through, deliberately: both consumers coerce a missing reveal mode to
-  // `'manual'`, so a silently-preserved key would turn every `alwaysVisible` world into a
-  // `manual` one with no error anywhere. Omitting it makes a missed reader fail loudly.
+  // relationship to them, and moved to `travelConfig` (issue 1282).
   assert.deepEqual(normalizeGatheringRealmSettings({}), { enabled: false });
   assert.deepEqual(
     normalizeGatheringRealmSettings({ enabled: true, revealMode: 'alwaysVisible', modifierVisibility: 'gmOnly' }),

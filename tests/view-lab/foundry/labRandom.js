@@ -1,19 +1,4 @@
-/**
- * Deterministic replacements for every source of entropy a Fabricate render can reach.
- *
- * A screenshot harness that leaks entropy produces a different PNG every run, which destroys the
- * only thing evidence is for: noticing when something changed. `foundry.utils.randomID` is the
- * obvious source, but it is not the only one — these all appear in real render paths and were
- * found by reading them, not by guessing:
- *
- * - `CraftingModifierCatalogueCard.svelte:74` falls through to `crypto.randomUUID()` when
- *   `foundry.utils.randomID` is absent.
- * - `CraftingSystemManagerRoot.svelte:4201` builds a drop-row id from `Date.now()` + `Math.random()`.
- * - `adminStore.js:846` builds fallback ids from `Date.now()`.
- *
- * Everything is restored by the returned disposer, so a lab page that tears down leaves the realm
- * as it found it.
- */
+/** Deterministic replacements for every source of entropy a Fabricate render can reach. */
 
 /** 2026-06-01T12:00:00Z — a fixed "now" for every lab render. */
 export const LAB_EPOCH_MS = 1_780_315_200_000;
@@ -44,7 +29,6 @@ const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456
  * @param {object} [options] Options.
  * @param {number} [options.seed] PRNG seed; the same seed yields the same frames.
  * @param {number} [options.epochMs] Fixed wall-clock time.
- * @returns {{random: () => number, randomID: (length?: number) => string, restore: () => void}}
  */
 export function installLabRandom({ seed = 20_260_601, epochMs = LAB_EPOCH_MS } = {}) {
   const random = mulberry32(seed);

@@ -1,12 +1,4 @@
-/**
- * `promptBulkCheckRoll` — the ONE dialog a whole batch answers (issue 859).
- *
- * It is a sibling export rather than a mode flag on `promptCheckRoll`, whose body is
- * already a dense conditional matrix — but the two share every leaf below the surface
- * (`renderDieRow`, `renderBonusInput`, `renderRollModePicker`, `readSharedRollChoice`,
- * `buildRollButtons`), which is why this suite and `tests/roll-prompt-options.test.js`
- * share ONE dialog stub out of `tests/helpers/rollPromptDialogStub.js`.
- */
+/** `promptBulkCheckRoll` — the ONE dialog a whole batch answers (issue 859). */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,9 +33,8 @@ async function open(args, formElements = FORM, options = {}) {
 
 describe('promptBulkCheckRoll: the headless and dismissal paths', () => {
   it('confirms without blocking when no DialogV2 exists at all', async () => {
-    // Headless (tests, and any harness with no dialog API). It must not stall a run, and
-    // it threads the SAME shape a confirmed click produces so the caller's downstream
-    // code has one path.
+    // Headless (tests, and any harness with no dialog API). It must not stall a run, and it threads
+    // the SAME shape a confirmed click produces so the caller's downstream code has one path.
     const original = globalThis.foundry;
     if (original !== undefined) delete globalThis.foundry;
     try {
@@ -60,9 +51,8 @@ describe('promptBulkCheckRoll: the headless and dismissal paths', () => {
   });
 
   it('returns { confirmed: false } when the dialog resolves null', async () => {
-    // `DialogV2.wait` with the default `rejectClose = false` resolves `result ?? null` on
-    // BOTH Escape and the window X — neither REJECTS, so a `.catch()` alone cannot see a
-    // dismissal. This is the shape the service reads as "cancel with zero mutation".
+    // `DialogV2.wait` with the default `rejectClose = false` resolves `result ?? null` on BOTH
+    // Escape and the window X — neither REJECTS, so a `.catch()` alone cannot see a dismissal.
     const stub = stubDialogDismissal(null);
     try {
       assert.deepEqual(await promptBulkCheckRoll({ subjects: subjects(2) }), { confirmed: false });
@@ -104,9 +94,8 @@ describe('promptBulkCheckRoll: the headless and dismissal paths', () => {
 
 describe('promptBulkCheckRoll: what it deliberately does NOT show', () => {
   it('renders no DC chip and no formula block', async () => {
-    // A batch has no single subject: each item rolls its OWN system's formula against its
-    // own DC / tiers / stages. Rendering one item's formula would be a claim about the
-    // other twenty-four, and rendering all of them would be a wall of text.
+    // A batch has no single subject: each item rolls its OWN system's formula against its own DC /
+    // tiers / stages.
     const { captured } = await open({ allowAdvantage: true, subjects: subjects(3) });
     assert.doesNotMatch(captured.content, /fabricate-roll-prompt__dc/, 'no DC chip');
     assert.doesNotMatch(captured.content, /fabricate-roll-prompt__formula/, 'no formula block');
@@ -115,8 +104,7 @@ describe('promptBulkCheckRoll: what it deliberately does NOT show', () => {
   });
 
   it('renders no playerPicks modifier fieldset', async () => {
-    // `playerPicks` is crafting-only, so a salvage batch never carries a
-    // `modifierChoice` at all.
+    // `playerPicks` is crafting-only, so a salvage batch never carries a `modifierChoice` at all.
     const { captured } = await open({ allowAdvantage: true, subjects: subjects(2) });
     assert.doesNotMatch(captured.content, /craftingModifier/);
   });
@@ -219,9 +207,8 @@ describe('promptBulkCheckRoll: bonus normalization', () => {
     { label: 'a leading plus with spaces', typed: '  +2  ', bonus: '2' },
     { label: 'a negative', typed: '-1', bonus: '-1' },
     { label: 'an expression', typed: '1d4 + 1', bonus: '1d4 + 1' },
-    // Only ONE leading plus is stripped, so `++2` stays malformed rather than being
-    // silently repaired into something the player did not type. `evaluateCheckRoll`'s
-    // `Roll.validate` net is what stops it becoming a rolled (consuming) failure.
+    // Only ONE leading plus is stripped, so `++2` stays malformed rather than being silently
+    // repaired into something the player did not type.
     { label: 'a double plus', typed: '++2', bonus: '+2' },
   ];
 

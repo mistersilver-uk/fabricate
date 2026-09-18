@@ -1,17 +1,4 @@
-/**
- * The two scoped-entity patterns whose whole contract is a STRUCTURAL absence (issue 1362).
- *
- * Both are proved by mounting the SAME props twice and changing only the descriptor, because
- * both defects this guards are invisible to a single-entity-type test:
- *
- *  - `MembershipActions` must render exactly ONE enabled switch for a tool and NONE for a
- *    component. A negative-only assertion passes on a component that renders no switch at all
- *    — including one that renders nothing whatsoever — which is the anti-guard shape. The
- *    POSITIVE half is therefore mandatory and is asserted from the same factory.
- *  - `InheritRow` must draw one row per INHERITABLE section: one for a component, two for a
- *    tool, and none for the tool's SEEDED `repairRequirements`. A per-entity-type test with
- *    its own fixture could satisfy each half against a different set of props.
- */
+/** The two scoped-entity patterns whose whole contract is a STRUCTURAL absence (issue 1362). */
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
 import { resolve } from 'node:path';
@@ -50,7 +37,6 @@ const SCOPED_RAW_MODULES = [
 
 /**
  * The class the shipped no-state primitive actually renders.
- *
  * Named once and asserted from BOTH directions below, because the version of this that read
  * `.manager-empty-state` matched nothing in the repository and therefore could never fail —
  * acceptance criterion 5's "no group chrome" half was decorative for the whole of PR 5.
@@ -92,8 +78,7 @@ const membershipHarness = createMountedComponentHarness({
 });
 
 /**
- * ONE props factory for both mounts. The entity type is the ONLY difference, which is what
- * makes the pair a comparison rather than two unrelated fixtures.
+ * ONE props factory for both mounts. The entity type is the ONLY difference.
  *
  * @param {string} entityType
  * @param {object} [overrides]
@@ -139,8 +124,7 @@ describe('MembershipActions (mounted)', () => {
       0,
       'a component membership record carries no enabled flag at all'
     );
-    // The positive control for the negative above: the cluster DID render, so the absent
-    // switch is the descriptor's doing rather than an empty mount.
+    // The positive control for the negative above: the cluster DID render.
     assert.ok(
       Boolean(root.querySelector('[data-scoped-membership-actions="component"]')),
       'the component cluster still renders'
@@ -163,23 +147,6 @@ describe('MembershipActions (mounted)', () => {
 
   /**
    * THE REMOVE SENTENCE IS THE ENTITY TYPE'S, NOT THE CALLER'S (issue 1371 r10, r9-cat finding 5b).
-   *
-   * Removing a COMPONENT from a system is not a membership edit: `partComponentFromSystem` runs
-   * the in-system delete through `deleteComponents`, which repairs every reference and DISABLES
-   * the recipes left without a usable ingredient set or result. `partEssenceFromSystem` filters
-   * `essenceDefinitions` and writes — no reference repair, no recipe disable — and the tool path
-   * is the generic verb, which does neither either.
-   *
-   * Revision 9 disclosed the cascade on the SHARED key, which this cluster renders for all three
-   * types, so an essence row began announcing a repair its own store does not perform. That is
-   * the same class of defect as the tag-merge overclaim the PR's own spec bans, and the fix is
-   * the one this file already exists to prove: read the answer from the DESCRIPTOR, so the
-   * component path structurally cannot borrow the essence sentence and the essence path
-   * structurally cannot borrow the component's.
-   *
-   * MOUNTED FROM ONE FACTORY WITH THE ENTITY TYPE AS THE ONLY DIFFERENCE, for the reason this
-   * file's header states: a `doesNotMatch` on its own passes on a cluster that rendered nothing,
-   * so the positive half is asserted from the same props.
    */
   it('announces the RECIPE CASCADE for a component, and not for an essence or a tool', async () => {
     const noteFor = (root) => {
@@ -262,9 +229,7 @@ describe('InheritRow (mounted)', () => {
       rows.map((row) => row.getAttribute('data-scoped-inherit-row')),
       ['category', 'essences'] // issue 1371 r18 (M31): category and the world essence section
     );
-    // No header, no divider, no empty state: chrome costs more space than the one control
-    // it would frame and says nothing the row does not.
-    //
+    // No header, no divider, no empty state.
     // `.manager-empty` IS THE SHIPPED CLASS. This read `.manager-empty-state`, which occurs
     // NOWHERE in the repository — `EmptyState.svelte` renders `class="manager-empty …"` — so
     // the assertion could not have failed on any tree at all. The suite below mounts the real
@@ -277,16 +242,6 @@ describe('InheritRow (mounted)', () => {
   it('draws exactly FOUR rows for a tool, and none for the SEEDED section', async () => {
     // NON-VACUITY FIRST. "A seeded section renders none" is satisfied by an EMPTY seeded list,
     // which removes nothing — and the tool list is inert today for a second reason:
-    // `TOOL_SECTIONS` never carried `repairRequirements`, so the resolver does not read
-    // through it and the subtraction removes nothing either way. Asserting the list is
-    // non-empty and then asserting no row bears its name is what makes the negative a
-    // measurement rather than a sentence.
-    //
-    // AND THE FILTER ITSELF REMAINS UNEXERCISED, which this comment records rather than
-    // implies. Replacing `inheritableSections`' body with `return [...descriptor.sections]`
-    // leaves this suite and every other one green: no entity type declares a section that is
-    // also seeded, so there is nothing for the subtraction to remove. What is guarded here is
-    // the CONSTANT and the row set it feeds, not the subtraction.
     assert.ok(
       SCOPED_SEEDED_SECTIONS.tool.length > 0,
       'the tool seeded-section list is empty, so "a seeded section renders none" filters nothing'
@@ -295,8 +250,7 @@ describe('InheritRow (mounted)', () => {
     const rows = [...root.querySelectorAll('[data-scoped-inherit-row]')].map((row) =>
       row.getAttribute('data-scoped-inherit-row')
     );
-    // FOUR since `1.31.0` (issue 1373): `prerequisites` and `bonus` became world-default
-    // sections with inherit switches of their own.
+    // FOUR since `1.31.0` (issue 1373).
     assert.deepEqual(rows, ['breakage', 'onBreak', 'prerequisites', 'bonus']);
     for (const seeded of SCOPED_SEEDED_SECTIONS.tool) {
       assert.equal(
@@ -331,12 +285,7 @@ describe('InheritRow (mounted)', () => {
       'an absent key reads as inheriting'
     );
     const toggles = [...root.querySelectorAll('[data-scoped-inherit-toggle]')];
-    // ON IS OVERRIDDEN. The switch means "this system sets its own", so the OVERRIDDEN row's
-    // switch is pressed and the INHERITING row's is not. This assertion is the inverse of what
-    // it asserted before issue 1372's parity round, and the old direction was the defect: it
-    // pinned a switch that contradicted the state chip one line above it and every note the
-    // essence editor writes under it. Both design frames draw this direction —
-    // `compare-images/PROTO-essence-rules-editor.png` and `tmp/proto/tool-rules-editor.png`.
+    // ON IS OVERRIDDEN. The switch means "this system sets its own".
     assert.deepEqual(
       toggles.map((toggle) => toggle.getAttribute('aria-pressed')),
       // FOUR rows, because issue 1373 gave a tool `prerequisites` and `bonus` alongside the two
@@ -350,8 +299,7 @@ describe('InheritRow (mounted)', () => {
       ['is-on', 'is-off', 'is-off', 'is-off'],
       'the painted state agrees with the pressed state'
     );
-    // The pair must never agree with each other by accident: the chip and the switch are read
-    // together, so assert the relationship rather than two independent snapshots.
+    // The pair must never agree with each other by accident.
     const chips = [...root.querySelectorAll('[data-scoped-inherit-state]')];
     for (const [index, chip] of chips.entries()) {
       const overridden = chip.getAttribute('data-scoped-inherit-state') === 'overridden';
@@ -369,7 +317,6 @@ describe('InheritRow (mounted)', () => {
     // `.manager-status-toggle-label` is `overflow: hidden` inside a compact switch, so the
     // sentence truncated to a meaningless first word — and the row already states the section,
     // the state and the inherited value.
-    //
     // It names the OVERRIDE, not the fallback, because ON is overridden (issue 1372). The
     // reassurance that the override is RETAINED did not go away with the old wording: it is in
     // the section NOTE — "Turn off to fall back to {name}." — which is where the corpus states

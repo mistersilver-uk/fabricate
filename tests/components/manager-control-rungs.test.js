@@ -1,50 +1,6 @@
 /**
  * The two control-ladder rulings of issue 1371's parity round 5 (maintainer rulings M12a and
  * M12b), held as a contract over the sheet and over the one primitive that emits the opt-in.
- *
- * ── M12a: A MANAGER BUTTON'S CORNER FOLLOWS ITS HEIGHT ──────────────────────────────────────
- * `openspec/specs/design-system/spec.md` publishes both ladders: control height is one of
- * 26 / 28 / 30 / 34 / 38 / 44, and "Radius tracks the size of the thing: 6 for chips at or below
- * 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px…". A `<ManagerButton>` is a
- * 34px control and painted a 6px corner — the chip rung — on every manager screen, because
- * `.fabricate-button.manager-button.fab-manager-button` declared the height and no radius and
- * the base `.fabricate-button.manager-button` rule's 6px reached it. Four parity regions on
- * three screens measured the same one-line drift.
- *
- * THE HAZARD THE FIX CREATES IS WHAT THE DERIVED GUARD BELOW IS FOR. Stating a corner on the
- * primitive's own (0,3,0) control rule means every MORE specific rule that overrides the height
- * DOWNWARD and states no corner of its own now inherits a 34px control's corner at 28px or 30px.
- * Two such rules existed and take the 26-32px rung explicitly. A third written later would be
- * silently off the ladder, in a direction no ratchet sees: `design-system-debt-ratchets` reads the
- * radius VALUES in the sheet and 9 is a legal value everywhere, so a 30px control wearing it is
- * invisible to that gate. This file derives the pairing from the sheet instead.
- *
- * ── M12b: 38 IS A RUNG AND IS REACHABLE ─────────────────────────────────────────────────────
- * The reference draws the world catalogue's toolbar search and membership filter and the system
- * rules list's search and two filters at 38px (`proto:577-578`, `proto:1053-1055`); all five ship
- * at 34. 38 is a published rung, so nothing licensed the drop — the size becomes reachable rather
- * than the reference being adapted to the shipped control.
- *
- * IT IS A CLASS FOR THE SELECTS AND A PROP FOR THE FIELD, and the asymmetry is the tree's rather
- * than a choice: `ManagerSearchField` is a component, and the manager has no select COMPONENT at
- * all — `ManagerToolbar`'s own header records that the control beside the field is three different
- * things across eleven bars and that the bar takes a slot rather than choosing between them. So
- * the contract a caller opts into for a `<select>` is the class, and the field's prop emits that
- * same class.
- *
- * ── ROUND 6 ADDED ONE CONTROL TO EACH HALF ──────────────────────────────────────────────────
- * The BUTTON joins M12b: `+ Register item` (`proto:570`) and `+ Add from catalogue`
- * (`proto:1046`) are both drawn at 38, so `ManagerButton` emits the same `is-size-38` token the
- * field does, and the sheet gives it the height alone — 34 and 38 are both inside the radius
- * ladder's 34-38px band, so the corner the primitive already states is right at either height.
- *
- * `InspectorActionButton` joins M12a: its own scoped block declared `min-height: 34px` with
- * `border-radius: 6px`, which is the identical off-ladder pairing on a second primitive, and the
- * rules list measured it as the last line on `sys-inspector-foot-action`. It is a scoped block
- * rather than a sheet rule, so it is read from the component's own source below — and that is
- * also why no rule in `styles/fabricate.css` could have corrected it: that sheet ships at
- * `layer(modules)` and an injected scoped block is unlayered, so a layered rule loses at any
- * specificity.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -64,10 +20,7 @@ const BAND_9 = Object.freeze([34, 38]);
 const BAND_7 = Object.freeze([26, 32]);
 
 /**
- * Every rule in the sheet, as `{ selector, body }`. A flat walk is enough here: the two
- * properties this file reads are never nested inside an at-rule in the corpus it inspects, and a
- * `@media` copy of a rule would appear as its own entry with the same selector, which is the
- * behaviour the pairing guard wants anyway.
+ * Every rule in the sheet, as `{ selector, body }`. A flat walk is enough here.
  *
  * @returns {Array<{ selector: string, body: string }>}
  */
@@ -107,9 +60,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
   const PRIMITIVE = '.fabricate-button.manager-button.fab-manager-button';
 
   it('publishes both ladders, so the numbers below are read and not restated', () => {
-    // Non-vacuity for the whole file: every assertion here is an arithmetic claim about two
-    // published ladders, and a rung set that had silently changed would make all of them
-    // meaningless while every one still passed.
+    // Non-vacuity for the whole file.
     const spec = readFileSync(resolve(repoRoot, 'openspec/specs/design-system/spec.md'), 'utf8');
     assert.match(
       spec,
@@ -132,9 +83,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
   });
 
   it('and the base rule it supersedes still states the chip rung, so the fix is a real change', () => {
-    // The negative control. If the base rule had been edited instead, the assertion above would
-    // pass while `.manager-icon-button` — which shares that rule and is a different control at a
-    // different size — had been repainted as a side effect.
+    // The negative control. If the base rule had been edited instead.
     const base = rules().find(
       (rule) =>
         rule.selector === '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button'
@@ -144,10 +93,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
   });
 
   /**
-   * Every converted-button selector that pulls the control BELOW the 34-38px band, with the
-   * radius the sheet gives it — read across the whole sheet rather than from the one rule that
-   * happens to state the height, because a corner may legitimately be stated by a later rule
-   * that lists several selectors together.
+   * Every converted-button selector that pulls the control BELOW the 34-38px band.
    *
    * @returns {Array<{ selector: string, height: number, radius: number | null }>}
    */
@@ -180,10 +126,6 @@ describe('M12a — a manager button takes the corner its height is on', () => {
     // wears the 34-38px band's 9px. What it must not do is state 9 — that is the exact
     // inheritance this guard exists to make visible, and `design-system-debt-ratchets` cannot see
     // it, because 9 is a legal radius value everywhere in the sheet.
-    //
-    // A sub-band button that states an off-ladder corner of its OWN is out of scope here and
-    // stays visible to the radius ratchet: the Checks Studio's preset row is 30px on 8px, which
-    // predates this ruling and is not something this edit moved.
     const offenders = convertedButtonsBelowTheBand()
       .filter(({ radius }) => radius === null || radius === 9)
       .map(({ selector, height, radius }) => `${selector} — ${height}px control, radius ${radius}`);
@@ -235,17 +177,10 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   after(() => harness.teardown());
 
   const fieldRule = '.fabricate-search.manager-search.is-size-38 input';
-  // The SECOND member re-rooted at issue 1508 — `ManagerToolbar`'s family is `.fabricate-filter-bar`
-  // now — while the first names `.manager-filter`, a CALLER class no primitive emits, so it stays
-  // application-rooted. `bodiesOf` looks the list up by exact text, so both halves are stated here.
+  // The SECOND member re-rooted at issue 1508.
   const selectRule =
     '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-filter-bar.manager-toolbar select.is-size-38';
-  // THE SCOPED CATALOGUE'S MEMBER LEFT THAT LIST AT ISSUE 1504 and is a rule of its own, because
-  // that toolbar's lane filters are shared `<Select>`s now: the class rides the SELECT ROOT and
-  // the rung has to reach the `<button>` trigger beneath it. It states `min-height` rather than
-  // `height`, because `.fabricate-select-trigger` sets `height: auto` to turn core's fixed
-  // `button { height: var(--button-size) }` into a floor — so a `height` here would put the
-  // fixed box straight back.
+  // THE SCOPED CATALOGUE'S MEMBER LEFT THAT LIST AT ISSUE 1504 and is a rule of its own.
   const triggerRule =
     '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger';
 
@@ -274,8 +209,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
 
   it('and the shipped controls it overrides are still 34px, so the opt-in is a real change', () => {
-    // Non-vacuity again, and a specificity claim: both shipped rules are (0,2,1) and both state
-    // the height, so an opt-in written at the same weight would be decided by source order.
+    // Non-vacuity again, and a specificity claim.
     assert.equal(pixels(valueOf(bodiesOf('.fabricate-search.manager-search input')[0], 'height')), 34);
     // The scoped catalogue's own shipped 34 is the `<Select>`'s `toolbar` rung since issue 1504,
     // not the narrowed `.manager-scoped-list-toolbar select` rule — that one paints the one
@@ -298,11 +232,6 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('emits NO size class by default, so every shipped field is unchanged', async () => {
     const root = await harness.mount({ ariaLabel: 'Search' });
     // THIS EQUALITY IS ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM (issue 1508).
-    // Every other reader of the root is SOURCE TEXT — the area-scope gate reads the `$derived`
-    // array, the host-independence fixtures write the class as a literal — so a component that
-    // declared the array and stopped rendering `class={classes}` would pass all of them while
-    // every re-rooted rule matched nothing. Mounting and comparing the WHOLE class string is what
-    // catches that, which is why the root is asserted here rather than in a separate clause.
     assert.equal(
       root.querySelector('label').className.replace(/ ?svelte-[a-z0-9]+/g, ''),
       'fabricate-search manager-search',
@@ -352,11 +281,9 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {
     const [body] = bodiesOf(buttonRule);
     assert.equal(pixels(valueOf(body, 'min-height')), 38, 'the button opts into the 38px rung');
-    // `min-height`, matching the property the rule it overrides declares: a `height` here would
-    // win the size argument while leaving a 34px floor underneath it.
+    // `min-height`, matching the property the rule it overrides declares.
     assert.equal(valueOf(body, 'height'), null, 'the rung states min-height, as the rule it overrides does');
-    // AND NO RADIUS. Both rungs are inside the 34-38px band, so restating 9 here would be a
-    // second source of truth for one value — the failure the primitive's docblock exists to end.
+    // AND NO RADIUS. Both rungs are inside the 34-38px band.
     assert.equal(
       valueOf(body, 'border-radius'),
       null,
@@ -377,8 +304,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('and the shipped button it overrides is still 34px, so the opt-in is a real change', () => {
     const [primitive] = bodiesOf('.fabricate-button.manager-button.fab-manager-button');
     assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
-    // A specificity claim, not a source-order one: the shipped rule is (0,3,0) and states the
-    // height, so an opt-in written at the same weight would be decided by where it was written.
+    // A specificity claim, not a source-order one.
     assert.equal((buttonRule.match(/\.[\w-]+/g) ?? []).length, 4);
   });
 
@@ -422,9 +348,7 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
   });
 
   it('is unreachable from the sheet, which is why the fix is in the component', () => {
-    // The measurement, not an opinion: `styles/fabricate.css` ships at `layer(modules)` and this
-    // block is injected unlayered, so a rule there is emitted, matches, and has its declaration
-    // discarded. A future author reaching for the sheet needs to find this stated.
+    // The measurement, not an opinion.
     const declarations = css
       .split('}')
       .filter((block) => /\.fab-inspector-action[^{]*\{/.test(block));
@@ -436,10 +360,7 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
   });
 
   it('leaves the primary’s retired 36px rung exactly as it stands, which is booked debt', () => {
-    // 36 is NOT on the ladder — `control-height-known-literals.js` already books it — and paying
-    // it down is a separate change with its own repaint. What matters here is that this edit did
-    // not quietly move it, and that 36 is inside the band the corner above serves, so the two
-    // are not in conflict.
+    // 36 is NOT on the ladder — `control-height-known-literals.js` already books it.
     const body = scopedRule(ACTION, '.fab-inspector-action.is-primary');
     assert.equal(pixels(valueOf(body, 'min-height')), 36, 'the primary’s height is unchanged by this edit');
     assert.ok(!LADDER_RUNGS.includes(36), '36 is still a retired rung, so this stays booked debt');

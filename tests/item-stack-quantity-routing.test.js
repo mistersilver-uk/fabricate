@@ -1,40 +1,14 @@
 /**
- * Acceptance criterion 6 (issue 1024): under a CONFIGURED stack-quantity path, every
- * consume and award path reads and writes ONLY the configured field.
- *
- * ## The load-bearing fixture shape
- *
- * Every item here carries **only** `system.qtd` — there is no `system.quantity` key on it
- * at all. That is what makes these assertions mean something. ~15 test files in this suite
- * hardcode `payload['system.quantity']` in their Item fakes and stay green whether the
- * sites are routed or not, because the UNCONFIGURED default *is* `system.quantity`.
- * `npm test` cannot otherwise distinguish "routed" from "not routed".
- *
- * ## What this file does NOT prove
- *
- * It proves the payload **shape**, not that the write lands. Every Item fake in this repo
- * applies its payload by hand, so a fake keyed on the configured path always applies it and
- * nothing here can observe a Foundry schema discard. That proof is routed to
- * `probeStackQuantityPath`'s `_source` verdict (`tests/item-stack-quantity.test.js`) and to
- * the manual test.
- *
- * Note also that an assertion under a MISCONFIGURED path would prove nothing at all: under
- * a misconfigured path the engine correctly deletes, so "delete was called" is the right
- * answer for the wrong reason.
- *
- * ## Ambient-state discipline
- *
- * The configured path is module state. Nothing here configures it at module scope, and
- * every test registers `t.after(resetItemStackQuantityPath)` as its FIRST statement, before
- * the configure call, so a mid-test throw still resets.
+ * Acceptance criterion 6 (issue 1024): under a CONFIGURED stack-quantity path, every consume and
+ * award path reads and writes ONLY the configured field. It proves the payload **shape**, not that
+ * the write lands.
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-// The `foundry.utils` path helpers are wired from the repo's own shared walker rather
-// than re-hand-rolled here for a fourth time. They are fixture plumbing only — nothing
-// below asserts on a value they produce — and `objectPath.js` has its own test file.
+// The `foundry.utils` path helpers are wired from the repo's own shared walker rather than
+// re-hand-rolled here for a fourth time.
 import { getByPath, setByPath } from '../src/utils/objectPath.js';
 
 globalThis.foundry = {
@@ -59,11 +33,7 @@ const { configureItemStackQuantityPath, resetItemStackQuantityPath } = await imp
 
 const CONFIGURED_PATH = 'system.qtd';
 
-/**
- * An owned item whose stack count lives ONLY at `system.qtd`. It applies whatever
- * flattened payload it is handed, so a write to the wrong key is visible in `updates`
- * rather than silently swallowed.
- */
+/** An owned item whose stack count lives ONLY at `system.qtd`. */
 function ownedItem(id, qtd, extra = {}) {
   return {
     id,
@@ -123,9 +93,7 @@ function assertNoDefaultPathWrite(item) {
   assert.equal(item.system.quantity, undefined, 'the item never grew a default-path key');
 }
 
-// ---------------------------------------------------------------------------
 // The four delete-on-underrun sites.
-// ---------------------------------------------------------------------------
 
 describe('craft consumption (_consumeIngredients — also the timed step START path)', () => {
   it('decrements the configured field and does NOT delete', async (t) => {
@@ -209,9 +177,7 @@ describe('alchemy NO-MATCH consumption (_consumeSubmittedAlchemyItems)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The award/creation paths.
-// ---------------------------------------------------------------------------
 
 describe('the timed-step restore path (_restoreComponentItem)', () => {
   it('authors the restored quantity at the configured field only', async (t) => {

@@ -1,22 +1,4 @@
-/**
- * THE ESSENCE DELETE IS AN OVERRIDE (issue 1371 r21-store4, the reviewer's round-7 finding 1).
- *
- * ── WHAT THIS SUITE FALSIFIES ────────────────────────────────────────────────────────────────
- * `deleteEssence` strips the essence from the PERSISTED in-system rows and the GM's confirmation
- * dialog states that strip as the impact they are consenting to. Since the `1.32.0` election a
- * component's `essences` are a WORLD SECTION every system INHERITS unless it overrides, and the
- * read union overwrites an inheriting row's map wholesale with the world one — so on the modal
- * post-upgrade world the strip changed nothing the system resolved. No test asserted anything
- * about a RESOLVED map after a delete, which is why the divergence survived two rounds.
- *
- * So this suite drives the real manager over a real read union and asks the only question that
- * matters: what does `getComponentsForSystem` answer AFTER the delete?
- *
- * The flag write is the CALLER's, because it is a world-scope setting write and this manager holds
- * no path to one — so the fixture wires the shipped decision function (`setSectionInheritance`)
- * behind the shipped rule (`createComponentEssenceOverride`), which is the composition the admin
- * store makes in production.
- */
+/** THE ESSENCE DELETE IS AN OVERRIDE (issue 1371 r21-store4, the reviewer's round-7 finding 1). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -30,11 +12,7 @@ installFoundryEnv();
 
 const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
 
-/**
- * A recipe manager double with nothing to cascade into: this suite is about the COMPONENT half.
- *
- * @returns {object}
- */
+/** A recipe manager double with nothing to cascade into: this suite is about the COMPONENT half. */
 function makeRecipeManager() {
   return {
     getRecipes: () => [],
@@ -49,14 +27,8 @@ function makeRecipeManager() {
  * The world after `1.32.0`: `ingot` carries `{fire: 3, earth: 2}` at WORLD scope, `sys` inherits
  * it, and the system's own row is the dormant one the election left behind.
  *
- * `components[0].essences` is EMPTY on purpose. That is the state adoption creates (the seed
- * stamps no essence map at all) and the harshest one for the fix: flipping the switch without
- * seeding the row would answer `{}` — deleting `fire` would silently take `earth` with it.
- *
- * @param {object} [options]
  * @param {boolean} [options.flagRefuses] whether the world-setting flag write is refused.
  * @param {object} [options.row] the system's own persisted essence map.
- * @returns {object}
  */
 function makeWorld({ flagRefuses = false, row = {} } = {}) {
   let corpus = {
@@ -159,9 +131,7 @@ test('1371 r21: deleteEssence overrides the pair first, so the system stops reso
 });
 
 test('1371 r21: the flipped row is seeded from what it RESOLVED, so the other essences survive', async () => {
-  // The second data loss the flip alone would cause. An inheriting pair's own row is dormant —
-  // empty here, stale in general — so overriding onto it without seeding would answer `{}` and
-  // deleting `fire` would take `earth` with it.
+  // The second data loss the flip alone would cause.
   const world = makeWorld();
   await world.manager.deleteEssence('sys', 'fire', world.seam);
   assert.deepEqual(
@@ -197,8 +167,7 @@ test('1371 r21: a component the delete does not affect is not flipped', async ()
 
 test('1371 r21: a REFUSED flag write leaves the pair inheriting rather than half-stripping it', async () => {
   // Warned, not blocked: the definition still goes, because refusing the whole delete over one
-  // setting refusal would leave a definition the GM asked to remove in place. The pair that could
-  // not be reached keeps resolving the world map, which is the honest outcome of a refusal.
+  // setting refusal would leave a definition the GM asked to remove in place.
   const world = makeWorld({ flagRefuses: true });
 
   assert.equal(await world.manager.deleteEssence('sys', 'fire', world.seam), true);

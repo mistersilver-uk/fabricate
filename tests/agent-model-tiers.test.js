@@ -21,10 +21,9 @@ import {
 } from '../scripts/lib/agentModelTiers.js';
 import { main } from '../scripts/validate-agent-bindings.mjs';
 
-// --- Fixtures ---------------------------------------------------------------
-// The canonical roster: 6 model-tiered families x 3 model tiers, plus 3 untiered
-// skill-backed roles and 1 Codex-only mapping role — 22 bindings-table rows,
-// 21 skill-backed roles + 1 mapping role.
+// Fixtures --------------------------------------------------------------- The canonical roster: 6
+// model-tiered families x 3 model tiers, plus 3 untiered skill-backed roles and 1 Codex-only
+// mapping role — 22 bindings-table rows, 21 skill-backed roles + 1 mapping role.
 
 const TIERS = ['small', 'medium', 'large'];
 
@@ -585,11 +584,8 @@ test('12. a description naming all three model tiers is rejected for every model
   assert.deepEqual(untiered, []);
 });
 
-// --- 13. The AGENTS.md <-> module mirror ------------------------------------
-// `AGENTS.md` restates HIGH_RISK_PATHS, the SMALL_MAX/MEDIUM_MAX table, the model
-// pins, and the roster. That is a hand-maintained mirror of this module, so without
-// this test the two drift silently and the Design's claim that "a later AGENTS.md
-// edit contradicting them fails npm test" is false.
+// 13. The AGENTS.md <-> module mirror ------------------------------------ `AGENTS.md` restates
+// HIGH_RISK_PATHS, the SMALL_MAX/MEDIUM_MAX table, the model pins, and the roster.
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const AGENTS_MD = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf8');
@@ -618,9 +614,8 @@ function readMarkdownTable(md, isHeader, label) {
 }
 
 /**
- * The fenced `HIGH_RISK_PATHS` block holds prose then a blank line then the list, so
- * the entries are the LAST blank-line-separated group. Reading the whole fence would
- * pick up the prose line that deliberately names a path.
+ * The fenced `HIGH_RISK_PATHS` block holds prose then a blank line then the list, so the entries
+ * are the LAST blank-line-separated group.
  */
 function fencedHighRiskPaths(md) {
   const marker = md.indexOf('**`HIGH_RISK_PATHS`.**');

@@ -28,20 +28,11 @@ let GatheringEconomyView;
 let mounted;
 let target;
 
-// This suite predates `createMountedComponentHarness` and still drives its own temp tree, but
-// the compile-and-rewrite half was a verbatim copy of the shared compiler — the very duplication
-// `svelte-component-harness.js`'s own header says it exists to remove. `getTempRoot` is a thunk
-// because `tempRoot` is not assigned until `before()`.
+// This suite predates `createMountedComponentHarness` and still drives its own temp tree.
 const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 /**
  * A rolled economy actor row, spelling out only what a case actually varies.
- *
- * Ten cases shipped this fixture as a full eight-key literal differing in two or three values,
- * which is one fixture written ten times — and SonarCloud counts duplication in `tests/**` exactly
- * as it does in `src/`. The defaults are the "rolled, no override" shape most cases want; `current:
- * null, max: null, rolledMax: null` is the un-rolled one, and `maxOverride` is what the override
- * cases set.
  *
  * @param {object} [overrides]
  * @returns {object}
@@ -137,8 +128,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     }
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
     writeCompiledSvelte('src/ui/svelte/components/RadioCardGroup.svelte');
-    // The manager's ONE labelled push-button (issue 1118): the actor list's bulk Save renders
-    // it. Already covered by the `SELECT_COMPILED_MODULES` loop above.
+    // The manager's ONE labelled push-button (issue 1118).
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(
@@ -438,12 +428,6 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     target.remove();
   });
   // ── Issue 1050: the two migrated cells ─────────────────────────────────────────────
-  //
-  // Phase 4's entry for the keyboard non-regression check, and the behavioural half of D1a for
-  // this view's two fields. `Max (override)` is GENUINE absence — `saveAll` maps `'' | null` to a
-  // null override meaning "use the rolled max" — while `Current` is COSMETIC zero, because
-  // `saveAll` writes `Number(draftCurrent) || 0` and absence is simply not a value it can persist.
-  // The two are asserted differently for exactly that reason.
   it('clears the max override to null, never hands Current a null, and still steps from the keyboard', async () => {
     const actors = [
       actor({ max: 5, maxOverride: 5 }),
@@ -474,8 +458,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     override.value = '';
     override.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
-    // Clearing Current is NOT: `allowUnset={false}` makes `onInput` return early on '', so the
-    // draft keeps its prior value and nothing null can reach the write below.
+    // Clearing Current is NOT: `allowUnset={false}` makes `onInput` return early on ''.
     current.value = '';
     current.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
@@ -518,25 +501,13 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     const unit = '[data-economy-regen-unit]';
     assert.deepEqual(selectOptionValues(target, policy), ['none', 'overTime']);
     assert.deepEqual(selectOptionLabels(target, policy), ['Manual only', 'Over world time']);
-    // CLOSE IT BEFORE OPENING THE NEXT. Nothing dismisses a panel in a mounted suite: the
-    // dismisser listens on `mousedown` and `.click()` fires none, so both panels would sit in the
-    // portal host at once and the class-first lookup would return the policy list for the unit
-    // trigger. The helper reports that as a mismatched `aria-controls` rather than as an option
-    // this control does not offer, which is how this line came to exist.
+    // CLOSE IT BEFORE OPENING THE NEXT. Nothing dismisses a panel in a mounted suite.
     closeSelectPanel(target, policy);
     assert.deepEqual(selectOptionValues(target, unit), ['minutes', 'hours', 'days', 'weeks']);
-    // THE LABEL IS THE `<option>`'s OWN TEXT, resolved the same way. This harness stubs
-    // `localize` to return the key, so `text(key, fallback)` yields the fallback — which for the
-    // unit list is the unit id itself, exactly as it was before the conversion. The SHIPPED copy
-    // is `Economy.Unit.*`'s singular capitalised forms ("Minute", "Hour", "Day", "Week"), so the
-    // row still reads "Every [3] Minute"; that is measured against the real `lang/en.json` in
-    // `tests/components/manager-select-conversion-rendered.test.js`, which is the only harness
-    // here that loads it. `DurationUnitPlural` exists and is deliberately NOT adopted: a copy
-    // change is not this conversion's to make.
+    // THE LABEL IS THE `<option>`'s OWN TEXT.
     assert.deepEqual(selectOptionLabels(target, unit), ['minutes', 'hours', 'days', 'weeks']);
 
-    // Both wrappers were deleted rather than demoted: each existed only to caption its select, so
-    // the caption rides the primitive's own `label=` form. The announced name is unchanged.
+    // Both wrappers were deleted rather than demoted: each existed only to caption its select.
     closeSelectPanel(target, unit);
     assert.equal(assertSelectHasResolvedName(target, policy), 'Regeneration');
     assert.equal(assertSelectHasResolvedName(target, unit), 'Per');

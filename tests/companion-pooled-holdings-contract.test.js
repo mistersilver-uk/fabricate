@@ -1,24 +1,7 @@
 /**
  * The two pooled members' CONTRACT half (issue 1342) — the result factories
- * `pooledHoldingsReadResult` and `pooledHoldingsConsumeResult`, their outcome vocabulary, their
- * two key tables and the two bounds their refusals interpolate.
- *
- * `src/systems/companionContract.js` is Foundry-free, so all of this is testable here. What is
- * NOT here is the members' behaviour — resolving a name against a crafting system's definition
- * index, pooling a ladder-aware currency balance, batching a delete per actor and restoring a
- * snapshot on failure — which lives with the leaves that do it. This suite is about what the
- * two factories PROMISE a companion, and about the derivations that keep the promise from
- * disagreeing with itself.
- *
- * Three claims carry the weight:
- *
- *   - `sufficient` is DERIVED from `available` against `requested`, and a tool's is
- *     `state === 'present'` and nothing else — so a damaged tool can never read as sufficient.
- *   - `consumed` is SUMMED, twice: each ledger row from its own takes, and the call from its
- *     rows. Nothing a caller passes can make the published total disagree with the lines
- *     beneath it.
- *   - `null` MEANS FABRICATE CANNOT SEE and `0` MEANS IT CAN PROVE NONE — the shipped
- *     `creditCurrency` rule, reused here rather than re-derived into a fourth value.
+ * `pooledHoldingsReadResult` and `pooledHoldingsConsumeResult`, their outcome vocabulary, their two
+ * key tables and the two bounds their refusals interpolate.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -149,8 +132,7 @@ test('every pooled consume outcome answers the WHOLE documented refusal shape', 
 
 test('insufficient is a REFUSED ACT, where the read answering no is a success', () => {
   // The line this pair is built on: `notAffordable` is a QUESTION answered no and is a success;
-  // `insufficient` is an ACT refused and is not. Answering `insufficient` with `success: true`
-  // would tell a companion its downtime stage was paid for.
+  // `insufficient` is an ACT refused and is not.
   assert.equal(pooledHoldingsConsumeResult('insufficient').success, false);
   assert.equal(pooledHoldingsConsumeResult('consumeFailed').success, false);
   assert.equal(pooledHoldingsReadResult('readFailed').success, false);
@@ -566,10 +548,7 @@ test('the entry-only lists are DATA, and the call-level set is computed by subtr
 });
 
 test('the two deleted tokens are not in the vocabulary, in either spelling', () => {
-  // Asserted rather than remembered. `costNotFound` would be a third spelling of the shipped
-  // `componentNotFound` and `unitNotFound`, and `partiallyConsumed` would name a state an
-  // all-or-nothing take cannot reach — which the dead-vocabulary sweep would then demand a key
-  // for. Both were deleted in review, and this is what stops one coming back.
+  // Asserted rather than remembered.
   for (const token of ['costNotFound', 'partiallyConsumed']) {
     assert.equal(COMPANION_OUTCOMES[token], undefined, `${token} is deliberately not declared`);
     assert.equal(POOLED_HOLDINGS_READ_MESSAGE_KEYS[token], undefined, `${token} has no read key`);
@@ -611,9 +590,8 @@ test('each bounded refusal interpolates its OWN bound rather than restating the 
 });
 
 test('every reading-level and row-level string interpolates NOTHING', () => {
-  // Load-bearing rather than incidental: an entry carries no `messageData` at all, so a
-  // placeholder on one of these keys puts literal braces in front of a GM with nothing able to
-  // supply them. The two `{max}` strings above are CALL-level, which is why they are exempt.
+  // Load-bearing rather than incidental: an entry carries no `messageData` at all, so a placeholder
+  // on one of these keys puts literal braces in front of a GM with nothing able to supply them.
   const entryLevel = [
     ...POOLED_HOLDINGS_READ_ENTRY_OUTCOMES.map((outcome) => [
       'read',
@@ -671,24 +649,9 @@ test('the cost axes are published as symbols, and the unserved ones are not amon
   assert.deepEqual(Object.keys(POOLED_TOOL_STATES), ['present', 'damaged', 'missing']);
 });
 
-// ---------------------------------------------------------------------------
 // The ACTOR-SET gate, driven directly
-// ---------------------------------------------------------------------------
 
-/**
- * `gatePooledActorUuids` had no unit suite of its own, and the gap was not cosmetic.
- *
- * Its only exercise was through the facade harness, whose resolver is a `Map.get(uuid) ?? null`
- * — it cannot throw, cannot alias two addresses onto one document, and answers instantly. So
- * `resolveOnePooledActor`'s `try`/`catch` could be deleted with the whole suite still green,
- * while the production resolver is `fromUuidSync`, which DOES throw: `strict` defaults to `true`
- * on both v13.350 and v14.365, and a pack-sourced embedded address cannot be resolved
- * synchronously.
- *
- * The function is Foundry-free and takes its resolver as a seam, so every case below is a
- * literal. `resolveActor` is spelled per case rather than shared, because the seam's BEHAVIOUR is
- * the subject.
- */
+/** `gatePooledActorUuids` had no unit suite of its own, and the gap was not cosmetic. */
 
 /** A resolved document stands only for its own identity here, so a bare object is enough. */
 const actorA = { uuid: 'Actor.a', documentName: 'Actor' };
@@ -745,8 +708,7 @@ test('the gate refuses a request that is wrong, carrying the bound its string in
 test('the gate refuses a pool that names one document twice, by IDENTITY', () => {
   // Both spellings of the repeat, and the second needs no caller mistake at all: `Token#actor`
   // returns `this.baseActor` for a LINKED token, so these two well-formed, visibly different
-  // addresses resolve to the identical document. Downstream every consumer sums per entry, so a
-  // repeat reads a party holding one stack of five as holding ten and then takes eight from it.
+  // addresses resolve to the identical document.
   const aliased = {
     'Actor.a': actorA,
     'Scene.s.Token.t.Actor.a': actorA,
@@ -767,10 +729,7 @@ test('the gate refuses a pool that names one document twice, by IDENTITY', () =>
 });
 
 test('the gate admits two DIFFERENT documents that share one id', () => {
-  // The counterpart, and the reason distinctness is by identity rather than by `id`. An UNLINKED
-  // token's synthetic actor is built by `ActorDelta#applyDelta` from `baseActor.toObject()` with
-  // `_id` deleted, so it carries the SAME `id` as its base actor while being a different
-  // document with a different inventory. An id-keyed test would refuse this legitimate party.
+  // The counterpart, and the reason distinctness is by identity rather than by `id`.
   const base = { id: 'shared', uuid: 'Actor.shared', documentName: 'Actor' };
   const synthetic = { id: 'shared', uuid: 'Scene.s.Token.t.Actor.shared', documentName: 'Actor' };
 
@@ -785,9 +744,7 @@ test('the gate admits two DIFFERENT documents that share one id', () => {
 
 test('a resolver that THROWS answers one unresolvable address, never an escaping exception', () => {
   // The production resolver is `fromUuidSync`, and it raises on a pack-sourced EMBEDDED address
-  // because `strict` defaults to true. A `stable` member may not throw, so the throw has to
-  // become a refusal — and WHICH refusal is the claim: the address answered nothing, so the
-  // partly-resolved rule decides, exactly as an unknown address would.
+  // because `strict` defaults to true.
   const errors = [];
   const originalError = console.error;
   console.error = (...args) => errors.push(args);

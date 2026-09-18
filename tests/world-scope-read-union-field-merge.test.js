@@ -1,37 +1,7 @@
 /**
  * THE READ UNION'S MERGE (issue 1363 Phase 8, inverted by issue 1370 PR 8a, SCOPED by 1372).
- *
  * `unionScopedDefinitions` used to push the world-resolved entry, mark the id claimed, and then
- * SKIP the legacy entry entirely. #1363 corrected that to `{ ...legacyEntry, ...entity,
- * ...resolved }`, and this file pinned the two spread hazards that correction left standing as
- * INTENDED: an authored empty-string world `description` beat a populated in-system one, and the
- * resolved `enabled` beat a GM-disabled in-system essence or tool.
- *
- * BOTH ARE STILL RETIRED, and issue 1372 did not bring either back. What 1372 changed is the
- * SCOPE of the rule that retired them. Issue 1370 made the in-system record decide EVERY key, and
- * this file said so in its own arm titles. It now decides its own identity and its own
- * NON-SECTION keys, while the membership record's inherit switch decides which layer answers a
- * SECTION, because `## CraftingSystem` requirement 36's blanket claim made every `Inheriting`
- * pill and every `World default: ...` line on the world-scope screens a false statement.
- *
- * SO THIS FILE PINS THE HALF THAT DID NOT MOVE, and the half that did is pinned next door in
- * `tests/world-scope-inherited-section-resolution.test.js`. The two are deliberately separate
- * files: every fixture here carries an OVERRIDING or absent membership record, or a world half
- * that authored no section at all, which is exactly the population the 1372 rule leaves alone -
- * and that is the fact worth having a file assert.
- *
- * The union still re-spreads the whole in-system record LAST and then DELETES every lifted
- * identity field that record does not carry, so the world layer supplies only the keys it does
- * not have. The reason the old bullets stop holding is unchanged and mechanical: every
- * shipped identity writer writes the IN-SYSTEM copy, no shipped editor writes a world or
- * membership `enabled`, and `resolveScopedDefinition` emits `enabled` — and `resolveComponent`
- * emits `tags` — UNCONDITIONALLY, so those two keys were overwritten even when no scope had
- * authored anything.
- *
- * MUTATION PROOF. Removing the trailing `...entry` re-spread reddens the identity and `enabled`
- * tests; removing the DELETE loop reddens the absence test; keeping the retired two-pass
- * claimed/fall-through build reddens the row-set and duplicate-id tests. Each was run and produced
- * `not ok` before this file was committed.
+ * SKIP the legacy entry entirely.
  */
 
 import assert from 'node:assert/strict';
@@ -133,13 +103,7 @@ describe('the read union merges FIELD BY FIELD on an id collision', () => {
 });
 
 describe('an unrecognised entityType is REFUSED, never defaulted', () => {
-  // THE THROW IS THE POINT, and it is new in this change. The DELETE half of the key rule reads
-  // its field list per entity type, and the retired spelling was `WORLD_IDENTITY_FIELDS[type] ??
-  // []` - which fails OPEN. A typo in one of the three call sites would delete nothing, leaving a
-  // stale world `name`, `icon` or `img` on a record the GM has since cleared, on every read, with
-  // every suite in the repository green: measured, two such typos kept 943 tests across 23 files
-  // passing. A key that silently disables a correctness rule has to be loud, and a documented
-  // contract with no test is how it stops being loud again.
+  // THE THROW IS THE POINT, and it is new in this change.
   const corpus = collidingCorpus(
     { id: 'comp-1', name: 'Ash Salt', description: 'the snapshot blurb' },
     { entityId: 'comp-1', systemId: 'sys-a', inherit: {} }
@@ -198,8 +162,7 @@ describe('an unrecognised entityType is REFUSED, never defaulted', () => {
   it('does NOT throw on the blank-systemId path, which returns before the check', () => {
     // A PRECISION FOOTNOTE, so a later reader does not widen the contract past what it says. The
     // early return for a blank `systemId` answers the in-system rows before any field list is
-    // resolved. That is not a fail-open hole: with no system there is no membership, so no row
-    // merges and the DELETE half has nothing to disable.
+    // resolved.
     const legacy = [{ id: 'comp-1', name: 'Ash Salt', description: 'kept' }];
     const answer = unionScopedDefinitions({
       corpus,
@@ -213,14 +176,7 @@ describe('an unrecognised entityType is REFUSED, never defaulted', () => {
 
 describe('a DECLARED section with no writer is REFUSED, on the same rule', () => {
   // THE SAME FAILURE ONE LEVEL DOWN, and unlike the entity-type typo above this one has already
-  // shipped. Issue 1373 added `prerequisites` and `bonus` to `TOOL_SECTIONS` while
-  // `INHERITED_SECTION_WRITERS.tools` still wrote `breakage` and `onBreak` alone. Nothing near
-  // the table went red: the two new sections kept answering from the in-system record whatever
-  // their switch said, which is precisely what an entity-type typo does, and only the suite that
-  // happens to drive every DECLARED section caught it.
-  //
-  // The section list and the writer table must stay equal and live in two modules, so this pins
-  // the check at the point the two MEET rather than in a suite a future lane may not run.
+  // shipped (issue 1373).
   const corpus = collidingCorpus({ id: 't1' }, { entityId: 't1', systemId: 'sys-a', inherit: {} });
 
   /** A resolver that declares one extra section, exactly as widening `TOOL_SECTIONS` would. */
@@ -294,10 +250,8 @@ describe('the two spread hazards stay RETIRED for a row with no section to inher
 
   it('a GM-disabled in-system essence and tool read back DISABLED', () => {
     // RETIRED, and this is the severe half: `enabled` is emitted UNCONDITIONALLY for an enableable
-    // scope, so before the inversion a disabled essence or tool read back usable whether or not
-    // any membership record had authored anything. `enabled` is NOT a section at any scope, so
-    // issue 1372's inherit-switch rule does not reach it, and the EMPTY `inherit` maps below -
-    // which read as inheriting everything - are what prove that rather than merely assert it.
+    // scope, so before the inversion a disabled essence or tool read back usable whether or not any
+    // membership record had authored anything (issue 1372).
     const essenceUnion = unionScopedDefinitions({
       corpus: collidingCorpus(
         { id: 'fire', name: 'Fire' },

@@ -1,11 +1,6 @@
 /**
- * Currency-refund coverage for the player-cancel reversal (issue 848).
- *
- * A cancel with refund ON must give back the exact currency a craft spent at START.
- * The refund is the inverse of the spend: `buildCurrencyRefundUpdates` adds the
- * requirement's own denomination back to the actor's balance (no change-making), the
- * ActorPropertyCoinSpender applies it, and `refundCurrencySpends` drives the aggregated
- * groups. Reusable by the GM cancel/reverse (issue 847).
+ * Currency-refund coverage for the player-cancel reversal (issue 848). A cancel with refund ON must
+ * give back the exact currency a craft spent at START.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -56,9 +51,8 @@ function makeActor(gp = 0, sp = 0) {
       this._updates.push(payload);
       for (const [path, value] of Object.entries(payload)) setProperty(this, path, value);
       // A real `Document#update` RESOLVES THE DOCUMENT when it applied a change, and resolves
-      // `undefined` when the diff was empty — which is what an off-schema path produces. The
-      // spender now judges the write by that return (issue 1301), so a stub that resolved
-      // nothing was asserting the very behaviour that means NOTHING WAS WRITTEN.
+      // `undefined` when the diff was empty — which is what an off-schema path produces (issue
+      // 1301).
       return this;
     },
   };
@@ -161,13 +155,7 @@ test('MacroCoinSpender.refund fails loudly when no increment macro is configured
   assert.equal(result.valid, false, 'a missing increment macro cannot silently drop a refund');
 });
 
-// ---------------------------------------------------------------------------
 // Refund ACCUMULATION across aggregated groups (issue 902).
-//
-// §RunModel requires the reversal to be "best-effort" and to report the actual
-// outcome. Aborting at the first failing group is neither: it strands every later
-// group unrefunded and reports one opaque boolean.
-// ---------------------------------------------------------------------------
 
 const { aggregateCurrencySpends } = await import('../src/systems/currencyAffordance.js');
 const { validateCurrencyProfile: validateProfile } = await import(

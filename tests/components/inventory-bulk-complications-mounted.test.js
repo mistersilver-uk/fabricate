@@ -1,21 +1,4 @@
-/**
- * The bulk panel's "What could go wrong" block (issue 1286, PR 2).
- *
- * Mounts `InventoryBulkPanel` DIRECTLY, because the block's whole contract is
- * given-props: every field it draws is published on the queued entry by
- * `inventoryStore`'s `bulkRunProjection`, and the panel's job is to render exactly that
- * and derive none of it. A suite that mounted `InventoryView` instead would prove the
- * store wiring and hide the block's own rules behind a fixture; the wiring half is
- * pinned where the wiring lives (`tests/stores/player-complication-seam.test.js` for the
- * projection, `tests/components/inventory-view.test.js` for the panel's props).
- *
- * The harness's `game.i18n` stub returns the KEY for `localize(key)` and
- * `<key>:<json>` for `localize(key, data)`, so the assertions below read as key names.
- * That is deliberately useful here: the formatted form pins the exact substitution
- * PAYLOAD, which is how a re-indexed position or a dropped DC is caught rather than
- * merely a string that happens to contain a number
- * (`inventory-view.test.js`'s `RecoveredCount` assertion is the precedent).
- */
+/** The bulk panel's "What could go wrong" block (issue 1286, PR 2). */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
@@ -32,10 +15,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-complications-',
-  // The panel's FULL static import closure, not the subset this suite's fixtures happen
-  // to render: a compiled `.svelte.js` carries static imports of every child whatever the
-  // `{#if}` branches do, and an omission HANGS the suite (# cancelled) rather than
-  // failing it. `createMountedComponentHarness` re-walks the closure and throws on a gap.
+  // The panel's FULL static import closure.
   rawModules: [
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
@@ -46,9 +26,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
   ],
   compiledModules: [
-    // The player window's own shared roster (issue 1514), spread rather than listed. The bulk
-    // panel and its report render `EmptyState` for their three empty lines and `Kicker` for the
-    // report's roll label now, and the roster already carries the record tile this list named.
+    // The player window's own shared roster (issue 1514).
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/RowDisclosure.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
@@ -60,9 +38,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte',
-    // INCLUDING the component under test: `setup()` writes `compiledModules` only, so a
-    // list that omits the panel's own compiled artefact leaves the import unresolvable —
-    // which surfaces as `# cancelled`, not as a failure.
+    // INCLUDING the component under test: `setup()` writes `compiledModules` only.
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
@@ -131,8 +107,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
   });
 
   it('is withheld once the run commits, in BOTH post-commit states', async () => {
-    // The fired record is reported on the aggregate chat card after a run, so a forecast
-    // still standing beside a committed outcome reads as a second, contradicting report.
+    // The fired record is reported on the aggregate chat card after a run.
     const running = await mount({ running: true, progress: { current: 0, total: 1 } });
     assert.ok(!blockIn(running), 'not while the batch runs');
     harness.remount();
@@ -145,9 +120,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
 
   it('renders ABOVE the queue, where it can still change the player’s mind', async () => {
     const root = await mount();
-    // Compared as INDICES, never as nodes: `node:assert` serialises a mounted happy-dom
-    // element's circular tree to build its diff, so a failed node comparison dies of a
-    // heap OOM and reports as a `# cancelled` suite with no message.
+    // Compared as INDICES, never as nodes.
     const sections = [...root.querySelectorAll('.inventory-detail-section')];
     assert.ok(
       sections.indexOf(blockIn(root)) <
@@ -248,8 +221,6 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
 
   it('renders the same complication twice when it is staged twice', async () => {
     // A component staged twice is two rows at two positions carrying one complication id:
-    // a complication is evaluated per result entry, so the second occurrence is a real
-    // second chance for it to fire — and a key over the id alone would collide.
     const root = await mount({
       salvageable: [
         entry({
@@ -295,10 +266,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
 
   // ── Whose order it is ────────────────────────────────────────────────────────────
 
-  // Three states, one per card. A boolean cannot hold them: a player who MAY arrange the
-  // list and has not is `orderIsPlayers: false` while plainly not looking at an order the
-  // GM fixed, so the middle state is asserted against BOTH of its neighbours rather than
-  // merely against the presence of a note.
+  // Three states, one per card. A boolean cannot hold them.
   const orderNoteIn = (group) => group.querySelector('[data-inventory-bulk-complication-order]');
 
   it('names the order as the player’s OWN, and says it is remembered', async () => {
@@ -368,9 +336,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
   });
 
   it('draws no order note at all for a provenance it does not know', async () => {
-    // Null is unreachable from the store for a card that exists — a row with no ordered
-    // stage list publishes no forecast — so the fallback exists to degrade to silence
-    // rather than to print a raw state name at a player.
+    // Null is unreachable from the store for a card that exists.
     const root = await mount({ salvageable: [entry({ orderProvenance: null })] });
     assert.ok(!orderNoteIn(groupsIn(root)[0]));
   });
@@ -404,9 +370,7 @@ describe('the bulk panel’s "What could go wrong" block (issue 1286)', () => {
   });
 
   it('never shows the player a trigger sentence', async () => {
-    // The body slot is TYPED on the shared row: the player variant reads `description`
-    // and the GM variants read `triggerSentence`, so handing a player the trigger is
-    // unspellable at the call site rather than merely discouraged.
+    // The body slot is TYPED on the shared row.
     const root = await mount();
     assert.doesNotMatch(blockIn(root).textContent, /When |1d20|rolls /);
   });

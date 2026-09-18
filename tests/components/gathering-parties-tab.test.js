@@ -9,9 +9,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
-// Issue 1504: the page-size control is a shared `<Select>`, so choosing a size is two clicks on
-// a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
-// harness's own mount target, which is why every lookup below is rooted there.
+// Issue 1504: the page-size control is a shared `<Select>`.
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -40,8 +38,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE chip (issue 883) and ONE no-state primitive (issue 785).
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // Issue 1515: the pane's search is the shared field and its refusal banner the shared
@@ -92,9 +89,7 @@ function cards(root) {
   return root.querySelectorAll('.manager-travel-parties-row');
 }
 
-// The hook on the INPUT (issue 1515). The field is `ManagerSearchField` now, whose `class`
-// prop lands on the `<label>` it renders, so the input is addressed by the `inputAttrs` hook
-// the pane passes through — the same one the View Lab case types into.
+// The hook on the INPUT (issue 1515). The field is `ManagerSearchField` now.
 function typeSearch(root, value) {
   const input = root.querySelector('[data-manager-party-search]');
   input.value = value;
@@ -178,9 +173,7 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('renders the shared filtered panel and NO card list when nothing matches', async () => {
     const root = await mountTab({ parties: makeParties(3) });
-    // The negative control for the pager assertion below: at exactly the threshold the
-    // bar is drawn even though three parties fit on one page, which is what `persistent`
-    // buys once the gate opens.
+    // The negative control for the pager assertion below.
     assert.ok(Boolean(root.querySelector('.manager-pagination')), 'the matched pane pages');
 
     typeSearch(root, 'zzz');
@@ -203,13 +196,7 @@ describe('GatheringPartiesTab (mounted)', () => {
   });
 
   it('returns to page ONE on a page-size change, where the clamp cannot do it for us', async () => {
-    // 13 parties, walked to page 3 of 5 at size 3, then resized to 6. The out-of-range
-    // clamp at `GatheringPartiesTab.svelte` only fires when `pageIndex * pageSize >=
-    // filteredParties.length` — here 2 * 6 = 12 < 13, so it does NOT fire and the ONLY
-    // thing that can put the pane back on page one is `changePageSize`'s explicit reset.
-    // The equivalent assertion in `manager-mounted.test.js` cannot discriminate: its
-    // 5-party lab fixture trips the clamp at every offered size above three, so the
-    // reset could be deleted there and the suite would stay green.
+    // 13 parties, walked to page 3 of 5 at size 3.
     const root = await mountTab({ parties: makeParties(13) });
     root.querySelector('[data-pagination-next]').click();
     flushSync();
@@ -229,7 +216,7 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('holds the pager back below three matches, and brings it in at three', async () => {
     let root = await mountTab({ parties: makeParties(2) });
-    // Two parties are one page at every offered size, so the bar could only state
+    // Two parties are one page at every offered size.
     // "Showing 1–2 of 2 · Page 1 of 1" over a list the GM is already seeing in full.
     assert.ok(!root.querySelector('[data-manager-party-pagination]'), 'no footer at two');
     harness.remount();
@@ -237,8 +224,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     root = await mountTab({ parties: makeParties(3) });
     assert.ok(Boolean(root.querySelector('[data-manager-party-pagination]')), 'footer at three');
 
-    // The gate reads the FILTERED set — the set every number in the bar counts — so a
-    // query that narrows the page below the threshold takes the bar with it.
+    // The gate reads the FILTERED set — the set every number in the bar counts.
     typeSearch(root, 'Party 1');
     assert.equal(cards(root).length, 1);
     assert.ok(!root.querySelector('[data-manager-party-pagination]'), 'and goes with the match');
@@ -249,8 +235,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     typeSearch(root, 'Party 2');
     assert.equal(cards(root).length, 1);
 
-    // The second party is deleted upstream: the search bar unmounts with it, so the
-    // query must go too or nothing left on screen can clear the no-match state.
+    // The second party is deleted upstream: the search bar unmounts with it.
     await harness.setProps({ parties: makeParties(1) });
     assert.ok(!root.querySelector('[data-manager-party-search]'), 'search bar is gone');
     assert.ok(!root.querySelector('[data-travel-parties-no-match]'), 'not stranded in no-match');
@@ -259,9 +244,7 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('offers exactly 3/6/9 per page and defaults to 3', async () => {
     const root = await mountTab({ parties: makeParties(9) });
-    // Counted, not merely present: the control renders unconditionally, so a presence
-    // assertion cannot fail. Read off the OPEN panel's rows, which is where the offered
-    // values live now.
+    // Counted, not merely present: the control renders unconditionally.
     assert.deepEqual(selectOptionValues(root, '[data-pagination-size]'), ['3', '6', '9']);
     assert.equal(cards(root).length, 3);
   });
@@ -296,12 +279,10 @@ describe('GatheringPartiesTab (mounted)', () => {
     pickerSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     assert.equal(root.querySelectorAll('.manager-travel-option').length, 1, 'picker is filtered');
-    // 2, not 3: the Wagon is not of a configured player-character type, so it is not a
-    // travel-actor candidate and is not in the denominator either.
+    // 2, not 3: the Wagon is not of a configured player-character type.
     assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '1 of 2');
 
-    // A page CHANGE would unmount the keyed cards and close both incidentally; a page
-    // SIZE change keeps them mounted, so it is the only case that proves the close.
+    // A page CHANGE would unmount the keyed cards and close both incidentally.
     chooseSelectOption(root, '[data-pagination-size]', 6);
 
     assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
@@ -436,8 +417,7 @@ describe('GatheringPartiesTab (mounted)', () => {
   });
 
   it('renders a rejected ENABLE as the pane-level summary above the list', async () => {
-    // `setPartyEnabled` passes no field context, and req 5 can reject an enable the
-    // travel-actor gate allows, so the enable control is never the only feedback surface.
+    // `setPartyEnabled` passes no field context.
     const root = await mountTab({
       parties: [
         makeParty({ id: 'p1', name: 'Wardens', enabled: true, travelActorUuid: 'Actor.v' }),
@@ -491,15 +471,7 @@ describe('GatheringPartiesTab (mounted)', () => {
   });
 
   it('keeps the realm-override picker on the value-bearing trigger with an in-popover search', async () => {
-    // NOT a characterization of the primitive's untouched path any more — this consumer
-    // now opts into `compactOptionRows` and the shared title/count header, so it is a
-    // changed surface. What it still pins is the deliberate HALF it did not adopt: the
-    // trigger stays mounted and keeps displaying the current override rather than being
-    // replaced by the search field, because a trigger that erases the value it reports
-    // makes the GM close the picker to re-read what they are changing. That makes this
-    // the only mounted coverage of the in-popover search row, which `inlineSearchTrigger`
-    // suppresses entirely — see `party-expanded-body.test.js` for the header/search
-    // ORDER, and `manager-world-parties-realm-override-picker` for its rendered frame.
+    // NOT a characterization of the primitive's untouched path any more.
     const chosen = [];
     const root = await mountTab({
       parties: [makeParty({ id: 'p1', name: 'Wardens' })],
@@ -531,15 +503,7 @@ describe('GatheringPartiesTab (mounted)', () => {
   });
 
   it('teaches SearchablePopover the pane scroller so a card picker is bounded by the pane', () => {
-    // happy-dom returns a zero-valued `getBoundingClientRect`, so the horizontal clamp
-    // cannot be proven by mounting. This pins the ancestor list itself, which is the
-    // thing that changed: without the pane class the walk falls through to the manager
-    // shell and a card's picker can be laid out past the pane's right edge.
-    //
-    // The list moved to `util/overlayBounds.js` with issue 1500 — a shared component under
-    // `components/` must not name an application's own scroller — so the pin follows it, and
-    // the second half checks the picker still DEFAULTS to that walk. Either half alone would
-    // pass over a picker that had stopped using it.
+    // happy-dom returns a zero-valued `getBoundingClientRect`.
     assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-table-scroll/);
     assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-travel-parties/);
 

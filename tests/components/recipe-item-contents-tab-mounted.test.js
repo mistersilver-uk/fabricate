@@ -15,9 +15,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The recipe thumbnails resolve through the shared pure image helper (issue 544).
     'src/ui/svelte/util/craftingImageDefaults.js',
-    // The Link-recipe menu is a `SearchablePopover` (issue 1458): it dismisses on an
-    // outside click, portals its panel to the manager host and lays it out against the
-    // trigger.
+    // The Link-recipe menu is a `SearchablePopover` (issue 1458).
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
@@ -52,9 +50,7 @@ const AVAILABLE = [
   { id: 'r3', name: 'Veil Powder', category: 'Alchemy' },
 ];
 
-// A library rather than a handful, because the search field and the matched-of-total count are
-// only meaningful over one — and because the two "Verd…" names are what let a typed query
-// narrow the list to more than one row, which is the state a choose has to survive.
+// A library rather than a handful.
 const LIBRARY = [
   { id: 'r1', name: 'Alloy Bronze', category: 'Smithing' },
   { id: 'r2', name: 'Refine Steel', category: 'Smithing' },
@@ -79,12 +75,7 @@ function openPicker(root) {
   };
 }
 
-/**
- * A keydown from wherever focus is, which is how the primitive's dismissal is reached.
- *
- * `settle` rather than `flushSync` alone: the primitive returns focus to the trigger from a
- * `tick().then(...)`, so the move needs a real turn of the loop.
- */
+/** A keydown from wherever focus is, which is how the primitive's dismissal is reached. */
 async function pressKey(key) {
   document.activeElement.dispatchEvent(
     new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
@@ -203,7 +194,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
     assert.equal(picker.count().textContent.trim(), '2 of 5');
   });
 
-  // `triggerHasPopup` came off WITH `showSearch={false}`, because the two are one statement read
+  // `triggerHasPopup` came off WITH `showSearch={false}`.
   // from either end: with a query field in it the panel is a dialog that CONTAINS a listbox, and
   // announcing a bare listbox promises a control the GM never gets. The source contract holds
   // the rule; this holds the rendered attribute, which is the thing a screen reader reads.
@@ -213,8 +204,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
       root.querySelector('[data-recipe-item-link-recipe-toggle]').getAttribute('aria-haspopup'),
       'dialog'
     );
-    // Single-select is UNCHANGED: `stayOpen` is the gate alone, so the list must not announce
-    // itself as multi-selectable.
+    // Single-select is UNCHANGED: `stayOpen` is the gate alone.
     const picker = openPicker(root);
     assert.equal(
       picker.panel().querySelector('[role="listbox"]').hasAttribute('aria-multiselectable'),
@@ -249,8 +239,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
     assert.equal(picker.search().value, 'Verd', 'the typed query survives the choice');
     assert.equal(picker.options().length, 2, 'the matched rows survive the choice');
 
-    // THE SECOND LINK WITHOUT RE-OPENING, which is the whole capability. A gate that closed the
-    // panel would leave nothing here to click.
+    // THE SECOND LINK WITHOUT RE-OPENING.
     picker.options()[1].click();
     flushSync();
     assert.deepEqual(calls, ['r4', 'r5']);
@@ -275,14 +264,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
     assert.ok(document.activeElement === button, 'an aria-disabled trigger still takes focus');
   });
 
-  // AND IT IS STILL PAINTED AS CLOSED, which the clause above cannot see. happy-dom computes no
-  // cascade, so a mounted assertion reads nothing the stylesheet says — and the swap from
-  // `disabled` to `triggerAriaDisabled` moved the trigger OUT of the only selector that dimmed
-  // it. `:disabled` matches an element carrying the native attribute, and this one no longer
-  // does, so the "every recipe is already linked" panel drew a full-opacity trigger at
-  // `cursor: pointer` that silently did nothing: a control that looks live and is not is worse
-  // than one that looks dead. The rule is read out of the COMPILED CSS, which is the artifact
-  // the browser is handed and the only place a pruned or mis-keyed selector shows up.
+  // AND IT IS STILL PAINTED AS CLOSED.
   it('paints the closed trigger through a selector that reads the ARIA flag it now carries', () => {
     const { css } = scopedComponentCss(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte')
@@ -357,8 +339,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-recipe-item-recipe]').length, 1);
   });
 
-  // AND THE LAST LINK, which is the state the trigger's flag exists for: the library empties
-  // under an open panel, the affordance closes, and Escape has to give the keyboard back.
+  // AND THE LAST LINK, which is the state the trigger's flag exists for.
   it('hands focus back to the closed trigger when the last linkable recipe is linked', async () => {
     const root = await harness.mount({
       linkedRecipes: [],

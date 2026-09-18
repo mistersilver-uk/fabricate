@@ -58,8 +58,7 @@ function makeServices() {
     craftErrorMessage: () => 'Crafting failed.',
     listCraftingForActor: async (opts) => {
       calls.list.push(opts);
-      // The listing resolves an actor ONLY when an id was threaded through — this
-      // is the crafting actor the view persisted, not the raw bar selection.
+      // The listing resolves an actor ONLY when an id was threaded through.
       return opts.rememberedActorId
         ? {
             selectedActorId: 'Actor.actor-x',
@@ -72,8 +71,7 @@ function makeServices() {
           }
         : { selectedActorId: null, actor: null, componentSourceIds: [], worldTime: 0, summaries: [], total: 0, counts: { available: 0, total: 0 } };
     },
-    // The DETAIL phase seam (issue 1075): the store hydrates the selected recipe's rich
-    // model on demand. The fixture recipe is already a rich model, so it serves both.
+    // The DETAIL phase seam (issue 1075).
     hydrateCraftingRecipe: ({ recipeId } = {}) => (recipeId === recipe().id ? recipe() : null)
   };
   return { services, calls, settings };

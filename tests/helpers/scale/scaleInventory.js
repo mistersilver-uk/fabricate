@@ -1,83 +1,27 @@
-/**
- * The HELD-INVENTORY axis (issues 1070, 1071).
- *
- * ## Why this is its own module and its own dimension
- *
- * Every other generator in this directory scales the CORPUS. The failure that started this
- * programme did not: a user with 1,080 components reported a 7.5 s crafting-menu open and
- * then traced it themselves to one character carrying hundreds of salvageable materials. The
- * terms that blew up are PRODUCTS — `items × components` for identity resolution and
- * `CraftingEngine.findComponentItems`, `recipes × items` for `evaluateCraftability`'s
- * per-call `sourceActors.flatMap((actor) => [...actor.items])`.
- *
- * Two consequences, both easy to get wrong and both fatal to the harness if got wrong:
- *
- * 1. **Held-item count varies independently of corpus size.** This module takes `stacks` and
- *    a component LIBRARY; it has no idea how many recipes exist and cannot be made to care.
- *    A profile that grew both together could not attribute a regression to either, which is
- *    the entire purpose of the harness. `assertInventoryIndependentOfCorpus` in the harness
- *    test proves the independence rather than asserting it in prose.
- *
- * 2. **Most held items resolve to NO component.** This is the counter-intuitive half. An
- *    inventory made entirely of registered components exercises the CHEAP identity tier: a
- *    durable `flags.fabricate.roles[systemId].componentId` hits on the first tier and stops.
- *    An ordinary item — mundane gear, ammo, loot, most of a real character sheet — carries no
- *    Fabricate flags, so it falls through both durable tiers, fails the source-reference
- *    intersection after scanning the WHOLE library, and then pays a second full scan in the
- *    name fallback before returning `null` (`essenceResolver.js` `findMatchingComponent` →
- *    `componentNameMatch.js` `findComponentByName`). Measured on this checkout against a
- *    5,000-component library, 1,000 items cost 3.3 ms when every item is durably flagged and
- *    220 ms when none is — a 66x difference that a 100%-component benchmark inventory hides
- *    completely.
- *
- *    So the default mix is 70% unmatched / 30% component, and the mix is RECORDED on the
- *    returned fixture so a baseline states what it measured instead of implying it.
- *
- * ## Two ways an item can be "matched"
- *
- * A matched stack is split further, because the two matched paths cost very differently and a
- * profile that only ships the durable kind would under-report:
- *
- * - `durable` — carries `flags.fabricate.roles[systemId].componentId`. Tier 1, one `find`.
- * - `sourceRef` — carries only the component's registered source uuid, as an un-restamped
- *   pre-#555 world's items do. Tiers 1 and 2 miss and tier 3 scans until it intersects.
- */
+/** The HELD-INVENTORY axis (issues 1070, 1071). */
 import { roleItem } from '../componentIdentityFixtures.js';
 
 import { intBetween } from './scaleRandom.js';
 
 /**
- * The inventory series issue 1071 requires be reported as a SERIES rather than a single
- * number. One data point cannot show super-linear growth, which is the defect being guarded
- * against.
- * @type {readonly number[]}
+ * The inventory series issue 1071 requires be reported as a SERIES rather than a single number. One
+ * data point cannot show super-linear growth, which is the defect being guarded against.
  */
 export const INVENTORY_SERIES = Object.freeze([100, 500, 1000]);
 
 /**
  * The composition of a real player sheet: most of what a character carries is not a crafting
- * component. Overridable per profile, but a profile that overrides it must say so, because
- * the mix decides which identity branch is measured.
+ * component.
  */
 export const DEFAULT_UNMATCHED_RATIO = 0.7;
 
 /**
- * Of the matched minority, how many carry a durable identity flag rather than only a raw
- * source reference. Two thirds durable reflects a world that has been through the #556/#567
- * restamp with a tail of older items.
+ * Of the matched minority, how many carry a durable identity flag rather than only a raw source
+ * reference.
  */
 export const DEFAULT_DURABLE_SHARE = 2 / 3;
 
-/**
- * A `getFlag`-compatible reader for an ACTOR's Fabricate flags.
- *
- * `componentIdentityFixtures.roleItem` supplies the ITEM-side reader; an actor needs a
- * different key set (`learnedRecipes`, `discoveryProgress`), so the two are not the same
- * function and sharing one would mean a reader that answers keys its subject never has.
- *
- * @param {{learnedRecipes?: object, discoveryProgress?: object}} values
- * @returns {(scope: string, key: string) => unknown}
- */
+/** A `getFlag`-compatible reader for an ACTOR's Fabricate flags. */
 function actorFlagReader(values) {
   return (scope, key) => {
     if (scope !== 'fabricate') return undefined;
@@ -90,13 +34,8 @@ function actorFlagReader(values) {
 /**
  * One held stack.
  *
- * @param {object} options
- * @param {'unmatched'|'durable'|'sourceRef'|'book'} options.kind
  * @param {number} options.index Global stack index; makes every uuid unique.
- * @param {string} options.systemId
  * @param {object|null} options.component The component this stack IS, for matched kinds.
- * @param {number} options.quantity
- * @returns {object}
  */
 function heldStack({ kind, index, systemId, component, quantity }) {
   if (kind === 'durable') {
@@ -124,9 +63,7 @@ function heldStack({ kind, index, systemId, component, quantity }) {
       compendiumSource: component,
     });
   }
-  // `unmatched`: an ordinary owned item. It has a `uuid` — real items always do — which is
-  // exactly why it is expensive: a non-empty reference set makes the tier-3 scan run in full
-  // instead of returning early, and then the name fallback scans the library again.
+  // `unmatched`: an ordinary owned item.
   return roleItem({
     uuid: `Actor.bench.Item.held-${index}`,
     name: `Mundane Sundry ${index}`,
@@ -134,19 +71,7 @@ function heldStack({ kind, index, systemId, component, quantity }) {
   });
 }
 
-/**
- * Order the three stack kinds so every PREFIX of the sequence holds the declared mix.
- *
- * Interleaved proportionally rather than shuffled. A seeded shuffle would be reproducible too,
- * but it can deal ONE actor a run of cheap durable stacks purely by luck of the seed, which makes
- * per-actor cost depend on the seed instead of on the declared mix. The rule is the standard
- * proportional interleave: repeatedly emit from whichever kind has made the least fractional
- * progress. Because every prefix holds the mix, so does every actor's round-robin share.
- *
- * @param {{unmatched: number, durable: number, sourceRef: number}} weights
- * @param {number} total
- * @returns {Array<'unmatched'|'durable'|'sourceRef'>}
- */
+/** Order the three stack kinds so every PREFIX of the sequence holds the declared mix. */
 function interleaveKinds(weights, total) {
   const kinds = Object.keys(weights);
   const cursors = Object.fromEntries(kinds.map((kind) => [kind, 0]));
@@ -172,26 +97,6 @@ function interleaveKinds(weights, total) {
 /**
  * Turn an ordered kind sequence into per-actor item lists, plus the indexes the benchmark cases
  * select branches with.
- *
- * `byKind` exists because the identity benchmarks MUST measure the miss case separately from the
- * durable-flag hit case — averaging them hides a two-orders-of-magnitude difference — and this is
- * how a case selects one branch WITHOUT stamping a marker field onto the item, which would put a
- * field on an item object that no real item carries.
- *
- * Matched stacks cover a CONTIGUOUS PREFIX of the library rather than a strided sample, for two
- * reasons that both come down to the fixture meaning something: a player holds a subset of the
- * library, not every seventh entry; and the recipe corpora consume components from the front of
- * the library, so a strided inventory would leave every recipe uncraftable and send every
- * craftability evaluation down the same "missing" branch.
- *
- * @param {object} options
- * @param {string[]} options.ordered
- * @param {object[]} options.components
- * @param {string} options.systemId
- * @param {() => number} options.random
- * @param {number} options.actorCount
- * @returns {{perActor: object[][], byKind: object, matchedComponentIds: string[],
- *   craftingActorComponentIds: string[]}}
  */
 function dealStacks({ ordered, components, systemId, random, actorCount }) {
   const perActor = Array.from({ length: actorCount }, () => []);
@@ -229,24 +134,17 @@ function dealStacks({ ordered, components, systemId, random, actorCount }) {
  * Build the held-inventory axis: `stacks` stacks spread over one crafting actor and
  * `sourceActorCount` additional component-source actors, resolved against `components`.
  *
- * @param {object} options
  * @param {number} options.stacks TOTAL held stacks across every actor.
  * @param {object[]} options.components The library the stacks are resolved against. Passed in
- *   rather than generated so the SAME inventory size can be run against different library
- *   sizes — which is what makes this axis independent of the corpus.
- * @param {string} options.systemId
- * @param {() => number} options.random
- * @param {number} [options.unmatchedRatio]
- * @param {number} [options.durableShare]
+ * rather than generated so the SAME inventory size can be run against different library sizes —
+ * which is what makes this axis independent of the corpus.
  * @param {number} [options.sourceActorCount] Additional actors beyond the crafting actor.
  * @param {string[]} [options.bookUuids] Recipe-item source uuids to grant, for the knowledge
- *   profile. Granted books are held IN ADDITION to `stacks` and are counted separately.
- * @param {string[]} [options.learnedRecipeIds]
- * @returns {{craftingActor: object, sourceActors: object[], actors: object[],
- *   byKind: {unmatched: object[], durable: object[], sourceRef: object[]},
- *   matchedComponentIds: string[], craftingActorComponentIds: string[],
- *   mix: {stacks: number, unmatched: number, durable: number, sourceRef: number,
- *   books: number, unmatchedRatio: number, sourceActorCount: number}}}
+ * profile. Granted books are held IN ADDITION to `stacks` and are counted separately.
+ * @returns {{craftingActor: object, sourceActors: object[], actors: object[], byKind: {unmatched:
+ * object[], durable: object[], sourceRef: object[]}, matchedComponentIds: string[],
+ * craftingActorComponentIds: string[], mix: {stacks: number, unmatched: number, durable: number,
+ * sourceRef: number, books: number, unmatchedRatio: number, sourceActorCount: number}}}
  */
 export function buildHeldInventory({
   stacks,
@@ -310,9 +208,7 @@ export function buildHeldInventory({
     sourceActors: actors.slice(1),
     actors,
     byKind,
-    // The component ids some stack actually resolves to. A benchmark that probes a component
-    // nobody holds measures only the miss path and reports `matchedItems: 0` forever, which
-    // looks identical to a fixture whose inventory silently failed to generate.
+    // The component ids some stack actually resolves to.
     matchedComponentIds,
     craftingActorComponentIds,
     mix: {

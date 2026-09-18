@@ -1,9 +1,4 @@
-/**
- * Issue 651 — `allowPlayerResultReorder` on the Recipe and on Component.salvage.
- *
- * The GM-authored reorder permission, default TRUE, replacing the retired system-level
- * `craftingCheck.progressive.allowPlayerReorder`.
- */
+/** Issue 651 — `allowPlayerResultReorder` on the Recipe and on Component.salvage. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -23,9 +18,7 @@ function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
 }
 
-// ---------------------------------------------------------------------------
 // Recipe — constructor default
-// ---------------------------------------------------------------------------
 
 test('Recipe defaults allowPlayerResultReorder to true when the key is absent', () => {
   // The absent-key-reads-true property is exactly why migration 1.17.0 does not seed.
@@ -45,16 +38,11 @@ test('Recipe honours an explicit false (the enabled default-true idiom, not a tr
   );
 });
 
-// ---------------------------------------------------------------------------
 // Recipe — toJSON allowlist round-trip
-// ---------------------------------------------------------------------------
 
 test('Recipe.toJSON round-trips allowPlayerResultReorder: FALSE', () => {
-  // MUST use a `false` fixture. `toJSON()` is an explicit allowlist and the only
-  // export/import gate — an omitted line silently drops the field on every save and
-  // export. A `true` fixture would round-trip GREEN through a dropped field, because
-  // the constructor default re-supplies `true`. Only `false` can fail.
-  // Mutation this test catches: delete the `allowPlayerResultReorder` line from toJSON().
+  // MUST use a `false` fixture. `toJSON()` is an explicit allowlist and the only export/import gate
+  // — an omitted line silently drops the field on every save and export.
   const original = new Recipe({ id: 'r1', name: 'Potion', allowPlayerResultReorder: false });
 
   const json = original.toJSON();
@@ -65,10 +53,7 @@ test('Recipe.toJSON round-trips allowPlayerResultReorder: FALSE', () => {
 });
 
 test('Recipe.toJSON OMITS allowPlayerResultReorder: true, and absence still reads true', () => {
-  // Issue 1087 stopped emitting the default. That is a WRITE-side change only, and the
-  // rest of this file is what makes it safe to make: `false` is still emitted (the test
-  // above), and absence has always meant `true` on disk anyway — issue 651 deliberately
-  // seeded no migration, so every reader already had to handle a missing key.
+  // Issue 1087 stopped emitting the default.
   const json = new Recipe({ id: 'r1', name: 'Potion', allowPlayerResultReorder: true }).toJSON();
   assert.ok(
     !('allowPlayerResultReorder' in json),
@@ -83,9 +68,7 @@ test('Recipe.toJSON survives a JSON string round-trip (export/import shape)', ()
   assert.equal(restored.allowPlayerResultReorder, false);
 });
 
-// ---------------------------------------------------------------------------
 // Component.salvage — both _normalizeSalvage return paths
-// ---------------------------------------------------------------------------
 
 test('_normalizeSalvage defaults allowPlayerResultReorder to true for a normal config', () => {
   const salvage = makeManager()._normalizeSalvage({ enabled: true });
@@ -93,9 +76,7 @@ test('_normalizeSalvage defaults allowPlayerResultReorder to true for a normal c
 });
 
 test('_normalizeSalvage defaults allowPlayerResultReorder to true on the NON-OBJECT path', () => {
-  // The early guard returns its own literal, so the default must be stated on BOTH
-  // return paths. Mutation: remove the field from the non-object literal — a component
-  // with no salvage config would then render the GM toggle off against a default-on spec.
+  // The early guard returns its own literal, so the default must be stated on BOTH return paths.
   const mgr = makeManager();
   for (const input of [null, undefined, 'nope', 42, true]) {
     assert.equal(

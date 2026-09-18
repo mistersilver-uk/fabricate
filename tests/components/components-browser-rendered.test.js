@@ -1,57 +1,4 @@
-/*
- * THE SYSTEM COMPONENT RULES LIST, RENDERED IN A REAL BROWSER (issue 1371 r16-list, maintainer
- * ruling M22; r18-list, maintainer ruling M28).
- * ── WHY THIS FILE EXISTS ─────────────────────────────────────────────────────────────────
- * Both of the defects it measures are CASCADE facts — which declaration a box's edge actually
- * resolves to — and happy-dom computes no layout, so the only place either can be measured is a
- * browser laying out the shipped markup under the shipped stylesheets. This follows
- * `world-component-catalogue-rendered.test.js`: MOUNT the real `ComponentsBrowserView` through the
- * shared harness, ship its `innerHTML` into Chromium inside the manager shell it renders in, and
- * read the boxes.
- * M22: the maintainer's live test found the toolbar card's LAST row — `Select all · GROUP BY
- * CATEGORY · SORT BY · N of M catalogue entries` — sitting flush against the card's bottom border
- * while the gap above it was the toolbar's ordinary row gap. The rule that shipped it said in its
- * own comment that the second row "already carries its own bottom margin"; no rule anywhere gave it
- * one.
- * M28: rows reading `No description` drew their medallion shunted to the middle of the row while
- * rows with a description sat flush. The row's identity is a `<button>`, and Foundry's own chrome
- * centres a button's content — measured on the harvested 14.365 sheet: the identity resolved
- * `justify-content: center` under it and `normal` without it. The module sheet set the button to
- * `display: flex` without saying where its content sits, and the copy column beside the medallion
- * was `flex: 0 1 auto`, so on a short description the pair floated to the centre of whatever
- * width the row left them. The shell here lays a stand-in for that chrome rule BEFORE the module
- * sheet, exactly where Foundry's sits, so the assertion holds under the arrangement the maintainer
- * photographed; where the harvested chrome is on disk the same measurement runs under the real
- * sheet too.
- * ── THE NEGATIVE CONTROLS ARE IN THE FILE ────────────────────────────────────────────────
- * A geometry assertion that has never been seen to fail is indistinguishable from one that
- * measures nothing. Each ruling's second page load re-declares the rule the defect shipped under,
- * and the suite asserts the defect comes back — reproduced on every CI execution rather than
- * pasted once.
- * ── SKIP POLICY, AND WHERE THE SKIPPED ARM RUNS IN CI ────────────────────────────────────
- * (issue 1371 r19-gates2, quality review round 5 Q2; the pattern and the wording follow
- * `tests/view-lab-fixture-assets.test.js`.)
- * The M28 arm that lays FOUNDRY'S OWN harvested sheet skips where no harvest exists, because
- * `npm test` must stay runnable without a Foundry licence — and `.foundry-chrome/` is a licensed
- * local artefact, so `ci.yml`'s `npm test` runner never holds one. A skip policy without a place
- * the skip cannot be taken is a guard that executes nowhere: the runner that DOES harvest is
- * `pr-screenshots.yml`'s capture job, and this file is named on its chrome-dependent step, beside
- * `view-lab-chrome-drift.test.js`, `view-lab-fixture-assets.test.js` and the two entry-frame
- * suites, under that step's `VIEWLAB_REQUIRE_CHROME=1`.
- * BOTH HALVES OF THAT POLICY COME FROM `harvestedFoundryChrome.js` SINCE r20 (issue 1371
- * r20-entry3): `registerChromeRunnerGuards` fails loudly when the harvest is absent and
- * `VIEWLAB_REQUIRE_CHROME=1`, and asserts against the workflow that this file is still named on
- * the step — so moving or renaming it reddens here at test time rather than silently disarming
- * the arm. The step's name is NOT transcribed here any more: `CHROME_STEP_NAME` in that helper is
- * the one place the test tree spells it, which is what a reader of a skipped arm should open.
- * AND THE STAND-IN IS ITSELF MEASURED. `FOUNDRY_BUTTON_CHROME` below is a hand transcription of
- * one line of Foundry's sheet, and until r19 nothing checked it against the real thing: emptied,
- * the whole suite stayed green, because the test that claimed to guard it was reading the
- * CONTROL's own `!important`. Two arms now measure a BARE `<button>` under each chrome with no
- * module sheet at all — the stand-in must centre one, and the harvested sheet must agree with it —
- * so a Foundry release that drops the rule, or a transcription that drifts from it, fails loudly
- * instead of silently disarming the arm that carries the claim in CI.
- */
+/* THE SYSTEM COMPONENT RULES LIST. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -76,9 +23,7 @@ const { harness, compiledModules } = createComponentsBrowserViewHarness({
   tmpPrefix: 'fabricate-components-rendered-',
 });
 
-// Wide enough that `.manager-body` keeps its columns: the sheet stacks the list over the
-// inspector at or below 1120px of container width, and a stacked toolbar is not the one the
-// maintainer measured.
+// Wide enough that `.manager-body` keeps its columns.
 const HOST_WIDTH_PX = 1280;
 const HOST_HEIGHT_PX = 720;
 // Anti-vacuity: an unstyled toolbar is a few pixels tall. The reference's band holds a 38px
@@ -92,27 +37,12 @@ const FLUSH_CONTROL = `
   .fabricate-manager .manager-component-toolbar { padding-bottom: 0 !important; }
 `;
 
-/**
- * THE CHROME STAND-IN (M28). Foundry's sheet centres a button's content; this is that one fact at
- * element specificity, laid before the module sheet where Foundry's own sits. The module rule that
- * closes M28 has to beat it the way it beats the real one — by declaring the property at all.
- */
+/** THE CHROME STAND-IN (M28). Foundry's sheet centres a button's content. */
 const FOUNDRY_BUTTON_CHROME = `
   button { display: inline-flex; align-items: center; justify-content: center; }
 `;
 
-/*
- * M28's fix is TWO declarations, one per cause, and each half is re-declared away on its own below
- * as well as together (issue 1371 r19-gates2, quality review round 5 Q7). Until r19 only the PAIR
- * was laid, and either declaration could be deleted with the suite green — the sheet's "two
- * declarations, one per cause" was a claim no arrangement measured.
- *
- * What the three arrangements say, measured rather than reasoned: each declaration ALONE still
- * draws the medallion flush, because either cause is sufficient on its own to leave no free space
- * for the content to float in — so the pair is defence in depth rather than two halves of one
- * fix — and each declaration is the only thing closing ITS OWN cause, which is why deleting either
- * now reddens the suite.
- */
+/* M28's fix is TWO declarations, one per cause. */
 
 /** Cause 1 alive: the identity's own alignment gone, so the chrome's `center` decides it again. */
 const NO_IDENTITY_ALIGNMENT_CONTROL = `
@@ -130,10 +60,7 @@ const CENTRED_CONTROL = NO_IDENTITY_ALIGNMENT_CONTROL + NO_COPY_GROW_CONTROL;
 /** Resolved ONCE, so the skipped arm, the mirror check and the CI guard all read one fact. */
 const harvestedChrome = harvestedFoundryChromeCss(repoRoot);
 
-// See the SKIP POLICY block at the head of this file. BOTH halves — the fail-loud arm on the
-// runner that is supposed to harvest, and the assertion that this file is still named on that
-// runner's step — live in `harvestedFoundryChrome.js` since r20, so all three chrome-dependent
-// rendered suites get them from one place rather than from three transcriptions.
+// See the SKIP POLICY block at the head of this file. BOTH halves.
 registerChromeRunnerGuards({
   repoRoot,
   suitePath: 'tests/components/components-browser-rendered.test.js',
@@ -142,10 +69,6 @@ registerChromeRunnerGuards({
 
 /**
  * A BARE `<button>` under one chrome sheet and NOTHING else — no module sheet, no scoped blocks.
- *
- * This is how the hand-written stand-in stops being an unguarded mirror: the one fact it
- * transcribes is read off it here, and off Foundry's own sheet in the same arrangement, so the two
- * can be compared instead of assumed equal.
  */
 function bareButtonPage(chromeCss) {
   return managerShellPage({
@@ -189,13 +112,7 @@ function card(id, name, description) {
   };
 }
 
-/**
- * The band, its two rows and the space between and under them, as laid out.
- *
- * `paddingBottom` is read as the computed value so the assertion can say which declaration won,
- * and `spaceBelowLastRow` is the geometric fact a GM sees: the distance from the last row's
- * border-box bottom to the band's own border-box bottom, border included.
- */
+/** The band, its two rows and the space between and under them, as laid out. */
 function measureToolbar() {
   const toolbar = document.querySelector('[data-component-toolbar]');
   const rows = [...toolbar.querySelectorAll('.manager-component-filter-row')];
@@ -219,19 +136,7 @@ function measureToolbar() {
   };
 }
 
-/**
- * Where each row's medallion sits against the row's leading edge, as laid out.
- *
- * `leadInset` is the fact a GM sees: the distance from the selection box's trailing edge to the
- * medallion's leading edge, which the reference draws as ONE row gap on every row whatever its
- * description says. `identityInset` separates the two ways it can go wrong — the button itself
- * moving, or the button staying put and its content floating inside it.
- *
- * `justifyContent` and `copySlack` are M28's TWO CAUSES read directly, one each: which declaration
- * won the identity's alignment, and how much free space the copy column left beside it for the
- * content to float in. The leading edge holds while EITHER is closed, so measuring the edge alone
- * cannot tell whether both declarations are still doing their job (issue 1371 r19-gates2, Q7).
- */
+/** Where each row's medallion sits against the row's leading edge, as laid out. */
 function measureRows() {
   return [...document.querySelectorAll('.manager-component-row')].map((row) => {
     const box = row.firstElementChild.getBoundingClientRect();
@@ -314,8 +219,7 @@ describe('the rules list toolbar’s rendered geometry (issue 1371 r16-list, M22
   });
 
   it('CONTROL: with the shipped zero re-declared, the last row touches the border again', () => {
-    // Proves the assertion above can fail: the same markup under the rule the defect shipped
-    // with must reproduce the defect the maintainer photographed.
+    // Proves the assertion above can fail.
     assert.equal(flush.paddingBottom, '0px', 'the control did not override the padding, so it proves nothing');
     assert.ok(
       flush.spaceBelowLastRow <= flush.borderBottom + 0.5,
@@ -339,8 +243,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
     rendered.scoped = collectScopedCss({ repoRoot, compiledModules });
     await harness.setup();
     try {
-      // ONE ROW WITH NO DESCRIPTION AND ONE WITH A LONG ONE, because the defect only showed on the
-      // first: a long description filled the copy column and hid where the content would float.
+      // ONE ROW WITH NO DESCRIPTION AND ONE WITH A LONG ONE.
       const target = await harness.mount({
         itemCards: [
           card('bare', 'Bitterbark', ''),
@@ -365,8 +268,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
       withoutCopyGrow = await rowsUnder({ chrome: FOUNDRY_BUTTON_CHROME, control: NO_COPY_GROW_CONTROL });
       if (chrome) underFoundry = await rowsUnder({ chrome });
 
-      // The stand-in's fidelity, measured rather than trusted: a BARE button under each chrome
-      // alone, so what is read back is the chrome's own arbitration and nothing else's.
+      // The stand-in's fidelity, measured rather than trusted.
       await tab.setContent(bareButtonPage(FOUNDRY_BUTTON_CHROME), { waitUntil: 'load' });
       standInBareButton = await tab.evaluate(measureBareButton);
       if (chrome) {
@@ -394,11 +296,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
     }
   }
 
-  /**
-   * M28's two causes, each read off the shipped row: the identity states its own alignment, so no
-   * host sheet re-arbitrates it, AND the copy takes the free space, so there is none to float in.
-   * The flush edge above survives either one on its own, which is why the pair needs saying here.
-   */
+  /** M28's two causes, each read off the shipped row: the identity states its own alignment. */
   function assertBothCausesClosed(rows, label) {
     for (const row of rows) {
       assert.equal(
@@ -416,9 +314,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
   it('renders the bare row and the described row, and the control really centres the identity', () => {
     assert.ok(rendered.markup.length > 0, 'the view rendered nothing at all');
     assert.equal(honest.length, 2);
-    // Non-vacuity for the CONTROL: the identity's `justify-content` is being ARBITRATED, so the
-    // arrangement that re-declares the defect must be seen to have re-declared it. The property is
-    // read off the shipped row rather than assumed.
+    // Non-vacuity for the CONTROL: the identity's `justify-content` is being ARBITRATED.
     assert.equal(
       centred[0].justifyContent,
       'center',
@@ -427,9 +323,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
   });
 
   it('THE MIRROR: the hand-written chrome stand-in centres a bare button, which is the one fact it transcribes', () => {
-    // Emptied, this line used to leave the whole suite green (Q2): the test that claimed to guard
-    // it was reading the CONTROL's own `!important`, not the stand-in. Measured here on a page
-    // carrying the stand-in and NOTHING else, so only the stand-in can produce the answer.
+    // Emptied, this line used to leave the whole suite green (Q2).
     assert.deepEqual(
       standInBareButton,
       { display: 'inline-flex', justifyContent: 'center', alignItems: 'center' },
@@ -438,9 +332,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
   });
 
   it('THE MIRROR: and Foundry’s own harvested sheet agrees with it, where a local harvest exists', { skip: skipWithoutHarvest(chrome) }, () => {
-    // The drift this catches is a Foundry release that stops centring a button's content: the
-    // stand-in would then describe a chrome nobody ships, and the CI arm below would be measuring
-    // a defect that no longer exists. Compared rather than restated, so one fact is pinned once.
+    // The drift this catches is a Foundry release that stops centring a button's content.
     assert.equal(
       foundryBareButton.justifyContent,
       standInBareButton.justifyContent,
@@ -465,9 +357,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
   });
 
   it('holds the edge on the identity’s own alignment alone, which is the only thing closing the chrome’s cause', () => {
-    // The copy's grow re-declared away: the edge still holds, because the identity packs its
-    // content to the start — and the free space the copy stopped taking is now measurable beside
-    // it, which is the cause this declaration does NOT close.
+    // The copy's grow re-declared away: the edge still holds.
     assertFlush(withoutCopyGrow, 'without the copy’s grow');
     const bare = withoutCopyGrow.find((row) => row.id === 'bare');
     assert.equal(bare.justifyContent, 'flex-start', 'the identity’s own alignment is what is holding the edge here');
@@ -478,8 +368,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
   });
 
   it('and on the copy’s grow alone, which is the only thing closing the free-space cause', () => {
-    // The identity's own alignment re-declared away: the chrome wins the alignment, and the edge
-    // still holds only because the copy leaves no free space for the content to float in.
+    // The identity's own alignment re-declared away: the chrome wins the alignment.
     assertFlush(withoutAlignment, 'without the identity’s alignment');
     for (const row of withoutAlignment) {
       assert.equal(row.justifyContent, 'center', 'the control did not hand the alignment back to the chrome, so this arrangement proves nothing');
@@ -491,9 +380,7 @@ describe('every row’s medallion sits at the leading edge after the box (issue 
   });
 
   it('CONTROL: with the fix re-declared away, the bare row’s medallion floats into the row again', () => {
-    // The defect the maintainer photographed: the bare row's content mid-row, the described row's
-    // nearer the edge but still adrift, under the same chrome. A measurement that could not see
-    // this would pass the arrangement above for nothing.
+    // The defect the maintainer photographed: the bare row's content mid-row.
     const bare = centred.find((row) => row.id === 'bare');
     assert.ok(
       bare.leadInset > bare.gap + 40,

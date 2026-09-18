@@ -1,15 +1,7 @@
 /**
- * Migration 1.26.0 — `migrateCurrencyToWorldScope` (issue 1278).
- *
- * Lifts the currency configuration off every crafting system and into the `currencyConfig` world
- * setting, leaving each system with `requirements.currency = { enabled }`. The two properties that
- * actually matter to a GM's world are pinned here:
- *
- *   - **Reference preservation.** Recipe currency options and salvage currency requirements store
- *     unit IDS. A unit dropped by the merge orphans every reference to it, so the merge is a union
- *     keyed by id, not a pick of one system's ladder.
- *   - **Idempotence.** A second run must never re-merge stale system blocks over a ladder the GM
- *     has since edited — including a unit they deliberately deleted.
+ * Migration 1.26.0 — `migrateCurrencyToWorldScope` (issue 1278). Lifts the currency configuration
+ * off every crafting system and into the `currencyConfig` world setting, leaving each system with
+ * `requirements.currency = { enabled }`.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -148,9 +140,7 @@ describe('stripSystemCurrencyConfig', () => {
   });
 
   it('returns an already-shrunk system BY REFERENCE, so change detection stays honest', () => {
-    // The runner decides whether to write by comparing JSON. Rebuilding an unchanged system would
-    // not change the JSON, but returning the same reference makes the no-op unmistakable and
-    // keeps a re-run from looking like work.
+    // The runner decides whether to write by comparing JSON.
     const system = systemWithCurrency('alchemy', { enabled: true });
     const [result] = stripSystemCurrencyConfig([system]);
     assert.equal(result, system);

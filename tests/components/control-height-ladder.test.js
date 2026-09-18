@@ -1,66 +1,8 @@
 /**
  * The control-height ladder is a rule the product can be checked against (issue 1391).
- *
- * `openspec/specs/design-system/spec.md` has closed the control-height ladder at 26, 28, 30, 34,
- * 38 and 44 — and retired 32, 36 and 40 — since the design system landed. NOTHING checked it.
- * Worse, half the corpus could not have been checked by the tool that would normally do it:
- * `npm run lint:css` globs `styles/**` and Svelte scoped `<style>` blocks are not in it, so the
- * 440 height declarations most likely to drift were entirely unlinted. Measured against that
- * silence: 86 occurrences of a retired value across 30 files, 26 of which carry exactly one —
- * the signature of a value copied once and never revisited rather than a deliberate system.
- * That first measurement stands as the record of what was found; the pinned total is 84 today,
- * because issue 1464 deleted two of them along with the dead Travel CSS that carried them.
- *
- * This gate FREEZES that. It does not require the whole ladder, and the reason is in the
- * requirement's own wording rather than in the size of the finding: `spec.md` governs "a control
- * a spec marks touch-reachable", which is an authored fact in `openspec/specs/**` and not a
- * property CSS carries at all. No selector heuristic can adjudicate it, and reading a
- * selector-classified sample confirms it: plenty of off-ladder heights are plainly not controls
- * — a 6px slider track at `styles/fabricate.css:12273`, a 14px toggle knob at
- * `apps/gathering/GatheringEnvironmentList.svelte:292`, textarea minimums at 68, 78 and 122
- * (`styles/fabricate.css:1124`, `:7588`, `:6808`), native radio and checkbox inputs at 16px
- * (`styles/fabricate.css:7781`, `:17803`, `:17840`). That classification was a one-off reading rather
- * than something this gate re-derives, so its examples are cited and its headcount is not: a
- * number no run reproduces is the kind of figure that goes stale unnoticed, which is the
- * failure this whole change is about. The three retired values are a closed, explicitly named
- * prohibition, so every hit is either a regression or a non-control a reviewer can weigh.
- *
- * The long-term rule is that a control height comes from a single published token rather than a
- * literal. That is not yet reachable: no such token exists. One was declared for it and never
- * read, and issue 1399 deleted it with the rest of the legacy generation rather than leave a
- * name in the sheet standing in for a decision nobody had taken.
- *
  * ── WHAT MAKES THIS NOT VACUOUS ─────────────────────────────────────────────────────────
  * An absence gate over an empty corpus passes forever. Four independent controls stand against
  * that, and they are independent on purpose rather than four spellings of one floor:
- *
- *   1. PER-CORPUS declaration floors. One total has slack and cannot see a partial loss — break
- *      the `<style>` extractor and 440 declarations vanish while 530 remain, which a combined
- *      floor of, say, 850 would sail past.
- *   2. PER-CORPUS rung presence, PER RUNG. All six live rungs appear in BOTH corpora. The
- *      per-rung part is the whole of its independence and it needs its own control: replace the
- *      group-by with the unfiltered occurrence list and this degenerates into "some rung appears
- *      in each corpus", which the floors already imply, at which point it stops being a separate
- *      control while still passing. So the loop asserts that its group really is one rung's.
- *   3. RESOLUTION DEPTH above zero. If `var()` resolution silently stopped, this reads zero
- *      while every other assertion here still passes.
- *
- *      It used to have a second half — an indirect occurrence in THIS corpus whose source line
- *      carried no pixel literal at all — and that half has moved (issue 1399). It depended on
- *      the tree happening to contain a retired height reached through a token, the corpus no
- *      longer contains one, and a control that can be emptied by ordinary work is a control
- *      that will one day be deleted as stale rather than repaired. It is re-established, end to
- *      end and on a corpus that cannot drift, by `the scan reaches a value written only into a
- *      token` in `tests/style-block-scan.test.js`, over a synthetic corpus of REAL FILES read
- *      through `collectStyleCorpus`. Depth stays here because it is a property of THIS scan of
- *      THIS corpus, which is the thing the other three controls are about.
- *   4. The ratchet itself fails on a SHRINK as well as a growth, so quietly paying one down
- *      without banking it is a failure rather than a free slot for the next author.
- *
- * ── THE SPEC HALF ───────────────────────────────────────────────────────────────────────
- * Short distinctive FRAGMENTS plus the numerals, following
- * `tests/components/flat-ui-style-contract.test.js`. A whole-sentence match reds on a typo fix;
- * a loose match passes a reworded sentence that has quietly dropped 36 from the retired set.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -86,17 +28,8 @@ import {
   SCANNED_HEIGHT_PROPERTIES,
 } from './control-height-known-literals.js';
 
-/**
- * Floors with deliberate headroom below the roughly 530 and 440 they were chosen against, so
- * deleting a screen does not red this while a broken extractor — which takes a corpus to
- * roughly zero — still does. These are the enforced figures; the reference counts they quote
- * are not, and say so.
- */
-// 470 against 530 until issue 1498 deleted the 367 rule blocks that matched no element, at base
-// `0eff5b36e`, taking this corpus to 491. Re-derived at the ratio it was originally chosen at —
-// 470/530 of 491 is 435 — so the "has not shrunk by a fifth" headroom below still means what it
-// meant. It was not breached; it is re-banked so both floors keep one relationship to their
-// corpora rather than drifting apart every time a sweep lands.
+/** Floors with deliberate headroom below the roughly 530 and 440 they were chosen against. */
+// 470 against 530 until issue 1498 deleted the 367 rule blocks that matched no element.
 const STYLESHEET_DECLARATION_FLOOR = 435;
 const SVELTE_DECLARATION_FLOOR = 380;
 
@@ -211,12 +144,7 @@ test('every live rung is still in use in BOTH corpora', () => {
   for (const rung of LADDER_RUNGS) {
     const hits = occurrences.filter((record) => record.value === rung);
 
-    // THE GROUP-BY IS WHAT MAKES THIS A PER-RUNG CONTROL, and until this line nothing checked
-    // it. Substitute the unfiltered `occurrences` for `hits` and the assertions below still
-    // pass — 7 pass, 0 fail — because every corpus holds SOME rung, so the check quietly
-    // weakens into a restatement of the floors above and control 2 in this file's own
-    // non-vacuity list stops being independent. The `values: [26]` falsification that stood
-    // for this proved the scan runs, not that it is being grouped.
+    // THE GROUP-BY IS WHAT MAKES THIS A PER-RUNG CONTROL.
     assert.ok(
       hits.every((record) => record.value === rung),
       `the ${rung}px group holds an occurrence of another value, so "this rung appears in both ` +
@@ -229,9 +157,7 @@ test('every live rung is still in use in BOTH corpora', () => {
     if (!inSvelte) missing.push(`${rung}px is absent from Svelte <style> blocks`);
   }
 
-  // Presence, not counts. A rung's count moves whenever anyone edits a screen, so pinning it
-  // would red on unrelated work; presence in BOTH corpora is the part that goes wrong when the
-  // scanner does, and it is what makes this a control independent of the floors above.
+  // Presence, not counts. A rung's count moves whenever anyone edits a screen.
   assert.deepEqual(
     missing,
     [],
@@ -265,30 +191,7 @@ test('var() resolution is running, and stays well inside its depth cap', () => {
 });
 
 /**
- * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name: it reads CSS
- * declarations in `styles/**` and in Svelte scoped `<style>` blocks, and nothing else. There are
- * three ways out of that, and WHICH of them is live in `src/` moved at issue 1506, so the whole
- * paragraph below is RE-MEASURED rather than re-pointed at a surviving file.
- *
- * THE LITERAL MARKUP ATTRIBUTE IS NOW THE LIVE ONE, and it is the one carrying retired values.
- * `components/Medallion.svelte` interpolates `width:${n}px;height:${n}px` into a `style` attribute
- * from its `size` prop, and `components/Avatar.svelte` does the same for a portrait. Measured on
- * this tree, those two draw 65 art tiles between them — 63 records and 2 actors — and NINETEEN of
- * the 65 render at a RETIRED control height: one at 32, one at 36, seventeen at 40, across eleven
- * files. None of the nineteen contributes an occurrence to the baseline below. A JS
- * `element.style.height = '36px'` is the one route still absent from `src/` entirely.
- *
- * THE CONFIDENT WRONG ANSWER IS GONE, and it went with the component that produced it. The third
- * route — a custom property set in markup from a JS prop and read back by a scanned declaration —
- * used to be spelled `height: var(--crafting-thumb-size, 48px)` on a crafting tile whose `size`
- * lived in a JS prop, so resolution fell back to the declared `48px` and tallied a size no call
- * site passed. Retiring both crafting tiles into the one art tile deleted that token. What is left
- * of that route is the BENIGN case it always had beside it: `detail/InventoryDetailHeader.svelte`
- * sets `--inventory-detail-thumb-size` in markup and reads `var(--inventory-detail-thumb-size,
- * 64px)`, no caller overrides its `size`, so the `64px` fallback is what renders and the scanner
- * happens to be right. Re-verified here: no comment-only or fallback-only declaration in the whole
- * corpus resolves to a retired height today.
- *
+ * WHAT THIS RATCHET DOES NOT SEE, stated rather than inferred from the name.
  * ACCEPTED, on the requirement's own terms rather than for convenience, and the adjudication is
  * RESTATED because its subject changed: every one of those declarations sizes a THUMBNAIL — a
  * record's art tile, an actor's portrait, or the inventory header's shell around one — and the
@@ -356,14 +259,12 @@ test('every baselined row still carries the raw and resolved text it was measure
 });
 
 test('exactly the rows whose raw and resolved texts differ carry a note', () => {
-  // The predicate is `raw !== resolved`, and that is narrower than "the source line does not
+  // The predicate is `raw !== resolved`.
   // explain the value". The two readings ALREADY diverge, on a row in the baseline rather than
   // on an invented one: `styles/fabricate.css min-height 40` writes its 40 literally on the
   // line — `calc(40px + (2 * var(--fab-space-3)) + 2px)` — so the value is right there to read,
   // and it qualifies only because a DIFFERENT token in the same calc resolves elsewhere. Its
   // own note says exactly that. A row could equally be unreadable while its two texts agree.
-  // So the textual reading is not standing in for the semantic one; it is the check, and the
-  // name says the check.
   const indirect = KNOWN_RETIRED_HEIGHTS.filter((row) =>
     row.texts.some((pair) => {
       const [raw, resolved] = pair.split(' => ');

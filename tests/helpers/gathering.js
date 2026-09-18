@@ -20,10 +20,8 @@ export const DEFAULT_TEST_SYSTEM = Object.freeze({
 });
 
 /**
- * A minimal Actor double whose `setFlag` resolves the updated DOCUMENT, as Foundry's
- * does — `writeAcknowledgedRunContainer` treats anything else as an unacknowledged
- * write. The stored value REPLACES rather than merging, so run-container suites, whose
- * writes carry `-=id` deletion keys, use `FakeActor` from `run-manager-fakes.js`.
+ * A minimal Actor double whose `setFlag` resolves the updated DOCUMENT, as Foundry's does —
+ * `writeAcknowledgedRunContainer` treats anything else as an unacknowledged write.
  */
 export function makeFakeActor(overrides = {}) {
   let flags = {};
@@ -103,11 +101,10 @@ export function makeRichState({
 }
 
 /**
- * The terminal-history half of a gathering run-manager double, with the real
- * manager's settlement semantics (`GatheringRunManager.settleHistory`): the
- * settlement resolves the record its own writer returned and REFUSES an
- * unknown run, so an engine that stops linking the settlement to the record it
- * created fails here instead of silently settling nothing.
+ * The terminal-history half of a gathering run-manager double, with the real manager's settlement
+ * semantics (`GatheringRunManager.settleHistory`): the settlement resolves the record its own
+ * writer returned and REFUSES an unknown run, so an engine that stops linking the settlement to the
+ * record it created fails here instead of silently settling nothing.
  *
  * @param {object} [hooks] Optional `onCreate`/`onComplete`/`onSettle` spies.
  */
@@ -204,27 +201,22 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
 }
 
 /**
- * Build a system-level routed gathering check (issue 424). Routed gathering
- * resolves through this check's roll formula rather than a per-task provider: the
- * single success tier (named `tierName`) routes to the result group whose name
- * matches it. Pair with {@link routedRoll}/{@link stubRoll} to drive the roll.
+ * Build a system-level routed gathering check (issue 424).
  *
- * @param {object} [options]
- * @param {string} [options.tierName] Name of the lone success tier (matches the
- *   result group it should route to). Defaults to `'Iron'`.
+ * @param {string} [options.tierName] Name of the lone success tier (matches the result group it
+ * should route to). Defaults to `'Iron'`.
  * @param {number} [options.dc] Base difficulty class. Defaults to `15`.
- * @param {string|null} [options.failureTierName] When set, append a lowest
- *   `success: false` tier (delta `-10`, threshold `dc - 10`) named this. Routed
- *   gathering now clamps a below-lowest relative roll to the closest tier, so a
- *   failure-path test needs a genuine failure tier for a low roll to land on — a
- *   bare success-only check would clamp a miss up to success. The name should not
- *   match any result group (so it routes to the failure path). Defaults to `null`.
- * @param {Array<object>} [options.triggers] Unified check triggers (issue 419/975)
- *   for the `checkBreakage` block `_resolveRoutedFormulaOutcome` reads. Authored in
- *   normalized shape (`{ id, condition, outcome, breakTools, tierStep }`), since the
- *   engine consumes `routed.checkBreakage.triggers` directly rather than through
- *   `CraftingSystemManager`. The block is always emitted — an empty list is what the
- *   normalizer itself produces, and is inert at every seam that reads it.
+ * @param {string|null} [options.failureTierName] When set, append a lowest `success: false` tier
+ * (delta `-10`, threshold `dc - 10`) named this. Routed gathering now clamps a below-lowest
+ * relative roll to the closest tier, so a failure-path test needs a genuine failure tier for a low
+ * roll to land on — a bare success-only check would clamp a miss up to success. The name should not
+ * match any result group (so it routes to the failure path). Defaults to `null`.
+ * @param {Array<object>} [options.triggers] Unified check triggers (issue 419/975) for the
+ * `checkBreakage` block `_resolveRoutedFormulaOutcome` reads. Authored in normalized shape (`{ id,
+ * condition, outcome, breakTools, tierStep }`), since the engine consumes
+ * `routed.checkBreakage.triggers` directly rather than through `CraftingSystemManager`. The block
+ * is always emitted — an empty list is what the normalizer itself produces, and is inert at every
+ * seam that reads it.
  * @returns {{ routed: object }} A `gatheringCraftingCheck` fragment.
  */
 export function routedSystemCheck({
@@ -255,9 +247,8 @@ export function routedSystemCheck({
 }
 
 /**
- * Stub `globalThis.Roll` so `evaluate()` resolves to a fixed `total` plus the
- * supplied `dice` groups (default none). Tests must `delete globalThis.Roll`
- * afterwards (try/finally).
+ * Stub `globalThis.Roll` so `evaluate()` resolves to a fixed `total` plus the supplied `dice`
+ * groups (default none). Tests must `delete globalThis.Roll` afterwards (try/finally).
  *
  * @param {number} total The roll total the stubbed engine returns.
  * @param {Array<object>} [dice] Dice-group metadata (e.g. crit detection).
@@ -271,9 +262,8 @@ export function stubRoll(total, dice = []) {
 }
 
 /**
- * Stub a routed-check roll that passes (`18`, a pass at the default dc 15) or
- * misses (`5`) the success tier — the convenience pair for {@link routedSystemCheck}.
- * Includes a single d20 dice group so crit detection sees a real roll.
+ * Stub a routed-check roll that passes (`18`, a pass at the default dc 15) or misses (`5`) the
+ * success tier — the convenience pair for {@link routedSystemCheck}.
  *
  * @param {boolean} [success] Whether the roll should clear the dc. Defaults to `true`.
  */

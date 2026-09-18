@@ -7,10 +7,8 @@ import {
 } from '../../src/ui/svelte/util/essencePreviewRow.js';
 import { GENERIC_ITEM_IMAGE } from '../../src/ui/svelte/util/craftingImageDefaults.js';
 
-// The exact set of top-level keys `InventoryListingBuilder._buildEssenceRows` emits — the
-// contract `InventoryItemCard` reads. Both preview rows share this shape so the card renders
-// them the same way it renders a real owned row. Kept in lockstep with
-// tests/inventory-listing-builder.test.js.
+// The exact set of top-level keys `InventoryListingBuilder._buildEssenceRows` emits — the contract
+// `InventoryItemCard` reads.
 const EXPECTED_KEYS = [
   'key',
   'componentId',

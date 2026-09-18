@@ -11,11 +11,9 @@ import {
   normalizeCharacterPrerequisite,
 } from '../src/systems/characterPrerequisites.js';
 
-// The gathering modifier normalizer is store-private, so this local mirror asserts
-// the mapped modifier partial survives the SAME shape the store normalizer produces
-// ({ id, label, icon, expression }). Kept minimal on purpose — the real normalizer
-// is exercised by the store tests; here we only need to prove the copy output is a
-// valid modifier partial.
+// The gathering modifier normalizer is store-private, so this local mirror asserts the mapped
+// modifier partial survives the SAME shape the store normalizer produces ({ id, label, icon,
+// expression }).
 function normalizeModifierLike(partial, id = 'generated-id') {
   return {
     id,

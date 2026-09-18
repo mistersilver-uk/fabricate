@@ -1,10 +1,7 @@
 /**
- * Issue 651 D12a — the cumulative "reached at ≥N" threshold helper.
- *
- * The centrepiece is the ORACLE TEST: the display's claim is checked against
- * `resolveProgressiveAward` ITSELF, for every award mode and every budget. A naive running
- * sum passes a hand-written expectation and fails this, which is the whole point — D0 says
- * the award loop owns the arithmetic, so presentation must not re-derive it.
+ * Issue 651 D12a — the cumulative "reached at ≥N" threshold helper. The centrepiece is the ORACLE
+ * TEST: the display's claim is checked against `resolveProgressiveAward` ITSELF, for every award
+ * mode and every budget.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,9 +12,7 @@ const { resolveProgressiveAward } = await import('../src/utils/progressiveAward.
 const costOf = (result) => Number(result.cost);
 const stages = (...costs) => costs.map((cost, i) => ({ id: `s-${i}`, cost }));
 
-// ---------------------------------------------------------------------------
 // The oracle — the display must agree with the loop, mode by mode, budget by budget
-// ---------------------------------------------------------------------------
 
 /**
  * For a budget N, the index of the last stage the AWARD LOOP actually awards.
@@ -96,9 +91,7 @@ test('ORACLE: a skipped stage is claimed at NO budget, because it is awarded at 
   }
 });
 
-// ---------------------------------------------------------------------------
 // The three divergences, pinned explicitly — a naive running sum fails each
-// ---------------------------------------------------------------------------
 
 test('equal: the threshold IS the running cumulative sum (the only mode where it is)', () => {
   assert.deepEqual(
@@ -133,9 +126,7 @@ test('skip: an invalid-cost stage neither takes a threshold nor advances the tot
   );
 });
 
-// ---------------------------------------------------------------------------
 // Shape / tolerance
-// ---------------------------------------------------------------------------
 
 test('returns one entry per result, in order', () => {
   assert.equal(

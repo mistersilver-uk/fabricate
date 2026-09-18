@@ -1,11 +1,6 @@
 /**
- * The common-trigger presets (issue 1096).
- *
- * The load-bearing claim is not that a preset appears — it is that **a preset authors an
- * ORDINARY trigger**. So every assertion here is against the exact object produced, field for
- * field, and one of them compares it to what `CheckTriggers.addTrigger` would have produced
- * from the same inputs: if the two ever diverge, "add this for me" has become a second kind of
- * trigger, which is the one outcome this feature must not have.
+ * The common-trigger presets (issue 1096). The load-bearing claim is not that a preset appears — it
+ * is that **a preset authors an ORDINARY trigger**.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

@@ -1,22 +1,6 @@
-/*
- * DRIVING A CONVERTED `<Select>` FROM A MOUNTED SUITE (issue 1504).
- *
- * Ten mounted suites drove the manager's page-size, category, check-tier and sort controls
- * as native `<select>`s: set `.value`, dispatch `change`, read `querySelectorAll('option')`.
- * Every one of those three moves is gone. The control is a `<button>` that opens a portaled
- * panel of `[role="option"]` rows, so choosing a value is TWO clicks and reading the offered
- * values means opening the panel first.
- *
- * IT IS ONE HELPER RATHER THAN TEN COPIES for two reasons. The mechanical one: the panel
- * is PORTALED to the nearest Fabricate application root, which in a mounted suite is the
- * harness's own mount target — so the row is NOT a descendant of the trigger's container, and a
- * suite that reached for it through the trigger's own subtree would find nothing. That is a fact
- * about the primitive, worth stating once. The other is that near-identical blocks repeated
- * across ten files are what the duplication gate exists to catch.
- *
- * `root` is always the harness's mount target — the element `createMountedComponentHarness`
- * gives `rootClass` to. A suite whose production host is the player window must declare
- * `rootClass: 'fabricate-app'`, or its panel portals to `<body>` and every lookup here misses.
+/**
+ * DRIVING A CONVERTED `<Select>` FROM A MOUNTED SUITE (issue 1504). `root` is always the harness's
+ * mount target — the element `createMountedComponentHarness` gives `rootClass` to.
  */
 import assert from 'node:assert/strict';
 
@@ -46,12 +30,7 @@ export function openSelectPanel(root, triggerSelector) {
     `${triggerSelector} opened no panel. The panel is portaled to the nearest application root, ` +
       'so a suite whose production host is not the manager must pass `rootClass`'
   );
-  // AND IT IS THIS TRIGGER'S PANEL. The lookup above is by CLASS over the whole portal host, so
-  // it returns the first `<Select>` panel in the root rather than the one just opened — correct
-  // today only because one panel can be open at a time, and silently wrong the moment a case
-  // leaves an earlier select open. The combobox's own `aria-controls` is the binding the
-  // primitive already publishes, so the pairing is asserted rather than assumed, and a miss
-  // reports as a mismatched id instead of as an option this panel does not offer.
+  // AND IT IS THIS TRIGGER'S PANEL.
   const list = panel.querySelector('[role="listbox"]');
   assert.ok(Boolean(list), `${triggerSelector} opened a panel that renders no option list`);
   assert.equal(
@@ -68,7 +47,6 @@ export function openSelectPanel(root, triggerSelector) {
  * @param {HTMLElement} root The harness mount target.
  * @param {string} triggerSelector A selector for the trigger.
  * @param {string|number} value The option's own value, as the caller declared it.
- * @returns {void}
  */
 export function chooseSelectOption(root, triggerSelector, value) {
   const panel = openSelectPanel(root, triggerSelector);
@@ -86,21 +64,8 @@ export function chooseSelectOption(root, triggerSelector, value) {
 /**
  * Closes a converted select's panel, the way clicking away from it does (issue 1510).
  *
- * WHY A SUITE NEEDS THIS AT ALL. {@link openSelectPanel} finds the panel by CLASS over the whole
- * portal host and then proves the pairing through `aria-controls` — which is what turns "an
- * earlier select is still open" from a silently wrong reading into a named failure. In a real
- * browser the earlier panel would already be gone: `dismissOnOutsideClick` listens on `mousedown`
- * and a pointer press on the next trigger fires one. A mounted suite's `.click()` fires no
- * `mousedown` at all, so nothing dismisses anything and a screen with two converted controls
- * leaves both panels in the DOM. Reading one list and then another therefore needs the first
- * closed explicitly.
- *
- * Closing is the trigger's own toggle rather than a synthesized outside click, because that is
- * the affordance the primitive publishes and the one a keyboard user reaches.
- *
  * @param {HTMLElement} root The harness mount target.
  * @param {string} triggerSelector A selector for the trigger.
- * @returns {void}
  */
 export function closeSelectPanel(root, triggerSelector) {
   const trigger = root.querySelector(triggerSelector);
@@ -117,9 +82,6 @@ export function closeSelectPanel(root, triggerSelector) {
 
 /**
  * Every value a converted select currently offers, in rendered order.
- *
- * Indexed over `[role="option"]` rather than over `[data-popover-option]`, so a row that lost
- * its identity handle is a MISSING value here rather than an invisible absence.
  *
  * @param {HTMLElement} panel An open panel.
  * @returns {string[]} The values, in rendered order.
@@ -170,17 +132,7 @@ export function selectTriggerText(root, triggerSelector) {
 
 /**
  * The accessible NAME a converted trigger actually resolves to, asserted non-empty (issue 1510).
- *
- * WHY A POSITIVE ASSERTION RATHER THAN A WARNING COUNT. `Select.svelte` warns only when all three
- * name props are absent, so "no `Fabricate | Select:` warning" proves AT LEAST ONE name rather
- * than the right one — and it is entirely silent for a demoted wrapper whose caption never
- * received its `id`, which is the exact defect the demotion rule can introduce. This resolves the
- * name the way an assistive technology does — `aria-labelledby` first, then `aria-label` — and
- * reds when the pointer names nothing, so a caption with no `id` fails here by name.
- *
- * It does NOT assert "never both". `Select.svelte` writes at most one of the two onto the trigger
- * by construction, so a DOM-level clause could never red; the check that can is the SOURCE-level
- * one over call sites, which is a different artifact.
+ * WHY A POSITIVE ASSERTION RATHER THAN A WARNING COUNT.
  *
  * @param {HTMLElement} root The harness mount target.
  * @param {string} triggerSelector A selector for the trigger — normally the call site's own hook.

@@ -1,10 +1,8 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-// The recipe-caller test drives the REAL `RecipeManager.toolMatchesItem` over an
-// installed crafting system, which reads `game.fabricate.getCraftingSystemManager()`.
-// Set the globals BEFORE importing the manager/engine classes (matching the proven
-// first-class-tools harness ordering), so import-time module evaluation sees them.
+// The recipe-caller test drives the REAL `RecipeManager.toolMatchesItem` over an installed crafting
+// system, which reads `game.fabricate.getCraftingSystemManager()`.
 globalThis.foundry = {
   utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}` },
 };
@@ -22,10 +20,9 @@ import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { RecipeManager } from '../src/systems/RecipeManager.js';
 import { roleItem, tool } from './helpers/componentIdentityFixtures.js';
 
-// Phase 1 of issue 540: the four name-fallback matching sites are unified behind the
-// shared `componentNameMatch` helper, PRESERVING each site's exact case-sensitivity, and
-// every name-only match emits warn-once telemetry. These tests pin (a) the per-site
-// case-sensitivity contract and (b) the telemetry guard.
+// Phase 1 of issue 540: the four name-fallback matching sites are unified behind the shared
+// `componentNameMatch` helper, PRESERVING each site's exact case-sensitivity, and every name-only
+// match emits warn-once telemetry.
 
 // Silence + capture console.warn so the warn-once assertions are deterministic and no
 // telemetry state bleeds between tests.
@@ -166,12 +163,8 @@ describe('findMatchingComponent — name fallback still fires (behaviour-preserv
   });
 });
 
-// ---------------------------------------------------------------------------
-// Caller-level arg-wiring guards (issue 540 review). The helper-level tests above
-// prove the primitive respects `caseSensitive`; these prove each CALL SITE passes the
-// RIGHT value. They are constructed to FAIL if a future edit flipped the argument:
-// the salvage caller to case-insensitive, or a recipe caller to case-sensitive.
-// ---------------------------------------------------------------------------
+// Caller-level arg-wiring guards (issue 540 review). The helper-level tests above prove the
+// primitive respects `caseSensitive`; these prove each CALL SITE passes the RIGHT value.
 
 describe('CraftingEngine._findComponentItems — salvage stays CASE-SENSITIVE end-to-end (issue 540)', () => {
   // A component with NO source refs so `_findComponentItems` skips the byUuid tier and

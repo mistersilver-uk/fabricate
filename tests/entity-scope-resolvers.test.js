@@ -1,10 +1,7 @@
-// The genuinely per-entity rules of Scoped Entity Definitions (issue 1358, part of epic 1357):
-// the component category fallback, the additive component tags, the STRUCTURALLY absent component
+// The genuinely per-entity rules of Scoped Entity Definitions (issue 1358, part of epic 1357): the
+// component category fallback, the additive component tags, the STRUCTURALLY absent component
 // `enabled` key, the essence soft disable, the tool repairRequirements seed, and the tool-breakage
 // authority pair.
-//
-// Everything that holds identically for all three entities is asserted once, in the parameterized
-// contract helper in `tests/scoped-definitions.test.js`.
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,10 +71,7 @@ test('the component normalizer DROPS an enabled key from adversarial input', () 
 });
 
 test('the component path exposes no enable/disable API', () => {
-  // A NAMING TRIPWIRE, not the enforcement. It scans exported names, so an API spelled
-  // `setComponentAvailability` would sail past it; what actually holds the line is the behavioural
-  // leg above — the resolver OMITS the key and the normalizer DROPS an authored one. This is kept
-  // because the cheap way to reintroduce the ruled-out toggle is to name it after `enabled`.
+  // A NAMING TRIPWIRE, not the enforcement.
   const enableApis = Object.keys(componentScope).filter((name) => /enabl/i.test(name));
   assert.deepStrictEqual(enableApis, [], 'component membership is binary: present or absent');
 });
@@ -135,8 +129,7 @@ test('a world category the GM later deletes reaches the resolver as absence and 
 
 test('BOTH normalizers coerce the category, so the overriding branch is as matchable as the inheriting one', () => {
   // The r1 asymmetry this pins: `resolveComponentCategory` trims, but it only runs on the
-  // INHERITING branch. An overriding record's category was handed back verbatim, so `'  ingot  '`
-  // resolved untrimmed and could never match `CraftingSystem.componentCategories`.
+  // INHERITING branch.
   const [world] = normalizeComponentWorldDefaults([{ id: ENTITY_ID, category: '  ore  ' }]);
   assert.equal(world.category, 'ore', 'the world default is trimmed at the normalizer');
 
@@ -276,10 +269,6 @@ test('the two essence inherit switches are independent', () => {
 
 test('the SEEDED sections are disjoint from the inherited ones, and stay that way', () => {
   // FIVE world-default sections, FOUR of them inherited since `1.31.0` (issue 1373).
-  // `repairRequirements` is the fifth and is a SEED (`seedToolRepairRequirements`), so promoting
-  // it into TOOL_SECTIONS would silently give it an inherit switch, a live world parent, and a UI
-  // row for a value the world scope cannot even address — a repair recipe names ingredient
-  // groups over the OWNING SYSTEM's components.
   assert.deepStrictEqual([...TOOL_SEEDED_SECTIONS], ['repairRequirements']);
   for (const seeded of TOOL_SEEDED_SECTIONS) {
     assert.ok(
@@ -315,14 +304,7 @@ test('a non-list repairRequirements value is DROPPED rather than persisted', () 
 });
 
 test('TOOL_BLOCKED matches the code the two shipped consumers already write as a bare literal', async () => {
-  // A hand-maintained mirror guard. Neither consumer is imported here: GatheringEngine drags the
-  // Foundry runtime in, and gatheringBlockedReasons is a player-app UI leaf — and `toolScope.js`
-  // is a deliberate leaf with neither in its closure. That is about what it may DEPEND ON, not
-  // about what depends on it: eight modules import it, the read seam of issue 1370 among them.
-  // Issue 1370's READ repointing did NOT converge these two onto this export — it repointed
-  // readers of the entity ARRAYS, a different set — so the convergence is still owed, and until
-  // it happens a rename here fails loudly instead of silently forking the vocabulary into two
-  // codes that mean the same refusal.
+  // A hand-maintained mirror guard (issue 1370).
   const mirrors = [
     ['src/systems/GatheringEngine.js', /^\s{2}TOOL_BLOCKED: 'FABRICATE\.Gathering\.Blocked\./m],
     [

@@ -1,12 +1,4 @@
-/**
- * Mounted behaviour of the GM Knowledge surface (issue 785).
- *
- * The armed two-step confirmation is per-INSTANCE component state rather than a
- * control shape, so its full disarm rule set is pinned here rather than in a
- * source-contract test. The five uses/inert chip combinations are pinned here too:
- * the pure derivations live in tests/knowledge-studio.test.js, but only a render
- * proves the fifth state (inert-but-not-spent) shows BOTH chips.
- */
+/** Mounted behaviour of the GM Knowledge surface (issue 785). */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -37,9 +29,7 @@ const harness = createMountedComponentHarness({
     // (issue 887). It is an import-free leaf, so this one entry suffices — but omitting
     // it HANGS this suite (`# cancelled`) rather than failing it.
     'src/ui/svelte/util/craftingImageDefaults.js',
-    // The companion contract (issue 1289): `knowledgeStudio` reads its `grantedBy`
-    // length bound and `KnowledgeLearnedRow` its two granted message keys. Import-free,
-    // so this one entry covers both edges.
+    // The companion contract (issue 1289).
     'src/systems/companionContract.js',
   ],
   // Both lists are inlined here, following the tool-studio-mounted precedent. A `.svelte` the
@@ -50,10 +40,7 @@ const harness = createMountedComponentHarness({
   // this suite does not spread.
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
-    // The actor portrait (issue 1506). The roster row and the detail header render it; the two
-    // owned-copy/learned rows still render `Medallion`, which is why BOTH art tiles are here.
-    // `Avatar` is NOT on `SHARED_PRIMITIVES` at two callers, so omitting it HANGS this suite
-    // (# cancelled) rather than failing it by name.
+    // The actor portrait (issue 1506). The roster row and the detail header render it.
     'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
@@ -72,7 +59,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRecipeItemsTab.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRecipesTab.svelte',
     // THE manager's labelled push-button (issue 1118). Both resets and the owned-copy row`s Expend use render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/apps/manager/KnowledgeView.svelte',
@@ -80,11 +66,7 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/KnowledgeView.svelte',
 });
 
-// ---------------------------------------------------------------------------
-// Fixtures. RAW seam-shaped records run through the real projection, so a change
-// to a derivation cannot leave these rows describing a state the surface can
-// never actually receive.
-// ---------------------------------------------------------------------------
+// Fixtures. RAW seam-shaped records run through the real projection.
 
 function rawCopy(overrides = {}) {
   return {
@@ -241,9 +223,7 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.ok(target.querySelector('[data-knowledge-learned-banner]'));
   });
 
-  // The five chip COMBINATIONS. `inert` is an independent chip, so an
-  // inert-but-not-spent copy keeps its remaining-tone uses chip AND gains an Inert
-  // chip — the state no unit test can draw and the visible form of the known gap.
+  // The five chip COMBINATIONS. `inert` is an independent chip.
   const CHIP_CASES = [
     {
       name: 'uncapped',
@@ -315,11 +295,9 @@ describe('KnowledgeView mounted behaviour', () => {
     expend.focus();
     expend.click();
     assert.deepEqual(expended, [['a1', 'i1']]);
-    // Expend is NOT destructive: the row survives, so focus MUST stay on the button a
-    // keyboard GM is walking a multi-use copy with. Moving it here would force a
-    // re-tab after every single charge.
+    // Expend is NOT destructive: the row survives.
     assert.equal(target.ownerDocument.activeElement, expend, 'Expend keeps its own focus');
-    // The type pill carries the count for a multi-recipe item, so the row no longer
+    // The type pill carries the count for a multi-recipe item.
     // renders a separate "N recipe(s) inside" chip stating the same number twice.
     assert.match(
       target.querySelector('[data-knowledge-copy="i1"] [data-knowledge-type]').textContent,
@@ -344,8 +322,7 @@ describe('KnowledgeView mounted behaviour', () => {
       null,
       'a durable match is diagnostic, not actionable, so it earns no chip'
     );
-    // The tier is still disclosed — in the row's title, where it costs no width in the
-    // pane the geometry guard measures at its narrowest.
+    // The tier is still disclosed — in the row's title.
     assert.match(durableRow.getAttribute('title'), /Durable match/);
     harness.remount();
 
@@ -439,8 +416,6 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.equal(owned.querySelector('[data-knowledge-no-refund]'), null);
 
     // The other three state the reason as ONE icon-led clause inside the source line.
-    // The old markup rendered a separate "Frees no slot" label whose cause the source
-    // line had already given, so the row said the same thing twice.
     const clause = (row) => row.querySelector('[data-knowledge-no-refund]');
 
     assert.match(lost.textContent, /Learned from Scroll of Elixirs/);
@@ -513,12 +488,7 @@ describe('KnowledgeView mounted behaviour', () => {
     const deleteButton = target.querySelector('[data-arm-token="delete:i1"]');
     assert.equal(deleteButton.getAttribute('data-armed'), 'false');
     assert.match(deleteButton.getAttribute('aria-label'), /Delete Alchemist Cook Book/);
-    // `describedBy` is OPTIONAL (issue 1129 added it for the bulk panels' impact list), and a
-    // row call site passes none. It must therefore render NO `aria-describedby` at all: the
-    // bare `aria-describedby=""` that a raw pass-through emits points at nothing, and a
-    // screen reader resolving an empty idref list is a worse name than no description. This
-    // is the assertion that makes `describedBy || undefined` in `ArmedDangerButton` a
-    // contract rather than a comment.
+    // `describedBy` is OPTIONAL (issue 1129 added it for the bulk panels' impact list).
     assert.equal(
       deleteButton.hasAttribute('aria-describedby'),
       false,
@@ -529,8 +499,7 @@ describe('KnowledgeView mounted behaviour', () => {
     await harness.setProps({});
     assert.equal(armedState(target, 'delete:i1'), 'true');
     assert.equal(deleted.length, 0, 'arming must not execute');
-    // The armed affordance swaps the ICON as well as the label, so it survives
-    // greyscale and does not rest on the danger fill.
+    // The armed affordance swaps the ICON as well as the label.
     assert.ok(target.querySelector('[data-arm-token="delete:i1"] .fa-triangle-exclamation'));
     assert.match(
       target.querySelector('[data-arm-token="delete:i1"]').getAttribute('aria-label'),
@@ -541,8 +510,7 @@ describe('KnowledgeView mounted behaviour', () => {
     await harness.setProps({});
     assert.deepEqual(deleted, [['a1', 'i1']]);
     assert.equal(armedState(target, 'delete:i1'), 'false');
-    // A destructive action DOES unmount the row that held focus, so focus is moved to
-    // the owning tab panel rather than falling through to `<body>`.
+    // A destructive action DOES unmount the row that held focus.
     assert.equal(
       target.ownerDocument.activeElement,
       target.querySelector('[data-knowledge-panel]'),
@@ -661,9 +629,7 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.deepEqual(erased, [['a1', 'r1']]);
   });
 
-  // ---------------------------------------------------------------------------
   // The GM-grant rungs (issue 1289, criterion 16).
-  //
   // All six rows sit on ONE character and are read from ONE mount, because the thing
   // under test is a three-way DISCRIMINANT: a per-case mount would prove each arm
   // fires when it is the only entry, which is exactly the assumption a shared default
@@ -671,11 +637,6 @@ describe('KnowledgeView mounted behaviour', () => {
   // kinds falling to the `LearnedFrom` default instead, the labelled row would read
   // "Learned from Greenwarden Circle" — naming a book that does not exist — and the
   // label-less row "Learned from " with nothing after it.
-  //
-  // Text is asserted against the ENGLISH FALLBACKS: the harness's `localize` answers
-  // the key for an unmapped key, so `text()` falls back exactly as a world with no
-  // translation for these keys does.
-  // ---------------------------------------------------------------------------
   const GRANTED_LABEL = 'Greenwarden Circle';
   const LONG_LABEL = 'A'.repeat(200);
   // Each of these is a `String.prototype.replace` REPLACEMENT pattern. A row built by
@@ -703,10 +664,7 @@ describe('KnowledgeView mounted behaviour', () => {
           granted: true,
         }),
         rawLearned({ recipeId: 'g-auto', recipeName: 'Grind Chalk', sourceItemUuid: null }),
-        // BOTH fields alongside a real book uuid. The book provenance wins: the entry
-        // has a source copy, and the grant fields are display-irrelevant there. This is
-        // also the complement of the dead-code guard below — the grant rungs are only
-        // consulted inside the `!uuid` branch.
+        // BOTH fields alongside a real book uuid. The book provenance wins.
         rawLearned({
           recipeId: 'g-both',
           recipeName: 'Distil Ember',
@@ -755,8 +713,7 @@ describe('KnowledgeView mounted behaviour', () => {
     const label = (id) => row(id).querySelector('[data-knowledge-source-name]').textContent;
     const icon = (id) => row(id).querySelector('[data-knowledge-source] > i').className;
 
-    // The three kinds are DISTINCT, which is what makes the label-less rung — the
-    // common one — addressable by a selector at all.
+    // The three kinds are DISTINCT, which is what makes the label-less rung.
     assert.equal(kind('g-labelled'), 'granted');
     assert.equal(kind('g-unlabelled'), 'grantedUnlabelled');
     assert.equal(kind('g-auto'), 'autoLearn');
@@ -781,15 +738,13 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.equal(line('g-nonstring'), 'Learned by grant');
     assert.doesNotMatch(target.textContent, /\[object Object\]/);
 
-    // Clamped INCLUSIVE of the ellipsis, so the rendered label never exceeds the
-    // 64 the write path refuses past.
+    // Clamped INCLUSIVE of the ellipsis.
     assert.equal(kind('g-long'), 'granted');
     assert.equal(label('g-long'), `${'A'.repeat(63)}…`);
     assert.equal([...label('g-long')].length, 64);
     assert.equal(line('g-long'), `Learned by grant: ${'A'.repeat(63)}…`);
 
-    // The `$` patterns appear VERBATIM. Rendered through `replace`, this row would
-    // read "Learned by grant: Learned by grant:  {grantedBy}  …" instead.
+    // The `$` patterns appear VERBATIM. Rendered through `replace`.
     assert.equal(label('g-dollar'), DOLLAR_LABEL);
     assert.equal(line('g-dollar'), `Learned by grant: ${DOLLAR_LABEL}`);
 
@@ -801,17 +756,14 @@ describe('KnowledgeView mounted behaviour', () => {
     assert.equal(icon('g-auto'), 'fas fa-book');
     assert.equal(icon('g-both'), 'fas fa-book');
 
-    // Every granted entry has `sourceItemUuid: null`, so erasing it frees no budget
-    // for the SAME reason auto-learn does. Asserted rather than discovered.
+    // Every granted entry has `sourceItemUuid: null`.
     for (const id of ['g-labelled', 'g-unlabelled', 'g-long', 'g-dollar', 'g-nonstring']) {
       const clause = row(id).querySelector('[data-knowledge-source] [data-knowledge-no-refund]');
       assert.equal(clause.dataset.knowledgeNoRefund, 'noSource', `${id}: no-refund reason`);
       assert.match(clause.textContent, /no source copy to refund/, `${id}: no-refund clause`);
     }
 
-    // The label reaches NO attribute — not a link target, not a tooltip. Rendered
-    // markup, not source text: an attribute added by a child component would be
-    // invisible to a source scan of this one file.
+    // The label reaches NO attribute — not a link target.
     const granted = row('g-labelled');
     assert.ok(!granted.querySelector('[href]'), 'no learned row renders a link');
     for (const titled of granted.querySelectorAll('[title]')) {
@@ -831,16 +783,7 @@ describe('KnowledgeView mounted behaviour', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The grant rungs at the LADDER, not the render (issue 1289, criterion 16).
-//
-// These live beside the mounted cases rather than in the pure suite because they are
-// the same requirement seen from the other end: the mount proves the discriminant is
-// rendered, and this proves the discriminant is REACHABLE. The rungs sit inside
-// `learnedRecipeSource`'s `!uuid` branch, which returns first, so a rung written after
-// the uuid rungs would be dead code that a table exercising only those three still
-// passes green.
-// ---------------------------------------------------------------------------
 const GRANT_LADDER_CASES = [
   // (label, raw) -> (kind, name)
   ['no uuid and no grant is still auto-learn', {}, 'autoLearn', ''],
@@ -853,8 +796,7 @@ const GRANT_LADDER_CASES = [
   ],
   ['a label is trimmed', { granted: true, grantedBy: '  Circle  ' }, 'granted', 'Circle'],
   ['whitespace is not a label', { granted: true, grantedBy: '   ' }, 'grantedUnlabelled', ''],
-  // `granted` is tested STRICTLY. The flag is public, so each of these is a value
-  // another module can write, and none of them records a GM grant.
+  // `granted` is tested STRICTLY. The flag is public.
   ['a truthy string is not a grant', { granted: 'yes' }, 'autoLearn', ''],
   ['a truthy number is not a grant', { granted: 1 }, 'autoLearn', ''],
   ['an explicit false is not a grant', { granted: false, grantedBy: 'Circle' }, 'autoLearn', ''],
@@ -879,8 +821,7 @@ describe('learnedRecipeSource grant rungs', () => {
   });
 
   it('lets real book provenance win over a grant on the same entry', () => {
-    // The complement of the case above: a uuid-bearing entry has a source copy, so the
-    // grant fields are display-irrelevant and MUST NOT be consulted.
+    // The complement of the case above: a uuid-bearing entry has a source copy.
     const owned = learnedRecipeSource({
       sourceItemUuid: 'Actor.a.Item.i',
       sourceOwned: true,
@@ -926,8 +867,7 @@ describe('learnedRecipeSource grant rungs', () => {
       grantedBy: '🜂'.repeat(100),
     });
     assert.equal(astral.name, `${'🜂'.repeat(63)}…`);
-    // `[...str]` iterates CODE POINTS, so a lone surrogate — the tofu a UTF-16 slice
-    // leaves behind — is the only way an element can land in the D800–DFFF range.
+    // `[...str]` iterates CODE POINTS, so a lone surrogate.
     const lone = [...astral.name].filter((point) => {
       const code = point.codePointAt(0);
       return code >= 0xd800 && code <= 0xdfff;
@@ -944,8 +884,7 @@ describe('learnedRecipeSource grant rungs', () => {
     });
     assert.equal(row.sourceKind, 'granted');
     assert.equal(row.sourceName, 'Circle');
-    // The projection keeps the DERIVED pair only, so no unclamped foreign text is
-    // published onto the row at all.
+    // The projection keeps the DERIVED pair only.
     assert.ok(!('grantedBy' in row), 'the raw label is not republished');
     assert.ok(!('granted' in row), 'the raw flag is not republished');
     assert.equal(row.noRefundReason, 'noSource');
@@ -961,8 +900,7 @@ describe('KnowledgeLearnedRow untrusted-text contract', () => {
   it('renders the source line as text and nothing else', () => {
     assert.ok(!source.includes('{@html'), 'the row must never render raw HTML');
     assert.ok(!/\bhref\b/.test(source), 'the row must never render a link');
-    // `title` is allowed — it carries the RECIPE name, which the surface already
-    // renders in full — but never the source name or a source-line fragment.
+    // `title` is allowed — it carries the RECIPE name.
     for (const [, expression] of source.matchAll(/\btitle=\{([^}]*)\}/g)) {
       assert.doesNotMatch(
         expression,
@@ -973,9 +911,7 @@ describe('KnowledgeLearnedRow untrusted-text contract', () => {
   });
 
   it('never substitutes through a mechanism that interprets $ patterns', () => {
-    // `String.prototype.replace` interprets `$&`, `` $` ``, `$'` and `$n` in the
-    // REPLACEMENT, and Foundry's `Localization#format` does the same, so neither may
-    // carry a value into a translated sentence here. `split`/`join` interprets nothing.
+    // `String.prototype.replace` interprets `$&`.
     assert.ok(!/\.replace\(/.test(source), 'no replace-based substitution');
     assert.ok(!/localize\([^)]*,/.test(source), 'no format-based substitution');
     assert.ok(source.includes('.split(`{${name}}`).join('), 'fill substitutes by split/join');

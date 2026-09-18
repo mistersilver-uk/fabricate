@@ -19,13 +19,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-grant-access-',
   rawModules: [
-    // Issue 1513: the shared `<Pagination>` imports `<Select>`, which reaches
-    // `SearchablePopover`'s whole raw closure whether or not `showPageSize={false}`
-    // ever renders one. A raw module missing from a manifest does not fail the suite —
-    // the harness throws in `before()` and every subtest reports `# cancelled`.
-    // It already carries `foundryBridge.js` and `listReorderAnnouncement.js`, so this list does
-    // not restate them: a duplicate entry is not an error the harness reports, it is a
-    // hand-maintained mirror that quietly disagrees with its source.
+    // Issue 1513: the shared `<Pagination>` imports `<Select>`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js',
@@ -36,9 +30,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
-    // Issue 1513: the roster pager is the shared primitive now, and `SELECT_COMPILED_MODULES`
-    // is the compiled closure it reaches through — which also covers the manager's ONE chip
-    // (issue 883) and the shared no-state primitive (issue 785) this tree already rendered.
+    // Issue 1513: the roster pager is the shared primitive now.
     'src/ui/svelte/components/Pagination.svelte',
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
@@ -183,9 +175,7 @@ describe('GrantAccessInspector (mounted)', () => {
         .textContent.trim();
     assert.equal(summary(), 'Showing 1–6 of 8');
 
-    // The PLAYER roster has two rows and therefore no bar at all, which is what makes the
-    // ancestor-scoped query above a real discriminator rather than a longer way to write the
-    // same thing.
+    // The PLAYER roster has two rows and therefore no bar at all.
     assert.ok(
       !root.querySelector('[data-access-roster="players"] [data-pagination-next]'),
       'a two-row roster draws no pager'
@@ -214,9 +204,6 @@ describe('GrantAccessInspector (mounted)', () => {
   // ── TWO PAGERS AT ONCE, WHICH IS THE STATE NO FIXTURE HELD (issue 1513, review r1) ─────
   // Every pager assertion above mounts a roster long enough to page and a second roster of two,
   // so exactly ONE bar renders and `[data-access-roster="…"]` discriminates nothing. Measured:
-  // re-pointing the PLAYERS section's `onPageChange` at `ui.characterPageIndex` shipped GREEN
-  // against the whole suite, because the crossed write moved a page index no rendered bar read.
-  // The fix is a fixture, not another assertion: both rosters over the page size at once.
   it('draws a pager per roster and each one pages only its own rows', async () => {
     const root = await harness.mount({
       recipe: makeRecipe(),
@@ -393,17 +380,6 @@ describe('GrantAccessInspector (mounted)', () => {
   });
 
   // THE TWO VIEW LAB CASES' OWN SELECTORS, RESOLVED AGAINST THE RENDERED COMPONENT (issue 1515).
-  //
-  // A capture case declares a CSS selector as its proof that the frame reached the state it is
-  // named for, and nothing checks that selector against the markup until the capture runs — at
-  // which point one bad selector fails the whole capture and publishes NO frames at all. So the
-  // two frames added for this inspector's crowded roster are proved here instead, on the real
-  // component, at the roster size the lab fixture seeds.
-  //
-  // The selectors are READ FROM THE CASES rather than restated: a copy would keep passing after
-  // the case it mirrors started naming something else, which is the drift this pair exists to
-  // stop. Only the area root is stripped, because a mounted component has no manager shell
-  // around it and that prefix is the one part of each selector this harness cannot supply.
   it('resolves both crowded-roster capture selectors against the rendered rosters', async () => {
     const withoutArea = (selector) => selector.replace('.fabricate-manager ', '');
     const root = await harness.mount({
@@ -467,8 +443,7 @@ describe('GrantAccessInspector (mounted)', () => {
     assert.equal(root.querySelectorAll('[data-access-roster]').length, 0);
   });
 
-  // Issue 884 — the header thumbnail is the recipe's own icon, resolved through the
-  // shared helper. It used to prefer the first containing book's artwork.
+  // Issue 884 — the header thumbnail is the recipe's own icon.
   itResolvesTheRecipesOwnImage({
     harness,
     mountProps: (imageOverrides) => ({
@@ -476,8 +451,7 @@ describe('GrantAccessInspector (mounted)', () => {
       characters: makeCharacters(1),
       players: makePlayers(1)
     }),
-    // Issue 1506 converted this header's raw `<img>` into the shared tile, so the query is
-    // the primitive's own image rather than the retired sheet class it used to carry.
+    // Issue 1506 converted this header's raw `<img>` into the shared tile.
     selectImg: (root) =>
       root.querySelector('.manager-inspector-icon [data-medallion] img').getAttribute('src')
   });

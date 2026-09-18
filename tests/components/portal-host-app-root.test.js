@@ -1,62 +1,9 @@
 /*
  * NO COMPONENT MAY HARD-CODE AN APPLICATION ROOT AS ITS PORTAL HOST (issue 1466).
- *
- * This is the SCRIPT half of the rule `searchable-popover-area-scope.test.js` enforces for CSS,
- * and it is deliberately general where that one is about a single primitive. The CSS gate asks
- * that no rule the picker owns be rooted at an application root; this one asks that no component
- * anywhere decide WHERE ITS OVERLAY LIVES by naming one.
- *
- * ── THE DEFECT ──────────────────────────────────────────────────────────────────────────────
- * Six components each wrote `closest('.fabricate-manager')` to find their portal host, and a
- * seventh wrote the worse variant, `document.querySelector('.fabricate-manager')`. Three of the
- * six lived in `src/ui/svelte/components/`, the shared directory whose premise is that a
- * component there works wherever it is mounted.
- *
- * Outside the manager the ancestor form returns null: the portal no-ops while the positioning
- * pass falls back to viewport coordinates, and the panel draws in the wrong place with identical
- * markup and no error. The document-wide form is worse rather than better — it finds the manager
- * window WHEREVER IT IS, so a dialog opened from another application portals itself into a
- * different window entirely.
- *
- * ── WHY IT NEEDS A GATE ─────────────────────────────────────────────────────────────────────
- * `closest('.fabricate-manager')` is what a reasonable author writes. Every existing manager
- * surface works, the manager is where these components are used today, and nothing in the
- * repository fails — the failure is a panel's POSITION in an application that does not exist yet.
- * The defect reappeared six times for exactly that reason, and the seventh occurrence would cost
- * one line to add.
- *
- * ── WHAT MAKES THIS NOT VACUOUS ─────────────────────────────────────────────────────────────
- * This is an ABSENCE gate over two derived populations, so either could silently go empty and
- * leave it passing while examining nothing. Both are floored, and the shipped tree has ZERO
- * offenders, which means the interesting number is not "how many did we find" but "did the
- * scanner still find anything AT ALL to look at":
- *
- *   1. The application-root vocabulary is read out of the APPLICATIONS — their ApplicationV2
- *      `classes` arrays and the root element each one's Svelte root component renders — not from
- *      a list here. A list would rot the moment an application is added.
  *   2. The portal population is read out of the corpus: every file that imports the portal action
  *      or the anchored-popover action, or owns the clipping selectors they pass. Read from CODE —
  *      the corpus is scanned with its comments blanked, so prose about a portal never joins a
  *      population this gate floors.
- *   3. The SELECTOR EXTRACTOR is floored on the calls it finds, not on the offences. After the
- *      fix there are no offending calls at all, so a pattern that quietly stopped matching would
- *      report a clean tree. The floor is on the host lookups those files still legitimately make,
- *      which proves the scanner is still reading. Issue 1500 took ALL FOUR `closest()` clipping
- *      walks out of the components: each became a `bounds` VALUE — a selector string the action
- *      is handed and calls `closest()` with — and those values are exported constants in
- *      `util/overlayBounds.js`. A reader that only knew how to find `.closest('…')` would
- *      therefore have gone blind at exactly the moment the selectors moved, and the offence
- *      clause below would have been policing an empty set. So the extractor reads BOTH shapes,
- *      over EVERY file in the population rather than over the bounds module alone, and the floor
- *      names one selector of each spelling it has to read: a constant, a plain call, an optional
- *      call, and an argument carrying the opposite quote. A synthetic case fixes a witness for
- *      each of those spellings besides, because which of them the shipped tree happens to contain
- *      is exactly the thing issue 1500 changed once already.
- *   4. The detector is proved to fire on a synthetic offender and not to fire on a shipped
- *      selector, so a predicate rewritten to match everything or nothing reds here rather than
- *      greening the assertion below.
- *   5. A positive ADOPTION clause, because "nobody hard-codes a root" is also satisfied by
- *      deleting every portal in the repository.
  */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -72,22 +19,9 @@ const RESOLVER_FUNCTION = 'resolveOverlayHost';
 /** The action itself, whose own `anchoredPopover(node, …)` signature is not an adoption of it. */
 const ANCHORED_POPOVER = 'src/ui/svelte/actions/anchoredPopover.js';
 const PORTAL_ACTION = 'actions/portal.js';
-/**
- * The THIRD portal route (issue 1500). Six overlays no longer name `portal.js` at all: they
- * reach `anchoredPopover`, which resolves the host and portals on their behalf. Without this the
- * population would silently shed them and this gate would guard the two that stayed behind.
- */
+/** The THIRD portal route (issue 1500). Six overlays no longer name `portal.js` at all. */
 const ANCHORED_POPOVER_ACTION = 'actions/anchoredPopover.js';
-/**
- * The module that now HOLDS the clipping selectors (issue 1500), and the reason it is scanned.
- *
- * The four `closest()` walks this gate used to read inside the components are gone: a component
- * passes `bounds`, and the shipped boundaries are string constants here. The strings are the same
- * strings — `.manager-main` and friends — and a `.fabricate-manager` written into one of them
- * would couple every caller of that constant to one application, which is this gate's whole
- * subject in the spelling the refactor gave it. It is in the population by its own PATH rather
- * than by an import, because it is the file the selectors live in.
- */
+/** The module that now HOLDS the clipping selectors (issue 1500), and the reason it is scanned. */
 const OVERLAY_BOUNDS = 'src/ui/svelte/util/overlayBounds.js';
 const OVERLAY_BOUNDS_MODULE = 'util/overlayBounds.js';
 
@@ -96,11 +30,6 @@ const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
 
 /**
  * Every class that identifies a Fabricate application's own root element.
- *
- * Derived from the applications, in the two layers a Foundry app actually has: the `classes`
- * ApplicationV2 puts on the window FRAME, and the class the Svelte root component renders on the
- * element INSIDE the window content. Both are roots for this purpose — a portal host hard-coded
- * to either pins the component to one application.
  *
  * @returns {Set<string>} The application-root vocabulary.
  */
@@ -134,27 +63,6 @@ function applicationRootClasses() {
 /**
  * Every `src/ui` file that portals something, or owns the clipping selectors those files pass.
  *
- * Membership is what makes a hard-coded root an OFFENCE rather than a legitimate lookup: the
- * manager's own root component queries `.fabricate-manager` to rescue focus into its live region,
- * which is a component naming ITS OWN root and is nobody else's business. The same string in a
- * portal host is the defect.
- *
- * READ FROM CODE, NOT FROM PROSE. The sources handed in have their comments blanked, so a file
- * that merely mentions `actions/portal.js` in a docblock — `ManagerColorPopover` says why it no
- * longer has a portal prop — does not join a population whose floor is an anti-vacuity claim
- * about how much real code this gate is reading.
- *
- * A FOURTH ROUTE WAS REMOVED RATHER THAN LEFT TO LOOK LIKE COVERAGE. `text.includes('portalTarget')`
- * was how a panel that is HANDED its host — rather than finding one — joined the population, and
- * `ManagerColorPopover`'s `portalTarget` prop was the only thing it ever matched. Issue 1500
- * deleted that prop: its caller drives `anchoredPopover` against the panel instead, so the panel
- * has nothing to be told. The string now survives in exactly one place in `src/ui`, the comment in
- * that component explaining the removal — and comments are blanked before this runs, so the route
- * selected NOTHING while reading as though a whole membership rule were still being enforced. A
- * clause that cannot fire is not a conservative extra; it is the thing this file's floors exist to
- * catch, in the file that declares them. If a panel is ever handed a host by prop again, the route
- * comes back with the prop and with a file for its floor to count.
- *
  * @param {Record<string, string>} sources Working-tree sources with comments blanked.
  * @returns {string[]} Sorted file paths.
  */
@@ -173,13 +81,6 @@ function portalingFiles(sources) {
 
 /**
  * Every DOM lookup made from a string-literal selector, with its position.
- *
- * `closest`, `querySelector` and `querySelectorAll` are the three ways a component locates
- * another element by name, and all three have been used as a portal host at some point in this
- * codebase's history.
- *
- * TWO SPELLINGS THIS MISSED, both of them shipped in the population it reads:
- *
  *   - `(?:\?\.)?\(` — an OPTIONAL call. `menuRoot?.querySelector?.('button')` is what a
  *     component writes when the node may not be mounted yet, and `ActionMenu` and
  *     `SearchablePopover` both write it. A pattern demanding a bare `(` read
@@ -189,11 +90,6 @@ function portalingFiles(sources) {
  *     that a `[^'"`]*` body could not reach past its second character. Each alternative below
  *     therefore excludes only its OWN delimiter, so `closest('[role="x"] .fabricate-manager')`
  *     — an offence written the way a real selector is written — is read rather than skipped.
- *
- * Neither is an edge case invented here: both were found in the shipped tree, and the second is
- * the shape a hard-coded root is most likely to arrive in, since a bare class selector is the
- * only kind the old pattern could see.
- *
  * The bodies stop at a newline. A selector never spans one, and an unterminated quote would
  * otherwise swallow the rest of the file and report it as one enormous selector.
  *
@@ -214,44 +110,11 @@ function selectorLookups(text) {
 
 /**
  * Every selector string a file states as a CONSTANT rather than passing to a call.
- *
- * The SECOND shape a host or boundary selector takes since issue 1500. `selectorLookups` reads a
- * call; this reads a VALUE, because the four `closest()` calls it used to find were replaced by
- * constants handed to the action. Both feed the same offence clause, so moving a selector out of
- * a call and into a constant does not move it out of this gate's sight.
- *
- * DETECTED BY WHAT THE VALUE IS, not by what the constant is CALLED. The first form of this read
- * `const \w*SELECTOR\w*`, which made the claim above false in the easiest possible way: a
- * boundary named `HOST`, `MANAGER_ROOT` or `PORTAL_HOME` is the same coupling under a name the
- * pattern does not recognise, and nothing in the repository requires the word. A CSS selector
- * begins with `.` or `[` for the two things this gate cares about — a class and an attribute
- * clause — so that is the test, and it is a property of the string rather than of the author's
- * naming. `const LABEL = 'Add tag'` and `const KEY = 'biomes'` are excluded by the same rule
- * without an allowlist to maintain.
- *
- * FOUR SPELLINGS THIS MISSED, each one measured escaping before the pattern was widened:
- *
- *   - `bounds: '.fabricate-manager'` — an object PROPERTY, and the likeliest shape the offence
- *     returns in: every caller converted at issue 1500 hands the selector to the action inside an
- *     options object, so it is never bound to a name at all.
- *   - `let` beside `const`. The keyword says nothing about what the value is.
- *   - a TEMPLATE LITERAL. `selectorLookups` has accepted backticks for a call argument since it
- *     was widened, so a value reader that refused them was inconsistent with the reader it is
- *     paired with, and the inconsistency was the way out.
  *   - the OPPOSITE quote inside the body, which the old `[^'"]*` excluded both of. That one did
  *     not merely stop short, because the closing delimiter backreferenced the opening one: the
  *     match failed outright, and `const HOST = '[role="dialog"] .fabricate-manager'` was read as
  *     NO selector rather than as a fragment. Each alternative below excludes only its own
  *     delimiter, exactly as the call reader's do, so that value is now read whole.
- *
- * The bodies stop at a newline for the reason they do there: a selector never spans one, and an
- * unterminated quote would otherwise swallow the rest of the file.
- *
- * THE PROPERTY BRANCH IS KEYED ON THE NAME `bounds`, which is the one exception to "detected by
- * what the value is" above and a deliberate one: accepting ANY property name would widen the read
- * population from stated boundaries to every selector-shaped string in every object literal under
- * `src/ui`. The cost is that a boundary handed over as `host:` or `boundary:` is still out of
- * sight — the next gap to close, if one is ever written that way.
  *
  * @param {string} text Source with comments already blanked.
  * @returns {Array<{call: string, selector: string}>}
@@ -267,13 +130,6 @@ function boundsSelectors(text) {
 
 /**
  * Every selector this file states, in whichever of the two shapes it states it.
- *
- * BOTH READERS RUN OVER EVERY FILE. `boundsSelectors` used to be applied to `overlayBounds.js`
- * alone, which reduced "a selector in a constant is still in sight" to "a selector in a constant
- * IN ONE FILE is still in sight" — and the offence this gate exists for is a component naming an
- * application root, so the one file exempted from the constant reader was the only one that could
- * not commit it. A component that lifts `'.fabricate-manager'` into a module constant is caught
- * here now, wherever it lives.
  *
  * @param {string} text Source with comments already blanked.
  * @returns {Array<{call: string, selector: string}>}
@@ -341,9 +197,7 @@ test('the portal population is the set of components that actually portal', () =
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    // A SCREEN REGION rather than a shared component, and the seventh copy of the positioning
-    // pass — converted at issue 1500 after the other six, because nobody had thought to grep
-    // `apps/manager/` for one. It is in this population for the same reason the components are.
+    // A SCREEN REGION rather than a shared component.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
     // The selectors themselves, which is the shape the clipping boundary took when it left the
     // components. Without this file the offence clause reads no boundary selector at all.
@@ -366,18 +220,11 @@ test('the portal population is the set of components that actually portal', () =
 });
 
 test('the selector extractor still finds the host lookups it reads', () => {
-  // THE LOAD-BEARING FLOOR. The shipped tree has zero offences, so every offence-counting
-  // assertion here passes trivially — including one whose pattern has stopped matching anything
-  // at all. What proves the scanner is alive is the lookups these files legitimately still make:
-  // the horizontal-bounds walks (`closest('.admin-main, .manager-main, …')`) and friends.
+  // THE LOAD-BEARING FLOOR. The shipped tree has zero offences.
   const files = portalingFiles(stripped);
   const lookups = files.flatMap((file) => hostLookups(stripped[file]));
 
-  // NAMED, not merely counted. Seven selectors survive in this population, so a bare floor of
-  // seven would be satisfied by seven of any kind — including seven the extractor found by
-  // accident. These are one of each SPELLING the extractor has to read, so a narrowing reds with
-  // the spelling it lost named in the message:
-  //
+  // NAMED, not merely counted. Seven selectors survive in this population.
   //   `.manager-main`                       a boundary CONSTANT, `MANAGER_MAIN_SELECTOR` in the
   //                                         bounds module — the biome picker's clipping walk in
   //                                         the form it took when it left the component
@@ -407,10 +254,7 @@ test('the selector extractor still finds the host lookups it reads', () => {
       'files. Seven ship; a number this low means the pattern no longer matches the code.'
   );
 
-  // BOTH READERS ARE ALIVE. The defect was written as `closest('.fabricate-manager')`, and the
-  // refactor turned every clipping `closest()` in this population into a constant the action
-  // calls `closest()` with — so a gate that could only read one of the two shapes would be half
-  // blind, and which half would depend on where the next author put the string.
+  // BOTH READERS ARE ALIVE. The defect was written as `closest('.fabricate-manager')`.
   for (const shape of ['querySelector', 'bounds']) {
     assert.ok(
       lookups.some((lookup) => lookup.call === shape),
@@ -428,9 +272,6 @@ test('the selector extractor reads every spelling a host lookup can take', () =>
   // `closest` alternative of the pattern was matched by NOTHING and could have been deleted
   // without reddening a thing. These inputs are fixed, so each alternative keeps a witness whether
   // or not any component still writes it.
-  //
-  // Every string here is the OFFENCE — `.fabricate-manager`, an application root — in a different
-  // spelling, so this doubles as the proof that the offence clause can see each of them.
   for (const [label, source, expected] of [
     ['the plain ancestor walk', `root.closest('.fabricate-manager')`, 'closest'],
     ['a document-wide query', `document.querySelector(".fabricate-manager")`, 'querySelector'],
@@ -447,8 +288,6 @@ test('the selector extractor reads every spelling a host lookup can take', () =>
   }
 
   // The opposite quote, kept separate because the SELECTOR is what differs rather than the call.
-  // An attribute clause is quoted CSS, so a pattern whose body excludes every quote truncates it
-  // — and this exact shape ships in `ActionMenu`.
   assert.deepEqual(
     selectorLookups(`row.closest('[role="listitem"] .fabricate-manager')`),
     [{ call: 'closest', selector: '[role="listitem"] .fabricate-manager' }],
@@ -456,12 +295,7 @@ test('the selector extractor reads every spelling a host lookup can take', () =>
       'an attribute clause in front of it passes this gate'
   );
 
-  // The value reader, over every spelling a STATED selector takes: a name the first form of it
-  // required and a name it did not, `let` beside `const`, a template literal, and the object
-  // PROPERTY the converted callers actually write — `bounds:` in an options object, which is the
-  // one shape the offence is likeliest to return in and the one this reader was blindest to. All
-  // five are the same coupling, and none is more likely than the others to be what the next
-  // author types.
+  // The value reader, over every spelling a STATED selector takes.
   for (const source of [
     `const MANAGER_HOST_SELECTOR = '.fabricate-manager';`,
     `const PORTAL_HOME = '.fabricate-manager';`,
@@ -477,10 +311,7 @@ test('the selector extractor reads every spelling a host lookup can take', () =>
     );
   }
 
-  // The opposite quote in the STATED shape, kept separate for the reason the call reader keeps its
-  // own: the selector is what differs rather than the spelling around it. An attribute clause is
-  // quoted CSS, and the old body excluded both quotes behind a backreferenced delimiter, so a
-  // value written this way matched nothing at all and the root inside it was invisible.
+  // The opposite quote in the STATED shape.
   assert.deepEqual(
     boundsSelectors(`const HOST = '[role="dialog"] .fabricate-manager';`),
     [{ call: 'bounds', selector: '[role="dialog"] .fabricate-manager' }],
@@ -552,18 +383,14 @@ test('no component hard-codes an application root as a portal host', () => {
 });
 
 test('every portal target is resolved through the shared resolver or handed in by its caller', () => {
-  // THE POSITIVE HALF. Absence alone is also satisfied by a tree with no portals in it, and by a
-  // component that invents a third way to find a host — walking `parentElement` twice, say — which
-  // names no root and would pass the clause above while reintroducing the same coupling.
+  // THE POSITIVE HALF. Absence alone is also satisfied by a tree with no portals in it.
   const targets = [];
   const unresolved = [];
 
   for (const [file, text] of Object.entries(corpus)) {
     if (file === RESOLVER || file === ANCHORED_POPOVER) continue;
     const source = stripComments(text);
-    // The anchored-popover action resolves the host through `resolveOverlayHost` itself, so a
-    // caller that uses it is adopted BY CONSTRUCTION and has no expression to examine. Counting
-    // those uses is what keeps this adoption clause from collapsing as the callers convert.
+    // The anchored-popover action resolves the host through `resolveOverlayHost` itself.
     for (const use of source.matchAll(/use:anchoredPopover=|anchoredPopover\(\w/g)) {
       targets.push(`${file}: ${use[0]}`);
     }
@@ -571,9 +398,7 @@ test('every portal target is resolved through the shared resolver or handed in b
       const expression = use[1].trim();
       targets.push(`${file}: ${expression}`);
 
-      // Either the expression resolves the host itself, or it calls a local function that does,
-      // or it is a bare identifier — a prop the caller supplies, which is the sanctioned way for
-      // a presentational panel to be told its host.
+      // Either the expression resolves the host itself.
       const callee = expression.match(/\(?\w*\)?\s*=>\s*(\w+)\(/)?.[1];
       const calleeBody = callee
         ? source.slice(source.indexOf(`function ${callee}(`)).slice(0, 400)
@@ -586,13 +411,7 @@ test('every portal target is resolved through the shared resolver or handed in b
     }
   }
 
-  // SIX SHIP as of issue 1503, down from eight, and the floor follows the population rather than
-  // pinning a number the tree no longer has. `IconPicker` and `EssenceSourceSelector` each drove
-  // the anchored-popover action against a panel of their own; both now render THROUGH
-  // `SearchablePopover`, which portals one panel for all three. That is two fewer overlays
-  // deciding for themselves where they live — the direction this clause exists to encourage —
-  // rather than two adoptions lost, and it is invisible from either picker's own lane because
-  // each removes only one.
+  // SIX SHIP as of issue 1503, down from eight.
   assert.ok(
     targets.length >= 5,
     `only ${targets.length} portaled overlays were found across the corpus. Six ship — one ` +

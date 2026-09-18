@@ -1,29 +1,4 @@
-/**
- * The link field's HOOK BAG, pinned in source (issue 1509).
- *
- * ── WHAT THIS FILE REPLACED, AND WHY IT NEEDED A GATE AT ALL ────────────────────────────
- * `ItemDropZone` carried THIRTEEN `kind === '…' ? … : undefined` attribute branches — seven on its
- * root, one on its hint line, two on the copy action and three on the unlink action. Every one of
- * them was a caller's DOM contract written inside the shared primitive, which is the shape
- * `essence-studio-fidelity.test.js` bans by name: a primitive that grows a branch per caller is a
- * union of its callers. Issue 1509 replaced all thirteen with ONE `hookAttrs` bag, in the shape
- * `EditorValidationSurface` already ships, keyed by a CLOSED region set.
- *
- * ── AND WHY A BAG NEEDS A GATE THAT A BRANCH DID NOT ────────────────────────────────────
- * A `kind ===` branch is wrong LOUDLY: mistype the kind and the attribute is simply absent, and
- * the primitive's own source is the one place a reader looks. A bag keyed by NAME is SILENT about
- * a name it does not recognise. `hookAttrs={{ rooot: { 'data-x': true } }}` spreads nothing,
- * renders identically to a site that passed no bag at all, and takes that site's whole DOM
- * contract with it — issue 1116's defect class exactly, unreachable configuration that looks
- * identical to working configuration. Three of these thirteen attributes are selected on by
- * mounted suites, one by a View Lab case and ONE BY THE STYLESHEET, so a silent miss is a test
- * that stops testing or a prompt that visibly narrows.
- *
- * The region names are read out of the PRIMITIVE's own `hooksFor('…')` call sites rather than
- * re-typed here, so widening the surface widens the gate and a call site cannot be greened by
- * editing this file. That is `editor-validation-surface-source-contract.test.js`'s discipline,
- * applied to the second bag in the repository.
- */
+/** The link field's HOOK BAG, pinned in source (issue 1509). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parse } from 'svelte/compiler';
@@ -53,17 +28,6 @@ function declaredRegions() {
 
 /**
  * The top-level keys of the object literal a call site passes to `hookAttrs`.
- *
- * Parsed from the AST rather than from the attribute's source text, for the reason the validation
- * surface's own contract records: a brace-counting scan over `hookAttrs={{ root: { 'data-x': true
- * } }}` has to know which `{` opens a nested object and which closes a string, and getting that
- * subtly wrong yields an EMPTY key list, which makes every clause below pass over nothing.
- *
- * A site whose bag is an IDENTIFIER rather than a literal — `hookAttrs={linkHooks}`, which the
- * recipe-item overview passes because its bag is `$derived` on its own link state — is reported
- * separately rather than as zero keys, because "this site names no region" and "this site names
- * its regions somewhere this reader cannot see" are different facts and only the first is a
- * defect.
  *
  * @param {string} file repo-relative component path
  * @returns {{keys: string[]|null, indirect: boolean}} the literal's keys, or an indirect marker
@@ -105,7 +69,6 @@ function callSites() {
  * Every element in the primitive's own template that carries a spread, with its bare attributes.
  *
  * @returns {{hosts: string[], bare: string[]}} `hosts` names every spread-carrying element,
- *   `bare` every valueless attribute found on one, as `<element> name`.
  */
 function spreadHosts() {
   const source = SOURCES[ZONE_PATH];
@@ -118,9 +81,7 @@ function spreadHosts() {
     if (!attributes.some((attribute) => attribute.type === 'SpreadAttribute')) return;
     hosts.push(node.name);
     for (const attribute of attributes) {
-      // `value === true` is the AST's marker for a VALUELESS attribute — `data-x` rather than
-      // `data-x=""` or `{x}`, both of which carry a value node. Same test the shared factory's
-      // valueless clause uses on CALL SITES; this one turns it on the primitive itself.
+      // `value === true` is the AST's marker for a VALUELESS attribute.
       if (attribute.type === 'Attribute' && attribute.value === true) {
         bare.push(`<${node.name}> ${attribute.name}`);
       }
@@ -139,10 +100,6 @@ test('no attribute on a spread-carrying element of the zone is written bare', ()
   // ten of its consumers are PRESENCE selectors (`[data-manager-item-drop-zone]`), which resolve
   // identically either way. Reverting the value to bare leaves the whole suite green without
   // this clause, which is exactly why it exists.
-  //
-  // Stated over EVERY spread host rather than over the one attribute, because the hazard is the
-  // spread and the zone has four regions: the day the hint line or an action grows a bare hook
-  // beside its spread, the same silent flip happens there and no consumer notices.
   const { hosts, bare } = spreadHosts();
   assert.ok(
     hosts.length > 0,
@@ -160,9 +117,7 @@ test('no attribute on a spread-carrying element of the zone is written bare', ()
 });
 
 test('the root still carries its own presence hook, spelled with an explicit empty value', () => {
-  // AND THE ONE THAT MATTERS BY NAME, so the clause above cannot pass by the root losing the hook
-  // instead of fixing it. Ten consumers select `[data-manager-item-drop-zone]` — four mounted
-  // suites and the host-independence fixture, which reproduces this element's markup verbatim.
+  // AND THE ONE THAT MATTERS BY NAME.
   const root = /data-manager-item-drop-zone=""/.test(SOURCES[ZONE_PATH]);
   assert.ok(
     root,
@@ -199,8 +154,7 @@ test('the thirteen `kind ===` attribute branches are gone and none has come back
       'a caller`s hook comes to depend on a string two files away:\n  ' +
       branches.join('\n  ')
   );
-  // NON-VACUITY: the prop is still declared and still ids the zone, so the clause above is a
-  // statement about branching rather than about a prop that has been deleted.
+  // NON-VACUITY: the prop is still declared and still ids the zone.
   assert.ok(
     /data-item-drop-zone=\{kind \|\| undefined\}/.test(source),
     '`kind` no longer ids the zone, so the clause above is holding over a prop that is gone ' +
@@ -220,8 +174,7 @@ test('every hook region a call site names is one the zone actually spreads', () 
       if (!regions.includes(key)) offenders.push(`${file}: hookAttrs.${key}`);
     }
   }
-  // Non-vacuity. A bag prop nothing passes, or an AST walk that stopped resolving the tag, reads
-  // as zero sites and greens this clause over an empty domain.
+  // Non-vacuity. A bag prop nothing passes, or an AST walk that stopped resolving the tag.
   assert.ok(sites >= 2, `only ${sites} <${TAG}> call sites pass a literal bag, so this is moot`);
   assert.deepEqual(
     offenders.sort((left, right) => left.localeCompare(right)),
@@ -234,9 +187,7 @@ test('every hook region a call site names is one the zone actually spreads', () 
 });
 
 test('the tag scan reaches every caller, so the clauses above hold over the real corpus', () => {
-  // The corpus floor. Nine files render this zone and one of them renders it twice; a lower
-  // number means the scan stopped resolving the tag and every clause above is examining a subset
-  // of the callers while reporting on all of them.
+  // The corpus floor. Nine files render this zone and one of them renders it twice.
   const files = callSites();
   assert.ok(
     files.length >= 9,
@@ -276,11 +227,7 @@ test('the one site whose bag is DERIVED passes it by identifier, not as a litera
 });
 
 test('the styled hook is still named by the caller that needs it', () => {
-  // `[data-tool-create-card]` IS A STYLING HOOK, not a test hook: `styles/fabricate.css` declares
-  // `.fabricate-manager [data-tool-create-card] { flex: 0 0 auto; width: 100% }`, so losing it
-  // narrows the Tools catalogue's create prompt from the list's full width. It is the one of the
-  // thirteen whose disappearance is VISIBLE rather than only unselectable, and it is the reason
-  // this bag's values are spread verbatim rather than normalised to booleans.
+  // `[data-tool-create-card]` IS A STYLING HOOK, not a test hook.
   const catalogue = 'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte';
   const { keys } = bagKeys(catalogue);
   assert.deepEqual(keys, ['root'], 'the Tools catalogue names exactly the root region');

@@ -1,9 +1,6 @@
 /**
- * Focused unit coverage for `GatheringNodeService` (issue 376) — the finite
- * resource-node subsystem extracted from `GatheringRichStateService`. These
- * exercise the collaborator directly through its injected seams: config reads
- * (`getConfig`), the environment store, the calendar-aware `secondsPerUnit`, the
- * d100 roller, the expression evaluator, and the interactable-scope seams.
+ * Focused unit coverage for `GatheringNodeService` (issue 376) — the finite resource-node subsystem
+ * extracted from `GatheringRichStateService`.
  */
 
 import test from 'node:test';
@@ -196,14 +193,8 @@ test('_respawnNode (expression) pre-rolls per interval via the evaluator', async
 // --- issue 896: a null anchor must not pre-roll expression amounts ---------
 
 /**
- * A depleted `expression` pool whose accrual anchor is an explicit `null` — the
- * shape `normalizeRespawn` persists for a pool that has never been evaluated.
- *
- * The literal `null` is load-bearing and NOT a style choice: `Number(undefined)`
- * is `NaN`, so a fixture that OMITS `lastEvaluatedWorldTime` already takes the
- * correct branch on the unfixed code and proves nothing. Only `null` differs
- * between the old lax predicate and #403's nullish-or-non-finite one, because
- * `Number(null) === 0` is finite and therefore read as "anchored at world time 0".
+ * A depleted `expression` pool whose accrual anchor is an explicit `null` — the shape
+ * `normalizeRespawn` persists for a pool that has never been evaluated.
  */
 function nullAnchoredExpressionPool() {
   return {
@@ -233,23 +224,9 @@ function countingEvaluatorService() {
   return { service, evaluations: () => evaluations };
 }
 
-// These cases assert the COUNT of expression evaluations, not the resulting pool
-// state: the state was already correct before the fix (the math's seed branch
-// consumed none of the pre-rolls), so the wasted work is the only defect signal.
-//
-// `_respawnNode` and `respawnInteractableNode` carry structurally identical
-// pre-roll blocks, so each has to be pinned in BOTH directions or an edit to one
-// of them ships green:
-//  - "pre-rolls too many" — a null-anchored seeding tick must roll NOTHING. That
-//    is the issue 896 defect, and it is the pair of cases immediately below.
-//  - "pre-rolls none" — an anchored pool must still roll once per elapsed
-//    interval. `_respawnNode` gets that from `_respawnNode (expression) pre-rolls
-//    per interval via the evaluator` above; `respawnInteractableNode` had NO
-//    expression-mode coverage in either direction, so its positive case is added
-//    here. Without it, replacing that site's anchor line with `const last = now`
-//    or zeroing its pre-roll loop survives green — the site would then never
-//    pre-roll anything and every interactable-scoped `expression` pool would stop
-//    regrowing.
+// These cases assert the COUNT of expression evaluations, not the resulting pool state: the state
+// was already correct before the fix (the math's seed branch consumed none of the pre-rolls), so
+// the wasted work is the only defect signal (issue 896).
 
 test('_respawnNode: a null-anchored expression pool pre-rolls nothing on its seeding tick', async () => {
   const { service, evaluations } = countingEvaluatorService();
@@ -273,9 +250,8 @@ test('respawnInteractableNode: a null-anchored expression pool pre-rolls nothing
   assert.equal(next.respawn.lastEvaluatedWorldTime, 500 * HOUR, 'the tick seeds the anchor at now');
 });
 
-// The positive counterpart for the scoped site: the pre-roll bound must still
-// produce one evaluation per elapsed interval for an ANCHORED pool. This is what
-// keeps the "pre-rolls none" direction honest at `respawnInteractableNode`.
+// The positive counterpart for the scoped site: the pre-roll bound must still produce one
+// evaluation per elapsed interval for an ANCHORED pool.
 test('respawnInteractableNode (expression): pre-rolls per interval via the evaluator', async () => {
   const { service, evaluations } = countingEvaluatorService();
   const pool = nullAnchoredExpressionPool();
@@ -285,10 +261,8 @@ test('respawnInteractableNode (expression): pre-rolls per interval via the evalu
   assert.equal(next.current, 4, '2 intervals × rolled 2');
 });
 
-// The `interval > 0` half of both pre-roll guards, pinned at both sites: a legacy
-// zero-interval pool must skip the block entirely. Without this, dropping that
-// half divides by zero, yields an `Infinity` elapsed-interval count and pre-rolls
-// a full restock the math never consumes (it short-circuits on the interval).
+// The `interval > 0` half of both pre-roll guards, pinned at both sites: a legacy zero-interval
+// pool must skip the block entirely.
 test('a legacy zero-interval expression pool pre-rolls nothing at either site', async () => {
   const zeroInterval = () => {
     const pool = nullAnchoredExpressionPool();

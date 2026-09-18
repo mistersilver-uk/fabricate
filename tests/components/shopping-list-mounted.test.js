@@ -57,10 +57,7 @@ function aggregate(overrides = {}) {
 
 const ENTRY = { recipeId: 'recipe-1', quantity: 2, name: 'Healing Potion', img: null };
 
-// The three summary cards are `<StatBox>`es since issue 1505, so both class selectors here
-// name the PRIMITIVE's elements rather than the hand-rolled ones whose rules went with the
-// conversion. `.fab-stat-box-value` also carries the card's leading glyph, which contributes no
-// text, so the trim below still yields the bare figure.
+// The three summary cards are `<StatBox>`es since issue 1505.
 function summaryCount(target, kind) {
   return target
     .querySelector(`[data-summary="${kind}"] .fab-stat-box-value`)
@@ -251,10 +248,7 @@ describe('ShoppingList mounted behavior', () => {
     );
   });
 
-  // Issue 924. The row is a `listitem` that NESTS a real `<button>`; it is not itself one,
-  // because `<button>`'s content model forbids the remove `<button>` as a descendant — and
-  // Svelte builds the DOM with `createElement`, never through the HTML parser, so that
-  // invalid nesting would ship rather than being implicitly closed.
+  // Issue 924. The row is a `listitem` that NESTS a real `<button>`.
   it('nests a real activation button in the queue row rather than making the row one', async () => {
     const target = await harness.mount({ aggregate: aggregate(), entries: [ENTRY] });
 
@@ -280,15 +274,7 @@ describe('ShoppingList mounted behavior', () => {
     );
   });
 
-  // The keyboard contract is now the PLATFORM's, which is the point of the change: a native
-  // `<button>` fires `click` on Enter and Space and swallows the space-scroll itself, so the
-  // hand-rolled `onEntryKey` is gone.
-  //
-  // happy-dom does not implement the UA's synthetic-click activation steps, so a dispatched
-  // `keydown` cannot be expected to activate anything here. That makes this test two halves,
-  // and together they are the contract: the row runs NO key handler of its own (so nothing
-  // hand-rolled survives to be relied upon), and the event the UA would deliver instead — a
-  // `click` on a focused, natively focusable button — does increment.
+  // The keyboard contract is now the PLATFORM's, which is the point of the change.
   it('leaves Enter/Space activation to the platform, with no hand-rolled key handler', async () => {
     const inc = [];
     const target = await harness.mount({
@@ -363,21 +349,7 @@ describe('ShoppingList mounted behavior', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 — a currency row states its VERDICT, never a ratio, and never a verdict
-// nobody established.
-//
-// A currency ingredient entry carries `have: 0` as a documented placeholder against a
-// `totalNeed` that is a PRICE, so the shared chip rendered "0 / 100 owned" in the danger
-// tone: a coin balance nobody measured, beside a price the row's NAME already spells out.
-// Asserted against the mounted DOM, because these are render defects — the projection can
-// be entirely correct while the markup keeps reading the wrong two fields.
-//
-// `game.i18n` is backed by the real `lang/en.json` for this block, so every assertion below
-// is on the SHIPPED copy. A renamed key renders as its dotted self and a reworded one
-// renders the new words, and both fail here — which is why the components carry no inline
-// English fallbacks to drift from.
-// ---------------------------------------------------------------------------
+// Issue 1493 — a currency row states its VERDICT, never a ratio.
 
 const CURRENCY_ENTRY = Object.freeze({
   key: 'cur:100 gp',
@@ -428,9 +400,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     assert.ok(Boolean(row), 'an unaffordable cost still belongs on the acquire list');
     assert.match(row.textContent, /100 gp/, 'the row NAME is the whole statement of the cost');
 
-    // Asserted on the CHIP ITSELF before any marker attribute, so the guard bites on the
-    // rendered words rather than on a data attribute a fix could add without changing
-    // what the player reads.
+    // Asserted on the CHIP ITSELF before any marker attribute.
     const chip = chipIn(target);
     assert.ok(Boolean(chip), 'the row still carries a chip');
     assert.equal(chip.textContent.trim(), "Can't afford", 'the shipped copy, read by key');
@@ -471,14 +441,11 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     assert.ok(chip.classList.contains('tone-danger'));
   });
 
-  // -------------------------------------------------------------------------
   // A cost refused for a CONFIGURATION reason (revision 3).
-  //
   // `RecipeManager` populates `issue` and the rail consumes it, but the aggregate entry
   // dropped it — so a player carrying 1000 gp against a cleared `gp` actorPath read
   // "100 gp — Can't afford" in red. That is the original defect in a new voice, and it
   // violates the MUST this change itself added to the ui-integration spec.
-  // -------------------------------------------------------------------------
 
   it('names a configuration refusal as setup, in the warning tone, not as a shortfall', async () => {
     const target = await harness.mount({
@@ -527,13 +494,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
   // A verdict that does not reach the aggregate (revision 3).
-  //
-  // `totalNeed` is multiplied by the queued quantity; `affordable` is a SINGLE craft's
-  // verdict. Reporting one against the other told a player with 150 gp that a queue of
-  // five 100 gp crafts was covered.
-  // -------------------------------------------------------------------------
 
   it('states how many times an unchecked cost recurs, with no verdict and no danger tone', async () => {
     const target = await harness.mount({
@@ -583,18 +544,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     assert.equal(summaryTone(target, 'components'), 'danger');
   });
 
-  // -------------------------------------------------------------------------
   // The `{#each}` key (revision 3).
-  //
-  // This list re-derived the aggregator's dedup rule with a coarser one that was not
-  // kind-qualified, so the two entries the aggregator deliberately SPLIT collapsed back
-  // onto one key. Svelte throws `each_key_duplicate` in the production branch as well as
-  // the dev one, and nothing under `src/` is wrapped in a `<svelte:boundary>` — so this
-  // took down the crafting app's render, not the row.
-  //
-  // Built by the REAL aggregator: a fixture with the keys typed in by hand would prove
-  // only that this component can render two objects.
-  // -------------------------------------------------------------------------
 
   it('renders two same-description entries of different kinds without a duplicate key', async () => {
     const nameless = { description: 'Unknown ingredient', need: 4, have: 0, satisfied: false };
@@ -634,9 +584,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
   });
 
   it('still renders a hand-built aggregate that carries no keys at all', async () => {
-    // The positional fallback. It is not a second identity rule — it only guarantees the
-    // folded list cannot repeat a key, so an aggregate assembled anywhere but the
-    // aggregator degrades to lost DOM identity rather than to a crash.
+    // The positional fallback. It is not a second identity rule.
     const target = await harness.mount({
       aggregate: {
         ingredients: [
@@ -656,17 +604,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
     assert.equal(target.querySelectorAll('.crafting-shopping-acquire-row').length, 3);
   });
 
-  /**
-   * THE PLANNER'S EMPTY IS A PANEL, NOT A ONE-LINE NOTE (issue 1514), and the classification is
-   * a MEASUREMENT rather than a reading of the markup.
-   *
-   * The plan listed this among the tab's one-liners because the markup is a single `<p>`. What it
-   * RENDERS is a 24px glyph over a centred sentence filling the whole planner column — measured
-   * 288.86x574.72 in the View Lab — which is the same shape as the inventory inspector's
-   * no-selection pane and takes the same answer: `EmptyState`'s panel nested inside a
-   * caller-owned fill wrapper. `note` would have released the fill AND the centring, which is
-   * the refusal recorded on `RecipeBrowser` in this same phase.
-   */
+  /** THE PLANNER'S EMPTY IS A PANEL, NOT A ONE-LINE NOTE (issue 1514). */
   it('draws the empty planner as the shared panel inside a caller-owned fill wrapper', async () => {
     const target = await harness.mount({ aggregate: aggregate({ ingredients: [], essences: [], tools: [] }), entries: [] });
 
@@ -688,11 +626,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       Boolean(panel.querySelector('i.fa-cart-shopping')),
       'and the cart glyph is the panel`s own tile now rather than a bare 24px mark beside the line'
     );
-    // THE PANEL FORM TAKES `title` AND THE `note` FORM DOES NOT, and the pair of rules is the
-    // whole classification. `title` renders an <h3>, so the four one-line `note` sites in this
-    // tab pass `hint` to keep headings out of the player app's outline; a full panel standing in
-    // for an entire column is a section in its own right and warrants exactly one, which is the
-    // same answer `InventoryDetail`'s no-selection pane took one phase earlier.
+    // THE PANEL FORM TAKES `title` AND THE `note` FORM DOES NOT.
     assert.ok(
       Boolean(panel.querySelector('h3')),
       'the panel heads with one <h3>, the same single heading the inventory inspector`s pane adds'
@@ -700,9 +634,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
   });
 
   it('draws all three card titles as the shared eyebrow', async () => {
-    // A fixture with TOOLS, because the third card only renders when one is unavailable — the
-    // default aggregate has none, and a two-of-three reading would have passed a `>= 2` check
-    // while leaving the tools title unconverted.
+    // A fixture with TOOLS, because the third card only renders when one is unavailable.
     const target = await harness.mount({
       aggregate: aggregate({
         tools: [{ toolId: 't1', name: 'Alembic', img: 'icons/tool.webp', available: false }],

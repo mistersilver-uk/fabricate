@@ -1,52 +1,6 @@
-/**
- * `Roll.parse` output RECORDED from a real Foundry build (14.365), not modelled.
- *
- * WHY IT IS CHECKED IN. Issue 1097's odds predicate is a positive whitelist over
- * `Roll.parse`, and the View Lab installs a `Roll` DOUBLE that must agree with the real
- * thing about the shape of every term. Grading either against a double the same author
- * wrote is circular: a double LOOSER than core produces false passes, which is the
- * direction nothing notices under `npm test` — `Roll.validate`'s own lab double already
- * accepts formulas real Foundry rejects (issue 1094).
- *
- * HOW IT WAS PRODUCED. Foundry's own `client/dice/grammar.pegjs` was compiled with the
- * `peggy` copy Foundry ships in its `node_modules`, and `client/dice/roll.mjs`,
- * `client/dice/parser.mjs` and `client/dice/terms/*.mjs` were loaded VERBATIM out of the
- * 14.365 release archive (`.foundry-e2e/cache/foundryvtt-14.365.zip`) against a minimal
- * `foundry.utils` / `CONFIG.Dice` host. `Roll.parse(formula, data)` was then called with
- * {@link RECORDED_ROLL_DATA} and its terms serialised field by field. Nothing below is
- * hand-written. A {@link RECORDED_UNDEFINED} marker preserves the distinction between a
- * key that is ABSENT and one whose value is `undefined`, which is exactly the distinction
- * `1d(1d4)` turns on.
- *
- * FOUR RECORDED FACTS THIS FILE EXISTS TO PIN, each of which a plausible model gets wrong:
- *
- * 1. `1d20 + @prof` and `1d20 + @nope` parse to the IDENTICAL term list. `Roll.parse`
- *    substitutes with `missing: "0"` FIRST, so an unresolved key is invisible to it and
- *    the refusal has to come from `resolveCheckFormulaDisplay`'s `missing: 'NaN'` signal.
- * 2. `1df` is a `FateDie` with `faces: 3` — an INTEGER — and `1dc` a `Coin` with
- *    `faces: 2`. They are told apart from a numeric die by DENOMINATION alone (`Die`
- *    overrides it to `` `d${faces}` ``; `DiceTerm` returns its class constant), so "the
- *    faces are not an integer" would be a false statement about either. Issue 1097's
- *    original nine reason codes assumed otherwise; this recording is why there is a tenth.
- * 3. `1d20 + (2d6)` yields exactly ONE top-level die plus a `ParentheticalTerm` reporting
- *    `isDeterministic: false` — `RollParser.flattenTree` does not recurse into it — while
- *    `1d20 + prof` yields a `StringTerm` reporting `isDeterministic: TRUE` for a string
- *    that then throws at evaluate. Note BOTH carry a string `term` field, so a predicate
- *    that tells them apart by that field alone answers the parenthetical with the wrong
- *    reason.
- * 4. A mid-edit formula THROWS a `peg$SyntaxError` out of `Roll.parse`, which does not
- *    `try`. `max(1d20,5)` does not throw and is not a die group either: it is one
- *    `FunctionTerm`, because the flattener pushes a function term whole.
- *
- * `tests/helpers/**` is outside the `npm test` glob, so this file adds no test count.
- */
+/** `Roll.parse` output RECORDED from a real Foundry build (14.365), not modelled (issue 1097). */
 
-/**
- * The recording. Keyed by the exact formula string passed to `Roll.parse`.
- *
- * @type {Readonly<Record<string, {threw: boolean, error?: string, message?: string,
- *   terms?: Array<object>}>>}
- */
+/** The recording. Keyed by the exact formula string passed to `Roll.parse`. */
 export const RECORDED_ROLL_PARSE_14_365 = Object.freeze({
   '1d20 + 5': {
     threw: false,
@@ -354,14 +308,8 @@ export const RECORDED_ROLL_PARSE_14_365 = Object.freeze({
     threw: false,
     terms: [{ class: 'FunctionTerm', isIntermediate: true, isDeterministic: false }],
   },
-  // A BOUNDED ROLLING CHECK MODIFIER, verbatim from `buildModifierRollFragment` (issue 1118)
-  // and appended by `appendCheckModifierRollTerms`. This is the shape every system with a
-  // clamped rolling modifier authors, and the recording is what pins the fact the enumerator
-  // turns on: `flattenTree` pushes the whole `min(...)` as ONE `FunctionTerm`, so the dice
-  // inside it are invisible to any top-level term scan.
-  // The SAME preview formula with a rolling modifier appended instead of a flat one. Both
-  // arms of `checkPreview.test.js`'s catalogue case are recorded, so neither is graded
-  // against a modelled parse.
+  // A BOUNDED ROLLING CHECK MODIFIER, verbatim from `buildModifierRollFragment` (issue 1118) and
+  // appended by `appendCheckModifierRollTerms`.
   '1d20 + 3[Tools]': {
     threw: false,
     terms: [
@@ -493,11 +441,6 @@ export function materialiseRecordedTerms(terms) {
 
 /**
  * A `Roll` stand-in that REPLAYS the recording instead of parsing.
- *
- * This is what lets the predicate be graded against real Foundry output in a headless
- * suite: `describeFormulaEnumerability` sees exactly the terms 14.365 produced, including
- * the thrown `SyntaxError` for a half-typed formula. The two string statics are the
- * lab's own, unchanged, because they are pure string work no dice engine is involved in.
  *
  * @param {object} [overrides] Extra statics — e.g. a `parse` that is absent or throws.
  * @returns {object} A `Roll`-shaped object.

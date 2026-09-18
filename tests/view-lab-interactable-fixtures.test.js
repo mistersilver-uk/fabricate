@@ -1,31 +1,6 @@
 /**
- * What the lab's seeded interactables can actually SHOW, measured through the production scan.
- *
- * ── WHY THIS EXISTS ───────────────────────────────────────────────────────────────────────────
- * The Manage Interactables list draws one marker chip per row, and `markerTone` gives `missing`
- * the `danger` tone — the only alarm colour the row can paint, against `muted` for `region-only`
- * and `neutral` for everything else. Until issue 1520's review the lab seeded no behaviour that
- * could produce it: `classifyMarkerStatus` returns `missing` only for a marker that is CONFIGURED
- * and does not RESOLVE, so no amount of leaving a field out reaches it, and the one tone a
- * reviewer most needed to see was the one no frame could show.
- *
- * The registry's `interactables-manager-list` case now gates its own frame on that chip, which is
- * the assertion that makes the FRAME prove it. This file is the half that runs in `npm test`: a
- * capture needs harvested Foundry chrome, so it does not run on a fork PR and is not part of the
- * unit gate, and between a fixture regression and the next successful capture the tone would go
- * quietly unphotographed again.
- *
- * ── WHY IT SCANS RATHER THAN READS ────────────────────────────────────────────────────────────
- * The claim is about what the WINDOW receives, so it is measured by running the production
- * `scanSceneInteractables` over the seeded scene with the same visual resolver
- * `InteractablesManagerApp` wires — `resolveLinkedVisual(system, { scene })`, over a
- * `fromUuidSync` backed by the world's own document index. Asserting the fixture's uuid literal
- * instead would pass on a uuid that had quietly become resolvable, which is precisely the
- * regression worth catching.
- *
- * The scene skeleton below is the two identifiers `labWorld.js` declares, and it is not an
- * unguarded mirror: `seedLabInteractables` THROWS when the scene or region id it looks for is
- * absent, so renaming either there reds this file loudly rather than silently seeding nothing.
+ * What the lab's seeded interactables can actually SHOW, measured through the production scan
+ * (issue 1520).
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -43,10 +18,6 @@ import {
 
 /**
  * Seed the lab interactables onto a minimal world and return the rows the manager would list.
- *
- * `globalThis.fromUuidSync` is installed for the duration because that is the PRIMARY path
- * `resolveLinkedVisual` takes and the one the seeder registers its marker Tile for; the
- * scene-embedded fallback would resolve the same Tile and hide a break in the index.
  *
  * @returns {object[]} The scan rows, in seed order.
  */
@@ -88,9 +59,7 @@ test('the lab world seeds a row for every marker tone the manager list can paint
   const rows = scanSeededRows();
   const statuses = new Set(rows.map((row) => row.markerStatus));
 
-  // The three tones, by the statuses that select them. `danger` is the one this file was written
-  // for; the other two are read with it so a fixture edit that traded one tone for another fails
-  // here rather than silently narrowing the frame's coverage.
+  // The three tones, by the statuses that select them.
   assert.ok(
     statuses.has(MARKER_STATUS.MISSING),
     "no seeded interactable has a configured-but-unresolvable marker, so `markerTone`'s " +
@@ -110,9 +79,7 @@ test('the lab world seeds a row for every state badge the manager list can draw'
   const rows = scanSeededRows();
 
   // `stateBadges` shows `Disabled`, `Locked` and `Consumed` and falls back to `Enabled`, so the
-  // frame covers the fallback only if some row is in none of the three. `Consumed` is deliberately
-  // absent from the set below: no seeded behaviour is consumed, and that gap is recorded here
-  // rather than in a comment nobody runs.
+  // frame covers the fallback only if some row is in none of the three.
   assert.ok(
     rows.some((row) => row.state.enabled === false),
     'no seeded interactable is disabled, so the `Disabled` badge is unphotographed'

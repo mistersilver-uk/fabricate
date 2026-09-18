@@ -1,22 +1,4 @@
-/**
- * The per-stage complication band on the shared progressive stage list (issue 1286, PR 2).
- *
- * Mounts `ProgressiveStageList` DIRECTLY, because the band's whole contract is
- * given-props: the data is published on the stage row by the two read-models and the
- * caller supplies only the tense. A suite that mounted a body instead would prove the
- * wiring and hide the band's own rules behind a fixture. The two wiring halves are pinned
- * where the wiring lives — `inventory-view.test.js` for salvage, `progressive-body-mounted`
- * for crafting — so a body that stopped passing the tense fails there, not here.
- *
- * Two of these cases are UNREACHABLE from the View Lab and are here for that reason:
- *
- *  - the `+N more` overflow. `hb-mortar-dust` authors two complications and exactly one is
- *    `visible`, so no lab world reaches a stage with two player-visible ones. Making it
- *    reachable would add a row to already-approved GM frames in the sibling PR, so it is
- *    pinned by a test rather than photographed.
- *  - the RESOLVED-but-not-fired tense. The lab's fired case fires on the stage it draws,
- *    so the past-tense NEGATIVE badge — the one the prototype gets wrong — has no frame.
- */
+/** The per-stage complication band on the shared progressive stage list (issue 1286, PR 2). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -34,7 +16,6 @@ const harness = createMountedComponentHarness({
   // The SHARED crafting lists, not a hand-rolled minimum. A bespoke list omits the component
   // under test's own compiled artefact and every leaf it reaches, and the omission HANGS the
   // suite (# cancelled) rather than failing it — which is how it reached the driver green.
-  // The shared constants already carry `ProgressiveStageList` and the band's three modules.
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
@@ -117,9 +98,7 @@ describe('the per-stage complication band (issue 1286)', () => {
     const line = row.querySelector('.crafting-stage-line');
     const band = bandIn(root, 's2');
     assert.ok(line, 'the row wraps its own content in a line');
-    // Compared as INDICES, never as nodes: `node:assert` serialises a mounted happy-dom
-    // element's circular tree to build its diff, so a failed node comparison dies of a heap
-    // OOM and reports as a `# cancelled` suite with no message.
+    // Compared as INDICES, never as nodes.
     const children = [...row.children];
     assert.equal(children.indexOf(line), 0, 'the line is the row’s first child');
     assert.equal(
@@ -148,9 +127,7 @@ describe('the per-stage complication band (issue 1286)', () => {
   });
 
   it('reads in the PAST tense once the roll is spent — the prototype’s own bug', async () => {
-    // The prototype derives `fired` from a stage being short, so a recovered stage keeps
-    // "This can go wrong" beneath a spent roll. Nothing can go wrong any more, and a player
-    // has no way to tell that row from one that is genuinely still pending.
+    // The prototype derives `fired` from a stage being short.
     const root = await mount({ complications: 'resolved' });
     assert.equal(tenseOf(root, 's2'), 'resolved');
     assert.equal(badgeIn(root, 's2').textContent.trim(), "This didn't happen");
@@ -167,8 +144,7 @@ describe('the per-stage complication band (issue 1286)', () => {
   });
 
   it('never claims fired on a forecast, whatever the row happens to carry', async () => {
-    // Crafting is forecast-only: it passes `forecast` always, because the fired record is
-    // defined on the salvage RUN record and the immediate crafting path writes none.
+    // Crafting is forecast-only: it passes `forecast` always.
     const root = await mount({ stages: stages([complication({ fired: true })]) });
     assert.equal(tenseOf(root, 's2'), 'forecast');
     assert.equal(badgeIn(root, 's2').textContent.trim(), 'This can go wrong');
@@ -216,9 +192,7 @@ describe('the per-stage complication band (issue 1286)', () => {
   });
 
   it('never shows the player a trigger sentence', async () => {
-    // The body slot is TYPED on the shared row: the player variant reads `description` and
-    // the GM variants read `triggerSentence`, so handing a player the trigger is unspellable
-    // at the call site rather than merely discouraged.
+    // The body slot is TYPED on the shared row.
     const root = await mount({
       stages: stages([complication({ description: 'A cloud of dust.' })]),
     });

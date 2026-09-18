@@ -1,13 +1,8 @@
 /**
  * A `CraftingRunManager` double for a legacy (native) crafting run.
  *
- * The real manager always returns a record carrying `steps`
- * (`src/systems/CraftingRunManager.js:140`) and the engine persists every native
- * stage transition through `updateRun`, so a double missing either stands in for a
- * collaborator production cannot supply. `getActiveRun` answers only while the run
- * is active, as the real one does once a completed run moves to history.
- *
- * @param {object} [options] `stepCount`/`stepIndex` shape the run; `onSuccess`/`onFailure` spy the terminal payloads.
+ * @param {object} [options] `stepCount`/`stepIndex` shape the run; `onSuccess`/`onFailure` spy the
+ * terminal payloads.
  */
 export function nativeCraftRunManager({
   stepCount = 1,

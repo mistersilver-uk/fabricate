@@ -1,32 +1,4 @@
-/*
- * Issue 1286 — the manager root's wiring for the component complications section.
- *
- * ## WHY THIS IS A SOURCE CONTRACT AND NOT A MOUNTED TEST
- *
- * `tests/components/manager-mounted.test.js` is the ONLY suite that mounts
- * `CraftingSystemManagerRoot`, and it is not this lane's to edit. The facts below are
- * nonetheless the ones that decide whether the section works at all, and every one of them
- * fails SILENTLY — a missing prop drops to its default, a dropped field is simply absent
- * from a payload — so leaving them unpinned would leave the section's contents asserted by
- * nothing. `tests/gathering-bootstrap-api.test.js`'s pin of a literal `src/main.js` wiring
- * line is the precedent this follows.
- *
- * Source assertions rot, so each is written against the SMALLEST stable token that carries
- * the meaning (a prop name, a field name) rather than against a formatted block that
- * Prettier can reflow.
- *
- * ## THE THREE FAILURES PINNED
- *
- * 1. The section derives `complicationActivities` from `salvageResolutionMode` alone when
- *    the host passes none — a deliberately narrow default, honest about the one axis a
- *    component can see. Left there, a progressive-CRAFTING system offers a GM no
- *    complications at all, and nothing is red.
- * 2. The trigger and macro pickers render an EMPTY list without their option props. An
- *    empty picker looks like an unconfigured system rather than a dropped projection.
- * 3. `updates.complications` is a TOP-LEVEL sibling of `salvage`, so it rides the save
- *    payload on its own. A field missing from that path is authored, shown, and silently
- *    discarded on save — the defect that shipped in issues 651 and 676.
- */
+/* Issue 1286 — the manager root's wiring for the component complications section. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -68,8 +40,7 @@ describe('1286 the manager root wires the complications section', () => {
         `the bag states the ${activity} axis`
       );
     }
-    // Crafting reads the SYSTEM's resolution mode and gathering the ECONOMY's — neither
-    // reaches a component, which is exactly why the editor cannot derive them.
+    // Crafting reads the SYSTEM's resolution mode and gathering the ECONOMY's.
     assert.match(derivation.slice(0, 600), /selectedSystem\?\.resolutionMode === 'progressive'/);
     assert.match(derivation.slice(0, 600), /gathering: gatheringProgressive/);
   });
@@ -77,8 +48,7 @@ describe('1286 the manager root wires the complications section', () => {
   it('passes the trigger options, labelled by the activity that owns the id space', () => {
     assert.match(componentEditViewCall(), /\{complicationTriggerOptions\}/);
     const derivation = rootSource.slice(rootSource.indexOf('const complicationTriggerOptions'));
-    // One entry per activity, and each reads that activity's PROGRESSIVE block: a trigger on
-    // a simple or routed check has no progressive stage outcome to reach a complication from.
+    // One entry per activity, and each reads that activity's PROGRESSIVE block.
     for (const [activity, block] of [
       ['crafting', 'craftingCheck'],
       ['salvage', 'salvageCraftingCheck'],
@@ -126,9 +96,7 @@ describe('1286 the manager root wires the complications section', () => {
       /\{ \.\.\.\(updates \|\| \{\}\), difficulty:/,
       'the payload is spread, not rebuilt'
     );
-    // The PAYLOAD is `merged`, whatever else the call carries beside it: since issue 1371
-    // r22-store4 the editor's stated baseline rides along as a third argument, and that is a fact
-    // about the OVERRIDE rule rather than about the payload this case is quantifying over.
+    // The PAYLOAD is `merged`, whatever else the call carries beside it.
     assert.match(
       body,
       /store\.updateComponent\?\.\(itemId, merged[,)]/,

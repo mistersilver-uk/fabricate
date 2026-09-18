@@ -1,15 +1,11 @@
-/**
- * Tests for shoppingListAggregator (T-059)
- * Uses node:test + node:assert/strict
- */
+/** Tests for shoppingListAggregator (T-059) Uses node:test + node:assert/strict */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { aggregateShoppingList } = await import('../src/ui/svelte/util/shoppingListAggregator.js');
 
-// Issue 1493 needs a REAL evaluation, not a stub: the defect is that the aggregation
-// never told the evaluator who was crafting, and only the real currency probe is
-// actor-bound. The Foundry globals the manager loads against are installed here.
+// Issue 1493 needs a REAL evaluation, not a stub: the defect is that the aggregation never told the
+// evaluator who was crafting, and only the real currency probe is actor-bound.
 globalThis.foundry = {
   utils: {
     randomID: () => 'aggregator-fixture-id',
@@ -24,16 +20,13 @@ globalThis.game = { user: { isGM: true }, fabricate: null };
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 
-// Global-free fixture module, so it may be imported statically alongside the dynamic
-// imports above.
+// Global-free fixture module, so it may be imported statically alongside the dynamic imports above.
 const { makeCurrencyRecipeManager, makePurseActor, currencyOption } = await import(
   './helpers/currencyRequirementFixtures.js'
 );
 
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeRecipe(id, name = `Recipe-${id}`) {
   return { id, name };
@@ -83,9 +76,7 @@ function makeRecipeManager(recipes = [], evaluationFn = null) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('aggregateShoppingList', () => {
 
@@ -559,22 +550,14 @@ describe('aggregateShoppingList', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 — the aggregation is evaluated AGAINST THE CRAFTING ACTOR.
-//
-// Asserted on `aggregate.ingredients`, never on the arguments handed to the manager.
-// The defect being fixed is a silent no-op: `evaluateShoppingRequirement`'s third
-// parameter is an OPTIONS BAG, so handing it a bare actor destructures
-// `actor.craftingActor` to `undefined` and the currency probe stays constant-false.
-// An argument spy passes on exactly that mistake.
-// ---------------------------------------------------------------------------
+// Issue 1493 — the aggregation is evaluated AGAINST THE CRAFTING ACTOR. Asserted on
+// `aggregate.ingredients`, never on the arguments handed to the manager.
 
 const TOLL_SYSTEM_ID = 'sys-1493-shop';
 
 /**
- * A real manager over a recipe whose single group offers "two specific planks OR 100 gp",
- * against a world ladder that resolves. Items are tried before currency, so a player who
- * holds no plank falls to the coin — IF the evaluation knows whose coin to look at.
+ * A real manager over a recipe whose single group offers "two specific planks OR 100 gp", against a
+ * world ladder that resolves.
  */
 function makeTollManager() {
   const manager = makeCurrencyRecipeManager(RecipeManager, { systemId: TOLL_SYSTEM_ID });
@@ -672,15 +655,8 @@ describe('aggregateShoppingList currency affordability (issue 1493)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 (revision 2) — a currency requirement is settled by AFFORDABILITY, and the
-// entry carries the discriminator the shopping list branches on.
-//
-// The aggregation derived `satisfied` from `totalNeed - have` for every entry, and a
-// currency state's `have` is a documented placeholder against a `need` that is a price.
-// So a cost the player can trivially pay aggregated to `missing: 100, satisfied: false`
-// and the shopping list told them to acquire a hundred of something.
-// ---------------------------------------------------------------------------
+// Issue 1493 (revision 2) — a currency requirement is settled by AFFORDABILITY, and the entry
+// carries the discriminator the shopping list branches on.
 
 function tollAggregate(manager, craftingActor, sourceActors) {
   return aggregateShoppingList(
@@ -762,19 +738,8 @@ describe('aggregateShoppingList currency entries (issue 1493)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1493 (revision 3) — three claims the aggregation must not make.
-//
-// 1. that two entries it deliberately kept apart are one thing. The dedup key is the
-//    aggregation's own notion of identity, and every consumer must key on THAT one: a
-//    coarser re-derivation downstream collapses a split pair, and Svelte answers a
-//    repeated `{#each}` key with `each_key_duplicate` — thrown in the production branch
-//    too, taking down the whole crafting app.
-// 2. that a cost the world's currency setup cannot resolve is an affordability shortfall.
-//    The reason travels with the entry so the surface can tell the two apart.
-// 3. that a SINGLE craft's affordability verdict settles an aggregate of several. It does
-//    not, and this module has no purse to ask a wider question with.
-// ---------------------------------------------------------------------------
+// Issue 1493 (revision 3) — three claims the aggregation must not make. 1. that two entries it
+// deliberately kept apart are one thing.
 
 /** A manager whose one recipe yields exactly the ingredient states supplied. */
 function makeStubbedStates(recipeId, states) {
@@ -791,10 +756,8 @@ function aggregateOnce(manager, recipeId, quantity = 1) {
 
 describe('aggregateShoppingList entry keys (issue 1493)', () => {
   it('splits a currency cost from a same-description item and gives each its own key', () => {
-    // Reachable, not hypothetical: an INCOMPLETE currency match and an option with no match
-    // at all both describe to "Unknown ingredient", and only a managed component carries an
-    // id. Without the `cur:` namespace they key identically and merge into one row of
-    // neither kind — summing a PRICE into an occurrence count.
+    // Reachable, not hypothetical: an INCOMPLETE currency match and an option with no match at all
+    // both describe to "Unknown ingredient", and only a managed component carries an id.
     const manager = makeStubbedStates('r-key', [
       makeIngredientState({
         description: 'Unknown ingredient',
@@ -901,9 +864,7 @@ describe('aggregateShoppingList currency configuration reasons (issue 1493)', ()
 
 describe('aggregateShoppingList currency affordability is a CONJUNCTION (issue 1493)', () => {
   it('reports unaffordable when a LATER recipe naming the same cost cannot be paid', () => {
-    // Ordered deliberately: affordable first, unaffordable second. The seed alone would
-    // report the first recipe's verdict and stop, so this is the case that distinguishes
-    // the merge's conjunction from it.
+    // Ordered deliberately: affordable first, unaffordable second.
     const manager = makeRecipeManager(
       [makeRecipe('r-cheap'), makeRecipe('r-dear')],
       (_actors, recipe) => ({
@@ -941,8 +902,6 @@ describe('aggregateShoppingList currency affordability is a CONJUNCTION (issue 1
 
 describe('aggregateShoppingList currency verdict SCOPE (issue 1493)', () => {
   // The resolver answers "can this actor pay ONE craft of this recipe?" and nothing wider.
-  // `totalNeed` is multiplied by the queued quantity, so reporting the verdict against it
-  // claimed a 150 gp purse covers five 100 gp crafts.
   function queuedCoinAggregate(quantity) {
     const manager = makeCoinOnlyManager();
     const purse = makePurseActor({ id: 'thin', gp: 150 });

@@ -199,8 +199,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
   });
 
   // An alias is recorded in the committed file, searched by the picker and resolved for stored
-  // data, so it is a referenced name in exactly the sense the Pro licence forbids. Keeping the
-  // glyph while keeping its Pro-only spelling would clear nothing.
+  // data, so it is a referenced name in exactly the sense the Pro licence forbids.
   it('drops a Pro-only alias from a glyph it keeps, because an alias is a referenced name', () => {
     const narrowed = intersectWithFreeIconNames(
       [{ iconCode: 'star', label: 'Star', aliases: ['star-sharp', 'star-christmas'] }],
@@ -211,9 +210,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
   });
 
   // No entry needs this against Foundry 14's bundle and Free 7.3.1 — every surviving glyph's
-  // offered name is already free. It is asserted anyway because the alternative to re-offering is
-  // emitting a Pro name, and a later release moving one preference is not something to discover
-  // from a licence complaint.
+  // offered name is already free.
   it('re-offers a kept glyph under a free name when its offered name is Pro-only', () => {
     const narrowed = intersectWithFreeIconNames(
       [{ iconCode: 'wand-magic-sparkles', label: 'Wand Magic Sparkles', aliases: ['magic'] }],
@@ -256,19 +253,10 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
 
 // THE LICENSING GUARD. Foundry ships Font Awesome Pro under a licence that forbids a third-party
 // package developer from having the icons "used, re-packaged, or referenced in code", and a
-// catalogue of names is a reference in code. The committed catalogue is therefore narrowed to the
-// names Font Awesome publishes for free, and this is the check that keeps it narrowed: a
-// regeneration against a Foundry install, or a hand-edit, that re-admits a Pro-only name fails CI
-// here rather than shipping.
-//
-// It reads the free stylesheet from the `@fortawesome/fontawesome-free` devDependency through the
-// generator's own resolver, so the guard and the generator cannot disagree about which file the
-// free set is. That package is a NAME ORACLE: no font from it is shipped and nothing under `src/`
-// imports it.
+// catalogue of names is a reference in code.
 describe('the committed catalogue names only icons Font Awesome publishes for free', () => {
   // Resolved and read at collection, so a missing or unreadable devDependency throws HERE, naming
-  // the package. A guard that fell back to an empty oracle would report every committed name as
-  // free and pass loudest exactly when it had stopped checking anything.
+  // the package.
   const stylesheetPath = resolveFreeStylesheetPath();
   const { release, names } = readFreeIconNames(stylesheetPath);
 
@@ -300,10 +288,8 @@ describe('the committed catalogue names only icons Font Awesome publishes for fr
     );
   });
 
-  // The guard's own negative control, and the reason it is worth having. `candle-holder` renders
-  // in Foundry, a companion module offers it, and this vocabulary declines it: it is a Pro-only
-  // name. If this ever resolves, the free oracle has stopped discriminating and the assertion
-  // above has stopped meaning anything.
+  // The guard's own negative control, and the reason it is worth having. `candle-holder` renders in
+  // Foundry, a companion module offers it, and this vocabulary declines it: it is a Pro-only name.
   it('still declines the Pro-only glyph the whole narrowing was decided over', () => {
     assert.ok(!names.has('candle-holder'), 'candle-holder must be absent from the free set');
     assert.ok(

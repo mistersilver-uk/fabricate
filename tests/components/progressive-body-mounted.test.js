@@ -1,23 +1,4 @@
-/**
- * Issue 651 — the player's progressive stage list (mounted).
- *
- * Carries two duties explicitly:
- *
- *  1. **The F1 fix.** A progressive recipe used to render an EMPTY output table, because
- *     browsing has no roll and the award loop therefore awarded nothing. The body must now
- *     show a populated, ordered stage list.
- *  2. **D13's fixed state.** With `canReorder` false the handlers must be NOT ATTACHED,
- *     not merely inert, and the grip glyph must be gone — identical rows minus working
- *     affordances is the worst outcome.
- *
- * These mount RecipeDetail (the dispatcher), NOT ProgressiveBody directly: the dispatcher
- * passes one identical prop set to all four bodies, so a prop it fails to forward silently
- * drops to its default and the list never renders.
- *
- * The ORDERING composition is deliberately not here — `craftingStore.svelte.js` is in
- * neither harness list, so this file can only prove presentation-given-props. The store
- * suite (`tests/stores/crafting-store.test.js`) carries that, plus D7/D7a.
- */
+/** Issue 651 — the player's progressive stage list (mounted). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -177,8 +158,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
     const status = target.querySelector('[data-progressive-stage-status]');
     assert.ok(status, 'the region renders');
     assert.equal(status.getAttribute('aria-live'), 'polite');
-    // `.sr-only` was retired in issue 1501: the utility is declared once at `.fabricate` under
-    // the name 22 of its 25 sites already carried.
+    // `.sr-only` was retired in issue 1501.
     assert.ok(status.classList.contains('visually-hidden'), 'and is visually hidden');
     assert.equal(status.textContent.trim(), 'Fine Blade moved to position 1 of 3');
   });
@@ -202,14 +182,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
   });
 
   it('D13: fixed rows attach NO drag handlers and are not draggable', async () => {
-    // "Not attached, not merely inert": a row that still says draggable="true" invites a
-    // grab that silently does nothing.
-    //
-    // Asserted structurally (the whole `{#if canReorder}` branch carrying the handlers
-    // does not render) AND behaviourally (a real drag lifecycle produces no callback).
-    // NOT via `row.ondragstart`: Svelte 5 binds through addEventListener, so that
-    // property is undefined whether or not a handler is attached — the check would pass
-    // vacuously in both states.
+    // "Not attached, not merely inert".
     const moves = [];
     const target = await mountBody({ canReorder: false, onReorderStage: (...a) => moves.push(a) });
     const row = rows(target)[0];
@@ -253,9 +226,7 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
   });
 
   it('stage artwork is NOT natively draggable, in either state', async () => {
-    // An <img> is draggable by default, so a drag started on the artwork becomes an image
-    // drag with the wrong ghost — and dropping it outside the app can navigate away.
-    // This is the repo's first drag row containing an image; the GM's row has none.
+    // An <img> is draggable by default.
     for (const canReorder of [true, false]) {
       const target = await mountBody({ canReorder });
       const images = [...target.querySelectorAll('.crafting-stage-img')];
@@ -273,7 +244,6 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   it('a drop commits the pending order write immediately (no debounce wait)', async () => {
     // A drag has already settled by the time it drops, so there is nothing to coalesce.
-    // Mutation: drop the onReorderSettled call from handleDrop.
     const settled = [];
     const target = await harness.mount({
       recipe: progressiveRecipe(),
@@ -332,12 +302,6 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
   });
 
   // ── Issue 675: the salvage extensions are OPT-IN ─────────────────────────
-  //
-  // Progressive salvage reuses this component, which needed a stacked row shape and a
-  // state chip. Both had to be additive and default-off, or a salvage feature would
-  // have re-skinned the Crafting tab as a side effect. The crafting path (this one)
-  // passes neither, so it must render exactly as it did — these assertions are the pin
-  // that keeps that true.
 
   it('675: the crafting rendering is unchanged when the new props are omitted', async () => {
     const target = await mountBody();
@@ -356,9 +320,6 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
 
   it('675: a stage carrying a quantity renders NONE — progressive is quantity-less', async () => {
     // There is no opt-in left to pass: `showQuantity` was deleted, not defaulted off.
-    // Awarding spends the budget against an entry ONCE and grants a single item, so any
-    // `×N` on this list is a number the engine does not honour — on this surface and on
-    // salvage's, which shares this component.
     const target = await mountBody({
       stages: [{ ...STAGES[0], quantity: 3 }, STAGES[1], STAGES[2]],
     });
@@ -414,9 +375,6 @@ describe('ProgressiveBody — the player stage list (issue 651)', () => {
             severity: 'major',
             visibility: 'visible',
             // Deliberately TRUE on the row. Crafting must render it as a forecast anyway:
-            // the fired record is defined on the salvage RUN record and the immediate
-            // crafting path writes none, so there is nothing here that could have fired
-            // and a body that forwarded a resolved tense would be asserting one.
             fired: true,
           },
         ],

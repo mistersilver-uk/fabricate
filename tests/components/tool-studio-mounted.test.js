@@ -36,9 +36,7 @@ const harness = createMountedComponentHarness({
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
     'src/utils/plainTextDescription.js',
-    // The add-new essence offer projection (issue 1036); the recipe ingredient components
-    // in this tree import it. Also the shared drop-data resolver, which `ItemDropZone`
-    // now uses to widen its guard onto the legacy compendium `{ pack, id }` shape.
+    // The add-new essence offer projection (issue 1036).
     'src/utils/essenceValidation.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -48,23 +46,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/recipeCurrency.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
-    // RecipeItemEditor/ToolEditView/EssenceEditView resolve, focus and mark the control a
-    // validation row addresses through this pure leaf (issue 1517). This harness validates its
-    // dependency graph, so an omission throws a named "add it to rawModules" error rather than
-    // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
+    // RecipeItemEditor/ToolEditView/EssenceEditView resolve.
     'src/ui/svelte/apps/manager/validationFocus.js',
-    // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
-    // route-only row, the control's accessible name, and the handoff to the module's shared
-    // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
-    // a raw module here too. It was five copies inside five hosts before it was one leaf.
+    // …and the announcement half beside it (issue 1517, review r1).
     'src/ui/svelte/apps/manager/validationAnnouncement.js',
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
-    // The repair block's plain-language readback (issue 1373, maintainer round 5): a pure
-    // module so the two scopes that render the block share one copy of the sentence.
+    // The repair block's plain-language readback (issue 1373, maintainer round 5).
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
-    // The ONE ingredient-kind table (issue 1373, round 8): the requirement row's plate glyph and
-    // tint, its kind select's four words, and the `or…` menu's four entries all read it.
+    // The ONE ingredient-kind table (issue 1373, round 8).
     'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
@@ -78,8 +68,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
   compiledModules: [
-    // The shared side-panel explainer card and icon fact row (issue 881); the behavior
-    // preview renders both.
+    // The shared side-panel explainer card and icon fact row (issue 881).
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
@@ -91,22 +80,16 @@ const harness = createMountedComponentHarness({
     // the conversion, so it is in this tree's static graph; the harness's closure validator
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    // The shipped segmented primitive (issue 975): `RecipeIngredientOption` below
-    // renders it for the tag-match Any/All control, so it is in this tree's static
-    // import graph and the closure validator throws without it.
+    // The shipped segmented primitive (issue 975).
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    // The world modifier library's row, which the prerequisite list and the bonus list both
-    // draw since issue 1373's round 5. Static in this tree, so omitting it HANGS the suite.
+    // The world modifier library's row.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
-    // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373): the armed remove-from-system
-    // control, the routed identity notice on Validation, the inherit/override card every
-    // behaviour section is drawn as, the system-scope band that opens Breakage, and the shared
-    // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
+    // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373).
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
@@ -124,17 +107,11 @@ const harness = createMountedComponentHarness({
     // pager - but the import is STATIC, so it is in this tree's graph either way and the
     // harness's closure validator throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the shared
-    // no-state primitive (issue 785), the shared chip (issue 883) — the library rows, the
-    // browser inspector, the editor tab bar and the behavior preview all render it — and the
-    // manager's ONE labelled push-button (issue 1096), which the Modifiers card and the Tool
-    // Studio header both render through.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte',
-    // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in
-    // this tree's static graph. `ToolOverviewTab` is NOT: issue 1373 retired the Overview tab
-    // from the SYSTEM rules editor, because a crafting system authors no identity.
+    // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038).
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     // The shared `REPLACEMENT COMPONENT` card (issue 1373, maintainer round 2). The system
@@ -175,11 +152,7 @@ const worldItems = [
     description: 'Still useful.',
   },
 ];
-// THE WORLD CHARACTER-PREREQUISITE LIBRARY (issue 1308), in the shape
-// `normalizeCharacterPrerequisite` publishes: `{id, name, icon, path, op, value}`. It used to
-// carry an `expression` key, which `prerequisitePreview` does not read — so every row's second
-// line rendered the placeholder `@… ≥` and the cell the row list is judged on carried nothing
-// real. The paths are ROLL-DATA paths, which is the convention the resolver reads.
+// THE WORLD CHARACTER-PREREQUISITE LIBRARY (issue 1308).
 const prerequisites = [
   { id: 'expert', name: 'Expert Crafter', icon: 'fas fa-star', path: 'prof', op: 'gte', value: 4 },
   {
@@ -214,11 +187,7 @@ const prerequisites = [
     value: 1,
   },
 ];
-// The WORLD modifier library (`characterLibraries.modifiers[]`), in the shape
-// `normalizeModifierLibrary` publishes. It is the design's `MODS` (`proto:3797`) and the roster
-// the bonus section selects over since issue 1373's maintainer round 3. Three entries, and the
-// third is a dice expression, because `isRollExpression` is the one field the row does NOT draw
-// and a library of interchangeable scalars could not show that.
+// The WORLD modifier library (`characterLibraries.modifiers[]`).
 const modifiers = [
   {
     id: 'mod-prof',
@@ -271,10 +240,6 @@ function tool(overrides = {}) {
  * `worldScopeProjection` publishes and `ToolEditView` reads: an entry per world entity, a row
  * per crafting system, and the `inherit` map on the row.
  *
- * Hand-built rather than projected for real, because what these cases vary is the ONE fact the
- * editor reads out of it - which sections this system overrides - and a real projection would
- * bury that under a corpus the assertions do not care about.
- *
  * @param {object} [options]
  * @param {object} [options.inherited] The per-section inherit map. Absent reads as inheriting.
  * @param {object|null} [options.defaults] The world defaults record for the Tool.
@@ -293,11 +258,7 @@ function toolScope({ inherited = OVERRIDES_EVERYTHING, defaults = null, member =
   };
 }
 
-/**
- * What every MIGRATED tool membership record carries: all four sections overridden.
- * `migrateToolRequirementSections` writes exactly this, so it is the state every existing world
- * is in and the right default for a case that is not about inheritance.
- */
+/** What every MIGRATED tool membership record carries: all four sections overridden. */
 const OVERRIDES_EVERYTHING = Object.freeze({
   breakage: false,
   onBreak: false,
@@ -392,10 +353,7 @@ describe('Tool Studio editor (mounted)', () => {
     // which no other editor panel in the manager is.
     assert.equal(tabPanel.getAttribute('tabindex'), '-1');
     assert.equal(tabPanel.getAttribute('data-keyboard-focus'), 'true');
-    // THE LINKED-ITEM CARD IS NOT HERE, and its absence is the assertion (issue 1373). It used
-    // to open this tab with a drop zone, a copy-uuid action and an unlink action, which let a
-    // CRAFTING SYSTEM re-point which game-world Item a Tool IS. Identity is world-scoped, so the
-    // whole card moved to the world Tool entry; `world-tool-entry-mounted` exercises it there.
+    // THE LINKED-ITEM CARD IS NOT HERE.
     assert.ok(!root.querySelector('[data-tool-source-card]'), 'no source card at system scope');
     assert.ok(!root.querySelector('[data-tool-description]'), 'and no linked-Item description');
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /Smith's Hammer/);
@@ -441,8 +399,7 @@ describe('Tool Studio editor (mounted)', () => {
       })
     );
 
-    // THE IDENTITY CARD IS A THUMBNAIL, A NAME AND A SCOPE SENTENCE. Its On/Off pill and its two
-    // chips restated the FIRST and FOURTH effective-rules rows one line below them.
+    // THE IDENTITY CARD IS A THUMBNAIL.
     const identity = root.querySelector('[data-tool-preview-identity]');
     assert.ok(!identity.querySelector('.manager-chip'), 'no status pill and no duplicate chips');
     assert.ok(!root.querySelector('.manager-tool-preview-chips'), 'and no chip strip at all');
@@ -477,8 +434,7 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   it('shows what breakage does to a copy, and never writes it', async () => {
-    // `Show as broken` is a PREVIEW state: it is the one thing the effective-rules rows state in
-    // the abstract and never show. Nothing about it reaches the draft.
+    // `Show as broken` is a PREVIEW state.
     const patches = [];
     const root = await harness.mount(
       props({
@@ -506,15 +462,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // THE PREVIEW SHOWS THE CONSEQUENCE, NOT A WORD FOR IT (issue 1373, maintainer round 2).
-  //
-  // All three on-break actions used to draw the SAME picture — the Tool's own art, dimmed, under
-  // a differently-worded chip — so a GM checking what `Destroy the item` does to a copy saw the
-  // copy, and what `Replace with component` produces was a chip reading `Replaced`.
-  //
-  // ASSERTED THROUGH `data-tool-player-image`, which exists for this: an empty box, the Tool's
-  // own art and a replacement's art are three different renderings that a selector on the tile
-  // cannot tell apart, and `assert.ok(!el)` rather than `assert.equal(el, null)` because
-  // node:assert serialises a mounted happy-dom element's circular tree to build a diff.
   it('empties the inventory tile when the Tool is DESTROYED on break', async () => {
     const root = await harness.mount(props({ tool: tool({ onBreak: { mode: 'destroy' } }) }));
     const broken = root.querySelector('[data-tool-player-broken]');
@@ -563,21 +510,13 @@ describe('Tool Studio editor (mounted)', () => {
 
   it('evaluates the Tool against a chosen actor, and says what that character gets', async () => {
     // `PREVIEW AS` is the design's third rail region and it is a REAL evaluation, not a label:
-    // the roll data comes back through an injected resolver — the only thing on this screen's
-    // path that touches a Foundry document — and `evaluatePrerequisites` is the same AND-semantics
-    // helper the crafting engine gates on, so the rail cannot answer differently from the runtime.
     const root = await harness.mount(
       props({
         tool: tool({
           prerequisites: { enabled: true, ids: ['strong'], gateMode: 'usability' },
           bonus: { enabled: false, expression: '' },
         }),
-        // A REAL prerequisite shape. `evaluatePrerequisite` reads `path`/`op`/`value` — the
-        // canonical stored shape `normalizeCharacterPrerequisite` produces and the one the
-        // Requirements tab's own `prerequisitePreview` already reads. The loose `expression`
-        // string the rest of this suite's fixtures carry resolves NO path, which every operator
-        // reads as `0` and every comparison then passes: an assertion written over it would be
-        // green whatever the actor's data said.
+        // A REAL prerequisite shape. `evaluatePrerequisite` reads `path`/`op`/`value`.
         prerequisiteOptions: [
           {
             id: 'strong',
@@ -625,8 +564,7 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-preview-gate]').textContent,
       /Wisp does not meet: Strength 13 or higher/
     );
-    // The GATE MODE decides the consequence, and the row states the one that applies: a
-    // `usability` gate makes the Tool unusable, where a `bonus` gate would only withhold it.
+    // The GATE MODE decides the consequence, and the row states the one that applies.
     assert.match(
       root.querySelector('[data-tool-preview-usability]').textContent,
       /Unusable here/
@@ -653,9 +591,7 @@ describe('Tool Studio editor (mounted)', () => {
       })
     );
 
-    // THE INHERITING SECTION states the world value and offers no controls: while
-    // `## CraftingSystem` requirement 36 keeps the in-system record authoritative, a control a
-    // GM could still reach would let this system diverge from a default the pill says it follows.
+    // THE INHERITING SECTION states the world value and offers no controls.
     const breakage = root.querySelector('[data-tool-rule-card="breakage"]');
     assert.equal(breakage.dataset.toolRuleState, 'inheriting');
     assert.equal(breakage.querySelector('[data-tool-rule-chip]').textContent, 'Inheriting');
@@ -686,9 +622,7 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   it('draws no inherit affordance for a Tool the world catalogue has no record of', async () => {
-    // A pre-migration in-system Tool has no world half, so there is nothing to inherit FROM and
-    // nothing to be removed from. Every card renders its controls with no switch and no pill —
-    // exactly what this screen did before the epic.
+    // A pre-migration in-system Tool has no world half.
     const root = await harness.mount(props({ scope: { entries: [] } }));
 
     assert.equal(
@@ -749,8 +683,7 @@ describe('Tool Studio editor (mounted)', () => {
       'and the globe row states where the name came from'
     );
 
-    // The switch is the same control, in the same place, with the same polarity as every other
-    // card head on the tab: ON is OVERRIDDEN.
+    // The switch is the same control, in the same place.
     const toggle = card.querySelector('[data-scoped-inherit-toggle="label"]');
     assert.ok(Boolean(toggle), 'the card carries the shared inherit switch');
     assert.equal(toggle.getAttribute('aria-pressed'), 'false');
@@ -771,18 +704,14 @@ describe('Tool Studio editor (mounted)', () => {
     // `manager-recipe-name-input` is this manager NAME-AUTHORING treatment. Wearing it here is
     // half of why the card read as though a crafting system names Tools.
     assert.equal(field.classList.contains('manager-recipe-name-input'), false);
-    // NO PLACEHOLDER. The world value is on the card head; repeating it as ghost text inside
-    // the override is what made a blank field look like a lost name.
+    // NO PLACEHOLDER. The world value is on the card head.
     assert.equal(field.getAttribute('placeholder'), null);
     assert.ok(Boolean(field.closest('.manager-tool-label-field')));
   });
 
 
   it('offers NO route to re-point the linked Item, at any of its three former controls', async () => {
-    // The negative half of issue 1373's relocation, asserted as three named absences rather
-    // than one: the drop target, the copy-uuid action and the unlink action were three separate
-    // controls, and a partial removal would leave one of them writing world identity from a
-    // crafting system. The positive half lives in `world-tool-entry-mounted`.
+    // The negative half of issue 1373's relocation.
     const root = await harness.mount(props());
 
     assert.ok(!root.querySelector('[data-tool-source-card]'), 'no drop target');
@@ -792,9 +721,7 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   it('routes the header World Tool button out to the world record, when one exists', async () => {
-    // Task 4's whole scope: the rules LIST advertises `Inherits world defaults`, `What it would
-    // inherit here` and an `Edit the world Tool` button, and the editor behind `Edit rules` had
-    // no route to that record at all. This is the same navigation the list's inspector takes.
+    // Task 4's whole scope: the rules LIST advertises `Inherits world defaults`.
     const routed = [];
     const root = await harness.mount(
       props({
@@ -811,9 +738,7 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   it('withholds that button for a Tool the world catalogue has no record of', async () => {
-    // `false` is a real answer rather than a fallback: a pre-migration in-system Tool that no
-    // `1.30.0` pass lifted has no world half, and routing there would land the GM on the entry
-    // editor's `no longer in the corpus` state.
+    // `false` is a real answer rather than a fallback.
     const root = await harness.mount(props({ scope: { entries: [{ id: 'someone-else' }] } }));
 
     assert.ok(!root.querySelector('[data-tool-editor-world-tool]'));
@@ -831,8 +756,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
 
     assert.equal(root.querySelector('[data-tool-name]'), null);
-    // The field exists only on the OVERRIDING face of the label card (issue 1373), so the tool
-    // this mounts already carries an override rather than the inheriting blank.
+    // The field exists only on the OVERRIDING face of the label card (issue 1373).
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
@@ -887,11 +811,7 @@ describe('Tool Studio editor (mounted)', () => {
     const root = await harness.mount(
       props({ activeTab: 'breakage', onPatch: (patch) => patches.push(patch) })
     );
-    // FOUR, and `unlimited` leads them (issue 1373). It is not a fourth `breakage.mode`: it is
-    // the `limitedUses` mode with a NULL `maxUses`, which the model has always documented as
-    // "never used up", which `Tool#validate` has always accepted, and which every reading
-    // surface has always printed as `Unlimited uses` - while this group offered no option for
-    // it at all and the stepper beside it drew the null as `1`.
+    // FOUR, and `unlimited` leads them (issue 1373). It is not a fourth `breakage.mode`.
     assert.deepEqual(
       Array.from(root.querySelectorAll('input[name="tool-breakage-mode"]')).map(
         (input) => input.value
@@ -907,13 +827,7 @@ describe('Tool Studio editor (mounted)', () => {
       assert.ok(choice.querySelector('[data-tool-choice-description]'));
     }
     assert.ok(root.querySelector('[data-tool-breakage-authority-explanation]'));
-    // THE ROW NAMES THE SCREEN THAT STILL EXISTS. It read `from the Tools library`, which is
-    // what the system's Tool list was called two renames ago; it is the Tool Rules screen now,
-    // and the design's own copy names it.
-    // THE PROVENANCE, NOT A PADLOCK (issue 1373). The row closed with a `System-wide` lock chip
-    // and dropped the world half of the sentence entirely, while the rules LIST one route away
-    // chipped the same setting `World default`. It states where the mode came from now, and the
-    // padlock - which claimed a permanence a per-system setting does not have - is gone.
+    // THE ROW NAMES THE SCREEN THAT STILL EXISTS. It read `from the Tools library`.
     assert.match(
       root.querySelector('[data-tool-breakage-authority-explanation]').textContent,
       /World default \u00b7 Tool-specific \u00b7\s+Set for every Tool on the Tool Rules screen\./
@@ -1028,8 +942,6 @@ describe('Tool Studio editor (mounted)', () => {
     // and the stepper beside it printed `tool.breakage.maxUses ?? 1` as `1`. The pane and the
     // rail therefore stated DIFFERENT RULES for one saved Tool, with Save disabled, and the
     // Validation tab called it `All clear`.
-    //
-    // A GM could land in that state, could not see it, and had no control to leave it.
     const root = await harness.mount(
       props({ tool: tool({ breakage: { mode: 'limitedUses', maxUses: null } }) })
     );
@@ -1078,8 +990,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-max-uses]').value, '4');
     root.querySelector('[data-tool-breakage-choice="unlimited"] input').click();
-    // Back to the state the model calls unlimited, written EXPLICITLY rather than left to a
-    // fallback that reads it as one use.
+    // Back to the state the model calls unlimited.
     assert.deepEqual(patches[1], { breakage: { mode: 'limitedUses', maxUses: null } });
   });
 
@@ -1305,9 +1216,7 @@ describe('Tool Studio editor (mounted)', () => {
     await tick();
     document.querySelector('[data-recipe-add="alternative-essence"]').click();
     await tick();
-    // BORN UNNAMED since issue 1373's maintainer round 5: the alternative used to arrive
-    // holding the first selectable essence. Its row's own field names it, which is also what
-    // lets a GM retype the row afterwards rather than deleting it.
+    // BORN UNNAMED since issue 1373's maintainer round 5.
     assert.deepEqual(patches.at(-1).repairRequirements[0].options[1].match, {
       type: 'essence',
       essenceId: '',
@@ -1369,10 +1278,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
   };
 
-  // ── THE DESIGN'S OWN TREATMENTS, WHERE THIS SCREEN HAD ITS OWN (issue 1373) ─────────────
-  //
-  // Each case below pins a value the design states once that this repository was stating
-  // twice, or in a vocabulary the design does not use at all.
+  // ── THE DESIGN'S OWN TREATMENTS.
   it('draws both header verbs as one treatment, and keeps the primary primary', async () => {
     // `proto:2601` and `proto:2602` are ONE style string - transparent over a border - so the
     // two verbs that leave this screen render alike. `World Tool` took the neutral role, which
@@ -1403,9 +1309,7 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   it('sizes the repair count pill as the design’s in-line count chip', async () => {
-    // `proto:4696`: `padding: 1px 8px; border-radius: 999px; font: 600 9px var(--sans)`, which
-    // is `Chip`'s `list` density value for value. It rendered the base 20px chip scale and
-    // outweighed the eyebrow it counts.
+    // `proto:4696`: `padding: 1px 8px; border-radius: 999px; font: 600 9px var(--sans)`.
     const root = await harness.mount(
       props({ tool: tool({ onBreak: { mode: 'flagBroken' }, repairRequirements: [] }) })
     );
@@ -1452,8 +1356,7 @@ describe('Tool Studio editor (mounted)', () => {
     // describes how system scope works — it is true of this card before the GM touches
     // anything. It reads as the specimen's quiet standing statement, not as a signal.
     assert.equal(strip.dataset.calloutTone, 'neutral');
-    // The design's own sentence describes a model with no inheritance; ours inherits for real,
-    // so the strip names the system it belongs to and says what following the world Tool means.
+    // The design's own sentence describes a model with no inheritance.
     assert.match(strip.textContent, /The Herbalist/);
     assert.match(strip.textContent, /follows the world Tool until you override it here/);
     // AND IT OPENS THE CARD, which is the half a presence check cannot see.
@@ -1495,16 +1398,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // ── E3 AT SYSTEM SCOPE (issue 1373, maintainer round 2) ─────────────────────────────────
-  //
-  // The tab is shared with the world entry and gains the design's heading anatomy at BOTH
-  // scopes: one card, an eyebrow over a sentence-case title, and a rule between the sections.
-  //
-  // WHAT DOES NOT MOVE HERE is the enable switch. The world entry puts it on the header row,
-  // where the design draws it; a system card's header row is already spent on the INHERIT
-  // switch, which is a different question wearing the same track, so the enable switch stays as
-  // the first row of the body. This case is the record of that divergence — without it, a later
-  // author reading the world frame would "fix" the system one into two identical switches a
-  // line apart.
   it('heads both sections with an eyebrow inside ONE card, and keeps the system enable row', async () => {
     const root = await harness.mount(props({ activeTab: 'requirements' }));
     const card = root.querySelector('.manager-tool-requirements-card');
@@ -1593,19 +1486,14 @@ describe('Tool Studio editor (mounted)', () => {
         .textContent.trim(),
       ''
     );
-    // The `<hr>` between the two sections went with the card idiom: each section is a
-    // `ToolInheritCard` with its own border, so a rule between them drew a second separator.
+    // The `<hr>` between the two sections went with the card idiom.
     assert.ok(!root.querySelector('[data-tool-requirements-divider]'));
     assert.equal(root.querySelectorAll('[data-tool-rule-card]').length, 2);
     assert.deepEqual(
       [...root.querySelectorAll('[data-tool-rule-card]')].map((card) => card.dataset.toolRuleCard),
       ['prerequisites', 'bonus']
     );
-    // THE BONUS IS A PICK FROM THE WORLD LIBRARY, NOT A TYPED EXPRESSION (issue 1373, maintainer
-    // round 3). `proto:2353`-`2369` draws a `World modifiers` list and `proto:4753` sets `bonus`
-    // to the chosen entry's `expr`; the free-text field this tab shipped with had no counterpart
-    // anywhere in the design. The persisted shape is unchanged - `bonus.expression` is still a
-    // string - so what this asserts is that the only way to author one is the list.
+    // THE BONUS IS A PICK FROM THE WORLD LIBRARY.
     assert.ok(
       !root.querySelector('[data-roll-data-expression="tool-bonus"]'),
       'no free-text bonus expression field'
@@ -1620,22 +1508,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // ── THE BONUS SECTION IS THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round 3) ──────
-  //
-  // `proto:3797` is the library the design's list reads (`MODS`, `{id, label, expr, note, icon}`)
-  // and ours is `characterLibraries.modifiers[]` — the same roster, normalized to
-  // `{id, label, expression, isRollExpression, icon?}`. `proto:4750` marks a row selected by
-  // `r.bonus === m.expr`, so the selection is resolved by EXPRESSION even though the radio's own
-  // value is the entry id: two entries may share an expression and a duplicate `{#each}` key
-  // throws, while `normalizeModifierLibrary` guarantees the ids are unique.
-  //
-  // ── AND IT IS A ROW LIST, NOT A CARD STACK (issue 1373, maintainer round 4) ───────────────
-  //
-  // The first pass drew the roster as a `RadioCardGroup`. This app already draws the
-  // distinction the other way, one screen from here: `checks/CraftingModifierCatalogueCard`
-  // presents THIS SAME roster as compact rows, and `How they combine` — a closed four-option
-  // set of behaviours, each needing a sentence — is the `RadioCardGroup` beneath it. So the
-  // classes below are the assertion, not decoration: they are the CHECKS row's own cells, and
-  // a card stack cannot emit them.
   it('draws the world modifier library as a single-select ROW list, one row per entry', async () => {
     const root = await harness.mount(props({ activeTab: 'requirements' }));
 
@@ -1681,9 +1553,7 @@ describe('Tool Studio editor (mounted)', () => {
       ['tool-bonus-modifier'],
       'one radio group name across the rows, so arrow keys traverse it as one control'
     );
-    // NO THIRD LINE. The design's rows carry an authored `note`; ours have no such field and
-    // one is NOT invented on the persisted shape. See the tab's own docblock. A row is icon +
-    // label + expression + the pick control, which is exactly the Checks row's anatomy.
+    // NO THIRD LINE. The design's rows carry an authored `note`.
     assert.equal(
       rows[0].querySelector('.manager-modifier-readonly-label').nextElementSibling.tagName,
       'CODE',
@@ -1715,11 +1585,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // ── AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS NOT DISCARDED ──────────────────────────
-  //
-  // A GM could type one under the control this list replaces, and the design's own model simply
-  // highlights nothing in that case. Dropping it would be silent data loss on save, so it keeps
-  // its own row at the head of the list, selected, saying where it came from — and picking a
-  // library entry replaces it.
   it('keeps a hand-typed expression as its own row and lets a library entry replace it', async () => {
     const patches = [];
     const root = await harness.mount(
@@ -1747,10 +1612,7 @@ describe('Tool Studio editor (mounted)', () => {
       '@abilities.str.mod + 2'
     );
     assert.equal(custom.querySelector('input[type="radio"]').checked, true);
-    // THE SENTENCE IS A SIBLING OF THE ROW, NOT A THIRD LINE INSIDE IT. The Checks row is one
-    // line and stays one line; its own bounds fault is stated the same way, as a paragraph
-    // after the row it qualifies. The radio names it through `aria-describedby`, so the
-    // explanation is announced with the option rather than orphaned beside it.
+    // THE SENTENCE IS A SIBLING OF THE ROW.
     const hint = root.querySelector('[data-tool-bonus-custom-hint]');
     assert.match(
       hint.textContent,
@@ -1776,11 +1638,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // ── AND THE LIBRARY CAN BE EMPTY ─────────────────────────────────────────────────────────
-  //
-  // The same state the prerequisite list one section up already draws, in the same words and
-  // the same shape: one muted sentence, no control. It carries the route as well, because
-  // `ToolInheritCard` renders the card's `subtitle` at WORLD scope only — at system scope the
-  // head is spent on the inherit row — so this sentence is the one line both scopes show.
   it('states the empty world modifier library the way the prerequisite list does', async () => {
     const root = await harness.mount(
       props({
@@ -1806,18 +1663,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // ── THE PREREQUISITE LIST IS THE SAME ROW AS THE BONUS LIST (issue 1373, round 5) ────────
-  //
-  // `proto:4741` gives the reference's prerequisite row
-  // `display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px;
-  // background: bg1|surface-active; border: 1px solid (border|accent-border)`, which is
-  // `proto:4752`'s bonus row byte for byte. The two lists are one row in the reference and were
-  // two in ours: a bespoke `ChecklistCardRow` above, `ModifierLibraryRow` below.
-  //
-  // This test replaces issue 772's conversion guard, which proved the same three things about
-  // the retired row: that the control is a real `<input type="checkbox">` (the keyboard, the
-  // label association and every `input[value=…]` selector this suite uses depend on it), that
-  // the checked state reaches the visible box, and that the change callback still fires. All
-  // three are asserted below against the row that replaced it, so nothing is dropped.
   it('draws the prerequisite list as the shared modifier row, with a checkbox', async () => {
     const patches = [];
     const root = await harness.mount(
@@ -1847,8 +1692,7 @@ describe('Tool Studio editor (mounted)', () => {
       assert.equal(row.querySelectorAll('label').length, 0);
       const box = row.querySelector('input[type="checkbox"]');
       assert.ok(box, 'every prerequisite row renders a real checkbox');
-      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has to be
-      // there beside the hidden input.
+      // A bare Foundry-chromed checkbox is a SECOND selection design.
       assert.ok(row.querySelector('.fab-selection-check.is-sm'));
     }
 
@@ -1859,8 +1703,7 @@ describe('Tool Studio editor (mounted)', () => {
       'the bespoke checklist row is gone from this tab'
     );
 
-    // The expression cell carries the entry's real preview, which is the reference's own second
-    // line for this row (`proto:2333`).
+    // The expression cell carries the entry's real preview.
     assert.deepEqual(
       rows.map((row) => row.querySelector('.manager-modifier-readonly-expression').textContent),
       [
@@ -1872,8 +1715,7 @@ describe('Tool Studio editor (mounted)', () => {
       ]
     );
 
-    // Checked state reaches the visible box, not just the input, and the ROW carries the
-    // selected class the sheet paints `--fab-surface-active` on.
+    // Checked state reaches the visible box, not just the input.
     const expertRow = rows[0];
     assert.equal(expertRow.querySelector('input[value="expert"]').checked, true);
     assert.equal(
@@ -1893,10 +1735,7 @@ describe('Tool Studio editor (mounted)', () => {
     // `proto:2334` is one muted sentence that states the AND rule AND introduces the gate pair.
     const cardText = root.querySelector('[data-tool-rule-card="prerequisites"]').textContent;
     assert.equal(cardText.includes('Which prerequisites'), false, 'no list eyebrow');
-    // `RadioCardGroup` hides its `is-config-cards` legend through the sheet, and `legendVisible`
-    // un-hides it by adding `is-legend-visible` to the fieldset. So the class is what says
-    // whether a heading is PAINTED; the `<legend>` element is there either way, carrying the
-    // group's accessible name, which is the part that must survive.
+    // `RadioCardGroup` hides its `is-config-cards` legend through the sheet.
     assert.ok(
       !root.querySelector('[data-tool-rule-card="prerequisites"] .is-legend-visible'),
       'and no visible gate-pair legend — the sentence above it is the introduction'
@@ -1919,20 +1758,6 @@ describe('Tool Studio editor (mounted)', () => {
   });
 
   // -- THE TWO ROWS ARE ONE COMPONENT WITH TWO DECLARED VARIANTS (issue 1373, round 6) ------
-  //
-  // Round 5 landed both lists on `ModifierLibraryRow` and recorded two DEVIATIONS from the
-  // reference rather than reproducing them: the prerequisite row's control moved to the trailing
-  // edge and its label and expression went inline. The maintainer's round-6 ruling is that both
-  // differences are real and load-bearing, and that the answer is declared variants on ONE
-  // component rather than two components or one shape forced on both.
-  //
-  // `proto:2331`-`2333`: the checkbox is the FIRST child, then the glyph, then a text block whose
-  // label and expression are STACKED. `proto:2361`-`2364`: no leading control, the label and
-  // expression INLINE in a flex row, and the radio dot trailing at `margin-left: auto`.
-  //
-  // ASSERTED AS DOCUMENT POSITION, not as a class list. A class assertion is satisfied by a row
-  // that emits `is-control-leading` and still renders its control last, which is the exact defect
-  // this guard exists to catch.
   it('leads the prerequisite row with its control and stacks its text, and trails the bonus row', async () => {
     const root = await harness.mount(
       props({
@@ -1955,8 +1780,7 @@ describe('Tool Studio editor (mounted)', () => {
         4,
         '`proto:2331` puts the checkbox FIRST, before the glyph — round 5 trailed it'
       );
-      // The literal first child is `SelectionCheckbox`'s real input, which is what makes the
-      // control the row's leading slot rather than merely its first PAINTED cell.
+      // The literal first child is `SelectionCheckbox`'s real input.
       assert.equal(
         row.firstElementChild.tagName,
         'INPUT',
@@ -1998,19 +1822,12 @@ describe('Tool Studio editor (mounted)', () => {
     }
   });
 
-  // -- ONE PREREQUISITE IS "One prerequisite", NOT "1 prerequisites" (issue 1373, round 6) --
-  //
+  // -- ONE PREREQUISITE IS "One prerequisite".
   // `manager-tool-prerequisites-selected-1280x720` photographed the preview rail with exactly one
   // prerequisite chosen and it read `1 prerequisites must be met.`. The singular string is not
   // missing - `FABRICATE.Admin.Manager.Tools.Editor.PreviewGateCountOne` has been in `lang/en.json`
   // all along - the call BRANCHED ITS FALLBACK and passed the plural KEY either way, so the
   // singular was selected only in a world with no translation loaded at all.
-  //
-  // WHICH IS WHY THIS TEST INSTALLS THE REAL LOCALE. The shared harness's `game.i18n.localize`
-  // returns the key, so every `text()`/`formattedText()` call in this suite takes its FALLBACK
-  // branch - the one branch that was already correct. Mounted against that double the defect is
-  // invisible and the guard would pass on the broken tree, which is the vacuity this suite has
-  // been bitten by before.
   it('says "One prerequisite" for one, reading the real locale', async () => {
     const locale = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
     const flat = new Map();
@@ -2031,8 +1848,7 @@ describe('Tool Studio editor (mounted)', () => {
         ),
     };
     try {
-      // The locale double is only honest if it can be SEEN: a sentence this suite already pins
-      // through its fallback must now arrive from `lang/en.json` instead.
+      // The locale double is only honest if it can be SEEN.
       const one = await harness.mount(
         props({
           activeTab: 'requirements',
@@ -2140,8 +1956,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
     assert.ok(!root.querySelector('[data-tool-preview-live-update]'), 'no live-update strip');
-    // Issue 881: every effective-rule row is the shared icon fact row, so the preview and
-    // the library inspector cannot drift back into two geometries for one projection.
+    // Issue 881: every effective-rule row is the shared icon fact row.
     assert.equal(
       root.querySelectorAll('[data-tool-preview-rule] > .manager-icon-fact-row').length,
       4
@@ -2249,12 +2064,7 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-preview-identity]').textContent,
       /5 uses|@prof/
     );
-    //
-    // Asserted as a boolean rather than by comparing the node to `null`/an element: on
-    // failure node:assert serialises the actual value for its diff, and walking a mounted
-    // happy-dom element's circular tree exhausts the heap. The suite then reports
-    // `# cancelled` with no message, which reads like a hang rather than a failed
-    // expectation — this exact assertion cost an OOM to diagnose.
+    // Asserted as a boolean rather than by comparing the node to `null`/an element.
     assert.ok(
       !root.querySelector('[data-tool-preview-live-update]'),
       'the live-update strip is gone with the standing explainer'
@@ -2302,10 +2112,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
 
     const blockers = root.querySelector('[data-tool-validation-tab]').textContent;
-    // THE IDENTITY FAILURE IS A ROUTED NOTICE, NOT A CHECK ROW (issue 1373). It names the world
-    // Tool, because that is the only scope that can repair it — and it does NOT count toward the
-    // blocking total, so it cannot redden this editor's tab badge over a defect no control here
-    // can clear. Escalated and stated in the handoff: the DOMAIN still refuses the save.
+    // THE IDENTITY FAILURE IS A ROUTED NOTICE.
     assert.ok(Boolean(root.querySelector('[data-tool-identity-notice]')));
     assert.match(blockers, /Its identity is set on the world Tool, not here/);
     assert.doesNotMatch(blockers, /Link an Item or managed Component/);
@@ -2436,24 +2243,6 @@ describe('Tool Studio editor (mounted)', () => {
 });
 
 // ── THE ROW ACTION MOVES FOCUS, AND SAYS SO (issue 1517) ────────────────────────────────────
-//
-// A validation row carries two independent addresses: `target`, the ROUTE, and `focusTarget`,
-// the CONTROL — the value of a `data-validation-target` attribute the offending control carries.
-// The editor requests the route synchronously and FIRST, then awaits `focusValidationTarget`,
-// then writes the announcement FROM the element that resolved.
-//
-// THIS EDITOR DOES NOT OWN ITS ROUTE, which is the one way it differs from the recipe and
-// essence editors: `activeTab` arrives as a prop and the change goes out as `onTabChange`. The
-// ordering claim is unchanged by that — the shell's own `$state` write is synchronous, exactly as
-// the tab strip's click is — and the harness stands in for the shell below.
-//
-// EVERY FOCUS ASSERTION ALSO READS THE FOCUSABILITY OFF THE DOM. happy-dom focuses ANYTHING —
-// `.focus()` on a bare `<div>` sets `document.activeElement` — so "the destination holds focus"
-// is vacuous on its own, with a named mutation: delete `tabindex="-1"` from a section and keep
-// `data-keyboard-focus`, and an `activeElement`-only assertion still passes while a real browser
-// focuses nothing. The attribute is read with `getAttribute` and the tag with `tagName`, NEVER by
-// calling `isFocusable` — re-using the helper as its own oracle would give the refusal path and
-// the assertion that proves it a single point of failure.
 describe('ToolEditView — the validation row action reaches the control (issue 1517)', () => {
   // Identity, asserted as a BOOLEAN. Handing a live happy-dom element to `node:assert` renders
   // its subtree, its parents and its owner document when the assertion fails, which takes the
@@ -2477,9 +2266,7 @@ describe('ToolEditView — the validation row action reaches the control (issue 
     );
     assert.ok(Boolean(button), `the ${checkId} row renders a View button`);
     button.click();
-    // NO `flushSync` BEFORE THE AWAIT, deliberately. The whole mechanism is that the route
-    // change's own flush is queued as a microtask BEFORE the helper's, so draining microtasks is
-    // what proves the ordering rather than a synchronous flush papering over it.
+    // NO `flushSync` BEFORE THE AWAIT.
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
     flushSync();
     return button;
@@ -2490,7 +2277,6 @@ describe('ToolEditView — the validation row action reaches the control (issue 
    * 1517's review round). A `polite` region is queued speech and a focus change CANCELS queued
    * speech, so the sentence is written after the move — the rule
    * `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module. The delay is IMPORTED:
-   * a local copy would silently start asserting the un-delayed state the moment the rule changed.
    */
   async function flushAnnouncement() {
     await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
@@ -2499,8 +2285,7 @@ describe('ToolEditView — the validation row action reaches the control (issue 
   }
 
   it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
-    // The defect this shape exists to prevent: the validation surface is inside the tab chain, so
-    // activating a row action unmounts the region in the same update that was to announce.
+    // The defect this shape exists to prevent: the validation surface is inside the tab chain.
     const root = await harness.mount(props({ activeTab: 'breakage' }));
     assert.ok(
       Boolean(root.querySelector('[data-tool-issue-announcement]')),
@@ -2537,9 +2322,7 @@ describe('ToolEditView — the validation row action reaches the control (issue 
     const section = root.querySelector('[data-validation-target="tool-bonus"]');
     assert.ok(Boolean(section), 'the Requirements tab carries the addressed section');
     assertIs(document.activeElement, section, 'and it holds focus');
-    // Read off the DOM. A section is NOT natively focusable, so it must declare both — the
-    // tabindex that makes the focus real and the attribute that tells Foundry the window is
-    // focused, without which Space pauses the game and the arrows pan the canvas.
+    // Read off the DOM. A section is NOT natively focusable, so it must declare both.
     assert.equal(section.tagName, 'SECTION');
     assert.equal(section.getAttribute('tabindex'), '-1');
     assert.equal(section.getAttribute('data-keyboard-focus'), 'true');
@@ -2582,8 +2365,7 @@ describe('ToolEditView — the validation row action reaches the control (issue 
   });
 
   it('drops the mark once focus moves elsewhere', async () => {
-    // A LEAKED MARK IS THE DEFECT INVERTED: a permanent accent outline on the last-focused
-    // control, which outlives the interaction instead of merely missing during it.
+    // A LEAKED MARK IS THE DEFECT INVERTED.
     const root = await harness.mount(
       routed({
         tool: tool({ breakage: { mode: 'diceExpression', formula: '', threshold: 3 } }),
@@ -2605,11 +2387,7 @@ describe('ToolEditView — the validation row action reaches the control (issue 
   });
 
   it('changes route and moves NO focus for a ROUTE-ONLY row', async () => {
-    // ROUTE-ONLY IS A STATED OUTCOME, NOT A SILENT ONE. A `breakage.mode` failure names the
-    // MECHANIC CHOICE — a radio group, not one control — so the row emits a route and no
-    // control. This asserts WHICH of the two shapes the row is, so a `focusTarget` going missing
-    // from a row that should have one reds here rather than degrading into a tab switch that
-    // focuses nothing and that nobody notices.
+    // ROUTE-ONLY IS A STATED OUTCOME.
     const root = await harness.mount(
       routed({ validation: { valid: false, errors: ['breakage.mode is not recognised'] } })
     );
@@ -2668,16 +2446,6 @@ describe('ToolEditView — the validation row action reaches the control (issue 
   });
 });
 // ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517, review r1) ────────────────────────────
-//
-// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
-// by THIS editor's facts: the producer's own address table, the destination declared for each
-// address it emits, and the host's own route call. The machinery those facts feed is written once
-// there and explained in its docblock.
-//
-// IT WAS REGISTERED FOR TWO OF THE FIVE SURFACES AND IS NOW REGISTERED FOR FOUR. Nothing read
-// this producer's table against the tabs that carry it, so deleting `tabindex="-1"` from the
-// prerequisites section, or mistyping `'tool-max-uses'` in the table, left every suite green: the
-// mounted clauses above cover the addresses their fixtures reach, and happy-dom focuses anything.
 describeValidationAddressPairing({
   title: 'every Tool address the producer emits is carried by a real control',
   producerFile: 'tools/toolStudio.js',
@@ -2700,11 +2468,7 @@ describeValidationAddressPairing({
   },
   routeNoun: 'tab',
   destinationNoun: 'tab',
-  // THREE OF THE SEVEN RIDE AN ATTRIBUTE BAG — two stepper `inputProps` and the chance slider's
-  // `numberProps` — so the element they land on belongs to a primitive and cannot be read from
-  // this tab's source. Their focusability is a property of that primitive; declared here rather
-  // than skipped so that a stamp moving between the two spellings, which silently gains or loses
-  // the static proof, has to be acknowledged.
+  // THREE OF THE SEVEN RIDE AN ATTRIBUTE BAG.
   focusProvenElsewhere: ['tool-breakage-chance', 'tool-breakage-threshold', 'tool-max-uses'],
 });
 

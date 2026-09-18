@@ -1,9 +1,8 @@
 /**
- * Tests for essence-option consumption in IngredientSet.resolveIngredientSelection
- * (issue 649): an essence GROUP option draws down items carrying that essence until
- * `amount` is met, participating in the same items-first selection plan as
- * component/tag/currency options, including the anti-double-consume `remaining`
- * bookkeeping and the `optionOverrides` path.
+ * Tests for essence-option consumption in IngredientSet.resolveIngredientSelection (issue 649): an
+ * essence GROUP option draws down items carrying that essence until `amount` is met, participating
+ * in the same items-first selection plan as component/tag/currency options, including the
+ * anti-double-consume `remaining` bookkeeping and the `optionOverrides` path.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,9 +11,7 @@ globalThis.foundry = { utils: { randomID: () => crypto.randomUUID() } };
 
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 
-// A minimal item: uuid, quantity, and Fabricate essence flags. `getFabricateFlag`
-// reads via `getFlag('fabricate', normalizeFlagKey('essences'))` (a possibly
-// dot-nested key), so resolve the key as a path within the fabricate scope.
+// A minimal item: uuid, quantity, and Fabricate essence flags.
 function item(uuid, quantity, essences) {
   const scopes = { fabricate: { fabricate: { essences }, essences } };
   return {
@@ -81,9 +78,8 @@ test('anti-double-consume: an item claimed by a component group is not recounted
 });
 
 test('anti-double-consume (tag + essence): one component carrying both cannot satisfy both requirements', () => {
-  // The user's scenario (issue 649): "any tag:iron  AND  2 fire essence", where a
-  // single "Blazing Iron" carries BOTH the iron tag and the fire essence. The shared
-  // `remaining` ledger must stop that one component from satisfying both AND groups.
+  // The user's scenario (issue 649): "any tag:iron AND 2 fire essence", where a single "Blazing
+  // Iron" carries BOTH the iron tag and the fire essence.
   const set = new IngredientSet({
     id: 's',
     ingredientGroups: [

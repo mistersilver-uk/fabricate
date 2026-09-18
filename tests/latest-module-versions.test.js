@@ -51,9 +51,7 @@ test('resolveAwsEnv falls back to the local default profile outside CI', () => {
 });
 
 test('applyAwsEnv DELETES a stale AWS_PROFILE in CI — Object.assign cannot remove a key', () => {
-  // The seam that actually runs in CI. Asserting only resolveAwsEnv's return value would miss
-  // this entirely: an inherited AWS_PROFILE survives an Object.assign that simply omits the key,
-  // and the SDK then skips the env-var credential provider and ignores OIDC.
+  // The seam that actually runs in CI.
   const target = { AWS_PROFILE: 'fabricate-beta', AWS_REGION: 'us-east-1' };
   applyAwsEnv({}, { GITHUB_ACTIONS: 'true' }, target);
 

@@ -1,34 +1,7 @@
 /**
- * Source contract: the at-a-glance figure is written in ONE place (issue 1505).
- *
- * Two screens had each hand-rolled the same box and drifted in two directions at once: the
- * player Shopping list drew an 18px sans numeral over a sentence-case 10px label on a
- * `--fab-surface-soft` card, and the manager's item page drew a 1.15rem sans numeral over a
- * sentence-case 0.7rem label on a `--fab-bg-1` one. Neither is `library.html:237-239`, which
- * draws ONE treatment and composes the label out of the shared kicker.
- *
- * ── THE CLAUSE THAT EARNS THIS FILE ───────────────────────────────────────────────────────
- * `design-system/spec.md` routes a figure a GM can change to a stepper and never to a stat box.
- * That is a rule about what this component may ACCEPT, not about what it looks like, and it is
- * invisible in every frame: a stat box that took an `onChange` and rendered a click target
- * would photograph identically to one that did not. So the extra clause below is stated over
- * the primitive's own prop set — every prop it accepts, pinned by name — rather than over its
- * markup alone.
- *
- * The four hook props are what make that clause exhaustive rather than approximate. They are
- * ATTRIBUTE-ONLY and carry no behaviour, and the second clause below is what keeps them that
- * way: the attribute NAME is caller-supplied and spread onto the element, so a call site that
- * passed `valueDataAttr="onclick"` would install a real handler through a prop whose whole
- * point is that it cannot. Every literal hook name at a call site must therefore start with
- * `data-`.
- *
- * ── THE CONTRACT CLASS ────────────────────────────────────────────────────────────────────
- * `fab-stat-box`, a new token written by nothing else in the tree, measured before it was
- * chosen. The exemption below has ONE entry — the primitive — and no deferral row, which is
- * what a new token buys.
- *
- * Everything else — the four shared clauses and the closed-token shape — is
- * `tests/helpers/primitiveSourceContract.js`, and argued there rather than again here.
+ * Source contract: the at-a-glance figure is written in ONE place (issue 1505). THE CLAUSE THAT
+ * EARNS THIS FILE ─────────────────────────────────────────────────────── `design-system/spec.md`
+ * routes a figure a GM can change to a stepper and never to a stat box.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -66,9 +39,7 @@ const contract = defineClosedTokenContract({
   callSiteFloor: 2,
 
   // Two tokens, asserted separately so the failure names the one that went missing. The class is
-  // what the restatement clause polices. The tone attribute is what a mounted suite reads to tell
-  // an alerting card from a resting one now that the caller's own `is-alert` class is gone —
-  // invisible in the DOM diff, and nothing else would notice its loss.
+  // what the restatement clause polices.
   emits: Object.freeze([`class="${CONTRACT_CLASS}"`, 'data-stat-tone={resolvedTone}']),
 
   primitiveWrites: {
@@ -95,18 +66,9 @@ const contract = defineClosedTokenContract({
 });
 
 /**
- * The clause that is this primitive's own: WHAT IT ACCEPTS.
- *
- * `spec.md` — "A number a GM can change is a stepper and never a stat box" — is a rule about the
- * component's surface, and no frame can photograph it. Pinning the prop set by NAME is what
- * makes it checkable: an `onChange`, an `onclick` or a `href` added here would be a routing
- * error that renders identically to the component that has none, and it would arrive as one
- * line inside a destructuring nobody diffs.
- *
- * Pinned as a whole LIST rather than as an absence of handlers, because the absence half alone
- * passes over a component that has quietly grown a `size`, a `unit` or a `warning` tone — the
- * three configurations this component was deliberately shipped without, each of them
- * unreachable by any caller and therefore unphotographable too.
+ * The clause that is this primitive's own: WHAT IT ACCEPTS. `spec.md` — "A number a GM can change
+ * is a stepper and never a stat box" — is a rule about the component's surface, and no frame can
+ * photograph it.
  */
 test('the stat box accepts exactly its declared props, none of which is a handler', () => {
   const props = contract.declaredList({
@@ -131,16 +93,7 @@ test('the stat box accepts exactly its declared props, none of which is a handle
   contract.assertNothingInteractive('the stat box emits an interactive element');
 });
 
-/**
- * The second clause: a hook NAME is caller-supplied and spread, so it must be a `data-` name.
- *
- * This is what keeps the clause above exhaustive. `{ [dataAttr]: dataValue }` spread onto an
- * element installs whatever key it is handed — `onclick` included — so "the primitive accepts no
- * handler" is only true while every hook name a call site passes is inert. Stated over LITERAL
- * values only, because an expression (`dataAttr={labelDataAttr}`, which is how `StatBox`
- * forwards the label's hook into the `Kicker` it composes) cannot be read from source text and
- * a clause that guessed at one would be worse than one that says what it covers.
- */
+/** The second clause: a hook NAME is caller-supplied and spread, so it must be a `data-` name. */
 test('every literal hook name a stat-box call site passes is a data- attribute', () => {
   contract.assertCallSitesAlive();
 

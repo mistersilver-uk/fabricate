@@ -1,29 +1,7 @@
 /**
  * Carrying the WORLD travel configuration — the realm library, its two scalars, and the Foundry
- * Scene Region links nested inside each realm as `sceneMappings[]` — through an export/import
- * round trip (issue 1282), plus the pre-v4 upcast that reads a legacy per-system export.
- *
- * These are decisions rather than mechanics, which is why they are pinned here:
- *
- *   - **Import merges, it never replaces.** Realms are world scope, so an imported system's
- *     library cannot overwrite geography the destination GM authored for unrelated systems.
- *     Realms merge by id with the DESTINATION winning a collision — environments
- *     (`includedRealmIds` / `excludedRealmIds`), party overrides and actor discovery flags all
- *     cite realms by id, so an id already in this world must keep its own definition or every
- *     one of those references silently starts naming a different place. It is also what makes
- *     an import safe to run twice.
- *   - **The scalars seed an unconfigured world only.** A world that already has realms has
- *     already answered how it discloses its places, and an imported system does not overrule it.
- *   - **The upcast is branch-independent.** `migrateExportPayload` early-returns once
- *     `schemaVersion` is current, so a derivation written only on the main path silently never
- *     runs for a current-schema payload that still carries the legacy shape.
- *
- * The composition is driven END TO END — `buildExportPayload` → `prepareForImport` →
- * `importFromPackData` — rather than by pinning call shapes, because both halves of this
- * pipeline fail SILENTLY: every parameter of `buildExportPayload` after `version` is defaulted,
- * so a call site that forgets one produces an empty slice instead of an error, and
- * `prepareForImport` rebuilds the pack object key by key, so a slice it forgets is dropped
- * without a trace. That pair is exactly how the currency import shipped dead.
+ * Scene Region links nested inside each realm as `sceneMappings[]` — through an export/import round
+ * trip (issue 1282), plus the pre-v4 upcast that reads a legacy per-system export.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -169,9 +147,7 @@ describe('the export envelope carries the world travel configuration', () => {
   });
 
   it('exports an EMPTY library when a call site forgets the argument', () => {
-    // The defect shape this file exists to catch. Every parameter after `version` is defaulted,
-    // so the omission produces a well-formed export that quietly carries nothing — which is why
-    // the round trip below is asserted end to end rather than by pinning the call.
+    // The defect shape this file exists to catch.
     const envelope = buildExportPayload(sourceSystem(), [], '1.27.0', [], {}, {});
 
     assert.deepEqual(envelope.travelConfig.realms, []);
@@ -230,9 +206,7 @@ describe('the library survives the WHOLE import composition, not just the merge 
   });
 
   it('reports the realm scene-region link as an unresolved external reference', async () => {
-    // The resolver reads realms from the ENVELOPE now. Left pointing at `system.gatheringRealms`
-    // it would find none, and every stale map link would import unreported instead of surfacing
-    // in the GM's repair list.
+    // The resolver reads realms from the ENVELOPE now.
     const world = destinationWorld();
     const { summary } = await runWholeComposition(world, exportedEnvelope());
 
@@ -244,9 +218,7 @@ describe('the library survives the WHOLE import composition, not just the merge 
   });
 
   it('carries the library through COPY mode WITHOUT rebinding realm ids', async () => {
-    // Realm ids are world scope and shared by every participating system. Rebinding them the way
-    // a copy rebinds recipe and component ids would duplicate the world's whole geography and
-    // leave the copy gating on the duplicates while every other system gated on the originals.
+    // Realm ids are world scope and shared by every participating system.
     const world = destinationWorld(worldTravelConfig());
     const { packData, persisted } = await runWholeComposition(world, exportedEnvelope(), 'copy');
 
@@ -421,10 +393,8 @@ describe('upcasting a pre-v4 export payload', () => {
   });
 
   it('runs on the CURRENT-schema branch too, which early-returns before the main path', () => {
-    // The trap this guards: a hand-authored or force-stamped payload can claim the current
-    // schema while still carrying the legacy shape. A derivation written only after the early
-    // return would silently never run for it — and every payload the shipping build writes
-    // carries the current schema, so that is the branch real bundles arrive on.
+    // The trap this guards: a hand-authored or force-stamped payload can claim the current schema
+    // while still carrying the legacy shape.
     const payload = { schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION, system: legacySystem() };
     const migrated = migrateExportPayload(payload);
 
@@ -451,8 +421,7 @@ describe('upcasting a pre-v4 export payload', () => {
 
   it('leaves a SCALARS-ONLY envelope alone, rather than rebuilding over it', () => {
     // A world that chose its reveal mode before authoring a single realm exports scalars and an
-    // empty library. A realm-COUNT guard would rebuild from the system block here and discard
-    // the choice the GM actually made.
+    // empty library.
     const migrated = migrateExportPayload({
       schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
       system: { id: 'x', name: 'X', gatheringRealmSettings: { enabled: true } },

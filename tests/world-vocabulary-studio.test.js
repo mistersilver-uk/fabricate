@@ -1,12 +1,4 @@
-/**
- * `worldVocabularyStudio.js`, the world Tags & Categories screen's pure leaf (issue 1392).
- *
- * Every function here was reachable ONLY through a mounted tree before this file, and a mounted
- * tree exercises the paths the fixture happens to walk: measured, mutating each of the four
- * `describeVocabularyInput` branches, both `sortVocabularyRows` comparators, the tag `#` prefix
- * and the tag lowercasing left 620 tests green. A leaf whose branches are only reachable through
- * a rendering is a leaf whose branches are untested.
- */
+/** `worldVocabularyStudio.js`, the world Tags & Categories screen's pure leaf (issue 1392). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

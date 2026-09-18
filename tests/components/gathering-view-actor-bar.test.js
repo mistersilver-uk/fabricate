@@ -8,9 +8,7 @@ import { compile, compileModule } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
-// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
-// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
-// there cannot go missing here.
+// The raw `.js` closure of `SearchablePopover`.
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -243,7 +241,6 @@ describe('GatheringView ↔ actor bar wiring', () => {
     });
     // Deliberately leave the store seed empty (do NOT call loadSelectableActors's
     // fallback here): set the selectable list but keep selectedActorId empty.
-    // We emulate that by mutating through a fresh store that only populated its list.
     store.selectableActors.push({ id: 'a1', name: 'Aria', img: null }, { id: 'a2', name: 'Borin', img: null });
 
     const { services, calls } = makeGatheringServices(listing([environment()], 'a2'));
@@ -373,9 +370,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     assert.ok(target.querySelector('[data-gathering-state="populated"]'), 'renders the populated layout');
   });
 
-  // The attempt must run as the SAME actor the listing was computed for, else the
-  // engine falls back to the first owned actor and silently fails location gating
-  // (the "nothing happens" bug).
+  // The attempt must run as the SAME actor the listing was computed for.
   function attemptableEnv() {
     return environment({
       tasks: [{ id: 'task-1', name: 'Extract Ore', attemptable: true, blockedReasons: [] }]
@@ -471,8 +466,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
     store.loadSelectableActors();
     flushSync();
-    // Every environment is realm-locked → none auto-selected; the listing still
-    // carries a realm context with enabled:true and an empty realm list.
+    // Every environment is realm-locked → none auto-selected.
     const envs = [
       environment({ id: 'e1', locked: true, attemptable: false }),
       environment({ id: 'e2', locked: true, attemptable: false })
@@ -492,8 +486,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     const store = makeStore({ actors: [{ id: 'a1', name: 'Aria', img: null }], seededId: 'a1' });
     store.loadSelectableActors();
     flushSync();
-    // A selectable (unlocked) environment auto-selects; its realmsEnabled +
-    // currentRealms refine the chip, overriding the listing baseline.
+    // A selectable (unlocked) environment auto-selects.
     const envs = [
       environment({
         id: 'e1',
@@ -542,9 +535,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     }
   });
 
-  // Issue 1648: a versioned start goes through the run authority, which refuses with
-  // `{success:false, reason}` — no `accepted`, no `message`. That missed the
-  // `accepted === false` branch above entirely, so the attempt was a SILENT no-op.
+  // Issue 1648: a versioned start goes through the run authority.
   it('warns with the worded reason when the run authority refuses a versioned start', async () => {
     const warns = [];
     globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };

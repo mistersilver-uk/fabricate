@@ -1,23 +1,6 @@
 /**
- * THE ESSENCE COLOUR REACHES EVERY SYSTEM-SCOPE READ (issue 1371 r18-colour, maintainer ruling M29).
- *
- * Two defects stacked to produce "the colour shows only on the world bulk panel", and each half
- * is pinned here on its own so a regression in one cannot hide behind the other:
- *
- * 1. THE PROJECTIONS NEVER LIFTED THE FIELD. `buildItemCards` resolved an essence's name and icon
- *    from the definition and stopped there, and `buildEditableEssenceOptions` is a whitelist rebuild
- *    that named `enabled` and not `colorToken` — so the rules editor's card took a `color` prop that
- *    nothing ever fed. Both now carry `colorToken`. The item-card MEMO SIGNATURE does not, and the
- *    claim that it must (r18-colour) was false as written: that memo guards only the async source
- *    resolution, and a card's `essences` — colour included — is rebuilt on every projection call,
- *    so no recolour can be served stale from it (issue 1371 r19-store2, QE round 5).
- * 2. THE WORLD EDITOR'S COLOUR NEVER REACHED A SYSTEM ROW. The world essence entry writes identity
- *    onto the world entity alone; the in-system row keeps the explicit `colorToken: null` the
- *    normalizer emits; and the read union answers identity from the in-system row first. So the
- *    colour a GM picks in the Essence Catalogue is the one colour no system screen could draw.
- *    The manager's refresh now overlays the world identity's colour onto the selected system's
- *    essence rows: a world-authored colour wins, an unauthored one leaves the row's own standing,
- *    and no world store at all changes nothing.
+ * THE ESSENCE COLOUR REACHES EVERY SYSTEM-SCOPE READ (issue 1371 r18-colour, maintainer ruling
+ * M29).
  */
 
 import assert from 'node:assert/strict';
@@ -149,12 +132,10 @@ test('M29/3: a world essence the roster does not hold, or no world store at all,
   assert.equal(coalCardEssence(withoutStore).colorToken, 'butter');
 });
 
-// ── AND THE MARKER THE BULK PANEL GATES ITS COLOUR AXIS ON (r19-store2) ───────────────────────
-//
-// The read overlay above is what makes a system-scope colour WRITE pointless wherever the world
-// catalogue holds the essence, so the essence bulk panel withholds its `Colour` axis on exactly
-// the condition `EssenceEditView`'s `scopedKnown` uses. The panel is a leaf with no corpus of its
-// own, so the manager's refresh stamps the fact on each row.
+// AND THE MARKER THE BULK PANEL GATES ITS COLOUR AXIS ON (r19-store2). The read overlay above is
+// what makes a system-scope colour WRITE pointless wherever the world catalogue holds the essence,
+// so the essence bulk panel withholds its `Colour` axis on exactly the condition
+// `EssenceEditView`'s `scopedKnown` uses.
 
 test('M29/4: an essence the WORLD corpus holds is marked worldDefined on the row and the card', async () => {
   const harness = makeEssenceStoreHarness({

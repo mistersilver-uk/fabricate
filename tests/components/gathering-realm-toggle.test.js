@@ -11,9 +11,7 @@ function read(relPath) {
   return readFileSync(resolve(repoRoot, relPath), 'utf8');
 }
 
-// Prettier formats components as of issue 923, so a source-contract assertion must not depend
-// on where the formatter chose to break a line. Match against a whitespace-collapsed copy and
-// write needles in the formatter's own idiom — `arrowParens: 'always'` means `(tab) =>`.
+// Prettier formats components as of issue 923.
 const squish = (value) => value.replace(/\s+/g, ' ');
 
 const systemEditSource = squish(read('src/ui/svelte/apps/manager/SystemEditView.svelte'));
@@ -91,8 +89,7 @@ describe('Travel & Realms participation toggle', () => {
       ),
       'the action writes participation onto the system'
     );
-    // Routing it through the realm store would leave the toggle permanently false: the world
-    // travel config carries no `enabled` at all.
+    // Routing it through the realm store would leave the toggle permanently false.
     assert.equal(adminStoreSource.includes('updateRealmSettings(systemId'), false);
     assert.ok(
       managerRootSource.includes(
@@ -157,11 +154,7 @@ describe('World and Travel navigation', () => {
     );
     assert.ok(managerRootSource.includes('<GatheringRealmsTab realms={worldRealms}'), 'Realms destination');
     assert.ok(managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'), 'Map destination');
-    // Unlike World > Currency it KEEPS the right-hand inspector: the realm detail pane is the
-    // authoring surface, whereas currency's unit editors expand in place.
-    // The class string carries the CARD FAMILY'S ROOT since issue 1508 rooted `InspectorCard` at
-    // `fabricate-card`: this is one of the root's 32 deferred hand-rolled cards, and every one of
-    // them gained the token so that the family's re-rooted sheet rules still reach it.
+    // Unlike World > Currency it KEEPS the right-hand inspector.
     assert.ok(
       managerRootSource.includes(
         '{:else if isWorldTravelRoute} <section class="fabricate-card manager-inspector-card manager-travel-inspector"'

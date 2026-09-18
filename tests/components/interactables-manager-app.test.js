@@ -4,12 +4,6 @@
  * components are not compiled in the Node test runner, so we assert their source
  * shape). The pure decisions (scene-scan rows, promote) are unit-tested directly
  * under tests/canvas/regions/.
- *
- * Covers: ApplicationV2 + SvelteApplicationMixin singleton semantics, the services
- * bag delegating to the pure scene-scan + promote helpers and the SHARED
- * behaviour-system builder, delete routed through services.confirmDialog (DialogV2,
- * never globalThis.confirm()), open-config / jump seams, and the root's list +
- * promote surfaces.
  */
 
 import { describe, it } from 'node:test';
@@ -39,11 +33,7 @@ const rootSource = readFileSync(
   'utf8'
 );
 
-/**
- * The shared radio primitive this panel's three fieldsets became (issue 1520), read so the
- * conversion clause can assert the WHOLE chain: what this root passes, and what the primitive
- * turns it into.
- */
+/** The shared radio primitive this panel's three fieldsets became (issue 1520). */
 const segmentedSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte'),
   'utf8'
@@ -206,9 +196,7 @@ describe('InteractablesManagerApp singleton window', () => {
 });
 
 describe('InteractablesManagerRoot body', () => {
-  // Table-driven source-shape assertions: each entry is `[needle, label]`. Driving
-  // the checks through one helper keeps the suite compact and (deliberately)
-  // distinct in shape from the sibling browser/config source-shape suites.
+  // Table-driven source-shape assertions.
   const expectAll = (pairs) => {
     for (const [needle, label] of pairs) {
       assert.ok(rootSource.includes(needle), label);
@@ -255,11 +243,7 @@ describe('InteractablesManagerRoot body', () => {
     ]);
   });
 
-  // THE PICKERS ARE SHARED CONTROLS NOW (issue 1520), so what this clause pins is the WIRING
-  // rather than a `bind:` directive this file no longer writes. `Select` and `SegmentedControl`
-  // both report an intent through `onChange` and take their current value as a plain prop -
-  // deliberately, because the caller owns the state - so a two-way binding would be the wrong
-  // shape even if one were available.
+  // THE PICKERS ARE SHARED CONTROLS NOW (issue 1520).
   it('surfaces the promote affordance + source picker (region, system, type, source, marker)', () => {
     expectAll([
       ['FABRICATE.Canvas.Manage.PromoteToggle', 'promote toggle'],
@@ -274,12 +258,6 @@ describe('InteractablesManagerRoot body', () => {
   });
 
   // THE THREE FIELDSETS ARE SEGMENTED TRACKS, AND THE CHAIN IS ASSERTED END TO END (issue 1520).
-  //
-  // The library routes a closed set of two-to-four NAMED options with no sentence each to
-  // `Segmented`; the option-card group is what a set with a description per option wants, and
-  // none of these three has one. The `name` attributes are carried across BYTE FOR BYTE, because
-  // they are DOM group identities rather than class names and the Foundry smoke's own radio
-  // locator reads one of them.
   it('renders the three promote choices as shared segmented tracks with their group names intact', () => {
     const tracks = rootSource.split('<SegmentedControl').slice(1);
     assert.ok(tracks.length === 3, 'exactly three segmented tracks (source type, marker, marker kind)');
@@ -296,13 +274,10 @@ describe('InteractablesManagerRoot body', () => {
       (rootSource.match(/ariaLabel=\{text\('FABRICATE\.Canvas\.Manage\.Promote/g) ?? []).length === 3,
       'all three tracks carry their own accessible name'
     );
-    // The primitive's half: it renders REAL radios inside a radiogroup, which is what makes the
-    // control keyboard- and screen-reader-operable rather than three styled divs.
+    // The primitive's half: it renders REAL radios inside a radiogroup.
     assert.ok(segmentedSource.includes('role="radiogroup"'), 'SegmentedControl is a radiogroup');
     assert.ok(/\n\s*type="radio"/.test(segmentedSource), 'SegmentedControl renders real radios');
-    // ANCHORED AT ITS OWN LINE, not matched as a substring: `name` is a suffix of `data-name`, so
-    // `includes` reports a group identity moved onto an inert `data-*` attribute - which no radio
-    // groups by - as an honoured one. Proved by mutation.
+    // ANCHORED AT ITS OWN LINE, not matched as a substring: `name` is a suffix of `data-name`.
     assert.ok(/\n\s*name=\{groupName\}/.test(segmentedSource), 'SegmentedControl honours groupName');
   });
 
@@ -314,21 +289,6 @@ describe('InteractablesManagerRoot body', () => {
   });
 
   // THE PROMOTE CARD IS ONE COLUMN OF ONE CONTROL WIDTH (issue 1520 review).
-  //
-  // `Select` declares no `width` and no `min-width` - "the trigger's box is the one thing this
-  // API does not address" - so a `<button>` hugs its content, and the published frame showed
-  // three pickers at 291px, 144px and 137px interleaved with four full-width 508px controls in a
-  // single column. The native `<select>`s they replaced filled it, because core gives an
-  // `<input>`-family control `width: 100%`.
-  //
-  // AND THE PANEL FOLLOWS THE TRIGGER, which is the half that only becomes necessary once the
-  // trigger is full width: the primitive's `form` rung caps its panel at 340px, so widening the
-  // trigger to the column would otherwise have hung a short panel under each of the three.
-  //
-  // The rule's ANCHOR is asserted, not just its declaration. `.fab-im-promote` is a `class` PROP
-  // handed to `InspectorCard`, so Svelte stamps no scoping hash on it and a rule rooted there
-  // would compile and match nothing - the silent failure this window's own style block already
-  // warns about twice.
   it('fills the promote column with its pickers and opens their panels to match', () => {
     assert.ok(
       /\.fabricate-interactables-manager-body\s*\n?\s*:global\(\.fabricate-select-field \.fabricate-select-trigger\)\s*\{\s*width:\s*100%/.test(
@@ -344,8 +304,7 @@ describe('InteractablesManagerRoot body', () => {
       rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 560'),
       "the panel cap is this window's declared width, so it never binds and the trigger decides"
     );
-    // The emitting half, as its two sibling clauses read it (issue 1520 review round 2): an
-    // EXACT count is a census, and a census over prose is one docblock example away from moving.
+    // The emitting half, as its two sibling clauses read it (issue 1520 review round 2).
     const selects = emittingHalfOf(rootSource).match(/<Select\b[\s\S]*?\/>/g) ?? [];
     assert.equal(selects.length, 3, 'the promote card renders three shared selects');
     for (const tag of selects) {
@@ -361,14 +320,6 @@ describe('InteractablesManagerRoot body', () => {
   });
 
   // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
-  //
-  // Nothing statically tied a locator in `scripts/foundry-test-run.mjs` to a class or attribute
-  // this root writes, and the smoke cannot run in CI - so a conversion that moved one off the
-  // DOM was invisible to `npm test`. This panel is the one the smoke drives hardest: it walks
-  // the list, opens the promote card, pins the system, chooses the source type, chooses the
-  // source and confirms, across twelve locators. See
-  // `tests/helpers/interactablesSmokeLocators.js` for the token terminator and the floor, both
-  // of which are shared with the config panel's own copy of this clause.
   it('still emits every locator the Foundry smoke drives against this panel', () => {
     assertLocatorsEmitted({
       locators: prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-manager-'),
@@ -384,8 +335,7 @@ describe('InteractablesManagerRoot body', () => {
       what: 'manage-panel layout classes',
       root: 'the interactables manager root',
     });
-    // The window's own root container, which the smoke waits on and which the conversion
-    // deliberately KEEPS: it is the scroll box, not a control family.
+    // The window's own root container.
     assert.ok(
       SMOKE_SOURCE.includes('.fabricate-interactables-manager'),
       'the smoke keys on the window root'

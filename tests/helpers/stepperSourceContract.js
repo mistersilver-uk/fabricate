@@ -1,18 +1,4 @@
-/**
- * Shared source-scanning primitives for the `Stepper` migration gates (issue 1050).
- *
- * Three suites police the same corpus — `src/ui/svelte/**\/*.svelte` — from three angles:
- * `stepper-spinner.test.js` counts the bare `type="number"` fields that survive and checks how
- * their spinners are suppressed, `stepper-call-site-contract.test.js` checks what each `<Stepper>`
- * call site passes, and both need the same tag extraction and the same comment stripping. They
- * live here rather than in either suite for the reason `sourceScan.js` gives: a byte-for-byte
- * duplicated scanner counts against the SonarCloud duplication gate, which does not honour
- * `sonar.cpd.exclusions` for `tests/**`, and a suite importing another suite to borrow a helper
- * would run that suite's tests a second time under the wrong name.
- *
- * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test`
- * glob, so nothing here is collected as a suite.
- */
+/** Shared source-scanning primitives for the `Stepper` migration gates (issue 1050). */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -26,32 +12,14 @@ export const UI_SVELTE_DIR = 'src/ui/svelte';
 /** The shared primitive, excluded BY PATH from the call-site scans and asserted separately. */
 export const STEPPER_PATH = 'src/ui/svelte/components/Stepper.svelte';
 
-/**
- * The ONE derivation of a Stepper's three accessible names from a field's own label.
- *
- * The two adjunct names are not independent strings — they are `localize()` of the two
- * parametrized `FABRICATE.Common.Stepper.*` keys against the input's label — so spelling that
- * derivation out per call site is one implementation written ~20 times. It lives in this module
- * and call sites spread it; {@link spreadsSharedStepperLabels} is what lets the naming rule
- * recognize a spread, and `tests/util/stepper-labels.test.js` is what makes recognizing it sound.
- */
+/** The ONE derivation of a Stepper's three accessible names from a field's own label. */
 export const STEPPER_LABELS_PATH = 'src/ui/svelte/components/stepperLabels.js';
 
 /**
  * Whether a `<Stepper>` tag reaches all three accessible names through the shared derivation.
  *
- * Two spellings, both real in the tree:
- *   - `{...stepperLabels(label)}` — spread inline, the ordinary case.
- *   - `{...tierStepAdjunctLabels}` — spread through a component-level binding assigned from it,
- *     which is how a call site whose INPUT name differs from its adjuncts' spells it (the
- *     tier-step operand is "Steps up", but its adjuncts read the row's "Tier step").
- *
- * The binding form is resolved against the component's own source rather than accepted on the
- * name, so an unrelated `{...props}` spread cannot satisfy the naming rule.
- *
  * @param {string} tag A single `<Stepper …/>` tag.
  * @param {string} source The component source the tag came from, comments already stripped.
- * @returns {boolean}
  */
 export function spreadsSharedStepperLabels(tag, source) {
   return [...tag.matchAll(/\{\s*\.\.\.\s*([A-Za-z_$][\w$]*)\s*(\()?/g)].some(([, name, call]) => {
@@ -60,52 +28,21 @@ export function spreadsSharedStepperLabels(tag, source) {
   });
 }
 
-/**
- * A floor on the enumeration, so a glob typo cannot pass vacuously.
- *
- * The tree holds ~265 `.svelte` files today. The floor is deliberately far below that and NOT a
- * moving target: its job is to fail an empty or near-empty scan, not to pin a file count that
- * every added component would have to update.
- */
+/** A floor on the enumeration, so a glob typo cannot pass vacuously. */
 export const MINIMUM_SCANNED_SVELTE_FILES = 200;
 
-/**
- * Strip HTML and CSS/JS BLOCK comments, leaving `//` line comments in place.
- *
- * The `//`-preserving variant, mirroring `tests/components/manager-layout.test.js`. Prose in this
- * repo quotes the very markup these gates count — `Stepper.svelte`'s own header writes
- * `<input type="number">`, and so do two explanatory comments in `ComponentEditView.svelte` — so a
- * gate that counted its own documentation would be answered with a file-level allowlist exempting
- * exactly the files it exists to police. `//` is left alone because removing to end-of-line
- * deletes real code wherever a URL appears (`https://…`).
- *
- * The two `//` comments that DO mention `type="number"` (`CraftingSystemManagerRoot.svelte` and
- * `ComponentEditorRoot.svelte`, both explaining the hand-rolled pair they replaced) are handled by
- * {@link BARE_NUMBER_INPUT} instead, which requires an actual `<input>` tag around the attribute.
- *
- * @param {string} source
- * @returns {string}
- */
+/** Strip HTML and CSS/JS BLOCK comments, leaving `//` line comments in place. */
 export function withoutComments(source) {
   return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-/**
- * A real `<input …>` element carrying `type="number"`, as opposed to the phrase in prose.
- *
- * `[^>]*` cannot cross an element boundary, so the attribute has to sit inside an opening tag.
- * That is what keeps the two surviving `//` comments above out of the count without inventing a
- * second comment stripper.
- */
+/** A real `<input …>` element carrying `type="number"`, as opposed to the phrase in prose. */
 export const BARE_NUMBER_INPUT = /<input\b[^>]*\btype="number"/g;
 
 /**
  * Read every `.svelte` file under a repo-relative directory into a `{ path: source }` corpus.
  *
- * Paths are normalized to forward slashes so an assertion reads the same on Windows.
- *
  * @param {string} [dir] Repo-relative directory to walk.
- * @returns {Record<string, string>}
  */
 export function collectSvelteSources(dir = UI_SVELTE_DIR) {
   const sources = {};
@@ -125,12 +62,6 @@ export function collectSvelteSources(dir = UI_SVELTE_DIR) {
 /**
  * Scan forward from `start` to the index just past the brace-balanced construct's terminator.
  *
- * Svelte props are `{ … }` expressions and Prettier prints them MULTI-LINE over an expression
- * value, so a lazy `\{\{[\s\S]*?\}\}` closes at the first `}}` it meets — which for
- * `inputProps={{ 'data-x': someCall({ a }) }}` is inside the value. Depth counting is the only
- * terminator that survives that.
- *
- * @param {string} source
  * @param {number} start Index of the opening `{`.
  * @returns {number} Index one past the matching `}`, or `-1` when unbalanced.
  */
@@ -149,16 +80,6 @@ function endOfBracedExpression(source, start) {
 /**
  * Scan forward from just past an opening tag name to the index one past the tag's `>`.
  *
- * The terminator is the first `>` that is NOT inside a `{ … }` expression or a quoted attribute
- * value, for the same reason {@link endOfBracedExpression} exists: an inline arrow such as
- * `onChange={(next) => f(next)}` contains a `>` that closes nothing.
- *
- * A sibling of {@link endOfBracedExpression} rather than an inner loop, because folded into its
- * caller the two nested `while`s plus five branches compute to a cognitive complexity of ~21
- * against Sonar's threshold of 15 (`S3776`) — and this file sits outside every `npm run lint`
- * scope, so nothing local would have said so.
- *
- * @param {string} source
  * @param {number} start Index just past the opening tag's name.
  * @returns {number} Index one past the tag's `>`, or the end of the scan when unterminated.
  */
@@ -188,7 +109,6 @@ function endOfTag(source, start) {
  * Every `<Stepper … />` tag in a component, as source text.
  *
  * @param {string} source Component source (comments already stripped by the caller).
- * @returns {string[]}
  */
 export function stepperTags(source) {
   const tags = [];
@@ -203,12 +123,6 @@ export function stepperTags(source) {
 /**
  * The `{ … }` object literal a tag passes as `inputProps`, or `null` when it passes none.
  *
- * Case-SENSITIVE, and that is load-bearing rather than tidy: `ToolBreakageTab.svelte` ships
- * `numberInputProps={{ … }}` and `rangeInputProps={{ … }}` on its `ChanceSlider`, and a
- * case-insensitive or unanchored match would let a ChanceSlider hook satisfy a Stepper rule. The
- * `(?<![A-Za-z])` guard is what rejects the capital-`I` spellings.
- *
- * @param {string} tag
  * @returns {string|null} The inner object source, braces included.
  */
 export function inputPropsExpression(tag) {
@@ -231,20 +145,8 @@ export function objectLiteralKeys(objectSource) {
 }
 
 /**
- * The `data-*` hooks the smoke harness and the mounted suites resolve against the real `<input>`.
- *
- * This is the delta's own enumerated list, copied verbatim rather than derived from the tree — a
- * derived list would shrink with the code and a dropped hook would pass vacuously.
- * `scripts/foundry-test-run.mjs` calls Playwright's `fill()` / `inputValue()` on three of them,
- * and neither resolves against a wrapper `<div>`, so a hook that stopped riding `inputProps` is an
- * un-waivable smoke failure rather than a cosmetic one.
- *
- * `data-trigger-value` LEFT this list in issue 1096, which is a removal from the delta's list and
- * therefore stated rather than done quietly. Its field is no longer a `Stepper` at all: a trigger
- * threshold is TYPED (reaching 20 from 1 is nineteen clicks) and the prototype draws one plain
- * input there. It is covered instead by `BARE_NUMBER_FIELD_REGISTER` entry R3, which is the
- * register this repo already keeps for exactly that decision — so the hook did not stop being
- * guarded, it moved to the guard that fits what it now is.
+ * The `data-*` hooks the smoke harness and the mounted suites resolve against the real `<input>`
+ * (issue 1096).
  */
 export const MIGRATED_INPUT_HOOKS = Object.freeze([
   'data-gathering-task-stamina-cost',
@@ -267,17 +169,8 @@ export const MIGRATED_INPUT_HOOKS = Object.freeze([
 ]);
 
 /**
- * Every bare `type="number"` field outside the shared primitive, with the reason each is allowed.
- *
- * R1 and R2 come from the non-reuse register (D12); R3 was added by issue 1096. The set is
- * asserted EXACTLY — every entry must still exist and must still contain a bare field, and no
- * unregistered file may — so a later migration of any of them fails as stale rather than leaving
- * a dead allowlist entry behind.
- *
- * `spinnerSuppressed` is the `iff` this register exists to keep honest: a field may lose the
- * browser's drawn arrows only when something else on screen already lets a POINTER step the same
- * value. R1 has a sibling range track; R2 and R3 have nothing, so their spinner is their only
- * pointer path to the value and it stays.
+ * Every bare `type="number"` field outside the shared primitive, with the reason each is allowed
+ * (issue 1096).
  */
 export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
   Object.freeze({
@@ -310,45 +203,17 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
   }),
 ]);
 
-/**
- * The shared component rendering the character-modifier Min / Max pair for BOTH scopes.
- *
- * D1a lists four genuine-absence fields here — drop min/max and event min/max — and they were
- * four `<Stepper>` tags in `CraftingSystemManagerRoot` until the row was extracted. They are one
- * call site now, so the table below carries one entry, and
- * {@link CHARACTER_MODIFIER_BOUNDS_SCOPES} is what keeps the other three fields covered: it
- * pins that both scopes still reach `allowUnset` through this component rather than having
- * quietly grown a second, unasserted copy.
- */
+/** The shared component rendering the character-modifier Min / Max pair for BOTH scopes. */
 export const CHARACTER_MODIFIER_BOUNDS_PATH =
   'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
 
-/**
- * The two update functions the shared bounds row is wired to, one per scope.
- *
- * Asserted as an exact set: a third scope that rendered the row would have to be added here
- * deliberately, and a scope that stopped rendering it — the way a regression would reintroduce
- * a local copy — fails rather than silently dropping out of the D1a coverage above.
- */
+/** The two update functions the shared bounds row is wired to, one per scope. */
 export const CHARACTER_MODIFIER_BOUNDS_SCOPES = Object.freeze([
   'onUpdateDropCharacterModifier',
   'onUpdateEventCharacterModifier',
 ]);
 
-/**
- * D1a's two tables, as the fixture for the unset-value split (V10).
- *
- * `kind` is the whole point: `genuine-absence` fields persist `null` as a distinct domain value
- * and MUST pass `allowUnset`; `cosmetic-zero` fields merely LOOKED blank for zero under their old
- * bare input, persist `0`, and must NOT. Nothing else in the change asserts which call site is
- * which — V3 counts inputs, V4 checks hook placement and the primitive's own suite tests it in
- * isolation — so a misapplied `allowUnset` on `staminaCost`, or a missing one on `dcOverride`,
- * would otherwise ship silently green.
- *
- * `anchor` is a set of substrings that must ALL appear in one tag, and the gate requires EXACTLY
- * one tag per entry to match. A formatting change that breaks an anchor therefore fails loudly
- * rather than silently matching nothing.
- */
+/** D1a's two tables, as the fixture for the unset-value split (V10). */
 export const UNSET_VALUE_CALL_SITES = Object.freeze(
   [
     {
@@ -442,26 +307,11 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
   ].map((entry) => Object.freeze(entry))
 );
 
-/**
- * The elements an implicit `<label>` can bind to, in the order a document walk meets them.
- *
- * `<Stepper>` is included because it RENDERS one: its first labelable descendant is the `−`
- * button, so a `<label>` wrapping a caption plus a Stepper makes the caption a decrement control.
- */
+/** The elements an implicit `<label>` can bind to, in the order a document walk meets them. */
 const LABELABLE = /<(input|select|textarea|button|meter|output|progress|Stepper)\b/;
 
 /**
  * Every `<label>` with NO `for` attribute whose first labelable descendant is a `<Stepper>`.
- *
- * The `for` exclusion is the difference between the rule this implements and a rule that would
- * over-report. HTML's labeled-control algorithm consults descendants ONLY when `for` is absent:
- * with `for` present the label binds to the element carrying that id, and a `for` naming no
- * element leaves the label with no labeled control at all. Neither case can turn a caption into
- * a decrement button, which is the whole defect here — a `<label for>` around a Stepper whose
- * input carries the same id is in fact the CORRECT spelling, focusing the typeable field.
- *
- * No such markup exists in the tree today; excluding it keeps the detector's name honest rather
- * than leaving a false positive waiting for the first caller that writes one.
  *
  * @param {string} source Component source with comments already stripped.
  * @returns {number[]} 1-based line numbers of the offending `<label>` tags.

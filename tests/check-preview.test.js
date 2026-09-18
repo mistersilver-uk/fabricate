@@ -1,22 +1,4 @@
-/**
- * The Checks Studio's outcome-preview simulator (issue 1097).
- *
- * The load-bearing claims here are all NEGATIVE — the preview posts no chat message,
- * shows no prompt and runs no macro — and a negative assertion is worth exactly as much
- * as the proof that it could have failed. So every spy below is FIRST shown to fire on a
- * path that really does call it, and only then asserted silent across a preview. A spy
- * that never fires proves nothing at all, and a "the preview posts nothing" test built on
- * one reads identically from the PR.
- *
- * The macro case is the sharpest of the three, and it is a safety property rather than a
- * limitation. The engine reaches a `dcMode: 'dynamic'` DC by RUNNING the linked macro
- * through `MacroExecutor.run`, which compiles `macro.command` into an `AsyncFunction` and
- * executes it with the current user's authority — guarded only by
- * `typeof command !== 'string'`, which is not a script-type check, because Foundry
- * declares `command` as `required: true, blank: true` on a CHAT macro too. A DC macro
- * that creates a `ChatMessage`, updates an Actor or writes a flag must not be able to do
- * any of that from a preview button.
- */
+/** The Checks Studio's outcome-preview simulator (issue 1097). */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -66,9 +48,8 @@ function installRoll({ face = 9 } = {}) {
     }
 
     // Delegated to the RECORDING rather than modelled here (issue 1097): the joint
-    // histogram/simulator case below asks the enumerator's predicate a question, and a
-    // second hand-written parse would grade it against this branch's own beliefs. One
-    // engine serves both halves, which is also the point of that case.
+    // histogram/simulator case below asks the enumerator's predicate a question, and a second
+    // hand-written parse would grade it against this branch's own beliefs.
     static parse(formula, data) {
       return recordedRollDouble().parse(formula, data);
     }
@@ -80,11 +61,7 @@ function installRoll({ face = 9 } = {}) {
       this.terms = [];
     }
 
-    // REDUCED, never summed by regex. The previous version masked the flavour and added up
-    // every number it could see, which reads `min(max((1d8), -1), 6)` as `9 - 1 + 6` — so a
-    // clamped rolling check modifier gave the simulator a total no roll can produce, and the
-    // histogram beside it would have been graded against that. `reduceRollExpression` is the
-    // shipped walk, pinned to one face per die, so this double rolls what Foundry rolls.
+    // REDUCED, never summed by regex.
     async evaluate() {
       const resolved = Roll.replaceFormulaData(this.formula, this.data, { missing: '0' });
       const { value } = reduceRollExpression(resolved, {
@@ -353,10 +330,8 @@ describe('checkPreview: unresolved roll data is surfaced, never silently zeroed'
 });
 
 describe('checkPreview: the actor and record selection', () => {
-  // The list used to be UNFILTERED, on the ground that the Studio is GM-only and a GM owns
-  // every actor. That is a statement about AUTHORITY, and authority was never the question:
-  // a crafting check is previewed against a CHARACTER, and a real world's actor directory is
-  // mostly bestiary. The maintainer overruled it; these two cases are the reversal.
+  // The list used to be UNFILTERED, on the ground that the Studio is GM-only and a GM owns every
+  // actor.
   it('offers only PLAYER-CHARACTER actors, whatever the GM may own', () => {
     const actors = listPreviewActors({
       getActors: () => [
@@ -375,10 +350,9 @@ describe('checkPreview: the actor and record selection', () => {
   });
 
   it('takes its membership from the SHARED player-character predicate by default', () => {
-    // No `isPlayerCharacter` seam and no `game.settings`, so the shipped predicate runs with
-    // its own degraded-to-`[]` additional-types read: the literal `character` still matches,
-    // which is the additivity guarantee `playerCharacterTypes.js` makes structurally. A
-    // default that filtered nothing would make the case above prove only the seam.
+    // No `isPlayerCharacter` seam and no `game.settings`, so the shipped predicate runs with its
+    // own degraded-to-`[]` additional-types read: the literal `character` still matches, which is
+    // the additivity guarantee `playerCharacterTypes.js` makes structurally.
     const actors = listPreviewActors({
       getActors: () => [
         { id: 'a', name: 'Sera Vane', type: 'character', img: 'icons/sera.webp' },
@@ -415,10 +389,7 @@ describe('checkPreview: the actor and record selection', () => {
 
   it('carries a DC and NOTHING ELSE — a record is not an outcome (issue 1097)', () => {
     // The `difficulties` slot this used to emit was a seam for the progressive award-count
-    // histogram, on the assumption that its ordered result difficulties would arrive on a
-    // record. They do not: that order is sandbox state ON THE CHECK, so the slot was an
-    // empty array every caller read as "no record has one" — a shape claiming a capability
-    // nothing could ever fill.
+    // histogram, on the assumption that its ordered result difficulties would arrive on a record.
     for (const record of buildPreviewRecords({ check: ROUTED_DRAFT, defaultLabel: 'Default' })) {
       assert.deepEqual(Object.keys(record).toSorted(), ['dc', 'id', 'name']);
     }
@@ -460,18 +431,8 @@ describe('checkPreview: the terse breakdown line', () => {
   });
 });
 
-// ── The histogram and the simulator must describe ONE formula (issue 1097) ─────────────
-//
-// THIS IS THE CASE WHOSE ABSENCE LET THE DEFECT SHIP. `buildPreviewCheckArgs` hands the
-// runner an AUTHORED formula plus a `craftingModifier` context, and `evaluateCheckRoll`
-// appends the resolved scalar itself — so an enumerator that charted the authored string
-// drew `1..20` beside a readout rolling `5..24`, for the same check, at the same moment.
-// Every existing case used an EMPTY catalogue, under which the scalar is `0` and the
-// append is a no-op, so all of them passed on both sides of the bug. Nothing published was
-// wrong only because every View Lab check also resolved a zero scalar, which is luck.
-//
-// So the fixture below is deliberately the opposite: a NON-EMPTY catalogue with a NON-ZERO
-// resolved scalar, asserted to be non-zero before anything else is claimed.
+// The histogram and the simulator must describe ONE formula (issue 1097). THIS IS THE CASE WHOSE
+// ABSENCE LET THE DEFECT SHIP.
 describe('checkPreview: the histogram enumerates the formula the simulator rolls', () => {
   /** The inclusive range of totals an enumerated space reaches. */
   function domainOf(verdict) {
@@ -565,23 +526,7 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
     );
   });
 
-  // ── A MODIFIER THAT ROLLS, WITH BOUNDS ───────────────────────────────────────────
-  //
-  // The flat case above is the easy half. A check modifier may ROLL, and its bounds are
-  // expressed IN the formula rather than around it — `min(max((1d8), -1), 6)[Modifiers]` —
-  // so the appended term is a function term with a die inside it. Two things go wrong at
-  // once for an enumerator that reads the string instead of the expression:
-  //
-  //   1. The clamp's BOUND ARGUMENTS `-1` and `6` are read as flat addends of the roll, so
-  //      the whole domain shifts by `+5`.
-  //   2. The modifier's die is read as a plain group of its own, so the enumerated space is
-  //      `1d20` convolved with a full `1d8` rather than with the `1..6` the clamp allows —
-  //      two faces too wide.
-  //
-  // Neither shows up as a crash, an empty panel or a misshapen chart. The histogram stays
-  // monotone, correctly ordered and plausibly labelled, and is simply wrong. So it is graded
-  // against an ORACLE computed here from first principles, not against the enumerator's own
-  // arithmetic re-spelled.
+  // A MODIFIER THAT ROLLS, WITH BOUNDS. The flat case above is the easy half.
   /** A system whose crafting check applies one catalogued modifier that ROLLS `1d8`, clamped to `[-1, 6]`. */
   const SYSTEM_WITH_ROLLING_CATALOGUE = {
     modifiers: [{ id: 'mod-charm', label: 'Charm', expression: '1d8', min: -1, max: 6 }],
@@ -619,9 +564,8 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
     assert.deepEqual(verdict.dice, [{ faces: 20 }, { faces: 8 }], 'both dice, in reading order');
     assert.equal(verdict.combinations, 160);
 
-    // THE ORACLE. Computed from the clamp's own definition rather than from anything the
-    // module under test does, so a bug shared between the enumerator and this expectation is
-    // not possible.
+    // THE ORACLE. Computed from the clamp's own definition rather than from anything the module
+    // under test does, so a bug shared between the enumerator and this expectation is not possible.
     const oracle = new Map();
     for (let d20 = 1; d20 <= 20; d20 += 1) {
       for (let d8 = 1; d8 <= 8; d8 += 1) {
@@ -642,9 +586,7 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
   });
 
   it('and the two ways of getting it wrong are BOTH excluded, by number', () => {
-    // The negative control the case above needs. `{ min: 5, max: 29 }` on its own is a
-    // number a wrong enumerator could stumble onto; these are the two specific wrong answers
-    // a string scan produces, stated so that landing on either fails here by name.
+    // The negative control the case above needs.
     installRoll({ face: 9 });
     const plan = planWithRollingCatalogue();
     const domain = domainOf(
@@ -665,9 +607,7 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
   });
 
   it('and the SIMULATOR lands inside that space, which is the claim the name makes', async () => {
-    // The whole point of the suite: the histogram and the readout describe ONE formula. The
-    // runner rolls a 9 on every die here, so its total is `9 + 3 + min(max(9, -1), 6) = 18`
-    // — the clamp biting is itself observable, because an unclamped 9 would total 21.
+    // The whole point of the suite: the histogram and the readout describe ONE formula.
     installRoll({ face: 9 });
     const plan = planWithRollingCatalogue();
     const result = await runCheckPreview(plan);
@@ -684,11 +624,6 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
 
   it('does NOT double-apply it: the tool term is appended ONCE, above the runner', async () => {
     // The mirror risk, and the reason this is asserted rather than assumed.
-    // `CraftingEngine._appendToolCheckBonuses` rewrites the formula BEFORE calling
-    // `evaluateCheckRoll`, and the runner appends no tool term of its own — so the
-    // preview appending them in `buildPreviewCheckArgs` is the engine's own shape, and
-    // the enumerator layering only the MODIFIER on top matches it exactly. A runner that
-    // also appended tools would show up here as a `+ 3[Tools]` twice over.
     installRoll({ face: 9 });
     const plan = planWithCatalogue();
     const result = await runCheckPreview(plan);
@@ -701,10 +636,7 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
   });
 
   it('appends NO situational bonus, because a preview is never interactive', async () => {
-    // The third append the runner knows about. It lives inside `options.interactive ===
-    // true`, and `rollOptions: null` spreads to `{}` — so the preview cannot reach it and
-    // the enumerator has nothing to mirror. Proved by a prompt that WOULD add +100 and is
-    // never called, with the same prompt then shown to fire on an interactive roll.
+    // The third append the runner knows about.
     installRoll({ face: 9 });
     let prompted = 0;
     const prompt = async () => {

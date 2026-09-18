@@ -4,12 +4,9 @@ import assert from 'node:assert/strict';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 
-// These tests drive the WIRED primary-GM check exactly as main.js wires it
-// (`() => game.users?.activeGM?.id === game.user?.id`), not the injected unit
-// seam, so they prove the load-bearing wiring gates the synced-hook setFlag
-// writes. The `() => true` default is exercised by the existing
-// salvage-run-manager / crafting-run-manager / salvage-engine suites, which
-// build no `activeGM` and must still resume.
+// These tests drive the WIRED primary-GM check exactly as main.js wires it (`() =>
+// game.users?.activeGM?.id === game.user?.id`), not the injected unit seam, so they prove the
+// load-bearing wiring gates the synced-hook setFlag writes.
 
 const WIRED_IS_PRIMARY_GM = () =>
   globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id;

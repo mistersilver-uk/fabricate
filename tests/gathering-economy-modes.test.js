@@ -497,10 +497,8 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
   });
 
   it('seeds a null respawn anchor at the current world time instead of granting a full restock (issue 403)', async () => {
-    // `_mergeNodeConfigState` rewrites the anchor through `numberOrNullStrict`, so
-    // a library-backed pool that has never been evaluated presents `null` — the
-    // NORMAL production shape. `Number(null) === 0` is finite, so the first tick
-    // used to read as "anchored at world time 0" and grant floor(now / interval).
+    // `_mergeNodeConfigState` rewrites the anchor through `numberOrNullStrict`, so a library-backed
+    // pool that has never been evaluated presents `null` — the NORMAL production shape.
     const { service, env } = libService({
       task: LIB_TASK({ nodes: { enabled: true, max: 3, current: 3, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
       nodeRuntime: { 'lib-1': { enabled: true, max: 3, current: 0, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }
@@ -516,10 +514,8 @@ describe('gathering economy — per-environment node pools (library tasks)', () 
   });
 
   it('a backward tick never truncates a pool whose stored count exceeds the library max (issue 403)', async () => {
-    // The reported "rewinding reduced my node count" defect: the clamp in
-    // `_mergeNodeConfigState` rode along on the persisted re-anchor. Freezing
-    // writes NOTHING, so there is no write for the clamp to ride on — pinned by
-    // the null return rather than the count alone, so a no-op write cannot pass.
+    // The reported "rewinding reduced my node count" defect: the clamp in `_mergeNodeConfigState`
+    // rode along on the persisted re-anchor.
     const { service, env } = libService({
       task: LIB_TASK({ nodes: { enabled: true, max: 2, current: 2, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR } } }),
       nodeRuntime: { 'lib-1': { enabled: true, max: 5, current: 5, depletionTiming: 'onStart', respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalSeconds: HOUR, lastEvaluatedWorldTime: 10 * HOUR } } }
@@ -1120,16 +1116,10 @@ describe('gathering economy — per-character max override', () => {
   });
 });
 
-// Issue 904: the routed check's effective DC is "the task's dcOverride when
-// finite, else the routed check's own dc" (openspec spec.md, §System routed
-// check resolution requirement 1), implemented by
-// GatheringEngine#_resolveGatheringRoutedDc reading `task?.dcOverride` off the
-// COMPOSED runtime task. `_libraryTaskToRuntimeTask` previously dropped the
-// field entirely (via `normalizeLibraryTask`, which never carried it either),
-// so the requirement was dead on arrival. This coverage stays at the
-// composition seam — routed gathering is disabled ("Coming soon") behind
-// resolutionMode: 'd100' pending #683, so the fix is plumbing-only and stays
-// dormant until routed resolution ships.
+// Issue 904: the routed check's effective DC is "the task's dcOverride when finite, else the routed
+// check's own dc" (openspec spec.md, §System routed check resolution requirement 1), implemented by
+// GatheringEngine#_resolveGatheringRoutedDc reading `task?.dcOverride` off the COMPOSED runtime
+// task.
 describe('gathering economy — library task dcOverride composition (issue 904)', () => {
   const LIB_TASK = (overrides = {}) => ({ id: 'lib-dc', name: 'Mine', ...overrides });
 

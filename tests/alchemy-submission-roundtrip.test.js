@@ -1,17 +1,6 @@
 /**
- * Regression guard for the P0 where `resolveAlchemySubmissions` stripped the
- * component linkage (issue 543 review round 1).
- *
- * These tests drive the REAL path the `submitAlchemyAttempt` facade runs —
- * `resolveAlchemySubmissions` (NOT hand-built submissions) -> `craftAlchemy`
- * (`_matchAlchemySignature` / `_submittedComponentMultiset`) — with a REALISTIC
- * owned item whose live `uuid` (`Actor.x.Item.y`) DIFFERS from its component
- * source reference (`Item.*`, carried in `_stats.duplicateSource`). The engine
- * resolves a submission to a component only by source-reference intersection, so
- * the pre-fix thin `{ uuid, registeredItemUuid: item.uuid }` submission never intersected
- * the component's source-ref chain: every brew fizzled and no dead-end key was
- * ever recorded. Existing suites masked this by making the owned uuid equal the
- * component source uuid; these do not.
+ * Regression guard for the P0 where `resolveAlchemySubmissions` stripped the component linkage
+ * (issue 543 review round 1).
  */
 
 import test from 'node:test';

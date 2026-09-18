@@ -1,51 +1,7 @@
 /**
- * THE FILTER BAR AND THE CARD SHELL, MOUNTED — the root-emission proof on the rendered DOM
- * (issues 1039, 1427 and 1508).
- *
- * ── WHY A MOUNTED SUITE FOR TWO PROPS-ONLY LEAVES ────────────────────────────────────────
- * Every other reader of `fabricate-filter-bar` and `fabricate-card` is SOURCE TEXT.
+ * THE FILTER BAR AND THE CARD SHELL, MOUNTED.
  * `tests/components/searchable-popover-area-scope.test.js` reads each primitive's
  * `const classes = $derived([…])` array; `tests/components/re-rooted-controls-host-independence.
- * test.js` writes the class string into its own fixture as a literal and measures the sheet
- * against it. Both would go on passing on a tree where the component declared the array and
- * stopped rendering `class={classes}` — and on that tree every re-rooted rule in
- * `styles/fabricate.css` matches nothing, in both applications, which is the whole of what issue
- * 1508 set out to prevent. Mounting the component and comparing the WHOLE class attribute is the
- * one reader that catches it.
- *
- * The four families that shipped before these two already have that reader somewhere: the button
- * families in `manager-button-mounted.test.js`, `ManagerSearchField` in the two `className`
- * equalities of `manager-control-rungs.test.js`, and `Field` in `field-mounted.test.js`'s two
- * `getAttribute('class')` equalities. Neither of these two had a mounted suite of its own, so
- * this is it, and it holds both because the question is identical for both and one table asking
- * it twice is the shape that does not drift — two copies of a class-string assertion are exactly
- * the near-identical block the SonarCloud duplication gate counts.
- *
- * ── WHAT IS ASSERTED, AND WHY EACH CLAUSE EARNS ITS PLACE ────────────────────────────────
- *  - THE HOST ELEMENT. Both primitives render a literal `<section>` rather than a
- *    `<svelte:element>`, and both are `<section>`s because a census of their call sites found a
- *    set of size one. A `<div>` here would keep every class and every `data-*` hook the rest of
- *    the suite looks for while dropping the bar out of the landmark list.
- *  - THE WHOLE CLASS STRING, by equality rather than by `classList.contains`. A `contains` check
- *    cannot see a root that arrived SECOND, and the position is a constraint rather than a style
- *    note: the area-scope gate reads the composed region up to the first `]`, so a root moved off
- *    the head of the array is a root that gate reports as unemitted.
- *  - THE CALLER'S EXTRA, APPENDED. Both take `class` as a named prop precisely so the rest spread
- *    cannot replace the primitive's own token, and both document that order. An `is-*` modifier
- *    or a caller's card class landing BEFORE the root would still paint; a caller class that
- *    REPLACED the family class would silently un-bar the section while every `data-*` selector in
- *    the tests kept resolving.
- *  - THE REST SPREAD, on the attribute both files record as a trap: a bare `data-*` on a
- *    component tag is the boolean `true` and renders `="true"`, where the hand-rolled section
- *    rendered `=""`.
- *  - THE BAR'S ACCESSIBLE NAME, which is a named prop rather than a rest key because a `<section>`
- *    without one is not a `region` landmark at all.
- *
- * Both components are import-free LEAVES — props only, no bridge, no util imports — so each
- * harness compiles exactly one module. `compiledModules` names the path as a LITERAL rather than
- * through a binding, because `mounted-harness-primitive-allowlist.test.js` reads that list by
- * matching path-shaped quoted strings and a bare identifier there would make this suite read as
- * compiling nothing at all.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -74,11 +30,6 @@ const cardHarness = createMountedComponentHarness({
  * The unconditional class literals of a primitive's `const classes = $derived([…])` array, READ
  * out of the component rather than restated here.
  *
- * The same reader `re-rooted-controls-host-independence.test.js` uses, and for its reason: a
- * probe built from a restated string keeps measuring the old control after the component stops
- * emitting it, and reports green while doing so. What this file adds on top is the comparison
- * against the RENDERED attribute, which is the half source text cannot answer.
- *
  * @param {string} file Repository-relative component path.
  * @param {string} label The component, for the failure message.
  * @returns {string[]} Every unconditional string literal in the array, in order.
@@ -92,14 +43,7 @@ function composedClasses(file, label) {
   return tokens;
 }
 
-/**
- * The two primitives, and the facts each clause below is stated over.
- *
- * `root` and `hook` are RESTATED here on purpose, against the values read out of the component by
- * `composedClasses`: the read is what keeps the assertions pointed at what the primitive really
- * emits, and the literal is what makes this file say out loud which class is supposed to lead.
- * The pinning clause asserts the two against each other, so neither can drift alone.
- */
+/** The two primitives, and the facts each clause below is stated over. */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
     name: 'ManagerToolbar',
@@ -107,8 +51,7 @@ const PRIMITIVES = Object.freeze([
     harness: toolbarHarness,
     root: 'fabricate-filter-bar',
     hook: 'manager-toolbar',
-    // A bar is a `region` landmark only while it has an accessible name, so every mount passes
-    // one. It is a NAMED prop rather than a rest key for that reason.
+    // A bar is a `region` landmark only while it has an accessible name.
     baseProps: Object.freeze({ ariaLabel: 'Filter components' }),
     callerClass: 'manager-scoped-list-toolbar',
     dataHook: 'data-recipe-toolbar',
@@ -138,10 +81,6 @@ afterEach(() => {
 /**
  * The rendered class attribute, with any Svelte scoping token removed.
  *
- * Neither primitive declares a scoped `<style>` today — both are painted by
- * `styles/fabricate.css` and both record why — so the strip is a no-op now and stays because the
- * assertion is about the family's tokens, not about whether a scoping hash happens to exist.
- *
  * @param {Element} node The mounted root element.
  * @returns {string} The class attribute.
  */
@@ -165,8 +104,7 @@ describe('the filter bar and the card shell emit their family root on the render
     const { name, file, harness, root, hook, baseProps, callerClass, dataHook } = primitive;
 
     it(`${name} declares ${root} as the FIRST literal of its class array`, () => {
-      // THE SOURCE HALF, asserted here rather than left to the area-scope gate, because this
-      // file's own equalities are only meaningful while the read and the literal agree.
+      // THE SOURCE HALF, asserted here rather than left to the area-scope gate.
       const tokens = composedClasses(file, name);
       assert.equal(
         tokens[0],
@@ -210,10 +148,7 @@ describe('the filter bar and the card shell emit their family root on the render
     });
 
     it(`${name} forwards a data hook through the rest spread as the empty string`, async () => {
-      // The trap both docblocks record: a BARE `data-*` on a component tag is the boolean `true`
-      // and renders `="true"`, where the hand-rolled `<section>` rendered `=""`. Presence
-      // selectors resolve either way, which is why the suites and smoke steps that use them
-      // would not have caught it — so the call sites spell the value and this asserts it.
+      // The trap both docblocks record.
       const target = await harness.mount({ ...baseProps, [dataHook]: '' });
       const node = target.querySelector('section');
       assert.equal(node.getAttribute(dataHook), '');
@@ -230,9 +165,7 @@ describe('the filter bar and the card shell emit their family root on the render
   });
 
   it('InspectorCard takes aria-label through the rest spread, having none of its own', async () => {
-    // The asymmetry is deliberate and is recorded in both components: the bar's accessible name
-    // is required in practice and gated by its source contract, so it is a named prop; the card
-    // has no name of its own to forget, so anything a caller wants rides the spread.
+    // The asymmetry is deliberate and is recorded in both components.
     const target = await cardHarness.mount({ 'aria-label': 'Matching evidence' });
     assert.equal(target.querySelector('section').getAttribute('aria-label'), 'Matching evidence');
   });

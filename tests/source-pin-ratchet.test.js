@@ -1,10 +1,6 @@
 /**
  * Ratchets the source-text pin sites per test file (issue 1658), so the conversions in #1691 and
  * #1697 each lower `tests/source-pin-ledger.txt` and nothing silently re-grows it.
- *
- * This file spells the tokens the gate hunts, in prose and in fixtures. That is safe by
- * construction rather than by exclusion: sites are AST call nodes, so a pattern written as a
- * string or regex literal, and a token in a comment, count zero.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -30,9 +26,7 @@ const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs']);
 
 /**
  * Names EXPORTED under `tests/` as a `src/` path constant, so a module that imports one and reads
- * through it resolves. Only an `export`ed declaration qualifies, and the set is applied per file
- * against what that file actually imports: matching bare names across the corpus would seed
- * `result`, `entry` and `text`, each bound to something unrelated in hundreds of places.
+ * through it resolves.
  */
 function exportedPathConstants(parsed) {
   const names = new Set();
@@ -113,11 +107,7 @@ test('the source-pin ledger matches the pinned baseline exactly, per test file',
   gate.check(assert);
 });
 
-/**
- * The counter's behaviour, as a table. One case per shape rather than six near-identical test
- * bodies: the bodies differed only in their literals, which a duplication detector normalizes
- * away, and the table reads as the specification it is.
- */
+/** The counter's behaviour, as a table. */
 const PROBES = Object.freeze([
   {
     name: 'a pattern spelled as a literal is not a pin site, so the gate does not count itself',

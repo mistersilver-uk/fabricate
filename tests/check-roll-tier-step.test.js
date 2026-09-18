@@ -1,10 +1,5 @@
-// Routed tier STEPPING (issue 975) — the per-trigger `tierStep` effect that replaced
-// the `natStepping` boolean and its hard-coded d20 / ±1 / relative-only rule.
-//
-// Renamed from `check-roll-nat-stepping.test.js`. The behaviours that file pinned (a
-// natural 20 steps up, a natural 1 steps down, the kept-face rule, the cap/floor
-// no-op) survive as trigger-authored cases here; what does NOT survive is the forced
-// bypass, which this file now pins in the opposite direction.
+// Routed tier STEPPING (issue 975) — the per-trigger `tierStep` effect that replaced the
+// `natStepping` boolean and its hard-coded d20 / ±1 / relative-only rule.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -187,10 +182,8 @@ tierStepTable([
     },
   },
   {
-    // `steps` is a MAGNITUDE — the direction lives in `mode` — so a raw negative can
-    // never invert the effect the GM authored. `_normalizeTierStep` clamps it to an
-    // integer >= 1 on the way in, but the runner clamps too, so a hand-edited world or
-    // a caller that skipped the normalizer cannot make an `up` trigger step DOWN.
+    // `steps` is a MAGNITUDE — the direction lives in `mode` — so a raw negative can never invert
+    // the effect the GM authored.
     name: 'a negative steps magnitude cannot invert an up trigger into a down step',
     total: ROLLS_FAIR,
     triggers: [tierStepTrigger({ id: 'up-negative', mode: 'up', steps: -2 })],
@@ -326,13 +319,9 @@ tierStepTable([
   },
 ]);
 
-// ── the forced + step matrix ────────────────────────────────────────────────
-//
-// Stepping is DISPOSITION-PRESERVING: with a forced outcome in play the array the
-// step moves within is the ranked SUBSET of tiers sharing that disposition
-// ([ruined, poor] / [fair, good, superb]), and it clamps there. Every row below also
-// runs the `data.success === the final tier's success` invariant through
-// `assertTierStepRow`, which is the whole point of the subset rule.
+// the forced + step matrix. Stepping is DISPOSITION-PRESERVING: with a forced outcome in play the
+// array the step moves within is the ranked SUBSET of tiers sharing that disposition ([ruined,
+// poor] / [fair, good, superb]), and it clamps there.
 
 tierStepTable([
   {
@@ -420,9 +409,8 @@ tierStepTable([
   {
     name: 'under forcing a target naming the opposite disposition is discarded BEFORE the comparison',
     total: ROLLS_FAIR,
-    // `ruined` is the lowest-ranked tier in the WHOLE ladder, so it would win outright
-    // if eligibility were tested after the comparison — and then no-op, leaving the
-    // craft on Superb. It is not in the success subset, so `good` wins instead.
+    // `ruined` is the lowest-ranked tier in the WHOLE ladder, so it would win outright if
+    // eligibility were tested after the comparison — and then no-op, leaving the craft on Superb.
     triggers: [
       forcingTrigger('success'),
       tierStepTrigger({ id: 'to-ruined', mode: 'target', tierId: 'ruined' }),
@@ -444,9 +432,8 @@ tierStepTable([
   {
     name: 'a forced outcome no longer bypasses stepping (the deleted natStepping bypass)',
     total: ROLLS_FAIR,
-    // Exactly the old bypass case: a forced failure alongside a natural-20 step-up
-    // trigger, the shape `_convertNatSteppingToTriggers` synthesises. The old runtime
-    // returned `{ matched, natStep: null }` unconditionally here.
+    // Exactly the old bypass case: a forced failure alongside a natural-20 step-up trigger, the
+    // shape `_convertNatSteppingToTriggers` synthesises.
     dice: [{ number: 1, faces: 20, total: 20, results: [{ result: 20 }] }],
     triggers: [
       forcingTrigger('failure'),
@@ -470,9 +457,8 @@ tierStepTable([
 // ── one tier ORDER derivation: rankedRoutedOutcomes ─────────────────────────
 
 test('equal-rank tiers resolve to the FIRST authored one in both forced directions', async (t) => {
-  // No pre-975 test exercised equal-rank tiers, and `routeCritOutcome`'s strict
-  // `>` / `<` kept the first author-ordered tier for BOTH dispositions. A `toSorted`
-  // copy indexed for "the highest succeeding tier" keeps the LAST.
+  // No pre-975 test exercised equal-rank tiers, and `routeCritOutcome`'s strict `>` / `<` kept the
+  // first author-ordered tier for BOTH dispositions.
   const TIED = [
     { id: 'win-first', name: 'Win First', success: true, dc: 5 },
     { id: 'win-second', name: 'Win Second', success: true, dc: 5 },
@@ -499,9 +485,8 @@ test('equal-rank tiers resolve to the FIRST authored one in both forced directio
   });
 
   await t.test('a step across equal-rank tiers walks them in author order', async () => {
-    // Rolled tier is `win-first` (threshold 15 at base DC 10; total 16 matches it and,
-    // on the tie, `matchRoutedOutcome`'s strict `>` keeps the first). Stepping up one
-    // must land on its equal-ranked sibling, the very next entry in author order.
+    // Rolled tier is `win-first` (threshold 15 at base DC 10; total 16 matches it and, on the tie,
+    // `matchRoutedOutcome`'s strict `>` keeps the first).
     const r = await runTierStepCase({
       total: ROLLS_GOOD,
       relativeOutcomes: TIED,
@@ -548,9 +533,8 @@ test('a tier whose rank is not a finite number is dropped from the order entirel
 });
 
 test('the minOutcomeId gate still compares threshold VALUES, so tiers sharing a start pass', async () => {
-  // Two fixed tiers share `start: 6` — `_normalizeRoutedOutcome` stores duplicate and
-  // overlapping ranges without complaint (non-overlap is only a readiness WARNING).
-  // By value they compare equal and the craft passes; by rank INDEX it would fail.
+  // Two fixed tiers share `start: 6` — `_normalizeRoutedOutcome` stores duplicate and overlapping
+  // ranges without complaint (non-overlap is only a readiness WARNING).
   const SHARED_START = [
     { id: 'a', name: 'A', success: true, breakTools: false, start: 6, end: 10 },
     { id: 'b', name: 'B', success: true, breakTools: false, start: 6, end: 12 },
@@ -599,9 +583,7 @@ test('an outcomeTier-conditioned step reads the ROLLED tier and the pass does no
   });
 
   await t.test('a condition on the STEPPED tier never fires — one pass, no fixpoint', async () => {
-    // The obvious non-terminating cycle: "landed on Fair, step up" plus "landed on
-    // Good, step up". Only the first matches, because every condition is evaluated
-    // once against the frozen rolled-tier snapshot.
+    // The obvious non-terminating cycle: "landed on Fair, step up" plus "landed on Good, step up".
     const r = await runTierStepCase({
       total: ROLLS_FAIR,
       triggers: [
@@ -737,9 +719,8 @@ test('the minOutcomeId gate judges the FINAL tier, and names the blocked tier', 
 // ── clampToNearest interacts with the step clamp only by composition ────────
 
 test('clampToNearest and the step clamp are independent concepts', async (t) => {
-  // `clampToNearest` decides whether a tier matched AT ALL; the step clamp decides
-  // where an out-of-range step lands. A total below every threshold clamps onto the
-  // lowest tier, and a `down` step from there has nowhere to go.
+  // `clampToNearest` decides whether a tier matched AT ALL; the step clamp decides where an
+  // out-of-range step lands.
   await t.test('a down step at the clamped lowest tier no-ops with no evidence', async () => {
     const r = await runTierStepCase({
       total: -1,

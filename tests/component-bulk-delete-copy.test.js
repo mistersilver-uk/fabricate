@@ -3,17 +3,6 @@
  * without mounting the much heavier `CraftingSystemManagerRoot` (issue 1129; the set delete became
  * the reference's `Remove N components from {system}…` leg in the panel's dock for issue 1371
  * r16-list, maintainer ruling M23).
- *
- * The twin of `essence-bulk-delete-copy.test.js`, and it follows that file's binding decision
- * rather than re-litigating it: `…Deleted` and `…RemoveArmedAnnouncement` each carry TWO
- * independent counts in one sentence, and no sibling key in `lang/en.json` pluralizes two numbers
- * at once — the established `…One` convention only ever branches on ONE count. So those strings
- * use the "(s)" idiom, which is count-agreement-neutral by construction, instead of a four-way
- * 1/1, 1/N, N/1, N/N key matrix. Both are AT-ONLY or toast strings; nothing visible carries "(s)".
- *
- * The SINGLE-count strings do branch, because they can: the remove leg's label and its note's
- * recipe sentences render `…One` siblings, so those are pinned here at both ends too. The mounted
- * suite proves the panel SELECTS the right key; this proves the key it selects actually reads.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -46,8 +35,7 @@ describe('1129/copy component bulk-remove two-count strings', () => {
 
   it('the armed announcement names the consequence, not just the state', () => {
     // Arming changes the button's label and name while it holds focus, which is not reliably
-    // announced; the polite live region is what carries the change. A bare "armed" would tell a
-    // screen-reader user that something changed but not what confirming would do.
+    // announced; the polite live region is what carries the change.
     const announcement = interpolate(bulkEdit.RemoveArmedAnnouncement, {
       count: 3,
       recipes: 2,
@@ -107,11 +95,8 @@ describe('1129/copy component bulk-remove single-count strings branch on One', (
     );
   });
 
-  // `recipesDisabled` counts a TRANSITION — recipes enabled today that this remove will switch
-  // off — and deliberately excludes recipes that were already disabled. The old wording, "N of
-  // those recipes will be left uncraftable and disabled", described the resulting STATE, under
-  // which an already-disabled recipe plainly belongs in the count; a GM reading it against a
-  // library holding disabled recipes would read the number as an undercount.
+  // `recipesDisabled` counts a TRANSITION — recipes enabled today that this remove will switch off
+  // — and deliberately excludes recipes that were already disabled.
   it('the disabled sentences name the TRANSITION rather than the resulting state', () => {
     for (const row of [
       bulkEdit.ImpactDisabledOne,
@@ -161,8 +146,7 @@ describe('1129/copy component bulk-remove single-count strings branch on One', (
 
 describe('1129/copy the singular delete dialog states the same arithmetic', () => {
   // The bulk panel and the single-component dialog are fed by the SAME describer, so their copy
-  // must be able to say the same thing. A dialog that named no numbers — which is what shipped
-  // before this issue — cannot.
+  // must be able to say the same thing.
   it('names both the rewrite count and the disable count', () => {
     const sentence = interpolate(deleteConfirm.Content, {
       name: 'Iron',

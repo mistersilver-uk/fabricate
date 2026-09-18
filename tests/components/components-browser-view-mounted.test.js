@@ -1,16 +1,4 @@
-/**
- * The GM component library's group headers (issue 676).
- *
- * `ComponentsBrowserView` composes filter → sort → paginate → GROUP, so a group header
- * that reports only its bucket length says "General · 25 components" above page 1 of a
- * 282-strong General bucket — the nav, the pager and the header then disagree about the
- * same library. The header carries BOTH numbers, and the total must respect the active
- * filters, or it is a third wrong number.
- *
- * The Component Studio and the Recipe Studio must read as one product, so the sibling
- * assertions live in `recipes-browser-view-mounted.test.js` and both are fed by the same
- * shared `browserGroupCounts.js`.
- */
+/** The GM component library's group headers (issue 676). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,15 +14,12 @@ import { createComponentBrowserState } from '../../src/utils/componentBrowserMod
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
-// Issue 1504: the page-size control is a shared `<Select>`, so choosing a size is two clicks on
-// a portaled panel rather than a `change` on a native `<select>`.
+// Issue 1504: the page-size control is a shared `<Select>`.
 import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// ONE MANIFEST FOR THE TWO SUITES THAT MOUNT THIS VIEW (issue 1371 r16-list): the module list
-// that used to sit here is `createComponentsBrowserViewHarness`'s now, so the rendered toolbar
-// geometry suite reads the same arrangement rather than a second copy of it.
+// ONE MANIFEST FOR THE TWO SUITES THAT MOUNT THIS VIEW (issue 1371 r16-list).
 const { harness: browser } = createComponentsBrowserViewHarness({
   repoRoot,
   tmpPrefix: 'fabricate-components-browser-',
@@ -107,17 +92,13 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
     const root = await browser.mount({ itemCards: manyGeneral(30) });
 
     assert.equal(root.querySelectorAll('.manager-component-row').length, 25, 'the default page holds 25');
-    // A BARE NUMERAL since issue 1371's parity round 4 (`proto:1073`, gap-list row 107): the
-    // reference draws the folder glyph, the category name and a mono count, and the noun is the
-    // band's whole subject. The `of` form survives for the one case that needs it — a category
-    // spanning a page boundary would otherwise report the slice as the whole bucket.
+    // A BARE NUMERAL since issue 1371's parity round 4 (`proto:1073`, gap-list row 107).
     assert.deepEqual(
       countTexts(root),
       ['25 of 30'],
       'the header must not say the General bucket holds 25'
     );
-    // The pager and the header now agree about the same library, in the sentence the reference
-    // writes for the in-system cohort (`proto:1069`).
+    // The pager and the header now agree about the same library.
     assert.equal(
       root.querySelector('[data-component-count]').textContent.trim(),
       '25 of 30 catalogue entries'
@@ -130,9 +111,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
   });
 
   it('handles the singular — a bare "1" whole, "1 of N" paged', async () => {
-    // The plural agreement this case was written for is GONE with the noun: a bare numeral has
-    // no singular branch to get wrong. What survives is the distinction the case really pins —
-    // a group shown whole says one number, a group spanning a boundary says two.
+    // The plural agreement this case was written for is GONE with the noun.
     const root = await browser.mount({ itemCards: manyGeneral(1) });
     assert.deepEqual(countTexts(root), ['1'], 'a whole group says its size and nothing else');
 
@@ -177,8 +156,7 @@ describe('ComponentsBrowserView group headers (issue 676)', () => {
 // vacuously.
 describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
   function metalWithFireLibrary() {
-    // 15 Metal (each carrying a Fire essence) + 5 Herb, so a page-2 (pageSize 10) filter
-    // by BOTH category=Metal AND essence=Fire is a real, non-empty page.
+    // 15 Metal (each carrying a Fire essence) + 5 Herb.
     const rows = [];
     for (let i = 0; i < 15; i += 1) {
       rows.push(
@@ -224,11 +202,7 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
 
     await browser.mount({ itemCards, categoryVocabulary: ['Metal', 'Herb'], selectedSystemId: 'sys-1', browserState: shared });
 
-    // Default page size keeps the 20-row library on one page, so the page index reads 0
-    // deterministically: the plain-object `browserState` (not a `$state` proxy) cannot
-    // drive the non-reactive `model` to recompute after the reset effect, so a smaller
-    // page size would let the page-sync effect memoize a stale non-zero page. The app uses
-    // a real proxy; page preservation on a same-system return is proven above.
+    // Default page size keeps the 20-row library on one page.
     shared.categoryFilter = 'Metal';
     shared.essenceFilter = 'Fire';
     shared.pageIndex = 1;
@@ -243,11 +217,6 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
     assert.equal(shared.essenceFilter, 'all', 'a switch clears the essence filter too');
     assert.equal(shared.pageIndex, 0, 'a switch returns to the first page');
     // THE COLLAPSE SET IS NO LONGER THIS SCREEN'S (issue 1371, parity round 4; gap-list row 107).
-    // The reference's group band draws no chevron and is not a button, so `collapsible={false}`
-    // means nothing on this list collapses and nothing here writes that field. It is left on the
-    // lifted state untouched — `createComponentBrowserState` still mints it and the Recipe Studio
-    // still uses its own — rather than cleared, which would be this screen reaching into a field
-    // it no longer owns.
     assert.equal(
       shared.collapsedCategories.has('Metal'),
       true,
@@ -262,8 +231,6 @@ describe('ComponentsBrowserView editor round-trip (issue 806)', () => {
 // Issue 801 — the LOAD-BEARING components contiguity proof. The util test can only show
 // `sortComponents({categoryMajor:true})` yields a flat category-major order; it cannot
 // bind the view (which could pass `categoryMajor:false` and still pass the util test).
-// This drives the real view: a category larger than the page must render contiguously
-// across the boundary, reading "N of M" on the filling page AND the continuation page.
 describe('ComponentsBrowserView category-major grouped pagination (issue 801)', () => {
   it('renders each category contiguously across a page boundary, N of M on both sides', async () => {
     // Herb (6) · Metal (12, the boundary-spanning bucket) · general (4) = 22 rows.
@@ -279,17 +246,14 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     // Shrink the page to 10 so Metal (12) must span two pages.
     chooseSelectOption(root, '[data-pagination-size]', 10);
 
-    // Page 1: the whole Herb bucket, then the first slice of Metal — NOT an interleaved
-    // Herb/Metal/general alphabetical slice, which is what the pre-801 order produced.
+    // Page 1: the whole Herb bucket, then the first slice of Metal.
     assert.equal(root.querySelectorAll('.manager-component-row').length, 10, 'page 1 holds ten');
     assert.deepEqual(groupsOnPage(root), [
       ['Herb', '6'],
       ['Metal', '4 of 12'],
     ]);
 
-    // Page 2: Metal CONTINUES contiguously (its remaining 8), then general begins. Metal's
-    // header reads "N of M" on this continuation page too, and no Metal rows are stranded
-    // on any non-adjacent page.
+    // Page 2: Metal CONTINUES contiguously (its remaining 8).
     root.querySelector('[data-pagination-next]').click();
     flushSync();
     assert.deepEqual(groupsOnPage(root), [
@@ -308,22 +272,6 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
 // DISTINCT operations and these cases keep them distinct, because conflating them is the
 // defect: a collapsed group's rows are not rendered, so the page control must never reach
 // them while the results link must.
-//
-// Issue 1010 lifted the seven cases into `tests/helpers/browserBulkSelectionCases.js` and the
-// Recipe Studio joined them there. They are stated ONCE and instantiated per studio, because
-// both browsers render the same `BulkSelectionToolbar` over the same `bulkSelectionModel.js`
-// — one contract, two consumers. Keeping a literal copy here as well would leave the contract
-// single-sourced in name only: a case tightened on one studio and not the other is exactly the
-// per-studio drift the extraction exists to prevent, and it is also the near-identical
-// assertion block SonarCloud's new-code duplication gate counts (it analyses `tests/**` and
-// ignores `cpd.exclusions`).
-//
-// Issue 924's focus-ring contract used to be asserted here too, against this view's rendered
-// toolbar. It belongs to the primitive rather than to one of its two consumers, so it
-// RELOCATED — unchanged in substance and widened in strength — to
-// `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns both the adjacency
-// case and the drift assertion over the class tokens inside the toolbar's `:global()`.
-// Do not re-add a per-studio copy of either; the primitive is what both studios render.
 describeBrowserBulkSelection({
   label: 'ComponentsBrowserView',
   prefix: 'component',
@@ -333,25 +281,14 @@ describeBrowserBulkSelection({
   rowsProp: 'itemCards',
   harness: browser,
   createBrowserState: createComponentBrowserState,
-  // `manyGeneral` zero-pads its names, so name-ascending order is also numeric order — which
-  // is what makes `flatId(1)` reliably the first row of page 1.
+  // `manyGeneral` zero-pads its names, so name-ascending order is also numeric order.
   makeFlatRows: (count) => manyGeneral(count),
   flatId: (index) => `g${index}`,
   // NO `makeGroupedRows` / `grouped` SINCE ISSUE 1371's PARITY ROUND 4. The shared collapsed-group
   // case drives a category's REAL header button, and this screen's band is no longer a button:
-  // the reference draws no chevron on it (gap-list row 107), so `collapsible={false}` leaves
-  // nothing on this list to collapse. The helper's own contract covers this — a studio with no
-  // grouping axis takes the flat branch, where the page box must still reach exactly the rendered
-  // rows and no more — and the Recipe Studio still exercises the collapsed branch.
-  //
-  // The grouped `pageIds` branch is NOT lost with it: `reaches every rendered row with grouping
-  // on` below drives it directly.
   props: (itemCards, extra = {}) => ({
     itemCards,
-    // Derived from the rows rather than hard-coded, because the same `props` builds both the
-    // flat fixtures (which carry no category and must land in the reserved `general` bucket,
-    // vocabulary empty) and the grouped one (which must offer both categories or the grouped
-    // branch of `pageIds` is never exercised).
+    // Derived from the rows rather than hard-coded.
     categoryVocabulary: [...new Set(itemCards.map((item) => item.category).filter(Boolean))],
     ...extra
   }),
@@ -429,19 +366,7 @@ describe('ComponentsBrowserView progressive DC badge re-gate (issue 772)', () =>
   });
 });
 
-/**
- * The hydration REQUEST (issue 1081).
- *
- * Since issue 1081 a component card arrives cheap and resolves its linked source document —
- * the "Missing" verdict and the live description fallback — only when something asks it to.
- * `hydrateItemCards` is pinned by the projection suites, but the wiring that must CALL it is
- * a render effect in this component, and deleting that effect outright left every one of
- * those suites green: what is proven there is the helper, not that anything invokes it.
- *
- * Asserted through a spy on the card rather than a real projection, because the claim is
- * about WHICH cards the view asks for — exactly the ones it renders — and the view reaches
- * them through `card.hydrate()` off the published object.
- */
+/** The hydration REQUEST (issue 1081). */
 describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 1081)', () => {
   /** Cards carrying a non-enumerable `hydrate` spy, exactly as the projection defines it. */
   function spyLibrary(count, requested) {
@@ -469,8 +394,7 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
       cards.slice(0, 25).map((card) => card.id).sort(),
       'the browser asked exactly the page it rendered'
     );
-    // The negative half stated against the same set: the five off-page cards cost nothing,
-    // which is the whole point of scoping the request to the page.
+    // The negative half stated against the same set.
     assert.equal(
       cards.slice(25).some((card) => requested.has(card.id)),
       false,
@@ -496,17 +420,6 @@ describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 
 });
 
 // -- THE WIDENED MEMBERSHIP COHORT (issue 1371) -----------------------------------------------
-//
-// The one route in the product to adopt a world component into a crafting system, and the state
-// that made the sibling Tool Rules list ship it unreachable: three places asked "is there anything
-// on this screen" and all three answered with the RAW `itemCards` prop, while the counts, the
-// list, the pager and the result summary were all computed over the widened cohort. For a system
-// that has adopted nothing the two disagree the moment the segment moves - the toolbar reads three
-// rows over a body drawing the zero state, because `itemCards.length === 0` is true and stays true
-// whatever the segment says.
-//
-// SO THE CRITERION IS THE COHORT'S ZERO POINT, not a populated library. On a populated one the
-// gate and the cohort agree and the defect is invisible.
 describe('ComponentsBrowserView world cohort (issue 1371)', () => {
   const WORLD_SYSTEMS = [{ id: 'sys-1', name: 'Forge' }];
 
@@ -527,14 +440,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     });
   }
 
-  /**
-   * A world corpus of `count` records, NONE of which this system has a record for.
-   *
-   * A parameterised sibling of `ghostScope()` above rather than a widening of it: every existing
-   * assertion in this block is written against those three named records, and the paging
-   * assertions need a cohort that spans a page boundary. Zero-padded names so the list order is
-   * also numeric order.
-   */
+  /** A world corpus of `count` records, NONE of which this system has a record for. */
   function wideGhostScope(count) {
     return projectComponentScope({
       entityType: 'component',
@@ -558,9 +464,6 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
 
   it('counts each cohort on its own segment, in the mono badge', async () => {
     // THE CONTROL IS A TWO-SEGMENT TRACK since issue 1371's parity round 4 (gap-list row 145).
-    // The `<select>` it replaced carried a third option, `Overriding`, that the reference draws
-    // nowhere: it was a PREDICATE over the member cohort rather than a cohort of its own, which
-    // is why it alone could carry no count.
     const root = await browser.mount({
       itemCards: [],
       scope: ghostScope(),
@@ -612,9 +515,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
   });
 
   it('draws a ghost as the SAME row, dimmed and stated', async () => {
-    // Gap-list row 146. The ghost used to be a two-line stub — name, "No rules in this system
-    // yet", and a filled green `+ Add`. The reference keeps every part of the member row and
-    // states the difference, so each of these five is a part the stub had dropped.
+    // Gap-list row 146. The ghost used to be a two-line stub — name.
     const root = await browser.mount({
       itemCards: [],
       scope: ghostScope(),
@@ -657,15 +558,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
   });
 
   it("a ghost's identity opens the world catalogue entry, not an in-system selection", async () => {
-    // `onSelectComponent` writes `selectedComponentId`, which the inspector resolves against THIS
-    // SYSTEM's row set — and a ghost has no row there by definition. Wiring the ghost's identity
-    // to it EMPTIED the inspector: whatever was selected vanished and nothing replaced it, so the
-    // click read as a control that visibly does nothing. The world catalogue entry is where that
-    // record's name, art and description are authored, so it is the destination the click implied.
-    //
-    // BOTH props are passed, and both are asserted, because the defect is not "nothing happens" —
-    // it is "the WRONG one fires". A test that only watched the navigation would stay green if the
-    // selection fired alongside it and emptied the panel anyway.
+    // `onSelectComponent` writes `selectedComponentId`.
     const opened = [];
     const selected = [];
     const root = await browser.mount({
@@ -691,12 +584,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
   });
 
   it("a MEMBER's identity still selects it in this system", async () => {
-    // The positive control for the test above. Without it, deleting the member branch's
-    // `onSelect: onSelectComponent` — or wiring every row to the navigation — passes.
-    //
-    // MOUNTED WITH THE ROW ALREADY SELECTED (issue 1371 r13-list, M14): the list now selects its
-    // first drawn row on open when nothing is, and that push would land in `selected` before the
-    // click below did. Naming the row as selected keeps the recorder's one entry the CLICK's.
+    // The positive control for the test above. Without it.
     const opened = [];
     const selected = [];
     const root = await browser.mount({
@@ -742,10 +630,6 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     // system holding a few, the widened cohort drew every remaining world component in one column
     // beneath a pager reading `1–10 of 8`. Both halves of that are defects — an unbounded column,
     // and a count describing a different list from the one under it.
-    //
-    // THE FIXTURE IS BIGGER THAN ONE PAGE ON PURPOSE. AC-8's three-ghost fixture cannot see this:
-    // at three ghosts under a 25-row page the unpaginated list and the correct one are the same
-    // list, which is why four gate runs passed over it.
     const root = await browser.mount({
       itemCards: manyGeneral(8),
       scope: wideGhostScope(5),
@@ -796,10 +680,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
   });
 
   it('states the cohort each sentence is true of, and never the other', async () => {
-    // Gap-list rows 106 and 145. The count read `1-23 of 23 · 44 not in this system` — one range
-    // over the MEMBER page beside a second number about a different cohort. The reference writes
-    // one sentence per cohort: `{shown} of {total} catalogue entries` in this system, and
-    // `{shown} shown · {mine} of {all} in this system` once the corpus is widened.
+    // Gap-list rows 106 and 145. The count read `1-23 of 23 · 44 not in this system`.
     const root = await browser.mount({
       itemCards: [makeComponent({ id: 'own', name: 'Bloom Ash' })],
       scope: ghostScope(),
@@ -820,17 +701,6 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
 });
 
 // ── WHAT THE LIST HEAD NO LONGER DRAWS (issue 1371, parity round 4) ──────────────────────────
-//
-// Gap-list rows 101 and 105. This pane opened with a `SharedDefinitionCallout` — the component's
-// name, a `World definition` pill and an `Edit shared definition` exit — and a centred
-// `N inherit the world category · M override it` line. The reference draws that callout on the
-// rules EDITOR only, and puts its content on THIS screen in the inspector's `Shared identity`
-// card; the summary line has no counterpart anywhere. A card in the wrong screen is the exact
-// class the parity inventory exists to name, so its ABSENCE here is the assertion.
-//
-// This is a removal, so it needs a positive control beside it or it passes on an empty tree: the
-// fixture below is the one the round-2 suite used to prove the banner PRESENT — a real member
-// scope with a selected component — and the rows it produces are asserted to render.
 describe('ComponentsBrowserView list head (issue 1371, parity round 4)', () => {
   const SYSTEMS = [{ id: 'sys-1', name: 'Forge' }];
 
@@ -889,22 +759,11 @@ describe('ComponentsBrowserView list head (issue 1371, parity round 4)', () => {
 });
 
 // ── C7. THE SYSTEM RULES LIST'S INSPECTOR (issue 1371, parity round 4) ────────────────────────
-//
-// `proto:1247-1275`, gap-list rows 117-123. The panel that shipped was a name, two stat tiles, a
-// source register and a FOUR-BUTTON stack; the reference draws a kicker, one identity line whose
-// subline states both numbers, four named blocks and a PINNED foot carrying one primary, with the
-// remaining commands behind a kebab. Every claim below is a part that anatomy either gained or
-// lost, and the panel had no mounted coverage at all before this suite.
-//
-// A SECOND HARNESS in this file rather than a second file: the inspector is this browser's
-// inspector — it is mounted by the shell into the same route — and `createComponentScopeHarness`
-// is the shared factory precisely so a second suite does not restate the manifest.
 const inspector = createComponentScopeHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-inspector-',
   componentPath: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
   // The overlay closure the kebab binds, and the category vocabulary the `Category` block reads.
-  // An omission here HANGS the suite (`# cancelled`) rather than failing it.
   rawExtras: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/actionMenuLayout.js'],
   compiledExtras: [
     'src/ui/svelte/components/ActionMenu.svelte',
@@ -964,9 +823,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   }
 
   it('opens on the kicker and ONE identity line, not on a pair of stat tiles', async () => {
-    // Gap-list rows 117 and 118. There was no kicker, the name read at 21.6px/700, and the two
-    // numbers the subline states were also drawn as `1 Tags` / `1 Essences` tiles beside it — the
-    // same fact three times, over a panel that is about to list both.
+    // Gap-list rows 117 and 118. There was no kicker, the name read at 21.6px/700.
     const root = await mountCoal();
 
     assert.equal(
@@ -976,8 +833,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     assert.equal(root.querySelector('.manager-component-inspector-name').textContent.trim(), 'Coal');
     assert.equal(
       root.querySelector('[data-component-inspector-subline]').textContent.trim(),
-      // `fuel` (world, unmuted) and `sooty` (this system's own); `bulk` is muted here and is not
-      // in effect, which is the same arithmetic the split counter states below.
+      // `fuel` (world, unmuted) and `sooty` (this system's own).
       '2 tags · 1 essence',
       'the subline states BOTH counts, which is what retires the tiles'
     );
@@ -1007,9 +863,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   });
 
   it('withholds that card for a component the world corpus does not hold', async () => {
-    // The negative control for the assertion above: without it, a card that never rendered at all
-    // would satisfy nothing and a card that ALWAYS rendered would claim a shared identity for a
-    // record that has none.
+    // The negative control for the assertion above: without it.
     const root = await mountCoal({ worldEntry: null });
     assert.ok(!root.querySelector('[data-component-shared-identity]'));
     assert.ok(
@@ -1019,9 +873,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   });
 
   it('states tags in effect as a SPLIT, and drops a tag this system mutes', async () => {
-    // Gap-list row 120. `bulk` is a world tag `sys-forge` mutes, so it is not in effect here and
-    // is neither listed nor counted; `fuel` is, and `sooty` is the system's own. A block titled
-    // "Tags in effect" that listed the union would be naming something else.
+    // Gap-list row 120. `bulk` is a world tag `sys-forge` mutes.
     const root = await mountCoal();
 
     assert.deepEqual(
@@ -1064,11 +916,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   });
 
   it('inks a WORLD tag blue and the system\u2019s OWN tag purple, as both screens do', async () => {
-    // `proto:5663` inks a world tag blue and `proto:5665` inks the system's own purple, which is
-    // the same pairing the rules editor's two runs use one route away. This panel had it the
-    // other way round — world purple, own neutral — so the two component screens disagreed about
-    // what purple means, and the split counter above the run was the only thing saying which was
-    // which. `is-info` and `is-tag` are `Chip`'s families for exactly those two colours.
+    // `proto:5663` inks a world tag blue and `proto:5665` inks the system's own purple.
     const root = await mountCoal();
     const chip = (tag) => root.querySelector(`[data-component-tag="${tag}"]`);
 
@@ -1087,15 +935,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   });
 
   it('and draws BOTH halves of the run at the primitive’s INSPECTOR scale', async () => {
-    // `proto:5663` and `proto:5665` draw the two halves at ONE geometry — `padding: 3px 9px`,
-    // a stadium corner, `600 10px` — while inking them differently, which is the whole shape of
-    // this run: one size, two origins. The default chip is that height (a 10px face in an
-    // unauthored line box is ~12px, so 3 + 12 + 3 is the base rule's 20px floor) but not that
-    // weight, corner or inset: it is 700 at `--fab-space-chip` with a 10px radius.
-    //
-    // `density="inspector"` is the primitive's name for exactly that — the default pill spoken
-    // more quietly — and it is asserted on BOTH chips because a density applied to one half
-    // would draw the run at two sizes and read as the origin split it is not.
+    // `proto:5663` and `proto:5665` draw the two halves at ONE geometry.
     const root = await mountCoal();
     const chip = (tag) => root.querySelector(`[data-component-tag="${tag}"]`);
 
@@ -1118,10 +958,6 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
     // to a panel-local class and never wrote the replacement, so the one thing on this screen a
     // GM has to act on rendered as unstyled body text. Nothing failed, because a class with no
     // rule behind it is invisible to every gate that reads the markup alone.
-    //
-    // So the class is read OFF THE RENDERED NODE and looked up in the sheet: renaming it in the
-    // component reds this, and deleting the rule reds it too, which neither a hard-coded selector
-    // nor a mounted-only check can both do.
     const root = await mountCoal({ selectedComponent: selectedCoal({ sourceMissing: true }) });
     const warning = root.querySelector('[data-component-source-missing]');
     assert.ok(Boolean(warning), 'the remediation paragraph renders in the dangling-link state');
@@ -1142,8 +978,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   });
 
   it('pins ONE primary in the foot and moves the rest behind a kebab', async () => {
-    // Gap-list row 123. Four buttons — Edit component, Copy source UUID, Unlink, Delete — scrolled
-    // inline with the body and gave four commands equal weight where the reference pins one.
+    // Gap-list row 123. Four buttons — Edit component, Copy source UUID, Unlink, Delete.
     const opened = [];
     const root = await mountCoal({ onEditSystemRules: (...args) => opened.push(args) });
     const foot = root.querySelector('[data-component-inspector-foot]');
@@ -1165,10 +1000,7 @@ describe('ComponentBrowserInspector — the reference anatomy (issue 1371, parit
   });
 
   it('heads the salvage block with `Salvage in` and the system name as its OWN node (issue 1371 r12-list)', async () => {
-    // `proto:1263` draws `Salvage in {{ d.sysName }}`: the caption and the name are two text nodes
-    // of one line, and the parity inventory keys the caption on its own. The subject folded both
-    // into one string, so its normalised key never matched. The name is wrapped, and the whole
-    // line is byte-identical to what it read before, so a screen reader hears the same sentence.
+    // `proto:1263` draws `Salvage in {{ d.sysName }}`.
     const root = await mountCoal();
     const label = root.querySelector('[data-component-salvage-label]');
     assert.ok(Boolean(label), 'the heading renders');
@@ -1192,23 +1024,6 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
    * (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44, with 32 / 36 / 40 retired), so nothing
    * licensed the drop; ruling M12b made the rung reachable on the shared primitives and this bar
    * is one of the two consumers.
-   *
-   * WHAT THESE ASSERTIONS ARE FOR, given that `manager-control-rungs.test.js` already pins the
-   * RULE. That file proves the sheet paints 38px and the band's 9px corner for
-   * `.manager-search.is-size-38 input` and for a toolbar `select.is-size-38`. It cannot see
-   * whether anything reaches those rules, and the opt-in has two silent ways to miss:
-   *
-   *  - the field takes a PROP whose value is checked against a closed set, so `size="38px"` or
-   *    `size={38.0}` renders the shipped 34px control with no error at all — by design, and
-   *    invisible to a className read that only asks whether the field exists;
-   *  - the selects take the CLASS DIRECTLY, and the sheet's host for it is `.manager-toolbar
-   *    select.is-size-38`. This bar wears `manager-toolbar` only because it is a
-   *    `<ManagerToolbar>`; converted back to a bare `<div class="manager-component-toolbar">`
-   *    the class would stay in the markup, keep every `data-*` selector resolving, and paint
-   *    nothing.
-   *
-   * So each control is reached through the SHEET'S OWN SELECTOR rather than by reading a class
-   * list, and the resolved node is then asserted to be this bar's control.
    */
   const FIELD_SELECTOR = '.manager-search.is-size-38 input';
   const SELECT_SELECTOR = '.manager-toolbar select.is-size-38';
@@ -1235,9 +1050,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     const field = root.querySelector(FIELD_SELECTOR);
     assert.ok(Boolean(field), `the toolbar search resolves through \`${FIELD_SELECTOR}\``);
     assert.ok(
-      // `:scope` here and not on the two constants above, which are the sheet's own selector
-      // text verbatim and stay that way. Without it a leading `[data-component-search]` is free
-      // to match an input inside the root whose LABEL is outside it.
+      // `:scope` here and not on the two constants above.
       field === root.querySelector(':scope [data-component-search] input'),
       'and it is this bar’s own search input, not another field that happens to carry the rung'
     );
@@ -1272,7 +1085,6 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
     // difference measured as three `compare` lines on this row — `borderTopWidth`,
     // `borderTopStyle` and `borderTopColor`. `Medallion`'s `variant="glyph-chip"` was BUILT for
     // this site and named it, and was wired at one of the three sites it was built for.
-    //
     // Asserted through the class the variant emits rather than through a computed style, because
     // the rule lives in the primitive's own scoped block and a mounted tree carries no sheet: the
     // class IS the seam between the caller and the paint, and its rule is pinned where the
@@ -1282,8 +1094,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
       categoryVocabulary: ['Metal', 'Herb'],
       selectedSystemId: 'sys-1',
     });
-    // `:scope` so the query cannot climb out of the mount root, and so this line adds no ESLint
-    // problem to a file `npm run lint` does not cover and therefore never cleans up.
+    // `:scope` so the query cannot climb out of the mount root.
     const chips = [...root.querySelectorAll(':scope .manager-component-row .fab-medallion')];
     assert.ok(chips.length > 0, 'the rows draw their chips, so the loop below is not vacuous');
     for (const chip of chips) {
@@ -1295,10 +1106,7 @@ describe('ComponentsBrowserView toolbar control rungs (issue 1371, ruling M12b)'
   });
 
   it('and the bar still wears `manager-toolbar`, which is what makes that host real', async () => {
-    // Non-vacuity for the selector above: it is two classes and an element, and the FIRST class
-    // is the shared primitive's, not this screen's. A bar that stopped being a `<ManagerToolbar>`
-    // would take both assertions above down with it — which is the point — but it would read as
-    // a markup change with no styling consequence, so the join is named here once.
+    // Non-vacuity for the selector above: it is two classes and an element.
     const root = await browser.mount({
       itemCards: metalWithFire(),
       categoryVocabulary: ['Metal', 'Herb'],
@@ -1449,11 +1257,6 @@ describe('ComponentsBrowserView auto-selects the first SHOWN row (issue 1371 r13
    * `manager-components-normal` frame at `60e035d2` shows what the ruling closes — the inspector
    * describing `Iron Ore`, the manager's STORED-first card, while the list's first row is
    * `Chainmail Shirt` and no row is marked at all.
-   *
-   * THREE ROWS WITH THREE DIFFERENT "FIRST" ANSWERS, so the pick's basis is decidable from the
-   * id it pushes: `zinc` is authored first (the stored order the root's fallback read), `alloy`
-   * is first by name over the whole library (a flat name sort), and `coal` is first in the order
-   * the body DRAWS — category-major (`Raw` before `Refined`, `general` last), name within.
    */
   function threeFirsts() {
     return [
@@ -1542,8 +1345,7 @@ describe('ComponentsBrowserView auto-selects the first SHOWN row (issue 1371 r13
     assert.deepEqual(rowIds(root), ['zinc', 'coal', 'alloy'], 'the flip really re-ordered the rows');
     assert.deepEqual(selected, [], 'a re-sort moves the list, not the selection');
 
-    // A filter that hides the selected row: it is still a component this system holds, so the
-    // panel keeps describing it rather than snapping to whatever is drawn first.
+    // A filter that hides the selected row: it is still a component this system holds.
     const filter = root.querySelector('[data-component-category-filter]');
     const refined = [...filter.options].find((option) => /Refined/.test(option.textContent));
     assert.ok(Boolean(refined), 'the filter offers the Refined category');
@@ -1562,8 +1364,7 @@ describe('ComponentsBrowserView auto-selects the first SHOWN row (issue 1371 r13
   });
 
   it('re-selects when the selection names no row this system holds', async () => {
-    // The root clears its id to `` on a system switch; a deleted or unlinked selection leaves a
-    // dangling one. Both are the same state to this effect: nothing this cohort holds is selected.
+    // The root clears its id to `` on a system switch.
     const { selected } = await mountWithRecorder({ selectedComponentId: 'gone' });
     assert.deepEqual(selected, ['coal'], 'the first drawn row is selected in the new cohort');
   });

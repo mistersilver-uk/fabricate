@@ -1,23 +1,4 @@
-/**
- * The Checks Studio's odds enumerator (issue 1097).
- *
- * TWO THINGS ARE GRADED HERE AND THEY ARE GRADED DIFFERENTLY.
- *
- * The PREDICATE is graded against `Roll.parse` output RECORDED from a real Foundry 14.365
- * build (`tests/helpers/recordedRollParse.js`) rather than against a double this branch
- * also wrote. That distinction is the whole point: a double looser than core produces
- * false passes, which is the direction nothing notices under `npm test`, and the lab's own
- * `Roll.validate` double is already known to accept formulas real Foundry rejects.
- *
- * The VIEW LAB DOUBLE is then graded against that same recording, term field by term
- * field, so the lab and the live client cannot disagree about what a formula parses to.
- *
- * Every refusal asserts ITS OWN reason code. A shared "not enumerable" observable would
- * let a predicate implemented as `return false` pass every negative case, which is exactly
- * what BM5 says to prevent — so the accepting set below is not two bare-remainder
- * formulas either: it carries a resolvable `@` key and a pair of flavoured appended terms,
- * which is the shape every real previewed formula has after issue 1094.
- */
+/** The Checks Studio's odds enumerator (issue 1097). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -48,15 +29,7 @@ function describe14365(formula, actor = ACTOR) {
   return describeFormulaEnumerability(formula, actor, { Roll: REAL });
 }
 
-/**
- * The View Lab's own `Roll`, which parses ANY formula rather than replaying a recording.
- *
- * The bucketing suites below need spaces the recording does not hold (`1d20 + 100`), and
- * they must not hand-build a `{ total, diceGroups }` list to get one: a bag spelled by hand
- * is exactly the second model this module refuses to keep. This double is graded against the
- * recording by `the View Lab Roll double agrees with the recorded 14.365 output`, so a space
- * taken through it is a space taken through the production enumerator.
- */
+/** The View Lab's own `Roll`, which parses ANY formula rather than replaying a recording. */
 const LAB_ROLL = createLabRoll({
   random: () => 0.5,
   replaceFormulaData: REAL.replaceFormulaData,
@@ -99,10 +72,8 @@ describe('checkOdds: the positive whitelist, graded against recorded Foundry 14.
   });
 
   it('accepts the flavoured appended terms every REAL previewed formula carries', () => {
-    // After issue 1094 the preview formula is the authored one plus `+ N[Tools]` and
-    // `+ N[Modifiers]`. A predicate that mishandled a flavoured constant would refuse
-    // every real formula while passing a hand-typed pair, so this case is taken from
-    // `buildPreviewCheckArgs`'s OWN output rather than typed here.
+    // After issue 1094 the preview formula is the authored one plus `+ N[Tools]` and `+
+    // N[Modifiers]`.
     const plan = buildPreviewCheckArgs({
       activity: 'crafting',
       mode: 'simple',
@@ -145,18 +116,14 @@ describe('checkOdds: the positive whitelist, graded against recorded Foundry 14.
   });
 
   it('ENUMERATES A DIE INSIDE A FUNCTION, which is what a bounded check modifier is', () => {
-    // THE CASE THIS ENUMERATOR WAS REBUILT FOR. A rolling check modifier's bounds are
-    // expressed IN the formula — `min(max((1d8), -1), 6)[Modifiers]` — so every system with
-    // one authored a formula whose dice are not all top-level. `RollParser.flattenTree`
-    // pushes a function term WHOLE, so the old top-level determinism test refused the lot.
+    // THE CASE THIS ENUMERATOR WAS REBUILT FOR.
     const verdict = describe14365('1d20 + min(max((1d8), -1), 6)[Modifiers]');
     assert.equal(verdict.enumerable, true, `enumerable (got ${verdict.reason})`);
     assert.deepEqual(verdict.dice, [{ faces: 20 }, { faces: 8 }], 'BOTH dice, in reading order');
     assert.equal(verdict.faces, null, 'and no single face count, because there is no one die');
     assert.equal(verdict.combinations, 160);
-    // THE CLAMP IS APPLIED, not merely parsed around: the `1d8` contributes 1..6, so the
-    // domain is `1+1 .. 20+6`. A string scan reads the bound arguments `-1` and `6` as flat
-    // addends and answers `7 .. 33` — monotone, correctly shaped and wrong by five.
+    // THE CLAMP IS APPLIED, not merely parsed around: the `1d8` contributes 1..6, so the domain is
+    // `1+1 .. 20+6`.
     assert.deepEqual(domainOf(verdict), { min: 2, max: 26 });
   });
 });
@@ -187,10 +154,8 @@ describe('checkOdds: every refusal carries its OWN reason code', () => {
   }
 
   it('ACCEPTS the three shapes that used to be refused for holding dice in a container', () => {
-    // The counter-list to the table above, and the point of it: `multiple-die-groups` is
-    // retired, and `max(1d20,5)`, `1d20 + 1d6` and `{1d20,1d12}kh` are all exactly
-    // enumerable. Each is checked by its DOMAIN rather than by the verdict flag, so a
-    // predicate that said yes and then charted the wrong space would fail here.
+    // The counter-list to the table above, and the point of it: `multiple-die-groups` is retired,
+    // and `max(1d20,5)`, `1d20 + 1d6` and `{1d20,1d12}kh` are all exactly enumerable.
     const clamped = describe14365('max(1d20,5)');
     assert.deepEqual(domainOf(clamped), { min: 5, max: 20 }, 'the floor is applied');
     const two = describe14365('1d20 + 1d6');
@@ -201,12 +166,8 @@ describe('checkOdds: every refusal carries its OWN reason code', () => {
   });
 
   it('refuses a space too large to walk, rather than sampling one', () => {
-    // A cap is a REFUSAL with a stated reason, because a sampled histogram is the
-    // approximation this whole module exists to avoid. `1d100 + 1d100 + 1d100` is a million
-    // assignments; the two-die case beneath the cap proves the refusal is the SIZE and not
-    // the die count.
-    // The pair BRACKETS the cap: 10 000 assignments are walked and 1 000 000 are refused, so
-    // neither arm can pass on a cap that has been moved.
+    // A cap is a REFUSAL with a stated reason, because a sampled histogram is the approximation
+    // this whole module exists to avoid.
     assert.equal(spaceOf('1d100 + 1d100').combinations, 10_000);
     assert.deepEqual(
       describeFormulaEnumerability('1d100 + 1d100 + 1d100', ACTOR, {
@@ -324,9 +285,8 @@ const routedArgs = (overrides = {}) => ({
 
 describe('checkOdds: routed bucketing matches a hand-computed distribution', () => {
   it('buckets a plain 1d20 against DC 12 exactly as the thresholds say', () => {
-    // Thresholds are 2 / 7 / 12 / 17 / 22 with `clampToNearest`, so totals 1–6 clamp to
-    // Ruined, 7–11 are Flawed, 12–16 Success, 17–21 Fine, 22+ Masterwork. With no
-    // remainder the totals ARE the faces: 6 / 5 / 5 / 4 / 0.
+    // Thresholds are 2 / 7 / 12 / 17 / 22 with `clampToNearest`, so totals 1–6 clamp to Ruined,
+    // 7–11 are Flawed, 12–16 Success, 17–21 Fine, 22+ Masterwork.
     const rows = enumerateRoutedOdds({ outcomes: spaceOf('1d20').outcomes, args: routedArgs() });
     assert.deepEqual(
       rows.map((row) => [row.id, row.count, row.percent]),
@@ -401,10 +361,9 @@ describe('checkOdds: the per-face dice bag comes from the production code path',
   });
 
   it('fails when the bag drops `results`, which is what makes the trigger visible at all', () => {
-    // The negative control for B12. `resolveForcedOutcome` reads `data.diceGroups[].results`
-    // for an `anyDie` aggregate, so a bag missing that key makes every per-die trigger
-    // invisible — while STILL matching a hand-computed distribution for a trigger-free
-    // check. This asserts the difference is observable rather than trusting that it is.
+    // The negative control for B12. `resolveForcedOutcome` reads `data.diceGroups[].results` for an
+    // `anyDie` aggregate, so a bag missing that key makes every per-die trigger invisible — while
+    // STILL matching a hand-computed distribution for a trigger-free check.
     const withResults = resolveForcedOutcome(NAT_TRIGGERS, {
       total: 25,
       diceGroups: [{ groupId: 0, group: '1d20', sum: 20, results: [20] }],

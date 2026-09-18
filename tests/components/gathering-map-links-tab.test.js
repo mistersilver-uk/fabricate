@@ -72,8 +72,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     assert.match(first.querySelector('.manager-map-link-name').textContent, /Northwood/);
     assert.match(first.querySelector('.manager-map-link-swatch').getAttribute('style'), /#1a9c4f/);
     assert.equal(first.dataset.managerMapRegionUuid, 'Scene.s1.Region.a');
-    // Each row carries its own link picker; the linked row shows the region name,
-    // the unlinked row reads "Not linked".
+    // Each row carries its own link picker.
     assert.match(first.querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Verdant/);
     assert.match(rows()[1].querySelector('.manager-map-link-picker-cell .manager-map-link-trigger').textContent, /Not linked/);
     harness.remount();
@@ -92,9 +91,7 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     flushSync();
     await tick();
     flushSync();
-    // The options live in the PORTALED panel, which hangs off the application root rather than
-    // off the row that opened it (issue 1466). Only one picker is open, so scoping to the mount
-    // is exact.
+    // The options live in the PORTALED panel.
     const option = Array.from(harness.target.querySelectorAll('.manager-travel-option'))
       .find(node => /Verdant/.test(node.textContent));
     assert.ok(option, 'the Verdant option should be present');

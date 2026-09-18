@@ -1,12 +1,7 @@
 /**
- * Tests for the 1.12.0 migration
- * (src/migration/migrateVisibilityModeEnum.js): deriving the flat
- * `visibilityMode` enum from the legacy `recipeVisibility.listMode` +
- * `knowledge.mode` pair, idempotency, purity, non-array safety, and a
- * `_normalizeSystem` round-trip.
- *
- * node:test + node:assert/strict. Pure function; Foundry globals only for the
- * normalizer round-trip.
+ * Tests for the 1.12.0 migration (src/migration/migrateVisibilityModeEnum.js): deriving the flat
+ * `visibilityMode` enum from the legacy `recipeVisibility.listMode` + `knowledge.mode` pair,
+ * idempotency, purity, non-array safety, and a `_normalizeSystem` round-trip.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

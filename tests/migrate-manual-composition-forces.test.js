@@ -1,16 +1,4 @@
-/**
- * Issue 1315 — 1.29.0: force add belongs to AUTOMATIC composition mode.
- *
- * Manual mode composes exactly the library-enabled records in `enabled*Ids`, so a manual
- * environment has no filter left for a force to override. Force add nevertheless RENDERS in
- * manual mode in every shipped version — that is the defect 1315 reports — so real worlds
- * hold manual environments whose composed records live only in `forced*Ids`. This migration
- * folds those into the picked lists before the rule changes under them, and then clears every
- * force list in the world.
- *
- * These cover the pure transform, the runner registration and version gate, the SECOND
- * ingress (an export bundle upcast on import), and the View Lab world as a real corpus.
- */
+/** Issue 1315 — 1.29.0: force add belongs to AUTOMATIC composition mode. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -28,11 +16,8 @@ import { environmentComposesRecord } from '../src/systems/gatheringComposition.j
 const CURRENT_EXPORT_SCHEMA = migrateExportPayload({}).schemaVersion;
 
 /**
- * A manual environment whose picked and forced lists both carry entries, so one fixture
- * exercises the append, the order and the clear at once.
- *
- * @param {object} [overrides]
- * @returns {object}
+ * A manual environment whose picked and forced lists both carry entries, so one fixture exercises
+ * the append, the order and the clear at once.
  */
 function manualEnvironment(overrides = {}) {
   return {
@@ -51,12 +36,9 @@ function manualEnvironment(overrides = {}) {
 }
 
 /**
- * The `{ enabled*, forced* }` projection of an environment — what this migration is about,
- * with the identity and display fields that it must never touch dropped so a failure reads
- * as the composition change it is.
- *
- * @param {object} environment
- * @returns {object}
+ * The `{ enabled*, forced* }` projection of an environment — what this migration is about, with the
+ * identity and display fields that it must never touch dropped so a failure reads as the
+ * composition change it is.
  */
 function compositionKeys(environment) {
   const picked = {};
@@ -79,7 +61,6 @@ function compositionKeys(environment) {
  * Drive the real registry through the real runner over an in-memory setting store.
  *
  * @param {object} [initial] Seed settings, merged over the empty-world defaults.
- * @returns {{ store: Map<string, any>, writes: string[], run: () => Promise<object> }}
  */
 function makeLadder(initial = {}) {
   const store = new Map(
@@ -108,9 +89,7 @@ function makeLadder(initial = {}) {
 const environmentsById = (store) =>
   new Map(store.get('gatheringEnvironments').map((environment) => [environment.id, environment]));
 
-// ---------------------------------------------------------------------------
 // The fold, on manual environments
-// ---------------------------------------------------------------------------
 
 test('1.29.0 folds a manual environment’s force lists into its picked lists and clears them', () => {
   const { environments, migratedCount } = applyManualCompositionForceFold([manualEnvironment()]);
@@ -165,14 +144,11 @@ test('1.29.0 preserves the force list’s own order when it folds more than one 
   assert.deepEqual(migrated.enabledTaskIds, ['task-c', 'task-a', 'task-b']);
 });
 
-// ---------------------------------------------------------------------------
 // The mode predicate — strict `=== 'manual'`, everything else is automatic
-// ---------------------------------------------------------------------------
 
 test('1.29.0 treats every non-manual mode shape as automatic: it clears, and never folds', () => {
   // Strict equality, matching `resolveGatheringCompositionMode` and the store's
-  // `VALID_COMPOSITION_MODES` gate. Reading any of these as manual would fold force entries
-  // into a list automatic mode ignores, silently GAINING the environment a record.
+  // `VALID_COMPOSITION_MODES` gate.
   const shapes = [
     ['absent', {}],
     ['undefined', { compositionMode: undefined }],
@@ -193,9 +169,7 @@ test('1.29.0 treats every non-manual mode shape as automatic: it clears, and nev
   }
 });
 
-// ---------------------------------------------------------------------------
 // Nothing to do — returned by reference
-// ---------------------------------------------------------------------------
 
 test('1.29.0 returns an environment with no force entries BY REFERENCE, migratedCount 0', () => {
   // Copy-on-write is what keeps an upgrade from rewriting the environment list of every world
@@ -260,9 +234,7 @@ test('1.29.0 never CREATES a picked list a fold could not populate', () => {
   assert.ok(!('forcedTaskIds' in migrated), 'the force list is still cleared');
 });
 
-// ---------------------------------------------------------------------------
 // Malformed input, permutation, idempotency
-// ---------------------------------------------------------------------------
 
 test('1.29.0 tolerates junk in a force list without throwing', () => {
   const [migrated] = applyManualCompositionForceFold([
@@ -327,9 +299,7 @@ test('the runner adapter returns only the environments key, and omits it when th
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // Registered in the runner, and reached
-// ---------------------------------------------------------------------------
 
 test('the runner runs 1.29.0 from 1.28.0 and bumps the version', async () => {
   // Starts at 1.28.0, the version immediately below, so the assertions below measure this
@@ -423,9 +393,7 @@ test('1.29.0 composes with the 1.0.0 hazard rename, which is what produces its i
   assert.ok(!('forcedHazardIds' in migrated));
 });
 
-// ---------------------------------------------------------------------------
 // The second ingress: an export bundle upcast on import
-// ---------------------------------------------------------------------------
 
 test('the export upcast applies the SAME fold, on a current-schema bundle', () => {
   // Branch-independent: every bundle the shipping build writes carries the current schema, so
@@ -444,11 +412,7 @@ test('an automatic force list composed NOTHING before the upgrade, so clearing i
   // The migration's label promises a GM that no environment loses or gains a composed record, and
   // the automatic half of that promise rests on a claim about the ENGINE, not about the editor:
   // "force add never rendered in automatic mode" is a statement about the control, and a reader
-  // could reasonably wonder whether the engine honoured a force list anyway. It did not.
-  //
-  // Captured from the rule as it stood at be04f069, the commit this branch is based on:
-  //   automatic: matches && !disabled          — `forced*Ids` is not consulted at all
-  //   manual:    forced || (matches && enabled)
+  // could reasonably wonder whether the engine honoured a force list anyway.
   const composedBefore = (environment, record, mode, matches) => {
     const id = String(record.id);
     const list = (key) => (Array.isArray(environment[key]) ? environment[key].map(String) : []);
@@ -523,15 +487,9 @@ test('the export upcast reaches the same fixed point as the world migration', ()
   );
 });
 
-// ---------------------------------------------------------------------------
-// The View Lab world, as a real corpus
-//
-// It already holds two manual environments whose ENTIRE composed task set lives in their
-// force lists, which is exactly the shape this migration exists for. The expectations below
-// were CAPTURED from the pre-change engine — `environmentComposesRecord` at `be04f069`, run
-// over `buildLabContent()` — rather than derived from the code they test, and they are pinned
-// as literals so that the engine flip landing in a sibling lane cannot move them.
-// ---------------------------------------------------------------------------
+// The View Lab world, as a real corpus. It already holds two manual environments whose ENTIRE
+// composed task set lives in their force lists, which is exactly the shape this migration exists
+// for.
 
 const LAB_COMPOSED_BEFORE = Object.freeze({
   'hb-env-thicket': {

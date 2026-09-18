@@ -1,17 +1,7 @@
 /**
- * Issue 561 — focused unit coverage for `itemIsToolByDurableIdentity`, the narrow
- * durable-identity predicate that gates destructive/consumptive TOOL selection (superseding
- * the component-scoped #557 gate). It accepts the durable-flag tier (`roles[sys].toolId`) and
- * the item's OWN uuid/compendium source, but EXCLUDES the transitive `_stats.duplicateSource`
- * reference and the name fallback that the wider `resolveToolForItem` presence matcher honours.
- *
- * Migrated from the `itemIsComponentByDurableIdentity` coverage (which was removed as dead code
- * once its only caller retargeted onto tool identity): the legacy-scalar tier-2 case is DROPPED
- * (tools have `legacyScalarKey: null` — no legacy scalar flag), and the vacuity-contrast case is
- * carried over to `itemResolvesToTool` so a predicate that returns false for everything cannot pass.
- *
- * A namespace import keeps the RED-on-main verification per-test: on pristine `main` the export
- * is absent (undefined) so each call throws and these tests fail.
+ * Issue 561 — focused unit coverage for `itemIsToolByDurableIdentity`, the narrow durable-identity
+ * predicate that gates destructive/consumptive TOOL selection (superseding the component-scoped
+ * #557 gate).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

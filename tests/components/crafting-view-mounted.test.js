@@ -44,9 +44,7 @@ describe('CraftingView mounted behavior', () => {
   });
 
   it('announces the loading root as busy, and does not once the view is ready', async () => {
-    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
-    // stops rendering it passes every source-text reader. The negative half matters as much —
-    // an attribute that is always there says nothing about the state it describes.
+    // Asserted on the RENDERED DOM (issue 1514).
     const loading = await harness.mount({
       services: services(fakeCraftingStore({ loading: true, loadedOnce: false, recipes: [] })),
     });
@@ -118,9 +116,7 @@ describe('CraftingView mounted behavior', () => {
     assert.equal(target.querySelector('[data-crafting-shopping]'), null, 'shopping list hidden while the run summary is shown');
   });
 
-  // Issue 1648: a failed CHECK now records an outcome too, so the same swap happens and the
-  // box must paint the FAILURE tone rather than the success one. happy-dom cannot compute the
-  // cascade, so this reads the rendered hooks the CSS keys off directly.
+  // Issue 1648: a failed CHECK now records an outcome too.
   it('paints the run summary as a failure when the recorded outcome is a failed check', async () => {
     const built = recipe();
     const store = fakeCraftingStore({
@@ -194,10 +190,6 @@ describe('CraftingView mounted behavior', () => {
   });
 
   // ── Issue 917: requirement rail wiring ────────────────────────────────────
-  //
-  // These prove the view's OWN decisions — which step's rail is interactive, and
-  // that the store's callbacks are actually reached. Both are invisible to the rail's
-  // own suite, which is handed its props directly.
 
   function railRecipe(overrides = {}) {
     return recipe({
@@ -221,8 +213,7 @@ describe('CraftingView mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-section="essence-pool"]'), 'the pool auto-opened');
   });
 
-  // A later step's rail describes a craft the button will not fire, and the engine
-  // drops any allocation naming the wrong step, so the rail must not imply otherwise.
+  // A later step's rail describes a craft the button will not fire.
   it('renders the rail read-only when the displayed step is not the active step', async () => {
     const store = fakeCraftingStore({ recipes: [railRecipe({ activeStepId: 'step-2' })] });
     const target = await harness.mount({ services: services(store) });
@@ -230,9 +221,7 @@ describe('CraftingView mounted behavior', () => {
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'), 'no chooser opens');
   });
 
-  // An armed time gate means the inputs were consumed when it was ARMED; a craft
-  // click hits the engine's "still in progress" return and the finish path never
-  // re-resolves ingredients, so the allocation controls would be a lie.
+  // An armed time gate means the inputs were consumed when it was ARMED.
   it('renders the rail read-only while the active step time gate is armed', async () => {
     const store = fakeCraftingStore({
       recipes: [railRecipe({ activeStepTimeGateArmed: true })]
@@ -263,11 +252,6 @@ describe('CraftingView mounted behavior', () => {
   // the Craft button could only refuse. The header now drops the chip and leads its blocking
   // callout with the refusal — worded by the SHARED `journalRunReasonMessage` vocabulary, not a
   // second map — while an available authority leaves the ready state exactly as it was.
-  //
-  // AN UNMAPPED REASON BLOCKS TOO, and that is a reversal. It used to keep the chip, which for an
-  // AVAILABILITY answer is backwards and is exactly what hid `authority-unavailable` for as long
-  // as that code went unmapped: `available === false` means the craft WILL be refused whatever
-  // the code says, so an unwordable one falls back to the generic sentence rather than silence.
   for (const [name, availability, ready] of [
     ['an available authority', { available: true, reason: null }, true],
     ['a refusal it can word', { available: false, reason: 'active-gm-missing' }, false],
@@ -296,36 +280,16 @@ describe('CraftingView mounted behavior', () => {
   }
 });
 
-/**
- * THE CRAFTING TAB'S ADOPTION OF THE SHARED PRIMITIVES, AND THE TWO ROUTINGS IT REFUSED
- * (issue 1514, the fifth and last phase).
- *
- * The refusals are asserted as well as the conversions, because a deferral recorded only in a
- * comment is a deferral the next author reverses without reading it. Each is stated as the
- * measurement that decided it, so a reviewer can re-take the measurement rather than re-argue it.
- */
+/** THE CRAFTING TAB'S ADOPTION OF THE SHARED PRIMITIVES. */
 describe('the crafting tab conversions and the routings they refused (issue 1514)', () => {
-  /**
-   * Source text with COMMENTS REMOVED, in both syntaxes.
-   *
-   * Every refusal below is recorded in a comment beside the markup it refuses for, and each of
-   * those comments NAMES the primitive it declined — so a raw `includes` scan reads the record of
-   * the refusal as the thing it forbids, and the assertion reds on the very sentence that makes
-   * the deferral legible.
-   */
+  /** Source text with COMMENTS REMOVED, in both syntaxes. */
   function code(file) {
     return readFileSync(resolve(repoRoot, file), 'utf8')
       .replaceAll(/<!--[\s\S]*?-->/gu, '')
       .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
   }
 
-  /**
-   * Does `file` IMPORT the named component?
-   *
-   * The sharper form of "draws no shared X", and the one both refusals need: stripping comments
-   * is not enough on its own, because a `//` line comment is prose about the tile a file mirrors
-   * and a substring scan reads every one of them.
-   */
+  /** Does `file` IMPORT the named component? */
   function imports(file, component) {
     return new RegExp(String.raw`import\s+${component}\s+from`, 'u').test(code(file));
   }
@@ -336,9 +300,7 @@ describe('the crafting tab conversions and the routings they refused (issue 1514
   it('leaves both progressive stage tiles raw, because the primitive cannot say `draggable`', () => {
     const stages = code(STAGE_LIST);
     assert.ok(!imports(STAGE_LIST, 'Medallion'), 'the stage list draws no shared tile');
-    // Counted over the `<img>` TAGS that carry the tile's class, not over the file: a third
-    // `draggable="false"` lives on the complication band's own element and would have made a
-    // whole-file count read three for two tiles.
+    // Counted over the `<img>` TAGS that carry the tile's class, not over the file.
     const stageImages = [...stages.matchAll(/<img\b[^>]*crafting-stage-img[^>]*>/gu)].map(
       ([tag]) => tag
     );
@@ -383,20 +345,7 @@ describe('the crafting tab conversions and the routings they refused (issue 1514
     );
   });
 
-  /**
-   * THE TAB'S FOUR ONE-LINE PANE EMPTIES, and the two sites that are NOT among them.
-   *
-   * The census predicate is the plan's own — `class="…empty"` under the crafting roots — and it
-   * returns SEVEN sites in this tab. The plan called six of them one-liners; measured, four are.
-   * `ShoppingList`'s is a glyph over a centred sentence FILLING its column (288.86x574.72), which
-   * is a panel and is asserted as one in `shopping-list-mounted`; `RecipeBrowser`'s is centred and
-   * is refused above; and `RecipeDetail`'s no-selection pane is the composition's sixth copy
-   * rather than an empty of its own.
-   *
-   * Asserted per file by IMPORT plus the deleted class, which is the pair that cannot both hold
-   * unless the conversion really happened: a file that still writes its own empty class has not
-   * converted, and a file importing nothing cannot be rendering the panel.
-   */
+  /** THE TAB'S FOUR ONE-LINE PANE EMPTIES, and the two sites that are NOT among them. */
   it('routes the tab`s remaining one-line empties through the released `note` panel', () => {
     // THE SOURCES BAR LEFT THIS LIST WITHOUT LEAVING THE TREATMENT (issue 1513). Its picker is
     // the shared `SearchablePopover` now, so the sentence reaches the same `EmptyState note`
@@ -431,9 +380,6 @@ describe('the crafting tab conversions and the routings they refused (issue 1514
 
   it('leaves the step label a 12px headline, on a refusal that predates this change', () => {
     // NOT this change's decision, and recorded so the delta's kicker table is not re-litigated:
-    // `a7fa2b123` (issue 1505) measured this label and refused it, because converting the step's
-    // HEADLINE to the 8.5px subtle rung ranked it below the "Requirements" label beneath it and
-    // below the 10px duration chip to its right. Re-measured here at 12.00/15.00, unmoved.
     const steps = 'src/ui/svelte/apps/crafting/detail/StepRequirementsList.svelte';
     assert.ok(!imports(steps, 'Kicker'), 'the step list draws no shared eyebrow');
     assert.match(
