@@ -26,7 +26,7 @@ export function createListingLoad({ fetch, onResult, afterCommit } = {}) {
       listing = (await fetch()) ?? null;
       onResult?.();
       loadedOnce = true;
-      await afterCommit?.();
+      if (afterCommit) await afterCommit();
     } catch (error_) {
       error = error_?.message ?? String(error_);
     } finally {
