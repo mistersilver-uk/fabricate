@@ -76,7 +76,7 @@ const TOLERATED_WARNINGS = [
   // The lab declares module version `0.0.0-viewlab`, which cannot satisfy the Item Piles minimum.
   /Item Piles integration: version .* does not meet minimum/,
   // The `1.30.0` world-scope migration's own completion notice
-  // (`src/migration/worldScopeEntityNotice.js`), reporting what it created and merged.
+  // (`src/systems/worldScopeEntityNotice.js`), reporting what it created and merged.
   /Fabricate gave this world one shared record per component, essence and tool/,
   // The Valid Id Basis fail-safe declining to prune. This is the safety behaviour working: the two
   // component-keyed passes are withheld and, as the message says itself, nothing is removed.

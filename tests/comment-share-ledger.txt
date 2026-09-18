@@ -9,10 +9,10 @@ src/canvas/linkedVisuals	64
 src/canvas/regions	331
 src/config	435
 src/integrations	20
-src/migration	1797
+src/migration	1343
 src/models	467
 src/models/match	66
-src/systems	28641
+src/systems	29095
 src/ui	1109
 src/ui/model	430
 src/ui/svelte	52
