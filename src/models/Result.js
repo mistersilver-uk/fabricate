@@ -38,8 +38,8 @@ export class Result {
 
     this.quantity = data.quantity || 1;
 
-    // Presence is the mode: a non-empty formula ROLLS the amount and `quantity` becomes the
-    // authored fallback. `''` and whitespace ARE absence, so the two on-disk states are one.
+    // Presence is the mode: a non-empty formula ROLLS the amount and `quantity` becomes the authored
+    // amount it falls back to. `''` and whitespace ARE absence, so the two on-disk states are one.
     this.quantityFormula = normalizeQuantityFormula(data.quantityFormula);
 
     this.propertyMacroUuid = data.propertyMacroUuid || null;

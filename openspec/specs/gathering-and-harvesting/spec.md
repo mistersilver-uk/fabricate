@@ -662,6 +662,7 @@ Character modifiers adjust the threshold side of d100 resolution and do not repl
 12. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
 13. A result-group result's rolled amount resolves through the shared result-amount resolver ONCE per attempt, in `plan()`, against the gathering character.
 `create()` awards the planned integer and never resolves again, so the journalled plan and the awarded stack are one roll rather than two.
+An award that reaches `create()` with no parked plan to read resolves there instead, still once.
 A planned amount of zero awards nothing, and the plan still records the roll that produced it.
 
 ## Gathering Tools Library
