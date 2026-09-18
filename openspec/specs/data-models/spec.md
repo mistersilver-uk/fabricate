@@ -3013,10 +3013,10 @@ Result = {
 
   // GROUP SETTINGS, read only where `alternatives` is present.
   chooser?: "playerChooses" | "rolled",
-  awardStrategy?: "anyOne" | "upTo" | "draw",
+  awardStrategy?: "anyOne" | "upTo",
   awardCount?: number,
   awardCountFormula?: string,
-  withReplacement?: boolean,
+  withReplacement?: boolean,   // `upTo` under a rolled chooser only
   selectionFormula?: string,
 
   // AN ALTERNATIVE'S OWN selecting range, read only on a member of a rolled group.
@@ -3050,15 +3050,17 @@ This section states only what is persisted.
 9. `chooser` defaults to `"playerChooses"` and is read only on a group.
    `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
 10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
-    `"upTo"` and `"draw"` require exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
     `awardCount` must be positive.
     `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
-11. `withReplacement` is read only where `awardStrategy` is `"draw"`, and defaults to `false`.
-    It is meaningless under `"anyOne"` and `"upTo"`, where it MUST NOT be written.
-12. `"draw"` pins `chooser` to `"rolled"`: a draw is rolled by definition, and a persisted `"playerChooses"` beside a `"draw"` is read as `"rolled"` rather than honoured.
+11. `withReplacement` is read only where `awardStrategy` is `"upTo"` AND `chooser` is `"rolled"`, and defaults to `false`.
+    It is meaningless in every other cell — there is nothing to repeat under `"anyOne"`, and a person picking from a list they can see does not repeat — where it MUST NOT be written.
+    `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
+12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
+    A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
 13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
     The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
-    Under `"draw"` the `selectionFormula` is rolled once per draw rather than once for the group.
+    Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
 14. A choice group is NOT valid inside a `progressive` result group.
     Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
     A payload carrying one is a misconfiguration; the authoring surface does not offer it.

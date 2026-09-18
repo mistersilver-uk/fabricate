@@ -1321,34 +1321,39 @@ The rows are otherwise the same row in both states: only the range cell appears 
 A range cell and an amount are different facts and MUST stay separately controlled.
 The range says WHICH alternative the roll selects; the amount says HOW MANY of it are awarded, and keeps the fixed-or-rolled control every result amount carries.
 
-THE AWARD STRATEGY states how many alternatives the group hands over, and it is a closed set of three operations rather than one mode with a flag:
-It is called a STRATEGY and not an award mode deliberately: `awardMode` is already canon on `progressive`, where it carries `partial`, `equal` and `exceed` and decides how a check-value budget is spent across an ordered result list.
-Two three-valued policies about what gets awarded, sharing one name, is a collision the persisted shape would inherit.
+THE AWARD STRATEGY states how many alternatives the group hands over, and it is a closed set of two:
 
 - `any one of` awards exactly one.
-- `up to N` awards a SUBSET: no alternative twice, and an N above the alternative count awards all of them.
-- `draw N` repeats a SELECTION: the same alternative MAY come up more than once, and the award count is N whatever the alternative count is.
+- `up to N` awards more than one, bounded by N.
 
-Up-to and draw MUST NOT be collapsed into one mode.
-They differ in whether a selection repeats, which is the distinction a GM is authoring, and a single mode with a repeat flag hides it behind a setting.
-`up to N` is a CEILING and not a quota: fewer is a legal outcome, and a two-alternative group set to up-to-three is authored rather than invalid.
+It is called a STRATEGY and not an award mode deliberately: `awardMode` is already canon on `progressive`, where it carries `partial`, `equal` and `exceed` and decides how a check-value budget is spent across an ordered result list.
+Two policies about what gets awarded, sharing one name, is a collision the persisted shape would inherit.
+
+`up to N` is a CEILING and never more than N, whatever else is set.
+Under player-chooses it is the player's ceiling and fewer is a legal outcome.
+Under a roll it is a ceiling for the reason the pool can run out — an N above the alternative count awards all of them — unless repeats are allowed, where the pool never runs out and N is exact.
+
+A REPEATED DRAW IS NOT A THIRD STRATEGY, and MUST NOT be modelled as one.
+A draw of N is `up to N` under a roll: the same count, the same ceiling, differing only in whether the same alternative may come up twice — which is one setting, not one operation.
+Two ways to author one behaviour is the drift the closed set exists to prevent.
 
 N takes the SAME fixed-or-rolled control a result amount takes — a stepper, or the shared expression control — switched in place in one slot.
 A rolled N states its expression and NO resolved value, for the reason a rolled amount does: the header has no actor in scope.
 
-REPLACEMENT belongs to `draw N` alone and MUST NOT render under the other two modes.
-It is only meaningful where a selection repeats, and a setting with no behaviour behind it invites a GM to hunt for a difference that does not exist.
-It defaults to WITHOUT replacement, and it states its own current value rather than being read as a checked or unchecked box.
-A draw of N above the alternative count exhausts the bundle rather than erroring.
+REPEATS are a setting of ONE CELL of the matrix: `up to N` under a roll, and nowhere else.
+Under `any one of` there is nothing to repeat, and under player-chooses a person picking twice from a list of things they can see is not a repeat but a mistake the surface should not offer.
+A setting with no behaviour behind it invites a GM to hunt for a difference that does not exist, so it is ABSENT rather than disabled in the three cells that cannot use it.
 
-A draw is ROLLED by definition, so `draw N` PINS the chooser to rolled rather than leaving a player-chooses draw authorable.
-It renders that control LOCKED, stating the pinned value and refusing the other, and MUST NOT hide it.
-A control that disappears under one setting is read as a control that never existed, and the header would change shape as the strategy changes.
-N is not pinned by the strategy: a draw's count is as authorable fixed as it is rolled, and it carries the same control under every strategy that takes an N.
+It defaults to NO REPEATS, and it states its own current value in plain terms rather than being read as a checked box or as the statistical name for it.
+A GM reads "up to 3, unique" and "up to 3, repeats allowed" without help; "with replacement" asks them to translate.
+With repeats allowed the same alternative may be awarded more than once and N is exact; without, the awards are distinct and an N above the alternative count exhausts the bundle rather than erroring.
 
-The group header reads LEFT TO RIGHT as one sentence — award strategy, N, replacement, chooser — with a help line beneath it restating the resolved behaviour in prose.
+NO STRATEGY PINS THE CHOOSER.
+Every cell of the two-by-two is authorable, which is the point of folding the repeated draw into the one it duplicated: there is no combination left that needs forbidding, and so no control that has to be locked or hidden to keep one out.
+
+The group header reads LEFT TO RIGHT as one sentence — award strategy, N, repeats, chooser — with a help line beneath it restating the resolved behaviour in prose.
 Four controls in a row are read faster as a sentence than as a form.
-Every strategy renders the SAME header: a setting its strategy does not take is absent, and a setting it pins is locked rather than removed, so the controls a reader has learned stay where they were.
+A setting the current combination cannot use is ABSENT rather than rendered inert, and every setting it can use sits where it sat before, so the controls a reader has learned stay put.
 The header states each setting ONCE, in the control that owns it.
 A badge or pill restating a value the control beside it already carries is FORBIDDEN: it says the same thing twice, and because its width tracks the value, editing N or the strategy moves every control after it.
 A caption that reads back the state is a help line beneath the header, where nothing is aligned to it.
@@ -1357,8 +1362,8 @@ The SELECTION EXPRESSION is the group's OWN roll and not the craft's check.
 A routed craft has already rolled once to reach this set, and reading that same total here would leave the group's authored expression with nothing to do.
 It resolves against the CRAFTING CHARACTER, the actor every other rolled amount in the craft resolves against, so a group is authored once and reads correctly for whoever crafts.
 
-Under `draw N` the selection expression is rolled ONCE PER DRAW rather than once for the group.
-A single roll would select the same alternative on every draw, which is not a draw at all.
+Where a roll awards more than one alternative, the selection expression is rolled ONCE PER AWARD rather than once for the group.
+A single roll would select the same alternative every time, which is not a selection at all.
 
 A roll that lands outside every authored range CLAMPS to the nearest one: below the lowest it selects the lowest alternative, above the highest it selects the highest.
 The ranges are a LADDER the roll is read against rather than a set of independent windows, so no authored group can produce nothing.
@@ -1390,17 +1395,17 @@ The persisted shape of the chooser, the award strategy, N and replacement is out
 - **THEN** the selection expression and every range cell are hidden
 - **AND** each alternative keeps its own fixed-or-rolled amount
 
-#### Scenario: A reward hands over more than one alternative
+#### Scenario: A player is offered more than one reward
 
-- **WHEN** a GM sets a result-side group to up to N
+- **WHEN** a GM sets a result-side group to up to N with the player choosing
 - **THEN** the header states N through the same fixed-or-rolled control an amount uses
-- **AND** the group renders no replacement setting
+- **AND** the group renders no repeats setting, because a person picking from a visible list cannot repeat
 
-#### Scenario: A reward repeats a selection
+#### Scenario: A roll may award the same reward twice
 
-- **WHEN** a GM sets a result-side group to draw N
-- **THEN** the group states its replacement setting, defaulting to without
-- **AND** the chooser is pinned to rolled rather than offered
+- **WHEN** a GM sets a result-side group to up to N and hands the choice to the roll
+- **THEN** the group offers the repeats setting, defaulting to unique
+- **AND** allowing repeats makes N exact rather than a ceiling
 
 #### Scenario: A GM authors an ingredient-side choice group
 
@@ -1414,11 +1419,11 @@ The persisted shape of the chooser, the award strategy, N and replacement is out
 - **THEN** the group awards the alternative that range names
 - **AND** it does not report a gap, because a craft that has been routed here still awards something
 
-#### Scenario: A draw of three selects three times
+#### Scenario: A rolled group of three selects three times
 
-- **WHEN** a group set to draw 3 resolves
-- **THEN** its selection expression is rolled once for each of the three draws
-- **AND** the draws may land on different alternatives
+- **WHEN** a group set to up to 3 resolves under a roll
+- **THEN** its selection expression is rolled once for each award
+- **AND** the awards may land on different alternatives
 
 #### Scenario: A GM authors a progressive recipe
 
