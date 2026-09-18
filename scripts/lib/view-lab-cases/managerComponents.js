@@ -493,7 +493,6 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$/,
     ],
   }),
   managerCase({

@@ -142,7 +142,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-validation-retired-placeholder',
   ]),
   // The shared empty panel.
-  'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze([
+  'src/ui/svelte/components/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'world-tool-catalogue-filtered-empty',
@@ -212,7 +212,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The surface that reports something that just happened (issue 1505), on two callers.
   'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
   // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing files.
-  'src/ui/svelte/apps/manager/Callout.svelte': Object.freeze([
+  'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
   ]),

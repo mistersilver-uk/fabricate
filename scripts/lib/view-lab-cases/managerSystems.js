@@ -79,7 +79,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
       ' .manager-setup-card',
     kinds: ['manager', 'systems'],
-    // No pattern for `manager/EmptyState.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
+    // No pattern for `components/EmptyState.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
