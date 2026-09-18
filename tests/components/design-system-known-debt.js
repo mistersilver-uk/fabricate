@@ -88,6 +88,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
  */
 // #1707: the root's 16 became 12 and `GatheringModifierEditor.svelte` took 2 (71 - 2). The other
 // two were DE-DUPLICATED by writing that panel once, not converted.
+// #1707 phase 2: the root's 12 became 2 and `GatheringRulesInspector.svelte` took 10, so the
+// total is unchanged and only the file count moves, 25 rows to 26. The two the root keeps are its
+// nav scope and the systems-list condition; neither is in an inspector branch.
 export const KNOWN_NATIVE_SELECT_TOTAL = 69;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
@@ -236,4 +239,11 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // the same commit. Re-measured rather than subtracted: 75 components outside `components/` clear
 // the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
 // already states.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;
+// 47 -> 48 (issue 1707 phase 2): `environment/GatheringModifierEditor.svelte` ARRIVED by
+// crossing the two-caller bar, which is the de-duplication acting rather than a new component —
+// `GatheringTaskInspector` and `GatheringEventInspector` are the two leaves that own its two
+// subjects, and before this phase the root was its single caller. Measured: 2 importers, both
+// inside the one gathering inspector column, so it is one feature's panel and not a vocabulary
+// candidate; the adjudication (promote, or a `notAPrimitive` row with this measurement) belongs
+// to the design-system pass, and the row records that nobody has made it yet.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;

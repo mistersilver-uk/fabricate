@@ -14,14 +14,15 @@ const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 const RAW_FIELD_ALLOWLIST = Object.freeze([
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    sites: 3,
+    sites: 1,
     why:
-      'The manager root, 13k lines and the file every manager lane touches. Its three remaining ' +
-      'fields are the drop-rate editor, the drop-count editor and the condition shortcut. It was ' +
-      'seven until issue 1707 wrote the twice-authored modifier panel once: FOUR left this file ' +
-      'and TWO landed in the row below, so the other two were DE-DUPLICATED rather than ' +
-      'converted. Deferred as a whole so the sweep and the root are separately reviewable, not ' +
-      'because the sites differ from the 81 that converted.',
+      'The manager root, the file every manager lane touches. Its one remaining field is the ' +
+      'systems-list condition shortcut. It was seven until issue 1707 wrote the twice-authored ' +
+      'modifier panel once (four left, two landed in the row below, two de-duplicated rather ' +
+      'than converted), and three until its phase 2 moved the drop-rate and drop-count editors ' +
+      'into the row below with the branch that drew them. Deferred as a whole so the sweep and ' +
+      'the root are separately reviewable, not because the sites differ from the 81 that ' +
+      'converted.',
   }),
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
@@ -30,6 +31,14 @@ const RAW_FIELD_ALLOWLIST = Object.freeze([
       'The condition-modifier picker and the expression-override field of the panel issue 1707 ' +
       'wrote once. RELOCATED without converting either, so the deferral is unchanged in ' +
       'substance; the file is now one screen\'s form, which a conversion lane can take on its own.',
+  }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+    sites: 2,
+    why:
+      'The drop-rate editor and the drop-count editor, relocated by issue 1707 phase 2 without ' +
+      'converting either, so the deferral is unchanged in substance; the file is now one ' +
+      "screen's form, which a conversion lane can take on its own.",
   }),
 ]);
 

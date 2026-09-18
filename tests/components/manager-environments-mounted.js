@@ -102,6 +102,65 @@ export function registerEnvironmentsCases() {
     await settleBetweenTests();
   });
 
+  // The rules leaf's own controls (issue 1707 phase 2). Every one of the ten selects and both
+  // steppers write through one `onUpdate` prop; before this case nothing anywhere changed one, so
+  // dropping the prop rendered the whole column inert and shipped green.
+  it('persists a Gathering Rules select, and the stepper the chosen mode reveals', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Settings').click();
+    await tick();
+    flushSync();
+
+    const card = target.querySelector('.manager-inspector [data-gathering-inspector-rules]');
+    assert.ok(Boolean(card), 'the settings tab renders the Gathering Rules card in the inspector');
+    const scope = card.querySelector('#manager-gathering-rule-reveal-scope');
+    scope.value = 'party';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.findLast((call) => call[0] === 'updateGatheringRules'),
+      ['updateGatheringRules', 'alchemy', { revealScope: 'party' }],
+      'the select writes its own field for the selected system, and only that field'
+    );
+
+    assert.ok(!card.querySelector('[data-gathering-rule-stepper="rewardLimit"]'));
+    const rewards = card.querySelector('#manager-gathering-rule-rewards');
+    rewards.value = 'limitedDrops';
+    rewards.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.findLast((call) => call[0] === 'updateGatheringRules'),
+      ['updateGatheringRules', 'alchemy', { rewardSelectionMode: 'limitedDrops' }],
+      'the rewards select writes the mode that reveals the limit stepper'
+    );
+
+    const stepper = card.querySelector('[data-gathering-rule-stepper="rewardLimit"]');
+    assert.ok(Boolean(stepper), 'choosing the limited mode reveals the reward-limit stepper');
+    [...stepper.querySelectorAll('button')]
+      .find((button) => button.getAttribute('aria-label') === 'Increase reward limit')
+      .click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.findLast((call) => call[0] === 'updateGatheringRules'),
+      ['updateGatheringRules', 'alchemy', { rewardLimit: 2 }],
+      'the revealed stepper writes the limit itself through the same one prop'
+    );
+  });
+
   it('routes to the environments browser and opens the forced v2 editor route', async () => {
     const calls = [];
     target = document.createElement('div');

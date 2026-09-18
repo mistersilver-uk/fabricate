@@ -1940,6 +1940,44 @@ export function registerGatheringCases() {
     );
   });
 
+  // The task leaf's own controls (issue 1707 phase 2): the count field and the duplicate action
+  // are handed writers pre-bound to the selected drop inside the leaf, so only a gesture proves
+  // the row they reach is the selected one rather than the first.
+  it('persists a drop count typed into the selected drop inspector', async () => {
+    const calls = [];
+    await openDirtyGatheringTaskEditor(calls, {});
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await settleSaveAttempt();
+
+    const countField = target.querySelector('[data-gathering-drop-inspector-count]');
+    assert.ok(Boolean(countField), 'the drop inspector renders the count field');
+    const countInput = countField.querySelector('input');
+    assert.equal(countInput.value, '2', 'the count field reads the fixture drop\'s own quantity');
+    setInputValue(countInput, '7');
+    await settleSaveAttempt();
+
+    const duplicate = [...target.querySelectorAll('.manager-drop-editor-actions button')].find(
+      (button) => button.getAttribute('aria-label') === 'Duplicate'
+    );
+    assert.ok(Boolean(duplicate), 'the drop header renders its duplicate action');
+    duplicate.click();
+    await settleSaveAttempt();
+
+    await clickHeaderSave();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
+    assert.equal(saved[2], 'task-herbs', 'the save carries the task being edited');
+    const typed = saved[3].dropRows.filter((row) => row.id === 'drop-nightshade');
+    assert.equal(typed.length, 1, 'the drop the inspector was bound to is still one row');
+    assert.equal(typed[0].quantity, 7, 'the typed count landed on that row, by its real id');
+    const copies = saved[3].dropRows.filter((row) => row.componentId === typed[0].componentId);
+    assert.equal(copies.length, 2, 'duplicating the selected drop added a second copy of it');
+    assert.deepEqual(
+      copies.map((row) => row.quantity),
+      [7, 7],
+      'the copy was taken from the selected row after the typed count, not from the first row'
+    );
+  });
+
   // The event half's glue: its pick writer is bound to `editingGatheringEvent` at that call site.
   it('persists a character modifier picked from the event editor suggestions', async () => {
     const calls = [];
