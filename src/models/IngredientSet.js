@@ -1,6 +1,15 @@
 import { getFabricateFlag } from '../config/flags.js';
-import { clampAllocation, deliveredEssences, greedyAllocate } from '../utils/essenceAllocation.js';
+import { greedyAllocate } from '../utils/essenceAllocation.js';
 
+import {
+  buildEssenceIndex,
+  essenceBlockMember,
+  essenceMemberIsFundable,
+  essencePoolFrom,
+  essenceResolverFor,
+  isFundableEssenceOption,
+  resolveEssenceBlock,
+} from './ingredientEssenceBlock.js';
 import { IngredientGroup } from './IngredientGroup.js';
 import {
   INGREDIENT_SEARCH_NODE_CAP,
@@ -219,7 +228,7 @@ export class IngredientSet {
       allocateEssences,
     } = {}
   ) {
-    const resolveEssences = this._essenceResolver(resolveItemEssences);
+    const resolveEssences = essenceResolverFor(resolveItemEssences);
     const ctx = {
       affordCurrency,
       optionOverrides,
@@ -252,17 +261,6 @@ export class IngredientSet {
   }
 
   /**
-   * The essence resolver used by the selection paths: the caller-supplied probe, or a flag-only
-   * default mirroring the legacy `_accumulateEssences` so the no-probe `canBeCraftedWith`/display
-   * path stays byte-for-byte.
-   */
-  _essenceResolver(resolveItemEssences) {
-    return typeof resolveItemEssences === 'function'
-      ? resolveItemEssences
-      : (item) => getFabricateFlag(item, 'essences', {});
-  }
-
-  /**
    * The author-order greedy resolution (the pre-issue-663 behaviour), retained as the deterministic
    * `missingGroups` source and the bounded-search safeguard fallback.
    */
@@ -282,7 +280,7 @@ export class IngredientSet {
     const outcomes = this.ingredientGroups.map((group) => this._resolveGroupGreedy(group, pass));
 
     const members = outcomes.filter((outcome) => outcome.member).map((outcome) => outcome.member);
-    const block = this._resolveEssenceBlock(members, availableItems, pass.remaining, ctx);
+    const block = resolveEssenceBlock(members, availableItems, pass.remaining, ctx);
     commitItemPlan(block.plan, pass.plan, pass.remaining);
 
     const { selectedIngredients, missingGroups } = this._collectGreedyOutcomes(outcomes, block);
@@ -293,7 +291,7 @@ export class IngredientSet {
       currencySpends: pass.currencySpends,
       missingGroups,
       essenceAllocation: block.allocation,
-      essencePool: this._essencePoolFrom(block),
+      essencePool: essencePoolFrom(block),
     };
   }
 
@@ -329,7 +327,7 @@ export class IngredientSet {
       return { option };
     }
     if (option?.match?.type === 'essence') {
-      return { member: this._essenceMember(group, option) };
+      return { member: essenceBlockMember(group, option) };
     }
     const candidate = buildItemPlanForOption(option, override.heldItemId, pass);
     if (!candidate.ok) {
@@ -347,7 +345,7 @@ export class IngredientSet {
 
     for (const option of options) {
       if (option?.match?.type === 'currency') continue;
-      if (option?.match?.type === 'essence') return { member: this._essenceMember(group, option) };
+      if (option?.match?.type === 'essence') return { member: essenceBlockMember(group, option) };
       const candidate = buildItemPlanForOption(option, null, pass);
       if (candidate.ok) {
         commitItemPlan(candidate.plan, pass.plan, pass.remaining);
@@ -428,7 +426,7 @@ export class IngredientSet {
     const groupCandidateKeys = this.ingredientGroups.map((group) =>
       this._indexGroupCandidates(group, items, matcher, optionItems, essenceOptions)
     );
-    const essence = this._buildEssenceIndex(items, essenceOptions, ctx);
+    const essence = buildEssenceIndex(items, essenceOptions, ctx, { seedRemaining });
 
     return {
       optionItems,
@@ -449,7 +447,7 @@ export class IngredientSet {
       const type = option?.match?.type;
       if (type === 'currency') continue;
       if (type === 'essence') {
-        essenceOptions.push(this._essenceMember(group, option));
+        essenceOptions.push(essenceBlockMember(group, option));
         continue;
       }
       const matched = items.filter((item) =>
@@ -470,77 +468,11 @@ export class IngredientSet {
     if (!essence) return carrying;
     for (const [groupIndex, group] of this.ingredientGroups.entries()) {
       const options = group.options || [];
-      if (options.some((option) => this._isLiveEssenceOption(option, group, essence))) {
+      if (options.some((option) => isFundableEssenceOption(option, group, essence))) {
         carrying.add(groupIndex);
       }
     }
     return carrying;
-  }
-
-  /** Whether `option` is an essence option this ledger could still fund. */
-  _isLiveEssenceOption(option, group, essence) {
-    if (option?.match?.type !== 'essence') return false;
-    return this._essenceOptionIsFeasible(this._essenceMember(group, option), essence);
-  }
-
-  /**
-   * The essence half of the pass index: the stacks that could ever fund this set's essence block,
-   * and the CEILING each essence id can deliver from them.
-   */
-  _buildEssenceIndex(availableItems, essenceOptions, ctx) {
-    const essenceIds = new Set(essenceOptions.map((member) => member.essenceId).filter(Boolean));
-    if (essenceOptions.length === 0) return null;
-
-    const seeded = seedRemaining(availableItems);
-    const resolveEssences = ctx?.resolveEssences;
-    const carriers = [];
-    const ceiling = new Map();
-    const seen = new Set();
-
-    for (const item of availableItems) {
-      const itemKey = itemKeyOf(item);
-      if (seen.has(itemKey)) continue;
-      seen.add(itemKey);
-
-      const essences = (resolveEssences ? resolveEssences(item) : null) || {};
-      const perUnit = {};
-      for (const essenceId of essenceIds) {
-        const amount = Number(essences?.[essenceId]) || 0;
-        if (amount > 0) perUnit[essenceId] = amount;
-      }
-      if (Object.keys(perUnit).length === 0) continue;
-
-      carriers.push({ itemKey, item, perUnit });
-      const units = Number(seeded.get(itemKey) || 0);
-      for (const [essenceId, amount] of Object.entries(perUnit)) {
-        ceiling.set(essenceId, (ceiling.get(essenceId) ?? 0) + amount * units);
-      }
-    }
-
-    const carrierKeys = this._contendedCarrierKeys(carriers, essenceOptions, ceiling);
-    return { carriers, ceiling, carrierKeys };
-  }
-
-  /** The carrier stacks a component/tag group can actually contend with the block for. */
-  _contendedCarrierKeys(carriers, essenceOptions, ceiling) {
-    const liveIds = new Set(
-      essenceOptions
-        .filter((member) => this._essenceOptionIsFeasible(member, { ceiling }))
-        .map((member) => member.essenceId)
-        .filter(Boolean)
-    );
-    return new Set(
-      carriers
-        .filter((carrier) => Object.keys(carrier.perUnit).some((id) => liveIds.has(id)))
-        .map((carrier) => carrier.itemKey)
-    );
-  }
-
-  /** Whether an essence option could be satisfied by ANY assignment of the untouched ledger. */
-  _essenceOptionIsFeasible(member, essence) {
-    if (!member.essenceId || member.need <= 0) return true;
-    if (!essence) return true;
-    return (essence.ceiling.get(member.essenceId) ?? 0) >= member.need;
   }
 
   /**
@@ -667,7 +599,7 @@ export class IngredientSet {
       currencySpends,
       missingGroups: [],
       essenceAllocation: block?.allocation ?? {},
-      essencePool: this._essencePoolFrom(block),
+      essencePool: essencePoolFrom(block),
     };
   }
 
@@ -758,7 +690,7 @@ export class IngredientSet {
    * groups left in `remaining`.
    */
   _settleEssenceBlock(state, frame) {
-    const block = this._resolveEssenceBlock(
+    const block = resolveEssenceBlock(
       state.essenceMembers,
       frame.availableItems,
       frame.remaining,
@@ -804,8 +736,8 @@ export class IngredientSet {
    */
   *_optionItemChoices(option, group, restrictItemId, scan) {
     if (option?.match?.type === 'essence') {
-      const member = this._essenceMember(group, option);
-      if (!this._essenceOptionIsFeasible(member, scan.index?.essence)) return;
+      const member = essenceBlockMember(group, option);
+      if (!essenceMemberIsFundable(member, scan.index?.essence)) return;
       yield { option, plan: [], currency: null, member };
       return;
     }
@@ -856,192 +788,6 @@ export class IngredientSet {
     const handler = getMatchHandler(option.match);
     if (!handler.affords(option.match, { affordCurrency })) return null;
     return handler.getCurrencySpend(option.match);
-  }
-
-  /** One essence requirement's membership of the set's essence block. */
-  _essenceMember(group, option) {
-    return {
-      group,
-      option,
-      groupId: group?.id ?? null,
-      essenceId: String(option?.match?.essenceId || '').trim(),
-      need: Math.max(0, Number(option?.match?.amount) || 0),
-    };
-  }
-
-  /**
-   * Resolve the set's essence BLOCK: every `match.type === 'essence'` option taken by this branch,
-   * funded JOINTLY from what the component/tag groups left in `remaining` (issue 917).
-   */
-  _resolveEssenceBlock(members, availableItems, remaining, ctx) {
-    if (!Array.isArray(members) || members.length === 0) {
-      return {
-        ok: true,
-        members: [],
-        requirements: [],
-        carriers: [],
-        allocation: {},
-        suggested: {},
-        delivered: {},
-        plan: [],
-      };
-    }
-
-    const carriers = this._essenceCarriers(
-      members,
-      availableItems,
-      remaining,
-      ctx.resolveEssences,
-      ctx.index
-    );
-    const availableUnits = Object.fromEntries(
-      carriers.map((carrier) => [carrier.itemKey, carrier.ownedUnits])
-    );
-    // Default the strategy here as well as at the public entry point, so a caller holding the
-    // private ctx directly (the search-seam tests) still allocates.
-    const allocate = typeof ctx.allocate === 'function' ? ctx.allocate : greedyAllocate;
-    const suggested = allocate(members, carriers, availableUnits);
-    const allocation = ctx.essenceAllocation
-      ? clampAllocation(ctx.essenceAllocation, availableUnits)
-      : suggested;
-    const delivered = deliveredEssences(allocation, carriers);
-    const requirements = this._partitionBlock(members, carriers, delivered);
-
-    return {
-      ok: requirements.every((requirement) => requirement.satisfied),
-      members,
-      requirements,
-      carriers,
-      allocation,
-      suggested,
-      delivered,
-      plan: this._essenceBlockPlan(members, carriers, allocation),
-    };
-  }
-
-  /**
-   * The stacks that can fund the block: every item `remaining` still holds units of that carries at
-   * least one essence the block needs, deduped by item key.
-   */
-  _essenceCarriers(members, availableItems, remaining, resolveEssences, index = null) {
-    const neededIds = new Set(members.map((member) => member.essenceId).filter(Boolean));
-    // The indexed path (issue 1083).
-    if (index?.essence) {
-      return index.essence.carriers.flatMap((carrier) => {
-        const ownedUnits = Number(remaining.get(carrier.itemKey) || 0);
-        if (ownedUnits <= 0) return [];
-        const perUnit = {};
-        for (const essenceId of neededIds) {
-          const amount = Number(carrier.perUnit[essenceId]) || 0;
-          if (amount > 0) perUnit[essenceId] = amount;
-        }
-        if (Object.keys(perUnit).length === 0) return [];
-        return [{ itemKey: carrier.itemKey, item: carrier.item, perUnit, ownedUnits }];
-      });
-    }
-
-    const carriers = [];
-    const seen = new Set();
-
-    for (const item of availableItems) {
-      const itemKey = itemKeyOf(item);
-      if (seen.has(itemKey)) continue;
-      seen.add(itemKey);
-
-      const ownedUnits = Number(remaining.get(itemKey) || 0);
-      if (ownedUnits <= 0) continue;
-
-      const essences = (resolveEssences ? resolveEssences(item) : null) || {};
-      const perUnit = {};
-      for (const essenceId of neededIds) {
-        const amount = Number(essences?.[essenceId]) || 0;
-        if (amount > 0) perUnit[essenceId] = amount;
-      }
-      if (Object.keys(perUnit).length === 0) continue;
-
-      carriers.push({ itemKey, item, perUnit, ownedUnits });
-    }
-
-    return carriers;
-  }
-
-  /**
-   * Attribute what the block delivered across its requirements, PER ESSENCE ID: the requirements
-   * naming an id settle in author order, each taking `min(need, remaining delivered of that id)`.
-   */
-  _partitionBlock(members, carriers, delivered) {
-    const unassigned = new Map(Object.entries(delivered));
-    const owned = new Map();
-    for (const carrier of carriers) {
-      for (const [essenceId, perUnit] of Object.entries(carrier.perUnit)) {
-        owned.set(essenceId, (owned.get(essenceId) ?? 0) + perUnit * carrier.ownedUnits);
-      }
-    }
-
-    return members.map((member) => {
-      const { essenceId, need } = member;
-      // A blank essence id or a non-positive amount is a runtime no-op, satisfied with nothing
-      // consumed, exactly as the pre-block per-option builder treated it.
-      const degenerate = !essenceId || need <= 0;
-      const pool = unassigned.get(essenceId) ?? 0;
-      const take = degenerate ? 0 : Math.min(need, pool);
-      if (take > 0) unassigned.set(essenceId, pool - take);
-      return {
-        groupId: member.groupId,
-        essenceId,
-        need,
-        delivered: take,
-        owned: owned.get(essenceId) ?? 0,
-        satisfied: degenerate || take >= need,
-      };
-    });
-  }
-
-  /**
-   * The block's consumption plan: AT MOST ONE entry per item key, whose `quantity` is the units the
-   * allocation draws from that stack.
-   */
-  _essenceBlockPlan(members, carriers, allocation) {
-    const plan = [];
-    for (const carrier of carriers) {
-      const units = Number(allocation?.[carrier.itemKey]) || 0;
-      if (units <= 0) continue;
-      const funded = members.filter(
-        (member) => (Number(carrier.perUnit[member.essenceId]) || 0) > 0
-      );
-      if (funded.length === 0) continue;
-      plan.push({
-        item: carrier.item,
-        quantity: units,
-        // The first funded option, retained for the back-compat readers that key off
-        // `entry.ingredient`.
-        ingredient: funded[0].option,
-        essenceGroupIds: funded.map((member) => member.groupId).filter(Boolean),
-      });
-    }
-    return plan;
-  }
-
-  /**
-   * Project a resolved block into the read-side pool model the crafting surfaces render: what each
-   * requirement needs and was delivered, what each carrier holds and contributes, and the
-   * allocation that ties the two together.
-   */
-  _essencePoolFrom(block) {
-    if (!block || block.members.length === 0) return null;
-    return {
-      requirements: block.requirements,
-      carriers: block.carriers.map((carrier) => ({
-        itemKey: carrier.itemKey,
-        item: carrier.item,
-        perUnit: carrier.perUnit,
-        ownedUnits: carrier.ownedUnits,
-        allocatedUnits: Number(block.allocation?.[carrier.itemKey]) || 0,
-      })),
-      allocation: block.allocation,
-      suggested: block.suggested,
-      totals: block.delivered,
-    };
   }
 
   /**

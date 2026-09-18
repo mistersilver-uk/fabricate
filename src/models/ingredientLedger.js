@@ -2,9 +2,8 @@
  * The remaining-quantity ledger an ingredient set resolves against: how it is seeded, the candidate
  * item plans drawn from it, and the shared node budget those enumerations charge.
  */
-// `itemStackQuantity.js` never touches `game`, `ui`, `Hooks` or `CONFIG` — it receives the
-// configured path by push — so importing it here does not break the ingredient model's Foundry-free
-// contract (`data-models`, Essence-Alternative Consumption).
+// `itemStackQuantity.js` takes the configured path by push and never touches `game`, `ui`, `Hooks`
+// or `CONFIG`, so this import keeps the ingredient model Foundry-free (`data-models`).
 import { readStackQuantity } from '../systems/itemStackQuantity.js';
 
 /** Node/subset budget for the item-level backtracking assignment search (issue 663). */
@@ -15,10 +14,7 @@ export function itemKeyOf(item) {
   return item.uuid || item.id;
 }
 
-/**
- * Seed the remaining-quantity ledger (item key -> available units) the search and the greedy pass
- * both draw from.
- */
+/** Seed the remaining-quantity ledger (item key -> units) shared by the search and greedy pass. */
 export function seedRemaining(availableItems) {
   const remaining = new Map();
   for (const item of availableItems) {
@@ -39,8 +35,7 @@ export function chargeNode(budget) {
 }
 
 /**
- * Append a chosen option's item plan entries to the running plan and deduct their quantities from
- * the ledger, so the default and override paths keep identical remaining-quantity bookkeeping. A
+ * Append a chosen option's plan entries to the running plan and deduct them from the ledger. A
  * supplied journal records each write in order, which is what makes the deduction undoable.
  */
 export function commitItemPlan(candidatePlan, plan, remaining, journal = null) {
@@ -80,9 +75,8 @@ export function candidateStacksForOption(option, restrictItemId, scan) {
 }
 
 /**
- * The matching stacks with a positive remaining count, in `availableItems` order — the domain the
- * unit-count enumeration draws from. Availability is snapshotted, so a later ledger write does not
- * change the domain an in-flight enumeration is walking.
+ * The matching stacks with a positive remaining count, in `availableItems` order. Availability is
+ * snapshotted, so a later ledger write cannot move the domain an in-flight enumeration walks.
  */
 export function candidateStacksWithAvailability(option, restrictItemId, scan) {
   const out = [];
@@ -126,10 +120,7 @@ export function buildItemPlanForOption(option, restrictItemId, scan) {
   };
 }
 
-/**
- * Enumerate the distinct unit-count plans over `matchingItems` consuming exactly `need` units,
- * front-loaded (greedy) first.
- */
+/** The distinct unit-count plans over `matchingItems` for exactly `need` units, greedy first. */
 export function* enumerateUnitPlans(option, matchingItems, need, budget) {
   yield* enumerateUnitPlansFrom(option, matchingItems, 0, need, [], budget);
 }
