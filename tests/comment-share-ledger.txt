@@ -36,7 +36,7 @@ src/ui/svelte/apps/manager/component	347
 src/ui/svelte/apps/manager/components	309
 src/ui/svelte/apps/manager/crafting	29
 src/ui/svelte/apps/manager/downtime	262
-src/ui/svelte/apps/manager/environment	493
+src/ui/svelte/apps/manager/environment	496
 src/ui/svelte/apps/manager/essences	633
 src/ui/svelte/apps/manager/knowledge	200
 src/ui/svelte/apps/manager/library	59

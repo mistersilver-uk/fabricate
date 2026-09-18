@@ -40,8 +40,8 @@ const TREE_EXCEPTIONS = Object.freeze([
     }),
     why:
       'deferred with a named reason. The root held the drop-scope and event-scope ' +
-      'character-modifier override switches as a hand-rolled PAIR; issue 1707 wrote that panel ' +
-      'once, so one of the two was DE-DUPLICATED rather than converted and the survivor moved ' +
+      'character-modifier override switches as a hand-rolled pair; issue 1707 wrote that panel ' +
+      'once, so one of the two was de-duplicated rather than converted and the survivor moved ' +
       'here with the rest of the panel. Pinned by count so a later pass that removes it without ' +
       'converting it fails here instead of leaving a deferral nobody is tracking.',
   }),
