@@ -3785,6 +3785,10 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
 - The card appends the **rolled check total** as its own row, mirroring the salvage summary's "with a roll of N" rule: rendered only for a finite value and omitted for a no-check guaranteed craft/salvage (`rollValue` null).
   The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
+- **A ROLLED result amount states its roll beside the produced line**, in the same `{formula} = {total}` shape and the same treatment the card's rolled-check-total row uses, so the run that says what was produced also says what produced it.
+  An EMPTY AWARD — a total of zero or less, which creates no item — is stated as its own row naming what produced nothing, never omitted, because a player who watched the dice fall is owed the outcome.
+  The card and the run journal read the roll the award recorded and never re-roll it.
+  The evaluated rolls are carried in the message's `rolls`, which is what sounds the dice and animates Dice So Nice; the custom card content survives that, and a crafting card is never whispered, so carrying them hides it from nobody.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
 - Gathering posts its own result card under the same `features.chatOutput` toggle.

@@ -332,9 +332,9 @@ They change no existing contract: the crafting and gathering economies, legacy c
 ### Apply Effects
 
 1. Consume ingredients and apply tool usage/breakage (destroying or flagging-broken exhausted tools) according to success/failure policy.
-2. Build result item payloads.
+2. Build result item payloads, resolving each result's amount through the one resolver first, so a rolled amount is rolled ONCE per result per award and the payload carries the integer it rolled.
 3. Apply property macros per result item when enabled: every contributing essence's own property macro runs first, in essence-library order, and then the result's own macro, so a recipe-specific macro is the last writer at any path the two share.
-4. Create result items.
+4. Create result items, except where a resolved amount is zero: that EMPTY AWARD creates nothing and still reaches the chat card, the run record and every other report an award reaches.
 
 ### Component Complications (progressive crafting)
 
