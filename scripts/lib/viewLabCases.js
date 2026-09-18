@@ -9101,6 +9101,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
     // The per-stage complication band (issue 1286) is asserted here rather than given its own case,
     // and the reason is mechanical: `SalvageProgressiveBody` passes `complications` on every render
@@ -9134,6 +9135,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   playerCase({
@@ -9157,6 +9159,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   playerCase({
@@ -9201,6 +9204,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   // Every card named below sits on page one of the 25-per-page grid, verified by rendering rather
@@ -9737,6 +9741,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   playerCase({
@@ -9944,6 +9949,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
     // The crafting half of the per-stage complication band (issue 1286), asserted on the frame that
     // already draws it for the same reason `player-salvage` is: `ProgressiveBody` passes
@@ -9976,6 +9982,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   playerCase({
@@ -9996,6 +10003,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   playerCase({
@@ -10016,6 +10024,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
     ],
   }),
   playerCase({
