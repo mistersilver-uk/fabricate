@@ -303,7 +303,7 @@ src/ui/svelte/
 │   └── editor/
 │       └── RecipeEditorRoot.svelte  # GM recipe editor
 ├── components/                  # Shared/reusable components
-│   └── DropZone.svelte
+│   └── ItemDropZone.svelte
 ├── stores/                      # Reactive state (one per app surface)
 │   ├── craftingStore.js
 │   ├── adminStore.js

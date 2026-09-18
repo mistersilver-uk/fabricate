@@ -953,10 +953,6 @@ test('manager environments browser and edit route define compact responsive geom
     !css.includes('.manager-environment-comp-evidence'),
     'environment editor CSS should no longer reference the removed inline-row evidence cell'
   );
-  assert.ok(
-    css.includes('.fabricate-manager .image-path-picker.is-button-only .image-path-picker-button'),
-    'environment editor should style the button-only ImagePathPicker variant'
-  );
   assert.equal(
     css.includes('.fabricate-manager .manager-environment-details-tabs'),
     false,

@@ -256,7 +256,7 @@
     "styles/fabricate.css | border-radius | 12px | 5",
     "styles/fabricate.css | border-radius | 13px | 1",
     "styles/fabricate.css | border-radius | 3px | 2",
-    "styles/fabricate.css | border-radius | 4px | 22",
+    "styles/fabricate.css | border-radius | 4px | 21",
     "styles/fabricate.css | border-radius | 5px | 13",
     "styles/fabricate.css | border-radius | 8px | 71"
   ],
@@ -379,7 +379,6 @@
     "src/ui/svelte/components/CollapsibleGroupHeader.svelte | 1",
     "src/ui/svelte/components/EssenceSourceSelector.svelte | 2",
     "src/ui/svelte/components/IconPicker.svelte | 1",
-    "src/ui/svelte/components/ImagePathPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPopover.svelte | 2",
     "src/ui/svelte/components/RowDisclosure.svelte | 1",

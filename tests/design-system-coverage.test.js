@@ -85,10 +85,10 @@ test('the library has the exact structure the parser assumes', () => {
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 72, 'distinct primitive names');
+  assert.equal(library.names.length, 71, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    72,
+    71,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
@@ -96,7 +96,7 @@ test('the library has the exact structure the parser assumes', () => {
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan.
-  assert.equal(library.fileWideNames.length, 83, 'file-wide primitive-shaped names');
+  assert.equal(library.fileWideNames.length, 82, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
 
@@ -189,7 +189,7 @@ test('every manifest library name resolves to a library entry', () => {
   }
 });
 
-/** The 28 library entries with no shipped implementation (issue 1505). */
+/** The 27 library entries with no shipped implementation (issue 1505). */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
   'DataTable', 'InfoStrip', 'LogList', 'Menu',
@@ -599,7 +599,7 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 33 shipped rows the library does not name. RE-COUNTED at issue 1392 rather than incremented.
+ * The 31 shipped rows the library does not name. RE-COUNTED at issue 1392 rather than incremented.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
@@ -632,7 +632,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/DropZone.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
