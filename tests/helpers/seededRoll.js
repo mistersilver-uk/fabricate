@@ -1,3 +1,5 @@
+// A Roll double: `totals` seeds evaluate(), `maxima` seeds evaluateSync({maximize:true}) (the
+// rollability-floor reading), and `unparsable` throws like Foundry's grammar does.
 export function seededRollClass({ totals = {}, maxima = {}, unparsable = [] } = {}) {
   const calls = [];
   const seeded = (map, formula) => (Object.hasOwn(map, formula) ? map[formula] : Number.NaN);
