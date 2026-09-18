@@ -22,7 +22,7 @@ src/systems/CompendiumImporter.js::importFromPackData	291
 src/systems/CraftingEngine.js	8475
 src/systems/CraftingEngine.js::_applyToolBreakage	111
 src/systems/CraftingEngine.js::_buildVersionedStageOperation	229
-src/systems/CraftingEngine.js::_createSingleResult	163
+src/systems/CraftingEngine.js::_createSingleResult	160
 src/systems/CraftingEngine.js::_finishTimedStep	349
 src/systems/CraftingEngine.js::_matchAlchemySignature	138
 src/systems/CraftingEngine.js::_prepareVersionedStage	118

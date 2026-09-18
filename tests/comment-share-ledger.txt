@@ -3,16 +3,16 @@ scripts/foundry	13
 scripts/lib	3263
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
-src	1248
+src	1249
 src/canvas	385
 src/canvas/linkedVisuals	64
 src/canvas/regions	332
 src/config	435
 src/integrations	20
 src/migration	1797
-src/models	465
+src/models	467
 src/models/match	66
-src/systems	28677
+src/systems	28667
 src/ui	1109
 src/ui/svelte	52
 src/ui/svelte/actions	73
@@ -49,7 +49,7 @@ src/ui/svelte/stores	4606
 src/ui/svelte/util	1273
 src/utils	1367
 styles	1045
-tests	19584
+tests	19553
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
@@ -60,7 +60,7 @@ tests/fixtures/manager-select	20
 tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
-tests/helpers	4059
+tests/helpers	4056
 tests/helpers/manager	290
 tests/helpers/scale	622
 tests/journal	157

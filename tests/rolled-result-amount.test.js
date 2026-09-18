@@ -1,8 +1,5 @@
-/**
- * Issue 1645: a RESULT's amount is fixed or ROLLED, and this pins the three facts beneath that —
- * the persisted shape (absent on disk means fixed), the rollability floor `validate({ Roll })`
- * enforces, and the one resolver that turns a result plus the crafting character into an integer.
- */
+/** Issue 1645: a RESULT's amount is fixed or ROLLED. This pins the persisted shape (absent on disk
+ *  means fixed), the rollability floor `validate({ Roll })` enforces, and the one resolver. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

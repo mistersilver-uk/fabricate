@@ -76,9 +76,7 @@ function buildCheckResult(value) {
   return { value };
 }
 
-// ---------------------------------------------------------------------------
 // AC 1 — equal mode: awards when remaining >= cost, stops when remaining < cost
-// ---------------------------------------------------------------------------
 
 test('equal mode — budget exactly matches difficulty → result awarded, remaining = 0', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'equal');
@@ -190,9 +188,7 @@ test('equal mode — budget exactly covers multiple results sequentially → all
   assert.equal(result.meta.remaining, 0);
 });
 
-// ---------------------------------------------------------------------------
 // AC 2 — exceed mode: awards when remaining > cost (strict inequality)
-// ---------------------------------------------------------------------------
 
 test('exceed mode — budget greater than difficulty → result awarded', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'exceed');
@@ -298,9 +294,7 @@ test('exceed mode — budget strictly exceeds all results → all awarded', () =
   assert.equal(result.meta.remaining, 5);
 });
 
-// ---------------------------------------------------------------------------
 // AC 3 — partial mode: awards partial credit on last result, then stops
-// ---------------------------------------------------------------------------
 
 test('partial mode — budget >= difficulty → full result awarded', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'partial');
@@ -414,9 +408,7 @@ test('partial mode — remaining exactly matches difficulty → full award, no p
   assert.equal(result.meta.remaining, 0);
 });
 
-// ---------------------------------------------------------------------------
 // AC 4 — Edge cases
-// ---------------------------------------------------------------------------
 
 test('edge case — zero check value → no results awarded in equal mode', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 1 }], 'equal');
@@ -505,9 +497,8 @@ test('edge case — no result groups → returns empty groups and zero remaining
 });
 
 test('edge case — a MAX_SAFE_INTEGER value (a forced-success crit) awards every result', () => {
-  // A progressive check's success crit forces value = Number.MAX_SAFE_INTEGER to
-  // mean "award everything"; the budget loop awards every result regardless of
-  // difficulty. Uses 'exceed' (the strictest mode) to prove the sentinel covers all.
+  // A progressive check's success crit forces value = Number.MAX_SAFE_INTEGER to mean "award
+  // everything"; the budget loop awards every result regardless of difficulty.
   const system = buildProgressiveSystem(
     [{ id: 'item-A', difficulty: 100 }, { id: 'item-B', difficulty: 9999 }],
     'exceed'
@@ -558,9 +549,7 @@ test('edge case — result with missing componentId is skipped, valid results st
   assert.equal(result.meta.remaining, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Quantity-less awards — progressive results grant one item per ordered entry
-// ---------------------------------------------------------------------------
 
 test('awarded results are forced to quantity 1, ignoring any legacy authored quantity', () => {
   // A recipe authored before the editor dropped the quantity field may still carry

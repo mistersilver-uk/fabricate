@@ -159,9 +159,8 @@ function tierStepForCard(checkResult) {
   return checkResult?.data?.tierStepApplied ?? null;
 }
 
-/** What a result card states about the rolled amounts an awarded array carries (issue 1645): the
- * live rolls the message rides them on, and the empty awards that created no item and so have no
- * receipt to render, making the award itself the row. Shared by the crafting and salvage posters. */
+/** What a card states about the rolled amounts an awarded array carries (issue 1645): the live
+ * rolls the message rides on, and the empty awards that created no item and so are their own row. */
 function rolledAwardChatParts(awarded) {
   const awards = awarded?.rolledAwards ?? [];
   return {
@@ -5744,8 +5743,8 @@ export class CraftingEngine {
       throw unconfirmedHistoryError('Crafting result source is unavailable');
     }
 
-    // Resolved ONCE, before `setStackQuantity` and `receiptQuantity` read it, so one award cannot
-    // roll twice. Zero is an EMPTY AWARD: no item, and the record is what states it.
+    // Resolved ONCE, before `setStackQuantity` and `receiptQuantity` read it. Zero is an EMPTY
+    // AWARD: no item is created, and the record is what states the roll (issue 1645).
     const { amount, rolled, roll } = await resolveRolledAmount(result, craftingActor, {
       Roll: diceEngine(),
     });
@@ -5791,23 +5790,20 @@ export class CraftingEngine {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
-    // The stacking veto is the OR across every macro that applied a path (issue 1036):
+    // The veto is the OR across every macro that applied a path (issue 1036), because
     // `createOrStackComponentItem` discards `itemData` when it stacks, losing every mutation.
     const hasPropertyUpdates = Boolean(essenceMacrosApplied || resultMacroApplied);
 
     // The durable component identity, so the inventory matcher attributes this output to its OWN
-    // component and not a sibling reached through a transitive `_stats.duplicateSource` (issue
-    // 539). No managed component or an unsafe system id is left unstamped, resolving by reference.
+    // component and not a sibling reached through `_stats.duplicateSource` (issue 539).
     stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
-    // Both the recipe- and system-level flags must be set. A transferring output is materially
-    // distinct per craft, so it must never merge into an existing stack.
+    // Both flags must be set, and a transferring output never merges into an existing stack.
     const transfersEffects =
       recipe.transferEffects === true && system?.features?.effectTransfer === true;
 
-    // Only a PLAIN component output stacks onto an existing item (issue 858): it must resolve to a
-    // managed component, carry no property-macro customization and transfer no effects, any of
-    // which makes it materially distinct.
+    // Only a PLAIN component output stacks onto an existing item (issue 858): a managed component
+    // with no property-macro customization and no transferred effects.
     const awardedQuantity = receiptQuantity(amount ?? 1);
     const itemsIterable =
       craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
@@ -6846,8 +6842,7 @@ export class CraftingEngine {
     const toolEntries = this._resolveToolChatEntries(tools, system);
     const { rolls, emptyAwards } = rolledAwardChatParts(createdResults);
 
-    // Resolve to a plain, Foundry-free model, then render via the shared pure
-    // builder (mirrors the gathering card: resolve names/images here, format there).
+    // A plain, Foundry-free model: names and images resolve here, formatting happens there.
     const content = buildCraftingChatContent(
       {
         status: success ? 'succeeded' : 'failed',
@@ -6898,10 +6893,8 @@ export class CraftingEngine {
       const key = componentId || pair.item?.uuid || pair.item?.name || null;
       if (key && seen.has(key)) continue;
       if (key) seen.add(key);
-      // `data-models` requirement 13: the authored label and the registration snapshot
-      // both outrank the linked component, and the matched item is the last resort. The
-      // previous component-then-item ordering skipped an authored `label` entirely and
-      // printed the raw item name for every item-sourced Tool (issue 1119).
+      // `data-models` requirement 13: the authored label and the registration snapshot both
+      // outrank the linked component, and the matched item is the last resort (issue 1119).
       entries.push({
         name: resolveToolDisplayName(pair.tool, component, '') || pair.item?.name || '',
         img: this._toolChatImage(pair.tool, component) || pair.item?.img || '',
@@ -6924,9 +6917,8 @@ export class CraftingEngine {
     const componentById = new Map(
       resolvedComponentsFor(system).map((component) => [component?.id, component])
     );
-    // The evidence carries `toolId` (issue 1119) precisely so this card can reach the Tool.
-    // Resolving `componentId` alone produced BLANK entries — not even a fallback — for an
-    // item-sourced Tool, which has no component to name.
+    // The evidence carries `toolId` (issue 1119) precisely so this card can reach a Tool an
+    // item sourced, which has no component to name and so resolves to nothing by `componentId`.
     const toolById = new Map(resolvedToolsFor(system).map((tool) => [tool?.id, tool]));
     const entries = [];
     const seen = new Set();
@@ -6947,10 +6939,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Post a salvage result chat card, the salvage analogue of {@link _postCraftChatMessage} (issue
-   * 675). Gated on the SAME `features.chatOutput` toggle, and posted only for a resolved success
-   * or a rolled failure — never for a cancelled prompt, a misconfigured abort, or a time-gated
-   * run that awarded nothing.
+   * The salvage analogue of {@link _postCraftChatMessage} (issue 675), on the SAME
+   * `features.chatOutput` toggle and posted only for a resolved success or a rolled failure.
    *
    * @param {boolean} [params.suppressed] Post nothing (issue 859) because a bulk salvage posts
    *   ONE aggregated card; gated with `features.chatOutput` so there is one early return.
@@ -7845,9 +7835,8 @@ export class CraftingEngine {
     return consumed;
   }
 
-  /** Every result in the resolved salvage groups, as the created documents plus the award records
-   * the run container needs. ONE implementation, TWO callers (issue 1098): a second copy would be a
-   * second place for the stacked-twice de-dup and the `componentId` fallback chain to drift. */
+  /** Every result in the resolved salvage groups: the created documents, plus the award records the
+   * run container needs. ONE implementation, TWO callers (issue 1098). */
   async _awardSalvageResultGroups({
     actor,
     resultGroups,
@@ -7857,8 +7846,7 @@ export class CraftingEngine {
     checkResult,
   }) {
     const resultItems = [];
-    // The awarding component id travels alongside each created item without reshaping
-    // `resultItems`, which both callers return as `results`.
+    // The awarding component id travels beside each item, leaving `resultItems` unreshaped.
     const createdRecords = [];
     const rolledAwards = [];
     const receiptCollector = createItemReceiptCollector();

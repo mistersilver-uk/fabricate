@@ -924,13 +924,9 @@ test('every rule the complications block adds is reached through a complication-
   }
 });
 
-/**
- * The rolled run is the one part of the row that MUST survive chat width (issue 1645).
- *
- * The item label is `nowrap` + ellipsis inside a `minmax(140px, 1fr)` track, so an amount stated in
- * that treatment is ellipsed away beside any ordinary component name — measured, not reasoned about.
- * The control is the shipped markup with the run moved back onto the label, and it must clip.
- */
+/** The rolled run is the one part of the row that MUST survive chat width (issue 1645): the item
+ *  label is `nowrap` + ellipsis in a `minmax(140px, 1fr)` track, so the control moves the run back
+ *  onto that treatment and must clip where the shipped markup does not. */
 test('1645: the rolled run stays readable at chat width where a label would be ellipsed', async () => {
   const html = buildCraftingChatContent(
     successModel({

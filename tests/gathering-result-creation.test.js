@@ -390,8 +390,7 @@ test('1645: a structurally equal clone of the planned row consumes the plan, nev
       quantityFormula: '1d4+2',
     });
     const creator = createGatheringResultCreator(managerWith(system));
-    // The run persists and reloads between plan and award, so the awarded row is an equal COPY of
-    // the planned one; keyed on identity alone, the amount would be rolled a second time.
+    // The run reloads between plan and award, so the awarded row is an equal COPY of the planned one.
     const planned = await creator.plan({ actor: capturingActor(), system, resultGroups: [{ results: [row()] }] });
     const created = await creator.create({ actor: capturingActor(), system, resultGroups: [{ results: [row()] }] });
 

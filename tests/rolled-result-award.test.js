@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { seededRollClass } from './helpers/seededRoll.js';
+import { seededRollClass, withRoll } from './helpers/seededRoll.js';
 import { itemReceipt } from '../src/systems/runHistoryEvidence.js';
 
 function setProperty(object, path, value) {
@@ -80,14 +80,9 @@ function capturingActor() {
   return actor;
 }
 
-function withRoll(seed, run) {
+function withSeededRoll(seed, run) {
   const seeded = seededRollClass(seed);
-  const previous = globalThis.Roll;
-  globalThis.Roll = seeded.Roll;
-  return Promise.resolve(run(seeded)).finally(() => {
-    if (previous === undefined) delete globalThis.Roll;
-    else globalThis.Roll = previous;
-  });
+  return withRoll(seeded.Roll, () => run(seeded));
 }
 
 const engine = () => new CraftingEngine({ canCraft: () => ({ canCraft: false }) }, null, null);
@@ -96,7 +91,7 @@ const record = (awards) => awards.map(({ roll, rolled, name, img, ...rest }) => 
 const resultRow = (id, quantityFormula) => ({ id, componentId: COMPONENT.id, quantity: 1, quantityFormula });
 
 test('1645: the crafted stack is the seeded roll total, rolled once against the crafter', async () => {
-  await withRoll({ totals: { '1d4+1': 4 } }, async ({ calls }) => {
+  await withSeededRoll({ totals: { '1d4+1': 4 } }, async ({ calls }) => {
     const actor = capturingActor();
     const { items } = await engine()._createResultItems(
       actor,
@@ -119,7 +114,7 @@ test('1645: the crafted stack is the seeded roll total, rolled once against the 
 });
 
 test('1645: a result rolling to zero creates no item and is still reported', async () => {
-  await withRoll({ totals: { '1d4-8': -3, '1d4+1': 2 } }, async ({ calls }) => {
+  await withSeededRoll({ totals: { '1d4-8': -3, '1d4+1': 2 } }, async ({ calls }) => {
     const actor = capturingActor();
     const { items } = await engine()._createResultItems(
       actor,
@@ -148,7 +143,7 @@ test('1645: a result rolling to zero creates no item and is still reported', asy
 });
 
 test('1645: a fixed result still awards its authored quantity and rolls nothing', async () => {
-  await withRoll({}, async ({ calls }) => {
+  await withSeededRoll({}, async ({ calls }) => {
     const actor = capturingActor();
     const { items } = await engine()._createResultItems(
       actor,
@@ -187,7 +182,7 @@ test('1645: a progressive salvage award forces one and drops the formula before 
 });
 
 test('1645: the award receipt records the roll, and a fixed award records no key at all', async () => {
-  await withRoll({ totals: { '1d4+1': 4 } }, async () => {
+  await withSeededRoll({ totals: { '1d4+1': 4 } }, async () => {
     const actor = capturingActor();
     const { items } = await engine()._createResultItems(
       actor,
@@ -215,7 +210,7 @@ test('1645: the award receipt records the roll, and a fixed award records no key
 });
 
 test('1645: the awarded array carries the live rolls the chat message needs', async () => {
-  await withRoll({ totals: { '1d4-8': -3 } }, async () => {
+  await withSeededRoll({ totals: { '1d4-8': -3 } }, async () => {
     const { items, ...returned } = await engine()._createResultItems(
       capturingActor(),
       RECIPE,

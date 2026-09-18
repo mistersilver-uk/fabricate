@@ -4,7 +4,6 @@ import {
   resolvePresentComponentIds,
   resolvePresentToolIds,
 } from '../gatheringToolRuntime.js';
-import { quantityFormulaErrors } from '../models/Result.js';
 import { resolveToolDisplayImage, resolveToolDisplayName } from '../models/toolDisplay.js';
 import {
   buildInteractiveRollOptions,
@@ -13,7 +12,6 @@ import {
 import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
-import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
@@ -50,6 +48,7 @@ import {
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
 import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
+import { gatheringResultAmountErrors } from './gatheringResultGroups.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
@@ -5623,7 +5622,7 @@ function validateTaskConfiguration(task, system = null) {
     if (hasInvalidFixedResultQuantity(resultGroups)) {
       errors.push('Gathering results require finite positive numeric quantities');
     }
-    errors.push(...unrollableResultAmounts(resultGroups));
+    errors.push(...gatheringResultAmountErrors(resultGroups));
   }
 
   if (resolutionMode === 'd100') {
@@ -5657,9 +5656,7 @@ function validateTaskConfiguration(task, system = null) {
     }
   }
 
-  // Routed gathering resolves through the system-level gathering check formula,
-  // not a per-task result-selection provider: require the configured routed roll
-  // formula. The result-group / group-name checks above still apply.
+  // Routed gathering resolves through the system-level check formula, not a per-task provider.
   if (
     resolutionMode === 'routed' &&
     !stringOrNull(system?.gatheringCraftingCheck?.routed?.rollFormula)
@@ -5688,19 +5685,6 @@ function validateTaskConfiguration(task, system = null) {
   }
 
   return errors;
-}
-
-/** The data boundary applies the SAME rollability floor the authoring surface does: a row that
- *  entered by import or seed has no editor to have refused it (issue 1645). */
-function unrollableResultAmounts(resultGroups) {
-  const Roll = diceEngine();
-  return resultGroups.flatMap((group) =>
-    normalizeList(group?.results).flatMap((result) =>
-      quantityFormulaErrors(stringOrNull(result?.quantityFormula), Roll).map(
-        (error) => `Gathering result ${error}`
-      )
-    )
-  );
 }
 
 function hasInvalidFixedResultQuantity(resultGroups) {

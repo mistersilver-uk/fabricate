@@ -1201,17 +1201,14 @@ test('1645: a rolled amount is stated beside the number every yield projection c
     getComponent,
   }).buildListing({ actor: ACTOR, viewer: PLAYER });
 
-  // `_yieldEntry`: the authored number stays readable, because a null `qty` renders as "not
-  // recorded" rather than as an amount no actor-free surface can preview.
   const [rolledEntry, fixedEntry] = listing.activeRuns[0].gatheringYield.entries;
-  assert.equal(rolledEntry.qty, 3);
-  assert.equal(rolledEntry.amountLabel, '1d4+1');
+  assert.equal(rolledEntry.qty, 3, 'a null qty renders as "not recorded", so the number stays');
+  assert.equal(rolledEntry.amountLabel, '1d4+1', 'and the expression rides beside it');
   assert.equal(fixedEntry.qty, 2);
   assert.ok(!('amountLabel' in fixedEntry), 'a fixed row states no expression at all');
 
-  // `_mapResult`: a recorded award states the roll as it fell, never the expression.
   const [rolledAward, fixedAward] = listing.history[0].createdResults;
-  assert.equal(rolledAward.quantity, 3, 'the awarded integer is what was recorded');
+  assert.equal(rolledAward.quantity, 3, 'a recorded award states the integer it awarded');
   assert.equal(
     rolledAward.amountLabel,
     `FABRICATE.App.Journal.AmountRolled|${JSON.stringify({ formula: '1d4+1', total: 3 })}`
@@ -1219,7 +1216,6 @@ test('1645: a rolled amount is stated beside the number every yield projection c
   assert.equal(fixedAward.quantity, 2);
   assert.ok(!('amountLabel' in fixedAward), 'and a fixed award carries no label key');
 
-  // `_tierYield`: one rendered amount string, so the expression occupies it directly.
   const system = {
     ...SYSTEM,
     gatheringCraftingCheck: {
@@ -1250,7 +1246,8 @@ test('1645: a rolled amount is stated beside the number every yield projection c
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].gatheringYield.tiers;
   assert.deepEqual(
     tiers[0].yields.map((entry) => entry.quantity),
-    ['×1d4+1', '×2']
+    ['×1d4+1', '×2'],
+    'a tier yield renders one amount string, so the expression occupies it directly'
   );
 });
 

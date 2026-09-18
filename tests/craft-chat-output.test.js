@@ -1,18 +1,6 @@
 /**
- * Unit tests for T-056: Automatic Crafting Chat Output
- *
- * Tests the _postCraftChatMessage() method added to CraftingEngine and the
- * end-to-end craft() integration.
- *
- * Test cases:
- *  1. Success message payload content
- *  2. Failure message payload content
- *  3. Toggle disabled -> no ChatMessage.create call
- *  4. Toggle enabled (default) -> ChatMessage.create called
- *  5. No system found -> graceful, no error
- *  6. Localization keys used
- *  7. Exactly-once emission in full craft() flow
- *  8. No message for validation-only failures (no actor, missing items)
+ * Unit tests for T-056: Automatic Crafting Chat Output. Tests the _postCraftChatMessage() method
+ * added to CraftingEngine and the end-to-end craft() integration.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,10 +9,9 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { attachAwardReceipts, attachRolledAwards } from '../src/systems/runHistoryEvidence.js';
 
 /**
- * The published card renders ACKNOWLEDGED awards only: production hands
- * `_postCraftChatMessage` the array `_createResultItems` returned, carrying its
- * immutable per-invocation receipts, so a bare array of item-likes would stand in for
- * a caller that cannot exist.
+ * The published card renders ACKNOWLEDGED awards only: production hands `_postCraftChatMessage` the
+ * array `_createResultItems` returned, carrying its immutable per-invocation receipts, so a bare
+ * array of item-likes would stand in for a caller that cannot exist.
  */
 function awardedResults(entries) {
   return attachAwardReceipts(
@@ -262,9 +249,8 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   assert.ok(content.includes('src="icons/sword.png"'), 'created result image src');
 });
 
-// Mutation control on the publication boundary: strip the receipts the writer
-// attached and the card refuses to publish rather than presenting planned awards as
-// actual ones. An empty award list is not an award, so it stays publishable.
+// Mutation control on the publication boundary: strip the receipts the writer attached and the card
+// refuses to publish rather than presenting planned awards as actual ones.
 test('_postCraftChatMessage: refuses to publish awards that carry no acknowledged receipts', async () => {
   setupGame(true);
   resetChat();
@@ -289,9 +275,8 @@ test('_postCraftChatMessage: refuses to publish awards that carry no acknowledge
 });
 
 test('_postCraftChatMessage: tools render authored component names (not the matched item) and never duplicate', async () => {
-  // A single owned item can satisfy two tool slots (source/name collision), which
-  // previously printed the item's name twice. The card must instead show each
-  // tool's authored component name.
+  // A single owned item can satisfy two tool slots (source/name collision), which previously
+  // printed the item's name twice. The card must instead show each tool's authored component name.
   const system = {
     id: 'sys-1',
     features: { chatOutput: true },
