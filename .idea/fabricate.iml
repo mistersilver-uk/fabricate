@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="WEB_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <!-- Agent worktrees. Each is a full checkout with its own node_modules, so indexing
+           them costs thousands of inotify watches apiece and exhausts fs.inotify.max_user_watches
+           long before the kernel default is reached. The directory is gitignored and is scratch
+           space for the agentic workflow; nothing in it is edited by hand. -->
+      <excludeFolder url="file://$MODULE_DIR$/.worktrees" />
+      <excludeFolder url="file://$MODULE_DIR$/.foundry-e2e" />
+      <excludeFolder url="file://$MODULE_DIR$/.foundry-chrome" />
+      <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/test-results" />
+      <excludeFolder url="file://$MODULE_DIR$/ui-screenshot-artifact" />
+    </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
