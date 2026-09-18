@@ -41,6 +41,7 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/playerResultOrder.svelte.js',
     'src/ui/svelte/stores/inventoryStore.svelte.js',
   ],
   compiledModules: [

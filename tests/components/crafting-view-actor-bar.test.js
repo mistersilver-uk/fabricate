@@ -17,6 +17,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 // wiring rather than a stubbed getSelectedCraftingActorId.
 const RUNE_MODULES = [
   'src/ui/svelte/stores/browseListing.svelte.js',
+  'src/ui/svelte/stores/playerResultOrder.svelte.js',
   'src/ui/svelte/stores/actorBarStore.svelte.js',
   'src/ui/svelte/stores/craftingSourcesStore.svelte.js',
   'src/ui/svelte/stores/craftingStore.svelte.js'

@@ -97,24 +97,17 @@ function recipe(id, name, extra = {}) {
 }
 
 /**
- * Compiles the crafting store module with its non-mocked leaf dependencies copied in plain, and
- * returns the loaded `createCraftingStore` factory alongside the compiler (the caller owns
- * `compiler.cleanup()`).
+ * Loads `createCraftingStore` with its real import graph walked rather than restated, and returns it
+ * alongside the compiler (the caller owns `compiler.cleanup()`).
+ *
+ * `loadWithClosure`, not `load` plus a hand list: an omission in such a list is reported as
+ * `cancelled` with `fail 0` rather than as a failure (issue 1695).
  */
 async function setupCraftingStoreCompiler(prefix) {
   const compiler = createSvelteModuleCompiler(prefix);
-  compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
-  // The store reconciles the player's stored stage order through this import-free leaf (issue 651).
-  compiler.copyPlain('src/utils/progressiveResultOrder.js');
-  // And the threshold helper: the store recomputes thresholds after a reorder.
-  compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-  // The requirement rail's slot projection (issue 917) — same rule again.
-  compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
-  // The authority-refusal wording the store falls back to when a result carries a
-  // `reason` and no `message` (issue 1648) — same rule again.
-  compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
-  compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
-  const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
+  const { createCraftingStore } = await compiler.loadWithClosure(
+    'src/ui/svelte/stores/craftingStore.svelte.js'
+  );
   return { compiler, createCraftingStore };
 }
 
@@ -1095,6 +1088,35 @@ describe('craftingStore', () => {
 
     assert.equal(writes.length, 1);
     assert.deepEqual(writes[0].order, ['s3', 's1', 's2']);
+  });
+
+  it('commits the moved order under the recipe selected when the debounce was ARMED', async () => {
+    // Issue 1695: crafting re-derived the key at flush, so a recipe selection inside the 400 ms
+    // window wrote the moved order under the NEWLY selected recipe's key — user-visible on reload
+    // as recipe B rendering recipe A's order. Salvage was already fixed this way by issue 859.
+    const { services, writes } = makeOrderServices();
+    services.listCraftingForActor = async () => ({
+      summaries: [
+        recipe('ordered-a', 'Blade', { progressiveStages: STAGES, allowPlayerResultReorder: true }),
+        recipe('ordered-b', 'Shield', { progressiveStages: STAGES, allowPlayerResultReorder: true }),
+      ],
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+    store.select('ordered-a');
+    flushSync();
+
+    store.reorderProgressiveStage(2, 0, 'Master moved to position 1 of 3');
+    flushSync();
+    store.select('ordered-b');
+    flushSync();
+
+    // Asserted BEFORE the flush: a run whose real 400 ms debounce had already fired would pass
+    // vacuously through the flush's nothing-pending early return.
+    assert.equal(writes.length, 0, 'the debounce had not fired');
+    assert.deepEqual(await store.flushProgressiveOrder(), { ok: true }, 'and it reports the write');
+
+    assert.deepEqual(writes, [{ key: 'recipe:ordered-a', order: ['s3', 's1', 's2'] }]);
   });
 
   it('D7a: a REJECTED write reverts the rows AND announces the revert', async () => {
