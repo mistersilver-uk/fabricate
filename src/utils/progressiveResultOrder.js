@@ -31,3 +31,42 @@ export function applyPlayerResultOrder(results, orderedIds) {
   out.push(...remaining);
   return out;
 }
+
+/**
+ * Whether a rendered stage order actually differs from the GM's authored one.
+ *
+ * Neither `allowPlayerResultReorder` nor "a stored order exists": the permission says a player
+ * may arrange the list, and a stored order can name the authored sequence exactly (dragged away
+ * and back, or re-authored into it). `applyPlayerResultOrder` returns its input by identity only
+ * for a null/empty order, so the comparison is positional and by id.
+ */
+export function orderDiffersFromAuthored(ordered, authored) {
+  return (
+    ordered.length === authored.length &&
+    ordered.some((stage, index) => stage?.id !== authored[index]?.id)
+  );
+}
+
+/** One subject's stored order within an order map, or null when it has none. */
+export function storedOrderFor({ scope, id, orders } = {}) {
+  const key = progressiveOrderKey({ scope, id });
+  return key ? (orders?.[key] ?? null) : null;
+}
+
+/**
+ * One subject's stage list as the run will spend it, plus whether that order is the player's.
+ *
+ * A pinned list (`allowPlayerResultReorder: false`) is the GM's by construction, so it
+ * short-circuits: reconciling it would be the same list back, and reporting it as the player's
+ * would be a lie the permission itself refutes.
+ *
+ * @returns {{stages: Array<object>, orderIsPlayers: boolean}}
+ */
+export function playerStageOrder(subject, storedOrder) {
+  const stages = Array.isArray(subject?.stages) ? subject.stages : [];
+  if (stages.length === 0 || subject?.allowPlayerResultReorder === false) {
+    return { stages, orderIsPlayers: false };
+  }
+  const ordered = applyPlayerResultOrder(stages, storedOrder);
+  return { stages: ordered, orderIsPlayers: orderDiffersFromAuthored(ordered, stages) };
+}
