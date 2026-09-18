@@ -7,7 +7,12 @@
  * duplication gate forbids a second copy in the builder).
  */
 
-import { cloneJson } from '../utils/scalars.js';
+import {
+  cloneJson,
+  iterableToArray as normalizeList,
+  stringOrEmpty,
+  stringOrNull,
+} from '../utils/scalars.js';
 
 /**
  * Sentinel `taskId` prefix persisted on an opaque-blind WAITING run in place of
@@ -60,22 +65,6 @@ export function isBlindWaitingTaskId(taskId) {
 }
 
 /**
- * Normalize an array / Map / iterable / Foundry collection into a plain array.
- * Returns an empty array for nullish or non-iterable input.
- *
- * @param {*} value
- * @returns {Array<*>}
- */
-export function normalizeList(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  if (value instanceof Map) return [...value.values()];
-  if (typeof value.values === 'function') return [...value.values()];
-  if (typeof value[Symbol.iterator] === 'function') return [...value];
-  return [];
-}
-
-/**
  * Resolve a document's stable id, preferring `id` then `uuid`.
  *
  * @param {*} document
@@ -83,18 +72,6 @@ export function normalizeList(value) {
  */
 export function idOf(document) {
   return stringOrNull(document?.id) || stringOrNull(document?.uuid);
-}
-
-/**
- * Trim a value to a non-empty string, or null when empty / nullish.
- *
- * @param {*} value
- * @returns {string|null}
- */
-export function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
 }
 
 /**
@@ -111,29 +88,6 @@ export function iterateCollection(collection) {
   if (Array.isArray(collection?.contents)) return collection.contents;
   if (typeof collection?.values === 'function') return collection.values();
   return [];
-}
-
-/**
- * Trim a value to a string, or `''` when nullish. Mirrors `stringOrNull` but
- * never returns null, for fields the listing models render directly.
- *
- * @param {*} value
- * @returns {string}
- */
-export function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-/**
- * Coerce a value to a finite number, or null when not finite.
- *
- * @param {*} value
- * @returns {number|null}
- */
-export function numberOrNull(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 /**
@@ -345,4 +299,10 @@ export function stripRuntimeSnapshotFromRun(run) {
   return publicRun;
 }
 
-export { cloneJson } from '../utils/scalars.js';
+export {
+  cloneJson,
+  iterableToArray as normalizeList,
+  laxNumberOrNull as numberOrNull,
+  stringOrEmpty,
+  stringOrNull,
+} from '../utils/scalars.js';

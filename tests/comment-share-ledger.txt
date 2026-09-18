@@ -6,13 +6,13 @@ scripts/visual-parity/lib	129
 src	1249
 src/canvas	385
 src/canvas/linkedVisuals	64
-src/canvas/regions	332
+src/canvas/regions	331
 src/config	435
 src/integrations	20
 src/migration	1797
 src/models	467
 src/models/match	66
-src/systems	28667
+src/systems	28641
 src/ui	1109
 src/ui/svelte	52
 src/ui/svelte/actions	73
@@ -47,9 +47,9 @@ src/ui/svelte/apps/manager/world	327
 src/ui/svelte/components	1245
 src/ui/svelte/stores	4606
 src/ui/svelte/util	1273
-src/utils	1367
+src/utils	1356
 styles	1045
-tests	19553
+tests	19540
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210

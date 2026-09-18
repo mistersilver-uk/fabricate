@@ -3,7 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, normalizeIdList, stringOrEmpty } from '../utils/scalars.js';
 
 const OVERRIDE_MODES = new Set(['none', 'manual']);
 
@@ -364,11 +364,6 @@ function replaceAt(array, index, value) {
   return next;
 }
 
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
 function optionalString(value) {
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim();
@@ -377,9 +372,4 @@ function optionalString(value) {
 
 function trimmedOrDefault(value, fallback) {
   return stringOrEmpty(value) || fallback;
-}
-
-function normalizeIdList(value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
 }

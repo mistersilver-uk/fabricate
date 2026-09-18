@@ -22,6 +22,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     'src/utils/essenceValidation.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     // `Chip.svelte` travels with it since issue 1371.

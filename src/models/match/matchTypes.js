@@ -1,9 +1,6 @@
 /** Registry of ingredient-`match` type handlers. */
 import { getFabricateFlag } from '../../config/flags.js';
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
+import { trimString as trimmed } from '../../utils/scalars.js';
 
 const componentHandler = {
   type: 'component',

@@ -20,7 +20,8 @@ const harness = createMountedComponentHarness({
     'src/models/match/matchTypes.js',
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
     // The tab localizes a signature-collision blocker row via this pure leaf (issue 549).
-    'src/utils/recipeActivationMessages.js'
+    'src/utils/recipeActivationMessages.js',
+    'src/utils/scalars.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the

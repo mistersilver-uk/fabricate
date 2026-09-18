@@ -3,7 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, normalizeIdList, stringOrEmpty } from '../utils/scalars.js';
 
 import {
   environmentComposesRecord,
@@ -630,19 +630,9 @@ function normalizeOptionalString(value) {
   return normalized || null;
 }
 
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
 function normalizeStringList(value) {
   const values = Array.isArray(value) ? value : value ? [value] : [];
   return [...new Set(values.map((entry) => stringOrEmpty(entry).toLowerCase()).filter(Boolean))];
-}
-
-function normalizeIdList(value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
 }
 
 function normalizeDropRateAdjustmentValue(value) {

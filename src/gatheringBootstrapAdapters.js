@@ -1,3 +1,5 @@
+import { arrayOrEmpty as normalizeList } from './utils/scalars.js';
+
 /**
  * The selectable gathering actor adapter GatheringEngine uses; the engine passes an explicit viewer,
  * direct callers falling back to the current user.
@@ -113,10 +115,6 @@ function normalizeFoundryCollection(collection) {
   if (typeof collection.values === 'function') return Array.from(collection.values());
   if (typeof collection[Symbol.iterator] === 'function') return Array.from(collection);
   return [];
-}
-
-function normalizeList(value) {
-  return Array.isArray(value) ? value : [];
 }
 
 function defaultWorldTimeProcessorError(label, error) {

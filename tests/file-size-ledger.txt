@@ -35,7 +35,7 @@ src/systems/CraftingEngine.js::describeVersionedStageCheck	117
 src/systems/CraftingEngine.js::executeVersionedStage	173
 src/systems/CraftingEngine.js::salvage	504
 src/systems/CraftingLifecycleExecutor.js::execute	113
-src/systems/CraftingListingBuilder.js	1290
+src/systems/CraftingListingBuilder.js	1285
 src/systems/CraftingListingBuilder.js::_buildCheck	111
 src/systems/CraftingListingBuilder.js::_buildRecipeModel	165
 src/systems/CraftingRunManager.js	1195
@@ -63,8 +63,8 @@ src/systems/GatheringRichStateService.js::_resolveCharacterModifierContribution	
 src/systems/GatheringRichStateService.js::composeEnvironment	119
 src/systems/GatheringRichStateService.js::previewDropBreakdown	125
 src/systems/GatheringRichStateService.js::resolveD100Attempt	106
-src/systems/GatheringRunManager.js	956
-src/systems/InventoryListingBuilder.js	2480
+src/systems/GatheringRunManager.js	950
+src/systems/InventoryListingBuilder.js	2475
 src/systems/InventoryListingBuilder.js::_buildRecipeItemRows	195
 src/systems/InventoryListingBuilder.js::_buildSalvage	133
 src/systems/InventoryListingBuilder.js::_buildSystemParticipations	105

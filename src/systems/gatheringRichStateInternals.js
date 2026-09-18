@@ -24,16 +24,6 @@ const SECONDS_PER_UNIT = Object.freeze({
   weeks: 604_800,
 });
 
-export function normalizeList(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-export function numberOrNullStrict(value) {
-  if (value == null || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
 export function nonNegativeNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : Number(fallback || 0);
@@ -87,4 +77,8 @@ export function durationToSeconds(secondsPerUnit, count, unit) {
   return Math.max(0, Number(count || 0) * safe);
 }
 
-export { cloneJson } from '../utils/scalars.js';
+export {
+  arrayOrEmpty as normalizeList,
+  cloneJson,
+  numberOrNull as numberOrNullStrict,
+} from '../utils/scalars.js';

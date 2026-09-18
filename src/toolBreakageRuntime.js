@@ -3,6 +3,7 @@ import { Tool } from './models/Tool.js';
 import { setStackQuantity } from './systems/itemStackQuantity.js';
 import { resolvedToolsFor } from './systems/scopedEntityReads.js';
 import { effectiveToolBreakageAuthority } from './systems/toolBreakageAuthority.js';
+import { untrimmedStringOrEmpty as stringOrEmpty } from './utils/scalars.js';
 
 /**
  * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item data BEFORE creation
@@ -140,10 +141,6 @@ export function plannedToolBreakageOutcome(tool) {
     };
   }
   return { action: 'none' };
-}
-
-function stringOrEmpty(value) {
-  return value === null || value === undefined ? '' : String(value);
 }
 
 /** Compare two numbers with one of the DSL operators. */

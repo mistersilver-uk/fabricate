@@ -7,6 +7,7 @@ import {
   findRangeConflicts,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
+import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 /**
  * Pure readiness evaluator for one subsystem check, mirroring `recipeReadiness.js`: it returns
@@ -130,10 +131,6 @@ function pushIssue(issues, id, severity, data = null) {
     );
   }
   issues.push(data === null ? { id, severity } : { id, severity, data });
-}
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**

@@ -18,6 +18,7 @@
   the two things that are genuinely its own: which tab is active, and which panel that renders.
 -->
 <script>
+  import { normalizeTag } from '../../../../utils/scalars.js';
   import { localize } from '../../util/foundryBridge.js';
   import VocabularyPanel from './VocabularyPanel.svelte';
   import VocabularyTabs from './VocabularyTabs.svelte';
@@ -70,9 +71,7 @@
   );
 
   function existsIn(rows, value) {
-    const normalized = String(value || '')
-      .trim()
-      .toLowerCase();
+    const normalized = normalizeTag(value);
     return (rows || []).some((row) => String(row.name || '').toLowerCase() === normalized);
   }
 
@@ -158,12 +157,6 @@
 
   function normalizeCategory(value) {
     return String(value || '').trim();
-  }
-
-  function normalizeTag(value) {
-    return String(value || '')
-      .trim()
-      .toLowerCase();
   }
 
   function categoryAdded() {

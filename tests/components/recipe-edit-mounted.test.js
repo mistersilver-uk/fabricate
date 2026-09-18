@@ -104,6 +104,7 @@ const RAW_MODULES = [
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/utils/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
+  'src/utils/scalars.js',
 ];
 
 // The new tab + section components the editor shell composes.
