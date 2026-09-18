@@ -514,6 +514,59 @@ describe('journal run command protocol', () => {
     assert.equal(executed.length, 1, 'the stage still executed, with the check settled for it');
   });
 
+  it('opens the roll prompt for an interactive public craft, as the crafting screen asks', async () => {
+    // Issue 1780. The player app's Craft button reaches the same `executePublicCraft` as a macro,
+    // through `game.fabricate.craftRecipe({ interactive: true })`. Issue 1683 hard-coded the
+    // execute as non-interactive, and once `main.js` began forwarding the option (issue 1759)
+    // the crafting screen lost its roll dialog: the View Lab's `player-crafting-roll-prompt`
+    // frame went from a standing prompt to a bare crafting tab. The flag is the CALLER's.
+    let promptCalls = 0;
+    const executed = [];
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      promptCheck: async () => {
+        promptCalls += 1;
+        return { confirmed: true, modifierIds: ['hb-mod-medicine'] };
+      },
+      operations: {
+        crafting: {
+          getRun: () => ({ id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' }),
+          describeCheck: async () => ({ required: true, publicPrompt: {}, privateEvaluation: {} }),
+          evaluateCheck: async () => ({
+            success: true,
+            engineEvaluated: true,
+            outcome: null,
+            value: null,
+            data: {},
+          }),
+          execute: async (args) => (executed.push(args), { success: true, terminal: true }),
+        },
+      },
+    });
+
+    const settled = await executePublicCraft({
+      engine: {
+        craft: async () => ({
+          success: true,
+          runId: 'run-1',
+          runRevision: 3,
+          requiresExecution: true,
+          canExecuteImmediately: true,
+        }),
+      },
+      runManager: { getActiveRun: () => null },
+      actor: { uuid: 'Actor.a' },
+      sourceActors: [{ uuid: 'Actor.a' }],
+      recipe: { id: 'recipe' },
+      options: { interactive: true },
+      executeCommand: (command, options) => service.executeJournalRunCommand(command, options),
+    });
+
+    assert.equal(promptCalls, 1, 'the crafting screen still gets its roll dialog');
+    assert.equal(settled.success, true, JSON.stringify(settled));
+    assert.equal(executed.length, 1, 'and the stage executed with the answered check');
+  });
+
   it('finishes a ready public gather in one call, and leaves a waiting one alone', async () => {
     // Issue 1759. Issue 1648 gave gathering a versioned lifecycle and `startGatheringAttempt` began
     // selecting it unconditionally, which routes a READY attempt away from the engine's immediate
@@ -581,6 +634,34 @@ describe('journal run command protocol', () => {
     });
     assert.deepEqual(blockedExecutes, []);
     assert.deepEqual(blocked.blockedReasons, [{ code: 'SCENE_BLOCKED' }]);
+  });
+
+  it('forwards the gathering screen\'s interactive flag to a ready public gather', async () => {
+    // Issue 1780, the gathering half: `GatheringView` starts an attempt with `interactive: true`
+    // and expects its roll dialog on a required check. `executePublicGather` hard-coded the
+    // execute as non-interactive, so a ready attempt with a check settled silently.
+    const executed = [];
+    const ready = await executePublicGather({
+      requestStart: async () => ({
+        accepted: true,
+        started: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'gather-1',
+        runRevision: 4,
+        blockedReasons: [],
+      }),
+      actor: { uuid: 'Actor.a' },
+      interactive: true,
+      executeCommand: async (command, options) => {
+        executed.push({ command, options });
+        return { success: true, terminal: true, status: 'succeeded', createdResultUuids: [] };
+      },
+    });
+
+    assert.equal(executed.length, 1);
+    assert.deepEqual(executed[0].options, { interactive: true }, 'the screen\'s flag reaches it');
+    assert.equal(ready.success, true, JSON.stringify(ready));
   });
 
   it('reports a ready gather whose execution failed as accepted but unsuccessful', async () => {
