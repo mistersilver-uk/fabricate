@@ -43,9 +43,9 @@ const harness = createMountedComponentHarness({
     // The actor portrait (issue 1506). The roster row and the detail header render it.
     'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     // The shared chip (issue 883). The tab bar's count badge and both row types render it.
     'src/ui/svelte/components/Chip.svelte',
     // THE manager's editor tab strip (issue 1362). `KnowledgeTabs` is a caller of it since

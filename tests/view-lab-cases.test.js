@@ -1103,7 +1103,7 @@ test('gathering feedback evidence reaches selected tools and all-empty fields at
     'src/ui/svelte/apps/manager/GatheringEventEditView.svelte',
   ]).map((entry) => entry.id);
   const emptyStateCases = mapChangedFilesToCases([
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
   ]).map((entry) => entry.id);
   for (const [suffix, width, height] of [
     ['normal', 1280, 820],

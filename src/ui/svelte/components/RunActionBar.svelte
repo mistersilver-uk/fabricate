@@ -1,6 +1,6 @@
 <!-- Run actions use caller-owned eligibility and a deliberate two-step cancellation. -->
 <script>
-  import SegmentedControl from '../apps/manager/SegmentedControl.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
   import IconButton from './IconButton.svelte';
   import ManagerButton from './ManagerButton.svelte';
 

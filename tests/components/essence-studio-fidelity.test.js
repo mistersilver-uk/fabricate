@@ -28,7 +28,7 @@ const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowser
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
 const studioSource = read('src/ui/svelte/apps/manager/essences/essenceStudio.js');
 const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
-const segmentedControlSource = read('src/ui/svelte/apps/manager/SegmentedControl.svelte');
+const segmentedControlSource = read('src/ui/svelte/components/SegmentedControl.svelte');
 const globalCss = read('styles/fabricate.css');
 
 // The scoped `<style>` block of a component.

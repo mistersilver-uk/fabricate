@@ -284,8 +284,8 @@ Use the expression `{' '}`, which survives the trim.
 
 | Primitive or contract | Shipped source | Reuse for |
 |---|---|---|
-| `EmptyState` | `src/ui/svelte/apps/manager/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
-| `Callout` | `src/ui/svelte/apps/manager/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
+| `EmptyState` | `src/ui/svelte/components/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
+| `Callout` | `src/ui/svelte/components/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
 | `ExplainerCard` | `src/ui/svelte/apps/manager/ExplainerCard.svelte` | EVERY side-panel "how this surface works" card — glyph-led card title, glyph-led guidance rows with optional bold lead-ins, an optional trailing row of ghost docs links. It wears `.manager-inspector-card` and `.manager-card-title`, so never restate the card shell or heading scale per surface |
 | `IconFactRow` | `src/ui/svelte/apps/manager/IconFactRow.svelte` | EVERY side-panel derived-fact row — leading accent glyph, bold statement, muted qualifying line. The stacking container owns the list gap; the row owns the well |
 | `Medallion` | `src/ui/svelte/components/Medallion.svelte` | THE art tile, manager and player alike — a record's linked image with a glyph fallback, the canonical surface, radius and sizing, and a `tint` that recolours the glyph only. Player item/recipe imagery and its missing-art fallback resolve through `src/ui/svelte/util/craftingArtResolution.js` and pass the result to this tile; never hand-roll a second thumbnail |

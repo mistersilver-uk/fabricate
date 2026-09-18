@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import {
     DEFAULT_GATHERING_EVENT_IMG,
     DEFAULT_GATHERING_TASK_IMG,

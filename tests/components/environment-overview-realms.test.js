@@ -72,7 +72,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     // ERR_MODULE_NOT_FOUND and node reports every test here as `# cancelled`.
     writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte.js')).href);

@@ -14,7 +14,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import StatBox from '../../components/StatBox.svelte';
   import Kicker from '../../components/Kicker.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
 
   let {
     aggregate = null,

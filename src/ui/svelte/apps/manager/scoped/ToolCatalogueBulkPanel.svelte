@@ -16,8 +16,8 @@
 <script>
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
-  import Callout from '../Callout.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { count = 0, applying = false, onClearSelection = () => {}, onApply = () => {} } = $props();

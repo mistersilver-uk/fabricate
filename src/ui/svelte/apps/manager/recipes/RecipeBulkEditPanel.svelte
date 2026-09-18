@@ -67,9 +67,9 @@
 -->
 <script>
   import BulkDeleteCard from '../BulkDeleteCard.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkEditSelect from '../BulkEditSelect.svelte';

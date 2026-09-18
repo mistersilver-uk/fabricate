@@ -6,7 +6,7 @@
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
   import Chip from '../../components/Chip.svelte';
   import Kicker from '../../components/Kicker.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,

@@ -10,7 +10,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';

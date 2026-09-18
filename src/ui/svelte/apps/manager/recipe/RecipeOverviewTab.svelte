@@ -24,7 +24,7 @@
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import RecipeStepsCard from '../RecipeStepsCard.svelte';
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
 
   let {

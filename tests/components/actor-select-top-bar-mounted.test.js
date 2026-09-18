@@ -25,7 +25,7 @@ const harness = createMountedComponentHarness({
     // `ComponentSourcesBar` in the bar's right slot, so that is in the static graph too — on
     // every tab, not just Crafting.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     // The two the bar reaches as of issue 1514's crafting phase. `FillBar` is the stamina

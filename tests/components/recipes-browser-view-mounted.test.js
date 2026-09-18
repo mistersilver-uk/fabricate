@@ -71,7 +71,7 @@ const browser = createMountedComponentHarness({
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The manager's ONE selection control and its ONE multi-select toolbar row (issue
     // 1010). The inspector harness below does not render either, so they are named here
     // rather than hoisted into RECIPE_PRIMITIVES.

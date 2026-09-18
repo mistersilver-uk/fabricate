@@ -52,7 +52,7 @@ const SCOPED_RAW_MODULES = [
 ];
 
 const FRAME_MODULES = [
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -65,7 +65,7 @@ const FRAME_MODULES = [
   'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, not a `<select>`.
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
 ];
 
 const catalogueHarness = createMountedComponentHarness({

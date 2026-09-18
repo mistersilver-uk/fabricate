@@ -21,7 +21,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
   import {
     toolEditorValidation,

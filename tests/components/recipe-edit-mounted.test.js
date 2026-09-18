@@ -114,7 +114,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/Chip.svelte',
   // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Field.svelte',
   // The manager's labelled push-button (issue 1118). Eight components in this tree render
   // their adds, deep-links and issue views through it, and a `.svelte` the tree renders but
@@ -122,7 +122,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   // The Results tab's progressive reorder-permission card (issue 651). A component the
   // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
   // rather than failing it.
@@ -152,7 +152,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsTab.svelte',
   // The Results tab's two standing notes became the shared strip (issue 1505). A `.svelte`
   // the tree renders but the harness omits does not fail this suite, it CANCELS it.
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte',
   // The two mode-conditional tabs (issue 676), rehomed from the deleted context rail.

@@ -12,7 +12,7 @@
   - EVERY TAB PROP MUST ALSO BE FORWARDED HERE, or the control silently takes its default.
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js';
   import RecipeEditorTabs from './recipe/RecipeEditorTabs.svelte';

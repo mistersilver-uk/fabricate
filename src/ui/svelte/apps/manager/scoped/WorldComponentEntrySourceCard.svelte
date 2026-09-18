@@ -8,7 +8,7 @@
   SOURCE-LINK fields, which `IDENTITY_FIELDS` deliberately does not buffer.
 -->
 <script>
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

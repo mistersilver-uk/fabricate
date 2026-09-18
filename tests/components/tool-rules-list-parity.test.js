@@ -21,8 +21,8 @@ const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));

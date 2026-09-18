@@ -9,7 +9,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import Avatar from '../../../components/Avatar.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
 

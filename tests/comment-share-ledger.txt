@@ -1,6 +1,6 @@
 scripts	2748
 scripts/foundry	13
-scripts/lib	3259
+scripts/lib	3262
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
 src	1249
@@ -29,7 +29,7 @@ src/ui/svelte/apps/inventory/bulk	525
 src/ui/svelte/apps/inventory/detail	598
 src/ui/svelte/apps/inventory/detail/salvage	293
 src/ui/svelte/apps/journal	530
-src/ui/svelte/apps/manager	5190
+src/ui/svelte/apps/manager	5003
 src/ui/svelte/apps/manager/checks	1603
 src/ui/svelte/apps/manager/component	347
 src/ui/svelte/apps/manager/components	309
@@ -46,16 +46,16 @@ src/ui/svelte/apps/manager/scoped	2435
 src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	327
-src/ui/svelte/components	1245
+src/ui/svelte/components	1432
 src/ui/svelte/stores	4604
 src/ui/svelte/util	1273
 src/utils	926
 styles	1045
-tests	19539
+tests	19543
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
-tests/components	14950
+tests/components	14951
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	20

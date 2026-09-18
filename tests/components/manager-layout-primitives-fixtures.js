@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // The shared no-state and standing-statement primitives keep their CSS in their own
 // scoped `<style>` blocks (issue 785), not in the global sheet, so the rules that used to
 // be read out of `styles/fabricate.css` are read out of the component source instead.
-const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/apps/manager/EmptyState.svelte');
-export const calloutPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Callout.svelte');
+const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/components/EmptyState.svelte');
+export const calloutPath = resolve(__dirname, '../../src/ui/svelte/components/Callout.svelte');
 // The shared side-panel explainer card and icon fact row (issue 881) follow the same rule:
 const explainerCardPath = resolve(
   __dirname,

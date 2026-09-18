@@ -62,7 +62,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
     // preview only ever reaches the BOOK branch, but module resolution is not rendering:
     'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',

@@ -12,7 +12,7 @@
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
   import JournalCard from './JournalCard.svelte';
 

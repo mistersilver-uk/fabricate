@@ -24,7 +24,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Callout from '../../manager/Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import SalvageMisconfiguredBody from './salvage/SalvageMisconfiguredBody.svelte';
   import SalvageProgressiveBody from './salvage/SalvageProgressiveBody.svelte';

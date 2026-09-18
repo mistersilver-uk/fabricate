@@ -81,7 +81,7 @@ const harness = createMountedComponentHarness({
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     // The shipped segmented primitive (issue 975).
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The world modifier library's row.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
@@ -91,7 +91,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ToggleCard.svelte',
     // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373).
     'src/ui/svelte/components/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',

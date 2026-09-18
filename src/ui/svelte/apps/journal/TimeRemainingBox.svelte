@@ -9,7 +9,7 @@
   renders the clock form (no phase passed).
 -->
 <script>
-  import Callout from '../manager/Callout.svelte';
+  import Callout from '../../components/Callout.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
 

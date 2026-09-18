@@ -76,7 +76,7 @@
   import { tick } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
-  import EmptyState from '../apps/manager/EmptyState.svelte';
+  import EmptyState from './EmptyState.svelte';
   import ManagerButton from './ManagerButton.svelte';
   import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';

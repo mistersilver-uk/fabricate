@@ -742,7 +742,7 @@ describe('CraftingSystemManager source contract', () => {
       'class="manager-main"',
       '<ManagerToolbar',
       'class="manager-filter"',
-      "import EmptyState from './EmptyState.svelte'",
+      "import EmptyState from '../../components/EmptyState.svelte'",
       '<EmptyState',
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);

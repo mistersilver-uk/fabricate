@@ -7,8 +7,8 @@
   Props: learnedRecipes, armedToken, onErase, onArm, onDisarm.
 -->
 <script>
-  import Callout from '../Callout.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeLearnedRow from './KnowledgeLearnedRow.svelte';
 

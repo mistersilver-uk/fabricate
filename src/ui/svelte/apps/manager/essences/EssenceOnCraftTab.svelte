@@ -24,7 +24,7 @@
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import ExplainerCard from '../ExplainerCard.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';

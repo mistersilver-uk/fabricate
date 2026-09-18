@@ -471,7 +471,11 @@ describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (iss
 
 describe('Step mode lives on the Overview tab (issue 676: rehomed from the deleted rail)', () => {
   it('renders Step mode as a real SegmentedControl beside the steps it governs', () => {
-    assert.ok(overviewSource.includes("import SegmentedControl from '../SegmentedControl.svelte'"));
+    assert.ok(
+      overviewSource.includes(
+        "import SegmentedControl from '../../../components/SegmentedControl.svelte'"
+      )
+    );
     assert.ok(overviewSource.includes('optionDataAttr="data-recipe-step-mode-option"'));
     assert.ok(
       overviewSource.includes('data-recipe-section="recipe-step-mode"'),

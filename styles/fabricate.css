@@ -13183,7 +13183,7 @@
   cursor: not-allowed;
 }
 
-/* The no-state panel's own appearance now lives in its component's scoped block (`src/ui/svelte/apps/manager/EmptyState.svelte`), not here: co-located CSS keeps `VIEW_RECIPES` screenshot detection scoped to the views that render the panel instead of matching the broad `theme-or-global-ui` recipe. */
+/* The no-state panel's own appearance now lives in its component's scoped block (`src/ui/svelte/components/EmptyState.svelte`), not here: co-located CSS keeps `VIEW_RECIPES` screenshot detection scoped to the views that render the panel instead of matching the broad `theme-or-global-ui` recipe. */
 
 .fabricate-manager .manager-setup-card {
   display: grid;

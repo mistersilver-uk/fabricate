@@ -41,7 +41,7 @@ const harness = createMountedComponentHarness({
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). Same rule, same consequence.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/Field.svelte',

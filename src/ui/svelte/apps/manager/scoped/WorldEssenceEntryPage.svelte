@@ -15,7 +15,7 @@
   import { localize, notifyError } from '../../../util/foundryBridge.js';
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import EditorTabs from '../../../components/EditorTabs.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

@@ -71,7 +71,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The manager's ONE icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
   // The shared no-state primitive (issue 785).
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   // Rendered by the salvage block.
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
@@ -97,7 +97,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   // The complications section and its two shared rows (issue 1286).
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
@@ -108,7 +108,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // THE PART D REBUILD'S FOUR NEW LEAVES (issue 1371, parity round 4).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   // `ExplainerCard`'s own card shell, two rungs down from this tree's root.
   'src/ui/svelte/components/InspectorCard.svelte',

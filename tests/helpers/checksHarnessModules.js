@@ -124,10 +124,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/StatusToggle.svelte',
   // The shared card shell (issue 1427).
   'src/ui/svelte/components/InspectorCard.svelte',
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE chip
   // for its trailing badge, so it is now in the row's STATIC closure.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',

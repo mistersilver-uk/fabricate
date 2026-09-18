@@ -22,8 +22,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   ],

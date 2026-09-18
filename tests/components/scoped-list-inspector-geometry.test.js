@@ -120,7 +120,7 @@ const harness = createMountedComponentHarness({
     'src/ui/model/managerBrowserViewState.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -136,7 +136,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
     'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
     // The shared frame's membership filter is a segmented track since issue 1373.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     SHELL,
   ],
   componentPath: SHELL,

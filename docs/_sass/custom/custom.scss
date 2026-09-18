@@ -119,7 +119,7 @@ a:not([class]) {
 // -----------------------------------------------------------------------------------------
 //
 // The generated rules supply the hairline, the left bar and the title; this adds the tinted
-// fill, the radius and the spacing, mirroring src/ui/svelte/apps/manager/Callout.svelte.
+// fill, the radius and the spacing, mirroring src/ui/svelte/components/Callout.svelte.
 //
 // Its governing decision is copied deliberately: the tone lives in the glyph, the bar and the
 // title, while the prose stays neutral. A callout is then a block of ordinary text that has

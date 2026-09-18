@@ -1670,11 +1670,11 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }
 
-  // And they must be gone from the MARKUP too, not merely unstyled.
-  const managerComponents = readdirSync(managerComponentDir, {
-    recursive: true,
-    withFileTypes: true,
-  })
+  // And they must be gone from the MARKUP too, not merely unstyled. BOTH primitive directories are
+  // walked, because issue 1710 moved `EmptyState` and `Callout` into `components/`.
+  const sharedComponentDir = resolve(managerComponentDir, '../../components');
+  const managerComponents = [managerComponentDir, sharedComponentDir]
+    .flatMap((directory) => readdirSync(directory, { recursive: true, withFileTypes: true }))
     // The primitives themselves are the ONE place the contract markup may be written.
     .filter(
       (entry) =>

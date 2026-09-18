@@ -12,7 +12,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 

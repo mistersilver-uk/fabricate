@@ -16,7 +16,7 @@ import { parse } from 'svelte/compiler';
 const COMPONENT_DIR = 'src/ui/svelte/components';
 const repoRoot = resolve(import.meta.dirname, '..');
 
-/** 37 components live here today; a walk that stopped recursing or filtering reads far below it. */
+/** 52 components live here today; a walk that stopped recursing or filtering reads far below it. */
 const CORPUS_FLOOR = 30;
 
 /** Keys that carry position, formatting or comments rather than meaning. */

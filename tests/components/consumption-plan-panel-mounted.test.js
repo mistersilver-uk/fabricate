@@ -29,7 +29,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Kicker.svelte',
     // The shared no-state panel (issue 1514). The panel's nothing-planned line is an
     // `EmptyState note`, so omitting it fails this suite by name.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',

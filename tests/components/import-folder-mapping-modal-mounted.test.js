@@ -43,7 +43,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     // The manager's ONE selection control (issue 772). The match-by-name toggle renders
     // through it now rather than as a raw checkbox wearing Foundry's control chrome.

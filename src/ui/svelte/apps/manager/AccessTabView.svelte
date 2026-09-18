@@ -19,7 +19,7 @@
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';

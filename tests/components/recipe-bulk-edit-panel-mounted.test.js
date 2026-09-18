@@ -36,8 +36,8 @@ const panel = createMountedComponentHarness({
     'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The shared bulk-edit chrome: this panel renders its header, hero.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',

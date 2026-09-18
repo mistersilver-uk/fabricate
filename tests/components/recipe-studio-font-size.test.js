@@ -276,8 +276,8 @@ const FIXTURE = `
 // The chip owns its appearance in `Chip.svelte`'s scoped block (issue 883).
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/Callout.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',

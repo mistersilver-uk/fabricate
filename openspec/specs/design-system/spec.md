@@ -212,8 +212,9 @@ Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `ManagerS
 None of the six portals anything either, so each needs exactly one root.
 All six are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
 That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
-The tree contradicts such a prohibition in both directions: `apps/inventory/detail/InventorySalvagePanel.svelte` and `apps/inventory/salvage/SalvageProgressiveBody.svelte` both import `apps/manager/Callout.svelte` and are reachable from the player application's root, and `components/SearchablePopover.svelte` imports `apps/manager/EmptyState.svelte`.
+Nothing here prohibits an application root from importing a primitive wherever it lives; the absence of a prohibition is a fact about scope, not about the primitive's directory.
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
+After issue 1710 exactly one member row scoped `shared` lives under `apps/manager/`, `ComplicationSummaryRow.svelte`.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
@@ -382,6 +383,12 @@ The two do meet at one place, and that place is asserted: a row whose family THI
 - **WHEN** a caller outside that root proposes to adopt the primitive
 - **THEN** the family is re-rooted first, in its own change
 - **AND** the adoption is not landed on top of a family that only paints on one screen
+
+#### Scenario: A shared primitive leaves the manager's directory
+
+- **WHEN** a member row scoped `shared` moves into `src/ui/svelte/components/`
+- **THEN** no file under `src/ui/svelte/components/` imports from `src/ui/svelte/apps/`
+- **AND** the move changes no emitted class, no declaration and no rendered frame
 
 #### Scenario: A member row records whether its component may leave the manager
 

@@ -25,7 +25,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...CHECKS_TREE_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',

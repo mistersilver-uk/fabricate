@@ -29,7 +29,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     // The shipped segmented primitive.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The shared numeric stepper: the condition Value field and the tier-step operand are
     // both built on it (issue 1050), and the same static-closure rule applies.
     'src/ui/svelte/components/Stepper.svelte',

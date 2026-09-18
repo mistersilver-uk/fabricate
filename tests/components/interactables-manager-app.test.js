@@ -35,7 +35,7 @@ const rootSource = readFileSync(
 
 /** The shared radio primitive this panel's three fieldsets became (issue 1520). */
 const segmentedSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte'),
+  resolve(__dirname, '../../src/ui/svelte/components/SegmentedControl.svelte'),
   'utf8'
 );
 const selectSource = readFileSync(

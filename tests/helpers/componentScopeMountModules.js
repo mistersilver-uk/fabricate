@@ -141,10 +141,10 @@ export function createWorldComponentCatalogueHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ];
   return {
@@ -284,7 +284,7 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
     // The cohort filter is the shared segmented track since issue 1371's parity round 4; the
     // `<select>` it replaced needed no entry, and an omission here HANGS this suite.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     // The manager's ONE multi-select row (issue 772; extracted to a shared primitive under
     // `apps/manager/` for issue 1010, so this path moved out of the browser's own directory).
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',

@@ -50,7 +50,7 @@ const SCOPED_RAW_MODULES = [
 ];
 
 const SHELL_MODULES = [
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
@@ -72,7 +72,7 @@ const SHELL_MODULES = [
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   // THE SHARED FRAME'S MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373.
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   // The extracted `SYSTEM RULES n / m` panel (issue 1372). A rendered child missing from this
   // list does not fail — it HANGS, and `node --test` reports the blocked tests as `# cancelled`.

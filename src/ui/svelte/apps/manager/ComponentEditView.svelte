@@ -1,7 +1,7 @@
 <script>
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
-  import Callout from './Callout.svelte';
+  import Callout from '../../components/Callout.svelte';
   import EditorTabs from '../../components/EditorTabs.svelte';
   import EditorValidationSurface from '../../components/EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';

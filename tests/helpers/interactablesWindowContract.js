@@ -95,8 +95,8 @@ export const MANAGE_PANEL_CONTRACT = Object.freeze({
     ['IconButton', '../../components/IconButton.svelte'],
     ['InspectorCard', '../../components/InspectorCard.svelte'],
     ['ManagerButton', '../../components/ManagerButton.svelte'],
+    ['SegmentedControl', '../../components/SegmentedControl.svelte'],
     ['Select', '../../components/Select.svelte'],
-    ['SegmentedControl', '../manager/SegmentedControl.svelte'],
   ]),
   layoutClasses: Object.freeze([
     'fab-im-empty',

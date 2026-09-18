@@ -48,7 +48,7 @@
     findCurrencyUnit,
   } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   // The ONE kind table: the plate's glyph and tint and the kind select's four words are read from
   // it rather than restated here.

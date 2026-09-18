@@ -8,8 +8,8 @@
   Props: copies, hasPartyPoolHazard, armedToken, onExpend, onDelete, onArm, onDisarm.
 -->
 <script>
-  import Callout from '../Callout.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import KnowledgeOwnedCopyRow from './KnowledgeOwnedCopyRow.svelte';
 

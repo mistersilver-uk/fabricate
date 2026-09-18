@@ -4,7 +4,7 @@
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { formatList, localize, viewScene } from '../../util/foundryBridge.js';

@@ -32,12 +32,12 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import BulkSelectionToolbar from '../BulkSelectionToolbar.svelte';
-  import Callout from '../Callout.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import Callout from '../../../components/Callout.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../../components/ManagerToolbar.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { createScopedListBrowserState } from '../../../../model/managerBrowserViewState.js';
 
   let {

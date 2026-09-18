@@ -35,7 +35,7 @@ const harness = createMountedComponentHarness({
   // THE PICKER RENDERS THROUGH THE SHARED PRIMITIVE (issue 1503), so its panel.
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     ICON_PICKER,

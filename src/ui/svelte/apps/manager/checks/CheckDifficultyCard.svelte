@@ -13,7 +13,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { interpolate } from './checksCopy.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';

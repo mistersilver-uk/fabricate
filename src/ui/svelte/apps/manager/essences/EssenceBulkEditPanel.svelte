@@ -26,11 +26,11 @@
   import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     ESSENCE_BULK_COLOUR_NONE,

@@ -351,7 +351,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
     resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
   );
   const segmentedScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/SegmentedControl.svelte')
   );
   const stamp = (markup) =>
     [
@@ -805,7 +805,7 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
   // `--fab-purple` - so a warm track puts the one control that is ABOUT tags in a different
   // family from everything beside it (issue 1373, maintainer round 7).
   const segmentedScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/SegmentedControl.svelte')
   );
   const stamp = (markup) =>
     [
