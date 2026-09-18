@@ -13,6 +13,7 @@ import {
   validateGatheringRealmList,
   validateTravelConfig,
 } from './gatheringRealms.js';
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 
 export class GatheringRealmValidationError extends Error {
   constructor(errors = []) {
@@ -45,28 +46,24 @@ export class GatheringRealmValidationError extends Error {
  * `delete` never blocks: it returns referenced-by repair evidence (environments and party
  * overrides that still cite the realm) so the GM confirm copy can warn before removal.
  */
-export class GatheringRealmStore {
+export class GatheringRealmStore extends SettingsBackedStore {
   constructor({
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
     randomID = null,
   } = {}) {
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey: SETTING_KEYS.TRAVEL_CONFIG });
     this.randomID = randomID || (() => globalThis.foundry?.utils?.randomID?.());
     this.config = null;
-    this.loaded = false;
+  }
+
+  _setCache(value) {
+    this.config = value;
   }
 
   load() {
-    const saved = this.getSetting(SETTING_KEYS.TRAVEL_CONFIG);
-    this.config = this._normalize(saved);
-    this.loaded = true;
+    this._publish(this._normalize(this._readSetting()));
     return cloneJson(this.config);
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   _normalize(raw) {
@@ -262,23 +259,10 @@ export class GatheringRealmStore {
     });
   }
 
-  /**
-   * PUBLISH THE CACHE BEFORE AWAITING THE WRITE, not after.
-   *
-   * Callers read-modify-write, so a second edit starting while the first `setSetting` is still
-   * in flight would otherwise read the pre-first-edit config and clobber it. The per-system
-   * store this replaced was safe by construction, because `CraftingSystemManager.updateSystem`
-   * writes its map before its own await; publishing late here would be a regression rather
-   * than a new limitation. The cost is a cache briefly ahead of the setting if the write
-   * rejects — recoverable on the next `load()`, which the replication bridge calls whenever
-   * the setting changes. A lost update is not recoverable at all.
-   */
   async _persist(next) {
     const normalized = this._normalize(next);
     const payload = cloneJson(normalized);
-    this.config = normalized;
-    this.loaded = true;
-    await this.setSetting(SETTING_KEYS.TRAVEL_CONFIG, payload);
+    await this._publishThenWrite(normalized, payload);
     return cloneJson(payload);
   }
 
