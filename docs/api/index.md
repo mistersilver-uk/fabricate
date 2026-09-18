@@ -312,7 +312,7 @@ The returned object has **four** shapes, and `cancelled` is distinct from a fail
 The engine returns these rather than throwing, so ordinary failures need no `try`/`catch`.
 
 Do not thread a result order into this call.
-For a progressive salvage, the engine captures the player's standing order (`salvage:<componentId>` in `fabricate.progressiveResultOrder`) onto the run record when the run starts, and reads it back at award time.
+For a progressive salvage, the engine captures the player's standing order (`salvage:<systemId>:<componentId>` in `fabricate.progressiveResultOrder`) onto the run record when the run starts, and reads it back at award time.
 A caller that wants a different order writes that setting first and lets the capture happen.
 
 ### Bulk Salvage & Destroy Runtime Facade
@@ -1921,7 +1921,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Client setting | `fabricate.lastManagedCraftingSystem` | Last viewed system in GM admin |
 | Client setting | `fabricate.lastAlchemySystem` | Last selected alchemy system (discipline) for the Alchemy Workbench tab |
 | Client setting | `fabricate.favouriteRecipes` | Favourite recipe IDs for the current client |
-| User setting | `fabricate.progressiveResultOrder` | Player progressive result-stage order, keyed `recipe:<recipeId>` / `salvage:<componentId>` to a list of result ids (Object, default `{}`). Registered with `scope: 'user'`, which is per user **within one world**. The same player in a second world reads the default. Writing it is an asynchronous, replicated document write that can reject, not a synchronous `localStorage` write, so a caller must `await` it. |
+| User setting | `fabricate.progressiveResultOrder` | Player progressive result-stage order, keyed `recipe:<recipeId>` / `salvage:<systemId>:<componentId>` to a list of result ids (Object, default `{}`). Registered with `scope: 'user'`, which is per user **within one world**. The same player in a second world reads the default. Writing it is an asynchronous, replicated document write that can reject, not a synchronous `localStorage` write, so a caller must `await` it. |
 | Client setting | `fabricate.gatheringHideUnavailableEnvironments` | Player "hide unavailable (locked) environments" toggle for the Gathering app Environments column (Boolean, default `false`, per client/device) |
 | Actor flag | `fabricate.craftingRuns.active` | In-progress crafting runs |
 | Actor flag | `fabricate.craftingRuns.history` | Completed crafting runs |
