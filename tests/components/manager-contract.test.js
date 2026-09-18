@@ -132,7 +132,6 @@ const craftingModifierCataloguePath = resolve(
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
 );
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
-const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
@@ -204,7 +203,6 @@ const previewProviderSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js'),
   'utf8'
 );
-const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 const managerSource = [
@@ -618,23 +616,15 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  it('defers the GM-only manager subtree to a lazy chunk (issue 150)', () => {
-    assert.ok(
-      !mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
-      'legacy manager side-effect import should be removed'
-    );
-    assert.ok(
-      !mainSource.includes("import './ui/SvelteCraftingSystemManagerApp.svelte.js';"),
-      'manager static side-effect import should be removed so it lands in a lazy chunk'
-    );
-    assert.ok(
-      mainSource.includes("import('./ui/SvelteCraftingSystemManagerApp.svelte.js')"),
-      'manager app should be pulled in via a dynamic import for the lazy chunk'
-    );
-    assert.ok(
-      mainSource.includes('loadCraftingSystemManagerAppClass'),
-      'main.js should expose the memoized async manager loader'
-    );
+  // The GM-only manager subtree is deferred to its own chunk (issue 150), so the static import is
+  // as load-bearing by its absence as the dynamic one is by its presence.
+  defineStructureContract('defers the GM-only manager subtree to a lazy chunk', MAIN, {
+    importsNo: [
+      './ui/SvelteRecipeManagerApp.svelte.js',
+      './ui/SvelteCraftingSystemManagerApp.svelte.js',
+    ],
+    importsLazily: ['./ui/SvelteCraftingSystemManagerApp.svelte.js'],
+    names: ['loadCraftingSystemManagerAppClass'],
   });
 
   // The access rosters are the manager's only Foundry user/ownership surface.
