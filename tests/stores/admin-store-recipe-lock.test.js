@@ -5,7 +5,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
-import { makeSystem } from '../helpers/adminStoreServices.js';
+import { createServices as createSharedServices, makeSystem } from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -38,26 +38,12 @@ function makeRecipe(overrides = {}) {
 function createServices({ recipes, system = {}, updateRecipe, notify }) {
   // The shared factory, with this suite's only two departures from it stated
   // explicitly rather than re-listing the other twelve fields.
-  const systems = [makeSystem({ visibilityMode: undefined, craftingCheck: {}, ...system })];
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => ({
-      getSystems: () => systems,
-      getSystem: (id) => systems.find((s) => s.id === id) || null,
-      getItems: () => [],
-    }),
-    getRecipeManager: () => ({
-      getRecipes: () => recipes,
-      getRecipe: (id) => recipes.find((r) => r.id === id) || null,
-      updateRecipe,
-    }),
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
-    localize: (key) => key,
-    notify: notify || { info: () => {}, warn: () => {}, error: () => {} },
-  };
+  return createSharedServices(
+    makeSystem({ visibilityMode: undefined, craftingCheck: {}, ...system }),
+    recipes,
+    [],
+    notify ? { updateRecipe, notify } : { updateRecipe }
+  );
 }
 
 function rowFor(store, id) {

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
+import { createServices as createSharedServices } from '../helpers/adminStoreServices.js';
 
 // Mock helpers
 
@@ -46,16 +47,6 @@ function makeRecipe(id, name, inputComponentIds = [], outputComponentIds = []) {
 }
 
 function createMockServices(recipes = [], system = null) {
-  const defaultSystem = system || makeSystem({ id: 'sys1' });
-  const systems = [defaultSystem];
-  const store = { lastManagedCraftingSystem: 'sys1' };
-
-  const mockSystemManager = {
-    getSystems: () => systems,
-    getSystem: (id) => systems.find(s => s.id === id) || null,
-    getItems: (systemId) => defaultSystem.items || []
-  };
-
   // A revision-token-minting recipe manager (issue 1076's contract), plus a call counter so a test
   // can assert that the graph index was NOT rebuilt.
   let recipeRevision = 1;
@@ -71,20 +62,15 @@ function createMockServices(recipes = [], system = null) {
     advanceRevision: () => { recipeRevision += 1; }
   };
 
-  return {
+  return createSharedServices(system || makeSystem({ id: 'sys1' }), recipes, [], {
+    settings: { lastManagedCraftingSystem: 'sys1' },
     recipeManager: mockRecipeManager,
-    getSetting: (key) => store[key] ?? '',
-    setSetting: async (key, value) => { store[key] = value; },
-    getCraftingSystemManager: () => mockSystemManager,
     getRecipeManager: () => mockRecipeManager,
-    getScriptMacros: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
     renderImportDialog: async () => {}
-  };
+  });
 }
 
 // Tests
