@@ -13,7 +13,7 @@
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import { matchFolderNameToVocabulary } from '../../../../utils/matchFolderVocabulary.js';
+  import { matchFolderNameToVocabulary } from '../../../model/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import ManagerModal from './ManagerModal.svelte';

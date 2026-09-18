@@ -21,7 +21,7 @@ import {
 } from '../../src/ui/svelte/apps/manager/scoped/componentScoped.js';
 import { buildWorldScopeState } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // The frame's own lifted view-state factory.
-import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
+import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
 // Issue 1504: this toolbar's lane filters and its sort key are shared `<Select>`s.
 import {

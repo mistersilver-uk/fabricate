@@ -33,7 +33,7 @@
   // The ONE complication summary row, in its `readonly-gm` variant — shared with the Component
   // Studio's salvage strip rather than copied, across six call sites.
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
-  import { complicationSummary } from '../../../../../utils/complicationSummary.js';
+  import { complicationSummary } from '../../../../model/complicationSummary.js';
 
   let {
     item = {},

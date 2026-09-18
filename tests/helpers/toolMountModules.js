@@ -29,7 +29,7 @@ export const TOOL_TREE_COMPILED_MODULES = Object.freeze([
 
 /** The WORLD SCOPE closure, spread on top of `TOOL_TREE_RAW_MODULES`. */
 export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
   'src/systems/scopedDefinitionStore.js',
@@ -43,12 +43,12 @@ export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
   // per-entry references now, so its own static closure reaches the vocabulary core and the shipped
   // counter.
   'src/systems/worldVocabulary.js',
-  'src/utils/vocabularyUsage.js',
+  'src/ui/model/vocabularyUsage.js',
   'src/utils/componentCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
   'src/utils/recipeCategories.js',
   // The shared list frame's LIFTED VIEW-STATE (issue 1438), reached through `EntityCatalogueShell`
   // -> `EntityListInspectorFrame`.
-  'src/utils/managerBrowserViewState.js',
+  'src/ui/model/managerBrowserViewState.js',
 ]);

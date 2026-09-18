@@ -7,10 +7,10 @@
  * `colorToken: null`, so the write primitive tests `Object.hasOwn` and never truthiness.
  */
 
-import { normalizeBulkStatus } from './bulkSelectionModel.js';
+import { normalizeBulkStatus } from '../../utils/bulkSelectionModel.js';
 
 /** The Status axis's three segments, in the panel's segmented-control order. */
-export { BULK_STATUS_VALUES as ESSENCE_BULK_STATUS_VALUES } from './bulkSelectionModel.js';
+export { BULK_STATUS_VALUES as ESSENCE_BULK_STATUS_VALUES } from '../../utils/bulkSelectionModel.js';
 
 /** The Colour control value that leaves the axis UNSTAGED — `Leave unchanged`. */
 export const ESSENCE_BULK_COLOUR_UNCHANGED = '';
@@ -127,4 +127,4 @@ export {
   toggleBulkSelection as toggleEssenceSelection,
   setBulkSelection as setEssenceSelection,
   pruneBulkSelection as pruneEssenceSelection,
-} from './bulkSelectionModel.js';
+} from '../../utils/bulkSelectionModel.js';

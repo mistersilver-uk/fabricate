@@ -1,5 +1,5 @@
 /**
- * `src/utils/complicationSummary.js` — the ONE localized trigger sentence a component complication
+ * `src/ui/model/complicationSummary.js` — the ONE localized trigger sentence a component complication
  * describes itself with (issue 1286).
  */
 
@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import {
   COMPLICATION_SUMMARY_STRINGS,
   complicationSummary,
-} from '../src/utils/complicationSummary.js';
+} from '../src/ui/model/complicationSummary.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
 let minted = 0;

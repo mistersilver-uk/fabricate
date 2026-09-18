@@ -15,7 +15,7 @@ const { IngredientSet, INGREDIENT_SET_OMITTED_WHEN_DEFAULT } = await import(
 const { Recipe } = await import('../src/models/Recipe.js');
 const { ingredientSetToolsAreActive } = await import('../src/systems/toolCheckBonus.js');
 const { stripComponentsFromRecipeJson } = await import('../src/utils/recipeComponentReferences.js');
-const { planRecipeTagRemovals } = await import('../src/utils/vocabularyCascade.js');
+const { planRecipeTagRemovals } = await import('../src/ui/model/vocabularyCascade.js');
 
 const METADATA = { created: 1, modified: 2, author: 'GM', version: '1.0.0' };
 

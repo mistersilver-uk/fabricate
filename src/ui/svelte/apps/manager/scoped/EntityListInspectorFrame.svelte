@@ -9,7 +9,7 @@
   neither may inline it.
 -->
 <script>
-  import { paginateRows } from '../../../../../utils/browserPagination.js';
+  import { paginateRows } from '../../../../model/browserPagination.js';
   import {
     describeBulkSelection,
     pruneBulkSelection,
@@ -22,7 +22,7 @@
     scopedEntryName,
     SYSTEM_MEMBERSHIP_FILTERS,
     WORLD_MEMBERSHIP_FILTERS,
-  } from '../../../../../utils/scopedEntityListModel.js';
+  } from '../../../../model/scopedEntityListModel.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Pagination from '../../../components/Pagination.svelte';
@@ -38,7 +38,7 @@
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../../components/ManagerToolbar.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
-  import { createScopedListBrowserState } from '../../../../../utils/managerBrowserViewState.js';
+  import { createScopedListBrowserState } from '../../../../model/managerBrowserViewState.js';
 
   let {
     scope = null,

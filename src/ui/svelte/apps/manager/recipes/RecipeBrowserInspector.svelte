@@ -28,7 +28,7 @@
     buildRecipeRoutingModel,
     buildRecipeStepModel,
     groupProduceRowsByResultGroup,
-  } from '../../../../../utils/recipeBrowserModel.js';
+  } from '../../../../model/recipeBrowserModel.js';
   import IconButton from '../../../components/IconButton.svelte';
 
   let {

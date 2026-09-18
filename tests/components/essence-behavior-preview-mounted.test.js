@@ -21,7 +21,7 @@ const harness = createMountedComponentHarness({
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
     'src/utils/scalars.js',
   ],
   compiledModules: [

@@ -28,7 +28,7 @@ const SCOPED_RAW_MODULES = [
   // shipped counter. The harness validates this closure and names the miss, unlike the
   // hand-rolled trees elsewhere.
   'src/systems/worldVocabulary.js',
-  'src/utils/vocabularyUsage.js',
+  'src/ui/model/vocabularyUsage.js',
   'src/utils/componentCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
@@ -39,14 +39,14 @@ const SCOPED_RAW_MODULES = [
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',
   'src/utils/scalars.js',
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/utils/definitionIndex.js',
   'src/utils/sourceReferenceUnion.js',
-  'src/utils/browserPagination.js',
+  'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
-  'src/utils/scopedEntityListModel.js',
+  'src/ui/model/scopedEntityListModel.js',
   // The frame's lifted view-state (issue 1438).
-  'src/utils/managerBrowserViewState.js',
+  'src/ui/model/managerBrowserViewState.js',
 ];
 
 const SHELL_MODULES = [
@@ -116,7 +116,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
   ],
   compiledModules: [
     ...SHELL_MODULES,

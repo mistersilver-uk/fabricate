@@ -23,10 +23,6 @@
  */
 
 import {
-  SOURCE_LINK_FIELDS,
-  WORLD_IDENTITY_FIELDS,
-} from '../../../migration/worldScopeEntityGrouping.js';
-import {
   COMPONENT_SCOPE,
   COMPONENT_SECTIONS,
   normalizeComponentEssenceMap,
@@ -40,10 +36,14 @@ import {
 } from '../../../systems/scopedDefinitions.js';
 import { TOOL_SCOPE, TOOL_SECTIONS } from '../../../systems/toolScope.js';
 import {
+  SOURCE_LINK_FIELDS,
+  WORLD_IDENTITY_FIELDS,
+} from '../../../systems/worldScopeEntityGrouping.js';
+import {
   WORLD_VOCABULARY_KINDS,
   worldDefaultsAffectedByDeletion,
 } from '../../../systems/worldVocabulary.js';
-import { buildVocabularyUsage } from '../../../utils/vocabularyUsage.js';
+import { buildVocabularyUsage } from '../../model/vocabularyUsage.js';
 
 /**
  * The three entity types, in the order the rail lists their world screens.
@@ -88,7 +88,7 @@ function identityFieldsOf(entityType) {
 /**
  * Whether this entity type's identity record carries a source item link.
  *
- * DERIVED, NEVER RESTATED. `src/migration/worldScopeEntityGrouping.js` owns both lists; this
+ * DERIVED, NEVER RESTATED. `src/systems/worldScopeEntityGrouping.js` owns both lists; this
  * intersects them. True for a component and a tool, false for an essence — which is one of the
  * THREE ways the three identity records differ (`data-models/spec.md` `### Properties`), and one
  * of the two a shell's own markup reads.

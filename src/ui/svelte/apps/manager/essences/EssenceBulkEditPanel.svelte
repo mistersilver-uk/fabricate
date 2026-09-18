@@ -42,7 +42,7 @@
     setBulkEssenceColour,
     setBulkEssenceIcon,
     setBulkEssenceStatus,
-  } from '../../../../../utils/essenceBulkEditModel.js';
+  } from '../../../../model/essenceBulkEditModel.js';
 
   let {
     count = 0,

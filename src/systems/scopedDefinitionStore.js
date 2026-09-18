@@ -1,11 +1,11 @@
+import { cloneJson } from '../utils/scalars.js';
+
+import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
 import {
   ESSENCE_EFFECT_SOURCE_FIELDS,
   identityOf,
   WORLD_IDENTITY_FIELDS,
-} from '../migration/worldScopeEntityGrouping.js';
-import { cloneJson } from '../utils/scalars.js';
-
-import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
+} from './worldScopeEntityGrouping.js';
 
 /**
  * The persistence shell behind the three world-scope entity settings (issue 1359, part of epic

@@ -20,7 +20,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     // Added by the conversion, and ONLY the dependency manifest: no assertion below moved.
-    'src/utils/macroReference.js',
+    'src/ui/model/macroReference.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     // The formula field's quick-add chips are DERIVED from the active world rather than

@@ -15,7 +15,7 @@
   import RosterRow from './RosterRow.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import { createRecipeAccessBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createRecipeAccessBrowserState } from '../../../model/managerBrowserViewState.js';
 
   // Fixed roster page size (design: 6 per roster). THE SEARCH FIELD IS UNCONDITIONAL WITH RESPECT
   // TO IT (issue 1513): gating on it withheld the field from exactly the rosters a GM reads most,

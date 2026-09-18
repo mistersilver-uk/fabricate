@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path';
 import test, { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { createManagerBrowserViewStates } from '../src/utils/managerBrowserViewState.js';
+import { createManagerBrowserViewStates } from '../src/ui/model/managerBrowserViewState.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MANAGER_DIR = 'src/ui/svelte/apps/manager';

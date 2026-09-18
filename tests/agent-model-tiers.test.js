@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -954,4 +954,11 @@ test('18. a TOML block description is parsed, not shadowed by the single-line pa
   assert.equal(wrongTier.length, 2);
   assert.match(wrongTier[0], /must name its own model tier \(small\)/);
   assert.match(wrongTier[1], /must not name model tier large/);
+});
+
+test('14. every exact-path HIGH_RISK_PATHS entry names a file that exists', () => {
+  const missing = HIGH_RISK_PATHS.filter(
+    (entry) => !entry.includes('*') && !existsSync(join(REPO_ROOT, entry))
+  );
+  assert.deepEqual(missing, [], 'a glob survives a move inside it, but an exact-path entry that no longer resolves stops matching silently');
 });

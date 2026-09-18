@@ -22,7 +22,7 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import { essenceColourName, essenceShortValueName } from '../scoped/essenceScoped.js';
   import { projectEssenceOnCraftCards } from './essenceStudio.js';
-  import { resolveMacroName } from '../../../../../utils/macroReference.js';
+  import { resolveMacroName } from '../../../../model/macroReference.js';
 
   let {
     essence = null,

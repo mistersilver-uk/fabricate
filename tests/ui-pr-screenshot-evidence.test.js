@@ -457,7 +457,7 @@ describe('UI PR screenshot evidence', () => {
     // Phase 1 is model-only for recipes: recipeBrowserModel.js is the SOLE changed file
     // that maps a frame to the recipes browser, so it MUST resolve to the continuation id.
     const recipeModelIds = mapChangedFilesToViews([
-      'src/utils/recipeBrowserModel.js',
+      'src/ui/model/recipeBrowserModel.js',
     ]).map(view => view.id);
     assert.ok(recipeModelIds.includes('manager-recipes-grouped-continuation'));
     // Issue 806: the state factory now also maps to the editor round-trip frame.
@@ -466,7 +466,7 @@ describe('UI PR screenshot evidence', () => {
     // The component model change maps to both the ordinary browser frame and the
     // dedicated continuation frame.
     const componentModelIds = mapChangedFilesToViews([
-      'src/utils/componentBrowserModel.js',
+      'src/ui/model/componentBrowserModel.js',
     ]).map(view => view.id);
     assert.ok(componentModelIds.includes('manager-components'));
     assert.ok(componentModelIds.includes('manager-components-grouped-continuation'));
@@ -499,7 +499,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
       'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
-      'src/utils/componentBulkEditModel.js',
+      'src/ui/model/componentBulkEditModel.js',
       'src/utils/bulkSelectionModel.js',
     ]) {
       assert.ok(
@@ -534,11 +534,11 @@ describe('UI PR screenshot evidence', () => {
       'manager-recipes-bulk-edit-blocked',
     ];
     assert.deepEqual(
-      mapChangedFilesToViews(['src/utils/componentBulkEditModel.js']).map(view => view.id),
+      mapChangedFilesToViews(['src/ui/model/componentBulkEditModel.js']).map(view => view.id),
       componentBulkPanelFrames,
     );
     assert.deepEqual(
-      mapChangedFilesToViews(['src/utils/recipeBulkEditModel.js']).map(view => view.id),
+      mapChangedFilesToViews(['src/ui/model/recipeBulkEditModel.js']).map(view => view.id),
       recipeBulkPanelFrames,
     );
     // The SHARED leaf is asserted separately rather than folded in, and it is the one file here
@@ -614,7 +614,7 @@ describe('UI PR screenshot evidence', () => {
 
     // The BLOCKED frame carries one trigger the other two do not: the browser model that derives
     // the row's `Can't enable` pill.
-    const pillDerivation = mapChangedFilesToViews(['src/utils/recipeBrowserModel.js'])
+    const pillDerivation = mapChangedFilesToViews(['src/ui/model/recipeBrowserModel.js'])
       .map(view => view.id);
     assert.ok(pillDerivation.includes('manager-recipes-bulk-edit-blocked'));
     assert.equal(pillDerivation.includes('manager-recipes-bulk-edit'), false);

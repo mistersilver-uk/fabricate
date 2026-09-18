@@ -9,7 +9,7 @@ import {
   ESSENCE_MERGE_REFUSAL_REASONS,
   essenceSlugStem,
 } from '../src/migration/worldEssenceEquivalence.js';
-import { keyedRemapper } from '../src/migration/worldScopeReferenceRewrite.js';
+import { keyedRemapper } from '../src/systems/worldScopeReferenceRewrite.js';
 import { mintEssenceId } from '../src/ui/svelte/apps/manager/scoped/essenceScoped.js';
 import {
   buildEssenceMergeCorpus,

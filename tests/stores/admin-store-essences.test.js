@@ -8,7 +8,7 @@ import test from 'node:test';
 import { get } from 'svelte/store';
 
 import { makeEssence, makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
-import { describeEssenceDeleteImpact } from '../../src/utils/essenceBulkEditModel.js';
+import { describeEssenceDeleteImpact } from '../../src/ui/model/essenceBulkEditModel.js';
 import { makeWorldScopeStoreFake } from '../helpers/worldScopeStoreFixture.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');

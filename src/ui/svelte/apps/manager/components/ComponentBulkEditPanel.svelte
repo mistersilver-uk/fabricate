@@ -53,7 +53,7 @@
   import { getComponentCategoryLabel } from '../../../../../utils/componentCategories.js';
   // The `essenceDefinitions` PROP stays unfiltered — the warning count reads authored values
   // against it — and only the inset narrows.
-  import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
+  import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
   import {
     bulkDraftHasChanges,
     countComponentsChangingEssences,
@@ -69,7 +69,7 @@
     stagedBulkAxes,
     toggleBulkDifficultyStaged,
     toggleBulkEssencesStaged,
-  } from '../../../../../utils/componentBulkEditModel.js';
+  } from '../../../../model/componentBulkEditModel.js';
 
   let {
     count = 0,

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { getFabricateFlag, setFabricateFlag } from '../src/config/flags.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { migrateWorldScopeEntities } from '../src/migration/migrateWorldScopeEntities.js';
-import { remapWorldScopeIdentityFlags } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import { remapWorldScopeIdentityFlags } from '../src/systems/remapWorldScopeIdentityFlags.js';
 import {
   runStartupMaintenance,
   STARTUP_PASS_ENTITY_KINDS,

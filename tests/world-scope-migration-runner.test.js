@@ -8,8 +8,8 @@ import test from 'node:test';
 import {
   mayClearWorldScopeRekeyMap,
   remapWorldScopeIdentityFlags,
-} from '../src/migration/remapWorldScopeIdentityFlags.js';
-import { buildWorldScopeEntityNotice } from '../src/migration/worldScopeEntityNotice.js';
+} from '../src/systems/remapWorldScopeIdentityFlags.js';
+import { buildWorldScopeEntityNotice } from '../src/systems/worldScopeEntityNotice.js';
 import {
   buildRawCorpus,
   installFoundryStubs,

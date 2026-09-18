@@ -53,7 +53,7 @@ const {
   setBulkRecipeLock,
   setBulkRecipeStatus,
   toBulkRecipeEdit,
-} = await import('../src/utils/recipeBulkEditModel.js');
+} = await import('../src/ui/model/recipeBulkEditModel.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');

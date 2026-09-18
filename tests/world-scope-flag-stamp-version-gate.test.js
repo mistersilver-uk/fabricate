@@ -19,7 +19,7 @@ import {
   remapCompletedCleanly,
   WORLD_ESSENCE_MERGE_RETIRED_LEG,
   WORLD_ESSENCE_MERGE_SYSTEMS_LEG,
-} from '../src/migration/remapWorldScopeIdentityFlags.js';
+} from '../src/systems/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');

@@ -7,7 +7,7 @@
 import {
   ESSENCE_VALIDATION_CHECKS,
   essenceEditorValidation,
-} from '../../../../../utils/essenceValidation.js';
+} from '../../../../model/essenceValidation.js';
 
 /** The list / grid presentation toggle, as `SegmentedControl` options. */
 export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([

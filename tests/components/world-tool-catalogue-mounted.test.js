@@ -33,9 +33,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     // The list model this page's rows, pager and bulk bar are derived from.
-    'src/utils/browserPagination.js',
+    'src/ui/model/browserPagination.js',
     'src/utils/bulkSelectionModel.js',
-    'src/utils/scopedEntityListModel.js',
+    'src/ui/model/scopedEntityListModel.js',
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,

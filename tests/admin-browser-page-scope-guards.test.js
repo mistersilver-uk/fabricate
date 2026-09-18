@@ -22,10 +22,10 @@ const { buildRecipeList } = await import('../src/ui/svelte/stores/adminRecipeRow
 const { buildItemCards, hydrateItemCards } = await import(
   '../src/ui/svelte/stores/adminComponentRowProjection.js'
 );
-const { buildRecipeBrowserModel } = await import('../src/utils/recipeBrowserModel.js');
-const { buildComponentBrowserModel } = await import('../src/utils/componentBrowserModel.js');
+const { buildRecipeBrowserModel } = await import('../src/ui/model/recipeBrowserModel.js');
+const { buildComponentBrowserModel } = await import('../src/ui/model/componentBrowserModel.js');
 const { buildVocabularyUsage, countRecipeTagPlaceholderUsage } = await import(
-  '../src/utils/vocabularyUsage.js'
+  '../src/ui/model/vocabularyUsage.js'
 );
 
 /** More than two pages, so "the page" and "the cohort" are different numbers. */

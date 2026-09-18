@@ -55,24 +55,24 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../../systems/gatheringComposition.js',
   '../../../../systems/progressiveCheckSandbox.js',
   '../../../../utils/categoryIcons.js',
-  '../../../../utils/componentBrowserModel.js',
-  '../../../../utils/componentBulkEditModel.js',
   '../../../../utils/componentCategories.js',
   '../../../../utils/craftingCheckExpression.js',
-  '../../../../utils/essenceBrowserModel.js',
-  '../../../../utils/essenceBulkEditModel.js',
   '../../../../utils/failureResultPolicy.js',
-  // Issue 1438 lifted the remaining browse surfaces' filter/search state onto one root-owned
-  // record, which the root mints from this factory.
-  '../../../../utils/managerBrowserViewState.js',
-  '../../../../utils/recipeBrowserModel.js',
-  '../../../../utils/recipeBulkEditModel.js',
   '../../../../utils/recipeCategories.js',
   '../../../../utils/routedOutcomeKeywords.js',
   // ADDED BY ISSUE 1373, and legitimately under the message below.
   '../../../../utils/sourceReferenceUnion.js',
-  '../../../../utils/vocabularyUsage.js',
   '../../../managerExtensions.js',
+  '../../../model/componentBrowserModel.js',
+  '../../../model/componentBulkEditModel.js',
+  '../../../model/essenceBrowserModel.js',
+  '../../../model/essenceBulkEditModel.js',
+  // Issue 1438 lifted the remaining browse surfaces' filter/search state onto one root-owned
+  // record, which the root mints from this factory.
+  '../../../model/managerBrowserViewState.js',
+  '../../../model/recipeBrowserModel.js',
+  '../../../model/recipeBulkEditModel.js',
+  '../../../model/vocabularyUsage.js',
   '../../../navTabBadgeStore.js',
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).

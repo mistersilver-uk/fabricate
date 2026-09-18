@@ -15,7 +15,7 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   // per-entry references now, so its own static closure reaches the vocabulary core and the shipped
   // counter.
   'src/systems/worldVocabulary.js',
-  'src/utils/vocabularyUsage.js',
+  'src/ui/model/vocabularyUsage.js',
   // `worldVocabulary.js`'s own two leaves: it asks each category vocabulary whether a name is
   // the general bucket, so both travel with it.
   'src/utils/componentCategories.js',
@@ -28,7 +28,7 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
   'src/systems/toolScope.js',
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/utils/sourceReferenceUnion.js',
 ]);
 
@@ -42,17 +42,17 @@ export const WORLD_COMPONENT_SCOPE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
   // The one tone map the converted status chips read (issue 1506).
   'src/ui/svelte/util/statusChipTone.js',
-  'src/utils/componentScopeValidation.js',
+  'src/ui/model/componentScopeValidation.js',
   'src/utils/componentCategories.js',
 ]);
 
 /** The shared scoped-list closure: the list model, its pagination and its bulk selection. */
 export const SCOPED_LIST_RAW_MODULES = Object.freeze([
-  'src/utils/scopedEntityListModel.js',
-  'src/utils/browserPagination.js',
+  'src/ui/model/scopedEntityListModel.js',
+  'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
   // The frame's lifted view-state factory.
-  'src/utils/managerBrowserViewState.js',
+  'src/ui/model/managerBrowserViewState.js',
 ]);
 
 /** The overlay closure `SearchablePopover` binds (issue 1500). */
@@ -305,15 +305,15 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         'src/ui/svelte/util/listReorderAnnouncement.js',
         'src/ui/svelte/actions/dragDrop.js',
         'src/utils/componentCategories.js',
-        'src/utils/componentBrowserModel.js',
+        'src/ui/model/componentBrowserModel.js',
         // componentBrowserModel imports the shared category totals; omitting it HANGS the suite
         // (`# cancelled`) rather than failing it.
-        'src/utils/browserGroupCounts.js',
+        'src/ui/model/browserGroupCounts.js',
         // ... and, since issue 1036, the shared page-window model too. Same consequence.
-        'src/utils/browserPagination.js',
+        'src/ui/model/browserPagination.js',
         // The pure bulk selection + staging model (issue 772). The view imports it for the
         // selection helpers and its toolbar reads the description it returns.
-        'src/utils/componentBulkEditModel.js',
+        'src/ui/model/componentBulkEditModel.js',
         // Its shared leaf (issue 1010): those selection helpers now live here and
         // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
         'src/utils/bulkSelectionModel.js',

@@ -37,8 +37,8 @@
     MACRO_DROP_REJECTED_NOT_SCRIPT,
     evaluateMacroDrop,
     resolveMacroName,
-  } from '../../../../utils/macroReference.js';
-  import { essenceEditorValidation } from '../../../../utils/essenceValidation.js';
+  } from '../../../model/macroReference.js';
+  import { essenceEditorValidation } from '../../../model/essenceValidation.js';
   import {
     ESSENCE_EDITOR_TABS,
     ESSENCE_RULES_TABS,

@@ -10,7 +10,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
+import { createRecipeBrowserState } from '../../src/ui/model/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
@@ -34,14 +34,14 @@ const RECIPE_RAW_MODULES = [
   'src/utils/recipeCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
-  'src/utils/recipeBrowserModel.js',
+  'src/ui/model/recipeBrowserModel.js',
   // recipeBrowserModel imports the shared category totals (issue 676).
-  'src/utils/browserGroupCounts.js',
+  'src/ui/model/browserGroupCounts.js',
   // ... and, since issue 1036, the shared page-window model too. Same consequence.
-  'src/utils/browserPagination.js',
+  'src/ui/model/browserPagination.js',
   // The pure bulk selection + staging model (issue 1010). The browser imports it for the
   // four selection helpers and the toolbar reads the description it returns.
-  'src/utils/recipeBulkEditModel.js',
+  'src/ui/model/recipeBulkEditModel.js',
   // Its shared leaf: those selection helpers live here and `recipeBulkEditModel.js`
   // re-exports them, so it is a STATIC import of that module. Naming only the model HANGS
   // the suite (`# cancelled`) rather than failing it.

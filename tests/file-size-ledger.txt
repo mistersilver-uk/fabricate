@@ -115,6 +115,7 @@ src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices>renderSystemImpo
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_prepareSvelteProps	412
 src/ui/SvelteFabricateApp.svelte.js::_buildServices	146
 src/ui/extensionRegistry.js::createExtensionRegistry	142
+src/ui/model/scopedEntityListModel.js::createScopedEntityListModel	118
 src/ui/navTabBadgeStore.js::createNavTabBadgeStore	114
 src/ui/svelte/SvelteApplicationMixinCore.js::createSvelteApplicationMixin	111
 src/ui/svelte/actions/anchoredPopover.js::anchoredPopover	188
@@ -222,4 +223,3 @@ src/ui/svelte/stores/worldScopeProjection.js	924
 src/ui/svelte/util/foundryIconCatalogue.js	1553
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	163
 src/utils/rollExpressionAverage.js::createReader	181
-src/utils/scopedEntityListModel.js::createScopedEntityListModel	118

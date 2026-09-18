@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRecipeAccessRoster } from '../../src/utils/recipeAccessRoster.js';
+import { resolveRecipeAccessRoster } from '../../src/ui/model/recipeAccessRoster.js';
 
 const ADA = { id: 'u1', name: 'Ada', avatar: 'icons/ada.webp' };
 const BRIN = { id: 'u2', name: 'Brin', avatar: '' };

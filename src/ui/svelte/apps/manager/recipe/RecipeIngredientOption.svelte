@@ -41,7 +41,7 @@
   // The add-new offer projection, feeding the SUGGESTION list only; `selectedEssence` below
   // resolves against the UNFILTERED prop, so an authored requirement on a disabled essence still
   // reads back by name rather than collapsing to an empty search field.
-  import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
+  import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
   import {
     currencyUnitLabel,
     currencyUnitIcon,

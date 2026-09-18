@@ -11,7 +11,7 @@ import {
   planWorldScopeIdentitySmoke,
   seededFlagPaths,
 } from '../scripts/lib/worldScopeIdentitySmoke.js';
-import { remapWorldScopeIdentityFlags } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import { remapWorldScopeIdentityFlags } from '../src/systems/remapWorldScopeIdentityFlags.js';
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

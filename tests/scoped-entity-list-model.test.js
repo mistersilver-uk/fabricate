@@ -8,18 +8,18 @@ import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
+import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 // BY PATH, and the path matters.
 import {
   emptyWorldScopeEntityState,
   projectWorldScopeEntity,
   WORLD_SCOPE_DESCRIPTORS,
 } from '../src/ui/svelte/stores/worldScopeProjection.js';
-import { paginateRows } from '../src/utils/browserPagination.js';
+import { paginateRows } from '../src/ui/model/browserPagination.js';
 // ALL THREE SHIPPED SORTS, run rather than restated.
-import { sortComponents } from '../src/utils/componentBrowserModel.js';
-import { sortEssences } from '../src/utils/essenceBrowserModel.js';
-import { sortRecipes } from '../src/utils/recipeBrowserModel.js';
+import { sortComponents } from '../src/ui/model/componentBrowserModel.js';
+import { sortEssences } from '../src/ui/model/essenceBrowserModel.js';
+import { sortRecipes } from '../src/ui/model/recipeBrowserModel.js';
 import {
   describeBulkSelection,
   pruneBulkSelection,
@@ -33,7 +33,7 @@ import {
   SCOPED_LIST_SORTS,
   SYSTEM_MEMBERSHIP_FILTERS,
   WORLD_MEMBERSHIP_FILTERS,
-} from '../src/utils/scopedEntityListModel.js';
+} from '../src/ui/model/scopedEntityListModel.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const ENTITY_TYPES = ['component', 'essence', 'tool'];
@@ -441,7 +441,7 @@ describe('the two memos, counted', () => {
 });
 
 describe('nothing shipped is restated', () => {
-  const source = readFileSync(resolve(repoRoot, 'src/utils/scopedEntityListModel.js'), 'utf8');
+  const source = readFileSync(resolve(repoRoot, 'src/ui/model/scopedEntityListModel.js'), 'utf8');
   const framePath = 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte';
   const frame = readFileSync(resolve(repoRoot, framePath), 'utf8');
 

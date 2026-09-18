@@ -482,6 +482,14 @@ export default [
     rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
   },
 
+  // 5d. The Foundry-free view models under `src/ui/model/` (issue 1664). A separate block, not a
+  //     fifth `DOMAIN_LAYER_ROOTS` entry: `tests/foundry-global-reads-ratchet.test.js` derives each
+  //     root from its first two path segments, so a three-segment root fails it.
+  {
+    files: ['src/ui/model/**/*.js'],
+    rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
+  },
+
   // 6. Node tooling (build/release scripts and root config files). These are
   //    CLI entry points, so process control and console output are expected.
   //

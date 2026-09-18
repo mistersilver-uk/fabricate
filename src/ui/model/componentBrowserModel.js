@@ -1,8 +1,12 @@
 /** Pure list model for the GM component library (issue 676): filter → sort → paginate → group. */
 
+import {
+  GENERAL_COMPONENT_CATEGORY,
+  normalizeComponentCategory,
+} from '../../utils/componentCategories.js';
+
 import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
 import { paginateRows } from './browserPagination.js';
-import { GENERAL_COMPONENT_CATEGORY, normalizeComponentCategory } from './componentCategories.js';
 
 /** Sort keys offered by the library toolbar, in menu order. */
 export const COMPONENT_SORT_KEYS = Object.freeze([

@@ -4,9 +4,9 @@
  * SIMPLY GETS NO WORLD DEFAULT, so refusing is always the safe answer.
  */
 
-import { normalizeComponentEssenceMap } from '../systems/componentScope.js';
 import { cloneJson, isPlainObject } from '../utils/scalars.js';
 
+import { normalizeComponentEssenceMap } from './componentScope.js';
 import { ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
 
 /** The world-default section each entity type may take, in the order they are elected. */

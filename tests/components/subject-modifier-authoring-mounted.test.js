@@ -306,7 +306,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
-    'src/utils/complicationSummary.js',
+    'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
   ],
   compiledModules: [

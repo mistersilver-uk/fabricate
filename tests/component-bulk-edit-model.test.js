@@ -1,12 +1,12 @@
 /**
  * Issue 772 — the component browser's pure bulk selection + staging model. Everything the bulk edit
- * feature can be reasoned about without a DOM lives in `src/utils/componentBulkEditModel.js`; the
+ * feature can be reasoned about without a DOM lives in `src/ui/model/componentBulkEditModel.js`; the
  * Svelte surfaces are wiring.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { createComponentBrowserState } from '../src/utils/componentBrowserModel.js';
+import { createComponentBrowserState } from '../src/ui/model/componentBrowserModel.js';
 import {
   adjustBulkEssence,
   bulkDraftHasChanges,
@@ -24,7 +24,7 @@ import {
   toBulkComponentEdit,
   toggleBulkDifficultyStaged,
   toggleBulkEssencesStaged,
-} from '../src/utils/componentBulkEditModel.js';
+} from '../src/ui/model/componentBulkEditModel.js';
 
 /** A projected `itemCards` row, essences-as-ARRAY exactly as the admin store emits them. */
 const card = (id, essences = []) => ({ id, name: id, essences });

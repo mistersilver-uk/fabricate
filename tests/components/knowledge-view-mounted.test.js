@@ -23,7 +23,7 @@ const harness = createMountedComponentHarness({
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     // The roster's lifted search term (issue 1438).
-    'src/utils/managerBrowserViewState.js',
+    'src/ui/model/managerBrowserViewState.js',
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     // knowledgeStudio resolves a learned recipe's image through the shared chokepoint
     // (issue 887). It is an import-free leaf, so this one entry suffices — but omitting

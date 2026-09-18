@@ -18,7 +18,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
-import { createEssenceBrowserState } from '../../src/utils/essenceBrowserModel.js';
+import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -32,12 +32,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
-    'src/utils/essenceBrowserModel.js',
-    'src/utils/essenceBulkEditModel.js',
+    'src/ui/model/essenceBrowserModel.js',
+    'src/ui/model/essenceBulkEditModel.js',
     'src/utils/bulkSelectionModel.js',
-    'src/utils/browserGroupCounts.js',
-    'src/utils/browserPagination.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/browserGroupCounts.js',
+    'src/ui/model/browserPagination.js',
+    'src/ui/model/essenceValidation.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     // The essence world-scope presentation leaf (issue 1372). `EssenceBrowserView` reads the
     // three-state membership answer and the inherit suffix from it; it imports nothing, so this
@@ -54,12 +54,12 @@ const harness = createMountedComponentHarness({
     // shipped counter. The harness validates this closure and names the miss, unlike the
     // hand-rolled trees elsewhere.
     'src/systems/worldVocabulary.js',
-    'src/utils/vocabularyUsage.js',
+    'src/ui/model/vocabularyUsage.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     'src/utils/recipeCategories.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/systems/componentScope.js',
     'src/systems/essenceScope.js',
     'src/systems/scopedDefinitionStore.js',

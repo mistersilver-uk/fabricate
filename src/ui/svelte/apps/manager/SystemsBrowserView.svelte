@@ -14,7 +14,7 @@
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createSystemsBrowserState,
-  } from '../../../../utils/managerBrowserViewState.js';
+  } from '../../../model/managerBrowserViewState.js';
 
   let {
     systems = [],

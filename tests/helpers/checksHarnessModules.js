@@ -82,7 +82,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/scopedEntityReads.js',
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/utils/definitionIndex.js',
   'src/utils/sourceReferenceUnion.js',
   'src/config/flags.js',

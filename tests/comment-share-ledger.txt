@@ -1,6 +1,6 @@
 scripts	2748
 scripts/foundry	13
-scripts/lib	3263
+scripts/lib	3259
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
 src	1249
@@ -9,11 +9,12 @@ src/canvas/linkedVisuals	64
 src/canvas/regions	331
 src/config	435
 src/integrations	20
-src/migration	1797
+src/migration	1343
 src/models	467
 src/models/match	66
-src/systems	28641
+src/systems	29095
 src/ui	1109
+src/ui/model	430
 src/ui/svelte	52
 src/ui/svelte/actions	73
 src/ui/svelte/apps	1178
@@ -47,7 +48,7 @@ src/ui/svelte/apps/manager/world	327
 src/ui/svelte/components	1245
 src/ui/svelte/stores	4606
 src/ui/svelte/util	1273
-src/utils	1356
+src/utils	926
 styles	1045
 tests	19540
 tests/actions	85

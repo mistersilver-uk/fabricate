@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { WORLD_DEFAULT_SECTIONS } from '../src/migration/worldScopeDefaults.js';
+import { WORLD_DEFAULT_SECTIONS } from '../src/systems/worldScopeDefaults.js';
 import { COMPONENT_SCOPE } from '../src/systems/componentScope.js';
 import { ESSENCE_SCOPE } from '../src/systems/essenceScope.js';
 import { resolveScopedDefinition } from '../src/systems/scopedDefinitions.js';
@@ -16,7 +16,7 @@ import {
   sourceReferencesOf,
   toolSourceReferences,
   WORLD_IDENTITY_FIELDS,
-} from '../src/migration/worldScopeEntityGrouping.js';
+} from '../src/systems/worldScopeEntityGrouping.js';
 import {
   buildMembershipRecord,
   migrateWorldScopeEntities,
@@ -645,7 +645,7 @@ test('the world defaults change NOTHING at migration time, RESOLVED VALUE by res
 });
 
 test('CONSTRAINT 1: a donor whose category is the reserved `general` elects NO world default', async () => {
-  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const { electWorldDefault } = await import('../src/systems/worldScopeDefaults.js');
   const elect = (category) =>
     electWorldDefault({
       entityType: 'components',
@@ -666,7 +666,7 @@ test('CONSTRAINT 1: a donor whose category is the reserved `general` elects NO w
 
 test('CONSTRAINT 0: a section ANY member left unauthored elects NO world default', async () => {
   // THE BLOCKING DEFECT THIS CLOSES.
-  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const { electWorldDefault } = await import('../src/systems/worldScopeDefaults.js');
   const elect = (memberRecords) =>
     electWorldDefault({
       entityType: 'tools',
@@ -702,7 +702,7 @@ test('CONSTRAINT 0: a section ANY member left unauthored elects NO world default
 test('CONSTRAINT 0 does NOT apply to the three sections that cannot fall back', async () => {
   // `effectSource` and `macro` are written UNCONDITIONALLY by the membership builder, and both CAN
   // express emptiness, so nothing falls back to them.
-  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const { electWorldDefault } = await import('../src/systems/worldScopeDefaults.js');
   const elected = electWorldDefault({
     entityType: 'essences',
     entityId: 'fire',
@@ -722,7 +722,7 @@ test('CONSTRAINT 0 does NOT apply to the three sections that cannot fall back', 
 });
 
 test('CONSTRAINT 2 and 3: a non-world-addressable reference declines its section', async () => {
-  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const { electWorldDefault } = await import('../src/systems/worldScopeDefaults.js');
   const worldComponentIds = new Set(['world-c']);
   const essence = (sourceComponentId) =>
     electWorldDefault({
@@ -761,7 +761,7 @@ test('CONSTRAINT 2 and 3: a non-world-addressable reference declines its section
 });
 
 test('CONSTRAINT 4: repairRequirements lifts only when every group system is a MEMBER', async () => {
-  const { electWorldDefault } = await import('../src/migration/worldScopeDefaults.js');
+  const { electWorldDefault } = await import('../src/systems/worldScopeDefaults.js');
   // `breakage` and `onBreak` are authored so CONSTRAINT 0 does not fire and this arm isolates
   // constraint 4; `repairRequirements` is exempt from constraint 0 in any case.
   const donorRecord = {

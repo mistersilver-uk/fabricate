@@ -95,7 +95,7 @@ const componentsBrowserFrame = (id, label, extraMatches = []) => ({
 
 // The two pure models the bulk panel stages against.
 const BULK_EDIT_MODEL_MATCHES = [
-  /^src\/utils\/componentBulkEditModel\.js$/,
+  /^src\/ui\/model\/componentBulkEditModel\.js$/,
   /^src\/utils\/bulkSelectionModel\.js$/,
 ];
 
@@ -121,7 +121,7 @@ const recipesBrowserFrame = (id, label, extraMatches = []) => ({
 // The two pure models the recipe bulk panel stages against — the recipe half of
 // `BULK_EDIT_MODEL_MATCHES` above, and hoisted for the same reason.
 const RECIPE_BULK_EDIT_MODEL_MATCHES = [
-  /^src\/utils\/recipeBulkEditModel\.js$/,
+  /^src\/ui\/model\/recipeBulkEditModel\.js$/,
   /^src\/utils\/bulkSelectionModel\.js$/,
 ];
 
@@ -235,7 +235,7 @@ export const VIEW_RECIPES = Object.freeze([
     // The only components-browser view with TWO frames, so it is the one entry here that
     // cannot come from `componentsBrowserFrame` (which keys its single label off the id).
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [...COMPONENTS_BROWSER_MATCHES, /^src\/utils\/componentBrowserModel\.js$/],
+    matches: [...COMPONENTS_BROWSER_MATCHES, /^src\/ui\/model\/componentBrowserModel\.js$/],
   },
   componentsBrowserFrame(
     'manager-components-progressive',
@@ -271,7 +271,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-components-grouped-continuation'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
-      /^src\/utils\/componentBrowserModel\.js$/,
+      /^src\/ui\/model\/componentBrowserModel\.js$/,
     ],
   },
   // Issue 800: write-time resolution of source descriptions.
@@ -446,7 +446,7 @@ export const VIEW_RECIPES = Object.freeze([
       // mounts, so a change to it is only visible in `manager-essence-edit-first-state` (issue
       // 1124).
       /^src\/ui\/svelte\/util\/(?:essenceIcons|essencePreviewRow|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
       // The shared bulk-delete card (issue 1132).
       /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/,
     ],
@@ -542,7 +542,7 @@ export const VIEW_RECIPES = Object.freeze([
     [
       /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
       ...RECIPE_BULK_EDIT_MODEL_MATCHES,
-      /^src\/utils\/recipeBrowserModel\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   ),
   // Issue 801: the grouped-category continuation frame for the recipe library.
@@ -552,7 +552,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-recipes-grouped-continuation'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
-      /^src\/utils\/recipeBrowserModel\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   },
   // Issue 806: the editor round-trip preservation frame.
@@ -562,7 +562,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-recipes-editor-roundtrip'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
-      /^src\/utils\/recipeBrowserModel\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   },
   // Issue 877 turned the report from a raw-HTML DialogV2 into a Svelte modal, so the

@@ -19,7 +19,7 @@ const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authori
 const { reportWorldIdentityDrift } = await import('../src/systems/worldIdentityDrift.js');
 const { REFERENCE_KINDS } = await import('../src/systems/importReferenceResolver.js');
 const { buildWorldScopeGrouping } = await import(
-  '../src/migration/worldScopeEntityGrouping.js'
+  '../src/systems/worldScopeEntityGrouping.js'
 );
 const { migrateWorldScopeEntities } = await import(
   '../src/migration/migrateWorldScopeEntities.js'

@@ -18,7 +18,7 @@
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createToolsBrowserState,
-  } from '../../../../utils/managerBrowserViewState.js';
+  } from '../../../model/managerBrowserViewState.js';
 
   let {
     tools = [],

@@ -33,14 +33,14 @@
     pruneRecipeSelection,
     setRecipeSelection,
     toggleRecipeSelection,
-  } from '../../../../utils/recipeBulkEditModel.js';
+  } from '../../../model/recipeBulkEditModel.js';
   import {
     RECIPE_SORT_KEYS,
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
     deriveRecipeStatuses,
-  } from '../../../../utils/recipeBrowserModel.js';
+  } from '../../../model/recipeBrowserModel.js';
   import IconButton from '../../components/IconButton.svelte';
   import Notice from '../../components/Notice.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';

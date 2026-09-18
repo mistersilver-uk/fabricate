@@ -48,7 +48,7 @@ const harness = createMountedComponentHarness({
     // IconPicker positions its panel through the shared action (issue 1500).
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
-    'src/utils/managerBrowserViewState.js',
+    'src/ui/model/managerBrowserViewState.js',
     // The page's own pure leaf and the World Vocabulary core it imports. Omitting either does
     // not fail a test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, which
     // `node --test` reports as `# cancelled`.

@@ -4,7 +4,7 @@
  * `hasSourceLink` answers presence only, and `worldCategory`/`worldTags` never block.
  */
 
-import { stringOrEmpty as trimmed } from './scalars.js';
+import { stringOrEmpty as trimmed } from '../../utils/scalars.js';
 
 /** The check ids, in render order. */
 export const COMPONENT_SCOPE_VALIDATION_CHECKS = Object.freeze([

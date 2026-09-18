@@ -65,9 +65,9 @@ export async function loadBenchmarkModules() {
     import('../../../src/utils/essenceResolver.js'),
     import('../../../src/utils/componentNameMatch.js'),
     import('../../../src/utils/definitionIndex.js'),
-    import('../../../src/utils/recipeBrowserModel.js'),
-    import('../../../src/utils/componentBrowserModel.js'),
-    import('../../../src/utils/browserPagination.js'),
+    import('../../../src/ui/model/recipeBrowserModel.js'),
+    import('../../../src/ui/model/componentBrowserModel.js'),
+    import('../../../src/ui/model/browserPagination.js'),
     import('../../../src/ui/svelte/util/recipeGraphBuilder.js'),
     import('../../../src/ui/svelte/stores/adminRecipeRowProjection.js'),
     // The world-scope entity stores (issue 1359).
