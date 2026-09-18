@@ -1,8 +1,4 @@
-/**
- * THE SCALAR HELPERS ARE DECLARED ONCE, AND THE ONES THAT ARE NOT SAY WHY (issue #1662).
- * `numberOrNull` (5 sites, 3 bodies) — two have no empty-string or null guard, so `''` and `null`
- * come back as `0` rather than `null`, because `Number('')` is `0`.
- */
+/** Every name `src/utils/scalars.js` owns is declared only there, and no retired name anywhere. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -18,29 +14,28 @@ const CANONICAL = 'src/utils/scalars.js';
 
 /** The names `src/utils/scalars.js` owns. Declaring one of these anywhere else is the failure. */
 const CONSOLIDATED = {
+  arrayOrEmpty: [CANONICAL],
+  arrayOrWrapped: [CANONICAL],
   cloneJson: [CANONICAL],
   isPlainObject: [CANONICAL],
+  iterableToArray: [CANONICAL],
+  laxNumberOrNull: [CANONICAL],
   normalizeConditionId: [CANONICAL],
+  normalizeIdList: [CANONICAL],
+  normalizeTag: [CANONICAL],
   normalizeTagList: [CANONICAL],
+  numberOrNull: [CANONICAL],
+  stringOnlyIdList: [CANONICAL],
+  stringOrEmpty: [CANONICAL],
+  stringOrNull: [CANONICAL],
   trimString: [CANONICAL],
-  // `TagsCategoriesView.svelte` keeps its own `normalizeTag`, and the exception is recorded rather
-  // than merged because it DIVERGES: it spells the guard `String(value || '')` where `scalars.js`
-  // spells it `String(value ?? '')`, so `0` normalises to `''` there and `'0'` here, and likewise
-  // `false` and `NaN`.
-  normalizeTag: [CANONICAL, 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'],
+  trimStringOrNull: [CANONICAL],
+  untrimmedStringOrEmpty: [CANONICAL],
+  untrimmedStringOrNull: [CANONICAL],
 };
 
-/**
- * Names still declared per file, with the number of declarations, because their copies disagree.
- */
-const DIVERGENT = {
-  numberOrNull: 5,
-  stringOrNull: 9,
-  stringOrEmpty: 9,
-  trimmed: 10,
-  normalizeList: 4,
-  normalizeIdList: 3,
-};
+/** Names no longer declared anywhere under `src/`; hub modules re-publish them as aliases. */
+const RETIRED = ['normalizeList', 'numberOrNullStrict', 'trimmed'];
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -48,8 +43,7 @@ const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), 
 function declarationsOf(names) {
   const wanted = new Set(names);
   const found = new Map();
-  // `.svelte` INCLUDED, and that is the whole difference between this gate and a comfortable one
-  // (issue 1050).
+  // `.svelte` is in scope, because a component copy is a copy (issue 1050).
   for (const file of Object.keys(collectSources(`${repoRoot}/src`))) {
     const source = readFileSync(path.join(REPOSITORY_ROOT, file), 'utf8');
     const ast = file.endsWith('.svelte') ? parseComponent(source) : parseModule(source);
@@ -72,11 +66,19 @@ function declarationsOf(names) {
 }
 
 test('the scan sees a real corpus', () => {
-  // A parse that started throwing, or a `collectSources` that stopped recursing, would make every
-  // assertion below pass over nothing.
-  const files = Object.keys(collectSources(`${repoRoot}/src`, { extensions: ['.js'] }));
-  assert.ok(files.length > 350, `expected the whole src/ tree, found ${files.length} files`);
-  assert.ok(files.includes(CANONICAL), `${CANONICAL} must be in the scanned corpus`);
+  // A throwing parse or a `collectSources` that stopped recursing passes every assertion over nothing.
+  const modules = Object.keys(collectSources(`${repoRoot}/src`, { extensions: ['.js'] }));
+  assert.ok(modules.length > 350, `expected the whole src/ tree, found ${modules.length} modules`);
+  assert.ok(modules.includes(CANONICAL), `${CANONICAL} must be in the scanned corpus`);
+
+  const components = Object.keys(collectSources(`${repoRoot}/src`, { extensions: ['.svelte'] }));
+  assert.ok(components.length > 300, `expected the component tree, found ${components.length} files`);
+
+  const probe = parseComponent('<script>\nfunction trimmed(value) { return value; }\n</script>\n');
+  const declared = [...walkNodes(probe)]
+    .filter((node) => node.type === 'FunctionDeclaration')
+    .map((node) => node.id?.name);
+  assert.deepEqual(declared, ['trimmed'], 'a component declaration must be visible to the walk');
 });
 
 test('each consolidated helper is declared only where it is allowed to be', () => {
@@ -93,8 +95,7 @@ test('each consolidated helper is declared only where it is allowed to be', () =
       files.has(CANONICAL),
       `${name} is not declared in ${CANONICAL} at all, so this gate guards a name nothing owns`
     );
-    // A recorded exception that no longer declares the helper is stale, and a stale exception is
-    // a licence nobody is using that the next author can reach for.
+    // A recorded exception the file no longer uses is a licence the next author can reach for.
     for (const file of allowed) {
       if (!files.has(file)) stale.push(`${name}: ${file}`);
     }
@@ -109,24 +110,19 @@ test('each consolidated helper is declared only where it is allowed to be', () =
   assert.deepEqual(stale, [], 'these CONSOLIDATED exceptions name a file that no longer declares the helper');
 });
 
-test('the divergent helpers have not quietly multiplied', () => {
-  const declarations = declarationsOf(Object.keys(DIVERGENT));
-  const counts = Object.fromEntries(
-    Object.keys(DIVERGENT).map((name) => [name, (declarations.get(name) ?? []).length])
-  );
+test('the retired helper names have no declaration left', () => {
+  const declarations = declarationsOf(RETIRED);
   assert.deepEqual(
-    counts,
-    DIVERGENT,
-    'the count of un-consolidated scalar helpers changed. Going DOWN is the point: fix one, and ' +
-      'lower its number here in the same commit. Going UP means a seventh spelling of a helper ' +
-      'whose six existing spellings already disagree.'
+    Object.fromEntries([...declarations].map(([name, sites]) => [name, sites.sort(byCodePoint)])),
+    {},
+    'a retired name was declared again. Import the export whose body it has from ' +
+      `${CANONICAL}, or alias it at the import, rather than writing the function out.`
   );
 });
 
-test('no divergent name is also owned by scalars.js', () => {
-  // The two lists must not overlap, or a name could be "consolidated" and "divergent" at once and
-  // the two assertions above would contradict each other without either failing.
-  const overlap = Object.keys(CONSOLIDATED).filter((name) => name in DIVERGENT);
+test('no retired name is also owned by scalars.js', () => {
+  // Overlapping lists would let a name be consolidated and retired at once, failing neither test.
+  const overlap = Object.keys(CONSOLIDATED).filter((name) => RETIRED.includes(name));
   assert.deepEqual(overlap, []);
 
   const canonical = parseModule(readFileSync(path.join(REPOSITORY_ROOT, CANONICAL), 'utf8'));
@@ -140,15 +136,14 @@ test('no divergent name is also owned by scalars.js', () => {
     `${CANONICAL} declares a different set of helpers than this gate enforces`
   );
   assert.deepEqual(
-    Object.keys(DIVERGENT).filter((name) => exported.has(name)),
+    RETIRED.filter((name) => exported.has(name)),
     [],
-    `${CANONICAL} exports a helper this file records as divergent, which cannot both be true`
+    `${CANONICAL} exports a helper this file records as retired, which cannot both be true`
   );
 });
 
 test('the gate can actually fail', () => {
-  // Guarding the guard: the parser must really report a declaration it is handed, or "no copies
-  // outside scalars.js" is a sentence about an empty search.
+  // The parser must report a declaration it is handed, or "no copies" is a sentence about nothing.
   const probe = parseModule('export function isPlainObject(value) { return !!value; }\n');
   const names = [...walkNodes(probe)]
     .filter((node) => node.type === 'FunctionDeclaration')
