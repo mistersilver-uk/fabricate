@@ -13,8 +13,6 @@ import { toAlchemyRecords } from '../helpers/alchemySubmissionRecords.js';
 let compiler;
 let createAlchemyStore;
 
-// Fixtures
-
 function concreteRecipe(id, name, concrete, resultName = 'Result') {
   const groups = Object.entries(concrete).map(([componentId, quantity]) => ({
     options: [{ componentId, name: componentId, img: null, quantity }],
@@ -134,8 +132,6 @@ const ALCHEMY_STORE_SHAPE = {
   ],
 };
 
-// ---------------------------------------------------------------------------
-
 describe('alchemyStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-alchemy-store-');
@@ -143,6 +139,7 @@ describe('alchemyStore', () => {
     // Issue 1648: the authority-refusal wording the brew path now falls back to. A
     // dependency the store imports but the compiler does not copy CANCELS this suite.
     compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
+    compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
     ({ createAlchemyStore } = await compiler.load('src/ui/svelte/stores/alchemyStore.svelte.js'));
   });
 
@@ -259,8 +256,7 @@ describe('alchemyStore', () => {
   });
 
   it('duplicate/identical learned signatures fail safe to `untried` (issue 774 — engine fizzles)', async () => {
-    // Identical signatures are now rejected at enable time and, if two ever both match, the engine
-    // fizzles (a non-unique maximum).
+    // Identical signatures are rejected at enable time, and a non-unique maximum fizzles.
     const listing = baseListing({
       recipes: [
         concreteRecipe('first', 'First Brew', { emberroot: 1 }, 'A'),
@@ -464,9 +460,7 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true);
   });
 
-  // Issue 966: a time-gated brew START matched a signature, consumed the inputs and
-  // armed a run — but returned `success: false` with no disposition, so it fell into
-  // the trailing else and bannered as a fizzle, telling the player their brew failed.
+  // A `success: false` with no disposition is a started run, not a fizzle (issue 966).
   it('a started time-gated brew banners as brewing, not as a fizzle, and toasts nothing', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({
@@ -493,9 +487,7 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true);
   });
 
-  // Issue 1648: the versioned-run authority refuses a brew with `{success:false, reason}`
-  // and no `message`, so the store toasted NOTHING and bannered `no-match-fizzle` —
-  // telling the player their reaction failed when nothing was ever attempted.
+  // A `{success: false, reason}` with no `message` is an authority refusal, not a fizzle.
   it('banners and toasts an authority refusal instead of reporting a fizzle', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({ success: false, reason: 'ledger-missing' }),
@@ -637,9 +629,8 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, false, 'a cancelled roll leaves the bench intact');
   });
 
-  // The aggregate essence readout is the ONLY progress signal an essence-authored
-  // recipe gets: such a recipe has no `concrete` multiset, so resolution fails safe
-  // to `untried` and never reports `ready`.
+  // The only progress signal an essence-authored recipe gets: with no `concrete` multiset
+  // its resolution fails safe to `untried`.
   describe('benchEssences (aggregate essence readout)', () => {
     const essenceListing = () =>
       baseListing({

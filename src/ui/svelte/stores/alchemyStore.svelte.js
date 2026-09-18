@@ -2,15 +2,10 @@
  * alchemyStore — Svelte 5 runes store backing the player-facing Alchemy tab (the
  * Workbench).
  *
- * Mirrors {@link createCraftingStore}: a plain factory that NEVER touches Foundry
- * globals. Every Foundry-facing read/write flows through the injected `services`
- * bag (the unified-window seam set built in `SvelteFabricateApp._buildServices`),
- * so the store stays presentational and fully unit-testable.
+ * Mirrors {@link createCraftingStore}: a plain factory reaching Foundry only through `services`.
  *
- * It holds the leak-safe listing produced by `AlchemyListingBuilder` (via
- * `services.listAlchemyForActor`) plus the local workbench state (`activeSystemId`,
- * the `workbench` component multiset, `selectedRecipeId`, `search`, `lastBrew`) and
- * the brew action. It derives the five-mode status CLIENT-SIDE against learned
+ * It browses the leak-safe listing from `services.listAlchemyForActor` and owns the workbench
+ * state and the brew action. It derives the five-mode status CLIENT-SIDE against learned
  * recipes plus the local fizzle set — but the client mode is BEST-EFFORT and
  * ADVISORY. `ready`/`assembling` resolve for two recipe shapes: a concrete
  * plain-component multiset (exact match), and an ESSENCE-ONLY requirement (`>=`
@@ -30,11 +25,9 @@
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
 import { isResolvedFailureOutcome, journalRefusalMessage } from '../util/journalRunReasons.js';
 
+import { createListingLoad } from './browseListing.svelte.js';
+
 export function createAlchemyStore({ services } = {}) {
-  let listing = $state(null);
-  let loading = $state(false);
-  let error = $state(null);
-  let loadedOnce = $state(false);
   let activeSystemId = $state(services?.getSelectedAlchemySystemId?.() || null);
   // workbench: { [componentId]: units } — a concrete plain-component multiset.
   let workbench = $state({});
@@ -43,6 +36,19 @@ export function createAlchemyStore({ services } = {}) {
   let componentSearch = $state('');
   let lastBrew = $state(null);
   let brewInFlight = $state(false);
+  // The pass in flight's `quiet` flag, which the auto-enter's re-entrant load inherits.
+  let loadQuiet = false;
+
+  const listingLoad = createListingLoad({
+    fetch: () =>
+      services?.listAlchemyForActor?.({
+        actorId: currentActorId(),
+        craftingSystemId: activeSystemId,
+        componentSourceActorIds: currentSourceIds(),
+      }),
+    afterCommit: () => settleActiveSystem(),
+  });
+  const listing = $derived(listingLoad.listing);
 
   function currentActorId() {
     return services?.getSelectedCraftingActorId?.() || null;
@@ -63,8 +69,7 @@ export function createAlchemyStore({ services } = {}) {
 
   const systems = $derived(Array.isArray(listing?.systems) ? listing.systems : []);
   const canSwitch = $derived(systems.length > 1);
-  // The chooser is shown when more than one alchemy system exists and none is
-  // active yet. Exactly one system auto-enters (see `load`).
+  // Shown when more than one system exists and none is active; a sole system auto-enters.
   const needsChooser = $derived(systems.length > 1 && !activeSystemId);
 
   const knownRecipes = $derived.by(() => {
@@ -341,39 +346,23 @@ export function createAlchemyStore({ services } = {}) {
   // (mid-build toward a selected recipe) are disabled.
   const brewEnabled = $derived(mode === 'ready' || mode === 'untried' || mode === 'no-reaction');
 
-  /**
-   * Fetch the alchemy listing for the current actor + sources scoped to the
-   * active system. Auto-enters the sole system when exactly one exists and none is
-   * active; drops a stale active id no longer offered.
-   */
-  async function load(quiet = false) {
-    if (!quiet) loading = true;
-    error = null;
-    try {
-      const result = await services?.listAlchemyForActor?.({
-        actorId: currentActorId(),
-        craftingSystemId: activeSystemId,
-        componentSourceActorIds: currentSourceIds(),
-      });
-      listing = result ?? null;
-      loadedOnce = true;
+  /** Fetch the alchemy listing for the current actor + sources scoped to the active system. */
+  function load(quiet = false) {
+    loadQuiet = quiet === true;
+    return listingLoad.refresh(quiet);
+  }
 
-      const offered = Array.isArray(listing?.systems) ? listing.systems : [];
-      // Drop a stale active id (system disabled / lost its recipes).
-      if (activeSystemId && !offered.some((system) => system.id === activeSystemId)) {
-        activeSystemId = null;
-        services?.setSelectedAlchemySystemId?.('');
-      }
-      // Auto-enter the sole discipline.
-      if (!activeSystemId && offered.length === 1) {
-        activeSystemId = offered[0].id;
-        services?.setSelectedAlchemySystemId?.(activeSystemId);
-        await load(quiet);
-      }
-    } catch (err) {
-      error = err?.message ?? String(err);
-    } finally {
-      if (!quiet) loading = false;
+  /** Drop an active id the committed listing no longer offers, then enter a sole discipline. */
+  async function settleActiveSystem() {
+    const offered = Array.isArray(listing?.systems) ? listing.systems : [];
+    if (activeSystemId && !offered.some((system) => system.id === activeSystemId)) {
+      activeSystemId = null;
+      services?.setSelectedAlchemySystemId?.('');
+    }
+    if (!activeSystemId && offered.length === 1) {
+      activeSystemId = offered[0].id;
+      services?.setSelectedAlchemySystemId?.(activeSystemId);
+      await load(loadQuiet);
     }
   }
 
@@ -580,13 +569,13 @@ export function createAlchemyStore({ services } = {}) {
       return listing;
     },
     get loading() {
-      return loading;
+      return listingLoad.loading;
     },
     get error() {
-      return error;
+      return listingLoad.error;
     },
     get loadedOnce() {
-      return loadedOnce;
+      return listingLoad.loadedOnce;
     },
     get activeSystemId() {
       return activeSystemId;
