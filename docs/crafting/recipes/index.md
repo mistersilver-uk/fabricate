@@ -38,6 +38,22 @@ The results a recipe produces are chosen on their own tab.
 
 {% include screenshot.html case="manager-recipe-edit-results" %}
 
+### Result Amounts: Fixed or Rolled
+
+A result's amount is either **fixed**, a plain number set on the result, or **rolled**, a dice expression resolved fresh each time the recipe is crafted.
+
+A rolled amount uses the same [expression syntax]({% link expressions.md %}) as everywhere else in Fabricate, including an optional reference to the crafting character's own data.
+It is resolved once, at the moment the result is awarded, against the character doing the crafting.
+
+A rolled amount can come up as zero.
+When it does, nothing is created, and the crafting or salvage chat card names the roll and states that nothing was produced, rather than leaving the result off the card.
+Fabricate refuses to save a rolled amount that could never produce anything at all, such as an expression with no dice and no character reference that can only ever total zero or less.
+An expression that reads the crafting character's own data is always accepted, because its value cannot be known in advance.
+
+{: .note }
+> Choosing between a fixed and a rolled amount on the Results tab is planned and not yet available.
+> Until then, a rolled amount can only reach a recipe by importing one that already has one, or through the API.
+
 ## Enabling and Disabling Recipes
 
 Whether a recipe is enabled controls whether it can be crafted.
