@@ -104,8 +104,8 @@
  * "Cheap availability" here and issue 1077's "indexed availability projection" are the SAME
  * rule with the SAME implementation, `projectRecipeAvailability` in `inventorySnapshot.js`,
  * reached only through {@link projectSummaryAvailability} below and never re-derived. The
- * two phrasings exist because issue 1077 named the rule at the tallies and issue 1091 named it again
- * at the summary that consumes it — a second name picked up along the way, not a second
+ * two phrasings exist because issue 1077 named the rule at the tallies and issue 1091 named it
+ * again at the summary that consumes it — a second name picked up along the way, not a second
  * rule authored twice. Treating them as two things is exactly the drift this module exists
  * to foreclose.
  *
