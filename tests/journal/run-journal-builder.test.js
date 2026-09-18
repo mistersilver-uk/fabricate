@@ -1211,7 +1211,7 @@ test('1645: a rolled amount is stated beside the number every yield projection c
   assert.equal(rolledAward.quantity, 3, 'a recorded award states the integer it awarded');
   assert.equal(
     rolledAward.amountLabel,
-    `FABRICATE.App.Journal.AmountRolled|${JSON.stringify({ formula: '1d4+1', total: 3 })}`
+    `FABRICATE.App.Journal.RolledAmount|${JSON.stringify({ formula: '1d4+1', total: 3 })}`
   );
   assert.equal(fixedAward.quantity, 2);
   assert.ok(!('amountLabel' in fixedAward), 'and a fixed award carries no label key');

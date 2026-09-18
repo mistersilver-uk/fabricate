@@ -147,7 +147,7 @@ test('1645: a rolled result states its roll beside the produced line', () => {
   );
   assert.ok(content.includes('3× Iron Sword'), 'the awarded integer still leads the row');
   assert.ok(
-    content.includes('fabricate-craft-chat__item-roll">rolled 1d4+1 = 3<'),
+    content.includes('fabricate-craft-chat__item-roll">Rolled 1d4+1 = 3<'),
     'the roll is a second run of the same row, in the card\'s rolled-total treatment'
   );
   assert.ok(!content.includes('{formula}'), 'no unsubstituted placeholder reaches chat');
@@ -161,7 +161,7 @@ test('1645: an empty award states the roll that produced nothing', () => {
     }),
     shippedLocalize
   );
-  assert.ok(content.includes('rolled 1d4-8 = -3, nothing produced'), 'the roll as it fell');
+  assert.ok(content.includes('Rolled 1d4-8 = -3, nothing produced'), 'the roll as it fell');
   assert.ok(content.includes('Iron Ore'), 'and what it was rolled for');
 });
 
@@ -969,7 +969,7 @@ test('1645: the rolled run stays readable at chat width where a label would be e
     assert.ok(clipped.clipped, 'control: on the label treatment the sentence is cut off');
     const shipped = await measure('shipped');
     assert.ok(!shipped.clipped, `the whole sentence is readable: ${shipped.text}`);
-    assert.equal(shipped.text, 'rolled 1d4-8 = -3, nothing produced', 'and it is the sentence');
+    assert.equal(shipped.text, 'Rolled 1d4-8 = -3, nothing produced', 'and it is the sentence');
   } finally {
     await context.close();
   }

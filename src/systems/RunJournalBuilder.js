@@ -54,7 +54,7 @@ function rolledAmountLabel(source, localize) {
   const rolled = plainObjectOrNull(source?.rolled);
   const total = numberOrNull(rolled?.total);
   if (stringOrNull(rolled?.formula) && total !== null) {
-    return localize('FABRICATE.App.Journal.AmountRolled', { formula: rolled.formula, total });
+    return localize('FABRICATE.App.Journal.RolledAmount', { formula: rolled.formula, total });
   }
   return stringOrNull(source?.quantityFormula);
 }
