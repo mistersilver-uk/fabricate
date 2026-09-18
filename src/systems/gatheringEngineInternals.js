@@ -7,7 +7,12 @@
  * duplication gate forbids a second copy in the builder).
  */
 
-import { cloneJson, stringOrEmpty, stringOrNull } from '../utils/scalars.js';
+import {
+  cloneJson,
+  iterableToArray as normalizeList,
+  stringOrEmpty,
+  stringOrNull,
+} from '../utils/scalars.js';
 
 /**
  * Sentinel `taskId` prefix persisted on an opaque-blind WAITING run in place of
@@ -57,22 +62,6 @@ export function blindWaitingTaskId(environment) {
  */
 export function isBlindWaitingTaskId(taskId) {
   return typeof taskId === 'string' && taskId.startsWith(BLIND_WAITING_TASK_PREFIX);
-}
-
-/**
- * Normalize an array / Map / iterable / Foundry collection into a plain array.
- * Returns an empty array for nullish or non-iterable input.
- *
- * @param {*} value
- * @returns {Array<*>}
- */
-export function normalizeList(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  if (value instanceof Map) return [...value.values()];
-  if (typeof value.values === 'function') return [...value.values()];
-  if (typeof value[Symbol.iterator] === 'function') return [...value];
-  return [];
 }
 
 /**
@@ -312,6 +301,7 @@ export function stripRuntimeSnapshotFromRun(run) {
 
 export {
   cloneJson,
+  iterableToArray as normalizeList,
   laxNumberOrNull as numberOrNull,
   stringOrEmpty,
   stringOrNull,

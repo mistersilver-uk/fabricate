@@ -3,7 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
-import { cloneJson, stringOrEmpty } from '../utils/scalars.js';
+import { cloneJson, normalizeIdList, stringOrEmpty } from '../utils/scalars.js';
 
 const OVERRIDE_MODES = new Set(['none', 'manual']);
 
@@ -372,9 +372,4 @@ function optionalString(value) {
 
 function trimmedOrDefault(value, fallback) {
   return stringOrEmpty(value) || fallback;
-}
-
-function normalizeIdList(value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
 }

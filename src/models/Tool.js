@@ -7,6 +7,7 @@
  * flag, never the name, is the authoritative presence-gate disqualifier.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { stringOnlyIdList as normalizeIdList } from '../utils/scalars.js';
 
 import { IngredientGroup } from './IngredientGroup.js';
 
@@ -35,18 +36,6 @@ function normalizeRequirement(input) {
   if (!input || typeof input !== 'object') return null;
   const formula = typeof input.formula === 'string' ? input.formula : '';
   return { formula };
-}
-
-function normalizeIdList(values) {
-  if (!Array.isArray(values)) return [];
-  return [
-    ...new Set(
-      values
-        .filter((value) => typeof value === 'string')
-        .map((value) => value.trim())
-        .filter(Boolean)
-    ),
-  ];
 }
 
 function normalizePrerequisites(input) {

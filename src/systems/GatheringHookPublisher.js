@@ -1,5 +1,5 @@
 import { GATHERING_HOOKS } from '../config/hooks.js';
-import { stringOrNull } from '../utils/scalars.js';
+import { arrayOrWrapped as normalizeList, stringOrNull } from '../utils/scalars.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -196,12 +196,6 @@ function idOf(document) {
 function numberOr(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
-}
-
-function normalizeList(value) {
-  if (Array.isArray(value)) return value;
-  if (value === null || value === undefined) return [];
-  return [value];
 }
 
 function deepClone(value) {
