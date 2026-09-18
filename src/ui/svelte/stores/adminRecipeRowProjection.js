@@ -404,7 +404,7 @@ function _recipeCheckSummary(context, recipe) {
  *
  * A field belongs here when NOTHING in `recipeBrowserModel.js` reads it — no filter, no sort
  * key, no category. Moving a field into this list that the model does read reintroduces the
- * failure `summaryProjection.js` records for the systems-layer manifest: the browser renders
+ * failure `summaryProjection.js` records for the shared summary manifest: the browser renders
  * name order under a "DC" label and says nothing.
  */
 const RECIPE_DETAIL_FIELDS = Object.freeze([
