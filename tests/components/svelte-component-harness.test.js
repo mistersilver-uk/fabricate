@@ -148,6 +148,9 @@ describe('rewriteClientImports', () => {
       "import { getContext, onDestroy, tick, untrack } from 'svelte';",
       "import Child from './Child.svelte';",
       'import Sibling from "../nested/Sibling.svelte";',
+      // A rune module importing another lands at `<path>.js` too, so it gains one `.js` and not
+      // two — the case a relaxed pattern would double-append unnoticed (issue 1673).
+      "import W from './browseListing.svelte.js';",
       "import { helper } from '../util/helper.js';"
     ].join('\n');
 
@@ -159,6 +162,7 @@ describe('rewriteClientImports', () => {
         "import { getContext, onDestroy, tick, untrack } from 'svelte';",
         "import Child from './Child.svelte.js';",
         'import Sibling from "../nested/Sibling.svelte.js";',
+        "import W from './browseListing.svelte.js.js';",
         "import { helper } from '../util/helper.js';"
       ].join('\n'),
       'only `.svelte` specifiers move; the bare `svelte` import must survive intact and unsplit'

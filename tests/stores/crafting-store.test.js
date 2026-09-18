@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
 
@@ -99,8 +100,6 @@ function recipe(id, name, extra = {}) {
  * Compiles the crafting store module with its non-mocked leaf dependencies copied in plain, and
  * returns the loaded `createCraftingStore` factory alongside the compiler (the caller owns
  * `compiler.cleanup()`).
- *
- * @param {string} prefix Unique tmp-dir prefix for this suite's compiled output.
  */
 async function setupCraftingStoreCompiler(prefix) {
   const compiler = createSvelteModuleCompiler(prefix);
@@ -114,9 +113,30 @@ async function setupCraftingStoreCompiler(prefix) {
   // The authority-refusal wording the store falls back to when a result carries a
   // `reason` and no `message` (issue 1648) — same rule again.
   compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
+  compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
   const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
   return { compiler, createCraftingStore };
 }
+
+const CRAFTING_STORE_SHAPE = {
+  getters: [
+    'availableCategories', 'availableSystems', 'categoryFilter', 'craftInFlight', 'craftableOnly',
+    'error', 'essenceScopeKey', 'favouriteIds', 'favouritesOnly', 'lastRollResult', 'listing',
+    'loadedOnce', 'loading', 'openSlotId', 'orderAnnouncement', 'orderedProgressiveStages',
+    'page', 'pageCount', 'pageItems', 'pageSize', 'progressiveOrders', 'railSlots', 'search',
+    'selectedCraftability', 'selectedEssenceAllocation', 'selectedIngredientOptions',
+    'selectedIngredientSetId', 'selectedRecipe', 'selectedRecipeId', 'selectedSet',
+    'selectedSummary', 'shoppingAggregate', 'shoppingEntries', 'slotAnnouncement', 'systemFilter',
+    'visibleRecipes', 'worldTimeTick',
+  ],
+  methods: [
+    'addToShoppingList', 'chooseIngredientOption', 'chooseIngredientSet', 'clearShoppingList',
+    'craft', 'decrementShoppingList', 'flushProgressiveOrder', 'load', 'openSlot', 'pickForMe',
+    'removeFromShoppingList', 'reorderProgressiveStage', 'select', 'setCategoryFilter',
+    'setCraftableOnly', 'setEssenceAllocation', 'setFavouritesOnly', 'setPage', 'setPageSize',
+    'setSearch', 'setSystemFilter', 'tickWorldTime', 'toggleFavourite',
+  ],
+};
 
 describe('craftingStore', () => {
   let compiler;
@@ -128,6 +148,14 @@ describe('craftingStore', () => {
 
   after(() => {
     compiler.cleanup();
+  });
+
+  it('returns exactly the 60 public members the crafting view reads, each still a getter', () => {
+    const store = createCraftingStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(CRAFTING_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {
@@ -145,6 +173,32 @@ describe('craftingStore', () => {
       rememberedActorId: 'hero',
       componentSourceActorIds: ['a1', 'a2'],
     });
+  });
+
+  it('seeds the favourites and stage orders BEFORE loadedOnce flips', async () => {
+    const listing = { summaries: [recipe('r1', 'Anvil')] };
+    const { services } = makeServices({ listing, favourites: ['r1'] });
+    const store = createCraftingStore({ services });
+    // Reading `loadedOnce` inside the seams is the only way to see the order: seeding after the
+    // flag pairs the new listing with the old seeds, and every assertion below still passes.
+    const seenAtSeed = [];
+    const favouriteIds = services.getFavouriteRecipeIds;
+    services.getFavouriteRecipeIds = () => {
+      seenAtSeed.push(store.loadedOnce);
+      return favouriteIds();
+    };
+    services.getProgressiveResultOrder = () => {
+      seenAtSeed.push(store.loadedOnce);
+      return { 'recipe:r1': ['a', 'b'] };
+    };
+
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(seenAtSeed, [false, false]);
+    assert.deepEqual(store.favouriteIds, ['r1']);
+    assert.deepEqual(store.progressiveOrders, { 'recipe:r1': ['a', 'b'] });
+    assert.equal(store.loadedOnce, true);
   });
 
   it('records the error message and clears loading when the fetch throws', async () => {
@@ -208,6 +262,15 @@ describe('craftingStore', () => {
     assert.deepEqual(
       store.pageItems.map((entry) => entry.name),
       ['Charlie', 'Delta']
+    );
+
+    store.setPage(99);
+    flushSync();
+    assert.equal(store.page, 99, 'the recipe pager stores the requested index unclamped');
+    assert.deepEqual(
+      store.pageItems.map((entry) => entry.name),
+      ['Echo'],
+      'the clamp happens on read, so an out-of-range page shows the last one'
     );
   });
 

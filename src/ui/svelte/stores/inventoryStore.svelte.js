@@ -21,6 +21,7 @@
  * @returns {object} The reactive inventory store.
  */
 
+import { createListingLoad, createPageWindow, firstVisible } from './browseListing.svelte.js';
 import {
   applyPlayerResultOrder,
   progressiveOrderKey,
@@ -572,10 +573,20 @@ function matchesFilter(row, filter) {
 }
 
 export function createInventoryStore({ services } = {}) {
-  let listing = $state(null);
-  let loading = $state(false);
-  let error = $state(null);
-  let loadedOnce = $state(false);
+  const listingLoad = createListingLoad({
+    fetch: () =>
+      services?.listInventoryForActor?.({
+        rememberedActorId: currentActorId(),
+        componentSourceActorIds: currentSourceIds(),
+      }),
+    // `persistedOrders` is the revert target for a rejected order write.
+    onResult: () => {
+      const orders = services?.getProgressiveResultOrder?.() ?? {};
+      progressiveOrders = orders && typeof orders === 'object' ? { ...orders } : {};
+      persistedOrders = { ...progressiveOrders };
+    },
+  });
+  const listing = $derived(listingLoad.listing);
   let selectedKey = $state(null);
   // The acting/selected system participation within the selected card (issue 766). null =
   // the primary participation. Reset on every `select`, so a freshly-selected card always
@@ -585,8 +596,6 @@ export function createInventoryStore({ services } = {}) {
   let search = $state('');
   let filter = $state('all');
   let sort = $state('name');
-  let page = $state(0);
-  let pageSize = $state(DEFAULT_PAGE_SIZE);
   let worldTimeTick = $state(0);
   // The recipe id currently being learned from a book (Inventory learn button),
   // so the UI can show a busy state and prevent double-submits.
@@ -683,21 +692,11 @@ export function createInventoryStore({ services } = {}) {
     return counts;
   });
 
-  const pageCount = $derived.by(() => {
-    const size = pageSize > 0 ? pageSize : 1;
-    return Math.max(1, Math.ceil(visibleItems.length / size));
+  const pageWindow = createPageWindow({
+    items: () => visibleItems,
+    defaultPageSize: DEFAULT_PAGE_SIZE,
   });
 
-  const pageItems = $derived.by(() => {
-    const size = pageSize > 0 ? pageSize : visibleItems.length || 1;
-    const clampedPage = Math.min(Math.max(0, page), pageCount - 1);
-    const start = clampedPage * size;
-    return visibleItems.slice(start, start + size);
-  });
-
-  // Find by key across the full listing; fall back to the first VISIBLE item so
-  // the selection respects the active search/filter.
-  //
   // `heldItem` (decision 11) takes precedence while a salvage ribbon is up: the last
   // copy of a salvaged component leaves the listing, so `rows.find` misses and the
   // fallback would swap in an unrelated component under the ribbon. The held snapshot
@@ -706,8 +705,7 @@ export function createInventoryStore({ services } = {}) {
     const live = rows.find((row) => row?.key === selectedKey) ?? null;
     if (live) return live;
     if (heldItem && heldItem.key === selectedKey) return heldItem;
-    if (rows.length === 0) return null;
-    return visibleItems[0] ?? null;
+    return firstVisible({ all: rows, visible: visibleItems });
   });
 
   /**
@@ -1082,32 +1080,9 @@ export function createInventoryStore({ services } = {}) {
     return key ? commitProgressiveOrder(key) : Promise.resolve({ ok: true });
   }
 
-  /**
-   * Fetch the inventory listing for the current actor + component sources.
-   *
-   * @param {boolean} [quiet=false] When true, do not raise `loading` (used for
-   *   background refreshes after a scene change / world-time tick).
-   */
-  async function load(quiet = false) {
-    if (!quiet) loading = true;
-    error = null;
-    try {
-      const result = await services?.listInventoryForActor?.({
-        rememberedActorId: currentActorId(),
-        componentSourceActorIds: currentSourceIds(),
-      });
-      listing = result ?? null;
-      // Seed the player's stored stage orders. The persisted snapshot is the revert
-      // target for a rejected write.
-      const orders = services?.getProgressiveResultOrder?.() ?? {};
-      progressiveOrders = orders && typeof orders === 'object' ? { ...orders } : {};
-      persistedOrders = { ...progressiveOrders };
-      loadedOnce = true;
-    } catch (err) {
-      error = err?.message ?? String(err);
-    } finally {
-      if (!quiet) loading = false;
-    }
+  /** Fetch the inventory listing for the current actor + component sources. */
+  function load(quiet = false) {
+    return listingLoad.refresh(quiet);
   }
 
   /**
@@ -1659,32 +1634,20 @@ export function createInventoryStore({ services } = {}) {
     heldItem = null;
   }
 
-  /** Update the search query and jump back to the first page. */
   function setSearch(value) {
     search = typeof value === 'string' ? value : '';
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Switch the active filter pill (jumps back to the first page). */
   function setFilter(value) {
     filter = INVENTORY_FILTERS.includes(value) ? value : 'all';
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Switch the sort key. */
   function setSort(value) {
     sort = VALID_SORTS.has(value) ? value : 'name';
-  }
-
-  function setPage(next) {
-    const value = Number(next);
-    page = Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
-  }
-
-  function setPageSize(next) {
-    const value = Number(next);
-    pageSize = Number.isFinite(value) && value > 0 ? Math.trunc(value) : DEFAULT_PAGE_SIZE;
-    page = 0;
   }
 
   /** Bump the world-time tick so calendar-aware derived labels recompute. */
@@ -1697,13 +1660,13 @@ export function createInventoryStore({ services } = {}) {
       return listing;
     },
     get loading() {
-      return loading;
+      return listingLoad.loading;
     },
     get error() {
-      return error;
+      return listingLoad.error;
     },
     get loadedOnce() {
-      return loadedOnce;
+      return listingLoad.loadedOnce;
     },
     get hasActor() {
       return hasActor;
@@ -1718,13 +1681,13 @@ export function createInventoryStore({ services } = {}) {
       return sort;
     },
     get page() {
-      return page;
+      return pageWindow.page;
     },
     get pageSize() {
-      return pageSize;
+      return pageWindow.pageSize;
     },
     get pageCount() {
-      return pageCount;
+      return pageWindow.pageCount;
     },
     get selectedKey() {
       return selectedKey;
@@ -1760,7 +1723,7 @@ export function createInventoryStore({ services } = {}) {
       return filterCounts;
     },
     get pageItems() {
-      return pageItems;
+      return pageWindow.pageItems;
     },
     get selectedItem() {
       return selectedItem;
@@ -1820,8 +1783,8 @@ export function createInventoryStore({ services } = {}) {
     setSearch,
     setFilter,
     setSort,
-    setPage,
-    setPageSize,
+    setPage: pageWindow.setPage,
+    setPageSize: pageWindow.setPageSize,
     tickWorldTime,
     toggleBulkSelection,
     removeFromBulkSelection,

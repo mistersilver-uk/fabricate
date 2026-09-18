@@ -185,7 +185,6 @@ tests/source-scan.test.js	1
 tests/status-toggle-source-contract.test.js	4
 tests/stores/actor-bar-store.test.js	1
 tests/stores/inventory-store.test.js	2
-tests/stores/journal-store.test.js	2
 tests/stores/player-complication-seam.test.js	2
 tests/style-block-scan.test.js	4
 tests/summary-projection.test.js	1

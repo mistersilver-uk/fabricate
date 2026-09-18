@@ -62,6 +62,7 @@ import {
   resolveOpenSlotId,
   suggestChoiceOverrides,
 } from '../util/requirementSlots.js';
+import { createListingLoad, createPageWindow, firstVisible } from './browseListing.svelte.js';
 import { applyPlayerResultOrder, progressiveOrderKey } from '../../../utils/progressiveResultOrder.js';
 import { progressiveStageThresholds } from '../../../utils/progressiveStageThresholds.js';
 
@@ -83,14 +84,23 @@ const RECIPE_STATUS_AVAILABLE = 'available';
 const GENERAL_RECIPE_CATEGORY = 'general';
 
 export function createCraftingStore({ services } = {}) {
-  let listing = $state(null);
-  let loading = $state(false);
-  let error = $state(null);
-  let loadedOnce = $state(false);
+  const listingLoad = createListingLoad({
+    fetch: () =>
+      services?.listCraftingForActor?.({
+        rememberedActorId: currentActorId(),
+        componentSourceActorIds: currentSourceIds(),
+      }),
+    // `persistedOrders` is the revert target for a rejected order write (D7a).
+    onResult: () => {
+      favouriteIds = services?.getFavouriteRecipeIds?.() ?? [];
+      const orders = services?.getProgressiveResultOrder?.() ?? {};
+      progressiveOrders = orders && typeof orders === 'object' ? { ...orders } : {};
+      persistedOrders = { ...progressiveOrders };
+    },
+  });
+  const listing = $derived(listingLoad.listing);
   let selectedRecipeId = $state(null);
   let search = $state('');
-  let page = $state(0);
-  let pageSize = $state(DEFAULT_PAGE_SIZE);
   let selectedIngredientSetId = $state(null);
   // Per-group option overrides for the selected set (issue 552), keyed by group id:
   // `{ [groupId]: { optionIndex, heldItemId } }`. Empty means the default
@@ -237,24 +247,18 @@ export function createCraftingStore({ services } = {}) {
     return [...rest, ...general];
   });
 
-  const pageCount = $derived.by(() => {
-    const size = pageSize > 0 ? pageSize : 1;
-    return Math.max(1, Math.ceil(visibleRecipes.length / size));
+  const pageWindow = createPageWindow({
+    items: () => visibleRecipes,
+    defaultPageSize: DEFAULT_PAGE_SIZE,
   });
 
-  const pageItems = $derived.by(() => {
-    const size = pageSize > 0 ? pageSize : visibleRecipes.length || 1;
-    const clampedPage = Math.min(Math.max(0, page), pageCount - 1);
-    const start = clampedPage * size;
-    return visibleRecipes.slice(start, start + size);
-  });
-
-  // The selected ROW. Find by id across the full listing; fall back to the first VISIBLE
-  // recipe so the selection respects the active search filter.
   const selectedSummary = $derived.by(() => {
     const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     if (recipes.length === 0) return null;
-    return recipes.find((recipe) => recipe?.id === selectedRecipeId) ?? visibleRecipes[0] ?? null;
+    return (
+      recipes.find((recipe) => recipe?.id === selectedRecipeId) ??
+      firstVisible({ all: recipes, visible: visibleRecipes })
+    );
   });
 
   // The hydrated rich models of this LOAD PASS, keyed by recipe id.
@@ -464,34 +468,9 @@ export function createCraftingStore({ services } = {}) {
     });
   });
 
-  /**
-   * Fetch the crafting listing for the current actor + component sources.
-   *
-   * @param {boolean} [quiet=false] When true, do not raise the `loading` flag
-   *   (used for background refreshes after a craft / world-time tick) so the list
-   *   does not flash a spinner.
-   */
-  async function load(quiet = false) {
-    if (!quiet) loading = true;
-    error = null;
-    try {
-      const result = await services?.listCraftingForActor?.({
-        rememberedActorId: currentActorId(),
-        componentSourceActorIds: currentSourceIds(),
-      });
-      listing = result ?? null;
-      favouriteIds = services?.getFavouriteRecipeIds?.() ?? [];
-      // Seed the player's stored stage orders, mirroring favouriteIds above. The
-      // persisted snapshot is the revert target for a rejected write (D7a).
-      const orders = services?.getProgressiveResultOrder?.() ?? {};
-      progressiveOrders = orders && typeof orders === 'object' ? { ...orders } : {};
-      persistedOrders = { ...progressiveOrders };
-      loadedOnce = true;
-    } catch (err) {
-      error = err?.message ?? String(err);
-    } finally {
-      if (!quiet) loading = false;
-    }
+  /** Fetch the crafting listing for the current actor + component sources. */
+  function load(quiet = false) {
+    return listingLoad.refresh(quiet);
   }
 
   /**
@@ -525,34 +504,33 @@ export function createCraftingStore({ services } = {}) {
     slotAnnouncement = '';
   }
 
-  /** Update the search query and jump back to the first page. */
   function setSearch(value) {
     search = typeof value === 'string' ? value : '';
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Toggle the favourites-only filter (jumps back to the first page). */
   function setFavouritesOnly(value) {
     favouritesOnly = value === true;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Toggle the craftable-only filter (jumps back to the first page). */
   function setCraftableOnly(value) {
     craftableOnly = value === true;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Filter to a single crafting system id, or clear it with a falsy value. */
   function setSystemFilter(systemId) {
     systemFilter = systemId ? String(systemId) : null;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Filter to a single recipe category token, or clear it with a falsy value. */
   function setCategoryFilter(category) {
     categoryFilter = category ? String(category) : null;
-    page = 0;
+    pageWindow.resetPage();
   }
 
   /** Toggle a recipe's favourite state, persisting through the services seam. */
@@ -639,17 +617,6 @@ export function createCraftingStore({ services } = {}) {
     orderCommitTimer = null;
     const key = progressiveOrderKey({ scope: 'recipe', id: selectedRecipe?.id });
     return key ? commitProgressiveOrder(key) : Promise.resolve();
-  }
-
-  function setPage(next) {
-    const value = Number(next);
-    page = Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
-  }
-
-  function setPageSize(next) {
-    const value = Number(next);
-    pageSize = Number.isFinite(value) && value > 0 ? Math.trunc(value) : DEFAULT_PAGE_SIZE;
-    page = 0;
   }
 
   function chooseIngredientSet(setId) {
@@ -914,13 +881,13 @@ export function createCraftingStore({ services } = {}) {
       return listing;
     },
     get loading() {
-      return loading;
+      return listingLoad.loading;
     },
     get error() {
-      return error;
+      return listingLoad.error;
     },
     get loadedOnce() {
-      return loadedOnce;
+      return listingLoad.loadedOnce;
     },
     get selectedRecipeId() {
       return selectedRecipeId;
@@ -929,13 +896,13 @@ export function createCraftingStore({ services } = {}) {
       return search;
     },
     get page() {
-      return page;
+      return pageWindow.page;
     },
     get pageSize() {
-      return pageSize;
+      return pageWindow.pageSize;
     },
     get pageCount() {
-      return pageCount;
+      return pageWindow.pageCount;
     },
     get selectedIngredientSetId() {
       return selectedIngredientSetId;
@@ -1012,7 +979,7 @@ export function createCraftingStore({ services } = {}) {
       return visibleRecipes;
     },
     get pageItems() {
-      return pageItems;
+      return pageWindow.pageItems;
     },
     /**
      * The selected ROW — the cheap summary the browser list highlights, and the identity
@@ -1045,8 +1012,8 @@ export function createCraftingStore({ services } = {}) {
     toggleFavourite,
     reorderProgressiveStage,
     flushProgressiveOrder,
-    setPage,
-    setPageSize,
+    setPage: pageWindow.setPage,
+    setPageSize: pageWindow.setPageSize,
     chooseIngredientSet,
     chooseIngredientOption,
     openSlot,
