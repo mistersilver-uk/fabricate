@@ -42,16 +42,16 @@ export class SettingsBackedStore {
 
   /** Abstract: read the setting, publish it, and answer whatever this store's `load()` returns. */
   load() {
-    throw new TypeError(`${this.constructor.name} must implement load()`);
+    throw new TypeError(`SettingsBackedStore subclass must implement load()`);
   }
 
   /** Abstract: assign the subclass's own cache field, named per store. */
   _setCache(_value) {
-    throw new TypeError(`${this.constructor.name} must implement _setCache(value)`);
+    throw new TypeError(`SettingsBackedStore subclass must implement _setCache(value)`);
   }
 
   /**
-   * Replace the published cache wholesale. Its IDENTITY is the invalidation signal readers key
+   * Replace the published cache wholesale. Its identity is the invalidation signal readers key
    * off, so `_setCache` assigns its subclass's field and never merges into the object it replaces.
    */
   _publish(value) {
@@ -79,7 +79,7 @@ export class SettingsBackedStore {
    * The accepted cost is a cache briefly ahead of the setting when the write rejects, recoverable
    * on the next `load()`; a lost update is not recoverable at all.
    *
-   * A store with a SECOND piece of published state assigns it before calling this and never after
+   * A store with a second piece of published state assigns it before calling this and never after
    * the await, so a reader on the replication path sees it in step with the payload being written.
    */
   async _publishThenWrite(value, payload) {

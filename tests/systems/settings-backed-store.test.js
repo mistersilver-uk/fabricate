@@ -1,7 +1,4 @@
-/**
- * `SettingsBackedStore` (issue 1689) — each primitive proved directly, so the six stores'
- * equivalence suite is testing their adoption of the base rather than the base itself.
- */
+/** `SettingsBackedStore` (issue 1689): each primitive proved directly against a recording seam. */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -38,6 +35,7 @@ function recordingSeam({ value = { id: 'stored' }, read = null } = {}) {
     setSetting: async (key, payload) => {
       observed.push(read?.());
       writes.push({ key, payload });
+      return 'seam-result';
     },
   };
 }
@@ -164,5 +162,17 @@ describe('SettingsBackedStore', () => {
     await assert.rejects(() => store._writeThenPublish({ id: 'next' }, { id: 'payload' }));
 
     assert.deepEqual(store.cache, { id: 'previous' });
+  });
+
+  it('leaves the cache published when the write rejects under _publishThenWrite', async () => {
+    const store = new ExampleStore({});
+    store.setSetting = async () => {
+      throw new Error('refused');
+    };
+    store._publish({ id: 'previous' });
+
+    await assert.rejects(() => store._publishThenWrite({ id: 'next' }, { id: 'payload' }));
+
+    assert.deepEqual(store.cache, { id: 'next' });
   });
 });

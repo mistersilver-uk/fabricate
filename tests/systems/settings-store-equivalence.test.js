@@ -1,8 +1,6 @@
 /**
- * The observable persistence behaviour of the six one-key world-setting stores (issue 1689),
- * authored against the sources BEFORE `SettingsBackedStore` exists. The same unmodified
- * assertions passing after the lift is what proves the lift changed nothing, so no assertion
- * here may be relaxed to accommodate the base.
+ * The observable persistence behaviour of the six one-key world-setting stores (issue 1689): write
+ * order, payload, load guardedness, rejected-write state, seededness and corpus identity.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -29,6 +27,7 @@ const GATHERING_SYSTEMS = Object.freeze([{ id: 'system-a', features: { gathering
 const STORES = Object.freeze([
   {
     name: 'CurrencyConfigStore',
+    cacheField: 'config',
     key: SETTING_KEYS.CURRENCY_CONFIG,
     guardedLoad: false,
     publishesBeforeWrite: true,
@@ -43,6 +42,7 @@ const STORES = Object.freeze([
   },
   {
     name: 'CharacterLibrariesStore',
+    cacheField: 'libraries',
     key: SETTING_KEYS.CHARACTER_LIBRARIES,
     guardedLoad: true,
     publishesBeforeWrite: true,
@@ -61,6 +61,7 @@ const STORES = Object.freeze([
   },
   {
     name: 'GatheringRealmStore',
+    cacheField: 'config',
     key: SETTING_KEYS.TRAVEL_CONFIG,
     guardedLoad: false,
     publishesBeforeWrite: true,
@@ -76,6 +77,7 @@ const STORES = Object.freeze([
   },
   {
     name: 'GatheringPartyStore',
+    cacheField: 'parties',
     key: SETTING_KEYS.GATHERING_PARTIES,
     guardedLoad: false,
     publishesBeforeWrite: false,
@@ -98,6 +100,7 @@ const STORES = Object.freeze([
   },
   {
     name: 'GatheringEnvironmentStore',
+    cacheField: 'environments',
     key: SETTING_KEYS.GATHERING_ENVIRONMENTS,
     guardedLoad: false,
     publishesBeforeWrite: false,
@@ -145,7 +148,7 @@ const byName = (name) => STORES.find((row) => row.name === name);
 
 /**
  * Build the store over a seam that records what the cache said at the moment the write was
- * issued, then prime it so every save runs against an ALREADY-LOADED store.
+ * issued, then prime it so every save runs against an already-loaded store.
  */
 function observedStore(row, { isGM = true } = {}) {
   const seam = makeSettingsSeam({ isGM, initial: [[row.key, row.seed]] });
@@ -220,7 +223,7 @@ describe('the six one-key world-setting stores', () => {
         assert.deepEqual(seam.writes, []);
         assert.deepEqual(seam.refused, [row.key]);
         assert.deepEqual(seam.settings.get(row.key), row.seed);
-        // Publish-first stores are knowingly left AHEAD of the refused setting and recover on the
+        // Publish-first stores are knowingly left ahead of the refused setting and recover on the
         // next `load()`; the two validation-gated stores stay in step with it.
         assert.equal(row.probe(store), row.publishesBeforeWrite ? row.after : row.before);
       });
@@ -265,7 +268,7 @@ describe('raw-key seededness across a write', () => {
       unseeded: {},
       expectAfterReload: (store) => {
         assert.equal(store.isSeeded('componentCategories'), true);
-        // Only the kinds a payload CARRIES are persisted, so an unwritten kind stays absent on
+        // Only the kinds a payload carries are persisted, so an unwritten kind stays absent on
         // disk and reads back as unseeded.
         assert.equal(store.isSeeded('componentTags'), false);
       },
@@ -316,4 +319,27 @@ describe('WorldVocabularyStore corpus identity', () => {
     assert.equal(resolved, store.corpus());
     assert.equal(store.list('componentCategories'), store.corpus().componentCategories);
   });
+
+  it('publishes a new corpus object on every save rather than mutating the old one', async () => {
+    const { store } = observedStore(row);
+    const before = store.load();
+
+    await row.save(store);
+
+    assert.notEqual(store.corpus(), before);
+  });
+});
+
+describe('cache identity is the invalidation signal', () => {
+  for (const row of STORES.filter((entry) => entry.cacheField)) {
+    it(`${row.name} publishes a new cache object on every save rather than mutating the old one`, async () => {
+      const { store } = observedStore(row);
+      store.load();
+      const before = store[row.cacheField];
+
+      await row.save(store);
+
+      assert.notEqual(store[row.cacheField], before);
+    });
+  }
 });
