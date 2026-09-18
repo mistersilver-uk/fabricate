@@ -1898,11 +1898,7 @@ Represent one consumable ingredient requirement.
 
 ```js
 Ingredient = {
-  // HOW MANY. `quantity` is the fixed amount. A non-empty `quantityFormula` means the
-  // amount is ROLLED and is that expression; `quantity` is then the authored fallback
-  // rather than the number consumed.
   quantity: number,
-  quantityFormula?: string,
   extractEffects: boolean,
 
   match: {
@@ -1931,31 +1927,28 @@ Ingredient = {
 ### Requirements
 
 1. `quantity` must be positive.
-2. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number consumed.
-   The fixed-or-rolled amount is a property of the ROW and not of the side it sits on, so an ingredient carries it on the same terms a result does — a craft that consumes a variable quantity is as authorable as one that produces one.
-   It is the shared roll expression, validated the way a crafting check formula is: usable only where it evaluates to a finite total, because `Roll.validate` is parse-only.
-   Where an ingredient amount resolves differs from where a result amount does: an INGREDIENT amount resolves BEFORE the craft, because what it resolves to is what the crafter must hold, and both resolve once per craft rather than being re-rolled while they are read.
-   An empty or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state every ingredient persisted before this change is in.
-3. `match.type` is required.
-4. If `match.type === "component"`, `match.componentId` is required.
-5. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
-6. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
-7. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
-8. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured world `CurrencyConfig.units[].id` and `amount` is a positive cost.
+   A requirement amount is always FIXED: there is no `quantityFormula` on this model, because a rolled requirement has no coherent moment to resolve.
+   The `design-system` capability records the ruling under "One requirement row serves both sides of a recipe".
+2. `match.type` is required.
+3. If `match.type === "component"`, `match.componentId` is required.
+4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
+5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
+6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
+7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured world `CurrencyConfig.units[].id` and `amount` is a positive cost.
    A currency option matches no inventory item and contributes no alchemy signature.
-9. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
+8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
    It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
    An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
    An essence option is resolved inside its ingredient set's single essence block rather than in its own author position (see §Essence-Alternative Consumption), so its funding is pooled with every other essence option in the set.
    The player selects the held **items** that fund the block through the `essenceAllocation` channel, rather than picking one option per essence requirement as they would for a component/tag group.
-10. `Ingredient.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the `systemItemId` duplicate unconditionally (issue 1135).
-    Option-level keys are the dominant term in a serialized recipe corpus because they are paid once per option, per group, per set, per recipe: an authored component option of 68 bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact duplicate — and ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
-    The omitted set is `componentId`, `itemUuid`, `tag`, `alternatives`, `extractEffects` and `effectFilter`; `match` and `quantity` are never omitted.
-    `quantity` is omittable by the model (`data.quantity || 1`) and is deliberately excluded, because serialized options are read arithmetically by the shopping-list and consumption projections and that is a separate reader audit.
-    Absence is not a new on-disk state for any omitted key: the 1.17.0 essence migration and `IngredientSet._legacyIngredientsToGroups` have both been writing options as a bare `{quantity, match}` with all seven fields missing, so every reader has always had to cope.
-    `extractEffects` and `effectFilter` have NO readers at all — the ingredient-level effect-extraction path was removed — and are worth 7.00% of a simple corpus between them.
-    `componentId` is a canonical field omitted when `null`, which does not weaken the canonical-write policy: the top-level field is DERIVED by the constructor from `match` (`match.type === 'component' ? match.componentId : null`), the canonical component reference is `match.componentId` and is always emitted, and `null` means "this option is not a component match" — which absence says identically to every reader, each of which coerces through `componentId || systemItemId`.
-    The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
+9. `Ingredient.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the `systemItemId` duplicate unconditionally (issue 1135).
+   Option-level keys are the dominant term in a serialized recipe corpus because they are paid once per option, per group, per set, per recipe: an authored component option of 68 bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact duplicate — and ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
+   The omitted set is `componentId`, `itemUuid`, `tag`, `alternatives`, `extractEffects` and `effectFilter`; `match` and `quantity` are never omitted.
+   `quantity` is omittable by the model (`data.quantity || 1`) and is deliberately excluded, because serialized options are read arithmetically by the shopping-list and consumption projections and that is a separate reader audit.
+   Absence is not a new on-disk state for any omitted key: the 1.17.0 essence migration and `IngredientSet._legacyIngredientsToGroups` have both been writing options as a bare `{quantity, match}` with all seven fields missing, so every reader has always had to cope.
+   `extractEffects` and `effectFilter` have NO readers at all — the ingredient-level effect-extraction path was removed — and are worth 7.00% of a simple corpus between them.
+   `componentId` is a canonical field omitted when `null`, which does not weaken the canonical-write policy: the top-level field is DERIVED by the constructor from `match` (`match.type === 'component' ? match.componentId : null`), the canonical component reference is `match.componentId` and is always emitted, and `null` means "this option is not a component match" — which absence says identically to every reader, each of which coerces through `componentId || systemItemId`.
+   The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
 
 ### Currency-Alternative Spend (Craft-Time)
 
