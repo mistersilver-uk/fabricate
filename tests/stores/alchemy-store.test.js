@@ -417,6 +417,32 @@ describe('alchemyStore', () => {
     assert.ok(calls.setSystem.includes('sys-a'));
   });
 
+  it('a quiet auto-enter interleaved with a loud load leaves loading to the loud pass', async () => {
+    const pending = [];
+    const harness = makeServices({
+      alchemySystem: '',
+      listing: () => new Promise((resolve) => pending.push(() => resolve(baseListing()))),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+
+    const quietPass = store.load(true);
+    const loudPass = store.load();
+    flushSync();
+    assert.equal(store.loading, true, 'the loud pass raised loading');
+
+    pending[0]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(pending.length, 3, 'the quiet pass auto-entered the sole discipline');
+    pending[2]();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(store.loading, true, 'the auto-enter inherited the quiet flag of its own pass');
+
+    pending[1]();
+    await Promise.all([quietPass, loudPass]);
+    flushSync();
+    assert.equal(store.loading, false, 'the loud pass clears loading in its own finally');
+  });
+
   it('brew submits the expanded bench, clears it, and banners a discovery', async () => {
     const harness = makeServices();
     // After the brew, reload reveals the newly-learned recipe.

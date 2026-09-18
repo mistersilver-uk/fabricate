@@ -168,7 +168,8 @@ describe('browseListing', () => {
         },
         onResult: () =>
           log.push(`onResult listing=${load.listing?.id} loadedOnce=${load.loadedOnce}`),
-        afterCommit: async () => log.push(`afterCommit loadedOnce=${load.loadedOnce}`),
+        afterCommit: async (quiet) =>
+          log.push(`afterCommit loadedOnce=${load.loadedOnce} quiet=${quiet}`),
       });
 
       await load.refresh();
@@ -177,8 +178,21 @@ describe('browseListing', () => {
       assert.deepEqual(log, [
         'fetch',
         'onResult listing=next loadedOnce=false',
-        'afterCommit loadedOnce=true',
+        'afterCommit loadedOnce=true quiet=false',
       ]);
+    });
+
+    it('hands afterCommit the quiet flag of its own pass', async () => {
+      const seen = [];
+      const load = createListingLoad({
+        fetch: async () => ({ id: 'next' }),
+        afterCommit: async (quiet) => seen.push(`quiet=${quiet}`),
+      });
+
+      await load.refresh(true);
+      flushSync();
+
+      assert.deepEqual(seen, ['quiet=true']);
     });
 
     it('awaits afterCommit inside the try, so its failure lands in error', async () => {
@@ -397,7 +411,7 @@ describe('browseListing', () => {
   });
 
   describe('firstVisible', () => {
-    it('answers nothing while the full listing is empty', () => {
+    it('pins the empty-listing guard the crafting and inventory tails ship today', () => {
       assert.equal(firstVisible({ all: [], visible: [{ id: 'i0' }] }), null);
     });
 

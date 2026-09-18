@@ -5,7 +5,7 @@
  * Mirrors {@link createCraftingStore}: a plain factory reaching Foundry only through `services`.
  *
  * It browses the leak-safe listing from `services.listAlchemyForActor` and owns the workbench
- * state and the brew action. It derives the five-mode status CLIENT-SIDE against learned
+ * state and the brew action. It derives the five-mode status client-side against learned
  * recipes plus the local fizzle set — but the client mode is BEST-EFFORT and
  * ADVISORY. `ready`/`assembling` resolve for two recipe shapes: a concrete
  * plain-component multiset (exact match), and an ESSENCE-ONLY requirement (`>=`
@@ -36,8 +36,6 @@ export function createAlchemyStore({ services } = {}) {
   let componentSearch = $state('');
   let lastBrew = $state(null);
   let brewInFlight = $state(false);
-  // The pass in flight's `quiet` flag, which the auto-enter's re-entrant load inherits.
-  let loadQuiet = false;
 
   const listingLoad = createListingLoad({
     fetch: () =>
@@ -46,7 +44,7 @@ export function createAlchemyStore({ services } = {}) {
         craftingSystemId: activeSystemId,
         componentSourceActorIds: currentSourceIds(),
       }),
-    afterCommit: () => settleActiveSystem(),
+    afterCommit: settleActiveSystem,
   });
   const listing = $derived(listingLoad.listing);
 
@@ -348,12 +346,11 @@ export function createAlchemyStore({ services } = {}) {
 
   /** Fetch the alchemy listing for the current actor + sources scoped to the active system. */
   function load(quiet = false) {
-    loadQuiet = quiet === true;
     return listingLoad.refresh(quiet);
   }
 
   /** Drop an active id the committed listing no longer offers, then enter a sole discipline. */
-  async function settleActiveSystem() {
+  async function settleActiveSystem(quiet = false) {
     const offered = Array.isArray(listing?.systems) ? listing.systems : [];
     if (activeSystemId && !offered.some((system) => system.id === activeSystemId)) {
       activeSystemId = null;
@@ -362,7 +359,7 @@ export function createAlchemyStore({ services } = {}) {
     if (!activeSystemId && offered.length === 1) {
       activeSystemId = offered[0].id;
       services?.setSelectedAlchemySystemId?.(activeSystemId);
-      await load(loadQuiet);
+      await load(quiet);
     }
   }
 

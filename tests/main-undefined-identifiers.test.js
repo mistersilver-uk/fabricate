@@ -68,11 +68,10 @@ describe('every src/ file outside CI’s lint glob resolves its identifiers', ()
     ]) {
       assert.ok(population.includes(rune), `${rune} must be in the population`);
     }
-    // A FLOOR RE-DERIVED BY COUNTING, never carried forward: `find src -name '*.svelte.js'`
-    // answers 13 since issue 1520 deleted the orphaned component-editor window, and none of the
-    // 13 sits under CI's lint glob, so all 13 must appear here. It was 14 before that deletion.
+    // A floor re-derived by counting, never carried forward: `find src -name '*.svelte.js'`
+    // answers 14, and none of the 14 sits under CI's lint glob, so all 14 must appear here.
     assert.ok(
-      population.filter((file) => file.endsWith('.svelte.js')).length >= 13,
+      population.filter((file) => file.endsWith('.svelte.js')).length >= 14,
       'every rune module is in the population'
     );
     for (const covered of ['src/systems/CraftingEngine.js', 'src/toolBreakageRuntime.js']) {

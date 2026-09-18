@@ -10,7 +10,8 @@
  * The `listing`/`loading`/`error`/`loadedOnce` envelope around one async fetch. `onResult` is
  * synchronous and runs with no await between the listing write and it, so nothing observes
  * `loadedOnce` true against the previous pass's seeded state. `afterCommit` is awaited inside the
- * same try, after `loadedOnce`, so its failure lands in `error` like any other.
+ * same try, after `loadedOnce`, and is handed that pass's own `quiet` flag; its failure lands in
+ * `error` like any other.
  */
 export function createListingLoad({ fetch, onResult, afterCommit } = {}) {
   let listing = $state(null);
@@ -26,7 +27,7 @@ export function createListingLoad({ fetch, onResult, afterCommit } = {}) {
       listing = (await fetch()) ?? null;
       onResult?.();
       loadedOnce = true;
-      if (afterCommit) await afterCommit();
+      if (afterCommit) await afterCommit(quiet);
     } catch (error_) {
       error = error_?.message ?? String(error_);
     } finally {

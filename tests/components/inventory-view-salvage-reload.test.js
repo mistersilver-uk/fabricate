@@ -235,8 +235,9 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     // The success ribbon is shown (the player must see what they recovered)...
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'), 'the success ribbon shows');
     // Defect 3: ...but there is nothing left to salvage, so no way back to rolling.
-    assert.ok(
-      !target.querySelector('[data-inventory-salvage-again]'),
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-again]'),
+      null,
       'no "Salvage again" when the last copy is gone'
     );
     assert.ok(
