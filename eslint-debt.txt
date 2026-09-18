@@ -265,7 +265,6 @@ src/ui/svelte/stores/craftingStore.svelte.js	unicorn/no-useless-fallback-in-spre
 src/ui/svelte/stores/inventoryStore.svelte.js	import-x/order
 src/ui/svelte/stores/inventoryStore.svelte.js	unicorn/catch-error-name
 src/ui/svelte/stores/inventoryStore.svelte.js	unicorn/explicit-length-check
-src/ui/svelte/stores/inventoryStore.svelte.js	unicorn/no-useless-fallback-in-spread
 src/ui/svelte/stores/inventoryStore.svelte.js	unicorn/no-useless-switch-case
 src/ui/svelte/stores/inventoryStore.svelte.js	unicorn/switch-case-braces
 src/ui/svelte/stores/journalStore.svelte.js	unicorn/catch-error-name

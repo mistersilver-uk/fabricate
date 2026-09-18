@@ -219,7 +219,7 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   const files = keys.filter((key) => !key.includes('::')).length;
   // 107/117 as of issue 1695. `inventoryStore.svelte.js` left the FILE list entirely — splitting
   // the salvage-execution and bulk-actions sub-stores out of it took it from 1,536 lines to 607 —
-  // while the function list traded its 137-line `salvage` (now three functions, none over 100) for
+  // while the function list traded its 137-line `salvage` (now four functions, none over 100) for
   // the two new sub-store factories, which are oversized as factories and nothing else.
   assert.equal(files, 107, 'oversized files');
   assert.equal(keys.length - files, 117, 'oversized functions');

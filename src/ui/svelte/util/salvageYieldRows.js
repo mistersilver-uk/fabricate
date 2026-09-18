@@ -1,9 +1,8 @@
 /**
  * The best-case salvage yield projection (issue 1695): what one row's salvage config could return,
- * per mode, and the identity those rows aggregate under. A plain leaf and deliberately NOT a
- * `.svelte.js` — it holds no rune, so a suite consuming it needs no `runeModules` entry. Both the
- * inspected panel's own preview and the bulk queue's aggregate read it, which is why it belongs to
- * neither store.
+ * per mode, and the identity those rows aggregate under. The bulk queue's aggregate is its only
+ * consumer today; it is a pure projection rather than store state, and it lives here as a plain
+ * leaf no mounted suite needs a `runeModules` entry for.
  */
 
 /**

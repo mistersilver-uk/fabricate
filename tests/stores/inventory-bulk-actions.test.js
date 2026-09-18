@@ -316,14 +316,26 @@ describe('createBulkActions', () => {
         yielding('c1', 'Iron', [{ componentId: 'x', name: 'Shard', quantity: 2 }]),
         yielding('c2', 'Bronze', [{ componentId: 'x', name: 'Shard', quantity: 1 }]),
         listingRow('c3', 'Ash', null),
+        // Same-named, distinct components stay two rows: `yieldKeyOf` keys on identity.
+        yielding('c4', 'Cedar', [{ componentId: 'y', name: 'Dust', quantity: 1 }]),
+        yielding('c5', 'Elm', [{ componentId: 'z', name: 'Dust', quantity: 1 }]),
       ],
     });
-    for (const key of ['sys:c1', 'sys:c2', 'sys:c3']) bulk.toggleBulkSelection(key);
+    for (const id of ['c1', 'c2', 'c3', 'c4', 'c5']) bulk.toggleBulkSelection(`sys:${id}`);
     flushSync();
 
     assert.deepEqual(
-      bulk.bulkYieldPreview.map((row) => [row.componentId, row.quantity, row.guaranteedQuantity]),
-      [['x', 3, 3]]
+      bulk.bulkYieldPreview.map((row) => [
+        row.componentId,
+        row.name,
+        row.quantity,
+        row.guaranteedQuantity,
+      ]),
+      [
+        ['y', 'Dust', 1, 1],
+        ['z', 'Dust', 1, 1],
+        ['x', 'Shard', 3, 3],
+      ]
     );
   });
 

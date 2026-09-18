@@ -35,7 +35,7 @@ const BULK_MAX_ITEMS = 25;
  */
 function actingParticipationOf(
   row,
-  { inspected = false, selectedSystemId = null, primaryOf } = {}
+  { inspected = false, selectedSystemId = null, primaryOf = () => null } = {}
 ) {
   const systems = Array.isArray(row?.systems) ? row.systems : [];
   if (systems.length === 0) {
@@ -249,6 +249,7 @@ function buildBulkReport(mode, snapshot, result) {
     key: entry.key,
     name: entry.name,
     img: entry.img,
+    // A snapshot row with no matching result still reports: spreading `undefined` adds nothing.
     ...items[index],
   }));
   return {
@@ -305,7 +306,7 @@ export function createBulkActions({
   // dropped) are silently filtered rather than surfaced — the panel has nothing
   // useful to show for a card that no longer exists.
   const bulkSelectedRows = $derived.by(() =>
-    bulkSelectedKeys.map((key) => rows().find((row) => row?.key === key) ?? null).filter(Boolean)
+    bulkSelectedKeys.map((key) => (rows?.() ?? []).find((row) => row?.key === key)).filter(Boolean)
   );
 
   /**
