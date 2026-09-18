@@ -41,15 +41,8 @@ test('buildScreenshotMarkdown sanitizes the label before it reaches markdown', (
 });
 
 test('a published frame is named and captioned from the CASE REGISTRY with no wiring supplied', async () => {
-  // THE DEFECT THIS PINS SHIPPED FOR AS LONG AS THE PUBLISH PATH HAS EXISTED. `labelForCaseId`
-  // documented itself as wired into this path and was not: no caller passed `labelForId`, so the
-  // lookup fell through `VIEW_RECIPES` -- a table keyed on SMOKE recipe ids, which a View Lab case
-  // id is not -- and landed on the bare id. Every lab frame in every PR body was captioned
-  // `manager-world-downtime-test-companion-installed`, which is why a maintainer reading one asked what
-  // "Ledger Administration" was and why it shipped.
-  //
-  // NOTHING IS INJECTED HERE, deliberately. Every existing case in this file passes its own
-  // `labelForId`, so all of them would go on passing over a default that was never restored.
+  // THE DEFECT THIS PINS SHIPPED FOR AS LONG AS THE PUBLISH PATH HAS EXISTED. NOTHING IS INJECTED
+  // HERE, deliberately.
   const root = mkdtempSync(join(tmpdir(), 'fabricate-vl-pub-'));
   try {
     const dir = join(root, 'frames');
@@ -73,9 +66,7 @@ test('a published frame is named and captioned from the CASE REGISTRY with no wi
     assert.notEqual(standIn.label, 'manager-world-downtime-test-companion-installed');
     assert.match(standIn.label, /TEST companion/);
 
-    // AND THE CAPTION IS ON THE FRAME THAT NEEDS IT AND NOT ON THE ONE THAT DOES NOT. Both are
-    // World Downtime frames, so a caption applied by route rather than by what the case asked the
-    // lab to register would land on both.
+    // AND THE CAPTION IS ON THE FRAME THAT NEEDS IT AND NOT ON THE ONE THAT DOES NOT.
     assert.equal(standIn.note, evidenceNoteForCaseId('manager-world-downtime-test-companion-installed'));
     assert.match(standIn.note, /tests\/view-lab\/mount\.js/);
     assert.match(standIn.note, /neither the free module nor Fabricate Premium/);

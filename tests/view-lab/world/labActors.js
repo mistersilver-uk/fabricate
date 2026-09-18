@@ -1,17 +1,4 @@
-/**
- * Duck-typed actors, items, and the uuid document index.
- *
- * Fabricate's craftability evaluation is deliberately structural: `RecipeManager` iterates
- * `actor.items` and `Ingredient.matches(item)` compares `item.uuid` against the component's
- * `originItemUuid`. So an "actor" here needs an id, a name, an image, and an iterable `items`
- * collection — nothing resembling a real Foundry Actor document.
- *
- * The inventories are chosen, not random. Three outcomes have to be reachable on the Crafting tab
- * or the frame shows one state and implies the others do not exist:
- *   - fully satisfied (the recipe is craftable now),
- *   - partially satisfied (some ingredients held, some missing),
- *   - unsatisfiable (nothing held).
- */
+/** Duck-typed actors, items, and the uuid document index. */
 
 import { installUpdateSemantics, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
 
@@ -19,18 +6,6 @@ const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
 /**
  * Foundry's `Document#toObject()`: a deep clone of the document's own source data.
- *
- * Load-bearing, not decoration. `CraftingEngine._createResultItem` and
- * `_restoreComponentItem` build a crafted output by cloning the component's REGISTERED
- * source item — `itemData = sourceItem.toObject()` — and `fromUuid` hands them a lab index
- * document. Without this the craft threw `sourceItem.toObject is not a function`, which the
- * engine swallowed into a generic "Something went wrong while crafting" notification: the
- * Craft button appeared to work, the right column never swapped to the run summary, and the
- * frame documented a UI that does nothing.
- *
- * The clone is what makes it safe as well as present. The engine mutates the returned data
- * (`itemData.system.quantity`, then `stampCraftedComponentIdentity`'s role flags), so handing
- * back the live index entry would let one craft rewrite the world's canonical item.
  *
  * @param {object} document The lab document to equip.
  * @returns {object} The same document.
@@ -49,24 +24,7 @@ function installToObject(document) {
 
 /**
  * Foundry's `Document#delete()`: the document removes itself from its parent's collection.
- *
  * Load-bearing, and the reason no bulk salvage run could complete in the lab before this.
- * `CraftingEngine._consumeComponentItems` BRANCHES on stack size — it reduces `system.quantity`
- * when it takes part of a stack and calls `item.delete()` when it takes all of one. Every
- * salvageable stack in this world is a single unit, so salvage always takes the delete branch,
- * and a duck-typed item without the method threw `item.delete is not a function` into the engine's
- * catch: every subject came back `outcome: 'error'` and the console errors failed the capture
- * gate. Crafting never surfaced it because Brenna holds her ingredients in quantity, so the update
- * branch covered her.
- *
- * The ALTERNATIVE was to raise one salvageable stack above a single unit, which dodges the branch
- * rather than implementing it — and the delete branch is the one a real ×1 salvage takes, so a lab
- * that cannot execute it cannot photograph the commonest case.
- *
- * It DELEGATES to the actor's own `deleteEmbeddedDocuments` rather than splicing itself out, so
- * the lab keeps ONE removal path. A stub that merely did not throw would be worse than the crash
- * it replaced: the run would report a salvage the still-populated listing contradicts, and the
- * frame would document a UI that consumed nothing.
  *
  * @param {object} item The item to equip.
  * @param {object} actor The actor whose collection holds it.
@@ -92,11 +50,7 @@ function installDeleteSemantics(item, actor) {
 function ownedItem(componentId, component, quantity, index) {
   const item = {
     // The uuid is what `Ingredient.matches` compares against `originItemUuid`, so it must be the
-    // component's OWN declared origin rather than one derived from the id. Almost every component
-    // declares `Item.<id>` and this is the same string either way — but a stack that backs a
-    // component in two systems is ONE document claimed by both definitions, and
-    // `InventoryListingBuilder` collapses rows on `item.uuid` alone. Deriving the uuid from the
-    // id would give that one physical stack two uuids, two cards, and a doubled quantity.
+    // component's OWN declared origin rather than one derived from the id.
     uuid: component?.originItemUuid ?? `Item.${componentId}`,
     id: `item-${componentId}-${index}`,
     name: component?.name ?? componentId,
@@ -106,10 +60,7 @@ function ownedItem(componentId, component, quantity, index) {
     flags: {},
     isOwner: true,
   };
-  // Real V13 flag semantics rather than `() => null`. Tool wear, breakage, catalyst usage, item
-  // essences and role identity are all owned-item flags read through `getFabricateFlag`, which
-  // normalises to the dotted `fabricate.<key>` — a hard null answers every one of them with its
-  // default and renders a pristine, unworn, unbroken frame no matter what the fixture seeded.
+  // Real V13 flag semantics rather than `() => null`.
   item.getFlag = makeGetFlag(item);
   item.setFlag = makeSetFlag(item);
   installUpdateSemantics(item);
@@ -120,11 +71,8 @@ function ownedItem(componentId, component, quantity, index) {
 /**
  * One owned copy of a recipe item — a book or scroll in a character's pack.
  *
- * Its `uuid` is the DEFINITION's source ref, because that is the tier
- * `matchRecipeItemDefinition` resolves on; its `id` is what every Knowledge row, arm token and
- * mutation is keyed by, so sibling copies of one book differ only there.
- *
- * @param {{id: string, uuid: string, name: string, icon: string, usage?: object}} copy Fixture spec.
+ * @param {{id: string, uuid: string, name: string, icon: string, usage?: object}} copy Fixture
+ * spec.
  * @returns {object} A duck-typed owned item.
  */
 function recipeItemCopy({ id, uuid, name, icon, usage = null }) {
@@ -148,16 +96,7 @@ function recipeItemCopy({ id, uuid, name, icon, usage = null }) {
   return item;
 }
 
-/**
- * Owned stacks per actor, keyed by component id.
- *
- * Read this as three inventories with intent:
- * - Brenna is the smith: she can complete the sword and shield lines, and is one silver ore short
- *   of refining silver, so a `missingMaterials` row is guaranteed on screen.
- * - Idrin is the herbalist: full potion line, plus the reagents the alchemy workbench needs.
- * - Vosk is the mule: bulk raw materials and nothing finished, which is what makes the
- *   multi-source component picker meaningful rather than decorative.
- */
+/** Owned stacks per actor, keyed by component id. */
 const INVENTORIES = {
   'lab-actor-brenna': {
     'sm-iron-ore': 12,
@@ -175,27 +114,19 @@ const INVENTORIES = {
     'sm-tool-anvil': 1,
     'sm-tool-tongs': 1,
     'hb-healing-potion': 2,
-    // Routed stock, deliberately ASYMMETRIC. Brenna holds the silver billet but not the gold one,
-    // so `jw-r-cast` renders with one route satisfied and one short — which is the whole point of
-    // a routedByIngredients frame. The wire is one under the three a circlet needs, for the same
-    // reason: a routed recipe where every route is green shows none of the routing.
+    // Routed stock, deliberately ASYMMETRIC.
     'jw-ingot-silver': 2,
     'jw-wire': 2,
     'rw-bar': 2,
     'rw-chalk': 4,
     // The world's only WORKING routed salvage (`rw-slag` — Jewelry's routed config is the
-    // misconfigured fixture). It was deliberately unstocked because a salvage config grows
-    // a salvage panel in the inventory detail; it is stocked now because the bulk panel's
-    // routed mode is otherwise unreachable and therefore unphotographable (issue 859).
-    // Kept at ×2 so it reads as a real holding without disturbing any quantity assertion.
+    // misconfigured fixture) (issue 859).
     'rw-slag': 2,
     // Its required tool. Without this the row is BLOCKED on `toolsUnavailable` rather than
     // queued, which is a different frame entirely — the tools-blocked case already owns that
     // one, and routed mode would have stayed unphotographable.
     'rw-tool-mallet': 1,
-    // ONE stack, registered as a component in TWO systems (see SHARED_AIR_SHARD_UUID). ×1 on
-    // purpose: the collapse contract is a single card whose quantity is counted ONCE, and a ×2
-    // stack would hide a double-count rather than disprove it.
+    // ONE stack, registered as a component in TWO systems (see SHARED_AIR_SHARD_UUID).
     'sm-air-shard': 1,
     // Progressive salvage lives on herbalism, so its salvageable component has to be held by
     // the actor the inventory opens on — Brenna — or the panel is unreachable.
@@ -233,84 +164,22 @@ const INVENTORIES = {
     // reachable only through the multi-source picker.
     'jw-ingot-gold': 3,
     'rw-bar': 6,
-    // The required-tool disclosure needs ONE tool held and one missing, and availability is
-    // scoped to the target salvage actor (`rowSources[0]`, crafting-actor-first). Brenna owns the
-    // whole smithy, so the toolchest is stocked on the mule instead — who carries the tongs the
-    // salvage names and not the anvil it also names.
+    // The required-tool disclosure needs ONE tool held and one missing, and availability is scoped
+    // to the target salvage actor (`rowSources[0]`, crafting-actor-first).
     'sm-tool-tongs': 1,
     'sm-toolchest': 1,
   },
 };
 
 /**
- * Stacks seeded BROKEN, per actor and by component id.
- *
- * ONE entry, and it exists because "broken AND salvageable" was unreachable in this world while
- * being the state the bulk panel argues hardest about: brokenness is about USABILITY and does not
- * gate salvage, so a broken row belongs in the queue beside its certainty chip and not in the
- * blocked list (`bulkBlockedReasonFor` omits `broken` deliberately). Nothing here was broken at
- * all — `ownedItem` builds every stack with `flags: {}`, and the only other source
- * (`InventoryListingBuilder._isToolBroken`'s `limitedUses` exhaustion) needs a `toolUsage` flag no
- * fixture seeded — so the card's whole broken presentation was unphotographed too.
- *
- * WHY THE FLAG AND NOT NEW SALVAGE CONFIG. The four tool-backed components (`sm-iron-ingot`,
- * `sm-steel-ingot`, `hb-mortar-dust`, `hb-empty-vial`) carry no salvage config, so seeding a flag
- * on a tool alone reaches a BLOCKED row, not a queued one; authoring salvage onto one of them
- * would change what those components are for on the four frames that use them as tools. Seeding
- * the flag on a stack that is already salvageable moves one fixture and nothing else.
- *
- * WHY THE LONGSWORD. Of the salvageable stacks Brenna holds it is the one named by the FEWEST
- * cases — one (`player-salvage-no-check`), against five for the Cracked Alembic and six for the
- * Air Shard, both of which are in the existing bulk selections and would have put a danger pill on
- * frames that are not about brokenness. Its salvage is also the clearer evidence: smithing authors
- * no salvage check, so the queue row carries a GUARANTEED chip beside the danger one and the frame
- * shows the two are independent. And a broken sword stripped for "Reclaimed stock" is what the
- * state is for.
- *
- * IT IS REACHABLE IN PRODUCTION, which is the bar a fixture has to clear. `Tool#applyUsage`'s
- * `flagBroken` action writes this flag on the ITEM it matched, and a tool may be registered by
- * item reference with no component at all (`componentId: null`, as all five Runework tools are) —
- * so a tool registered on the same item that backs a salvageable component breaks exactly this
- * way. The flag is seeded at production's own depth (`flags.fabricate.fabricate.toolBroken`, what
- * `setFabricateFlag`'s dotted update expands to), never at the shallower spelling, so the lab
- * cannot answer a depth bug from a copy production never writes.
+ * Stacks seeded BROKEN, per actor and by component id. IT IS REACHABLE IN PRODUCTION, which is the
+ * bar a fixture has to clear.
  */
 const BROKEN_STACKS = Object.freeze({
   'lab-actor-brenna': ['sm-longsword'],
 });
 
-/**
- * Owned RECIPE-ITEM copies — the books and scrolls the GM Knowledge surface audits.
- *
- * Not part of {@link INVENTORIES}, because these are not components: a recipe item is matched to
- * its definition by source uuid (`matchRecipeItemDefinition`), never by the component map, and it
- * carries a `recipeItemUsage` flag no component has. Several copies deliberately share ONE uuid —
- * three copies of the same book is the normal case, and the projection keys each row on the
- * document ID, so a shared uuid is what makes "this copy is spent and that one is not" possible.
- *
- * The distribution is chosen, not incidental:
- * - Brenna carries the FOUR uses-chip states in one list — a partly-used capped book, an uncapped
- *   scroll (whose Expend control must be disabled), an inert copy, and a spent one. She is the
- *   roster's first character, so this is what the Knowledge surface opens on.
- * - Idrin carries knowledge and NO copies at all, which is the only way to reach the Recipe-items
- *   tab's empty state, and her learned entries name a source she no longer holds — the `lostCopy`
- *   rung of the learned-source ladder.
- * - Vosk holds the `total`-scope party codex that is STILL the source of a learned entry, which is
- *   the one arrangement that raises the ordering-hazard band.
- *
- * The crafting actor's LEARNED side is deliberately narrow rather than empty: `lastCraftingActor`
- * is Brenna, and the player's recipe visibility for the knowledge-gated herbalism system is
- * evaluated against her learned set, so anything she learns appears in the player's crafting
- * listing. She learns exactly the two progressive recipes and nothing else — see
- * {@link LEARNED_RECIPES} for why the general prohibition was too coarse and what keeps the
- * already-captured crafting and journal frames unmoved.
- *
- * A COPY reveals for the same reason, which is why every copy here is a copy of a book carrying no
- * authored membership: `hasMatchedItem` is computed over the crafting actor plus every
- * component-source actor, and the lab's component-source set is the whole roster, so there is no
- * character a member-carrying book can be parked on. See `HERBALISM_RECIPE_ITEMS` in
- * `labContent.js`, which owns that decision.
- */
+/** Owned RECIPE-ITEM copies — the books and scrolls the GM Knowledge surface audits. */
 const RECIPE_ITEM_COPIES = {
   'lab-actor-brenna': [
     {
@@ -355,34 +224,13 @@ const RECIPE_ITEM_COPIES = {
 };
 
 /**
- * Learned recipes per actor, keyed exactly as `flags.fabricate.fabricate.learnedRecipes` is.
- *
- * `sourceItemUuid` is what decides which rung of the source ladder a row renders on: a uuid the
- * actor still owns reads as the owned copy, a uuid it does not reads as the book's DEFINITION name
- * (`lostCopy`), and no uuid at all reads as an auto-learn, a labelled GM grant or a label-less GM
- * grant — the last three discriminated by `granted === true` and then by whether `grantedBy` is a
- * usable string (issue 1289).
+ * Learned recipes per actor, keyed exactly as `flags.fabricate.fabricate.learnedRecipes` is (issue
+ * 1289).
  */
 const LEARNED_RECIPES = {
-  // The crafting actor learns EXACTLY the two progressive recipes and nothing else.
-  //
-  // This reverses an earlier blanket "never teach Brenna anything" rule, and the reason it was
-  // written still holds — it was just too coarse. Herbalism is the world's only progressive system
-  // and it is knowledge-gated, so the four progressive player frames are unreachable while the
-  // crafting actor knows nothing; and `progressive` is a per-SYSTEM resolution mode, so no
-  // globally-visible system can carry a progressive recipe without being a sixth system.
-  //
-  // What the old rule was protecting against was REFLOW: the player recipe browser sorts A→Z and
-  // pages at twelve, so revealing a recipe named earlier than "Inscribe a Runeblade" pushes a row
-  // off page one and breaks the eight cases that select a row by id with no search filter. Both
-  // recipes named here sort after it, so page one is byte-identical and each is reached by its own
-  // case's search step.
-  //
-  // `sourceItemUuid: null` is an AUTO-LEARN — the bottom rung of the source ladder, and the only
-  // rung that adds no book. A learned entry sourced from a definition would also have to be
-  // reachable from a held copy, which would add a row to the Books & Scrolls library and a second
-  // one to Brenna's Knowledge recipe-items tab. This moves one thing: the learned-recipes tab
-  // badge on the three frames that open the Knowledge surface on Brenna.
+  // The crafting actor learns EXACTLY the two progressive recipes and nothing else. This reverses
+  // an earlier blanket "never teach Brenna anything" rule, and the reason it was written still
+  // holds — it was just too coarse.
   'lab-actor-brenna': {
     'hb-r-stillroom': { sourceItemUuid: null, learnedAt: 1_190_000 },
     'hb-r-kiln': { sourceItemUuid: null, learnedAt: 1_195_000 },
@@ -395,20 +243,7 @@ const LEARNED_RECIPES = {
     'hb-r-salve': { sourceItemUuid: 'Item.hb-book', learnedAt: 1_123_200 },
     // An auto-learn: no source at all, so the ladder falls to its bottom rung.
     'hb-r-grind': { sourceItemUuid: null, learnedAt: 1_209_500 },
-    // The two GM-grant rungs (issue 1289). BOTH are seeded, and one entry would not do:
-    // the label-less rung is the common case — a caller with nothing meaningful to say
-    // passes no label rather than its own module id — and with only the labelled entry
-    // here it would appear in no published frame at all. They sit beside the auto-learn
-    // on purpose, because "Learned by grant" against "Learned by crafting" is the pair a
-    // GM has to tell apart at 0.62rem, and the frame is the only evidence that they read
-    // as different rows rather than as one restated.
-    //
-    // `hb-r-tincture` and `hb-r-antitoxin` are chosen because they are members of NO
-    // recipe-item definition (`HERBALISM_RECIPE_ITEMS` confines membership to the unheld
-    // `hb-book`), so neither moves a Books & Scrolls `learnedByCount`; and because
-    // `evaluateKnowledgeAccess` reads `hasLearned` off the CRAFTING actor alone — Brenna
-    // — while Idrin contributes owned items only, so neither reveals a recipe to the
-    // player listing and page one of the A→Z recipe browser is byte-identical.
+    // The two GM-grant rungs (issue 1289).
     'hb-r-tincture': {
       sourceItemUuid: null,
       learnedAt: 1_214_000,
@@ -439,14 +274,9 @@ const ACTOR_DEFINITIONS = [
     name: 'Vosk',
     img: `${PORTRAIT_BASE}/commodities/leather/fur-brown-gold.webp`,
   },
-  // The one NON-player-character actor in the lab world, and it is APPENDED rather than
-  // inserted: `labWorld.js` picks `lab-party`'s travel actor by position out of the
-  // character subset, and the manager's "Preview as" and knowledge rosters read this list
-  // in order. It exists so the two exclusions the World > Parties pickers apply are
-  // photographable and testable rather than merely asserted: a vehicle is offered by
-  // neither the member picker nor the travel-actor picker's eligible set, yet a vehicle
-  // ALREADY linked as a travel actor is still offered by that picker so it can be seen
-  // and changed — which is `lab-party-long-haul`'s state.
+  // The one NON-player-character actor in the lab world, and it is APPENDED rather than inserted:
+  // `labWorld.js` picks `lab-party`'s travel actor by position out of the character subset, and the
+  // manager's "Preview as" and knowledge rosters read this list in order.
   {
     id: 'lab-actor-wagon',
     name: 'The Ashfall Wagon',
@@ -489,50 +319,25 @@ export function buildLabActors(content) {
       system: {
         currency: { gp: 45, sp: 12, cp: 30 },
         abilities: { int: { mod: 3 }, str: { mod: 2 } },
-        // `.mod` ONLY, and only these two keys. Herbalism's check-modifier catalogue resolves
-        // `@skills.med.mod` and `@skills.nat.mod`, and without them both fall to 0 — so the
-        // `playerPicks` fieldset would photograph three interchangeable "+0" chips and prove
-        // nothing about picking. Deliberately NOT `.value` and NOT `.total`: `skills.nat.value` is
-        // what `hb-prereq-nature` gates on and `@skills.nat.total` / `@skills.sur.total` are the
-        // gathering character modifiers, so adding either would flip a prerequisite chip or a
-        // gathering modifier row on frames that have nothing to do with this.
+        // `.mod` ONLY, and only these two keys.
         skills: { med: { mod: 4 }, nat: { mod: 2 } },
       },
       flags: {},
       isOwner: true,
       testUserPermission: () => true,
-      // `checkRoll.js` and `checkModifierResolver.js` resolve `@`-expressions against this. A
-      // real dnd5e actor supplies it; without it every `@prof` / `@abilities.*.mod` in a check
-      // formula resolves to NaN and the card renders a broken formula.
+      // `checkRoll.js` and `checkModifierResolver.js` resolve `@`-expressions against this.
       getRollData() {
         return { ...this.system, prof: 3 };
       },
       /**
        * The smoke's seed stocks the crafter through this, so an actor has to accept embedded items
        * or every inventory-dependent frame renders empty.
-       *
-       * A created document gets a NEW OWNED ADDRESS — `<actor uuid>.Item.<item id>`, and `parent`
-       * set to the actor — because that is what Foundry returns and what `writeItemAward`
-       * (`src/systems/runHistoryEvidence.js`) requires before it will count an award as landed:
-       * without both halves every craft, salvage and gathering award refuses with "Item creation
-       * was not acknowledged" and the run reports an effect needing reconciliation.
-       *
-       * The spec's `flags.core.sourceId` is therefore left WHERE IT IS rather than becoming the
-       * uuid. It names where the stack came from, and that is the field production actually
-       * matches on: `getCompendiumSourceUuid` reads it into `getItemSourceReferences`, whose
-       * raw-reference tier is what `resolveComponentForItem` falls through to. Spelling the
-       * source id as the uuid conflated the two, and also made two stacks created from one
-       * component share an address — which `InventoryListingBuilder.documentIdentity` collapses
-       * into a single card, undercounting real holdings.
        */
       async createEmbeddedDocuments(type, specs = [], options = {}) {
         if (type !== 'Item') return [];
         const created = specs.map((spec, offset) => {
-          // Foundry mints a fresh id and IGNORES a payload's `_id` unless the caller asks to
-          // keep it, which is what `keepId` is for. Honouring it only under that flag matters
-          // both ways: a fixture that stocks an actor gets a readable, stable address, while a
-          // crafted output — whose `itemData` is `sourceItem.toObject()` and therefore always
-          // carries the SOURCE item's `_id` — gets a new one, as a new document must.
+          // Foundry mints a fresh id and IGNORES a payload's `_id` unless the caller asks to keep
+          // it, which is what `keepId` is for.
           const id =
             (options?.keepId === true && spec._id) || `item-${definition.id}-${items.length + offset}`;
           const item = {
@@ -572,11 +377,6 @@ export function buildLabActors(content) {
     installUpdateSemantics(actor);
     // Installed HERE rather than in `ownedItem`/`recipeItemCopy`, because an item can only remove
     // itself from a collection that exists — and the actor holding it is built after its items.
-    // `parent` is set in the same pass and for the same reason. An owned item's parent IS its
-    // Actor in Foundry, and production derives the owning actor from it rather than from the
-    // call's own argument: `mapConsumedIngredientRef` stamps every consumed-ingredient receipt's
-    // `actorUuid` from `item.parent?.uuid`, and a null there is the key
-    // `addHistoricalEssenceContribution` then fails to find a carrier under.
     for (const item of items) {
       item.parent = actor;
       installDeleteSemantics(item, actor);
@@ -584,8 +384,7 @@ export function buildLabActors(content) {
     const learned = LEARNED_RECIPES[definition.id];
     // `flags.fabricate.fabricate.learnedRecipes`, which is where production's dotted-top-level-key
     // `update` lands it after V13 expands the path — the same doubly-nested depth every Fabricate
-    // read normalises to. Seeded through the shared helper so the lab can never hold one key at
-    // two depths and answer a depth bug from whichever copy the reader happens to find.
+    // read normalises to.
     if (learned)
       seedFabricateFlag(actor, ['fabricate', 'learnedRecipes'], structuredClone(learned));
     return actor;
@@ -593,12 +392,7 @@ export function buildLabActors(content) {
 }
 
 /**
- * Build the `fromUuid` index.
- *
- * This is not optional decoration. Roughly nine render paths resolve names and images through
- * `fromUuid`/`fromUuidSync` — environment scene links, recipe-item books, tool sources, the manager's
- * source-item panels. Without an index those surfaces render as unresolved, which is precisely the
- * "looks broken" failure a screenshot must not have.
+ * Build the `fromUuid` index. This is not optional decoration.
  *
  * @param {object} content Output of `buildLabContent()`.
  * @param {object[]} actors Output of {@link buildLabActors}.

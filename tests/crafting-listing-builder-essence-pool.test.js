@@ -1,22 +1,6 @@
 /**
- * Issue 917 — the crafting READ side's step scoping and shared essence pool.
- *
- * Three things are pinned here:
- *
- *  1. `CraftingListingBuilder` names the step an actor's run is actually parked on.
- *     The projection was hard-pinned to step 0 for every mode, so a player with a run
- *     on step 2 saw a step-0 requirement rail driving a step-2 craft. The rail stays
- *     step-0 (a routed/progressive recipe surfaces no `steps[]` to move it to), but
- *     the model now NAMES both steps plus the armed-time-gate state, which is what
- *     lets the UI render read-only instead of lying.
- *  2. The `stepRecipeView` module the builder and `CraftingEngine` now share: the
- *     tool-id union, and the two rules that make step/set resolution safe.
- *  3. `Fabricate#evaluateSelectedSet`'s stepped-recipe regression — it read
- *     `recipe.ingredientSets`, which is EMPTY for every explicit multi-step recipe, so
- *     it returned null and the issue-552 per-group option overrides were silently dead
- *     on stepped recipes. `main.js` cannot be imported (module-level Foundry side
- *     effects), so the behaviour is proven at the extracted seam and the wiring is
- *     pinned by a source contract.
+ * Issue 917 — the crafting READ side's step scoping and shared essence pool. Three things are
+ * pinned here:
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,9 +33,7 @@ const MAIN_SOURCE = readFileSync(
   'utf8'
 );
 
-// ---------------------------------------------------------------------------
 // Fixtures — a two-step forge recipe whose FIRST step is essence-funded
-// ---------------------------------------------------------------------------
 
 const EMBER_ESSENCE = { id: 'ember', name: 'Ember', icon: 'fa-fire' };
 
@@ -152,9 +134,7 @@ function buildRecipeModel({ recipe = forgeRecipe(), craftingRunManager = null, a
   });
 }
 
-// ---------------------------------------------------------------------------
 // 1. activeRunStepState — the shared synchronous run read
-// ---------------------------------------------------------------------------
 
 test('activeRunStepState reports step 0 with no run manager, no actor, or no active run', () => {
   const actor = { id: 'a' };
@@ -188,9 +168,7 @@ test('activeRunStepState falls back to step 0 for a non-finite or negative run i
   }
 });
 
-// ---------------------------------------------------------------------------
 // 2. The shared step view + step/set resolution rules
-// ---------------------------------------------------------------------------
 
 test('buildStepRecipeView unions recipe and step tool ids rather than falling back', () => {
   const view = buildStepRecipeView(
@@ -237,9 +215,7 @@ test('resolveStepIngredientSet returns null for an unknown step or an empty reci
   assert.equal(resolveStepIngredientSet({ steps: [], setId: 'set-1' }), null);
 });
 
-// ---------------------------------------------------------------------------
 // 3. The builder names the active step
-// ---------------------------------------------------------------------------
 
 test('with no active run the displayed step IS the active step (today behaviour)', () => {
   const model = buildRecipeModel({ craftingRunManager: runManagerAt(null) });
@@ -300,9 +276,7 @@ test('a redacted teaser exposes no step structure', () => {
   assert.equal(model.activeStepTimeGateArmed, false);
 });
 
-// ---------------------------------------------------------------------------
 // 4. The essence pool reaches the per-set craftability the rail renders
-// ---------------------------------------------------------------------------
 
 test('the first step set carries the shared essence pool the rail edits', () => {
   const model = buildRecipeModel({ craftingRunManager: runManagerAt(null) });
@@ -318,9 +292,7 @@ test('the first step set carries the shared essence pool the rail edits', () => 
   assert.equal(pool.carriers[0].allocatedUnits, 1);
 });
 
-// ---------------------------------------------------------------------------
 // 5. evaluateSelectedSet — the stepped-recipe regression
-// ---------------------------------------------------------------------------
 
 test('a stepped recipe has NO top-level ingredient sets, which is what broke evaluateSelectedSet', () => {
   const recipe = forgeRecipe();
@@ -384,9 +356,7 @@ test('a supplied allocation flows through the same seam and steers the pool', ()
   assert.equal(craftability.essencePool.requirements[0].delivered, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 6. Source contract — the facade is actually wired to the seam above
-// ---------------------------------------------------------------------------
 
 test('src/main.js resolves evaluateSelectedSet through the execution steps', () => {
   const body = MAIN_SOURCE.slice(

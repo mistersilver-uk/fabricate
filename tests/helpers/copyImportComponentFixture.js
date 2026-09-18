@@ -1,16 +1,6 @@
 /**
- * Shared fixture for the issue 570 copy-import component-id regeneration tests.
- *
- * ONE hoisted export payload exercising EVERY D1 within-payload component-reference
- * site (Sonar new-code fixture-duplication mitigation). Every `*.test.js` for #570
- * imports this so the fixture cannot drift and the round-trip / residual-closure /
- * behaviour / no-dangle / key-aware-negative cases share a single source of truth.
- *
- * This file is a HELPER, never a `*.test.js`. It carries CANONICAL serialized shapes
- * (`ingredientGroups[].options[]` with `match`, the flat `ingredients`/`results`
- * aliases, `resultGroups`, catalysts, salvage, tools, essence, gathering drop rows)
- * so it round-trips faithfully through `prepareForImport(payload, 'copy')` and builds
- * a live `Recipe` model.
+ * Shared fixture for the issue 570 copy-import component-id regeneration tests. This file is a
+ * HELPER, never a `*.test.js`.
  */
 
 /** The component ids authored in the raw fixture (pre-regeneration). */
@@ -106,9 +96,7 @@ export function buildCopyImportComponentFixture() {
         originItemUuid: 'Compendium.world.items.Item.iron-ore',
         essences: { earth: 1 },
         aliasItemUuids: [],
-        // Site F: salvage result refs to another component. The group id is a
-        // key-aware NEGATIVE probe: a salvage-GROUP id set to a value that equals a
-        // (pre-regeneration) component id, which MUST NOT be rewritten (case f).
+        // Site F: salvage result refs to another component.
         salvage: {
           enabled: true,
           ingredientQuantity: 1,
@@ -308,13 +296,6 @@ export function buildCopyImportComponentFixture() {
 
 /**
  * Independent, LITERAL-path sweep of every D1 component-reference site (issue 570 D2).
- *
- * This is deliberately NOT shared with the production transform's site list: a shared
- * constant would blind both the transform and this oracle to the same omission and
- * reopen the trap. It is the load-bearing completeness check for every site the
- * `collectBrokenInternalReferences` collector does not (yet) cover — in particular the
- * flat `ingredients[]` alias, which has NO independent behavioural backstop
- * (IngredientSet re-derives it on normalize).
  *
  * @param {object} prepared - a `prepareForImport(...)` result
  * @returns {Array<{ path: string, value: string }>} every present, non-empty ref value

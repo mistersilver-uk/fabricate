@@ -1,15 +1,6 @@
 /**
- * Issue 771 — the COMPOSITION seams between the drop handler, the per-folder collector,
- * and the set-apply primitive. The pure helpers are covered elsewhere; this pins the
- * wiring the regression risk actually lives in:
- *
- *  (a) the `collectImportFolderGroups` divert decision — which drops open the mapping
- *      modal (groups), which fall through to the one-shot import (passthrough), and which
- *      are handled-with-a-notice (the compendium-directory descope). The Foundry drop
- *      resolution is mocked exactly as the collector tests mock it; the group-level
- *      decision uses the REAL `hasRealFolderGroups` + collector functions.
- *  (b) the `commitImportFolderMapping` import→apply loop, exercised through the REAL
- *      exported `applyFolderImportDecisions` against a REAL `CraftingSystemManager`.
+ * Issue 771 — the COMPOSITION seams between the drop handler, the per-folder collector, and the
+ * set-apply primitive.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,13 +13,10 @@ import {
   applyFolderImportDecisions,
 } from '../src/ui/svelte/util/importFolderGroups.js';
 
-// ── (a) divert decision table ────────────────────────────────────────────────
-//
-// Mirrors the branch STRUCTURE of `SvelteCraftingSystemManagerApp.collectImportFolderGroups`
-// (single-item / whole-pack / folder / compendium-directory), delegating the actual
-// grouping to the real collector + the real `hasRealFolderGroups` divert. Returns a plan
-// tag the same way `dropComponent` reads it: 'modal' (open modal), 'passthrough' (fall to
-// onDropItem), or 'handled' (collector already notified, do not fall through).
+// (a) divert decision table. Mirrors the branch STRUCTURE of
+// `SvelteCraftingSystemManagerApp.collectImportFolderGroups` (single-item / whole-pack / folder /
+// compendium-directory), delegating the actual grouping to the real collector + the real
+// `hasRealFolderGroups` divert.
 function classifyImportDrop(data, { resolveFolder, getPack, notify }) {
   const unfiledName = 'Ungrouped';
   const planFor = (groups) =>
@@ -218,12 +206,9 @@ test('a decision with no category and no tags still imports but applies nothing'
   assert.deepEqual(component.tags, []);
 });
 
-// ── (c) write amplification (issue 1086) ─────────────────────────────────────
-//
-// `save()` replaces the WHOLE `craftingSystems` world setting and replicates it to every
-// connected client, so a per-item save makes a folder import quadratic in corpus size.
-// These are counter assertions, not timings: the invariant is the number of corpus
-// writes, and it must grow with neither the item count nor the folder count.
+// (c) write amplification (issue 1086). `save()` replaces the WHOLE `craftingSystems` world setting
+// and replicates it to every connected client, so a per-item save makes a folder import quadratic
+// in corpus size.
 
 const BASE_FROM_UUID = globalThis.fromUuid;
 
@@ -296,9 +281,7 @@ test('folder import commit — the collaborators still write per call when nothi
   const manager = buildManager();
   const writes = countCorpusWrites(manager);
 
-  // The same four imports the commit loop would make, issued directly at the default
-  // `persist`. The counter DOES move with item count here, which is what makes the
-  // `calls === 1` above a statement about batching rather than a stub that never fires.
+  // The same four imports the commit loop would make, issued directly at the default `persist`.
   const ids = [];
   for (const uuid of ['Item.bulk-c-0', 'Item.bulk-c-1', 'Item.bulk-c-2', 'Item.bulk-c-3']) {
     const result = await manager.addItemFromUuid('sys1', uuid);
@@ -359,14 +342,11 @@ test('folder import commit — a mid-run failure flushes what was imported and s
   );
 });
 
-// ── (d) the plain folder drop delegates to the batched commit loop ────────────
-//
-// `SvelteCraftingSystemManagerApp`'s `onDropItem` Folder branch is not importable in
-// isolation (the module builds a Foundry ApplicationV2 subclass at import time), and the
-// `onDropItem` integration tests elsewhere exercise a hand-written MIRROR of it — which
-// keeps passing however the real branch is written. This pins the real file: the branch
-// must delegate to the batched `applyFolderImportDecisions` and must not re-inline a
-// per-item import loop, which is what made a folder drop quadratic.
+// (d) the plain folder drop delegates to the batched commit loop.
+// `SvelteCraftingSystemManagerApp`'s `onDropItem` Folder branch is not importable in isolation (the
+// module builds a Foundry ApplicationV2 subclass at import time), and the `onDropItem` integration
+// tests elsewhere exercise a hand-written MIRROR of it — which keeps passing however the real
+// branch is written.
 
 const APP_SOURCE = readFileSync(
   new URL('../src/ui/SvelteCraftingSystemManagerApp.svelte.js', import.meta.url),

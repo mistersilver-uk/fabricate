@@ -11,9 +11,7 @@ import {
   runComponentIdMigration,
 } from '../src/migration/migrateComponentId.js';
 
-// ---------------------------------------------------------------------------
 // 1. Catalyst systemItemId migrated to componentId (top-level catalysts)
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: catalyst systemItemId -> componentId', () => {
   const input = [{ catalysts: [{ systemItemId: 'item-forge', degradesOnUse: false }] }];
@@ -23,9 +21,7 @@ test('migrateRecipes: catalyst systemItemId -> componentId', () => {
   assert.equal('systemItemId' in recipe.catalysts[0], false);
 });
 
-// ---------------------------------------------------------------------------
 // 2. Result systemItemId migrated to componentId (resultGroups[].results[])
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: result systemItemId -> componentId in resultGroups', () => {
   const input = [
@@ -37,9 +33,7 @@ test('migrateRecipes: result systemItemId -> componentId in resultGroups', () =>
   assert.equal('systemItemId' in recipe.resultGroups[0].results[0], false);
 });
 
-// ---------------------------------------------------------------------------
 // 3. Ingredient match.systemItemId and match.type migrated
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: ingredient match.systemItemId -> match.componentId and type "systemItem" -> "component"', () => {
   const input = [
@@ -61,9 +55,7 @@ test('migrateRecipes: ingredient match.systemItemId -> match.componentId and typ
   assert.equal('systemItemId' in ing.match, false);
 });
 
-// ---------------------------------------------------------------------------
 // 4. Ingredient top-level systemItemId migrated
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: ingredient top-level systemItemId -> componentId', () => {
   const input = [
@@ -82,9 +74,7 @@ test('migrateRecipes: ingredient top-level systemItemId -> componentId', () => {
   assert.equal('systemItemId' in ing, false);
 });
 
-// ---------------------------------------------------------------------------
 // 5. Ingredient alternatives recursively migrated
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: ingredient alternatives[] recursively migrated', () => {
   const input = [
@@ -116,9 +106,7 @@ test('migrateRecipes: ingredient alternatives[] recursively migrated', () => {
   assert.equal('systemItemId' in alt.match, false);
 });
 
-// ---------------------------------------------------------------------------
 // 6. IngredientSet-level catalysts migrated
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: ingredientSets[].catalysts[].systemItemId migrated', () => {
   const input = [
@@ -135,9 +123,7 @@ test('migrateRecipes: ingredientSets[].catalysts[].systemItemId migrated', () =>
   assert.equal('systemItemId' in cat, false);
 });
 
-// ---------------------------------------------------------------------------
 // 7. Step-level catalysts, results, and ingredients migrated
-// ---------------------------------------------------------------------------
 
 test('migrateRecipes: steps[].catalysts, resultGroups, and ingredientSets all migrated', () => {
   const input = [
@@ -166,9 +152,7 @@ test('migrateRecipes: steps[].catalysts, resultGroups, and ingredientSets all mi
   assert.equal('systemItemId' in step.ingredientSets[0].ingredients[0], false);
 });
 
-// ---------------------------------------------------------------------------
 // 8. CraftingSystem managedItems renamed to components
-// ---------------------------------------------------------------------------
 
 test('migrateCraftingSystems: managedItems array renamed to components', () => {
   const input = [{ id: 'sys-1', managedItems: [{ id: 'comp-a' }] }];
@@ -179,9 +163,7 @@ test('migrateCraftingSystems: managedItems array renamed to components', () => {
   assert.equal('managedItems' in system, false);
 });
 
-// ---------------------------------------------------------------------------
 // 9. Salvage catalysts migrated inside component salvage data
-// ---------------------------------------------------------------------------
 
 test('migrateCraftingSystems: components[].salvage.catalysts[].systemItemId migrated', () => {
   const input = [
@@ -203,9 +185,7 @@ test('migrateCraftingSystems: components[].salvage.catalysts[].systemItemId migr
   assert.equal('systemItemId' in cat, false);
 });
 
-// ---------------------------------------------------------------------------
 // 10. Salvage results migrated inside component salvage resultGroups
-// ---------------------------------------------------------------------------
 
 test('migrateCraftingSystems: components[].salvage.resultGroups[].results[].systemItemId migrated', () => {
   const input = [
@@ -229,9 +209,7 @@ test('migrateCraftingSystems: components[].salvage.resultGroups[].results[].syst
   assert.equal('systemItemId' in result, false);
 });
 
-// ---------------------------------------------------------------------------
 // 11. Idempotent: already-migrated data passes through unchanged
-// ---------------------------------------------------------------------------
 
 test('idempotency: already-migrated data with componentId is unchanged', () => {
   const alreadyMigrated = [
@@ -250,9 +228,7 @@ test('idempotency: already-migrated data with componentId is unchanged', () => {
   assert.deepEqual(migrated, alreadyMigrated);
 });
 
-// ---------------------------------------------------------------------------
 // 12. Idempotent: running migration twice produces same output as running once
-// ---------------------------------------------------------------------------
 
 test('idempotency: f(f(x)) === f(x) for recipes and systems', () => {
   const recipes = [
@@ -274,9 +250,7 @@ test('idempotency: f(f(x)) === f(x) for recipes and systems', () => {
   assert.deepEqual(twice.systems, once.systems);
 });
 
-// ---------------------------------------------------------------------------
 // 13. Edge cases: empty arrays, null, missing keys handled gracefully
-// ---------------------------------------------------------------------------
 
 test('edge cases: empty arrays, null values, and missing keys do not throw', () => {
   assert.doesNotThrow(() => migrateRecipes([]));

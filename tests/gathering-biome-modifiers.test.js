@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 
 import { makeRichState } from './helpers/gathering.js';
 
-// Compose an environment whose biomes drive biome-modifier matching, with a
-// chosen aggregation mode. composeEnvironment pulls conditions from system
-// defaults; we override rules so each test can pick the aggregation strategy.
+// Compose an environment whose biomes drive biome-modifier matching, with a chosen aggregation
+// mode.
 function composedEnvironment(service, { biomes = [], aggregation = 'strongestOfEach', events = [] } = {}) {
   const composed = service.composeEnvironment({
     id: 'env',

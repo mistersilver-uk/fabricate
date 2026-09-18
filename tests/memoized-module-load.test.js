@@ -1,18 +1,7 @@
 /**
  * `createMemoizedLoad` (issue 1565) — the memoization `src/main.js` has carried since issue 150,
- * moved behind a seam a test can actually execute.
- *
- * THE THREE PROPERTIES, and why each is here rather than assumed:
- *
- *  1. REPEAT callers after a success share the resolved attempt. This is the property issue 150
- *     shipped for (a non-GM never downloads the manager subtree, and a GM downloads it once).
- *  2. CONCURRENT callers during one attempt share it. A memo that stored the RESULT rather than
- *     the in-flight promise would satisfy (1) and fail this, entering `import()` twice on a
- *     double click.
- *  3. A REJECTION leaves the memo EMPTY. Note what is deliberately NOT claimed: the next call
- *     re-invokes the loader, and for a real dynamic `import()` that second attempt resolves from
- *     the host's own recorded failure without a fetch. So this asserts the memo's state, not a
- *     recovery — see the module's own header.
+ * moved behind a seam a test can actually execute. 1. REPEAT callers after a success share the
+ * resolved attempt.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -69,10 +58,7 @@ test('a rejection does not leave the memo populated, and every waiting caller se
 
   const a = memoized();
   const b = memoized();
-  // Identity is asserted BEFORE anything is awaited on purpose. A memo that stored the result
-  // instead of the in-flight promise leaves `b` a SECOND attempt that this fixture never
-  // settles, so awaiting it first would hang the suite (`node --test` reports that as
-  // `cancelled`, five minutes later) instead of failing it here.
+  // Identity is asserted BEFORE anything is awaited on purpose.
   assert.ok(a === b, 'a concurrent open during a failing attempt shares that attempt');
   calls[0].reject(failure);
 

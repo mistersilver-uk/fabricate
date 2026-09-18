@@ -1,16 +1,7 @@
 /**
- * The shared dotted-path walker (issue 1024).
- *
- * Five hand-rolled walkers collapsed into this one module, so the behaviours each
- * consumer relied on are pinned here rather than rediscovered from a regression:
- *
- *   - `currencyProfile.js` preferred `foundry.utils.getProperty`, which tries a dotted
- *     key as a LITERAL own key first. That branch is kept.
- *   - `runFlagInvalidation.js` needs PRESENCE (`in`), not a value read, because an
- *     `updateActor` change diff can legitimately carry `undefined` at a touched path.
- *   - the four item-creation sites need `setByPath` to CREATE intermediate objects; a
- *     reducer-shaped setter no-ops on a >= 3-segment path and the created item then has
- *     no stack quantity at all.
+ * The shared dotted-path walker (issue 1024). Five hand-rolled walkers collapsed into this one
+ * module, so the behaviours each consumer relied on are pinned here rather than rediscovered from a
+ * regression:
  */
 
 import { describe, it } from 'node:test';

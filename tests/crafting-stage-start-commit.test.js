@@ -1,11 +1,7 @@
 /**
- * The versioned stage-start commit: D-026 (materials are consumed when a stage starts) and
- * D-028 (the component choice is made and LOCKED at that same moment), with the explicit
- * begin control and the roll-readiness rule the maintainer stated with them.
- *
- * Every case drives the real engine, the real run manager and the real projection builder
- * against `createPersistedCraftingHistory`'s `drive` seam; only Foundry documents, the
- * authority grant and the roll result are doubled.
+ * The versioned stage-start commit: D-026 (materials are consumed when a stage starts) and D-028
+ * (the component choice is made and LOCKED at that same moment), with the explicit begin control
+ * and the roll-readiness rule the maintainer stated with them.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

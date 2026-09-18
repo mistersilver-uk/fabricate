@@ -1,19 +1,6 @@
 /**
- * The revisioned alchemy signature report (issue 1074, under #1070).
- *
- * Two things are under test and they fail in opposite directions, so both are pinned here:
- *
- * 1. **The cache is FAST.** One full audit per cold revision, zero on an unchanged one, a
- *    bounded number of recipe-corpus copies however many rows are prepared, and a candidate
- *    compared against an indexed cohort rather than every pair in the system.
- * 2. **The cache is RIGHT.** `SignatureValidator.validateSystem` is deliberately left as the
- *    unpruned oracle, and every answer the cached path gives is asserted against it. A
- *    signature answer that goes stale does not merely render something wrong — it permits or
- *    refuses a GM's save — so the staleness cases are enumerated one clause at a time.
- *
- * The counters read here are the module-level ones in `SignatureValidator`, not a per-
- * instance wrapper: the row path builds its own validator inside `RecipeManager`, so a
- * wrapper can only see the instances a test constructed itself.
+ * The revisioned alchemy signature report (issue 1074, under #1070). Two things are under test and
+ * they fail in opposite directions, so both are pinned here:
  */
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
@@ -39,10 +26,7 @@ function component(id) {
 /**
  * A recipe whose ingredient sets each require exactly the listed components.
  *
- * @param {string} id
  * @param {string[][]} sets one component-id list per ingredient set.
- * @param {{enabled?: boolean}} [options]
- * @returns {object}
  */
 function recipePayload(id, sets, { enabled = true } = {}) {
   return {
@@ -96,17 +80,8 @@ function makeManager({ recipes, resolutionMode = 'alchemy', components } = {}) {
 
 /**
  * The full-audit answer, reproduced exactly: an unpruned audit over the live cohort with the
- * candidate IN it — substituted for its stored copy, or appended when it has none (issue
- * 1167) — filtered to the conflicts naming it.
- *
- * This is the oracle every cached answer below is compared against. The append leg matters
- * as much as the substitution leg: an oracle that only substituted would answer `[]` for a
- * not-yet-stored candidate, and would then agree with the vacuous gate rather than judge it.
- *
- * @param {object} manager
- * @param {object} systemManager
- * @param {object} candidate
- * @returns {object[]}
+ * candidate IN it — substituted for its stored copy, or appended when it has none (issue 1167) —
+ * filtered to the conflicts naming it.
  */
 function oracleConflicts(manager, systemManager, candidate) {
   const validator = new SignatureValidator({
@@ -194,11 +169,7 @@ describe('the cached alchemy signature gate agrees with the full-audit oracle', 
   });
 
   it('orders an INCREMENTALLY-checked candidate’s conflicts as the full audit does', () => {
-    // The ordering case the fast path cannot cover. r-z is disabled, so it is answered from
-    // the index — and its FIRST set collides with a LATER recipe (r-c) than its second set's
-    // colliders (r-a, r-b). Discovery order is therefore set-by-set while audit order is
-    // collider-by-collider, so the two disagree unless the pairs are re-sorted into the audit's
-    // own `(cohortIndex, setIndex)` order.
+    // The ordering case the fast path cannot cover.
     const corpus = [...COLLIDING_CORPUS, recipePayload('r-z', [['c2'], ['c1']], { enabled: false })];
     const { manager, systemManager } = makeManager({ recipes: corpus });
     const candidate = enabledClone(manager.getRecipe('r-z'));
@@ -209,10 +180,8 @@ describe('the cached alchemy signature gate agrees with the full-audit oracle', 
   });
 
   it('answers a NOT-YET-STORED candidate as an audit of the post-create cohort would', () => {
-    // Issue 1167: `createRecipe` and `importRecipes` gate before the recipe reaches the map,
-    // so the candidate has no stored copy to substitute for. It is appended instead, and the
-    // answer must match the unpruned audit pair for pair AND in audit order — including
-    // which side of each conflict the newcomer lands on, which the append position decides.
+    // Issue 1167: `createRecipe` and `importRecipes` gate before the recipe reaches the map, so the
+    // candidate has no stored copy to substitute for.
     const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
     const candidate = new Recipe(recipePayload('r-new', [['c1']]));
 
@@ -276,10 +245,7 @@ describe('the alchemy signature report is compiled once per revision', () => {
     }
     const warm = readSignatureCounters();
     assert.equal(warm.reportBuilds, 0, 'an unchanged revision must recompile nothing');
-    // The four ENABLED rows are answered from the report with no comparison at all. The
-    // DISABLED r-e is the only row that still has a question to ask — "would enabling this
-    // collide?" — and it asks it of its three indexed candidates, not of all ten pairs the
-    // system holds.
+    // The four ENABLED rows are answered from the report with no comparison at all.
     assert.equal(warm.signatureComparisons, 3);
   });
 
@@ -356,9 +322,7 @@ describe('the signature report invalidates when the world moves under it', () =>
   });
 
   it('recompiles after an IN-PLACE enabled flip that advances no token', () => {
-    // The clause tokens alone cannot cover. `disableSignatureConflicts` is the one manager
-    // path that mutates a stored recipe rather than replacing it, and a fixture flipping the
-    // flag directly (several suites in this repository do) is indistinguishable from it.
+    // The clause tokens alone cannot cover.
     const { manager } = makeManager({ recipes: COLLIDING_CORPUS });
     assert.equal(gateMessages(manager, 'r-e').length, 3);
 
@@ -396,11 +360,9 @@ describe('the signature report invalidates when the world moves under it', () =>
       'the newcomer is scanned against the system it moved into'
     );
 
-    // The assertion above no longer BINDS on its own: since issue 1167 a candidate the
-    // report has no slot for is appended to the scan rather than answered "no conflict", so
-    // it reads correctly from a stale report too. What a stale report cannot get right is
-    // what it tells a recipe it ALREADY holds, so the newcomer is enabled and an incumbent
-    // is asked — an answer that can only come from the report's own compiled entries.
+    // The assertion above no longer BINDS on its own: since issue 1167 a candidate the report has
+    // no slot for is appended to the scan rather than answered "no conflict", so it reads correctly
+    // from a stale report too.
     manager.recipes.set(
       'r-x',
       new Recipe({ ...outsider, craftingSystemId: SYSTEM_ID, enabled: true })
@@ -416,10 +378,7 @@ describe('the signature report invalidates when the world moves under it', () =>
 
   it('recompiles after an IN-PLACE component edit that advances the system token', () => {
     // The sibling above replaces the components ARRAY, which the container clause catches on
-    // identity alone. This one re-tags a component in place: same system, same array, same
-    // length, so NOTHING in the object graph moved and only the system revision token can
-    // see it. That is the whole reason the report consumes #1076's tokens rather than
-    // fingerprinting the graph.
+    // identity alone.
     const components = [
       { id: 'c1', name: 'Iron', tags: ['metal'] },
       { id: 'c2', name: 'Gold', tags: ['metal'] },
@@ -477,8 +436,7 @@ describe('the signature report invalidates when the world moves under it', () =>
   it('recompiles when a recipe is written straight into the map, advancing no token', () => {
     // The clause the map SIZE covers. Dozens of fixtures in this repository seed and extend
     // `manager.recipes` directly, and so does the compendium importer's batch loop before its
-    // trailing save. A report whose cohort map has never seen the newcomer answers "no
-    // conflict" for it, which is a save the gate should have refused.
+    // trailing save.
     const { manager } = makeManager({ recipes: COLLIDING_CORPUS });
     assert.equal(gateMessages(manager, 'r-e').length, 3, 'warm the report first');
 
@@ -488,10 +446,8 @@ describe('the signature report invalidates when the world moves under it', () =>
 
     assert.equal(gateMessages(manager, 'r-f').length, 3, 'r-f collides with r-a, r-b and r-d');
 
-    // As in the moved-in case above, that assertion stopped binding at issue 1167: a
-    // candidate absent from the report is appended to the scan, so it reads correctly from
-    // a stale one. An ENABLED direct write is the leg that still binds, because it changes
-    // what the report must tell every OTHER recipe.
+    // As in the moved-in case above, that assertion stopped binding at issue 1167: a candidate
+    // absent from the report is appended to the scan, so it reads correctly from a stale one.
     manager.recipes.set('r-g', new Recipe(recipePayload('r-g', [['c1']])));
     assert.equal(
       manager.revision(REVISION_SCOPES.recipesOfSystem(SYSTEM_ID)),
@@ -523,10 +479,7 @@ describe('the signature report invalidates when the world moves under it', () =>
   });
 
   it('recompiles after a component-array edit that advances NO token', () => {
-    // The stubbed-`save` trap, stated as a test. The `system:<id>` scope is advanced by
-    // `CraftingSystemManager.save()`, and this repository holds around thirty suites that stub
-    // that method — so a report trusting the token alone would serve an answer computed
-    // against a component library the system no longer has.
+    // The stubbed-`save` trap, stated as a test.
     const components = [
       { id: 'c1', name: 'Iron', tags: ['metal'] },
       { id: 'c2', name: 'Gold', tags: ['metal'] },
@@ -575,10 +528,7 @@ describe('the signature report invalidates when the world moves under it', () =>
   });
 
   it('recompiles after an in-place component APPEND that advances no token', () => {
-    // The sibling clause: the array object never changes, so only its LENGTH can report the
-    // append. Deliberately arranged so the append CREATES a collision rather than removing
-    // one — a cache that fails open here lets a colliding recipe be enabled, which is the
-    // direction that corrupts a world rather than merely annoying a GM.
+    // The sibling clause: the array object never changes, so only its LENGTH can report the append.
     const components = [{ id: 'c1', name: 'Iron', tags: [] }];
     const tagged = {
       ...recipePayload('t-a', [['c1']]),
@@ -671,10 +621,8 @@ describe('the report scans exactly the recipes the audit scans', () => {
   beforeEach(() => resetSignatureCounters());
 
   it('skips a stored record whose enabled key is absent, exactly as validateSystem does', () => {
-    // Issue 1134: `validateSystem` scopes with a TRUTHY `recipe?.enabled` while the model's
-    // meaning is `!== false`, so a raw payload omitting the key is skipped. That defect is
-    // not this cache's to fix, and the cache must not silently change which recipes the gate
-    // scans — so the report's membership clause uses the same truthy test.
+    // Issue 1134: `validateSystem` scopes with a TRUTHY `recipe?.enabled` while the model's meaning
+    // is `!== false`, so a raw payload omitting the key is skipped.
     const keyless = recipePayload('r-keyless', [['c1']]);
     delete keyless.enabled;
     const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
@@ -692,29 +640,12 @@ describe('the report scans exactly the recipes the audit scans', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The recipe editor's live-draft prediction (issue 1201)
-// ---------------------------------------------------------------------------
 
 /** Every store an editor test opened, closed after it by {@link afterEach}. */
 const openedEditorStores = [];
 
-/**
- * An admin store wired to a real `RecipeManager` and the system-manager double above.
- *
- * `selectedSystemId` is seeded from the `lastManagedCraftingSystem` setting at
- * construction, and that plus the two manager services is the WHOLE of the state
- * `getRecipeSignatureConflicts` reads — it touches no projection — so the store is held at
- * `isFabricateReady() === false`. That is not a convenience: `createAdminStore` fires an
- * un-awaited `refresh()`, whose whole-system projection does signature work of its own, and
- * a projection landing on a microtask between a counter reset and its reading would make
- * every measurement below unreadable. Held not-ready, the refresh publishes a loading state
- * and returns.
- *
- * @param {object} manager
- * @param {object} systemManager
- * @returns {object}
- */
+/** An admin store wired to a real `RecipeManager` and the system-manager double above. */
 function editorStore(manager, systemManager) {
   const store = createAdminStore({
     getSetting: (key) => (key === 'lastManagedCraftingSystem' ? SYSTEM_ID : ''),
@@ -732,33 +663,12 @@ function editorStore(manager, systemManager) {
 /**
  * The editor's draft shape: the recipe JSON `cloneRecipeDraft` hands the editor, which is
  * `Recipe#toJSON` output and NOT the raw constructor payload.
- *
- * The distinction is load-bearing, not incidental. An ingredient option's component is
- * carried on `match` in the serialised shape, and a raw `{componentId, quantity}` payload
- * expands to NO component at all — so a suite that drafted raw payloads would compile every
- * signature to an inert one, compare nothing, find nothing, and pass every counter
- * assertion below while proving none of them.
- *
- * @param {string} id
- * @param {string[][]} sets
- * @param {{enabled?: boolean}} [options]
- * @returns {object}
  */
 function draftJson(id, sets, options = {}) {
   return new Recipe(recipePayload(id, sets, options)).toJSON();
 }
 
-/**
- * `adminStore`'s module-private `_getManagedItems`, reproduced.
- *
- * The component source the deleted editor audit read, and one of the two things the
- * routing change substitutes: the retained path reaches components through
- * `CraftingSystemManager.getComponentsForSystem` instead. An oracle that read the NEW
- * source could not tell the two apart, so it is the OLD one that belongs here.
- *
- * @param {object} system
- * @returns {object[]}
- */
+/** `adminStore`'s module-private `_getManagedItems`, reproduced. */
 function managedItemsOf(system) {
   if (Array.isArray(system?.components)) return system.components;
   if (Array.isArray(system?.items)) return system.items;
@@ -766,29 +676,10 @@ function managedItemsOf(system) {
 }
 
 /**
- * The editor answer the retained path REPLACED: the whole persisted corpus copied through
- * `toJSON`, the draft substituted for the record of the edited id, a fresh
- * `SignatureValidator` over that copy — reading components through the deleted code's own
- * `_getManagedItems`, not the manager seam that replaced it — one full `n(n-1)/2` audit,
- * filtered to the conflicts naming the edited recipe.
- *
- * Kept as the oracle rather than deleted with the code, because "identical conflicts, same
- * order, same messages" is the entire claim of the routing change, and an oracle that
- * shared any part of the retained path could not falsify it. Each of the three
- * collaborators keeps the deleted code's `id === sysId` guard for the same reason: an
- * oracle that answered for a system it was never asked about would agree with a retained
- * path that did too.
- *
- * Two departures from the deleted text, neither of them a behaviour of the substitution:
- * `sysId` — `get(selectedSystemId)`, which {@link editorStore} seeds to `SYSTEM_ID` — is
- * inlined as that constant, and the store's early returns for a missing service, id or
- * system are omitted because the fixture always supplies them.
- *
- * @param {object} manager
- * @param {object} systemManager
- * @param {string} recipeId
- * @param {object|null} draftRecipe
- * @returns {{code: string|null, params: object, message: string}[]}
+ * The editor answer the retained path REPLACED: the whole persisted corpus copied through `toJSON`,
+ * the draft substituted for the record of the edited id, a fresh `SignatureValidator` over that
+ * copy — reading components through the deleted code's own `_getManagedItems`, not the manager seam
+ * that replaced it — one full `n(n-1)/2` audit, filtered to the conflicts naming the edited recipe.
  */
 function priorEditorAudit(manager, systemManager, recipeId, draftRecipe = null) {
   const system = systemManager.getSystem(SYSTEM_ID);
@@ -814,17 +705,7 @@ function priorEditorAudit(manager, systemManager, recipeId, draftRecipe = null) 
     .map((conflict) => ({ code: conflict.code, params: conflict.params, message: conflict.message }));
 }
 
-/**
- * A corpus of `size` recipes with PAIRWISE DISTINCT signatures, one component each.
- *
- * Distinct on purpose: the corpus-independence claim is about the candidate's indexed
- * cohort, and a corpus that recycles three components would give every draft a cohort of
- * `size / 3` and grow with the corpus for a sound reason. Here a draft's cohort is one
- * entry however large the system is, so a count that grows is the audit leaking back in.
- *
- * @param {number} size
- * @returns {{recipes: object[], components: object[]}}
- */
+/** A corpus of `size` recipes with PAIRWISE DISTINCT signatures, one component each. */
 function distinctCorpus(size) {
   return {
     recipes: Array.from({ length: size }, (_unused, index) =>
@@ -834,16 +715,7 @@ function distinctCorpus(size) {
   };
 }
 
-/**
- * Cold and warm counter readings for `keystrokes` draft mutations in a `size`-recipe system.
- *
- * Each keystroke passes a FRESH draft object, as the editor's `$derived` does — it rebuilds
- * `recipeDraft` by spread on every patch — so nothing can be memoised on draft identity.
- *
- * @param {number} size
- * @param {number} keystrokes
- * @returns {{cold: object, warm: object, conflicts: object[]}}
- */
+/** Cold and warm counter readings for `keystrokes` draft mutations in a `size`-recipe system. */
 function measureEditorKeystrokes(size, keystrokes) {
   const { recipes, components } = distinctCorpus(size);
   const { manager, systemManager } = makeManager({ recipes, components });
@@ -908,10 +780,8 @@ describe('the recipe editor predicts a collision without auditing the system', (
   });
 
   it('answers a DISABLED draft empty, as the enabled-scoped audit it replaced did', () => {
-    // The substituting audit dropped a disabled draft's entries from the scan, so it named
-    // no conflict for the edited recipe. The retained path refuses the candidate outright.
-    // Same answer, and it must stay the same answer: showing a prediction here would be a
-    // behaviour change wearing a performance fix's clothes.
+    // The substituting audit dropped a disabled draft's entries from the scan, so it named no
+    // conflict for the edited recipe. The retained path refuses the candidate outright.
     const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
     const store = editorStore(manager, systemManager);
     const draft = draftJson('r-a', [['c1']], { enabled: false });
@@ -934,14 +804,9 @@ describe('the recipe editor predicts a collision without auditing the system', (
   });
 
   it('answers [] with no draft for a recipe of ANOTHER system, as the scoped audit did', () => {
-    // `RecipeManager.getRecipe` is keyed on the recipe id alone and spans every system,
-    // while the audit this replaced scanned the SELECTED system's cohort and filtered to
-    // `recipeId` — so a record belonging elsewhere named no conflict at all. Unscoped, the
-    // candidate seam compiles that record against THIS system's report, finds no cohort
-    // slot for it, and appends it as a newcomer: three conflicts for a recipe the tab is
-    // not looking at. The DRAFT leg is deliberately not scoped this way — a draft is
-    // scanned under the id it was opened on whether or not anything is persisted under it
-    // (issue 1167), which is the case above.
+    // `RecipeManager.getRecipe` is keyed on the recipe id alone and spans every system, while the
+    // audit this replaced scanned the SELECTED system's cohort and filtered to `recipeId` — so a
+    // record belonging elsewhere named no conflict at all (issue 1167).
     const foreign = {
       ...recipePayload('r-foreign', [['c1']]),
       craftingSystemId: 'other-system',
@@ -971,12 +836,7 @@ describe('the recipe editor predicts a collision without auditing the system', (
   });
 
   it('answers a NOT-YET-PERSISTED draft as an audit of the post-create cohort would', () => {
-    // The ONE answer this change moves, and it moves off a vacuous one. The prior audit
-    // substituted the draft for a persisted record of the same id and did nothing else, so a
-    // draft with no persisted record was dropped from the scan entirely and the editor
-    // predicted "no collision" for every new recipe — issue 1167's vacuity, on the editor
-    // surface. The retained path appends the candidate at the cohort position persisting it
-    // would give it, which is what the enable gate the tab is predicting already does.
+    // The ONE answer this change moves, and it moves off a vacuous one (issue 1167).
     const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
     const store = editorStore(manager, systemManager);
     const draft = draftJson('r-new', [['c1']]);
@@ -1023,10 +883,7 @@ describe('the recipe editor predicts a collision without auditing the system', (
   });
 
   it('builds ONE report cold, ZERO warm, and compares a corpus-INDEPENDENT number of pairs', () => {
-    // The two counters together are the claim. `reportBuilds === 0` alone does not carry it:
-    // the fresh-validator audit this replaced also read 0, precisely because it never touched
-    // the retained report. What separates a candidate lookup from an audit is the comparison
-    // count, and the way to see that is to measure it at two corpus sizes.
+    // The two counters together are the claim.
     const keystrokes = 20;
     const small = measureEditorKeystrokes(50, keystrokes);
     const large = measureEditorKeystrokes(200, keystrokes);

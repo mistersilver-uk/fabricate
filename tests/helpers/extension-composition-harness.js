@@ -1,7 +1,6 @@
 /**
  * Both composition boots use one isolated middleware-server factory with distinct Foundry hosts.
  * Lifecycle replay supplies `/lang/en.json` and `CONFIG` for the real entry module's boot.
- * Close-ordering capture evaluates one application against hand-stubbed globals.
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -25,17 +24,12 @@ async function startCompositionServer() {
 }
 
 /**
- * Boot the real entry module inside `buildLabWorld`'s Foundry host and hand the caller the
- * ACTUAL `init` and `ready` callbacks `src/main.js` registered.
- *
- * `buildLabWorld` is the smallest faithful Foundry host for evaluating the real entry module,
- * and its browser-side boot fetches `/lang/en.json`, which Node has no answer for — hence the
- * direct file response installed here rather than in each caller.
+ * Boot the real entry module inside `buildLabWorld`'s Foundry host and hand the caller the ACTUAL
+ * `init` and `ready` callbacks `src/main.js` registered.
  *
  * @param {(context: {world: object, init: Function, ready: Function}) => Promise<void>} run
- *   Scenario body. Its own cleanup belongs in its own `finally`; this helper restores only the
- *   globals and the server it created.
- * @returns {Promise<void>}
+ * Scenario body. Its own cleanup belongs in its own `finally`; this helper restores only the
+ * globals and the server it created.
  */
 export async function withFabricateLifecycleReplay(run) {
   const originalFetch = globalThis.fetch;
@@ -70,13 +64,8 @@ export async function withFabricateLifecycleReplay(run) {
 }
 
 /**
- * Close one production application against a recording ApplicationV2 base and report the
- * ordered lifecycle.
- *
- * The recorded entries are a DEEP-EQUAL target on purpose: the whole point is the ORDER of
- * the companion disposal against `super.close()`, together with the fact that the mount target
- * was still connected when the disposal ran. Loosening the caller's assertion to an ordering
- * predicate would leave both suites green while proving strictly less.
+ * Close one production application against a recording ApplicationV2 base and report the ordered
+ * lifecycle.
  *
  * @param {object} options Scenario inputs.
  * @param {string} options.modulePath Vite-root-relative module to evaluate.
@@ -84,8 +73,8 @@ export async function withFabricateLifecycleReplay(run) {
  * @param {string} options.disposeMethod Svelte-root export the application must call first.
  * @param {(app: object) => void} [options.prepareApp] Per-application stubbing.
  * @param {object} [options.closeOptions] Options passed to `close()`.
- * @returns {Promise<Array>} `[['companion-dispose', targetConnected], ['application-close', options, targetConnected]]`
- *   in the order they actually happened.
+ * @returns {Promise<Array>} `[['companion-dispose', targetConnected], ['application-close',
+ * options, targetConnected]]` in the order they actually happened.
  */
 export async function captureCloseOrdering({
   modulePath,

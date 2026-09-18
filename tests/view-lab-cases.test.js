@@ -1,12 +1,4 @@
-/**
- * Invariants for the View Lab case registry.
- *
- * These exist because the registry's failure modes are all silent. A `sourceMatches` pattern that
- * matches nothing selects no evidence and the gate still passes. A step naming a button that was
- * renamed clicks nothing and captures the wrong screen. A viewport a few pixels short lets Foundry
- * clamp the window and the frame is quietly the wrong size. None of those announce themselves in a
- * screenshot — which is exactly why they belong in `npm test` rather than in the capture run.
- */
+/** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
@@ -64,12 +56,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** The fixture world, for checks that must derive a case's truth rather than trust its author. */
 const content = buildLabContent();
 
-// ── THE LAB'S WORLD VOCABULARY SEED (issue 1392, epic 1357, PR 7a) ──────────────────────────
-//
-// The `world-vocabulary` case photographs ONE resting state and types nothing, so everything the
-// frame has to show has to be in the fixture. A seed that were merely non-empty would publish a
-// screen whose three rows all render the same affordance — which is precisely the picture the
-// one-click gate's conjunction exists to falsify.
+// THE LAB'S WORLD VOCABULARY SEED (issue 1392, epic 1357, PR 7a). The `world-vocabulary` case
+// photographs ONE resting state and types nothing, so everything the frame has to show has to be in
+// the fixture.
 test('the lab seeds a world vocabulary carrying all three delete affordances', () => {
   const settingsSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
   assert.match(
@@ -144,15 +133,7 @@ test('the lab seeds a world vocabulary carrying all three delete affordances', (
   );
 });
 
-/**
- * The viewport the capture driver uses, EXTRACTED from the driver rather than restated.
- *
- * Every ceiling this file computes is arithmetic over these two numbers, so a restated pair is a
- * mirror that goes stale in the one direction that matters: the driver widens or shortens its
- * context, the clamp moves, and this file keeps admitting a case geometry that no longer renders.
- * The driver's own source is already read here for the click modifiers and the verb list, so this
- * is the same read one constant further.
- */
+/** The viewport the capture driver uses, EXTRACTED from the driver rather than restated. */
 const CAPTURE_VIEWPORT = (() => {
   const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
   const match = /viewport:\s*\{\s*width:\s*(\d+),\s*height:\s*(\d+)\s*\}/.exec(driver);
@@ -162,35 +143,17 @@ const CAPTURE_VIEWPORT = (() => {
 
 /**
  * The roots every check below draws its corpus from, and the extensions that make them complete.
- *
- * `.css` and `.json` are not decoration. Without them the corpus is 548 files instead of 550, and
- * the two it drops are `styles/fabricate.css` and `lang/en.json` — which reds the orphan check
- * with two false orphans (both theme cases claim `/^styles\/fabricate\.css$/`) and kills the
- * `lang/en.json` clause in the render-source filter below. They are stated HERE, per caller, rather
- * than added to `SCANNED_EXTENSIONS`: that constant is shared with three literal gates that scan
- * `src/` only, where widening it would be inert today and would silently move their scope the first
- * time a `.json` landed under `src/`.
  */
 const CORPUS_ROOTS = ['src', 'styles', 'lang'];
 const CORPUS_EXTENSIONS = ['.js', '.mjs', '.svelte', '.css', '.json'];
 
-/**
- * The corpus, read from the WORKING TREE in a single walk.
- *
- * This used to be `git ls-files` followed by a `readFileSync` of each path it named — the index
- * asked what exists and the working tree asked what it contains. That divergence threw ENOENT
- * inside the render-source accessor for real once, six tests failing at once right after a
- * `git merge --ff-only`, and it also answered silently wrong: an unstaged component was invisible
- * and a staged deletion still counted. See `collectWorkingTreeSources` for what the single walk
- * does and does not fix — the window is narrowed to ~55 ms, not closed.
- */
+/** The corpus, read from the WORKING TREE in a single walk. */
 const sourceCorpus = collectWorkingTreeSources(CORPUS_ROOTS, CORPUS_EXTENSIONS);
 const sourceFiles = Object.keys(sourceCorpus);
 
 /**
  * Hooks the CAPTURE DRIVER hard-codes, which appear in no case and were therefore guarded by
- * nothing. Renaming `.manager-nav-button` breaks every label step at once — 92 of them across ~60
- * cases — with `npm test` green, because the registry never mentions it. Same for the route probe.
+ * nothing.
  */
 const RAIL_BUTTON_CLASS = 'manager-nav-button';
 const DRIVER_HOOKS = [
@@ -198,19 +161,12 @@ const DRIVER_HOOKS = [
   'data-manager-view', // the attribute the `expectView` probe reads — 1 file
   'fabricate-app-shell', // the player readiness root — 1 file
   'data-active-tab', // the attribute `expectTab` reads — 1 file
-  // `fabricate-manager` is deliberately NOT here. It is the `expectView` probe's root, but it is
-  // also a styling scope used in ten components, so a presence check over the tree would stay green
-  // long after the root element stopped carrying it — the weak-check shape this file keeps finding.
-  // Guarding it properly means asserting it is a class ATTRIBUTE on the manager root specifically,
-  // which is worth doing and is not done here rather than being pretended at.
+  // `fabricate-manager` is deliberately NOT here.
 ];
 
 /**
  * Every source file that can carry a UI hook, keyed by path so a check can be scoped to the
- * component that actually renders the thing rather than to the whole tree. Scoping is what stops a
- * check passing on a coincidence, which has happened three times in this file.
- *
- * Includes : some nav ids are declared in a plain module rather than a component.
+ * component that actually renders the thing rather than to the whole tree.
  */
 function renderSources() {
   return new Map(
@@ -224,24 +180,7 @@ function renderSources() {
 }
 
 /**
- * The same corpus, reduced to the half of each file that can put a hook ON AN ELEMENT.
- *
- * WHY A WHOLE-FILE SCAN IS THE WRONG CORPUS FOR A SELECTOR (issue 1520 review round 2). A
- * component's own class names are written TWICE — once on the element and once as the selector of
- * the scoped rule that paints it — so "the file contains `fab-ib-row`" stays true after the
- * `class="…"` attribute is deleted, and a `data-*` hook survives in any paragraph that names it.
- * Measured on the interactable browser: with `floor: 0` the selector scan is the sole owner of
- * `[data-interactable-browser-system]` and `[data-interactable-browser-search]`, deleting both
- * from the markup reds it — and re-running with ONE added `//` comment naming the two hooks goes
- * green over a tree that emits neither, at which point the `fill` step of
- * `interactables-browser-filtered` throws twenty minutes into a capture run.
- *
- * `emittingHalfOf` is the reduction `tests/helpers/interactablesSmokeLocators.js` already applies
- * to the smoke-locator scan for the same reason, shared rather than copied: two implementations of
- * "the part that can carry an attribute" is two things to weaken.
- *
- * `lang/en.json` is passed through untouched — it carries no comments and no `<style>` block, and
- * the label branch reads it for TEXT rather than for hooks.
+ * The same corpus, reduced to the half of each file that can put a hook ON AN ELEMENT (issue 1520).
  *
  * @returns {Map<string, string>} `path -> emitting half`, keyed as {@link renderSources}.
  */
@@ -258,24 +197,11 @@ function emittingSources() {
  * The files that could legitimately declare a nav item id: whichever component builds the id
  * template, plus the modules it imports by relative path.
  *
- * One hop, not a full closure. A nav list is either inline in the component or in a module beside
- * it, and widening further starts readmitting the coincidences this scoping exists to exclude.
- *
  * @param {Map<string, string>} sources Render sources, keyed by repo-relative path.
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
-/**
- * The components that RENDER the manager rail.
- *
- * Shared by the string-label branch and the rail-HOOK branch below, because the two guard the
- * same thing and a second copy of the rule is a second thing to weaken. An unscoped search is
- * what makes either branch vacuous: `Tools` is a common English word, and
- * `manager-world-nav-parties` would resolve out of a test fixture or a comment.
- *
- * @param {Map<string, string>} sources
- * @returns {Array<[string, string]>}
- */
+/** The components that RENDER the manager rail. */
 function railRenderingFiles(sources) {
   return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
 }
@@ -303,10 +229,7 @@ const PRESS_KEYS = ['Enter', 'Space'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
- * default click runs. Keeping it out of `VERBS` is load-bearing twice over — the mutual-exclusion
- * check counts the VERBS present, so admitting it there would reject the legal `{selector,
- * modifiers}` step as naming two verbs; and the pairing rule below is precisely that `modifiers`
- * may accompany none of them.
+ * default click runs.
  */
 const MODIFIERS_KEY = 'modifiers';
 
@@ -321,21 +244,13 @@ function escapeForRegExp(value) {
 test('the corpus every check below reads is the whole tree, not a slice of it', () => {
   // Every other check in this file answers against `sourceCorpus`, so a corpus that quietly lost a
   // root or an extension would not fail — it would go VACUOUS, and the orphan check would then
-  // report the absence as a stranded pattern in the registry. That is not hypothetical: at
-  // `SCANNED_EXTENSIONS` (no `.css`, no `.json`) this corpus is 548 files and the orphan check
-  // reds with two false orphans, both `/^styles\/fabricate\.css$/`.
-  //
-  // The thresholds are deliberately NOT the `> 100` used elsewhere in this repo, which is far too
-  // loose to be a pin here: dropping `.svelte` leaves 283 files and dropping `.js` leaves 269, and
-  // `> 100` survives both.
+  // report the absence as a stranded pattern in the registry.
   assert.ok(
     sourceFiles.length >= 500,
     `expected the whole ${CORPUS_ROOTS.join('/, ')}/ tree, got ${sourceFiles.length} files`
   );
   // Defence in depth rather than a live guard: 283 non-`.svelte` files mean the `>= 500` above
-  // already forces `>= 217` components, so nothing reaches this that did not red first. It stays
-  // because it stops being implied the moment either number moves — and it now names its threshold
-  // and its roots, like its two neighbours, so a future failure is readable on its own.
+  // already forces `>= 217` components, so nothing reaches this that did not red first.
   const components = sourceFiles.filter((file) => file.endsWith('.svelte'));
   assert.ok(
     components.length >= 200,
@@ -344,11 +259,6 @@ test('the corpus every check below reads is the whole tree, not a slice of it', 
 
   // By KEY, one per root — because a count threshold cannot see a single file go missing, and each
   // of these is a whole root's or a whole extension's worth of coverage standing on one file.
-  // `lang/en.json` is the sharpest of the three: dropping `.json` (or the `lang` root) moves the
-  // count 550 -> 549, which no threshold can catch, and it is the one omission that leaves a
-  // filter clause matching nothing — `file === 'lang/en.json'` in `renderSources` above. The
-  // clause still runs; it just stops selecting anything, and no check below asserts on what it
-  // selects, so this key is the only thing that would notice.
   for (const file of [
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
@@ -360,12 +270,8 @@ test('the corpus every check below reads is the whole tree, not a slice of it', 
     );
   }
 
-  // `tests/view-lab-chrome-license.test.js` still shells out to `git ls-files`, and must keep
-  // doing so. Tracked-ness is that test's SUBJECT, not its input: it proves no harvested
-  // proprietary Foundry asset is tracked, which is a question only the index can answer. A tree
-  // walk there would find the same harvested files sitting untracked in a working directory and
-  // report the repository clean, silently retiring the check. The divergence this file just
-  // removed was a bug precisely because tracked-ness was never what it was asking about.
+  // `tests/view-lab-chrome-license.test.js` still shells out to `git ls-files`, and must keep doing
+  // so.
 });
 
 test('case ids are unique and non-empty', () => {
@@ -411,31 +317,11 @@ test('every sourceMatches pattern resolves to at least one source file', () => {
 /** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
 const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
-/**
- * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix.
- *
- * The lab's companion stand-in is the one renderer in this corpus that is deliberately NOT
- * Core: it stands in for a premium module, so Core does not own its markup and never will.
- * A case that drives that stand-in — pressing its drill-down to reach the runtime route-chrome
- * state, for instance — therefore names hooks no `src/` file can contain.
- *
- * This is a redirection and not an exemption: the token still has to exist, it is just looked
- * for in the file that actually renders it. Renaming the harness's hook without updating the
- * case still fails here rather than twenty minutes into a capture run.
- */
+/** Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix. */
 const LAB_HOOK = /^(?:data-)?lab-/;
 const labHarnessSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
 
-/**
- * A selector with every `:not(…)` group removed, brackets balanced.
- *
- * `String#replaceAll` with a regex cannot do this: a `:not(:has([data-x]))` carries nested
- * parentheses, and a non-greedy pattern stops at the first `)`, leaving a dangling tail that
- * then tokenizes.
- *
- * @param {string} selector
- * @returns {string}
- */
+/** A selector with every `:not(…)` group removed, brackets balanced. */
 function stripNegations(selector) {
   let result = '';
   let index = 0;
@@ -457,32 +343,9 @@ function stripNegations(selector) {
   return result;
 }
 
-/**
- * Assert that every stable hook in ONE selector still exists in the UI corpus.
- *
- * Extracted so `expectSelector` is checked by the SAME code as `steps[].selector` (issue 1118
- * review). It was only ever run over steps, and `expectSelector` is the assertion the capture
- * driver runs BEFORE it photographs: a dead one fails the job WHOLE and publishes nothing,
- * while `npm test` stays green and `check-screenshots` passes on stale frames. A second copy of
- * the extraction would drift, so there is one.
- *
- * `continue` in the original loop becomes `return`: each branch that recognises a selector
- * SHAPE has finished with it.
- */
+/** Assert that every stable hook in ONE selector still exists in the UI corpus (issue 1118). */
 function collectSelectorHookFailures(viewCase, selector, sources, haystack, missing) {
-  // A LITERAL ID IS ANSWERED BY THE ID ITSELF (issue 1520 review). The branch below exists
-  // because an editor tab strip INTERPOLATES its ids, so neither half of `#tool-tab-validation`
-  // appears in any source and the guard has to go looking for the file that builds the stem. A
-  // hand-rolled tablist writes its ids out - `id="fab-ib-tab-tasks"` in the interactable
-  // browser - and for those the heuristic is not merely unnecessary, it is WRONG: the family
-  // `fab-ib` builds no `${...}` ids and declares no `idStem`, so the branch reported a selector
-  // that resolves perfectly as naming UI that does not exist.
-  //
-  // The literal form is STRICTER than the branch it short-circuits, not looser: it demands the
-  // whole id on an `id` attribute somewhere in the corpus, where the branch demands only that
-  // some file interpolates the family and mentions the tab id in quotes. So an id renamed on the
-  // element still fails - through this branch when nothing writes it, and through the one below
-  // when nothing builds it either.
+  // A LITERAL ID IS ANSWERED BY THE ID ITSELF (issue 1520 review).
   const literalId = /^#([\w-]+)$/.exec(selector);
   if (literalId && [...sources].some(([, text]) => text.includes(`id="${literalId[1]}"`))) {
     return;
@@ -490,20 +353,8 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
   const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(selector);
   if (editorTab) {
     const [, family, tabId] = editorTab;
-    // TWO WAYS to build the stem, because `EditorTabs.svelte` took the interpolation over
-    // (issues 1362 and 1038). A strip that still writes its own ids carries the literal
-    // `<family>-tab-${`; a strip converted onto the primitive carries `idStem="<family>"`
-    // instead, and the primitive interpolates for it.
-    //
-    // BOTH forms have to be recognised or this branch silently repoints. Measured on
-    // `#tool-tab-validation`: with only the first form, the sole remaining match was
-    // `ToolEditView.svelte` — the PANEL, which builds `tool-tab-${activeTab}` for its
-    // `aria-labelledby` and branches on three of the four ids — so the guard reported that the
-    // Tool editor "declares no validation tab" while the tab was rendering perfectly. The
-    // converse is the worse half: `#environment-tab-tasks` resolved through
-    // `EnvironmentEditView.svelte` for the same reason and PASSED, because that panel happens
-    // to carry the id literals its strip does. A guard that reads the panel instead of the
-    // strip is right by luck in one case and wrong in the other.
+    // TWO WAYS to build the stem, because `EditorTabs.svelte` took the interpolation over (issues
+    // 1362 and 1038).
     const builders = [...sources].filter(
       ([, text]) => text.includes(`${family}-tab-\${`) || text.includes(`idStem="${family}"`)
     );
@@ -520,22 +371,9 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
     }
     return;
   }
-  // The two rail groups build their subitem ids from a nav item's id
-  // (`manager-crafting-nav-${id}` / `manager-gathering-nav-${id}`), so the literal selector
-  // never appears in source; the id stem is what a rename would move.
-  //
-  // Scoped to the file that BUILDS those ids, exactly as the editor-tab branch above is. This
-  // branch used to search the whole tree, which is the pass-on-a-coincidence failure that branch
-  // exists to prevent — found by mutation: renaming `gatheringNavItems`' `id: 'tasks'` in
-  // `CraftingSystemManagerRoot.svelte` left the guard green, because `id: 'tasks'` also occurs in
-  // `GatheringDetailTabs.svelte`, which is a PLAYER-app component that has nothing to do with the
-  // manager rail. Three nav ids were in that state: tasks, encounters, travel.
-  // The Checks section STRIP builds `checks-section-${section.id}` (issue 1096), so the
-  // literal never appears in source either — and unlike a rail subitem the ids do not
-  // live in a component at all: they are `CHECK_SECTION_IDS`, declared beside the issue
-  // registry that buckets into them. Checking membership of the imported constant is
-  // stronger than a source scan, because a section renamed in one place and not the
-  // other cannot satisfy it.
+  // The two rail groups build their subitem ids from a nav item's id (`manager-crafting-nav-${id}`
+  // / `manager-gathering-nav-${id}`), so the literal selector never appears in source; the id stem
+  // is what a rename would move (issue 1096).
   const sectionId = /^#checks-section-(.+)$/.exec(selector);
   if (sectionId) {
     if (!CHECK_SECTION_IDS.includes(sectionId[1])) {
@@ -547,20 +385,6 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
     return;
   }
   // A RAIL HOOK, scoped to the components that render the rail (issue 1362).
-  //
-  // The label steps this replaced were checked against `railRenderingFiles`, and the generic
-  // token branch at the bottom of this function is WEAKER than that in two different ways —
-  // which is exactly why the string branch was kept alive for the eight labels this relabel
-  // does not touch rather than being deleted wholesale:
-  //
-  //  - it searches the WHOLE `src/` tree, so `manager-nav-tool-rules` would resolve out of a
-  //    comment or an unrelated component;
-  //  - and it STRIPS ATTRIBUTE VALUES before tokenizing, so an attribute-shaped hook such as
-  //    `[data-manager-nav="component-catalogue"]` would verify only that the ATTRIBUTE NAME
-  //    exists somewhere — every one of the nine rail values could be wrong and stay green.
-  //
-  // The branch is therefore conditioned on the hook SHAPE rather than on whether the id is
-  // interpolated: an attribute-value hook is weakened exactly as badly as an interpolated id.
   const railHook =
     /^#(manager-(?:world-)?nav-[a-z0-9-]+)$/.exec(selector) ??
     /^\[data-(?:manager|world)-nav-item="([^"]+)"\]$/.exec(selector);
@@ -579,9 +403,8 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
   const navId = /^#manager-(crafting|gathering|checks)-nav-(.+)$/.exec(selector);
   if (navId) {
     const [, group, id] = navId;
-    // The scope is the builder PLUS what it imports: the gathering items are declared inline in
-    // the root, but the crafting ones live in `crafting/craftingNav.js`, which the root pulls
-    // in. Builder-only would reject every crafting nav id; whole-tree would accept anything.
+    // The scope is the builder PLUS what it imports: the gathering items are declared inline in the
+    // root, but the crafting ones live in `crafting/craftingNav.js`, which the root pulls in.
     const scope = navDeclarationScope(sources, `manager-${group}-nav-\${`);
     if (scope.length === 0) {
       missing.push(
@@ -596,18 +419,8 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
     }
     return;
   }
-  // Everything else is a compound of stable hooks: literal element ids, class names, and
-  // `data-*` attribute names. EVERY hook in the selector is checked, not just the first —
-  // a compound whose leading class survives a rename of its trailing attribute would
-  // otherwise match a broader element and capture the wrong row. Attribute VALUES are not
-  // hooks: they are fixture ids, which live in `tests/view-lab/world/`, not in `src/`.
-  // Values are stripped BEFORE extraction, not filtered afterwards: a quoted uuid such as
-  // `[data-essence-carrier="Item.sm-coal"]` otherwise reads `.sm-coal` as a class name and
-  // fails against a tree that was never supposed to contain it.
-  // `:not(…)` asserts ABSENCE, so requiring its hooks to exist is backwards: the one case
-  // that pins "this editor renders no modifier surface at all" would be failed by the very
-  // deletion it exists to photograph. Stripped BEFORE values, so a value inside a `:not`
-  // cannot survive its removal.
+  // Everything else is a compound of stable hooks: literal element ids, class names, and `data-*`
+  // attribute names.
   const withoutValues = stripNegations(selector).replaceAll(/=\s*("[^"]*"|'[^']*')/g, '');
   const tokens = [...withoutValues.matchAll(/#([a-z][\w-]*)|\.([a-z][\w-]*)|\[([a-z-]+)/gi)].map(
     (match) => match[1] ?? match[2] ?? match[3]
@@ -618,22 +431,9 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
   }
   for (const token of tokens) {
     // Anchored on a word boundary at BOTH ends, not a bare substring. `haystack.includes(token)`
-    // passes on a coincidence whenever one hook name contains another:
-    //
-    //   prefix — renaming the real `data-component-select` left `data-component-select-all-page`
-    //     in a sibling component, so the substring still matched and the guard stayed green over
-    //     six broken selectors.
-    //   suffix — deleting the `.inventory-card` CLASS while keeping the `data-inventory-card`
-    //     ATTRIBUTE left the token `inventory-card` still matching, because the attribute name
-    //     ENDS with it. A trailing-only boundary does not see this.
-    //
-    // Both were found by mutation, the second after the first was "fixed". `[\w-]` is what an
-    // attribute or class name continues with, so requiring neither neighbour to be one is what
-    // makes a token stop matching a longer name that merely contains it.
-    // Foundry's own chrome is not in this corpus and never will be: a selector that reaches
-    // into a core dialog is pinning core markup, which this repository does not own and
-    // cannot rename. Named individually rather than pattern-matched, so adding one is a
-    // deliberate act.
+    // passes on a coincidence whenever one hook name contains another:. prefix — renaming the real
+    // `data-component-select` left `data-component-select-all-page` in a sibling component, so the
+    // substring still matched and the guard stayed green over six broken selectors.
     if (FOUNDRY_CHROME_HOOKS.has(token)) continue;
     const bounded = new RegExp(String.raw`(?<![\w-])${escapeForRegExp(token)}(?![\w-])`);
     // A `lab-` hook is rendered by the harness's companion stand-in, so that is where it has
@@ -648,8 +448,6 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
 test('every interaction step names text that exists in the manager UI', () => {
   // Steps are clicked by accessible name. A renamed rail entry would otherwise click nothing, and
   // the case would capture whichever screen happened to be showing.
-  // Includes `src/ui/**/*.js`: the crafting sub-tab ids the selector steps target are declared in
-  // `crafting/craftingNav.js`, not in any component file.
   const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
 
@@ -657,11 +455,7 @@ test('every interaction step names text that exists in the manager UI', () => {
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step === 'string') {
-        // Scoped to the component that RENDERS the rail, not the whole tree. The eight rail labels
-        // are `Crafting`, `Components`, `Essences`, `Tools`, `Gathering` and friends — common
-        // English words that occur all over a 300-file haystack, so an unscoped `includes` could
-        // never fail. Demonstrated: deleting the entire manager rail still resolved all eight, out
-        // of `lang/en.json` and unrelated components, leaving 92 steps across ~60 cases unguarded.
+        // Scoped to the component that RENDERS the rail, not the whole tree.
         const railFiles = railRenderingFiles(sources);
         if (railFiles.length === 0) {
           missing.push(`${viewCase.id}: nothing renders "${RAIL_BUTTON_CLASS}" any more`);
@@ -699,10 +493,7 @@ test('every interaction step names text that exists in the manager UI', () => {
       // is not an `npm test` gate — so a bad step would sit green in the registry until somebody
       // spent twenty minutes discovering it. Both rules are therefore enforced HERE as well.
       if (MODIFIERS_KEY in step) {
-        // A modifier can only ride on a click. Playwright's `selectOption`, `fill`, `setInputFiles`
-        // and `scrollIntoViewIfNeeded` accept no `modifiers` option, so the pairing is not a
-        // stricter step — it is an INERT one, capturing the unmodified state under the name of the
-        // modified one.
+        // A modifier can only ride on a click.
         const paired = VERBS.filter((verb) => verb in step);
         if (paired.length > 0) {
           missing.push(
@@ -726,9 +517,7 @@ test('every interaction step names text that exists in the manager UI', () => {
         }
       }
       // An editor tab strip renders `id={`<family>-tab-${tab.id}`}`, so neither half of the
-      // selector appears literally. Both halves still have to be checked, and checking them
-      // against the WHOLE tree would pass on a coincidence — `'overview'` occurs everywhere. So
-      // locate the file that builds those ids, and require the tab id to be declared in THAT file.
+      // selector appears literally.
       collectSelectorHookFailures(viewCase, step.selector, sources, haystack, missing);
     }
   }
@@ -740,23 +529,8 @@ test('every interaction step names text that exists in the manager UI', () => {
 });
 
 /**
- * The four rail labels that BECAME AMBIGUOUS when the world scoped-entity leaves landed
- * (issue 1362), as an enumerated DENY-LIST rather than a blanket ban on string steps.
- *
- * Only these four collide. `Components`, `Essences` and `Tools` were relabelled to
- * `Component Rules` / `Essence Rules` / `Tool Rules`, and `Tools` is additionally a live
- * SUBSTRING of the new `Tools Catalogue`; `Tags & Categories` was not relabelled at all and is
- * now CHARACTER-FOR-CHARACTER IDENTICAL across the two rail scopes. A substring collision is
- * recoverable by DOM order; an exact duplicate is not.
- *
- * The other four labels — `Crafting`, `Checks`, `Gathering`, `System Overview`, 109 steps —
- * keep the string branch, and that is deliberate rather than laziness. The string branch
- * validates a label against the components that actually RENDER the rail button class; the
- * selector branch that would replace it strips attribute VALUES before tokenizing. Deleting
- * the branch outright would have forced all 158 migrations AND removed a STRONGER check than
- * what replaced it.
- *
- * @type {readonly string[]}
+ * The four rail labels that BECAME AMBIGUOUS when the world scoped-entity leaves landed (issue
+ * 1362), as an enumerated DENY-LIST rather than a blanket ban on string steps.
  */
 const MIGRATED_RAIL_LABELS = Object.freeze([
   'Components',
@@ -795,10 +569,8 @@ test('no case reaches a rail entry by one of the four ambiguous labels', () => {
 });
 
 test('every expectSelector names UI that still exists', () => {
-  // The step sweep above never looked at `expectSelector`, so a hook named only there — which
-  // is the normal shape for a case whose whole job is to assert a state — was guarded by
-  // nothing. `data-world-modifier-roll-note` was exactly that: mutated to nonsense, every
-  // guard passed and only a 20-minute capture run would have found it.
+  // The step sweep above never looked at `expectSelector`, so a hook named only there — which is
+  // the normal shape for a case whose whole job is to assert a state — was guarded by nothing.
   const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
   const missing = [];
@@ -817,14 +589,7 @@ test('every expectSelector names UI that still exists', () => {
   );
 });
 
-/**
- * Every SELECTOR-BEARING field on a case, so a scan cannot silently miss one.
- *
- * `steps[].selector` is the obvious one and the only one the token check above looks at.
- * `expectSelector` is not gated by that check AT ALL — it is the assertion the capture
- * driver runs before it photographs, and a dead one fails the job WHOLE, publishing
- * nothing while `check-screenshots` stays green on stale frames.
- */
+/** Every SELECTOR-BEARING field on a case, so a scan cannot silently miss one. */
 function caseSelectors(viewCase) {
   const selectors = [];
   for (const step of viewCase.steps ?? []) {
@@ -851,21 +616,12 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-journal-stacked',
 ];
 
-// And the manager case that asserts the OPPOSITE shape (issue 1362): a released third column
-// — exactly TWO resolved tracks — with the inspector aside genuinely ABSENT. Both halves are
-// measured in the browser, because they are two separate edits and doing only the stylesheet
-// one leaves the empty aside wrapped to an implicit grid row, where the track count is still
-// two and the frame still photographs a dead strip.
+// And the manager case that asserts the OPPOSITE shape (issue 1362): a released third column —
+// exactly TWO resolved tracks — with the inspector aside genuinely ABSENT.
 const FULL_WIDTH_LAYOUT_CASE_IDS = ['world-scoped-narrow'];
 
 // And the two consumers of the SHARED EDITOR FRAME, which assert the stacked shape on a grid of
-// their OWN rather than on `.manager-body` (issue 1371 r19-entry2). They are a third group because
-// the frame's stack is its own container query at 1000px, not the shell's at 960: the frame is one
-// column below its threshold whatever the body around it did, so a `maxContentBoxInlineSize` bound
-// borrowed from the responsive group would be asserting a different screen's breakpoint. The claim
-// they need is the one they carry — exactly ONE resolved column track on the frame's own grid —
-// because the DOM is identical on both sides of a container query and no selector can tell the
-// stacked frame from the wide one.
+// their OWN rather than on `.manager-body` (issue 1371 r19-entry2).
 const FRAME_STACK_LAYOUT_CASE_IDS = [
   'world-component-entry-stacked',
   'manager-component-edit-stacked',
@@ -894,9 +650,7 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
       continue;
     }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
-    // shared literal would be asserting one screen's threshold about another's. The shell's stack
-    // is reached at 1024; the shared editor frame's own container query is at 1000 and the lab's
-    // manager container resolves two pixels inside its window, so 1024 leaves that frame WIDE.
+    // shared literal would be asserting one screen's threshold about another's.
     assert.deepEqual(
       viewCase.position,
       FRAME_STACK_LAYOUT_CASE_IDS.includes(viewCase.id)
@@ -950,9 +704,7 @@ test('compact Journal captures add full, short, empty, restored and tool witness
   }
 });
 
-// The evidence each history-data state exists to photograph, keyed by its own witness. Pinned
-// here rather than derived from the registry: the registry is what these strings guard, so
-// reading them back out of it would assert nothing about what the frame shows.
+// The evidence each history-data state exists to photograph, keyed by its own witness.
 const HISTORY_DATA_EVIDENCE = [
   // The saved world's two independent rolls, and the global cut that must NOT be synthesised.
   ['legacy-row-rolls', [/legacy-iron-ore-roll-12"\]\.is-cleared/, /legacy-copper-ore-roll-94"\]\.is-cleared/, /:not\(:has\(\[data-yield-cut\]\)\)/]],
@@ -1010,9 +762,7 @@ test('the history-data witnesses name their defining evidence on the selected re
 });
 
 test('no expectSelector nests one :has() inside another', () => {
-  // `:has()` may not appear inside a relative selector of another `:has()`. A browser REJECTS the
-  // whole selector, and the capture driver evaluates `expectSelector` before it photographs, so
-  // one such selector fails the job whole and publishes nothing — including every unrelated frame.
+  // `:has()` may not appear inside a relative selector of another `:has()`.
   const nests = (selector) => {
     const stack = [];
     let open = 0;
@@ -1066,9 +816,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
     undefined,
     'the player refusal frame, which shows a blocker that still happens, is retained'
   );
-  // Issue 1648: the retained-claim frame is GM-only BY CONSTRUCTION. Only the active GM may
-  // reconcile a claim, so the affordance it photographs exists for no other viewer, and a
-  // player frame of it would show a run blocked with no way out — the defect, not the fix.
+  // Issue 1648: the retained-claim frame is GM-only BY CONSTRUCTION.
   assert.equal(byState.get('claim-retained').query.viewer, 'gm');
   assert.match(byState.get('claim-retained').expectSelector, /data-notice-action/);
   for (const state of ['stale-action', 'command-timeout']) {
@@ -1177,16 +925,9 @@ test('the capture runner threads and asserts declared layouts before taking a sc
   assert.ok(screenshot > assertion, 'the layout assertion must run before frame.screenshot()');
 });
 
-// -- THE PER-CASE CONSOLE-ERROR ALLOWANCE (issue 1515) ------------------------------------------
-//
-// The capture driver fails a render on ANY console error, and that is why a lab frame is worth
-// looking at: a frame rendered over a thrown handler is indistinguishable from one rendered over a
-// working handler. Widening that gate is therefore the most dangerous edit in this harness, and
-// these three properties are what keep the widening narrow.
-//
-// The driver script itself cannot be imported - it dispatches on `process.argv` at module scope
-// and would launch a browser - so the decision is a pure function in the registry module and the
-// WIRING is asserted separately below, in the same shape as the layout-threading check above.
+// THE PER-CASE CONSOLE-ERROR ALLOWANCE (issue 1515). The capture driver fails a render on ANY
+// console error, and that is why a lab frame is worth looking at: a frame rendered over a thrown
+// handler is indistinguishable from one rendered over a working handler.
 test('an undeclared console error is still fatal, and a declared one is not', () => {
   const allowance = [/Failed to toggle recipe enabled state/];
 
@@ -1206,8 +947,7 @@ test('an undeclared console error is still fatal, and a declared one is not', ()
   );
 
   // (3) AND AN UNMATCHED ERROR BESIDE A MATCHED ONE IS STILL FATAL, which is the property that
-  // makes the allowance narrow rather than a mute button. A case that declares one refusal must
-  // not thereby tolerate a second, unrelated failure in the same render.
+  // makes the allowance narrow rather than a mute button.
   assert.deepEqual(
     partitionConsoleErrors(
       ['Fabricate | Failed to toggle recipe enabled state: refused', 'TypeError: x is undefined'],
@@ -1218,10 +958,7 @@ test('an undeclared console error is still fatal, and a declared one is not', ()
 });
 
 test('a declared console error that never arrives fails the case too', () => {
-  // The allowance is an ASSERTION, not a permission. A pattern that matches nothing means the
-  // case stopped reaching the refusal it is named for, and the frame it is about to publish is
-  // the resting screen - the "unreachable configuration looks identical to working configuration"
-  // failure this repository keeps meeting.
+  // The allowance is an ASSERTION, not a permission.
   assert.deepEqual(partitionConsoleErrors([], [/never happens/]), {
     unmatched: [],
     unusedAllowances: ['/never happens/'],
@@ -1235,11 +972,8 @@ test('a declared console error that never arrives fails the case too', () => {
 });
 
 test('a global-flagged allowance does not skip its second match', () => {
-  // `RegExp#test` advances `lastIndex` on a `g`-flagged pattern, so the second call against a
-  // fresh string starts from the first match's offset and can miss. The symptom would be an
-  // "unused allowance" failure on a case that DID produce the error twice, which reads as a
-  // fixture regression and is not one. `partitionConsoleErrors` strips the flag before it
-  // matches, so the pattern is stateless by the time it is used.
+  // `RegExp#test` advances `lastIndex` on a `g`-flagged pattern, so the second call against a fresh
+  // string starts from the first match's offset and can miss.
   const sticky = /refused/g;
   assert.deepEqual(partitionConsoleErrors(['refused once', 'refused twice'], [sticky]), {
     unmatched: [],
@@ -1255,15 +989,9 @@ test('the capture runner threads the per-case console allowance into the render'
   assert.match(driver, /allowedConsoleErrors: viewCase\.allowedConsoleErrors \?\? \[\]/);
   assert.match(driver, /partitionConsoleErrors\(\s*consoleErrors,\s*allowedConsoleErrors\s*\)/);
 
-  // BOTH halves of the rule reach a throw, and BOTH throws precede the return that hands the
-  // buffer back to the publisher.
-  //
-  // THE GUARD AND ITS THROW ARE PINNED AS ONE STATEMENT, not as two substrings that both occur
-  // somewhere. `driver.includes('unusedAllowances.length > 0')` is satisfied by
-  // `if (false && unusedAllowances.length > 0)` - measured, by mutating the driver to exactly
-  // that and watching an earlier draft of this test stay green over a gate that could no longer
-  // fire. A grep that cannot fail is the defect this whole file exists to catch, so the condition
-  // is matched verbatim and the `throw` is required to be the next thing inside the block.
+  // BOTH halves of the rule reach a throw, and BOTH throws precede the return that hands the buffer
+  // back to the publisher. THE GUARD AND ITS THROW ARE PINNED AS ONE STATEMENT, not as two
+  // substrings that both occur somewhere.
   assert.match(
     driver,
     /\n\s*if \(unmatched\.length > 0\) \{\n\s*throw new Error\(/,
@@ -1280,9 +1008,7 @@ test('the capture runner threads the per-case console allowance into the render'
   assert.ok(partition >= 0, 'the runner must consult the shared partition helper');
   assert.ok(handOff > unusedThrow, 'both gates must run before the frame is returned');
 
-  // AND THE ALLOWANCE IS RARE BY CONSTRUCTION. The registry-wide count is asserted so that
-  // adopting this field becomes a visible edit rather than a habit: the gate is the reason the
-  // lab is trusted, and a second case wanting an allowance should have to argue for it here.
+  // AND THE ALLOWANCE IS RARE BY CONSTRUCTION.
   const declaring = VIEW_LAB_CASES.filter(
     (viewCase) => (viewCase.allowedConsoleErrors ?? []).length > 0
   ).map((viewCase) => viewCase.id);
@@ -1294,19 +1020,9 @@ test('the capture runner threads the per-case console allowance into the render'
   );
 });
 
-// -- AN ALERT FRAME HAS TO CONTAIN ITS ALERT (issue 1515, driver capture) ----------------------
-//
-// `manager-world-parties-pane-alert` PASSED its first real capture and did not depict the state
-// it is named for. The click that produces the alert auto-scrolls its own target into view, and
-// the alert renders above the card list, so the shutter opened on a pane with the refusal message
-// off the top edge. Every assertion the case carried was green: `expectSelector` resolves against
-// the DOM, and `expectVisible` asks about `display` and box size rather than about scroll offset.
-// A frame count is not the check.
-//
-// `expectContained` is the assertion that CAN see it, because it compares bounding boxes against
-// the element that clips them. So the two cases whose subject is a transient alert declare it,
-// and this pins the declaration: deleting an `expectContained` entry is otherwise silent, and
-// what it silently restores is a case that photographs the wrong part of the right screen.
+// AN ALERT FRAME HAS TO CONTAIN ITS ALERT (issue 1515, driver capture).
+// `manager-world-parties-pane-alert` PASSED its first real capture and did not depict the state it
+// is named for.
 test('the two alert frames assert their alert is inside the box that clips it', () => {
   const pinned = [
     // The pane's own scroller - the element `GatheringPartiesTab.svelte` binds as `scroller` and
@@ -1486,21 +1202,8 @@ test('environment empty membership evidence clears the actual fixture and is sel
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
-  // see them go stale. The token check above strips attribute values before extracting
-  // hooks ("Attribute VALUES are not hooks"), so a renamed value passes it; `expectSelector`
-  // is not scanned by it at all. Issue 1095 renamed exactly such a value — `byRecipe` to
-  // `bySubject` — and the failure mode is total: the capture job fails whole and publishes
-  // NOTHING.
-  //
-  // THE ATTRIBUTE NAME IS IMPORTED, NOT RESTATED — the rule this file already states at the
-  // knowledge-probe check below ("The list is IMPORTED, not restated"). A restated literal
-  // would go on naming the old attribute after a rename, this scan would extract ZERO
-  // values, `[] ⊆ MODIFIER_POLICIES` would hold vacuously, and the guard would pass over
-  // seven dead selectors. The literal cannot be imported out of Svelte MARKUP — it is a
-  // prop value, the component exports nothing, and this file compiles no Svelte — so it is
-  // hoisted into `modifierPolicyAttrs.js`, which the component consumes and this test
-  // imports. `MODIFIER_POLICIES` is imported for the same reason.
+  // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
+  // go stale (issue 1095).
   const pattern = new RegExp(
     String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
     'g'
@@ -1514,15 +1217,7 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
     }
   }
 
-  // NON-EMPTY, and of the EXPECTED CARDINALITY. Either half alone goes vacuous: an empty
-  // set satisfies the membership assertion, and a non-empty one satisfies it while nine of
-  // the ten selectors have quietly lost the attribute.
-  //
-  // NINE since issue 1095's review (the two SUBJECT-PICKER cases each click the rule card
-  // before routing to their editor, because the picker renders under `bySubject` alone and
-  // both lab systems author a non-selecting rule), and a TENTH since issue 1608's
-  // `manager-recipe-edit-crafting-modifier-suppressed`, which also clicks the rule card
-  // before un-marking a modifier's eligibility on the same tab.
+  // NON-EMPTY, and of the EXPECTED CARDINALITY (issue 1095).
   assert.equal(
     found.length,
     10,
@@ -1542,10 +1237,7 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
 });
 
 test('the combination-rule scan reads expectSelector, not only steps', () => {
-  // The property that keeps the check above honest, asserted rather than assumed. The
-  // pre-1095 registry carried one of its seven rule selectors in `expectSelector`
-  // (`manager-checks-crafting-modifiers`), which the existing token check never looks at —
-  // so a scan restricted to `steps[]` would have graded six of seven and called it a pass.
+  // The property that keeps the check above honest, asserted rather than assumed.
   const fromExpect = VIEW_LAB_CASES.filter((viewCase) =>
     (viewCase.expectSelector ?? '').includes(MODIFIER_POLICY_OPTION_ATTR)
   ).map((viewCase) => viewCase.id);
@@ -1566,20 +1258,8 @@ test('the combination-rule scan reads expectSelector, not only steps', () => {
 });
 
 test('the hooks the capture driver hard-codes still exist in the UI', () => {
-  // These are the load-bearing selectors no case names, so nothing else can notice them going away.
-  // `scripts/view-lab-screenshots.mjs` clicks every rail label through `.manager-nav-button` and
-  // reads both route probes off the two roots — a rename there breaks the whole registry at once
-  // while every other assertion in this file still passes.
-  // Comments are stripped first, and that is not fastidiousness — it is a bug this check had.
-  // A comment I wrote in `FabricateAppRoot.svelte` mentioned `data-manager-view` by name to explain
-  // what the new player attribute mirrors. Renaming the REAL attribute then left the guard green,
-  // because the prose still matched. A check whose haystack includes its own documentation cannot
-  // fail on a rename that only the documentation survives.
-  //
-  // It used to strip comments HERE, in a third hand-rolled copy that left `<style>` blocks in — so
-  // `.manager-nav-button` would still have resolved out of the rule that paints it after the class
-  // came off the element. {@link emittingSources} is the shared reduction, and it removes the
-  // scoped block as well (issue 1520 review round 2).
+  // These are the load-bearing selectors no case names, so nothing else can notice them going away
+  // (issue 1520).
   const haystack = [...emittingSources().values()].join('\n');
   const absent = DRIVER_HOOKS.filter(
     (hook) => !new RegExp(String.raw`(?<![\w-])${hook}(?![\w-])`).test(haystack)
@@ -1595,12 +1275,7 @@ test('the hooks the capture driver hard-codes still exist in the UI', () => {
 
 test('the modifier vocabulary this file enforces is the one the capture driver enforces', () => {
   // The pairing rule and the modifier names are checked twice: statically above, and in `runSteps`
-  // at capture time. Only the static half runs in `npm test`, and it is a hand-copied list — so a
-  // modifier added to the driver, or a verb that stops being incompatible with one, would leave the
-  // two halves disagreeing with nothing to say so. Read the driver's own arrays instead of trusting
-  // the copy. The verb list is the same comparison in the other direction: the driver refuses to
-  // pair `modifiers` with exactly the verbs this file knows about, so a sixth verb added there
-  // without being added here would go unchecked at the only point that gates a PR.
+  // at capture time.
   const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
   const declaredArray = (name) => {
     const match = new RegExp(String.raw`const ${name} = \[([^\]]*)]`).exec(driver);
@@ -1626,18 +1301,8 @@ test('the modifier vocabulary this file enforces is the one the capture driver e
 });
 
 test('no two cases claiming exact reach produce the same frame', () => {
-  // Identical inputs produce a byte-identical PNG, by construction. So two cases that both claim
-  // `exact` from the same tuple cannot both be landing on their own counterpart's condition — at
-  // least one is publishing a frame of something else under its name.
-  //
-  // This is mechanical where reading the registry is not. Three separate overclaims of exactly this
-  // shape survived hand review: `manager-default-selection` / `-selected-normal` / `-rail-expanded`
-  // are three different smoke screens sharing one tuple, `manager-component-edit-salvage` claimed a
-  // ROUTED salvage editor while opening the same Simple-mode component as `-salvage-simple`, and
-  // `manager-tags-categories-stacked` pinned the normal geometry while declaring itself responsive.
-  //
-  // A `window` case sharing a tuple with an `exact` one is fine and deliberately not flagged: it has
-  // already declared that it falls short, which is the honest state for a case still to be reached.
+  // Identical inputs produce a byte-identical PNG, by construction. This is mechanical where
+  // reading the registry is not.
   const byTuple = new Map();
   for (const viewCase of VIEW_LAB_CASES) {
     if (!viewCase.publish || viewCase.reaches !== 'exact') continue;
@@ -1677,19 +1342,7 @@ test('the no-selection World Parties case clears selection through the real Mana
 
 test("the two day-one repair frames drop the fixture's OWN world component records", () => {
   // BOTH OF THESE CASES PHOTOGRAPH AN ABSENCE, and issue 1392 authored the record that filled it
-  // (issue 1540). `lab-world-component-curio` is a world-only component the world Tags &
-  // Categories screen needs, and NOTHING LIFTED IT — so `clearSystem`, which empties the world
-  // catalogue by removing the crafting systems the migration lifts FROM, cannot reach it. Its
-  // entity put one row in the "no catalogue" frame's name field and its default's `moss` put one
-  // row in the "no tags" frame's picker, and each case then failed on the assertion naming its
-  // own state rather than publishing a populated frame under an empty frame's name.
-  //
-  // A MIRROR GUARD IN BOTH DIRECTIONS. The flag is plumbed through three files that know nothing
-  // about each other — the case literal here, `mount.js`'s query layer and `labWorld.js`'s
-  // fixture — and a rename in any one of them leaves a query parameter nobody reads. That failure
-  // is silent at the point it happens and only surfaces as a wrong frame. The fixture premise is
-  // pinned with it: if the seeded world component records or their tags ever go away, these cases
-  // no longer need the flag, and this is where that is noticed rather than in a screenshot.
+  // (issue 1540). A MIRROR GUARD IN BOTH DIRECTIONS.
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
   const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
   const emptyCatalogue = getCaseById('world-tool-entry-on-break-repair-empty-catalogue');
@@ -1698,9 +1351,7 @@ test("the two day-one repair frames drop the fixture's OWN world component recor
   // The catalogue frame needs BOTH sources gone, because they are independent.
   assert.equal(emptyCatalogue.query?.clearSystem, '1');
   assert.equal(emptyCatalogue.query?.noAuthoredWorldComponents, '1');
-  // The picker frame needs only the authored one. Its list is the union of the world components'
-  // own `defaults.tags`, which the migration leaves unauthored, so removing the crafting systems
-  // would prove nothing about this control and would change every other row in the frame.
+  // The picker frame needs only the authored one.
   assert.equal(emptyPicker.query?.noAuthoredWorldComponents, '1');
   assert.ok(!emptyPicker.query?.clearSystem, 'the picker frame keeps its crafting systems');
 
@@ -1782,10 +1433,8 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   // The uuid shape this walk composes is `buildLabActors`' own, not a guess.
   assert.match(actorSource, /uuid: `Actor\.\$\{definition\.id\}`,/);
 
-  // The seeded party list, read out of the fixture rather than restated here — with the
-  // three fields legality depends on RESOLVED against those actors, not merely matched.
-  // Every claim below is derived from it, so a rename or an extra party fails by name
-  // instead of quietly changing what a published frame shows.
+  // The seeded party list, read out of the fixture rather than restated here — with the three
+  // fields legality depends on RESOLVED against those actors, not merely matched.
   const seedStart = worldSource.indexOf("put(\n    'gatheringParties',");
   assert.ok(seedStart > 0, 'the gatheringParties seed must remain locatable');
   const seedEnd = worldSource.indexOf("put('lastCraftingActor'", seedStart);
@@ -1796,12 +1445,6 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   const fieldIn = (block, name) => new RegExp(`^\\s*${name}: (.+?),\\s*$`, 'm').exec(block)?.[1];
 
   // `characterActors`, optionally `.slice(a[, b])`, mapped to uuids.
-  // ANCHORED at both ends, and the `.map(...)` is required rather than optional: an
-  // unanchored prefix match discards the tail, so `characterActors.map((actor) => actor.id)`
-  // — bare ids, the exact defect `labWorld.js:90-94` records as having shipped once and
-  // rendered "Disabled · 0 members" — would resolve to uuids and pass, and
-  // `characterActors.map(…).concat([uuidOf('lab-actor-wagon')])` would silently drop the
-  // wagon from the uniqueness walk. Anything unmodelled returns null and fails loud below.
   function resolveCharacterSubset(expression) {
     const match =
       /^characterActors(?:\.slice\((\d+)(?:,\s*(\d+))?\))?\.map\(\(actor\) => actor\.uuid\)$/.exec(
@@ -1873,12 +1516,9 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   );
   assert.match(actorSource, /type: definition\.type \?\? 'character',/);
 
-  // Legality under `GatheringPartyStore._validateList`, which the lab does NOT run: it writes
-  // the settings map raw and validation lives in `_persist`, so an impossible world would
-  // render and publish. The two invariants are computed, not approximated by matching the
-  // shapes today's seed happens to use: a shape check passes any NEW illegal shape it did not
-  // anticipate — giving `lab-party-long-haul` a member drawn from `characterActors` satisfies
-  // every such check while putting Brenna in two enabled parties at once.
+  // Legality under `GatheringPartyStore._validateList`, which the lab does NOT run: it writes the
+  // settings map raw and validation lives in `_persist`, so an impossible world would render and
+  // publish.
   const enabled = parties.filter((party) => party.enabled);
   assert.deepEqual(
     enabled.map((party) => party.id),
@@ -1907,9 +1547,8 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
     }
   }
 
-  // The search term matches exactly two of the five, and it matches them by DIFFERENT routes:
-  // one on its own name, one on its travel actor's name. Anything else renamed into range
-  // fails here rather than over-matching silently in a frame nobody can count.
+  // The search term matches exactly two of the five, and it matches them by DIFFERENT routes: one
+  // on its own name, one on its travel actor's name.
   const term = WORLD_PARTIES_SEARCH_TERM.toLowerCase();
   const byPartyName = parties.filter((party) => party.name.toLowerCase().includes(term));
   const byActorName = actorNames.filter((name) => name.toLowerCase().includes(term));
@@ -1945,13 +1584,9 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   assert.equal(declaredPageSize, 3);
   assert.equal(Math.ceil(parties.length / declaredPageSize), 2, 'five records is two pages');
   assert.equal(parties.length - declaredPageSize, 2, 'the last page holds the trailing two cards');
-  // The pager itself is gated on the smallest offered size, so a seed below it would
-  // photograph a pane with no footer at all — and the last-page case would have no
-  // control to reach page two with.
-  //
-  // The RULE is asserted, not a second literal: the source derives the threshold from the
-  // page-size list, so this pins that derivation. Restating `=== 3` here would let the two
-  // drift apart with only the `[3, 6, 9]` regex above noticing.
+  // The pager itself is gated on the smallest offered size, so a seed below it would photograph a
+  // pane with no footer at all — and the last-page case would have no control to reach page two
+  // with.
   const declaredPageSizes = /const PAGE_SIZE_OPTIONS = \[([\d, ]+)\];/
     .exec(tabSource)?.[1]
     .split(',')
@@ -1977,18 +1612,6 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
 
   // THE REFUSED ENABLE (issue 1515), derived from the same parsed seed, the same `holder` map the
   // uniqueness walk above built, and the same page size the last-page case is held to.
-  //
-  // `manager-world-parties-pane-alert` is the registry's only frame of
-  // `GatheringPartiesTab.svelte`'s `role="alert"` summary line, and that line renders only when a
-  // travel write is refused with no field to attach the reason to. `setPartyEnabled` is that
-  // operation - `withSave` passes it no `fieldContext`, so `_travelErrorState` writes a summary
-  // and no field error - and the refusal itself is the composite-uniqueness invariant the walk
-  // above models.
-  //
-  // The failure this pins is silent in both directions. A fixture edit that ENABLES the pressed
-  // party makes the press a disable, which is never refused; one that removes the collision makes
-  // the enable SUCCEED. Either way the case still runs, still reaches the pane, and publishes a
-  // frame with no alert in it under the only case named for one.
   const alertCase = getCaseById('manager-world-parties-pane-alert');
   const alertPartyId = /data-manager-party-enable="([^"]+)"/.exec(
     alertCase.steps.map((step) => step.selector ?? '').join(' ')
@@ -2034,22 +1657,14 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
 
 test('the World Tools Catalogue search terms match exactly the rows their frames claim', async () => {
   // WHY THIS EXISTS AT ALL is the reason its parties counterpart above does: an over-match is
-  // INVISIBLE in a screenshot. A frame showing four rows where two were meant looks like a frame,
-  // and the catalogue's filter does not search only names — `worldToolSearchText` concatenates the
-  // entity's name, its description AND both of its Item uuids, so a term chosen by reading the
-  // fixture's names can be answered by a uuid nobody looked at.
+  // INVISIBLE in a screenshot.
   const [{ buildLabContent }, { worldToolSearchText }] = await Promise.all([
     import('./view-lab/world/labContent.js'),
     import('../src/ui/svelte/apps/manager/scoped/worldToolStudio.js'),
   ]);
   const content = buildLabContent();
 
-  // THE DOMAIN IS THE UNION, and that is what makes the derivation honest rather than
-  // convenient. The catalogue's twelve rows come from two places: the seven records the fixture
-  // seeds into `toolScope.entities`, and the five the `1.30.0` world-scope pass LIFTS out of the
-  // crafting systems' own `tools[]` — the lab seeds no `migrationVersion`, so every migration
-  // runs on every build. Deriving over the seeded set alone would leave the five migrated rows
-  // out of the check, and both of the rows this term is chosen for are migrated ones.
+  // THE DOMAIN IS THE UNION, and that is what makes the derivation honest rather than convenient.
   const seeded = new Map(content.toolScope.entities.map((entity) => [entity.id, entity]));
   const domain = [
     ...content.toolScope.entities,
@@ -2121,37 +1736,20 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-narrow',
       'manager-world-downtime-collapsed',
       'manager-world-downtime-test-companion-installed',
-      // The companion driving Core's own route header. It is the only frame in the corpus
-      // that can photograph the runtime route-chrome channel: every other Downtime case rests
-      // on a list screen, which renders identically whether or not that channel exists.
+      // The companion driving Core's own route header.
       'manager-world-downtime-test-companion-chrome',
       // Issue 1302 — the parent rollup, appended after the four tab cases (never inserted
       // among them): the manifest above is order-sensitive and `cases.slice(0, 4)` below is
       // index-based, so a new case has to land after both without disturbing either.
       'manager-world-downtime-test-companion-rollup',
-      // Issue 1332 — the companion NAVIGATING, appended for the same reason. It is the only
-      // frame reached by pressing a control the COMPANION drew rather than one of Core's, which
-      // is the whole of what `navigateToTab` added: before it, such a control could name its
-      // destination and not reach it, and a dead button photographs exactly like a live one.
+      // Issue 1332 — the companion NAVIGATING, appended for the same reason.
       'manager-world-downtime-test-companion-tab-navigation',
     ]
   );
-  // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
-  // share one assertion loop: Core's `Unlock with Premium` CTA and its scrolling preview pane
-  // are Core's own content, and the spec says neither is rendered over a companion's screens
-  // — so requiring the CTA of every downtime case would pin exactly the defect it forbids.
-  // All THREE provider-mode frames are excluded from the Core-preview loop, and for the one
-  // reason: over a companion's screens Core renders no preview pane and no CTA at all, so
-  // every assertion below is about markup the spec forbids there. The rollup case joins the
-  // premium-installed and companion-chrome frames for the same reason — it is reached on
-  // `expectView: 'systems'`, not `'world-downtime'`, and asserts a DOM-removal claim the
-  // Core-preview loop below has no vocabulary for.
-  // SELECTED BY WHAT MAKES THEM DIFFERENT, not by how they are spelled. These three used to be
-  // picked out with `id.endsWith('-premium-installed')` and two siblings like it, which is an
-  // instrument whose reach exceeds its claim: renaming a frame silently dropped it back into the
-  // Core-preview loop below, where every assertion is about content a companion's screens must
-  // NOT carry. The fact that separates them is that they register the lab's stand-in companion,
-  // and that is on the case as `query.downtimeProvider`.
+  // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot share
+  // one assertion loop: Core's `Unlock with Premium` CTA and its scrolling preview pane are Core's
+  // own content, and the spec says neither is rendered over a companion's screens — so requiring
+  // the CTA of every downtime case would pin exactly the defect it forbids.
   const withCompanion = allCases.filter((entry) => entry.query?.downtimeProvider === '1');
   assert.equal(
     withCompanion.length,
@@ -2184,19 +1782,11 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       `${viewCase.id} checks the CTA accepts a real pointer click`
     );
   }
-  /*
-    `expectOverflowY` above is what every downtime case owes: the PANEL owns the vertical
-    overflow, not the shell around it. `expectScrollable` is a stronger and different claim —
-    that the pane's content actually exceeds its box at that case's window size — and it is
-    honest of exactly one of these frames.
-
-    It used to be required of all six, and the preview satisfied it by carrying a 720px
-    `min-height` that no content asked for. That floor is what the maintainer saw as a screenful
-    of empty surface below the feature cards on an ordinary window, so it is gone; at 1330x900
-    the preview simply fits. The narrow frame is the one whose window genuinely cannot hold it —
-    960px folds the feature grid to 2x2 and stacks the hero — so the real scrolling proof lives
-    there, and pinning it here stops a future change quietly removing the scroller altogether.
-  */
+  /**
+   * `expectOverflowY` above is what every downtime case owes: the PANEL owns the vertical overflow,
+   * not the shell around it. It used to be required of all six, and the preview satisfied it by
+   * carrying a 720px `min-height` that no content asked for.
+   */
   const scrolls = cases.filter((entry) => entry.expectScrollable);
   assert.deepEqual(
     scrolls.map((entry) => entry.id),
@@ -2268,17 +1858,12 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     );
   }
 
-  // Issue 1185 — the premium-installed frame. Every other manager case renders the free
-  // module, so this is the only frame that can photograph the title bar's gold badge, the
-  // muted rail chip and the installed-state rail tooltip. Its assertions are pinned here
-  // because the values are hand-copied from `lang/en.json` and rot silently otherwise.
+  // Issue 1185 — the premium-installed frame.
   assert.equal(premium.expectView, 'world-downtime');
   assert.equal(premium.query.downtimeProvider, '1', 'the premium frame registers a companion');
-  // Issue 1213 — the rail lock. The frame has to REACH the locked state or it proves nothing:
-  // the lab world seeds an expanded rail and cases cannot override a lab setting, so a run that
-  // never presses the toggle is pixel-identical with and without the lock. The press must also
-  // come BEFORE the route, because on the route the control is disabled and Playwright would
-  // refuse to press it.
+  // Issue 1213 — the rail lock. The frame has to REACH the locked state or it proves nothing: the
+  // lab world seeds an expanded rail and cases cannot override a lab setting, so a run that never
+  // presses the toggle is pixel-identical with and without the lock.
   assert.deepEqual(
     premium.steps.map((step) => step.selector),
     ['[data-manager-rail-toggle]', '#manager-world-nav-downtime'],
@@ -2322,12 +1907,8 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   );
 
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
-  // WHERE THE TAB FIELDS LAND, read back out of the lab provider that supplies them, because
-  // this frame is the only place the two are rendered side by side. `accessibleName` names the
-  // rail BUTTON, and the region is named by that button's LABEL element — different values on
-  // purpose, because a landmark announced as "Open the downtime ledger, region" is the wrong
-  // shape. Hand-copying either into this file would be the mirror the expectation exists to
-  // catch, so both come from the fixture's own source.
+  // WHERE THE TAB FIELDS LAND, read back out of the lab provider that supplies them, because this
+  // frame is the only place the two are rendered side by side.
   const labLedger = mountSource.match(
     /id: 'ledger',\s*\n\s*label: '([^']+)',\s*\n\s*accessibleName: '([^']+)',/
   );
@@ -2359,10 +1940,7 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     'long-copy evidence keeps the real Core fallback provider active'
   );
 
-  // Issue 1302 — the parent rollup, on a closed disclosure with zero interaction (AC-19). This
-  // is the persona state a fresh Manager open actually lands on: `railGroupUserExpanded.worldDowntime`
-  // seeds `false` and nothing locks the group open off the Downtime route, so no GM ever sees the
-  // rollup's counterpart today without navigating away from the one place the badge would matter.
+  // Issue 1302 — the parent rollup, on a closed disclosure with zero interaction (AC-19).
   assert.equal(rollup.expectView, 'systems', 'reached with no interaction, on the systems browser');
   assert.equal(
     rollup.query?.downtimeProvider,
@@ -2419,9 +1997,7 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     'the premium-installed frame pins its own tab-id-keyed badge containment, not just the rollup'
   );
 
-  // Issue 1332 — the navigating frame. Its whole evidence value rests on HOW it is reached: a
-  // rail sub-item click lands on the same panel and photographs the same pixels, so a case that
-  // drifted to one would publish a frame that says nothing about the seam it was added for.
+  // Issue 1332 — the navigating frame.
   const tabNavigation = named('manager-world-downtime-test-companion-tab-navigation');
   assert.deepEqual(
     tabNavigation.steps.map((step) => step.selector),
@@ -2484,10 +2060,6 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // `detail/ProgressiveBody.svelte` selects the four progressive frames rather than all 27. That
   // narrowing is only safe while each case's declared mode matches the mode it actually renders,
   // and the case list is hand-maintained — so derive the truth from the fixture instead.
-  //
-  // `resolutionMode` is a SYSTEM property (`labContent.js`), so a case's mode is the mode of the
-  // system owning the recipe its steps select. A case that opens no recipe detail renders no body
-  // and must claim none.
   const modeOfSystem = new Map(
     content.systems.map((system) => [system.id, system.resolutionMode ?? null])
   );
@@ -2502,8 +2074,6 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   };
 
   // `RegExp.source` escapes every forward slash, so a literal `apps/crafting` never matches it.
-  // Comparing against the unescaped form is what makes this check non-vacuous — the first draft
-  // examined zero cases and passed.
   const plain = (pattern) => pattern.source.replaceAll('\\', '');
 
   const examined = [];
@@ -2543,25 +2113,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   );
 
   // The check above is only worth anything if it looked at the cases. It did not, in its first
-  // draft, and passed clean.
-  //
-  // 31 rather than 28 as of issue 1513, and the three that joined are three DIFFERENT things
-  // this scan now sees. `player-crafting-sources-picker` is a genuine new crafting case, and it
-  // opens the sources picker rather than a recipe detail, so claiming no body is correct for it.
-  // `player-inventory` and `player-alchemy-workbench` are NOT crafting frames at all: they joined
-  // because this predicate reads any `apps/crafting` path, and those two now name
-  // `apps/crafting/ComponentSourcesBar.svelte` explicitly — the bar draws in their tabs as well,
-  // and `CRAFTING_SHARED` could never route to them. Both open no recipe detail, so both are
-  // required to claim no body, which is exactly what the `wrong` sweep above holds them to.
-  //
-  // 32 as of issue 1511. `player-crafting-category-filter-list` opens the browser's converted
-  // category filter and stops there, so like the sources picker it renders no recipe detail and is
-  // correct to claim no mode body.
-  //
-  // 33 as of issue 1648. `player-crafting-authority-blocked` photographs the header withholding
-  // "Ready to craft" while the run authority refuses, and names `RecipeDetailHeader.svelte`. Like
-  // `player-crafting-simple` it selects no recipe through a step, so by this scan's own rule it
-  // renders no mode body and correctly claims none.
+  // draft, and passed clean. 31 rather than 28 as of issue 1513, and the three that joined are
+  // three DIFFERENT things this scan now sees.
   assert.equal(
     examined.length,
     33,
@@ -2581,13 +2134,7 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
 
 test('no case tags itself with a second, competing reach vocabulary', () => {
   // `reaches` is this registry's honesty contract, and the index page prints `kinds` and `reaches`
-  // into one tag list. So a kind that reads like a reach value is not a label — it is a SECOND
-  // claim about the same thing, free to contradict the first.
-  //
-  // It did. `window-only` survived on 85 cases while only 5 still reached `window`, so most of the
-  // registry would have rendered tagged `exact` and `window-only` at once, on the very page whose
-  // job is to tell a reviewer what each frame is evidence of. It was defined nowhere and consumed
-  // by nothing but the filter.
+  // into one tag list.
   const RESERVED = new Set(['exact', 'window', 'beyond', 'window-only', 'state', 'screen']);
   const offenders = VIEW_LAB_CASES.flatMap((viewCase) =>
     (viewCase.kinds ?? [])
@@ -2626,9 +2173,7 @@ test('every case declaring an expectView targets the manager', () => {
 });
 
 test('the capture viewport clears the max-height Foundry clamps windows to', () => {
-  // `.application { max-height: calc(100vh - 1.5 * var(--hotbar-height)) }`. `_updatePosition`
-  // applies that clamp with no signal, so a viewport a few pixels short yields a green run and a
-  // wrong-sized frame.
+  // `.application { max-height: calc(100vh - 1.5 * var(--hotbar-height)) }`.
   const ceiling = FOUNDRY_CHROME_SPEC.maxHeightFor(CAPTURE_VIEWPORT.height);
   for (const appId of Object.keys(APP_CHROME)) {
     const minimum = minimumViewportFor(appId);
@@ -2646,13 +2191,9 @@ test('the capture viewport clears the max-height Foundry clamps windows to', () 
     );
   }
 
-  // ── AND EVERY CASE'S OWN GEOMETRY, NOT ONLY EACH APP'S DEFAULT (issue 1392) ──────────────
-  //
-  // A case may override `position`, and an override above the clamp does not render taller — it
-  // renders CLAMPED, at a height nobody declared, with no signal at all. The app-default loop
-  // above cannot see that: it quantifies over the six app defaults, and a case override is not
-  // one of them. Measured when this was added: exactly one case exceeded the ceiling, by 38px,
-  // and every view-lab suite was green.
+  // AND EVERY CASE'S OWN GEOMETRY, NOT ONLY EACH APP'S DEFAULT (issue 1392). A case may override
+  // `position`, and an override above the clamp does not render taller — it renders CLAMPED, at a
+  // height nobody declared, with no signal at all.
   const tooTall = VIEW_LAB_CASES.filter((viewCase) => viewCase.position.height > ceiling)
     .map((viewCase) => `${viewCase.id}: ${viewCase.position.height}px`)
     .sort();
@@ -2717,19 +2258,7 @@ test('changed files map to the windows they affect', () => {
 
   assert.deepEqual(ids(['lang/en.json']), []);
 
-  // A shared primitive or a global stylesheet can change every screen. Selecting all of them would
-  // bury the reviewer, so those signals map to one player screen and one manager screen — PLUS
-  // the sheet's own `BROAD_SIGNAL_CASE_OVERRIDES` entry (issue 1515), which is why this list is
-  // five and not two.
-  //
-  // The representative pair is still here, and its presence is the assertion that the override
-  // is ADDITIVE rather than a replacement: the table's contract is that a broad signal keeps
-  // selecting the pair, and "claimed wins, no fallback" would show up here as the pair
-  // disappearing rather than as a comment going stale.
-  //
-  // The three added ids are the surfaces the pair structurally cannot contain — the availability
-  // pill family in the gathering task editor, and the World > Downtime rail group expanded and
-  // collapsed. The entry beside them in `viewLabCases.js` says why each.
+  // A shared primitive or a global stylesheet can change every screen (issue 1515).
   assert.deepEqual(ids(['styles/fabricate.css']).sort(), [
     'fabricate-app-shell',
     'manager-components-normal',
@@ -2747,54 +2276,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
     'src/ui/svelte/components/SearchablePopover.svelte',
   ]).map((viewCase) => viewCase.id);
 
-  // Three overrides, not one, because the primitive has three modes and no frame shows
-  // another's chrome. `inlineSearchTrigger` (the actor picker) replaces its trigger with
-  // the search field and renders NO in-popover search row at all, so the compact search
-  // field, its leading glyph and its position below the title/count header are invisible
-  // in that frame; the realm-override picker keeps its value-bearing trigger and is the
-  // only surface that renders them.
-  //
-  // The third arrived with issue 1458's conversion and is the `showSearch={false}` panel:
-  // an option list with no query field at all, which is the shape that keeps
-  // `triggerHasPopup="listbox"` truthful on the trigger. Both parties frames render the
-  // field, so neither can show what the panel looks like without one, and every other
-  // gathering-task frame draws the menu CLOSED — where the whole conversion is a wrapper
-  // class and a scoping hash.
-  //
-  // The FIFTH is a fifth CONFIGURATION rather than a fifth mode (issue 1373, round 8): the
-  // recipe row's `or…` menu is the only frame that renders the `popoverTitle` header on a panel
-  // with NO search field, at a caller-fixed 150px. The parties frames draw the header over a
-  // search row, the availability menu draws the search-less list with no header, and neither can
-  // show what happens where the two meet — which is where the shared box's `min-width: 240px`
-  // floor silently overrode a caller asking for 150.
-  //
-  // The FOURTH is not a mode but an APPLICATION (issue 1475). Those three are all manager
-  // frames, and until `ActorSelectTopBar` converted, the manager was the only place this
-  // primitive could paint at all. `player-actor-picker` opens it in the player window, so
-  // a regression that broke the primitive only outside the manager — a re-rooted family
-  // reverted, a portal host narrowed back to `.fabricate-manager` — no longer publishes
-  // three frames in every one of which it still works.
-  //
-  // THE FIFTH AND SIXTH ARE THE PRIMITIVE'S EMPTY BRANCH (issue 1373), and they are the gap that
-  // let a dashed hero panel with a magnifier and no words ship inside a 240px popover. All four
-  // above open a picker over a POPULATED list, so the branch that renders when the list is empty
-  // — reached by every one of the 24 call sites, and by four of them with no `emptyHint` to draw
-  // — was in no frame at all. `manager-recipe-edit-tag-picker` is the populated tag picker,
-  // over the herbalism system's own eight-tag vocabulary and the one lab recipe carrying a tag
-  // requirement; `world-tool-entry-on-break-repair-tag-picker-empty` is the same control at
-  // WORLD scope, where the list is the union of every world component's own `defaults.tags` and
-  // only `setWorldTags` ever writes one — so a freshly installed world reaches it with nothing to
-  // list, which is the state the maintainer met. The lab world itself has authored one such tag
-  // since issue 1392, and that case's `noAuthoredWorldComponents` is what puts the fixture back
-  // in the day-one state rather than leaving the frame to whatever the fixture happens to carry.
-  //
-  // THE EIGHTH IS THE GRID LIST FORM (issue 1503), and it is a form rather than a configuration:
-  // `as="grid"` re-maps the key map's horizontal axis, paints from a `data-picker-columns` the
-  // primitive stamps on the list, and renders a caller-supplied `option` snippet inside the row
-  // element the primitive owns. Measured across `src/`, `EssenceSourceSelector` is its only
-  // caller, so `manager-essences-source-picker` is the only frame in the registry that can
-  // contain any of it — every other frame here is a flex column of the primitive's own rows, and
-  // without this entry a change to the grid rung published nine frames none of which was a grid.
+  // Three overrides, not one, because the primitive has three modes and no frame shows another's
+  // chrome (issue 1458).
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
     [
@@ -2804,15 +2287,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
-      // THE NINTH AND TENTH OVERRIDES (issue 1513), and they are two capabilities rather than
-      // two more instances of one. `manager-recipe-item-contents-picker` is the only frame that
-      // draws the panel a choice does NOT close — `stayOpen`, which the book-contents picker
-      // needs without any selection semantics because a linked recipe leaves its option set —
-      // and `player-crafting-sources-picker` is the only one that draws `multiple`: a
-      // `role="listbox"` announcing `aria-multiselectable` over rows marked several at once, in
-      // the PLAYER window, with a caller's own `option` snippet inside the primitive's row. The
-      // eight above are all single-value panels that shut on choose, so a regression in the
-      // selection model or in the stay-open gate was in none of them.
+      // THE NINTH AND TENTH OVERRIDES (issue 1513), and they are two capabilities rather than two
+      // more instances of one.
       'manager-recipe-item-contents-picker',
       'manager-world-parties-actor-picker',
       'manager-world-parties-realm-override-picker',
@@ -2823,60 +2299,12 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The twenty frames a change to the shared positioning seam must publish (issue 1500; the
-// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
-// twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
-// PLAYER window, which is a second application root for the seam to clamp against — and the
-// fourteenth and fifteenth at issue 1520's second review round, which is the two GM canvas
-// windows' open option panels).
-//
-// THE EIGHTEENTH, NINETEENTH AND TWENTIETH ARRIVED WITH THE CONTROLS THEY DROP FROM (issue 1511).
-// The player app's six native selects converted, and three of them are registered open:
-// `player-inventory-sort-list`, `player-journal-sort-list` and
-// `player-crafting-category-filter-list`. They are three rather than one because the three states
-// are genuinely different for THIS seam — a panel clamped to a narrow floored trigger, a panel
-// that has to portal out of an overflow-clipped half-height column, and a panel tracking a
-// full-width trigger under a caller-supplied ceiling — and a regression in the measure, clamp and
-// portal pass shows in whichever of the three it reaches. All three rest on an open panel, which
-// is this array's own membership test, and each spreads the seam in its own `sourceMatches`.
-//
-// THE SIXTEENTH ARRIVED BY THE SAME DOOR AS THE THREE BEFORE IT (issue 1513).
-// `manager-recipe-item-contents-picker` opens the recipe-item editor's link-recipe picker, which
-// is a `SearchablePopover` and therefore already portaled and anchored by this seam — the case is
-// new, the wiring it exercises is not. It is a growth in the direction this array's failure text
-// permits: the frame RESTS ON AN OPEN PANEL, which is the membership test itself, rather than
-// drawing a trigger closed.
-//
-// THE SEVENTEENTH IS THE SAME FRAME THAT WAS DELIBERATELY ABSENT ONE COMMIT EARLIER.
-// `player-crafting-sources-picker` was registered against a panel this seam did not place — a
-// `position: absolute` child of `ComponentSourcesBar` — so naming the seam there would have
-// claimed a regression the frame could not show. The commit that routed that control onto
-// `SearchablePopover` is what changed the fact: the panel is portaled, measured and clamped by
-// this pass now, so the case took `...ANCHORED_POPOVER_SOURCES` in the same commit that made it
-// true. Growth in the permitted direction again — the frame RESTS ON AN OPEN PANEL — and the
-// two-step arrival is the point: the array's membership is a measurement of the tree, so it moved
-// when the tree did rather than in anticipation.
-//
-// THOSE LAST TWO ARRIVED THE WAY THE THREE BEFORE THEM DID: a frame resting on an open panel that
-// did not name the seam. `interactables-config-source-open` was PUBLISHED, and it is the frame the
-// round measured a 340px option panel under a 450px trigger on — a defect whose repair was in this
-// seam, in a frame the seam did not route to. That is the same category error the paragraph below
-// records for `IconPicker` and `ActionMenu`, arriving by a different door: not "an override covers
-// it" this time, but "the window's own two source patterns cover it", which answers a different
-// question again.
-//
-// Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
-// the answer from the same array would agree with any wiring, including the one this list exists
-// to correct. The seam shipped selecting SEVEN of these — the `SearchablePopover` frames minus the
-// bulk-edit picker, which reaches its `sourceMatches` through a shared array — and reading
-// `BROAD_SIGNAL_CASE_OVERRIDES` as cover for the `IconPicker` and `ActionMenu` frames was the
-// mistake that let three go missing. That map routes a change to a COMPONENT; this seam is a file
-// those components import, and no override entry can speak for it.
-//
-// Both files are pinned, not just the action. They are a pair by construction — the action is the
-// pass and `overlayBounds.js` holds the boundaries it clamps against — and a wiring that named one
-// of them in a case's `sourceMatches` and dropped the other would publish a full-looking set for
-// half the seam.
+// The twenty frames a change to the shared positioning seam must publish (issue 1500; the eleventh
+// joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the twelfth and
+// thirteenth at issue 1504, when `Select`'s option list got two — one of them in the PLAYER window,
+// which is a second application root for the seam to clamp against — and the fourteenth and
+// fifteenth at issue 1520's second review round, which is the two GM canvas windows' open option
+// panels).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -2923,10 +2351,7 @@ for (const seamFile of [
 test('the player top bar routes to the frame that opens its picker, not only to the one that draws it', () => {
   // Before issue 1475 the bar sat under `src/ui/svelte/components/`, a broad signal, so it
   // published the representative pair and nothing else — and in both of those frames the picker is
-  // CLOSED. An override added the frame that opens it. Issue 1500 moved the file to `apps/`, where
-  // it is a broad signal no longer: the override went, and the two frames it actually appears in
-  // name it themselves. `manager-components-normal` is deliberately NOT among them — it is the
-  // MANAGER, and it drew this player bar only ever as a side effect of the broad-signal pair.
+  // CLOSED.
   const selected = mapChangedFilesToCases(['src/ui/svelte/apps/ActorSelectTopBar.svelte']).map(
     (viewCase) => viewCase.id
   );
@@ -2937,19 +2362,9 @@ test('the player top bar routes to the frame that opens its picker, not only to 
   );
 });
 
-// The NEW `.js` modules this change adds under the checks tree, and the frames a change
-// confined to each of them must still select (issue 1095, C2).
-//
-// STATED AS A POSITIVE PIN, not as a `FALLBACK_CASE_ID` probe. The premise that a `.js`
-// module reaches the fallback is FALSE here: nine cases already claim the directory prefix
-// `/^src\/ui\/svelte\/apps\/manager\/checks\//`, and `UI_PATH_PATTERN` admits any
-// `src/ui/**/*.js` as a render file — so a change confined to a new module under that
-// directory selects those cases and can NEVER reach the fallback. "Proven to fail before
-// the entry exists" would therefore be vacuous, and "selects exactly those ids" would be
-// false in the other direction.
-//
-// What CAN fail, and is what matters, is the direction below: each module selects a
-// non-empty set that INCLUDES the frames it determines, and never the fallback.
+// The NEW `.js` modules this change adds under the checks tree, and the frames a change confined to
+// each of them must still select (issue 1095, C2). STATED AS A POSITIVE PIN, not as a
+// `FALLBACK_CASE_ID` probe.
 const NEW_CHECKS_MODULES = [
   [
     'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
@@ -2959,25 +2374,13 @@ const NEW_CHECKS_MODULES = [
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
     ['manager-checks-crafting-modifiers', 'manager-checks-validation'],
   ],
-  // The Checks rail GROUP model (issue 1096). It determines the entire rail and the four
-  // route ids, so a change confined to it must select the frames that show them.
-  //
-  // Stated as the same POSITIVE pin its two siblings are, and for the reason recorded
-  // above rather than a new one: the `/^src\/ui\/svelte\/apps\/manager\/checks\//`
-  // directory prefix nine cases already claim admits any `.js` under that directory, so a
-  // change confined to this module can never reach `FALLBACK_CASE_ID` and a
-  // "proven to fail before the entry exists" clause would be vacuous here too.
+  // The Checks rail GROUP model (issue 1096). It determines the entire rail and the four route ids,
+  // so a change confined to it must select the frames that show them.
   [
     'src/ui/svelte/apps/manager/checks/checksNav.js',
     ['manager-checks-rail-group', 'manager-checks-rail-dirty'],
   ],
-  // The outcome simulator and the odds enumerator (issue 1097). BH4 asked for these two to
-  // select "exactly" their own cases and never the fallback; they are stated as the same
-  // POSITIVE pin their three siblings are, for the reason recorded above and now proven
-  // twice — the directory prefix nine cases already claim admits ANY `.js` under
-  // `apps/manager/checks/`, so "exactly these ids" is false for every module in this
-  // directory and "never the fallback" is unreachable rather than guarded. What is real,
-  // and what these entries hold, is that each module selects the frames it DETERMINES.
+  // The outcome simulator and the odds enumerator (issue 1097).
   [
     'src/ui/svelte/apps/manager/checks/checkPreview.js',
     ['manager-checks-crafting-simulator-rolled'],
@@ -3043,11 +2446,7 @@ test('every publishable case is in the registry order the driver iterates', () =
 });
 
 test('manager cases pin the geometry their smoke label was captured at', () => {
-  // The smoke does not use one manager size. `setManagerWindowSize` is called with 1280x820 for most
-  // frames, 1280x900 for some, 880x900 for the narrow ones, and 1000x700 / 900x700 / 614x704 for the
-  // Tool Studio parity set. A case captured at the wrong one cannot be compared with its counterpart:
-  // a different content height changes the rail and inspector layout, and every difference then looks
-  // like a rendering defect rather than a size difference.
+  // The smoke does not use one manager size.
   for (const viewCase of VIEW_LAB_CASES) {
     if (viewCase.app !== 'fabricate-crafting-system-manager') continue;
     assert.ok(viewCase.position, `manager case "${viewCase.id}" must pin its capture geometry`);
@@ -3064,14 +2463,6 @@ test('manager cases pin the geometry their smoke label was captured at', () => {
 
 test('every case declares how far it actually gets', () => {
   // `exact` — lands on the smoke counterpart's own condition, so a side-by-side is meaningful.
-  // `window` — reaches the right application window but not that counterpart's specific condition;
-  //   useful evidence and known remaining work, accounted for by a class-level entry in the
-  //   known-gaps register in `scripts/README.md` rather than by 71 near-identical case comments.
-  // `beyond` — a condition the smoke never walks, so there is no counterpart to fall short of.
-  //
-  // The values were `state` / `screen` before plan-review: `state` collided with Svelte's `$state`
-  // and with the spec's own broader "the state it expects" phrasing one requirement over, and
-  // `screen` collided with this file's own definition of a screen as the whole captured window.
   for (const viewCase of VIEW_LAB_CASES) {
     assert.ok(
       ['exact', 'window', 'beyond'].includes(viewCase.reaches),
@@ -3082,9 +2473,7 @@ test('every case declares how far it actually gets', () => {
 
 test('every case records the smoke labels it corresponds to', () => {
   // The pairing is what makes a side-by-side possible, and what makes "which smoke frame does this
-  // replace?" answerable without reading the capture walk. A `beyond` case has no counterpart by
-  // definition, and must say so with an EMPTY array rather than by omitting the field — the
-  // difference between "the smoke does not cover this" and "nobody filled this in".
+  // replace?" answerable without reading the capture walk.
   for (const viewCase of VIEW_LAB_CASES) {
     assert.ok(Array.isArray(viewCase.smokeLabels), `case "${viewCase.id}" declares no smokeLabels`);
     if (viewCase.reaches === 'beyond') {
@@ -3099,27 +2488,14 @@ test('every case records the smoke labels it corresponds to', () => {
   }
 });
 
-/**
- * The smoke script, read once, so the label cross-check below answers against the live harness.
- */
+/** The smoke script, read once, so the label cross-check below answers against the live harness. */
 const smokeHarnessSource = readFileSync(resolve(ROOT, 'scripts/foundry-test-run.mjs'), 'utf8');
 
-/**
- * A capture label's SHAPE: lowercase kebab with at least one hyphen.
- *
- * The filter exists because `label:` is not exclusively a capture key in the smoke — it is also a
- * fixture field on essences, currency units and tools ("Gold", "Alchemy", "Smoke Anvil"). Without
- * it the emitted set would absorb every one of those, and a case could then claim a smoke frame
- * named after a currency unit and pass.
- */
+/** A capture label's SHAPE: lowercase kebab with at least one hyphen. */
 const SMOKE_LABEL_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
 
 /**
  * The text between a balanced pair of delimiters, starting at the opener.
- *
- * Balancing rather than a regex because the smoke's capture calls run across several lines and
- * carry nested calls and object literals in their arguments; a non-greedy match stops at the first
- * `)` and reads one argument of four.
  *
  * @param {string} source The file text.
  * @param {number} openIndex Index of the opening delimiter.
@@ -3142,12 +2518,6 @@ function balancedSlice(source, openIndex, open, close) {
 /**
  * The helpers that FORWARD their own `label` binding into `screenshot(page, label)`.
  *
- * Derived from the harness rather than listed, because the list has changed five times: the tool
- * studio, the recipe results tab, the stable-manager capture and the player gathering walk each
- * grew their own wrapper, and a hand-written list would have gone stale as each arrived — quietly,
- * since a missing wrapper makes this check REJECT a label the smoke really does emit, and the
- * cheapest way out of a false failure is to delete the assertion.
- *
  * @returns {string[]} Function names.
  */
 function labelForwardingHelpers() {
@@ -3168,20 +2538,6 @@ function labelForwardingHelpers() {
 
 /**
  * Every label the smoke harness can actually write a PNG under.
- *
- * FOUR forms, because the harness reaches `screenshot()` four ways and modelling only the direct
- * one would reject 40 labels the smoke genuinely emits:
- *
- *   1. `screenshot(page, 'label')` — the direct call.
- *   2. `label: 'label'` inside a capture helper's options object.
- *   3. `['tab-id', 'label']` — the environment editor's tab loop destructures a tuple and passes
- *      the second element.
- *   4. any string literal in the argument list of a {@link labelForwardingHelpers} call.
- *
- * Form 4 is the loose one: it admits a helper's OTHER string arguments too. That is deliberate and
- * bounded — those arguments are selectors and fixture names, which the shape filter rejects on
- * sight (`.manager-card`, `Smoke Anvil`) — and the alternative is modelling argument positions per
- * helper, which is the shape that rots.
  *
  * @returns {Set<string>} Emitted labels.
  */
@@ -3211,17 +2567,7 @@ function smokeEmittedLabels() {
 }
 
 test('every declared smoke label is one the harness can actually emit', () => {
-  // THE GAP THIS CLOSES, AND WHY IT MATTERS (issue 1520). `smokeLabels` was checked for SHAPE and
-  // non-emptiness and for nothing else, so a case could name a frame the smoke has never taken and
-  // pass — and one revision of this change's own plan did exactly that, pairing the three canvas
-  // config cases with `interactable-config`, which is a STEP ID in the harness
-  // (`results.steps.push({ step: 'interactable-config' })`) and not a capture label at all. It
-  // would have shipped green: the string exists in the file, the array is non-empty, the shape is
-  // right, and nothing anywhere asked the harness.
-  //
-  // The failure it prevents is not cosmetic. `smokeLabels` is the answer to "which smoke frame
-  // does this replace?", which is what a reviewer uses to put a lab frame beside its live
-  // counterpart; a label naming no frame sends them looking for a photograph that does not exist.
+  // THE GAP THIS CLOSES, AND WHY IT MATTERS (issue 1520).
   const emitted = smokeEmittedLabels();
 
   // NON-VACUITY FIRST, because every clause below quantifies over this set: an extraction that
@@ -3232,8 +2578,6 @@ test('every declared smoke label is one the harness can actually emit', () => {
       'probably broken, which would make every assertion below vacuous'
   );
   // And a NEGATIVE control, named rather than generic: the exact string the wrong revision used.
-  // It occurs in the harness — as a step id — so a check that merely looked for the literal would
-  // admit it. This clause is what proves the extraction distinguishes the two.
   assert.ok(
     !emitted.has('interactable-config'),
     '"interactable-config" is a step id, not a capture label. If it is being extracted as one, ' +
@@ -3259,20 +2603,7 @@ test('every declared smoke label is one the harness can actually emit', () => {
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // What a change to the lab's OWN inputs costs (issue 1000).
-//
-// Measured on PR #991: 157 frames, 20m29s, against a 25-minute job cap, re-run on every rebase —
-// because any path under `tests/view-lab/` or this registry selected the whole corpus. These tests
-// pin both halves of the narrowing that replaced it: the frames it is now allowed to skip, and the
-// far larger set of inputs for which skipping any frame is still forbidden.
-//
-// The fail-safe direction is towards MORE frames. An input nobody has attributed, a patch that does
-// not parse, a patch that does not describe this checkout — every one of them is an ALL, because
-// the failure this rule exists to prevent is a PR that invalidates the corpus and publishes no
-// evidence of it. `mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []` is the
-// regression, verified as real before the blanket rule existed.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
@@ -3313,11 +2644,6 @@ const labActorsLineOf = (text) => lineOf(labActorsSource, text, LAB_ACTORS_PATH)
  * context either side that `git` emits, and contiguous lines grouped into one hunk as it groups
  * them.
  *
- * The `+` lines carry the file's CURRENT text, which is exactly what a patch for a change that has
- * landed looks like — and, together with the context, is the sequence the selector locates each
- * hunk by. One builder for every attributed input rather than one per input: the shape of the diff
- * is the same fact whichever file it describes.
- *
  * @param {string[]} source The file the patch describes, by line.
  * @param {number[]} lineNumbers Lines to mark as added.
  * @returns {string} The patch.
@@ -3347,11 +2673,7 @@ function patchAdding(source, lineNumbers) {
 
 /**
  * Text for a `-` line: content the checkout does NOT have, which is what every removed line in a
- * `pulls/{n}/files` patch is.
- *
- * Deliberately not a comment and not blank. `isInertSourceLine` skips both, so a removed line
- * shaped like a comment would be dropped before `regionsTouchedAt` ever placed it, and every
- * assertion below would pass against a hunk whose removals were never attributed at all.
+ * `pulls/{n}/files` patch is. Deliberately not a comment and not blank.
  *
  * @param {number} index Which removed line this is.
  * @returns {string} A non-inert source line this repo does not contain.
@@ -3362,21 +2684,12 @@ const removedText = (index) =>
 /**
  * A unified diff for an EDIT — a hunk carrying `-` lines — rather than for a pure addition.
  *
- * This is the shape EVERY edited line has in GitHub's `patch` field, and `patchAdding` cannot
- * produce it: the removed text is content the file being rendered no longer holds, surrounded by
- * context that it does. That asymmetry is the whole of the removal path — the anchor sequence must
- * EXCLUDE the removals (they are not in the new file) while the attribution walk must still PLACE
- * them (they are still changed lines), and a removed line must not advance the new-file cursor.
- *
- * The anchor window is identical to `patchAdding([line])`'s — the same seven lines of `source` —
- * so a one-line edit is directly comparable against the equivalent addition.
- *
  * @param {string[]} source The file the patch describes, by line.
  * @param {object} edit The edit to describe.
  * @param {number} edit.line The 1-based line of `source` the hunk is centred on.
  * @param {number} [edit.removed] How many `-` lines to emit immediately before it.
  * @param {boolean} [edit.replaced] True to emit `source[line - 1]` as `+` (a replace run), false to
- *   emit it as context (a deletion-only hunk, which adds nothing at all).
+ * emit it as context (a deletion-only hunk, which adds nothing at all).
  * @returns {string} The patch.
  */
 function patchEditing(source, { line, removed = 1, replaced = true }) {
@@ -3430,8 +2743,7 @@ function caseLiteralLines(id) {
 test('a labRunStates change selects the player windows that render runs — not none, not all', () => {
   // Its whole output is the three actor run containers and the `gatheringBlindRuns` world setting,
   // and only the player window reads either: the Journal in its entirety, the Crafting tab's run
-  // summary, the Gathering tab's in-flight rows. The manager renders `game.settings` definitions
-  // and touches no actor run flag.
+  // summary, the Gathering tab's in-flight rows.
   const selected = selectedIds(['tests/view-lab/world/labRunStates.js']);
   const everything = publishableCases();
   const players = everything.filter((viewCase) => viewCase.app === 'fabricate-app');
@@ -3490,24 +2802,11 @@ test('every lab input the registry cannot attribute selects surface coverage', (
   assert.ok(coverage < publishableCases().length / 3, 'coverage must be a fraction of the corpus');
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // Surface coverage.
-//
-// The set an unattributable change resolves to, and the reason the answer is no longer "all 243".
-// What these guard is the pair of properties that make the narrowing safe rather than merely
-// cheap: EVERY screen is still photographed (so no lab-input change can leave a window, a route or
-// a tab unproven), and each screen is photographed by a frame that actually shows it (not its
-// 680px variant, not a modal covering it).
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
  * The coverage set as `selectedIds` returns it: registry order, so a `deepEqual` against it pins
  * MEMBERSHIP and not merely a count.
- *
- * A count was enough while the widened answer was the whole corpus — there is exactly one
- * 246-element subset of a 246-element set, so `length === 246` implied membership. Coverage is a
- * proper subset, so the same assertion now passes for any 34 cases at all, including 34 wrong
- * ones. Every widening assertion below therefore compares ids.
  */
 const coverageIds = () => [...LAB_SURFACE_CASE_IDS];
 
@@ -3526,9 +2825,7 @@ test('surface coverage holds exactly one publishable case per surface, and misse
   const groups = casesBySurface();
 
   // A PARTITION, asserted in both directions: one representative per surface, and no surface
-  // without one. The second half is the one that matters — a screen missing from coverage is a
-  // screen a fixture change can break with nothing red, and it would arrive silently the day
-  // someone adds a route.
+  // without one.
   assert.deepEqual(
     [...new Set(LAB_SURFACE_CASES.map((viewCase) => labSurfaceKey(viewCase)))].sort(),
     [...groups.keys()].sort(),
@@ -3542,8 +2839,7 @@ test('surface coverage holds exactly one publishable case per surface, and misse
 
   // The partition above derives BOTH sides from `labSurfaceKey`, so it is satisfied by any key at
   // all — including one that returns each case's own id, under which every case becomes its own
-  // surface and coverage narrows nothing. Asserting that the key CONSOLIDATES is what makes the
-  // pair non-circular; it is the one property the partition cannot see.
+  // surface and coverage narrows nothing.
   assert.ok(
     [...groups.values()].some((group) => group.length > 1),
     'labSurfaceKey must fold a surface’s variants together — a key that consolidates nothing ' +
@@ -3557,10 +2853,7 @@ test('surface coverage holds exactly one publishable case per surface, and misse
     'coverage must photograph every application the registry renders'
   );
   // Every manager route, every player tab, and every application theme — derived from the cases
-  // rather than listed. `query.colorScheme` is the axis with the least margin for error: exactly
-  // two cases declare it, both `coverage-theme-light-*`, and they are the only frames the lab
-  // renders under Foundry's light chrome. Drop the theme term from `labSurfaceKey` and they fold
-  // into their dark twins and leave coverage — which every OTHER assertion in this file survives.
+  // rather than listed.
   for (const [axis, read] of [
     ['expectView', (viewCase) => viewCase.expectView],
     ['query.tab', (viewCase) => viewCase.query?.tab],
@@ -3581,11 +2874,9 @@ test('surface coverage holds exactly one publishable case per surface, and misse
 });
 
 test('the surface key falls back to the case id when a case declares neither route nor tab', () => {
-  // Unreachable from the registry today — every manager case declares `expectView` and every
-  // player case a `query.tab`, both separately gated above — so the fallback is asserted against
-  // synthetic cases rather than left to a future one to discover. Its whole job is to fail SAFE:
-  // an unclassifiable case must become its OWN surface and always be captured, never collapse
-  // into a shared `app|undefined` bucket and be represented by a frame of a different screen.
+  // Unreachable from the registry today — every manager case declares `expectView` and every player
+  // case a `query.tab`, both separately gated above — so the fallback is asserted against synthetic
+  // cases rather than left to a future one to discover.
   const app = VIEW_LAB_CASES[0].app;
   const first = labSurfaceKey({ app, id: 'lab-surface-probe-one' });
   const second = labSurfaceKey({ app, id: 'lab-surface-probe-two' });
@@ -3642,12 +2933,7 @@ test('a surface is represented by a frame that shows it, not by a variant of it'
     }
 
     // The third criterion, and the one that actually decides most surfaces: among the cases that
-    // TIE on the two above, the representative is the least-driven. Restricting to the tied pool
-    // is what makes this checkable — comparing against the whole group would fail wherever a
-    // stacked variant has fewer steps than the default-geometry frame that correctly beats it.
-    //
-    // Unpinned, reversing this comparison swaps a resting screen for an elaborately-configured one
-    // across most of the coverage set with nothing else in the suite going red.
+    // TIE on the two above, the representative is the least-driven.
     const tied = group.filter(
       (viewCase) =>
         (sizeOf(viewCase) === defaults.get(viewCase.app)) ===
@@ -3686,19 +2972,7 @@ test('an unattributable lab input does not swallow the frames its co-changed ren
 
 test('widening unions with what was already attributed, at every level it can happen', () => {
   // The defect this pins shipped in the first revision of surface coverage and was caught in
-  // review. Three code paths widened by REPLACING an accumulated selection rather than adding to
-  // it — each safe only while the widened answer was the whole corpus, which contained whatever it
-  // discarded. Coverage contains no detailed state, so each one silently dropped the frame of the
-  // very case the patch edited: a capture showing everything except the change.
-  //
-  // Both fixtures below are ordinary registry PRs, not corner cases. The first is "edit a case and
-  // touch the shared factory above it"; the second is "edit a case and also touch the fixture
-  // world". Each is asserted as coverage PLUS the edited case, so a regression to replacement reds
-  // on the missing id rather than on a count.
-  // A case deliberately NOT in coverage — the recipe editor's Tools tab folds into the
-  // `recipe-edit` route, whose representative is `manager-recipe-edit-normal`. If it were a
-  // coverage member the union would be indistinguishable from replacement and this would pass
-  // against the defect.
+  // review.
   const INSIDE_A_CASE_LITERAL = 'manager-recipe-edit-tools';
   assert.ok(
     !LAB_SURFACE_CASE_IDS.includes(INSIDE_A_CASE_LITERAL),
@@ -3737,10 +3011,7 @@ test('widening unions with what was already attributed, at every level it can ha
 });
 
 test('a region-attributed input widens by union too, and so does a straddling hunk', () => {
-  // The two widening call sites the union test above does not reach. `casesFromRegionPatch` is
-  // structurally distinct — it maps region keys through `selectsRegion` BEFORE widening — and
-  // `regionsTouchedAt` is the innermost level of all, where one hunk's changed lines fall partly
-  // inside a region and partly outside it. Both dropped the attributed half before review.
+  // The two widening call sites the union test above does not reach.
   const playerIds = publishableCases()
     .filter((viewCase) => viewCase.app === 'fabricate-app')
     .map((viewCase) => viewCase.id);
@@ -3761,12 +3032,9 @@ test('a region-attributed input widens by union too, and so does a straddling hu
     inRegistryOrder(playerIds)
   );
 
-  // ONE hunk that STRADDLES a boundary: two adjacent changed lines, the first the closing line of
-  // a case literal and the second the array's spread of `journalBlindRunCases()` — which is a call
-  // to shared code and therefore inside no region at all. `patchAdding` merges adjacent lines into
-  // a single run, so this really is one hunk with one anchor, which is the level `regionsTouchedAt`
-  // owns. The pair is picked from the registry's own text rather than invented: the spread is the
-  // only non-inert line between two case literals.
+  // ONE hunk that STRADDLES a boundary: two adjacent changed lines, the first the closing line of a
+  // case literal and the second the array's spread of `journalBlindRunCases()` — which is a call to
+  // shared code and therefore inside no region at all.
   const spread = registryLineOf('  ...journalBlindRunCases(),');
   assert.equal(registrySource[spread - 2], '  }),', 'the line above the spread must close a case');
   const closedCase = caseIdByLine().get(spread - 1);
@@ -3783,16 +3051,9 @@ test('a region-attributed input widens by union too, and so does a straddling hu
 });
 
 test('the two Access roster frames are pinned to the crowded roster the shim seeds', () => {
-  // A MIRROR GUARD ACROSS FOUR FILES THAT KNOW NOTHING ABOUT EACH OTHER (issue 1515): the two
-  // case literals here, `mount.js`'s query layer, `installFoundryShim.js`'s roster table and
-  // `GrantAccessInspector.svelte`'s own page size. A rename in any one of them leaves a query
-  // parameter nobody reads or a page size nothing fills, and neither failure says anything at
-  // the point it happens — it surfaces as a frame showing a one-row roster under a case named
-  // for a pager, which is exactly the class of defect issue 1632 records as undetectable.
-  //
-  // The ARITHMETIC is derived here rather than restated in the cases, for the reason the World >
-  // Parties page-size block a few hundred lines up gives: two magic numbers in two files drift,
-  // and the drift is invisible in a screenshot.
+  // A MIRROR GUARD ACROSS FOUR FILES THAT KNOW NOTHING ABOUT EACH OTHER (issue 1515): the two case
+  // literals here, `mount.js`'s query layer, `installFoundryShim.js`'s roster table and
+  // `GrantAccessInspector.svelte`'s own page size.
   const shimSource = readFileSync(
     resolve(ROOT, 'tests/view-lab/foundry/installFoundryShim.js'),
     'utf8'
@@ -3815,8 +3076,7 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
   assert.ok(Number.isInteger(pageSize) && pageSize > 0, 'the inspector states no roster page size');
 
   // The two claims the paged frame rests on, in the order they fail: a FULL first page, and a
-  // SECOND page to put a bar under it. A roster that fell to the page size satisfies the first
-  // and not the second, and would publish a full page with no pager.
+  // SECOND page to put a bar under it.
   assert.ok(
     rosterSize >= pageSize,
     `the seeded roster is ${rosterSize} and the page size ${pageSize}, so page one is not full ` +
@@ -3873,12 +3133,7 @@ test('the registry counts quoted in prose match the registry', () => {
   // These four numbers are hand-copied registry facts, and they have drifted three separate times:
   // this change found `AGENTS.md` claiming 155 cases, `CONTRIBUTING.md` claiming 181, and
   // `scripts/README.md` claiming 219 with a `reaches` split to match — three different wrong
-  // answers, none of which anything failed on. A contributor reads these to decide whether a
-  // capture is worth waiting for, so a stale one is not cosmetic.
-  //
-  // Matched by REGEX against the prose rather than by templating the docs, because the docs are
-  // written for humans and must stay readable; the regex is deliberately narrow enough that a
-  // rewrite of the surrounding sentence fails loudly here rather than silently skipping.
+  // answers, none of which anything failed on.
   const reaches = (value) =>
     publishableCases().filter((viewCase) => viewCase.reaches === value).length;
   const total = publishableCases().length;
@@ -3916,12 +3171,7 @@ test('the registry counts quoted in prose match the registry', () => {
 
 test('a lab-input-only change selects frames while leaving the evidence gate unarmed', () => {
   // The two answers are deliberately different, and the asymmetry looks like a bug in isolation —
-  // which is why it is pinned. `hasUiChanges` decides whether `check-screenshots` ARMS, and a
-  // fixture-only PR changes no render file, so it must not demand evidence of its author. The
-  // selector still answers with coverage, because `pr-screenshots.yml` renders those frames to
-  // verify the lab survived the change even though it publishes nothing for a gate that is not
-  // armed. "Fixing" `hasUiChanges` to include lab inputs would force screenshot evidence onto
-  // every fixture-only PR, and nothing else in this suite would notice.
+  // which is why it is pinned.
   const fixtureOnly = ['tests/view-lab/world/labContent.js'];
 
   assert.equal(hasUiChanges(fixtureOnly), false, 'a fixture-only change must not arm the gate');
@@ -3934,16 +3184,8 @@ test('a lab-input-only change selects frames while leaving the evidence gate una
 
 test('no single changed file selects more than one window, and every lab input reaches coverage', () => {
   // The invariant this narrowing exists for, asserted over the real tree rather than over a handful
-  // of sampled paths: no ONE file — no component, no stylesheet, no lab input — can demand a capture
-  // of every state of every screen.
-  //
-  // The ceiling is DERIVED, not a ratio. One window's worth of cases is the widest selection a
-  // single file legitimately makes today: `labRunStates.js` produces every actor run container and
-  // the blind-run setting, which only the player window reads, so it selects all of that window's
-  // cases and is separately pinned as doing exactly that. Anything above one window means a pattern
-  // widened past the window it belongs to — the failure this guards. A ratio of the corpus would
-  // instead drift: the margin shrinks as the player corpus grows relative to the whole, so a
-  // healthy registry would eventually red it for no defect at all.
+  // of sampled paths: no ONE file — no component, no stylesheet, no lab input — can demand a
+  // capture of every state of every screen. The ceiling is DERIVED, not a ratio.
   const total = publishableCases().length;
   const perApp = new Map();
   for (const viewCase of publishableCases()) {
@@ -3997,12 +3239,7 @@ test('a registry change with no usable patch selects surface coverage', () => {
     "    id: 'a-line-this-file-does-not-have',"
   );
 
-  // A malformed header over a body that WOULD anchor. The old fixture (`@@ this is not a hunk
-  // header @@\n+x`) stopped discriminating once attribution became content-anchored: `+x` occurs
-  // nowhere in the registry, so it widened whether the header was rejected or not, and relaxing
-  // `HUNK_HEADER_PATTERN` to `/^@@/` left the suite green. This body is a real seven-line window
-  // whose middle line is marked `+`, so the ONLY thing standing between it and a one-frame
-  // selection is the header-shape check.
+  // A malformed header over a body that WOULD anchor.
   const [, ...anchorableBody] = registryPatch([idLine]).split('\n');
   const malformedHeader = ['@@ this is not a hunk header @@', ...anchorableBody].join('\n');
   assert.deepEqual(
@@ -4060,13 +3297,11 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // A shared helper, a pattern constant, the array's own spread of a case factory, and the mapping
-  // function itself. Each can move any frame, and none is inside a case literal — so none can be
-  // attributed to a case, and each answers with one frame of every surface.
+  // function itself.
   for (const line of [
     'function managerCase(entry) {',
-    // Was `  'RadioCardGroup',`, one element of the hand-written `MANAGER_PRIMITIVES` array. Issue
-    // 1378 replaced that array with a derivation over `designSystemPrimitives.js`, so the same
-    // constant is now one line rather than fourteen; this is that line.
+    // Was ` 'RadioCardGroup',`, one element of the hand-written `MANAGER_PRIMITIVES` array (issue
+    // 1378).
     "const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');",
     '  ...journalBlindRunCases(),',
     'export function mapChangedFilesToCases(files = [], { patches } = {}) {',
@@ -4081,8 +3316,7 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
 
 test('a comment-only registry change selects one frame — not 157, and not none', () => {
   // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
-  // cost this narrowing exists to remove. It still yields the fallback frame rather than nothing,
-  // so no changed set silently produces no evidence.
+  // cost this narrowing exists to remove.
   const commentLine = registryLineOf(
     "    // Reached the way the smoke reaches it: by CLICKING the system row's identity, which is what"
   );
@@ -4093,8 +3327,7 @@ test('a comment-only registry change selects one frame — not 157, and not none
 
 test('a lab input no longer swallows the render files it ships with', () => {
   // The old blanket branch answered for the whole changed set and returned before the render files
-  // were consulted. That was invisible while the answer was "everything"; now that a lab input can
-  // select a subset, the selection is a UNION or those frames go missing.
+  // were consulted.
   const selected = selectedIds([
     'tests/view-lab/world/labRunStates.js',
     'src/ui/svelte/apps/manager/SystemEditView.svelte',
@@ -4119,8 +3352,7 @@ test('a lab input no longer swallows the render files it ships with', () => {
 
 test('the capture workflow hands the selector the patches it can narrow on', () => {
   // The library is pure — it never reads git — so the narrowing only happens if the workflow passes
-  // the `patch` field through. Without this guard the passthrough could be dropped and the only
-  // symptom would be a job that quietly went back to twenty minutes.
+  // the `patch` field through.
   const workflow = readFileSync(resolve(ROOT, '.github/workflows/pr-screenshots.yml'), 'utf8');
   assert.match(
     workflow,
@@ -4135,29 +3367,13 @@ test('the capture workflow hands the selector the patches it can narrow on', () 
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
-// Content-anchored attribution (issue 1049).
-//
-// `pr-screenshots.yml` runs on `pull_request`, so `actions/checkout` gives the job the MERGE commit
-// while the `patch` field from `pulls/{n}/files` describes the PR HEAD. A PR whose base moved the
-// file it patches therefore arrives with hunk headers whose line numbers do not land on the file
-// that will render — not a corner case, but the normal state of any PR that has been open while
-// something else merged.
-//
-// The first narrowing seeded a cursor from the header and compared each line against
-// `sourceLines[cursor - 1]`, so that PR silently paid the twenty-minute whole-corpus capture. Worse
-// in the other direction: a shifted patch landing on a verbatim twin of its own content verified
-// SUCCESSFULLY against the wrong occurrence and published a frame under a case name it does not
-// show. Both are pinned below, as is the precision deliberately given up to close the second one.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Content-anchored attribution (issue 1049). The first narrowing seeded a cursor from the header
+// and compared each line against `sourceLines[cursor - 1]`, so that PR silently paid the
+// twenty-minute whole-corpus capture.
 
 /**
  * The same patch with every hunk header's line numbers moved and its BODY untouched — what a
  * merge-commit checkout effectively does to a head-generated diff.
- *
- * The substitution is asserted to have applied. A `replaceAll` that quietly matched nothing would
- * leave every assertion below passing against the unshifted patch, which reads as "the anchoring
- * works" while nothing was perturbed.
  *
  * @param {string} patch A unified diff.
  * @param {number} delta Lines to move every header by.
@@ -4180,11 +3396,6 @@ function shiftHunkHeaders(patch, delta) {
 /**
  * Shifts that keep every header a positive line number, including the most extreme negative one
  * available — which moves the first hunk to line 1.
- *
- * Zero is filtered out rather than merely unlikely: a patch whose earliest hunk ALREADY starts at
- * line 1 makes that extreme shift a no-op, and `shiftHunkHeaders`' own "this changed nothing"
- * assertion would then fire on a patch that was never perturbable in the first place — a spurious
- * failure that says nothing about the anchoring.
  *
  * @param {string} patch A unified diff.
  * @returns {number[]} Deltas to apply.
@@ -4211,8 +3422,7 @@ function caseIdByLine() {
 
 /**
  * The four per-actor fixture tables the selector keys on, named once for every check below that has
- * to say them out loud. This IS a hand-written mirror of `LAB_ACTOR_FIXTURE_TABLES`' keys — the
- * canary further down is what makes it a guard rather than a second thing to keep in step.
+ * to say them out loud.
  */
 const FIXTURE_TABLE_NAMES = [
   'INVENTORIES',
@@ -4261,12 +3471,9 @@ const windowIndexes = new Map();
 /**
  * Every window of `size` consecutive lines of a file, mapped to the 1-based lines it starts at.
  *
- * Indexed once per file rather than rescanned per question: the removal fixtures below ask about
- * every candidate case literal, and a fresh scan apiece turns a millisecond test into a minute one.
- *
  * @param {string[]} source The file, by line.
  * @param {number} size Window length in lines; 7 is what one changed line plus git's three lines of
- *   context either side produces.
+ * context either side produces.
  * @returns {Map<string, number[]>} Window content -> the starts at which it occurs.
  */
 function windowIndex(source, size) {
@@ -4288,10 +3495,6 @@ function windowIndex(source, size) {
  * Every window of `size` consecutive lines of a file that occurs more than once, with the region
  * each occurrence's middle line belongs to.
  *
- * Measured from the shipped files rather than invented. The ambiguity the agreement rule refuses is
- * a property of the files this repo actually renders from — a synthetic fixture would prove the
- * rule against a file nobody ships, and would keep passing after the real duplication went away.
- *
  * @param {string[]} source The file, by line.
  * @param {Map<number, string>} owner Line number -> region key, for lines inside a region.
  * @param {number} size Window length in lines.
@@ -4308,9 +3511,7 @@ function recurringWindows(source, owner, size) {
 
 test('a patch whose hunk headers do not land still selects exactly what its content names', () => {
   // The regression this replaces: the same patch with its headers moved down three lines selected
-  // all 181 frames. The assertion is deliberately the same IDS, not merely a smaller count — a
-  // narrowing that lands on the wrong case is worse than one that widens, and a count cannot tell
-  // the two apart.
+  // all 181 frames.
   const inline = caseIds.filter((id) => registrySource.includes(`    id: '${id}',`));
   for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
     const patch = registryPatch([registryLineOf(`    id: '${id}',`)]);
@@ -4364,9 +3565,7 @@ test('a hunk whose content recurs in two different cases selects THOSE cases, no
 
   // The middle line of the window, patched with its OWN correct line numbers: the patch is aligned,
   // it verifies, and it is still ambiguous — the identical window elsewhere would attribute it to a
-  // different case. The honest answer is the UNION of the places it could be (issue 1127). That set
-  // always CONTAINS the true one, because the anchor sequence is content the rendered file holds at
-  // every candidate, so the edit landed at one of them.
+  // different case (issue 1127).
   for (const window of crossCase.slice(0, 3)) {
     const line = window.starts[0] + 3;
     const expected = [...new Set(window.ids)];
@@ -4386,13 +3585,7 @@ test('a hunk whose content recurs in two different cases selects THOSE cases, no
 });
 
 test('the SAME edit applied to sibling cases selects exactly those siblings (issue 1125 shape)', () => {
-  // The shape that made this worth fixing. PR #1125 added four identical lines to three sibling
-  // case literals; each hunk anchored at more than one of them, the candidates disagreed, and the
-  // capture widened to 209 frames and 28 minutes for want of three.
-  //
-  // Built from the registry's own duplication rather than invented: one window that recurs across
-  // several case literals, patched at its middle line in EVERY case it occurs in — which is what
-  // "the same edit, applied to each sibling" produces.
+  // The shape that made this worth fixing (issue 1125).
   const window = recurringWindows(registrySource, caseIdByLine(), 7)
     .filter((entry) => entry.ids.every(Boolean) && new Set(entry.ids).size > 2)
     .at(0);
@@ -4415,21 +3608,7 @@ test('the SAME edit applied to sibling cases selects exactly those siblings (iss
 });
 
 test('no recurring window mixes inside-a-region with outside-every-region, so no real diff needs that path', () => {
-  // The measurement, kept for what it still measures, with its original justification retired. It
-  // used to guard an UNFIXTURED BRANCH: a multi-candidate hunk with one candidate outside every
-  // region short-circuited and threw away the regions its other candidates had landed in, and no
-  // real input could produce that shape to assert against.
-  //
-  // There is no such branch now. A widening candidate contributes surface coverage and its
-  // siblings contribute their regions, and the answer is both (`regionsTouchedByHunk`), so the
-  // shape is defined rather than unfixtured — and `widening unions with what was already
-  // attributed` asserts the same rule at the levels a real diff CAN reach.
-  //
-  // What the measurement is still worth: none of the three region-attributed inputs contains a
-  // window that recurs both inside a region and outside every region, so no real diff exercises
-  // candidate-level widening at all. If this ever fails, that input has grown one — which is not a
-  // defect, just a shape worth an explicit assertion: its answer is that hunk's regions UNIONED
-  // with surface coverage.
+  // The measurement, kept for what it still measures, with its original justification retired.
   for (const [where, source, owner] of [
     ['the registry', registrySource, caseIdByLine()],
     [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],
@@ -4450,10 +3629,7 @@ test('no recurring window mixes inside-a-region with outside-every-region, so no
 test('a hunk the selector cannot anchor selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
-  // Every way a hunk can fail to name a unique place in the file that will render. The zero-context
-  // hunk is the one worth stating out loud: `-U0` produces a hunk whose body is entirely removals,
-  // so the sequence that must EXIST in the new file is empty — and an empty sequence occurs at
-  // every offset, which is not an attribution.
+  // Every way a hunk can fail to name a unique place in the file that will render.
   for (const [patch, why] of [
     ['@@ -100,0 +100,0 @@', 'a zero-context (`-U0`) hunk anchors nowhere'],
     ['@@ -1,2 +1,0 @@\n-one\n-two', 'a removal-only hunk has no new-file content to find'],
@@ -4473,10 +3649,6 @@ test('a hunk the selector cannot anchor selects surface coverage', () => {
 /**
  * How many times the seven-line window centred on a line occurs in its own file.
  *
- * The removal fixtures below all assert a SINGLE id, so each needs a line whose window anchors
- * uniquely — otherwise the agreement rule widens and the fixture would be measuring the ambiguity
- * rule instead of the removal path, and would pass whatever the removal path did.
- *
  * @param {string[]} source The file, by line.
  * @param {number} line The 1-based line the window is centred on.
  * @returns {number} Occurrences of that window in the file.
@@ -4493,12 +3665,6 @@ function windowOccurrences(source, line) {
 /**
  * Cases whose id line, and whose LAST content line, both anchor uniquely — so a fixture built at
  * either lands on exactly one place in the file.
- *
- * Derived rather than listed, and drawn at an even stride through the qualifying set rather than
- * from its head, so these cannot quietly become assertions about the registry's first few entries.
- *
- * `FALLBACK_CASE_ID` is excluded: the deletion-only fixture's wrong answer IS the fallback frame,
- * so a fixture built on the fallback case could not tell the right answer from the wrong one.
  *
  * @param {number} howMany How many to return.
  * @returns {{id: string, idLine: number, lastContentLine: number}[]} Qualifying cases.
@@ -4527,30 +3693,13 @@ function uniquelyAnchoredCases(howMany) {
   return Array.from({ length: howMany }, (_, index) => qualifying[index * stride]);
 }
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
-// The REMOVAL path (issue 1049 review).
-//
-// Every fixture above this point is addition-only, and `patchAdding` cannot emit a `-` line — so
-// the shape GitHub's `pulls/{n}/files` `patch` field has for every EDITED line was pinned by
-// nothing. Three separate defects survived that gap, each of which is a silent wrong answer rather
-// than an over-capture:
-//
-//   - building the anchor sequence from ALL lines instead of skipping the removals. Removed text is
-//     by definition absent from the file that will render, so every modify hunk would anchor
-//     nowhere and the whole narrowing would revert to 181 frames without one test going red;
-//   - advancing the new-file cursor on a removed line. A removed line occupies no new-file
-//     position, so counting it walks the cursor off the end of the case literal and attributes a
-//     replace run near a boundary to the NEIGHBOURING case;
-//   - attributing only `+` lines. A deletion-only hunk then touches nothing, and "nothing" is not
-//     "everything" — it collapses to the single fallback frame, which is a wrong narrowing rather
-//     than a safe widening.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The REMOVAL path (issue 1049 review). Every fixture above this point is addition-only, and
+// `patchAdding` cannot emit a `-` line — so the shape GitHub's `pulls/{n}/files` `patch` field has
+// for every EDITED line was pinned by nothing.
 
 test('a one-line EDIT inside a case literal selects the same case its addition does', () => {
   // The commonest diff shape there is, and the one no fixture had: one `-` for the old text, one
-  // `+` for the new, three lines of context either side. The anchor window is identical to the
-  // equivalent `patchAdding`, so the two must agree — asserted against the addition's own answer
-  // rather than against a hard-coded id, so the pair cannot drift apart.
+  // `+` for the new, three lines of context either side.
   for (const { id, idLine } of uniquelyAnchoredCases(3)) {
     const patch = patchEditing(registrySource, { line: idLine });
     assert.deepEqual(
@@ -4574,10 +3723,7 @@ test('a one-line EDIT inside a case literal selects the same case its addition d
 
 test("a replace run at a case literal's last line is not attributed to its neighbour", () => {
   // N removals followed by one addition, on the LAST content line of a literal — the shape a PR has
-  // when it replaces a block of steps with one. A removed line holds no new-file position, so
-  // counting it walks the cursor past the `  }),` that closes the case and into the literal that
-  // follows: the deeper the run, the further into the neighbour it lands. Eight is enough to clear
-  // the close line, the blank between elements and the next factory call.
+  // when it replaces a block of steps with one.
   for (const { id, lastContentLine } of uniquelyAnchoredCases(3)) {
     for (const removed of [1, 3, 8]) {
       const patch = patchEditing(registrySource, { line: lastContentLine, removed });
@@ -4593,9 +3739,7 @@ test("a replace run at a case literal's last line is not attributed to its neigh
 
 test('a deletion-only hunk inside a case literal selects that case, not the fallback', () => {
   // A hunk with `-` lines and no `+` at all still CHANGES the case it sits in, so it must select
-  // that case. Attributing only additions would make it select nothing — and nothing is not the
-  // safe answer here, it is the single fallback frame, published under a case the PR never touched.
-  // Asserted against `FALLBACK_CASE_ID` explicitly, because that is the wrong answer's shape.
+  // that case.
   for (const { id, idLine } of uniquelyAnchoredCases(3)) {
     for (const removed of [1, 3]) {
       const patch = patchEditing(registrySource, { line: idLine, removed, replaced: false });
@@ -4608,28 +3752,14 @@ test('a deletion-only hunk inside a case literal selects that case, not the fall
   }
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // `labActors.js`, attributed by fixture table (issue 1049).
-//
-// Narrowed on the axis that IS derivable — which fixture table a diff is confined to, and which
-// cases render actor-owned data at all — and NOT per actor. Only three cases in the whole registry
-// name an actor id; every player frame draws the whole roster through `ComponentSourcesBar` and computes its
-// listings from all three inventories, so a per-actor list would be hand-maintained work wearing
-// derived clothing, and its wrong answers would be silent.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 const playerCaseIds = () =>
   publishableCases()
     .filter((viewCase) => viewCase.app === 'fabricate-app')
     .map((viewCase) => viewCase.id);
 
-/**
- * The three canvas windows' cases, derived rather than listed.
- *
- * Keyed on "neither the player window nor the Manager", so a fourth canvas window registered
- * later is inside this set the day its `APP_CHROME` entry lands — which is what stops the canvas
- * attribution claims below going quietly half-true.
- */
+/** The three canvas windows' cases, derived rather than listed. */
 const canvasCaseIds = () =>
   publishableCases()
     .filter(
@@ -4677,8 +3807,7 @@ test('a labActors patch confined to a stock table selects every player frame and
 test('a labActors EDIT inside a stock table selects the same frames its addition does', () => {
   // The region path has its own copy of nothing — it shares `regionsTouchedByHunk` with the
   // registry — but it is the input a real PR is most likely to EDIT rather than append to, since
-  // restocking an actor rewrites a quantity in place. So the removal shape is pinned here too, and
-  // against the addition's own answer rather than a hard-coded list.
+  // restocking an actor rewrites a quantity in place.
   const line = labActorsLineOf("    'sm-iron-ore': 12,");
   assert.equal(
     windowOccurrences(labActorsSource, line),
@@ -4707,15 +3836,7 @@ test('a labActors EDIT inside a stock table selects the same frames its addition
 
 test('every knowledge render file the predicate probes is a real source file', () => {
   // These four paths are STRINGS tested against each case's `sourceMatches` regexes, so a rename
-  // makes a probe match nothing — and nothing else notices. `every sourceMatches pattern resolves
-  // to at least one source file` does not: the pattern claiming `ItemPageInspector.svelte` is an
-  // alternation whose other branches still resolve, so it stays green while the probe goes dead and
-  // `manager-system-edit-normal` silently drops out of the knowledge selection.
-  //
-  // The list is IMPORTED, not restated. A copy here would go on naming the renamed file, so this
-  // test and `knowledgeSurfaceCaseIds` below would both stay green against a live probe that had
-  // stopped matching anything — the test claiming to check what the predicate probes while
-  // checking a second list nothing consults.
+  // makes a probe match nothing — and nothing else notices.
   const missing = ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => !sourceFiles.includes(file));
   assert.deepEqual(
     missing,
@@ -4760,14 +3881,7 @@ test('a labActors patch confined to a knowledge table adds the frames that read 
 test('every knowledge or books-scrolls case is inside the sourceMatches-derived set', () => {
   // The predicate is keyed on `sourceMatches` rather than on `kinds`, because `sourceMatches`
   // already declares which render files a case is evidence about and is ALREADY gated for
-  // completeness by `tests/view-lab-source-coverage.test.js`. A `kinds`-keyed predicate would need
-  // a hand-listed set of nav selectors to police instead.
-  //
-  // The two derivations must therefore agree in the direction that matters: a case tagged as a
-  // Knowledge or Books & Scrolls frame that does NOT claim one of those render files would be
-  // dropped from the selection silently. The reverse is allowed and is one frame today —
-  // `manager-system-edit-normal` declares `ItemPageInspector` in its own `sourceMatches`, so
-  // honouring its declaration costs that frame rather than second-guessing it.
+  // completeness by `tests/view-lab-source-coverage.test.js`.
   const derived = new Set(knowledgeSurfaceCaseIds());
   const missing = publishableCases()
     .filter((viewCase) =>
@@ -4789,17 +3903,7 @@ test('every knowledge or books-scrolls case is inside the sourceMatches-derived 
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // An oracle for `ACTOR_KNOWLEDGE_RENDER_FILES` itself (issue 1052).
-//
-// Every check above trusts the list's CONTENT to derive the expectation it then checks itself
-// against, which is tautological for a change to the list: deleting an entry moves both sides of
-// an assertion together, so `every knowledge or books-scrolls case is inside the sourceMatches-
-// derived set` cannot see the deletion at all. These three checks derive their expectation from
-// something the list does NOT control — the live registry's own admission arithmetic, and the
-// `kinds` tag vocabulary independently of any render-file probe — so a deleted entry actually
-// changes one side without moving the other.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
  * @param {string[]} list Render-file paths, tested against each case's own `sourceMatches`.
@@ -4815,15 +3919,7 @@ const admittedCaseIds = (list) =>
 /**
  * Entries in `ACTOR_KNOWLEDGE_RENDER_FILES` that admit no case on their own — because every case
  * their own path could admit is already admitted by another entry declared in that SAME case's
- * `sourceMatches`. Follows `UNCLAIMED_BY_DESIGN` in `tests/view-lab-source-coverage.test.js`: a
- * frozen list of path plus reason, gated below in both directions so a stale exemption cannot
- * outlive the thing it exempted.
- *
- * `RecipeItemEditorTabs.svelte` is redundant for a second reason worth recording but not acting
- * on here: it is a pure tab strip taking `activeTab`, `badges` and `onSelect` — it reads no owned
- * copy or learned-recipe data itself, which contradicts this file's own docblock ("the render
- * files that read an actor's owned recipe-item copies or learned recipes"). Fixing that would mean
- * editing `scripts/lib/viewLabCases.js`, which this file does not own.
+ * `sourceMatches`.
  */
 const REDUNDANT_BY_DESIGN = Object.freeze([
   {
@@ -4843,9 +3939,7 @@ const REDUNDANT_BY_DESIGN = Object.freeze([
 
 test('every entry in ACTOR_KNOWLEDGE_RENDER_FILES is necessary, or recorded as redundant', () => {
   // For each entry NOT covered by REDUNDANT_BY_DESIGN: removing it from the list must strictly
-  // shrink the admitted set. This is the direction a deletion of a NECESSARY entry cannot pass —
-  // `KnowledgeView.svelte` and `ItemPageInspector.svelte` both fail it once removed, which is the
-  // issue's own defect reproduced as a positive assertion.
+  // shrink the admitted set.
   const redundantPaths = new Set(REDUNDANT_BY_DESIGN.map((entry) => entry.path));
   const full = admittedCaseIds(ACTOR_KNOWLEDGE_RENDER_FILES);
   const notNecessary = [];
@@ -4873,9 +3967,7 @@ test('REDUNDANT_BY_DESIGN entries are still list members, still redundant, and s
       `REDUNDANT_BY_DESIGN entry "${entry.path}" no longer names a member of ` +
         'ACTOR_KNOWLEDGE_RENDER_FILES — delete the exemption or fix the rename'
     );
-    // Direction two: a key that has become necessary. If the registry changes so this entry now
-    // admits a case nothing else does, the exemption itself would hide exactly the defect Task 1
-    // exists to catch.
+    // Direction two: a key that has become necessary.
     const without = admittedCaseIds(
       ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => file !== entry.path)
     );
@@ -4896,9 +3988,7 @@ test('REDUNDANT_BY_DESIGN entries are still list members, still redundant, and s
 /**
  * Publishable cases the `knowledge`/`books-scrolls` tag vocabulary cannot reach, but which
  * genuinely render an owned-knowledge surface — proven by declaring one of
- * `ACTOR_KNOWLEDGE_RENDER_FILES` in their OWN `sourceMatches`, not asserted from outside it. Gated
- * below the same way REDUNDANT_BY_DESIGN is: a member that stops declaring the render file, or
- * that gains a `knowledge`/`books-scrolls` tag and so no longer needs the exemption, fails.
+ * `ACTOR_KNOWLEDGE_RENDER_FILES` in their OWN `sourceMatches`, not asserted from outside it.
  */
 const KNOWLEDGE_EXTRAS_BY_DESIGN = Object.freeze([
   {
@@ -4969,11 +4059,7 @@ test('KNOWLEDGE_EXTRAS_BY_DESIGN entries are still publishable, still untagged, 
 test('a labActors change outside its fixture tables selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
-  // `ACTOR_DEFINITIONS` is deliberately on this side. A name and a portrait are not confined to the
-  // surfaces that read an actor's holdings: `ActorSelectTopBar` draws them on every player frame,
-  // and the manager draws them in the Knowledge roster, the Gathering → Travel party rows, the
-  // grant-access roster and the stamina roster. The builders below reach further still —
-  // `buildDocumentIndex` is the uuid table `fromUuid` resolves against.
+  // `ACTOR_DEFINITIONS` is deliberately on this side.
   for (const line of [
     "    name: 'Brenna Karrunsdottir',",
     'function ownedItem(componentId, component, quantity, index) {',
@@ -4995,9 +4081,7 @@ test('a labActors change outside its fixture tables selects surface coverage', (
 
 test('the four labActors fixture tables the selector keys on still exist under those names', () => {
   // The selector finds each table by a column-zero `const NAME = ` line whose statement that line
-  // OPENS. Either half failing fails SAFE — the parse returns null and the whole corpus is selected
-  // — which is correct and invisible: the only symptom would be a job quietly back at twenty
-  // minutes. So both have to fail LOUDLY here too.
+  // OPENS.
   const declared = FIXTURE_TABLE_NAMES.filter(
     (name) => !labActorsSource.some((line) => line.startsWith(`const ${name} = `))
   );
@@ -5010,10 +4094,7 @@ test('the four labActors fixture tables the selector keys on still exist under t
   );
 
   // The second invisible shape, which the probe above cannot see: a table collapsed onto ONE line
-  // still `startsWith` its own declaration. It parses to a span that runs to the NEXT column-zero
-  // `};` — so it answers for whatever is declared in between, under the wrong table's key, and
-  // that is a wrong NARROWING rather than a safe widening. `parseLabActorTableRegions` refuses it,
-  // and this is where the fixture drifting into that shape gets named.
+  // still `startsWith` its own declaration.
   const selfClosing = FIXTURE_TABLE_NAMES.filter(
     (name) => !labActorsSource.find((line) => line.startsWith(`const ${name} = `)).endsWith('{')
   );
@@ -5026,14 +4107,7 @@ test('the four labActors fixture tables the selector keys on still exist under t
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // `parseLabActorTableRegions`, driven directly (issue 1049 review).
-//
-// The tests above reach it only through `mapChangedFilesToCases`, over the file this repo actually
-// ships — which is well-formed, so both of its refusals are unreachable from there and were pinned
-// by nothing. It is already a pure function of an injected `string[]`, so a synthetic fixture needs
-// no file, no path injection and no second copy of the walk: just call it.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
  * One top-level fixture table, authored the way Prettier authors them.
@@ -5069,9 +4143,7 @@ test('parseLabActorTableRegions maps each fixture table to its own span, in file
 test('parseLabActorTableRegions refuses a table whose opening line closes its own statement', () => {
   // The direct check on the assumption, and NOT reachable through the overlap check: the one-lined
   // table here swallows a plain const rather than another table, so no two table spans overlap and
-  // the consequence check passes. Verified by mutation — deleting the opening-line check from
-  // `parseLabActorTableRegions` makes this fixture parse, with `BROKEN_STACKS` spanning lines 5-9
-  // and answering for every line of `TOOL_DURABILITY`.
+  // the consequence check passes.
   const swallowed = ['const TOOL_DURABILITY = {', "  'sm-hammer': 3,", '};', ''];
   const source = [
     ...tableBlock('INVENTORIES'),
@@ -5095,9 +4167,8 @@ test('parseLabActorTableRegions refuses a table whose opening line closes its ow
 });
 
 test('parseLabActorTableRegions refuses tables whose spans overlap', () => {
-  // The consequence check, on the shape the direct check above cannot see: a legitimate opener —
-  // it ends in `{` — whose close the column-zero search cannot find, because a second call wraps
-  // it. `INVENTORIES` then runs to `BROKEN_STACKS`' close and contains it whole.
+  // The consequence check, on the shape the direct check above cannot see: a legitimate opener — it
+  // ends in `{` — whose close the column-zero search cannot find, because a second call wraps it.
   const wrapped = [
     'const INVENTORIES = Object.freeze(withDefaults({',
     "  'lab-actor-brenna': { 'sm-iron-ore': 12 },",
@@ -5123,18 +4194,7 @@ test('parseLabActorTableRegions refuses tables whose spans overlap', () => {
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // `mount.js`, attributed by MARKED region (issue 1198).
-//
-// The page that mounts every frame was an unattributed lab input, so any edit to it selected the
-// whole corpus — which is what the PR introducing the player companion seam would have done to
-// itself. Four of its blocks only the PLAYER window can render, and each is marked in the file
-// rather than found by column, because two of them sit inside functions the Manager window runs
-// too (`readParams` and `settle`). Keying on those FUNCTIONS would claim a readership the file
-// does not have: a later edit to a manager query param would then select the player frames and
-// publish no evidence for the manager frames it moved — a silent wrong narrowing, which is the
-// one outcome this whole table exists to make unreachable.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 const labMountLineOf = (text) => lineOf(labMountSource, text, LAB_MOUNT_PATH);
 
@@ -5142,12 +4202,7 @@ const labMountLineOf = (text) => lineOf(labMountSource, text, LAB_MOUNT_PATH);
 const labMountPatches = (lineNumbers) =>
   patchesFor(LAB_MOUNT_PATH, patchAdding(labMountSource, lineNumbers));
 
-/**
- * One anchor line inside each declared region, so every key is pinned rather than sampled.
- *
- * A multi-key region entry requires ALL its keys to parse or it widens, so a region left
- * unpinned here is a region whose spelling can drift back to a twenty-minute capture unnoticed.
- */
+/** One anchor line inside each declared region, so every key is pinned rather than sampled. */
 const MOUNT_REGION_ANCHORS = [
   ['player-extension-params', "    playerProvider: params.get('playerProvider') === '1',"],
   [
@@ -5158,14 +4213,7 @@ const MOUNT_REGION_ANCHORS = [
   ['player-settle-stores', '      if (pending.length === 0) break;'],
 ];
 
-/**
- * The same, for the two regions only the three CANVAS windows can render (issue 1520).
- *
- * A SEPARATE list rather than two more rows above, because the assertion each list drives is a
- * different claim: the player list is held to "selects every player frame and no manager frame",
- * and a canvas row in it would fail that loop rather than be checked by it. The two are
- * concatenated for the marker-count and parser checks, which quantify over every declared key.
- */
+/** The same, for the two regions only the three CANVAS windows can render (issue 1520). */
 const CANVAS_MOUNT_REGION_ANCHORS = [
   ['canvas-mount-params', "    interactable: params.get('interactable') ?? null,"],
   ['mount-canvas-app', "    exportName: 'InteractableBrowserApp',"],
@@ -5195,9 +4243,8 @@ test('a mount.js patch confined to a player region selects every player frame an
     );
   }
 
-  // The removal shape too, on the region a real PR is most likely to EDIT rather than append to:
-  // a param default is rewritten in place, not added beside itself. Asserted against the
-  // addition's own answer so the two cannot drift apart.
+  // The removal shape too, on the region a real PR is most likely to EDIT rather than append to: a
+  // param default is rewritten in place, not added beside itself.
   const line = labMountLineOf(MOUNT_REGION_ANCHORS[0][1]);
   assert.equal(
     windowOccurrences(labMountSource, line),
@@ -5219,10 +4266,9 @@ test('a mount.js patch confined to a player region selects every player frame an
 test('a mount.js change outside its player regions selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
-  // The first line is the proof that the marking is doing the work rather than the function
-  // name: it is a query param inside the SAME `readParams()` the player block sits in, three
-  // lines away from it and outside the markers, and it must widen. The rest are the shared
-  // machinery every frame of both windows renders through.
+  // The first line is the proof that the marking is doing the work rather than the function name:
+  // it is a query param inside the SAME `readParams()` the player block sits in, three lines away
+  // from it and outside the markers, and it must widen.
   for (const line of [
     "    colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',",
     '  const determinismStyle = installDeterminismStyles();',
@@ -5294,22 +4340,7 @@ test('the six mount.js regions the selector keys on are still marked in the file
 
 test('the player-only readership of the settle-stores region is still a fact about the Manager', () => {
   // Three of the four regions are player-only STRUCTURALLY — they are the player mount path, the
-  // player provider and the player query params, and no manager frame reaches them. The fourth
-  // is not: `settle()` runs for BOTH windows, and this block's player-only readership rests
-  // entirely on a claim about a different file — that the six store names it waits on are names
-  // the Manager's `_buildServices()` does not declare, so `watched` is empty on every manager
-  // frame and an edit here cannot move one.
-  //
-  // Every other refusal in `parseMountRegions` fails SAFE: it widens to the whole corpus.
-  // This one fails UNSAFE. The day the Manager gains a `journal` or an `inventory` seam, an edit
-  // inside these markers narrows to player frames only and publishes NO evidence for the manager
-  // frames it moved — the silent wrong narrowing the whole table exists to make unreachable, and
-  // nothing else in the repo would notice. Asserted in prose in two files before this; asserted
-  // here.
-  //
-  // Both halves are DERIVED rather than restated: the names come out of the region itself, and
-  // the keys out of the manager's own services literal, so neither can drift from what it
-  // describes without failing.
+  // player provider and the player query params, and no manager frame reaches them.
   const region = parseMountRegions(labMountSource)?.find(
     (candidate) => candidate.key === 'player-settle-stores'
   );
@@ -5355,13 +4386,7 @@ test('the player-only readership of the settle-stores region is still a fact abo
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // `parseMountRegions`, driven directly.
-//
-// The tests above reach it only through `mapChangedFilesToCases`, over the file this repo ships —
-// which is well-formed, so every one of its refusals is unreachable from there. It is a pure
-// function of an injected `string[]`, so a synthetic fixture needs no file and no path injection.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /** The marked regions, authored the way the mount page authors them. */
 const mountRegionBlock = (key, { close = true } = {}) => [
@@ -5488,10 +4513,8 @@ test('the player companion cases photograph the seam through the production regi
     'the fault frame expects Core’s own diagnostic copy verbatim'
   );
 
-  // Containment is REPORTED by design, so the one frame whose subject is that report would fail
-  // the driver's console gate. The lab swallows exactly that message, only for a case that asked
-  // for a fault — pinned here because a widened prefix would start hiding real errors, and
-  // because the message it excuses is the shipped host's, so it is a mirror like any other.
+  // Containment is REPORTED by design, so the one frame whose subject is that report would fail the
+  // driver's console gate.
   const host = readFileSync(resolve(ROOT, 'src/ui/svelte/apps/PlayerExtensionHost.svelte'), 'utf8');
   assert.match(
     mountSource,
@@ -5512,9 +4535,7 @@ test('the player companion cases photograph the seam through the production regi
   assert.match(fault.expectSelector, /data-player-extension-fault/);
 
   // The lab registers through the PRODUCTION page-session registry and derives the snapshot with
-  // the same function the application host calls. Passing the registry alone would render an
-  // empty rail: the shell subscribes to nothing by design, and this file never runs
-  // `_registerHooks()`, so nothing else would compute `extensionSurfaces`.
+  // the same function the application host calls.
   assert.match(mountSource, /playerProvider: params\.get\('playerProvider'\) === '1'/);
   assert.match(
     mountSource,
@@ -5580,40 +4601,16 @@ test('the capture workflow renders and publishes the one id list it computed', (
   assert.match(runner, /join\(ARTIFACT_DIR, 'apps'\)/, 'the runner no longer writes `apps/`');
   assert.match(workflow, /--output-dir ui-screenshot-artifact\/apps/);
 
-  // `--clean` wipes that directory. The workflow must not pass it: a scoped render followed by a
-  // wiping publish would drop every frame the PR did not re-select, which is exactly the failure a
-  // narrowing makes reachable.
+  // `--clean` wipes that directory.
   assert.ok(
     !/view-lab-screenshots\.mjs apps[^\n]*--clean/.test(workflow),
     'the workflow wipes the frame directory before a scoped render, so unrendered frames are lost'
   );
 });
 
-// ── `expectView` is otherwise unguarded by `npm test` (issue 1096, B10 / BM8) ──────────
-//
-// `tests/view-lab-cases.test.js` asserted only that a case DECLARING `expectView` is a
-// manager case; the VALUE was never matched against any route id. Splitting `checks` into
-// four routes left eight cases comparing `'checks'` against `'checks-crafting'`, and that
-// failure surfaces at CAPTURE time — where it fails the job whole and publishes nothing.
-//
-// The pin states its scope and its vocabulary, because an unscoped one is unimplementable:
-// the registry carries 21 distinct `expectView` values, `expectView` is compared against
-// `data-manager-view`, and that attribute is bound from a free-form `currentView` string
-// with no declared registry. `craftingNav.js` is the worked counter-example — it declares a
-// nav item `settings` whose VIEW is `crafting-settings`, so a pin written against nav ids
-// would compare the wrong vocabulary entirely.
-//
-//   1. every value beginning `checks` is a member of `CHECKS_VIEWS`;
-//   2. `CHECKS_VIEWS` values ARE the `data-manager-view` strings the root renders — asserted
-//      as `currentView === '<id>'` literals, not as nav-item ids;
-//   3. every remaining value is one of those same literals.
-//
-// (3) closes the set rather than sampling it: the root declares exactly the literals the
-// registry uses, so the pin covers the whole registry instead of the checks subset.
-// THE RULE ITSELF, hoisted out of the two tests below so the capability proof cannot drift
-// from the enforcement. It was hand-copied into the proof, which meant a change to the
-// enforcing predicate left the proof asserting the OLD rule still rejected the old mistakes —
-// a proof of nothing, and green either way. One `accepts` is what makes the proof load-bearing.
+// `expectView` is otherwise unguarded by `npm test` (issue 1096, B10 / BM8).
+// `tests/view-lab-cases.test.js` asserted only that a case DECLARING `expectView` is a manager
+// case; the VALUE was never matched against any route id.
 function buildExpectViewPredicate() {
   const rootSource = readFileSync(
     resolve(ROOT, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
@@ -5634,17 +4631,7 @@ test('every expectView value names a route the manager root actually renders', (
   const { rootSource, rendered, accepts } = buildExpectViewPredicate();
   assert.ok(rendered.size > 10, 'the scan must find the manager root route literals at all');
 
-  // (2) — and it is the assertion that makes (1) worth anything. `CHECKS_VIEWS` is the set
-  // the checks half is pinned against, so if those strings were nav-item IDS rather than
-  // VIEW ids the pin would be checking a vocabulary nothing renders.
-  //
-  // The four values appear in no `currentView === '…'` literal, deliberately: the root
-  // routes the whole group through the `isChecksRoute` predicate rather than four branches.
-  // So the chain is asserted where it actually runs — `data-manager-view` is bound from
-  // `currentView`; the rail routes with `setView(checksItem.view)` over `checksNavItems`;
-  // and `buildChecksNavItems` puts exactly the `CHECKS_VIEWS` strings on `item.view`. Every
-  // link is checked, because breaking any one of them is what would make the checks half
-  // vacuous.
+  // (2) — and it is the assertion that makes (1) worth anything.
   assert.match(rootSource, /data-manager-view=\{currentView\}/);
   assert.match(rootSource, /setView\(checksItem\.view\)/);
   assert.match(rootSource, /const checksNavItems = \$derived\(buildChecksNavItems\(/);
@@ -5677,10 +4664,8 @@ test('every expectView value names a route the manager root actually renders', (
 });
 
 test('the expectView pin FAILS against the pre-split value, and against a nav id', () => {
-  // The capability proof, run against the two mistakes the pin exists to catch rather than
-  // against an arbitrary bad string. Both are what the registry ACTUALLY contained before
-  // this change, or what a plausible edit would put back.
-  // The SAME predicate the test above enforces with — not a restatement of it.
+  // The capability proof, run against the two mistakes the pin exists to catch rather than against
+  // an arbitrary bad string.
   const { accepts } = buildExpectViewPredicate();
 
   assert.equal(accepts('checks'), false, 'the PRE-SPLIT value must be rejected');
@@ -5692,19 +4677,9 @@ test('the expectView pin FAILS against the pre-split value, and against a nav id
   assert.equal(accepts('recipe-edit'), true);
 });
 
-// ── the recipe-readiness string-path probe (issue 1098, BH4) ─────────────────────────────
-//
-// `recipeReadiness.js` decides the readiness BADGES on the recipe editor's tabs, and issue
-// 1098 makes its routed-check validation policy-conditional. A change confined to it must
-// therefore select the recipe-editor frames — and it must NOT fall through to
-// `FALLBACK_CASE_ID`, which is what `mapChangedFilesToCases` returns when nothing matched
-// and is the silent failure this whole file exists to catch: the capture job would publish
-// the app shell and `check-screenshots` would go green on a frame showing nothing.
-//
-// PROVEN CAPABLE OF FAILING: pointing it at a path no `sourceMatches` covers (asserted
-// below against a deliberately unmatched file) returns exactly the fallback, so a
-// regression that stopped `recipeReadiness.js` matching would red the first assertion
-// rather than quietly widening the second.
+// the recipe-readiness string-path probe (issue 1098, BH4). `recipeReadiness.js` decides the
+// readiness BADGES on the recipe editor's tabs, and issue 1098 makes its routed-check validation
+// policy-conditional.
 test('a change confined to recipeReadiness.js selects the recipe-editor cases, never the fallback', () => {
   const selected = mapChangedFilesToCases([
     'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
@@ -5735,23 +4710,8 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
   );
 });
 
-// ── The environment editor's validation tab (issue 1517) ───────────────────────────────────
-//
-// THE DEFECT THIS PINS WAS A STALE CLAIM, NOT AN ABSENT ONE, and the difference is why it
-// survived a green tree for as long as it did. `EnvironmentValidationTab.svelte` sits in the
-// mounted closure, so `view-lab-source-coverage.test.js` has always required SOME case to claim
-// it — and four did, all four through the same `environment/` directory prefix, and not one of
-// them opens the validation tab: two stop on a Tasks tab, one on Events, one in the environments
-// browser. A change to that file therefore published four frames that structurally could not
-// contain it, every one of them reporting SATISFIED. Registering a fifth case does not retire
-// the four; the claims have to be narrowed as well, or the change publishes five frames of
-// which four are noise.
-//
-// BOTH DIRECTIONS ARE ASSERTED, because a narrowing has two ways to be wrong and only one of
-// them is loud. Excluding too little leaves the noise, which nothing else in the suite sees.
-// Excluding too much drops a sibling's claim — the SAME defect pointed at a different file —
-// and `view-lab-source-coverage.test.js` reds on that one; it is restated here anyway so this
-// file is discriminating when it is run alone, which is how a chunked run runs it.
+// The environment editor's validation tab (issue 1517). THE DEFECT THIS PINS WAS A STALE CLAIM, NOT
+// AN ABSENT ONE, and the difference is why it survived a green tree for as long as it did.
 const ENVIRONMENT_DIR = 'src/ui/svelte/apps/manager/environment/';
 
 /** The four cases whose `environment/` prefix claimed the validation tab without opening it. */
@@ -5805,9 +4765,8 @@ test('narrowing the environment claim leaves every sibling in that directory cla
 });
 
 test('the environment readiness module selects the validation frame AND the badge frames', () => {
-  // It is the producer of both: the tab strip's badge counts and the validation tab's own rows
-  // and verdict read the same evaluator. Narrowing the tab's claim must not narrow the module's,
-  // and registering the tab's case must not leave the module claiming only the old four.
+  // It is the producer of both: the tab strip's badge counts and the validation tab's own rows and
+  // verdict read the same evaluator.
   const selected = mapChangedFilesToCases([`${ENVIRONMENT_DIR}environmentReadiness.js`]).map(
     (viewCase) => viewCase.id
   );
@@ -5825,11 +4784,9 @@ test('the environment readiness module selects the validation frame AND the badg
 
 test('the validation surface is represented by a frame that can draw its View deep link', () => {
   // `EditorValidationSurface`'s representative pair photographs the surface's two rail arities and
-  // NEITHER can contain the row's View button: it renders only where a row carries a route, and
-  // the two frames the pair names are a Checks tick list and a recipe-item tab whose producer
-  // emits none. The registry recorded that gap in its own prose and left it open. A third member
-  // closes it, and it is pinned by ID rather than by count so that dropping it and adding some
-  // other frame is a visible edit rather than an arithmetic one.
+  // NEITHER can contain the row's View button: it renders only where a row carries a route, and the
+  // two frames the pair names are a Checks tick list and a recipe-item tab whose producer emits
+  // none.
   const members =
     BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/EditorValidationSurface.svelte'];
   assert.ok(
@@ -5839,29 +4796,15 @@ test('the validation surface is represented by a frame that can draw its View de
   );
 
   // The FOURTH member, pinned the same way and for a state neither the pair nor the recipe frame
-  // can reach: the IN-GROUP SORT. A group has to hold two kinds of row for the lift to be visible
-  // at all, and the Checks route is the only one that draws a tick and an issue together — in its
-  // CLEAN state (`manager-checks-validation`) the groups are ticks alone. This case types a
-  // placement the migration shim refuses and reaches a critical issue, which is the row that
-  // rises. Its own `sourceMatches` name `apps/manager/checks/` only, so without this entry a
-  // change to the shared surface never selects it.
+  // can reach: the IN-GROUP SORT.
   assert.ok(
     members.includes('manager-checks-validation-retired-placeholder'),
     "the surface's representative set must include the one frame whose group holds both a " +
       `critical issue and a tick, or the in-group sort is published by nothing; it is ${JSON.stringify(members)}`
   );
 
-  // And that frame has to prove it drew the BUTTON. `expectView` gates the ROUTE, and a route
-  // survives a tab click that did nothing — so without this the case publishes whatever tab the
-  // recipe editor opened on and reports SATISFIED for a change about validation rows.
-  //
-  // A ROW WAS THE FIRST ATTEMPT AND COULD NOT FAIL, which is why the clause is written on the
-  // hook instead. `EditorValidationSurface` puts `manager-recipe-val-row` on every `<li>`
-  // whatever its status and `evaluateRecipeReadiness` always emits its structural ticks, so
-  // `.manager-recipe-val-row` was satisfied by construction on every recipe in the corpus: it
-  // rejected a wrong tab and an empty stack, and never the missing button this member exists to
-  // represent. `data-recipe-issue-view` is what the recipe editor passes as `viewDataAttr`, and
-  // the surface writes it only where a row carried a route.
+  // And that frame has to prove it drew the BUTTON. A ROW WAS THE FIRST ATTEMPT AND COULD NOT FAIL,
+  // which is why the clause is written on the hook instead.
   const recipeFrame = getCaseById('manager-recipe-edit-validation');
   assert.equal(
     typeof recipeFrame.expectSelector,
@@ -5875,12 +4818,7 @@ test('the validation surface is represented by a frame that can draw its View de
       `"${recipeFrame.expectSelector}"`
   );
 
-  // …AND THE FIXTURE HAS TO BE ABLE TO DRAW ONE. The clause above is a claim about the selector;
-  // this is the claim about the world it runs against, and it is the half whose absence let the
-  // first attempt ship. Derived through the REAL readiness evaluator over the REAL lab corpus
-  // rather than trusting the case's comment: a recipe whose issues all lose their `target`, or a
-  // step id that drifts off the one recipe that has one, fails the capture job WHOLE and
-  // publishes nothing for every case in the run.
+  // …AND THE FIXTURE HAS TO BE ABLE TO DRAW ONE.
   const routed = content.recipes
     .filter((recipe) => evaluateRecipeReadiness(recipe, {}).issues.some((issue) => issue.target))
     .map((recipe) => recipe.id);
@@ -5912,27 +4850,6 @@ test('the validation surface is represented by a frame that can draw its View de
 
 /**
  * The `name=value` pairs a component file writes STATICALLY, from its parsed template.
- *
- * ── THE HAYSTACK, STATED, BECAUSE THE VERSION THIS REPLACES GOT IT WRONG ─────────────────────
- * Three node populations of the Svelte AST and nothing else:
- *
- *  1. `Attribute` nodes with a single `Text` value on any element or component node — the markup
- *     form, `data-environment-tab="validation"`;
- *  2. the properties of the `ObjectExpression` a call site passes as `hookAttrs.root` — the
- *     hook-bag form `root: { 'data-recipe-tab': 'validation' }`, which is how a site that adopted
- *     `EditorValidationSurface` hands its own root hook to the shared surface;
- *  3. and, through (1), a component PROP written as a literal, such as
- *     `viewDataAttr="data-recipe-issue-view"`.
- *
- * JS comments, `<!-- … -->` blocks, `<style>` contents, string literals in the `<script>` and
- * template TEXT NODES are all OUTSIDE it: the parser puts them in nodes this never visits.
- *
- * The predecessor was a regex over comment-stripped file TEXT, and its own comment claimed a
- * conversion that dropped the hook would red here. It would not. Measured: deleting
- * `data-environment-tab="validation"` from the root element outright and declaring a
- * `const hookAttrs = { root: { 'data-environment-tab': 'validation' } }` that NOTHING spreads
- * left the whole file green — the exact adoption slip the pin was written for. The same literal
- * as visible `<p>` text satisfied it too.
  *
  * @param {string} source `.svelte` text
  * @param {string} filename for the parser's own error messages
@@ -5967,27 +4884,14 @@ function staticPairsIn(source, filename) {
   return pairs;
 }
 
-/**
- * {@link staticPairsIn} over one repo-relative `.svelte` path.
- *
- * @param {string} file
- * @returns {Set<string>}
- */
+/** {@link staticPairsIn} over one repo-relative `.svelte` path. */
 function staticAttributePairs(file) {
   const source = SOURCES[file];
   assert.ok(source, `${file} is not in the .svelte corpus this reads`);
   return staticPairsIn(source, file);
 }
 
-/**
- * A SYNTHETIC component carrying one probe hook six times over, in six different positions.
- *
- * Three of the six render and three do not, and the corpus cannot tell them apart: a completed
- * conversion contains no negative case, so the live files can only ever confirm that the reader
- * finds what is there. What the clause below actually needs is the other direction — that the
- * reader does NOT find the four spellings that reach no DOM — and the one the pin exists for is
- * `unspread`: a bag DECLARED and never passed, which is the adoption slip that ships green.
- */
+/** A SYNTHETIC component carrying one probe hook six times over, in six different positions. */
 const HOOK_DETECTOR_SOURCE = [
   '<!-- data-probe="commented" -->',
   '<script>',
@@ -6016,17 +4920,7 @@ test('the validation hook reader sees what renders and not what merely appears',
 
 test('each validation frame names a hook the component it opens actually writes', () => {
   // THE SUITE-WIDE `expectSelector` CHECK CANNOT DO THIS, and the gap is measured rather than
-  // assumed. That check tokenizes the selector against a whole-tree haystack and strips attribute
-  // VALUES first, so `[data-environment-tab="validation"]` is satisfied by the Events tab writing
-  // `data-environment-tab="events"` in a different file. Proved by mutation: renaming the
-  // attribute on the validation tab alone, and on the recipe validation tab alone, left that
-  // check green in both cases. What a capture actually resolves is the attribute on THAT
-  // component, so that is what this pins — one file, one pair, per frame.
-  //
-  // It is also the contract a later adoption of `EditorValidationSurface` has to keep. The
-  // surface preserves a site's own hooks through `hookAttrs`, so both spellings are admitted —
-  // see {@link staticAttributePairs} for which, and for the haystack that makes a DECLARED and
-  // unspread bag fail rather than pass.
+  // assumed. It is also the contract a later adoption of `EditorValidationSurface` has to keep.
   const pins = [
     [
       // The markup form: the tab writes the hook on its own root element.
@@ -6042,10 +4936,7 @@ test('each validation frame names a hook the component it opens actually writes'
       'manager-recipe-edit-validation',
     ],
     [
-      // The row ACTION's hook, which the same frame's selector now names. The surface writes this
-      // attribute only where a row carried a route, so the pin is on the site's `viewDataAttr`
-      // prop; that the surface spreads it is held by `recipe-validation-tab.test.js`, which
-      // mounts the tab and reads `[data-recipe-issue-view]` out of the rendered DOM.
+      // The row ACTION's hook, which the same frame's selector now names.
       'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
       'viewDataAttr=data-recipe-issue-view',
       'manager-recipe-edit-validation',
@@ -6065,48 +4956,15 @@ test('each validation frame names a hook the component it opens actually writes'
   // that the reader finds what is present.
 });
 
-// ── The world-tool capture cases and the lab fixture that feeds them (issue 1373) ──────────
-//
-// A CASE THAT NAMES A FIXTURE RECORD IS A HAND-MAINTAINED MIRROR, and this is the guard that
-// stops it rotting silently. The `world-tool-entry` case is reached by CLICKING a catalogue
-// row, so its steps name a world tool by id; the capture driver throws by name on a selector
-// that matches nothing, and a case registered ahead of its data fails the capture run WHOLE,
-// thereafter, for every change that touches a capture input.
-//
-// So the ids the cases click are resolved against the lab world's own corpus, through the REAL
-// store and the REAL projection rather than by reading the fixture literal: what has to hold is
-// that the record survives normalization and projects a row, not that a key is present.
-/**
- * The one `(case, row)` pair whose row deliberately has NO membership record.
- *
- * The clause this exempts is a real one and stays for every other case: a world Tool ENTRY frame
- * taken on a record no crafting system has adopted shows an empty per-system cluster, and that is
- * a frame of an empty state rather than of the screen.
- *
- * `world-tool-entry-unlinked` is photographing something else, and its own `expectContained`
- * says so: the SOURCE tile's unlinked face, on the Overview tab, which is where a world record
- * with no game-world Item behind it states what it has and what it lacks. `worldScopeEntityGrouping`
- * records that state as one the `1.30.0` migration produces, and `lab-tool-unlinked` is the lab
- * corpus's instance of it. Giving it a membership to satisfy the clause would put a row it does
- * not have into the catalogue, the system Tool Rules library and three other frames, to green a
- * clause about a cluster this case's frame does not contain.
- *
- * The key is `<caseId>|<rowId>`, so the exemption is a pair rather than a blanket pass on the id:
- * a second case clicking the same row still has to answer the clause.
- *
- * @type {Set<string>}
- */
+// The world-tool capture cases and the lab fixture that feeds them (issue 1373). A CASE THAT NAMES
+// A FIXTURE RECORD IS A HAND-MAINTAINED MIRROR, and this is the guard that stops it rotting
+// silently.
+/** The one `(case, row)` pair whose row deliberately has NO membership record. */
 const MEMBERLESS_ROW_CASES = new Set([
   'world-tool-entry-unlinked|lab-tool-unlinked',
-  // The DANGLING SOURCE LINK record (issue 1373). Like `lab-tool-unlinked` above it, it is a
-  // world-ONLY entity: the state it exists to draw — `ItemDropZone`'s `missing` face, which
-  // renders only when a record NAMES an Item and that Item does not resolve — is a fact about a
-  // world record and about nothing a crafting system holds, and giving it a membership would put
-  // an unresolvable Tool into a system's rules list on every other frame of that list.
+  // The DANGLING SOURCE LINK record (issue 1373).
   'world-tool-entry-source-missing|lab-tool-warped-crucible',
-  // The same record on its Validation tab. Its memberlessness is not incidental there — it is one
-  // of the two warnings the frame exists to photograph, and the check that reports it says so in
-  // as many words: `No crafting system has this Tool, so its world defaults reach nothing.`
+  // The same record on its Validation tab.
   'world-tool-entry-validation|lab-tool-warped-crucible',
 ]);
 
@@ -6132,15 +4990,6 @@ test('every world tool id the capture cases click exists in the lab world, proje
   });
 
   // PAIRED WITH THE CASE THAT CLICKS IT, not flattened to a set of ids (issue 1373, round 2).
-  // The membership clause below has exactly one honest exception and it is a PER-CASE fact, so
-  // a bare set of ids could not express it without exempting the id everywhere.
-  //
-  // AND THE SCAN IS SCOPED TO THE TOOL ROUTES (issue 1371). It used to walk EVERY case in the
-  // registry and resolve every clicked row id against the TOOL corpus, which was correct only
-  // while the tool screens were the only ones whose cases clicked a scoped-list row. The
-  // component catalogue's cases click component ids, and this test would have reported them as
-  // world tools the lab does not hold — a true statement about the wrong corpus. The component
-  // twin is the test below.
   const clicked = [];
   for (const viewCase of VIEW_LAB_CASES) {
     if (!String(viewCase.expectView || '').startsWith('world-tool')) continue;
@@ -6196,37 +5045,9 @@ test('every world tool id the capture cases click exists in the lab world, proje
   );
 });
 
-// ── The world-COMPONENT capture cases and the lab fixture that feeds them (issue 1371) ──────
-//
-// The twin of the guard above, and it resolves against a DIFFERENT corpus for a reason that is
-// structural rather than incidental: the lab's world component roster is not a seeded literal.
-// The `1.30.0` migration LIFTS every crafting system's own `components[]` into world records at
-// boot, and the fixture seeds only the four states that migration cannot produce — an inheriting
-// category, a world tag list with a mute, a component no system has, and one with no source Item.
-//
-// So the id set a case may click is the UNION of the two halves, and asserting against either
-// alone would be wrong in opposite directions: the seed alone rejects every migrated row, and the
-// systems alone reject the two world-only records the entry cases are built on.
-// -- A FIXTURE ID IN A SELECTOR IS UNCHECKED BY THE SELECTOR GUARD (issue 1632) ----------------
-//
-// `collectSelectorHookFailures` STRIPS ATTRIBUTE VALUES before it tokenizes, and deliberately so:
-// a value is a fixture id, and fixture ids live in `tests/view-lab/world/`, not in `src/`. The
-// consequence is that the guard proves `data-recipe-id` still exists on some element and says
-// nothing whatever about `sm-r-runeplate-draft`. A renamed or deleted recipe therefore leaves the
-// whole suite green and fails twenty minutes into a capture run - where an aborted step takes the
-// ENTIRE run down, so no case in the registry publishes a frame.
-//
-// The world COMPONENT ids and the world TOOL ids already have their counterpart guards. This is
-// the recipe one, added with issue 1515's cases because two of them are the first to name a
-// recipe id for a state only that recipe can reach.
-//
-// FOUR ATTRIBUTES, because a recipe id reaches the DOM under four different hooks and a guard
-// that knew only the one this change happened to use would be green over the other three: the
-// browse row's identity (`data-recipe-id`), its edit pencil (`data-recipe-edit`), its
-// bulk-selection checkbox (`data-recipe-select`) and the Access route's row (`data-access-row`).
-// The SECTION / MODE / ADD attributes are deliberately NOT in the set - `data-recipe-section`,
-// `data-recipe-mode` and `data-recipe-add` carry vocabulary rather than identity, and demanding a
-// recipe of that name would fail on a correct registry.
+// The world-COMPONENT capture cases and the lab fixture that feeds them (issue 1371). The twin of
+// the guard above, and it resolves against a DIFFERENT corpus for a reason that is structural
+// rather than incidental: the lab's world component roster is not a seeded literal.
 test('every recipe id the capture cases name exists in the lab world', async () => {
   const { buildLabContent } = await import('./view-lab/world/labContent.js');
   const content = buildLabContent();
@@ -6236,9 +5057,7 @@ test('every recipe id the capture cases name exists in the lab world', async () 
   const IDENTITY_HOOK = /\[data-(?:recipe-id|recipe-edit|recipe-select|access-row)="([^"]+)"\]/g;
   const named = [];
   for (const viewCase of VIEW_LAB_CASES) {
-    // BOTH halves of a case, not only its steps. An `expectSelector` naming a dead id fails the
-    // capture exactly as a step does - it is the assertion the driver runs before it photographs
-    // - and `manager-recipes-bulk-edit-blocked` already names one there.
+    // BOTH halves of a case, not only its steps.
     const selectors = [
       ...(viewCase.steps ?? [])
         .filter((step) => typeof step === 'object')
@@ -6266,17 +5085,9 @@ test('every recipe id the capture cases name exists in the lab world', async () 
   }
 });
 
-// -- THE THREE STATES ISSUE 1515 REGISTERED, DERIVED FROM THE FIXTURE --------------------------
-//
-// Each of these three cases photographs a state that exists only because the fixture is in a
-// particular condition, and in every case the failure mode is a frame that looks fine. A repaired
-// recipe publishes the recipe browser with no flash; a system whose report empties publishes the
-// validation tab's own empty panel; an Access system that stopped being `restricted` does not
-// render the rail entry the case clicks at all.
-//
-// So the premise is DERIVED from production code over the fixture rather than restated. Nothing
-// here asserts a count or a message - both are free to move - only that the state each frame is
-// named for is still reachable.
+// THE THREE STATES ISSUE 1515 REGISTERED, DERIVED FROM THE FIXTURE. Each of these three cases
+// photographs a state that exists only because the fixture is in a particular condition, and in
+// every case the failure mode is a frame that looks fine.
 test('the states issue 1515 registered are still reachable from the lab fixture', async () => {
   const { buildLabContent } = await import('./view-lab/world/labContent.js');
   const { evaluateSystemValidation } = await import('../src/systems/systemValidation.js');
@@ -6296,9 +5107,7 @@ test('the states issue 1515 registered are still reachable from the lab fixture'
   };
 
   // `manager-recipes-blocked-enable-flash` presses a switch whose write the activation gate
-  // refuses. Two facts have to hold together: the recipe is OFF, so the click is an ENABLE and
-  // not a never-gated disable, and the readiness predicate the browse row's pill reads reports a
-  // critical issue against it, which is the same incompleteness activation refuses on.
+  // refuses.
   const flashCase = getCaseById('manager-recipes-blocked-enable-flash');
   const blockedId = /data-recipe-id="([^"]+)"/.exec(
     flashCase.steps.map((step) => step.selector ?? '').join(' ')
@@ -6321,8 +5130,7 @@ test('the states issue 1515 registered are still reachable from the lab fixture'
   );
 
   // `manager-system-edit-validation` photographs the kind-grouped issue list, and its
-  // `expectSelector` requires a populated `recipe` group inside the counts row. An empty report
-  // draws `data-system-overview-empty` instead, which is a different surface.
+  // `expectSelector` requires a populated `recipe` group inside the counts row.
   const validationCase = getCaseById('manager-system-edit-validation');
   assert.ok(
     reportFor(validationCase.query.system).issues.some((issue) => issue.kind === 'recipe'),
@@ -6389,18 +5197,9 @@ test('every world component id the capture cases click exists in the lab world',
   }
 });
 
-// ── EXISTENCE IS NOT REACHABILITY (issue 1371, round 2) ─────────────────────────────────────
-//
-// The guard above proves a clicked id is IN THE CORPUS. That is a different question from
-// whether its row hook is in the DOM, and the difference cost this lane a whole capture run: the
-// shared frame pages at ten rows and sorts `name-asc`, the lab world holds 68 world components,
-// and three of the four ids the component cases click sort onto pages 2, 4 and 7. Every one of
-// their row hooks was absent, the driver threw by name on a selector that matched nothing, and
-// because an abort takes the WHOLE run down, no case in the registry published a frame.
-//
-// So a case that clicks a scoped-list row must either land inside the first page under the
-// frame's own sort, or NARROW the list first. `fill` is the narrowing the frame offers a GM, and
-// it is the one this registry can check for without re-implementing the list model.
+// EXISTENCE IS NOT REACHABILITY (issue 1371, round 2). The guard above proves a clicked id is IN
+// THE CORPUS. So a case that clicks a scoped-list row must either land inside the first page under
+// the frame's own sort, or NARROW the list first.
 test('a capture case that clicks a scoped-list row can actually reach it', async () => {
   const { buildLabContent } = await import('./view-lab/world/labContent.js');
   const content = buildLabContent();
@@ -6414,19 +5213,9 @@ test('a capture case that clicks a scoped-list row can actually reach it', async
   const pageSize = Number(frame.match(/const DEFAULT_PAGE_SIZE = (\d+);/)?.[1]);
   assert.ok(pageSize > 0, 'the frame declares a default page size; the read is broken');
 
-  // The world component corpus as the catalogue orders it: every in-system component the
-  // migration lifts, plus the fixture's world-only records, by NAME ascending.
-  //
-  // IT MODELS `name-asc`, WHICH IS THE FRAME'S RESTING SORT AND NOT A UNIVERSAL ONE. Every world
-  // component case today lands on the list at rest and none declares a sort step, so the model is
-  // exact — but a case that clicked the sort-direction toggle, chose a different sort key, or set
-  // a page size would reorder or re-slice the very page this scan reasons about, and the guard
-  // would answer about a list the capture never renders. It fails in the SAFE direction for a
-  // reversed sort (a row believed to be on page one is not, and the assertion demands a narrowing
-  // step that is harmless to add) and in the UNSAFE direction for a widened page size (a row
-  // believed to be past the fold is reachable, and the guard asks for a step the case does not
-  // need). The day a component case declares a sort, this model has to read it off the case's own
-  // steps rather than assuming the resting one.
+  // The world component corpus as the catalogue orders it: every in-system component the migration
+  // lifts, plus the fixture's world-only records, by NAME ascending. IT MODELS `name-asc`, WHICH IS
+  // THE FRAME'S RESTING SORT AND NOT A UNIVERSAL ONE.
   const byName = [
     ...new Map(
       [
@@ -6502,19 +5291,7 @@ test('a capture case that clicks a scoped-list row can actually reach it', async
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // The fixture ids the three issue-1513 cases click, pinned against the lab world (issue 1632).
-//
-// Every OTHER guard in this file checks a selector's HOOKS against `src/`, and attribute VALUES
-// are stripped before that check runs — deliberately, because a value is a fixture id and fixture
-// ids do not live in `src/`. The consequence is that a drifted id inside a step selector is
-// checked by nothing: `[data-access-row="al-r-nonexistent"]` passes every sweep here and then
-// throws by name in the capture driver, which aborts the WHOLE run and publishes no frame at all.
-//
-// So these two read the fixture the same way `every world component id the capture cases click
-// exists in the lab world` reads its own, and they go one step further where existence is not
-// reachability: a row that exists on page four is as absent as a row that does not exist.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 test('the recipe-item contents cases open a definition the lab world holds, with recipes left to link', async () => {
   const { buildLabContent } = await import('./view-lab/world/labContent.js');
@@ -6570,14 +5347,10 @@ test('the recipe-item contents cases open a definition the lab world holds, with
   );
 });
 
-// ── THE PICKER FRAME'S SUBJECT MOVED WITH THE SEARCH FIELD (issue 1513, review r1) ────────
-// The case was registered one phase before the field existed and recorded, beside its own
-// `expectSelector`, that it made "no `.manager-travel-popover-search` claim: this call site
-// passes `showSearch={false}` today". That phase has landed and the claim is false, so
-// `design-system/spec.md:222` applies — a refusal the tree has overturned is RESTATED by the
-// change that overturns it. This clause is what keeps the two halves in step: the call site and
-// the frame's own assertion are a hand-maintained mirror, and a frame that stopped claiming the
-// field would go on publishing green over a panel that had lost it.
+// THE PICKER FRAME'S SUBJECT MOVED WITH THE SEARCH FIELD (issue 1513, review r1) ──────── The case
+// was registered one phase before the field existed and recorded, beside its own `expectSelector`,
+// that it made "no `.manager-travel-popover-search` claim: this call site passes
+// `showSearch={false}` today".
 test('the recipe-item picker frame claims the search field its call site now renders', () => {
   const callSite = readFileSync(
     resolve(ROOT, 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte'),
@@ -6642,8 +5415,7 @@ test('the access inspector case clicks a recipe row on the Access list first pag
     );
     // REACHABILITY, answered without appealing to the list's sort order: the Access list opens
     // unfiltered, so every row of a system holding no more than one page of recipes is on page one
-    // whatever order they arrive in. A system that outgrows a page would need this check to know
-    // that order, and the assertion says so rather than passing quietly.
+    // whatever order they arrive in.
     assert.ok(
       recipes.length <= pageSize,
       `${caseId} clicks "${id}" on a system holding ${recipes.length} recipes against a ` +
@@ -6653,19 +5425,8 @@ test('the access inspector case clicks a recipe row on the Access list first pag
   }
 });
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
-// `ComponentSourcesBar` publishes the three tabs it draws in, not only the one its directory names.
-//
-// The bar is the Crafting tab's right-slot content in the SHARED `ActorSelectTopBar`, and
-// `showSourcesBar` is `isCrafting || isInventory || isAlchemy` — three tabs. Its only routing was
-// `CRAFTING_SHARED`, a pattern over `apps/crafting/`, which cannot reach an inventory or alchemy
-// frame however many crafting frames it selects. Issue 1500 made exactly this repair for
-// `ActorSelectTopBar`, and its pin above is the shape this one takes.
-//
-// Written out rather than derived from the patterns: a pin that recomputed the answer from the
-// same `sourceMatches` it is checking would agree with any wiring, including the one it exists to
-// correct.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
+// `ComponentSourcesBar` publishes the three tabs it draws in, not only the one its directory names
+// (issue 1500).
 test('the crafting sources bar routes to the inventory and alchemy frames that draw it too', () => {
   const selected = mapChangedFilesToCases([
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',

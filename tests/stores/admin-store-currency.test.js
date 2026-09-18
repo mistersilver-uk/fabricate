@@ -1,15 +1,4 @@
-/**
- * The admin store's WORLD currency actions (issue 1278).
- *
- * Currency used to be per-crafting-system state, so these lived in `adminStore.test.js` inside
- * the selected-system describe and asserted against the `updateSystem` payload. The ladder,
- * spend strategy, provider and macro set are world scope now — one config for the whole world,
- * because a world runs one ruleset and so has one way actors store coins — so the actions take
- * no system id and persist through `CurrencyConfigStore` instead.
- *
- * These drive the REAL store against a REAL `CurrencyConfigStore` over an in-memory setting, so
- * the normalizer that the store round-trips through is exercised rather than stubbed.
- */
+/** The admin store's WORLD currency actions (issue 1278). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -226,8 +215,7 @@ describe('adminStore world currency actions', () => {
 
   it('actorInventory in a no-provider system (dnd5e) leaves configured units untouched', async () => {
     // Regression: dnd5e has no registered provider, so getDefaultProviderId('dnd5e') === '' and
-    // getProviderCanonicalUnits('') is empty. The actorInventory strategy must NOT wipe the GM's
-    // units in that case.
+    // getProviderCanonicalUnits('') is empty.
     const { store, currency } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
     await store.addCurrencyUnit({
       id: 'gp',
@@ -304,17 +292,7 @@ describe('adminStore world currency actions', () => {
 
 });
 
-/**
- * The derived world-currency validation report (issue 1493).
- *
- * `validateCurrencyProfile` shipped with ZERO callers in the manager UI, so a world whose ladder
- * could not be spent against said nothing at all in the place the ladder is authored — the GM only
- * found out at craft time, through a player being told they were poor.
- *
- * These drive the REAL store over a REAL `CurrencyConfigStore`, and read the published viewstate
- * rather than calling the validator directly: a test that calls `validateCurrencyProfile` itself
- * would pass on the broken tree, because the validator was never the defect.
- */
+/** The derived world-currency validation report (issue 1493). */
 describe('adminStore world currency validation', () => {
   it('publishes the report as a TOP-LEVEL sibling, leaving worldCurrency a four-key CurrencyConfig', async () => {
     const { store } = await setupCurrencyStore();
@@ -373,8 +351,7 @@ describe('adminStore world currency validation', () => {
 
   it('reports the strategy the ladder is actually on, not the one it was authored for', async () => {
     // A dnd5e ladder switched to actorInventory: `collectUnitStrategyErrors` requires a pf2e
-    // denomination, so every unit is named. This is the transient state a GM lands in mid-switch,
-    // and reporting it is the point — it is exactly why the craft would refuse.
+    // denomination, so every unit is named.
     const { store } = await setupCurrencyStore({ getFoundrySystemId: () => 'dnd5e' });
     await store.addCurrencyUnit({
       id: 'crowns',

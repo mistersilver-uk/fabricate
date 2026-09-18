@@ -1,29 +1,14 @@
 /**
- * Unit tests for RecipeVisibilityService (T-024)
- *
- * Covers:
- *   AC1 - Player mode listing (restricted/allowedUserIds)
- *   AC2 - Knowledge mode access (item/learned/itemOrLearned)
- *   AC3 - Recipe item matching (UUID and core.sourceId)
- *   AC4 - Limited-use exhaustion
- *   AC5 - Deterministic item selection
- *   AC6 - Learn operation
- *   AC7 - Edge cases
- *
- * Flag double-prefix:
- *   getFabricateFlag(doc, 'learnedRecipes', {}) calls
- *     doc.getFlag('fabricate', 'fabricate.learnedRecipes')
- *   FakeDocument.getFlag(scope, key) does getPathValue(this._flags[scope], key)
- *   _flags = { fabricate: <flagsArg> }
- *   So to seed 'learnedRecipes', pass flagsArg = { fabricate: { learnedRecipes: value } }
+ * Unit tests for RecipeVisibilityService (T-024). Covers: AC1 - Player mode listing
+ * (restricted/allowedUserIds) AC2 - Knowledge mode access (item/learned/itemOrLearned) AC3 - Recipe
+ * item matching (UUID and core.sourceId) AC4 - Limited-use exhaustion AC5 - Deterministic item
+ * selection AC6 - Learn operation AC7 - Edge cases
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -40,27 +25,20 @@ globalThis.ui = {
 // game.actors is used by cleanupLearnedRecipes — set per-test via helper
 globalThis.game = { actors: [] };
 
-// ---------------------------------------------------------------------------
 // Import after globals are set
-// ---------------------------------------------------------------------------
 
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-// The Knowledge projection's `spent` predicate, imported HERE so the two can be driven
-// over the same axes and required to agree (issue 785). It is a pure module and takes
-// no Foundry globals, so the deferred import above does not apply to it.
+// The Knowledge projection's `spent` predicate, imported HERE so the two can be driven over the
+// same axes and required to agree (issue 785).
 const { isRecipeItemSpent } = await import(
   '../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js'
 );
-// The entry-boundary reader the service and the GM surfaces share (issue 1143). Pure,
-// dependency-free, and imported here so the tests assert the same view production does
-// rather than re-deriving ids from the persisted shape by hand.
+// The entry-boundary reader the service and the GM surfaces share (issue 1143).
 const { readLearnedRecipeEntries, readDiscoveryProgressEntries } = await import(
   '../src/systems/recipeKeyedFlagEntries.js'
 );
 
-// ---------------------------------------------------------------------------
 // Path helpers
-// ---------------------------------------------------------------------------
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -82,28 +60,9 @@ function setPathValue(object, path, value) {
   target[last] = value;
 }
 
-// ---------------------------------------------------------------------------
-// Value-tree expansion (issue 1143)
-//
-// `Document#update` dot-expands the whole nested VALUE TREE of an `ObjectField`, not
-// just the update path key, so a map key containing a `.` is NOT persisted flat. Both
-// supported builds do it, by different routes:
-//
-//   V14.365 — `ObjectField#_cleanType` → `#reconstructOperators` calls
-//             `SchemaField.expandObject` then recurses into every nested plain object
-//             (`common/data/fields.mjs`).
-//   V13.351 — `DataModel#updateSource` (`common/abstract/data.mjs`) replaces `changes`
-//             with `expandObject(changes)` whenever any top-level key contains a dot,
-//             and V13's `expandObject` (`common/utils/helpers.mjs`) recurses into
-//             nested plain objects, re-splitting keys at EVERY depth via `setProperty`.
-//             Fabricate always writes the dotted `flags.fabricate.fabricate.<key>`
-//             path, so that guard always fires.
-//
-// This mirrors that recursion. Without it the doubles stored a dotted key verbatim,
-// which is the single reason no test saw issue 1143: every fixture lied about the
-// persisted shape. `pins the double against real Foundry V13.351 output` below asserts
-// this function's results against shapes produced by EXECUTING the real V13 helper.
-// ---------------------------------------------------------------------------
+// Value-tree expansion (issue 1143). `Document#update` dot-expands the whole nested VALUE TREE of
+// an `ObjectField`, not just the update path key, so a map key containing a `.` is NOT persisted
+// flat.
 
 function isPlainObjectValue(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -122,29 +81,15 @@ function expandValueTree(value, depth = 0) {
   return expanded;
 }
 
-// ---------------------------------------------------------------------------
-// FakeDocument
-//
-// Stores state in this._flags = { fabricate: <flagsArg> }
-// getFlag('fabricate', 'fabricate.learnedRecipes') resolves
-//   getPathValue(this._flags['fabricate'], 'fabricate.learnedRecipes')
-//   = this._flags.fabricate.fabricate.learnedRecipes
-// So to seed 'learnedRecipes', pass flagsArg = { fabricate: { learnedRecipes: value } }
-//
-// Every value the document accepts — the constructor seed, `setFlag`, and `update` —
-// goes through `expandValueTree`, so a fixture written with a dotted id is stored in the
-// shape Foundry would really persist it in. Seeding without expanding would leave the
-// fixture lying even once the two write paths were faithful (issue 1143).
-// ---------------------------------------------------------------------------
+// FakeDocument. Stores state in this._flags = { fabricate: <flagsArg> } getFlag('fabricate',
+// 'fabricate.learnedRecipes') resolves getPathValue(this._flags['fabricate'],
+// 'fabricate.learnedRecipes') = this._flags.fabricate.fabricate.learnedRecipes So to seed
+// 'learnedRecipes', pass flagsArg = { fabricate: { learnedRecipes: value } } (issue 1143).
 
 class FakeDocument {
   constructor(flagsArg = {}) {
     this._flags = { fabricate: expandValueTree(flagsArg) };
     // Spies (issue 773): payload-level assertions against the deletion primitive.
-    // The fake's setFlag REPLACES and is still merge-blind — that axis of fidelity is
-    // deliberately unmodelled — so a getFlag read-back cannot distinguish a reload-safe
-    // `-=` delete from a resurrecting setFlag-merge rebuild; the tests assert what
-    // update()/setFlag() RECEIVE. Value-tree EXPANSION is modelled faithfully (1143).
     this.updateCalls = [];
     this.setFlagCalls = [];
   }
@@ -170,10 +115,8 @@ class FakeDocument {
     }
   }
 
-  // Minimal `Actor#update` fake honouring Foundry's `-=<key>` deletion syntax so a
-  // reload (re-read via getFlag) reflects a real key removal. A leading `flags.`
-  // segment maps onto this._flags (where getFlag reads). Records every payload for
-  // payload-level assertions.
+  // Minimal `Actor#update` fake honouring Foundry's `-=<key>` deletion syntax so a reload (re-read
+  // via getFlag) reflects a real key removal.
   async update(changes = {}) {
     this.updateCalls.push(changes);
     for (const [rawPath, value] of Object.entries(changes)) {
@@ -200,9 +143,7 @@ class FakeDocument {
   }
 }
 
-// ---------------------------------------------------------------------------
 // FakeItem — extends FakeDocument with uuid, flags.core.sourceId, and delete()
-// ---------------------------------------------------------------------------
 
 class FakeItem extends FakeDocument {
   constructor({ uuid = 'item-uuid', name = 'Recipe Item', sourceId = null, compendiumSource = null, flagsArg = {} } = {}) {
@@ -225,9 +166,7 @@ class FakeItem extends FakeDocument {
   }
 }
 
-// ---------------------------------------------------------------------------
 // FakeActor — has id, items array, and inherits FakeDocument flag behaviour
-// ---------------------------------------------------------------------------
 
 class FakeActor extends FakeDocument {
   constructor({
@@ -249,9 +188,7 @@ class FakeActor extends FakeDocument {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Recipe / system factory helpers
-// ---------------------------------------------------------------------------
 
 function buildMockRecipe(overrides = {}) {
   return {
@@ -279,12 +216,8 @@ function buildMockSystem(overrides = {}) {
     },
     ...overrides
   };
-  // Per-item caps (issue 511): the service now reads use/learn caps from the
-  // recipe's linked recipe item definition, not the system-wide knowledge config.
-  // These fixtures still declare caps under knowledge.item / knowledge.learn, so
-  // mirror those onto each recipe item definition — exactly as the 1.11.0 migration
-  // does at load time — keeping the fixtures exercising real cap behaviour. A
-  // definition that already carries its own `caps` is left untouched.
+  // Per-item caps (issue 511): the service now reads use/learn caps from the recipe's linked recipe
+  // item definition, not the system-wide knowledge config.
   const knowledge = system.recipeVisibility?.knowledge || {};
   const seededCaps = {
     item: { ...(knowledge.item || {}) },
@@ -318,9 +251,7 @@ function buildService({ system = null, systems = null, recipes = [] } = {}) {
   return new RecipeVisibilityService(recipeManager, craftingSystemManager);
 }
 
-// ---------------------------------------------------------------------------
 // AC1 — Player mode listing
-// ---------------------------------------------------------------------------
 
 test('AC1.1 - player mode: unrestricted recipe is visible to non-GM', () => {
   const system = buildMockSystem({ recipeVisibility: { listMode: 'player' } });
@@ -425,9 +356,7 @@ test('AC1.7 - missing listMode defaults to global visibility behaviour', () => {
   assert.equal(result.reason, 'ok');
 });
 
-// ---------------------------------------------------------------------------
 // AC2 — Knowledge mode access evaluation
-// ---------------------------------------------------------------------------
 
 test('AC2.1 - knowledge item mode: grants access when matching item exists', () => {
   const system = buildMockSystem({
@@ -576,9 +505,7 @@ test('AC2.6 - knowledge itemOrLearned mode: grants when only learned', () => {
   assert.equal(result.hasLearned, true);
 });
 
-// ---------------------------------------------------------------------------
 // AC3 — Recipe item matching
-// ---------------------------------------------------------------------------
 
 test('AC3.1 - _isMatchingRecipeItem returns true when item.uuid matches linkedRecipeItemUuid', () => {
   const service = buildService();
@@ -624,9 +551,7 @@ test('AC3.4 - _collectCandidateItems gathers items from craftingActor and compon
   assert.equal(matches[1].itemOrder, 0);
 });
 
-// ---------------------------------------------------------------------------
 // AC4 — Limited-use exhaustion
-// ---------------------------------------------------------------------------
 
 // `_filterNonExhausted` resolves each candidate against its OWN book's caps; a
 // match with no `item` resolves to the recipe's first member book, so these
@@ -731,9 +656,7 @@ test('AC4.5 - applyRecipeItemUseOnCraft skips use-tracking when no actual matchi
   assert.equal(nonMatchingItem.deleted, false);
 });
 
-// ---------------------------------------------------------------------------
 // Issue 511 Phase 1 — per-document learn-count helpers (mirror recipeItemUsage)
-// ---------------------------------------------------------------------------
 
 test('511.P1.1 - _getRecipeItemLearnCount reads the per-document learn count, defaulting to 0', () => {
   const service = buildService();
@@ -758,9 +681,7 @@ test('511.P1.2 - _setRecipeItemLearnCount writes a clamped non-negative integer 
   assert.equal(service._getRecipeItemLearnCount(item), 0);
 });
 
-// ---------------------------------------------------------------------------
 // AC5 — Deterministic item selection
-// ---------------------------------------------------------------------------
 
 test('AC5.1 - _selectDeterministic selects item with highest timesUsed', () => {
   const service = buildService();
@@ -807,9 +728,7 @@ test('AC5.3 - _selectDeterministic tiebreaks by lower itemOrder when timesUsed a
   assert.equal(selected.itemOrder, 0);
 });
 
-// ---------------------------------------------------------------------------
 // AC6 — Learn operation
-// ---------------------------------------------------------------------------
 
 test('AC6.1 - learnRecipe writes learnedAt and sourceItemUuid to actor flag', async () => {
   const system = buildMockSystem({
@@ -1259,9 +1178,7 @@ test('AC6.13 - owned-item learning splits auto and manual scopes by dragDropEnab
   assert.deepEqual(manualPreview.learnedRecipes.map(recipe => recipe.id), ['manual-recipe']);
 });
 
-// ---------------------------------------------------------------------------
 // Issue 511 Phase 2 — recipe-item learn budget (capped books)
-// ---------------------------------------------------------------------------
 
 function buildCappedSystem({ id = 'system-1', maxRecipes = 2, destroyWhenSpent = false, dragDropEnabled = true, originItemUuid = 'Compendium.world.items.book' } = {}) {
   return buildMockSystem({
@@ -1544,9 +1461,8 @@ test('511.P2.11 - a limitRecipes system with an invalid maxRecipes fails closed 
 });
 
 test('511.P2.PERITEM - two books in ONE system enforce independent per-item caps', async () => {
-  // The core per-item behaviour (issue 511): caps live on the recipe item
-  // DEFINITION, so a system can hold a strict 1-recipe scroll and a generous
-  // 3-recipe tome side by side. This is impossible under the old system-wide cap.
+  // The core per-item behaviour (issue 511): caps live on the recipe item DEFINITION, so a system
+  // can hold a strict 1-recipe scroll and a generous 3-recipe tome side by side.
   const system = buildMockSystem({
     id: 'system-1',
     recipeVisibility: { listMode: 'knowledge', knowledge: { mode: 'learned', learn: { dragDropEnabled: true } } },
@@ -1660,9 +1576,7 @@ test('511.P2.E2E - full flow: capped drop suppressed, pick K, refuse (K+1), dest
   assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent');
 });
 
-// ---------------------------------------------------------------------------
 // AC7 — Edge cases
-// ---------------------------------------------------------------------------
 
 test('AC7.1 - evaluateRecipeAccess returns missing-system reason when system not found', () => {
   // buildService with system=null means getSystem returns null
@@ -1866,11 +1780,8 @@ test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones
   }
 });
 
-// Issue 970: this pass runs on every client at startup and mutates actor flags
-// directly (there is no GM relay). An un-filtered walk had a player attempt
-// `Actor#update` on every other character in the world; Foundry refuses it and
-// `setFabricateFlag` rejects by design, which took `initialize()` down before
-// `ready` was ever set.
+// Issue 970: this pass runs on every client at startup and mutates actor flags directly (there is
+// no GM relay).
 test('cleanupLearnedRecipes skips actors this client cannot write', async () => {
   const service = buildService();
   const mine = new FakeActor({
@@ -1907,13 +1818,9 @@ test('cleanupLearnedRecipes skips actors this client cannot write', async () => 
   }
 });
 
-// ---------------------------------------------------------------------------
 // AC3 (T-087) — Recipe item matching via _stats.compendiumSource
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // AC8 — Knowledge mode: visibility and learnability via formula items
-// ---------------------------------------------------------------------------
 
 test('AC8.1 - learned mode: recipe visible but not craftable when player has matching item but has not learned', () => {
   const system = buildMockSystem({
@@ -2044,16 +1951,8 @@ test('AC8.5 - learned mode: canLearn derivation is true when recipe is visible v
   assert.equal(canLearn, true, 'canLearn should be true for visible-but-unlearned recipe with matching item');
 });
 
-// ---------------------------------------------------------------------------
-// AC9 — Alchemy REVEAL-not-gate (issue 563)
-//
-// `visibilityMode` selects which source(s) REVEAL a recipe in the Known list;
-// brewing is NEVER gated by visibility. For a non-GM alchemy recipe the service
-// therefore returns `craftable: true` regardless of reveal state — reveal governs
-// only `visible`. Reason taxonomy: `gm` (GM), `alchemy-revealed`,
-// `alchemy-unrevealed`. Discovery-by-brew (`learnOnCraft` ⇒ learnedRecipes) is
-// unioned across all modes.
-// ---------------------------------------------------------------------------
+// AC9 — Alchemy REVEAL-not-gate (issue 563). `visibilityMode` selects which source(s) REVEAL a
+// recipe in the Known list; brewing is NEVER gated by visibility.
 
 function alchemyItemModeSystem() {
   return buildMockSystem({
@@ -2205,9 +2104,7 @@ test('AC9.6 - discovery-by-brew is unioned across modes: a learned recipe reveal
   assert.equal(result.craftable, true);
 });
 
-// ---------------------------------------------------------------------------
 // AC3 (T-087) — Recipe item matching via _stats.compendiumSource
-// ---------------------------------------------------------------------------
 
 test('AC3.5 - _isMatchingRecipeItem returns true when _stats.compendiumSource matches linkedRecipeItemUuid', () => {
   const service = buildService();
@@ -2232,9 +2129,7 @@ test('AC3.6 - _isMatchingRecipeItem returns false when _stats.compendiumSource d
   assert.equal(service._isMatchingRecipeItem(recipe, item), false);
 });
 
-// ---------------------------------------------------------------------------
 // 511 — learnRecipeFromOwnedBook (player Inventory learn affordance)
-// ---------------------------------------------------------------------------
 
 function buildUncappedLearnSystem({ consumeOnLearn = true, mode = 'learned' } = {}) {
   return buildMockSystem({
@@ -2337,9 +2232,7 @@ test('511.INV.6 - learnRecipeFromOwnedBook matches a book duplicated from a worl
   assert.equal(result.success, true, 'a world-duplicated book resolves for learning');
 });
 
-// ---------------------------------------------------------------------------
 // Issue 511 PR-B — flat visibilityMode gating (global/restricted/item/knowledge)
-// ---------------------------------------------------------------------------
 
 test('MODE.global - every recipe is visible and craftable to a non-GM', () => {
   const system = buildMockSystem({ visibilityMode: 'global' });
@@ -2520,9 +2413,7 @@ test('MODE.legacyFallback - AC1.7 preserved: absent visibilityMode + listMode ma
   assert.equal(result.craftable, true);
 });
 
-// ---------------------------------------------------------------------------
 // Issue 511 PR-B — whenSpent: destroyed vs inert on craft exhaustion
-// ---------------------------------------------------------------------------
 
 function buildWhenSpentSystem(whenSpent, maxUses = 2) {
   return buildMockSystem({
@@ -2572,9 +2463,7 @@ test('WHENSPENT.inert - the item survives, is flagged inert, and is NOT deleted'
   assert.equal(usage.inert, true);
 });
 
-// ---------------------------------------------------------------------------
 // Issue 511 PR-B — learning modes (once / ntimes / party shared pool) + prerequisite
-// ---------------------------------------------------------------------------
 
 function makeFakePartyPool() {
   const store = {};
@@ -3012,9 +2901,7 @@ test('PREREQ - a dangling Required Knowledge id (deleted recipe) fails open (iss
   assert.equal(result.success, true, 'a deleted prerequisite recipe does not brick the book');
 });
 
-// ---------------------------------------------------------------------------
 // Issue 555 — R5 tier-4-only bulk auto-learn refusal + R6 cap resolution
-// ---------------------------------------------------------------------------
 
 test('555 R5 - bulk auto-learn REFUSES a recipe whose owned item matches only via tier 4 (duplicateSource)', () => {
   const system = buildUncappedLearnSystem({ consumeOnLearn: false });
@@ -3082,11 +2969,9 @@ test('555 R6b - _matchDefinitionForItem: an ABSENT item still yields the first m
   assert.equal(def?.id, 'book', 'item == null falls back to defs[0]');
 });
 
-// A recipe linked only by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a
-// standalone alchemy formula item — resolves through the synthetic entry built by
-// `_recipeItemMatchDefinitions`, which carries `id: null`. It has no registered definition,
-// so `autoStampRecipeItemSources` can never stamp its source and tier 1 is unreachable.
-// Refusing its tier-4 match would disable on-drop learning permanently, not until R3 runs.
+// A recipe linked only by the legacy `linkedRecipeItemUuid` — an un-migrated book, or a standalone
+// alchemy formula item — resolves through the synthetic entry built by
+// `_recipeItemMatchDefinitions`, which carries `id: null`.
 function buildLegacyLinkedRecipe(uuid) {
   return buildMockRecipe({ id: 'r-legacy', recipeItemId: null, linkedRecipeItemUuid: uuid });
 }
@@ -3120,12 +3005,10 @@ test('555 R5 - the tier-4 refusal still applies to a REGISTERED definition', () 
   assert.equal(preview.matchedRecipes.length, 0, 'a registered book is still refused at tier 4');
 });
 
-// #703 — System-Validity Gate at craft time (guardCraftStart) + entity tier
-// ---------------------------------------------------------------------------
+// 703 — System-Validity Gate at craft time (guardCraftStart) + entity tier
 
-// A system whose validation report blocks the whole system (progressive mode with
-// no configured progressive check → `progressiveNoCheck`, a `blocks: 'system'`
-// blocker).
+// A system whose validation report blocks the whole system (progressive mode with no configured
+// progressive check → `progressiveNoCheck`, a `blocks: 'system'` blocker).
 function buildBlockedSystem(id = 'system-1') {
   return {
     id,
@@ -3245,13 +3128,10 @@ test('703 - guardCraftStart evaluates system visibility at most once per craft c
   assert.equal(getRecipesCalls, 1, 'system visibility computed once, not per step');
 });
 
-// ---------------------------------------------------------------------------
-// #704 — learn preconditions honour the authored flat visibility mode
-// ---------------------------------------------------------------------------
+// 704 — learn preconditions honour the authored flat visibility mode
 
-// A flat-authored system that keeps the normalizer's residual `knowledge.mode`
-// default of `itemOrLearned`. Under a non-`knowledge` flat mode, learning must be
-// refused even though the residual sub-mode would otherwise allow it.
+// A flat-authored system that keeps the normalizer's residual `knowledge.mode` default of
+// `itemOrLearned`.
 function buildFlatModeLearnSystem(visibilityMode) {
   return buildMockSystem({
     id: 'system-1',
@@ -3347,14 +3227,11 @@ test('704 - a legacy knowledge system with no authored flat mode keeps learned b
   assert.ok(actor.getFlag('fabricate', 'fabricate.learnedRecipes')['recipe-1']);
 });
 
-// ---------------------------------------------------------------------------
-// #705 — cap resolution anchors on each candidate item's OWN book, not the
-// recipe's first member book
-// ---------------------------------------------------------------------------
+// 705 — cap resolution anchors on each candidate item's OWN book, not the recipe's first member
+// book
 
-// A recipe (r1) living in two books of one system with DIFFERING caps. Book A is the
-// recipe's first member book; book B differs, so judging B's items by A's caps is the
-// drift under test.
+// A recipe (r1) living in two books of one system with DIFFERING caps. Book A is the recipe's first
+// member book; book B differs, so judging B's items by A's caps is the drift under test.
 function buildTwoBookSystem({ bookACaps, bookBCaps, visibilityMode = 'knowledge' } = {}) {
   return buildMockSystem({
     id: 'system-1',
@@ -3475,10 +3352,8 @@ test('705 - learnRecipe consumes the selected item only when ITS book consumeOnL
   assert.equal(bookAItem.deleted, false, "book A's consumeOnLearn:false retains the item");
 });
 
-// ---------------------------------------------------------------------------
-// #706 — bulk drop-learn reads consumeOnLearn from the matched book's caps, not
-// the legacy system-wide config the normalizer strips
-// ---------------------------------------------------------------------------
+// 706 — bulk drop-learn reads consumeOnLearn from the matched book's caps, not the legacy
+// system-wide config the normalizer strips
 
 // A knowledge system whose bulk-learnable book authors consumeOnLearn on its caps
 // (the real runtime shape), with NO system-level `knowledge.learn.consumeOnLearn`.
@@ -3570,11 +3445,8 @@ test('706d - the normalized system config carries no legacy consumeOnLearn, yet 
   assert.equal(item.deleted, true, 'consumption is driven by the definition caps');
 });
 
-// ---------------------------------------------------------------------------
-// Issue 773 — the crafting-knowledge deletion primitive (erase one / reset one
-// system / reset all) with reload-safe `-=` deletion, the dotted-id two-step
-// fallback, and learn-budget freeing.
-// ---------------------------------------------------------------------------
+// Issue 773 — the crafting-knowledge deletion primitive (erase one / reset one system / reset all)
+// with reload-safe `-=` deletion, the dotted-id two-step fallback, and learn-budget freeing.
 
 // A fake party pool that records decrements (issue 773 — symmetric with increment).
 function makeDecrementablePartyPool(initial = {}) {
@@ -3740,23 +3612,15 @@ test('773 dotted-id fallback is a two-step ORDERED delete-then-write; a co-resid
   assert.ok(!('imported' in reloaded), 'the dotted entry subtree is removed post-reload');
 });
 
-// ---------------------------------------------------------------------------
-// Issue 1143 — deleting a recipe destroyed learned knowledge for recipes that still
-// exist, because every reader derived ids from the map's TOP LEVEL while
-// `Document#update` had nested a dotted id into a subtree.
-//
-// Every persisted shape asserted here was produced by EXECUTING Foundry V13.351's real
-// `common/utils/helpers.mjs#expandObject` against the exact payload `setFabricateFlag`
-// writes; V14.365 reaches the same shape through `ObjectField#_cleanType`.
-// ---------------------------------------------------------------------------
+// Issue 1143 — deleting a recipe destroyed learned knowledge for recipes that still exist, because
+// every reader derived ids from the map's TOP LEVEL while `Document#update` had nested a dotted id
+// into a subtree.
 
 const entryAt = (n, uuid = null) => ({ learnedAt: n, sourceItemUuid: uuid });
 
 test('1143 pins the double against real Foundry V13.351 expandObject output', () => {
-  // Guard against the double drifting back into storing dotted keys verbatim, which is
-  // the exact defect that let issue 1143 ship. Left-hand values are what the REAL V13
-  // helper returned for the same input; a mismatch means the double stopped modelling
-  // Foundry, not that the product changed.
+  // Guard against the double drifting back into storing dotted keys verbatim, which is the exact
+  // defect that let issue 1143 ship.
   const stored = (map) =>
     new FakeActor({ flagsArg: { fabricate: { learnedRecipes: map } } }).getFlag(
       'fabricate',
@@ -3841,10 +3705,9 @@ test('1143 AC1 cleanup leaves an actor with NO stale ids completely untouched', 
 });
 
 test('1143 the reader stops at the ENTRY boundary, never at flattenObject leaves', () => {
-  // The obvious fix — flatten the stored map and diff against the valid ids — recurses
-  // to non-object LEAVES (`plainid.learnedAt`, …), none of which is a recipe id, so
-  // every key reads as stale and every actor's whole map is deleted on any recipe
-  // deletion. This pins that the reader yields ids, not leaf paths.
+  // The obvious fix — flatten the stored map and diff against the valid ids — recurses to
+  // non-object LEAVES (`plainid.learnedAt`, …), none of which is a recipe id, so every key reads as
+  // stale and every actor's whole map is deleted on any recipe deletion.
   const stored = { imported: { recipe: { id: entryAt(1) } }, plainid: entryAt(2) };
   const view = readLearnedRecipeEntries(stored);
 
@@ -4037,9 +3900,8 @@ test('1143 discoveryProgress carries the identical defect and is repaired with i
 });
 
 test('1143 a learned entry is SCALAR-ONLY, which is what the entry-shape walk relies on', async () => {
-  // The walk treats a plain-object-valued field as a nested recipe id, so an entry that
-  // grew an object field would silently break the disambiguation. Drive the real learn
-  // path and pin the contract at the source rather than in a fixture.
+  // The walk treats a plain-object-valued field as a nested recipe id, so an entry that grew an
+  // object field would silently break the disambiguation.
   const service = buildService();
   const recipe = buildMockRecipe({ id: 'r-scalar' });
   const actor = new FakeActor({ id: 'a-scalar' });
@@ -4121,9 +3983,8 @@ test('773 an orphan entry frees NOTHING — no wrong-key decrement and no per-co
 
 test('773 a HELD book whose recipe was deleted frees NOTHING (unresolvable-recipe orphan)', async () => {
   const system = buildLearnModeSystem({ learningMode: 'party', learnScope: 'total', learnsAllowed: 2 });
-  // The learned entry's recipe no longer resolves (recipe deleted) even though the
-  // source book is STILL HELD — the `if (!recipe) return` orphan path. It must free
-  // neither the party pool (an unreconstructable key) nor the per-copy count.
+  // The learned entry's recipe no longer resolves (recipe deleted) even though the source book is
+  // STILL HELD — the `if (!recipe) return` orphan path.
   const pool = makeDecrementablePartyPool({ 'system-1::book': 1 });
   const recipeManager = { getRecipes: () => [], getRecipe: () => null };
   const service = new RecipeVisibilityService(recipeManager, { getSystem: () => system }, pool);
@@ -4211,21 +4072,13 @@ test('773 forgetLearnedRecipes no-ops for an actor without update()', async () =
   assert.deepEqual(result, { success: false, count: 0 });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 785 — item-anchored use expenditure.
-//
-// `_applyRecipeItemUse(item, itemCaps)` is the SINGLE decision point for the use
-// increment, the exhaustion test and the `whenSpent` disposal, shared by the
-// recipe-driven craft path (`applyRecipeItemUseOnCraft`) and the GM-driven
-// Knowledge surface (`expendRecipeItemUse`).
-// ---------------------------------------------------------------------------
 
 const OWNED_COPY_ID = 'owned-copy-1';
 const OWNED_COPY_UUID = `Actor.a1.Item.${OWNED_COPY_ID}`;
 
-// One owned-copy builder for every 785 case: the seeded `recipeItemUsage` flag is the
-// only axis that varies. `FakeItem` carries no `id`, but the GM path resolves by
-// DOCUMENT ID, so one is attached here.
+// One owned-copy builder for every 785 case: the seeded `recipeItemUsage` flag is the only axis
+// that varies.
 function buildOwnedCopy({ id = OWNED_COPY_ID, usage = null } = {}) {
   const item = new FakeItem({
     uuid: `Actor.a1.Item.${id}`,
@@ -4236,11 +4089,7 @@ function buildOwnedCopy({ id = OWNED_COPY_ID, usage = null } = {}) {
   return item;
 }
 
-// Every payload the service handed to `setFlag` for the usage flag, in order. The
-// PAYLOAD is the assertable surface: `FakeDocument.setFlag` replaces via
-// `setPathValue` and is merge-blind, whereas real Foundry recursively merges an
-// `ObjectField`, so a `getFlag` read-back asserts the OPPOSITE of real behaviour
-// for any key the payload omits.
+// Every payload the service handed to `setFlag` for the usage flag, in order.
 function usageWrites(item) {
   return item.setFlagCalls
     .filter((call) => call.key === 'fabricate.recipeItemUsage')
@@ -4286,10 +4135,8 @@ const APPLY_USE_CASES = [
     expectedDeletes: 1,
   },
   {
-    // The GM path has no `_filterNonExhausted` pre-filter, so the core owns the
-    // already-spent refusal itself. Without it a stale row would drive one further
-    // increment and, under `whenSpent: 'destroyed'`, silently delete a player's book
-    // while reporting success.
+    // The GM path has no `_filterNonExhausted` pre-filter, so the core owns the already-spent
+    // refusal itself.
     name: 'already spent — no write, no delete',
     itemCaps: { limitUses: true, maxUses: 5, whenSpent: 'destroyed' },
     usage: { timesUsed: 5 },
@@ -4304,10 +4151,7 @@ const APPLY_USE_CASES = [
     expectedDeletes: 0,
   },
   {
-    // A corrupt truthy non-numeric count. The craft path double-coerced
-    // (`Number(selected.timesUsed || 0) + 1` over an already-coerced value), so this
-    // has always produced 1; a single coercion would write `null`, force `exhausted`
-    // false, and make the `whenSpent` disposal branch unreachable for the copy.
+    // A corrupt truthy non-numeric count.
     name: 'corrupt non-numeric timesUsed coerces to zero, not NaN',
     itemCaps: { limitUses: true, maxUses: 3, whenSpent: 'destroyed' },
     usage: { timesUsed: 'abc' },
@@ -4315,10 +4159,8 @@ const APPLY_USE_CASES = [
     expectedDeletes: 0,
   },
   {
-    // The fifth (inert-but-not-spent) state: `_filterNonExhausted` reads `timesUsed`
-    // only, so this copy still has charges and is expendable. The write MUST carry
-    // `timesUsed` alone — Foundry's recursive ObjectField merge is then what
-    // preserves the pre-existing `inert: true`.
+    // The fifth (inert-but-not-spent) state: `_filterNonExhausted` reads `timesUsed` only, so this
+    // copy still has charges and is expendable.
     name: 'inert-but-not-spent — the write omits `inert` so the real merge preserves it',
     itemCaps: { limitUses: true, maxUses: 5, whenSpent: 'inert' },
     usage: { timesUsed: 1, inert: true },
@@ -4489,13 +4331,8 @@ test('785 expendRecipeItemUse writes NOTHING for an ALREADY-SPENT copy and says 
   assert.equal(item.deleteCount, 0, 'the copy survives');
 });
 
-// --- spent-predicate parity between the engine and the projection ----------
-//
-// `knowledgeStudio.isRecipeItemSpent` is a hand-written mirror of
-// `_filterNonExhausted`. A hand transcription is only as good as its last edit, so
-// the two are driven over the SAME generated axes here and required to agree. A
-// divergence would let a row claim a copy is spent while the runtime still grants
-// craftability from it — or the reverse, offering Expend on a dead copy.
+// spent-predicate parity between the engine and the projection. `knowledgeStudio.isRecipeItemSpent`
+// is a hand-written mirror of `_filterNonExhausted`.
 test('785 the projection\'s `spent` is the exact complement of `_filterNonExhausted`', () => {
   const service = buildService();
   const limitUsesAxis = [true, false, undefined];
@@ -4509,10 +4346,8 @@ test('785 the projection\'s `spent` is the exact complement of `_filterNonExhaus
         const label = `limitUses=${String(limitUses)} maxUses=${String(maxUses)} timesUsed=${String(timesUsed)}`;
         const definition = buildUseCapDefinition({ limitUses, maxUses });
         const item = buildOwnedCopy({ usage: { timesUsed } });
-        // `_filterNonExhausted` anchors each candidate on the book that candidate IS,
-        // so pinning that resolution is what lets the axes reach the real predicate
-        // body unchanged. `_getRecipeItemCaps` reads `recipe` only to default the
-        // definition, so a null recipe is inert here.
+        // `_filterNonExhausted` anchors each candidate on the book that candidate IS, so pinning
+        // that resolution is what lets the axes reach the real predicate body unchanged.
         service._matchDefinitionForItem = () => definition;
         const engineSpent =
           service._filterNonExhausted(null, [
@@ -4533,15 +4368,9 @@ test('785 the projection\'s `spent` is the exact complement of `_filterNonExhaus
   assert.equal(compared, limitUsesAxis.length * maxUsesAxis.length * timesUsedAxis.length);
 });
 
-// --- craft-path extraction parity -----------------------------------------
-//
-// The craft path used to derive `nextUses` from `selected.timesUsed`, a value
-// snapshotted onto the candidate record by `_collectCandidateItems`; the extracted
-// core carries no candidate record and re-reads the usage flag itself. The two are
-// provably equal today (nothing awaits between collection and the write), so this
-// pins EQUIVALENCE — it must never be satisfied by threading the snapshot into the
-// core, which would carry the staleness window into the GM path. The pre-existing
-// AC4.4 / WHENSPENT.* / 705 craft tests are the byte-identical-behaviour guard.
+// craft-path extraction parity. The craft path used to derive `nextUses` from `selected.timesUsed`,
+// a value snapshotted onto the candidate record by `_collectCandidateItems`; the extracted core
+// carries no candidate record and re-reads the usage flag itself.
 
 test('785 craft-path parity — the candidate snapshot equals the re-read, and the core does the write', async () => {
   const system = buildWhenSpentSystem('inert', 5);
@@ -4600,12 +4429,9 @@ test('785 craft-path parity — the core re-reads the document, so a stale candi
   );
 });
 
-// --- D7 learn-budget cases reachable from the Knowledge surface ------------
-//
-// Erase frees a learn slot ONLY when the source copy is still owned;
-// `_freeLearnBudgetForEntry` early-returns on a falsy or dangling `sourceItemUuid`.
-// In every case the actor STILL holds the book, so an untouched per-copy counter is
-// a real negative rather than an absent-document artefact.
+// D7 learn-budget cases reachable from the Knowledge surface. Erase frees a learn slot ONLY when
+// the source copy is still owned; `_freeLearnBudgetForEntry` early-returns on a falsy or dangling
+// `sourceItemUuid`.
 
 const HELD_BOOK_UUID = 'Actor.a1.Item.book';
 
@@ -4674,10 +4500,7 @@ for (const budgetCase of D7_BUDGET_CASES) {
 }
 
 test('LEARN.scope=total - a player is told a GM is required, NOT that the budget is spent', async () => {
-  // The shared budget lives in a world setting, so a player cannot reserve a slot. That
-  // refusal used to be reported as `LearnBudgetSpent` — telling players their budget was
-  // gone while it sat untouched, which reads as a data bug and silently made every
-  // `total`-scope book unusable rather than pointing at the actual requirement.
+  // The shared budget lives in a world setting, so a player cannot reserve a slot.
   const system = buildLearnModeSystem({ learnScope: 'total', learnsAllowed: 2 });
   const recipes = [buildCappedRecipe({ id: 'r-a' })];
   const pool = { ...makeFakePartyPool(), writable: () => false };
@@ -4707,10 +4530,8 @@ test('LEARN.scope=total - a writable pool still reports a genuinely spent budget
   assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent', 'spent is still spent');
 });
 
-// ---------------------------------------------------------------------------
-// 1289 — the observability predicate, the shared flag key, and the byte-identical
-// pin on the learn gate it is a SIBLING of.
-// ---------------------------------------------------------------------------
+// 1289 — the observability predicate, the shared flag key, and the byte-identical pin on the learn
+// gate it is a SIBLING of.
 
 const { readFileSync } = await import('node:fs');
 const { LEARNED_RECIPES_FLAG_KEY } = await import('../src/config/flags.js');
@@ -4736,18 +4557,9 @@ const LEARN_GATE_SOURCE = [
 ].join('\n');
 
 test('1289 C8 `_isLearnModeEnabled` is BYTE-IDENTICAL, comment and body', () => {
-  // A source pin, not a behavioural one, and that is the whole point: issue 1289's D4
-  // WITHDREW a disjunct that an earlier revision would have added to this method, so the
-  // proof it shipped as designed is that the method is unchanged. A green diff cannot tell
-  // "correctly left alone" from "forgotten", and a behavioural test cannot either — the
-  // withdrawn `|| resolutionMode === 'alchemy'` widening would leave every existing learn
-  // case green while silently admitting alchemy systems to the learn path.
-  //
-  // If you are here because this failed: the observability question belongs to
-  // `isLearnedKnowledgeObservable`, which is a SIBLING derived from the reveal switch arm by
-  // arm. Do not fold it into this gate. Only a genuine change to what may be LEARNED — with
-  // its own spec change under §Learning Recipes → Preconditions — justifies editing the
-  // literal above.
+  // A source pin, not a behavioural one, and that is the whole point: issue 1289's D4 WITHDREW a
+  // disjunct that an earlier revision would have added to this method, so the proof it shipped as
+  // designed is that the method is unchanged.
   assert.ok(
     VISIBILITY_SERVICE_SOURCE.includes(LEARN_GATE_SOURCE),
     'the learn gate must not drift while observability is added beside it'
@@ -4755,9 +4567,8 @@ test('1289 C8 `_isLearnModeEnabled` is BYTE-IDENTICAL, comment and body', () => 
 });
 
 test('1289 the two predicates are siblings: neither is expressed in terms of the other', () => {
-  // The capability control for the scan above: applied to the SIBLING it must find the
-  // method, so a scan that could never match anything fails here rather than passing
-  // silently over both.
+  // The capability control for the scan above: applied to the SIBLING it must find the method, so a
+  // scan that could never match anything fails here rather than passing silently over both.
   const slice = VISIBILITY_SERVICE_SOURCE.slice(
     VISIBILITY_SERVICE_SOURCE.indexOf('  isLearnedKnowledgeObservable(system) {'),
     VISIBILITY_SERVICE_SOURCE.indexOf('  // Per-recipe-item use/learn caps (issue 511)')
@@ -4805,11 +4616,7 @@ test('1289 the observability predicate matches the reveal switch, arm by arm', (
     ['alchemy global', system({ resolutionMode: 'alchemy', visibilityMode: 'global' }), true],
     ['alchemy knowledge', system({ resolutionMode: 'alchemy', visibilityMode: 'knowledge' }), true],
     [
-      // Over a flat `item` mode, NOT a flat `global` one. `global` already satisfies "not
-      // restricted and not item" on its own, so a global fixture never exercises teaser
-      // resolution on this arm at all and passes identically with the teaser rule deleted.
-      // Layered over `item` the row bites: teaser wins, and the arm reads the learned map for
-      // a mode that otherwise would not.
+      // Over a flat `item` mode, NOT a flat `global` one.
       'alchemy teaser OVER a flat item mode falls to the default arm, which DOES read the learned map',
       system({
         resolutionMode: 'alchemy',
@@ -4962,11 +4769,9 @@ test('1289 C7 a node carrying only `granted` does not read as an ENTRY', async (
   const onlyLabel = readLearnedRecipeEntries({ 'r-x': { grantedBy: 'mod' } });
   assert.equal(onlyLabel.has('r-x'), false, 'nor is `grantedBy` alone');
 
-  // What such a node DOES read as, pinned rather than left to be rediscovered: the walk
-  // treats a scalar under a container as the pre-object `{ id: true }` legacy entry shape,
-  // so the field name surfaces as the trailing segment of a bogus id. Harmless — nothing
-  // resolves it to a recipe — but it is not "no keys at all", and a reader diffing these
-  // against the live corpus will see it as an orphan.
+  // What such a node DOES read as, pinned rather than left to be rediscovered: the walk treats a
+  // scalar under a container as the pre-object `{ id: true }` legacy entry shape, so the field name
+  // surfaces as the trailing segment of a bogus id.
   assert.deepEqual([...onlyGranted.keys()], ['r-x.granted']);
 
   // A full granted entry, by contrast, reads whole and keeps both new scalars.

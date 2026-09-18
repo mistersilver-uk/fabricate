@@ -11,13 +11,8 @@ import {
 } from '../src/utils/recipeComponentReferences.js';
 
 /**
- * The component delete's shared cascade leaf and the impact statement that counts through it
- * (issue 1129).
- *
- * The whole point of the extraction is that the panel's stated numbers and the manager's
- * executed write run the SAME functions, so these tests pin the arithmetic the GM is shown
- * rather than a parallel model of it. The manager-side proof that the write agrees lives in
- * `crafting-system-component-essence-deletion.test.js`.
+ * The component delete's shared cascade leaf and the impact statement that counts through it (issue
+ * 1129).
  */
 
 /** A recipe whose single group offers `componentIds` and whose single result is `resultId`. */
@@ -69,12 +64,8 @@ test('stripComponentsFromRecipeJson removes every selected component in ONE pass
   assert.equal(changed, true);
   const surviving = json.ingredientSets[0].ingredientGroups[0].options.map((o) => o.componentId);
   assert.deepEqual(surviving, ['copper'], 'only the unselected option survives');
-  // Since issue 1135 the flat mirror is DROPPED for a set that has groups rather than
-  // recomputed from them: `toJSON` no longer emits the alias. Recomputing it here would not
-  // reach disk — `updateRecipe` rebuilds via `Recipe.fromJSON` and persists `toJSON()`, which
-  // strips it either way — but it would leave the intermediate patch carrying a SECOND
-  // ingredient authority per set, which is the issue-1036 resurrection hazard.
-  // The set's own constructor is what re-derives it, which is what this now pins.
+  // Since issue 1135 the flat mirror is DROPPED for a set that has groups rather than recomputed
+  // from them: `toJSON` no longer emits the alias.
   assert.ok(
     !('ingredients' in json.ingredientSets[0]),
     'the retired flat alias is not recomputed back onto the wire'

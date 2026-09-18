@@ -1,14 +1,10 @@
 /**
- * Test helper: build the `{ item, componentId }` submission records that the
- * alchemy engine seams (`craftAlchemy` / `_matchAlchemySignature` /
- * `_submittedComponentMultiset`) consume after issue 572. Bucketing happens exactly
- * once — at the collector — so the engine no longer resolves identity itself; these
- * unit/integration tests build the records through the SAME production resolver
- * (`resolveAlchemySubmissionComponent`) the collector and palette use, so they still
+ * Test helper: build the `{ item, componentId }` submission records that the alchemy engine seams
+ * (`craftAlchemy` / `_matchAlchemySignature` / `_submittedComponentMultiset`) consume after issue
+ * 572. Bucketing happens exactly once — at the collector — so the engine no longer resolves
+ * identity itself; these unit/integration tests build the records through the SAME production
+ * resolver (`resolveAlchemySubmissionComponent`) the collector and palette use, so they still
  * exercise resolution + matching together rather than hand-supplying a bucket id.
- *
- * Hoisted so the record-shaping literal lives in ONE place across the alchemy suites
- * (SonarCloud counts `tests/**` duplication).
  */
 import { resolveAlchemySubmissionComponent } from '../../src/utils/alchemySubmissions.js';
 

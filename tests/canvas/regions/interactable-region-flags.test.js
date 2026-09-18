@@ -20,9 +20,8 @@ import {
 import { parseInteractableSourceUuid } from '../../../src/canvas/interactableResolution.js';
 
 /**
- * A fake `foundry.data.fields` namespace. Each field class records its own kind +
- * the options it was constructed with, so the schema shape is fully inspectable
- * without Foundry.
+ * A fake `foundry.data.fields` namespace. Each field class records its own kind + the options it
+ * was constructed with, so the schema shape is fully inspectable without Foundry.
  */
 function makeFakeFields() {
   function makeFieldClass(kind) {
@@ -76,9 +75,8 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
   assert.equal(schema.interactableType.kind, 'StringField');
   assert.deepEqual(schema.interactableType.options.choices, ['tool', 'gatheringTask']);
   assert.equal(schema.interactableType.options.blank, false);
-  // Unconfigured-sentinel initials (issue 342) keep the three identity fields
-  // required/blank:false while letting the native empty-system instantiation
-  // produce a valid-but-unconfigured behaviour.
+  // Unconfigured-sentinel initials (issue 342) keep the three identity fields required/blank:false
+  // while letting the native empty-system instantiation produce a valid-but-unconfigured behaviour.
   assert.equal(schema.interactableType.options.initial, 'tool');
 
   assert.equal(schema.sourceUuid.kind, 'StringField');
@@ -97,10 +95,9 @@ test('buildInteractableBehaviorSchema produces the full field set with a fake fi
   }
 
   assert.equal(schema.name.kind, 'StringField');
-  // A gatheringTask interactable may be LINKED to the task or UNLINKED with its
-  // own independent node pool, gated by `taskNodeLink` (default 'linked' shares the
-  // task's `environment.nodeRuntime[taskId]`). The independent pool is stored
-  // verbatim in the `node` ObjectField.
+  // A gatheringTask interactable may be LINKED to the task or UNLINKED with its own independent
+  // node pool, gated by `taskNodeLink` (default 'linked' shares the task's
+  // `environment.nodeRuntime[taskId]`).
   assert.equal(schema.taskNodeLink.kind, 'StringField');
   assert.equal(schema.taskNodeLink.options.initial, 'linked');
   assert.deepEqual(schema.taskNodeLink.options.choices, ['linked', 'unlinked']);

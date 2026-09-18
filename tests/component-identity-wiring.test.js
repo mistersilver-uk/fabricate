@@ -1,16 +1,6 @@
 /**
  * Production-wiring coverage for the per-system durable component identity
  * (`flags.fabricate.roles[systemId].componentId`) introduced by issue 556.
- *
- * These are List-A fail-on-main guards driven through REAL production entry points
- * (never a direct `resolveComponentForItem(..., systemId)` call): a `roles`-only
- * identity fixture with a conflicting `_stats.duplicateSource` that names a DIFFERENT
- * component. On `origin/main` (which cannot read `roles`) and on an UNTHREADED fix
- * (`systemId === undefined` ⇒ `roles[undefined]` absent) each such fixture buckets
- * under the `duplicateSource` component, so only genuinely threading the system id at
- * each call site turns them green — exactly the coverage rule the delta mandates.
- *
- * Plus A5 (per-system repair, no cross-clear) and B9 (restamp resilience).
  */
 
 import test from 'node:test';
@@ -41,9 +31,8 @@ function buildManager(systemsById) {
   return mgr;
 }
 
-// The shared fail-on-main fixture: `item` carries roles → rolesComp, but its
-// duplicateSource overlaps dupComp's source ref. Both components live in one system's
-// set, with DISTINCT essences so attribution is observable.
+// The shared fail-on-main fixture: `item` carries roles → rolesComp, but its duplicateSource
+// overlaps dupComp's source ref.
 function conflictingIdentityFixture({ quantity } = {}) {
   const rolesComp = component('comp-roles', { originItemUuid: 'Item.roles-src', essences: { fire: 2 } });
   const dupComp = component('comp-dup', { originItemUuid: 'Item.dup-src', essences: { ice: 3 } });
@@ -56,9 +45,7 @@ function conflictingIdentityFixture({ quantity } = {}) {
   return { rolesComp, dupComp, item, components: [rolesComp, dupComp] };
 }
 
-// ---------------------------------------------------------------------------
 // A7 — essence USED-BY path: InventoryListingBuilder._buildSystemParticipations
-// ---------------------------------------------------------------------------
 
 test('A7 - used-by: _buildSystemParticipations threads system.id so a roles-only item buckets under its roles component, not its duplicateSource sibling', () => {
   const { rolesComp, item, components } = conflictingIdentityFixture({ quantity: 2 });
@@ -74,9 +61,7 @@ test('A7 - used-by: _buildSystemParticipations threads system.id so a roles-only
   assert.equal(participations[0].componentId, rolesComp.id, 'bucketed under the roles component');
 });
 
-// ---------------------------------------------------------------------------
 // A8 — essence CRAFT-TIME path: CraftingEngine._buildEssenceContext (:2607)
-// ---------------------------------------------------------------------------
 
 test('A8 - craft-time: _buildEssenceContext threads recipe.craftingSystemId so essences attribute to the roles component', () => {
   const { item, components } = conflictingIdentityFixture();
@@ -92,9 +77,7 @@ test('A8 - craft-time: _buildEssenceContext threads recipe.craftingSystemId so e
   assert.equal(resolvedEssences.ice, undefined, 'NOT the duplicateSource component (ice)');
 });
 
-// ---------------------------------------------------------------------------
 // A9a — recipe-availability (alchemy): CraftingEngine._matchAlchemySignature (:1305)
-// ---------------------------------------------------------------------------
 
 test('A9a - recipe-availability: _matchAlchemySignature threads options.system.id so a roles-only item satisfies an essence-only set', () => {
   const { item, components } = conflictingIdentityFixture();
@@ -114,9 +97,7 @@ test('A9a - recipe-availability: _matchAlchemySignature threads options.system.i
   assert.equal(result.ingredientSetId, 'set-1');
 });
 
-// ---------------------------------------------------------------------------
 // A9b — recipe-availability: RecipeManager._accumulateEssences (:1278)
-// ---------------------------------------------------------------------------
 
 test('A9b - recipe-availability: _accumulateEssences threads recipe.craftingSystemId so essences attribute to the roles component', () => {
   const { item, components } = conflictingIdentityFixture({ quantity: 1 });
@@ -132,12 +113,8 @@ test('A9b - recipe-availability: _accumulateEssences threads recipe.craftingSyst
   assert.equal(accumulated.ice, undefined, 'NOT the duplicateSource component (ice)');
 });
 
-// ---------------------------------------------------------------------------
 // A10 — gathering award STACK GUARD driven through the real award closure
 // (createGatheringResultCreator.create → findStackableMatch at the call site).
-// This is the surface #556 is named for; a direct 4-arg findStackableMatch unit
-// test (A2) cannot see a regression at THIS call site, so it must be driven here.
-// ---------------------------------------------------------------------------
 
 test('A10 - award: a fresh award is NOT folded into an owned stack that resolves to a DIFFERENT component via a transitive duplicateSource', async () => {
   const awardComp = component('comp-award', { originItemUuid: 'Item.award-src' }); // no registeredItemUuid ⇒ bare-component source
@@ -186,9 +163,7 @@ test('A10 - award: a fresh award is NOT folded into an owned stack that resolves
   assert.equal(createdDocs.length, 1, 'a new document is created for the award instead');
 });
 
-// ---------------------------------------------------------------------------
 // A5 — per-system repair clears/writes only the map key (no cross-system clear)
-// ---------------------------------------------------------------------------
 
 test('A5 - repair writes roles[sysB].componentId for a source owned by system B only, and a non-owning system A pass never clears it (order-independent)', async () => {
   const compA = component('comp-a', { registeredItemUuid: 'Item.a-src', originItemUuid: 'Item.a-src' });
@@ -219,10 +194,8 @@ test('A5 - repair writes roles[sysB].componentId for a source owned by system B 
   globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [] };
 });
 
-// ---------------------------------------------------------------------------
-// A11a — a dotted system id is rejected LOUDLY at creation/import, never accepted
-// as a booby-trapped durable-flag map key that silently degrades matching.
-// ---------------------------------------------------------------------------
+// A11a — a dotted system id is rejected LOUDLY at creation/import, never accepted as a
+// booby-trapped durable-flag map key that silently degrades matching.
 
 test('A11a - createSystem rejects a dotted system id with a clear error and accepts a randomID-shaped id', async () => {
   const mgr = buildManager({});
@@ -240,9 +213,7 @@ test('A11a - createSystem rejects a dotted system id with a clear error and acce
   globalThis.game = { user: { isGM: true, id: 'gm-user' }, actors: [], items: [], packs: [] };
 });
 
-// ---------------------------------------------------------------------------
 // B9 — restamp resilience (autoStampComponentSources)
-// ---------------------------------------------------------------------------
 
 test('B9 - autoStampComponentSources writes roles[sys].componentId, skips missing + locked sources, and is idempotent', async () => {
   const _registry = new Map();

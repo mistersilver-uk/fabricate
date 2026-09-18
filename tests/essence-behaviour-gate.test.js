@@ -1,20 +1,6 @@
 /**
- * Issue 1036 — the essence behaviour gate.
- *
- * `EssenceDefinition.enabled` gates essence-carried BEHAVIOUR, never essence ARITHMETIC.
- * A disabled essence still matches, accumulates and is consumed exactly as before —
- * because a mid-session toggle must not change what an already-held item is worth — but it
- * carries nothing onto a crafted result: neither its property macro NOR its active-effect
- * transfer runs.
- *
- * Both suppressions are asserted here, together, because the whole point of the maintainer
- * decision is that they are ONE rule. Two further things are pinned that are easy to get
- * silently wrong:
- *
- *  - the stacking veto `transfersEffects` must NOT become essence-aware (it is computed
- *    before the contributing walk, so an all-disabled craft on a transferring recipe still
- *    declines to stack — matching what an unresolvable essence source already does);
- *  - a time-gated craft evaluates the START snapshot, never the live definitions.
+ * Issue 1036 — the essence behaviour gate. `EssenceDefinition.enabled` gates essence-carried
+ * BEHAVIOUR, never essence ARITHMETIC.
  */
 
 import assert from 'node:assert/strict';
@@ -153,15 +139,9 @@ test('1036/4: a disabled essence still ACCUMULATES its quantity into the craft c
   );
 });
 
-// ---------------------------------------------------------------------------
-// Criterion 4's other two thirds: a disabled essence still MATCHES and is still CONSUMED
-//
-// The maintainer's binding decision is that `enabled` gates essence-carried BEHAVIOUR and
-// never essence ARITHMETIC — "its quantities still match, accumulate and are consumed".
-// Accumulation is pinned above. These pin the other two, which are exactly what an
-// implementer "completing the gate" would break: adding the definition lookup to the
-// matcher, or to the consumption plan, reads as finishing the job and is wrong.
-// ---------------------------------------------------------------------------
+// Criterion 4's other two thirds: a disabled essence still MATCHES and is still CONSUMED. The
+// maintainer's binding decision is that `enabled` gates essence-carried BEHAVIOUR and never essence
+// ARITHMETIC — "its quantities still match, accumulate and are consumed".
 
 /** An item whose Fabricate essence flags resolve through the real dotted-key reader. */
 function makeEssenceItem(uuid, quantity, essences) {
@@ -446,11 +426,9 @@ test('1036/21: a run armed BEFORE this change (no snapshot key) reads as all-ena
 });
 
 test('1036/21: an EMPTY snapshot and an absent one coincide, because the snapshot is complete', () => {
-  // `_snapshotEssenceEnabled` emits one entry per START `resolvedEssences` key, so the two
-  // are empty or non-empty TOGETHER — which is why `_resumedEssenceEnabled` need not
-  // distinguish `{}` from an absent map. A pre-change run carries NO key at all, and
-  // reaches the all-enabled reading through the absent branch. `{}` alongside a non-empty
-  // `resolvedEssences` is the shape a DROPPED key produces, not a state correct code emits.
+  // `_snapshotEssenceEnabled` emits one entry per START `resolvedEssences` key, so the two are
+  // empty or non-empty TOGETHER — which is why `_resumedEssenceEnabled` need not distinguish `{}`
+  // from an absent map.
   const engine = makeEngine();
 
   assert.deepEqual(
@@ -533,10 +511,9 @@ test('1036/20: an essence property macro applies to a SALVAGE result', async () 
   assert.equal(
     actor.captured[0].system.school,
     'fire',
-    // The contribution arrives through the CONSUMED item's own essence flags, which is
-    // what `_buildEssenceContext` resolves first; the salvaged component's `essences` map
-    // is the fallback the flag pre-empts. Either way the seam is reached live, with no
-    // precomputed map and no snapshot — which is the fact this test is for.
+    // The contribution arrives through the CONSUMED item's own essence flags, which is what
+    // `_buildEssenceContext` resolves first; the salvaged component's `essences` map is the
+    // fallback the flag pre-empts.
     'salvage reaches the same seam, live, from the consumed item essence contribution'
   );
 });

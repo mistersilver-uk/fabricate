@@ -1,28 +1,7 @@
 /**
- * NO RULE SENTENCE IS LOST WHEN THE HARNESS DOCUMENTS ARE SPLIT (issue #1661, phases 3-5).
- *
- * `AGENTS.md`, `CLAUDE.md` and `CONTRIBUTING.md` are being split into a short rulebook plus
- * reference files loaded on demand, across several PRs. The issue's acceptance for that was "a
- * diff review confirms no rule sentence was lost". A human diff review of an 1,100-line move is
- * exactly where a lost sentence hides, so this is the mechanical replacement, and it lands BEFORE
- * any text moves — a gate added after the move it was meant to guard has nothing left to guard.
- *
- * HOW IT WORKS. `tests/fixtures/doc-split/*.pre-split.md` are byte copies of the three documents
- * as they stood before any split. Every rule-bearing line of those is asserted to survive, the
- * same number of times, somewhere in the post-split set — which is enumerated by explicit path in
- * `DESTINATIONS` below, never by directory glob, so adding a file cannot silently satisfy this.
- *
- * WHY A MULTISET AND NOT A SET. If a rule appears twice in the old documents and once in the new,
- * a set comparison is satisfied while one of the two places that stated it has stopped stating it.
- * The issue's own verification allowed for "minus duplicated paragraphs", which is a loophole
- * wide enough to lose a rule through: a deliberate de-duplication must name the surviving location
- * and is checked against it, and the allowlist's length is pinned so it cannot quietly grow.
- *
- * WHILE NOTHING HAS MOVED YET this passes trivially — `DESTINATIONS` is the same three files. That
- * is the correct state for a gate armed ahead of the work, and it is also the state in which a
- * broken checker is invisible. So the falsification below is not decoration: it drives the real
- * comparator against deletion, reordering and REWORDING, the last being the edit a reviewer cannot
- * catch by eye and the one a laxer normalisation would wave through.
+ * NO RULE SENTENCE IS LOST WHEN THE HARNESS DOCUMENTS ARE SPLIT (issue #1661, phases 3-5). HOW IT
+ * WORKS. `tests/fixtures/doc-split/*.pre-split.md` are byte copies of the three documents as they
+ * stood before any split.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -49,14 +28,7 @@ const SOURCES = [
   { fixture: `${FIXTURES}/CONTRIBUTING.pre-split.md`, floor: 900 },
 ];
 
-/**
- * Every file a sentence is allowed to have moved INTO, by explicit path.
- *
- * NOT A GLOB, and that is the load-bearing part. A directory glob would let a stray file — a
- * scratch note, an unrelated document that happens to quote a rule — satisfy the assertion, so a
- * sentence could read as surviving in a file nothing else knows about. Phases 3-5 add their
- * destinations here, which is a visible edit in the PR that moves the text.
- */
+/** Every file a sentence is allowed to have moved INTO, by explicit path. */
 const DESTINATIONS = [
   'AGENTS.md',
   'CLAUDE.md',
@@ -70,30 +42,15 @@ const DESTINATIONS = [
 ];
 
 /**
- * Sentences deliberately dropped, each naming the location that still carries them.
- *
- * The one admissible reason is de-duplication: the same rule stated twice, now stated once. A bare
- * "this was a duplicate" is not admissible — the entry names where it survives, and the assertion
- * below checks that file actually contains it. Same shape as ALLOW_MISSING in
- * `scripts/validate-agent-bindings.mjs`, where every exception carries a reason that is checkable.
- *
- * Empty, because nothing has moved yet. It is pinned at its length so that an entry cannot be
- * appended as the cheap way to green a real loss.
+ * Sentences deliberately dropped, each naming the location that still carries them. Empty, because
+ * nothing has moved yet.
  */
 const DEDUPLICATED = [];
 
 /** Pinned exactly, not as a ceiling: a ceiling banks a free slot on every entry that is retired. */
 const DEDUPLICATED_COUNT = 0;
 
-/**
- * Sentences a move forced to change, where the only change is a link TARGET.
- *
- * When a heading moves to another file, the in-file `(#anchor)` links pointing at it have to
- * become `(path/to.md#anchor)`. That is a changed sentence and the subset assertion reports it,
- * which is correct — so the allowance is made here, and made narrowly: the test asserts that
- * stripping link targets from both makes them the same string. A retarget is admissible; a
- * reworded rule wearing a retarget's clothes is not.
- */
+/** Sentences a move forced to change, where the only change is a link TARGET. */
 const RETARGETED = [
   {
     before: 'See [Manager confirm-discard guard](#manager-confirm-discard-guard).',
@@ -105,22 +62,7 @@ const RETARGETED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
 const RETARGETED_COUNT = 1;
 
-/**
- * Sentences that state a View Lab registry case count, where the only change is that NUMBER.
- *
- * `scripts/lib/viewLabCases.js` grows independently of the AGENTS.md/CLAUDE.md/CONTRIBUTING.md
- * split, and these frozen sentences state the registry size directly, so a case-count PR changes
- * them for a reason that has nothing to do with a move. RETARGETED's shape — pin the literal
- * replacement text — does not fit here: the count keeps changing (it is already 463, and TP14-F
- * raises it again to 479), so a pinned `after` string would need editing on every registry change,
- * which is the churn this allowance exists to avoid.
- *
- * So each entry is the frozen `before` sentence only, and the proof is narrower instead of the
- * replacement being narrower: `withoutCounts` (digits replaced with a placeholder) must match
- * EXACTLY ONE surviving sentence, and the frozen text itself must no longer be present. Every
- * character that is not part of a digit run must still match exactly, so a reworded rule cannot
- * hide behind a coincidental digit change.
- */
+/** Sentences that state a View Lab registry case count, where the only change is that NUMBER. */
 const RENUMBERED = [
   'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
   'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other ' +
@@ -138,9 +80,7 @@ const RENUMBERED_COUNT = 3;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
- * #1761). Each entry pins the replacement and the exact identifier pair, and substituting the old
- * identifier back into the surviving sentence must reproduce the frozen one character for
- * character, so a reworded rule wearing a rename's clothes fails here.
+ * #1761).
  */
 const RENAMED = [
   {
@@ -174,8 +114,7 @@ function survivingSentences() {
 
 test('the frozen fixtures are the documents they claim to be', () => {
   // A checker fed an empty or unreadable OLD passes trivially, which is the commonest way a
-  // migration gate is green on arrival. Each fixture is floored at a count derived from the real
-  // document, so a truncated or emptied one fails here rather than everywhere else silently.
+  // migration gate is green on arrival.
   for (const { fixture, floor } of SOURCES) {
     const absolute = path.join(REPOSITORY_ROOT, fixture);
     assert.ok(existsSync(absolute), `${fixture} is missing; it is the only record of the old text`);
@@ -249,9 +188,7 @@ test('every retarget claim really is a retarget and nothing more', () => {
       (surviving.get(after) ?? 0) > 0,
       `RETARGETED claims this replaced a sentence and it is in no destination:\n  ${after}`
     );
-    // 2. THE ONLY DIFFERENCE MAY BE THE LINK TARGET. Without this the allowlist is a hole big
-    //    enough to rewrite a rule through, which is the exact loophole this whole file exists to
-    //    close on the deduplication side.
+    // 2. THE ONLY DIFFERENCE MAY BE THE LINK TARGET.
     assert.equal(
       withoutLinkTargets(after),
       withoutLinkTargets(before),
@@ -282,9 +219,7 @@ test('every renumbering claim really is a renumbering and nothing more', () => {
       0,
       `RENUMBERED still lists this sentence, which is present after all — remove the entry:\n  ${sentence}`
     );
-    // 2. Exactly one surviving sentence may match once digits are ignored. Zero means the count
-    //    changed into a sentence that also changed some other word; more than one means the digit
-    //    normalisation is too coarse to say which surviving sentence replaced this one.
+    // 2. Exactly one surviving sentence may match once digits are ignored.
     const target = withoutCounts(sentence);
     const matches = [...surviving.keys()].filter((candidate) => withoutCounts(candidate) === target);
     assert.equal(
@@ -337,9 +272,7 @@ test('every rename claim really is a rename and nothing more', () => {
 });
 
 test('the comparator catches deletion, reordering and rewording', () => {
-  // A gate that has only ever been watched to report nothing is not known to work. Each case below
-  // is a way the split can actually go wrong, and the third is the one a laxer normaliser — one
-  // that folded case or stripped punctuation "to be forgiving" — would wave through.
+  // A gate that has only ever been watched to report nothing is not known to work.
   const original = ['Never import them directly.', 'Read the token through `.document`.', 'Do not conflate the two.'];
   const before = multiset(original);
 

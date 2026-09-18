@@ -1,14 +1,4 @@
-/**
- * Per-recipe access grants (Books & Scrolls `restricted` visibility mode).
- *
- * Covers Recipe._normalizeAccess:
- *   - default empty grant when no access / visibility is present;
- *   - read-forward: legacy `visibility.allowedUserIds` seeds `playerIds` when the
- *     access grant is absent or fully empty;
- *   - explicit access wins over read-forward (no seeding when a grant exists);
- *   - dedupe + ignore non-strings for both character and player id lists;
- *   - toJSON round-trips the normalized access snapshot as a fresh copy.
- */
+/** Per-recipe access grants (Books & Scrolls `restricted` visibility mode). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

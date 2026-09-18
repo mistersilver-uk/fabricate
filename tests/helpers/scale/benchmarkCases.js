@@ -1,35 +1,6 @@
 /**
- * The benchmark case registry (issue 1071).
- *
- * One case = one isolated hot path, one profile, one measured region. A case has three parts
- * and the split between them is the harness's central discipline:
- *
- * - `setup(context)` builds whatever the case needs and is NEVER timed. Hydrating 10,000
- *   recipes through `Recipe.fromJSON` costs real milliseconds; folding that into a case that
- *   claims to measure filtering would make the number meaningless.
- * - `run(state)` is the ONLY timed and counted region.
- * - `counts(state, result, counters)` adds case-specific class-1 facts (payload bytes, node
- *   and edge counts, row counts) on top of whatever the counter seams observed.
- *
- * ## Named hot paths and where each is measured
- *
- * | Issue-1071 hot path                          | Case id prefix                          |
- * |----------------------------------------------|-----------------------------------------|
- * | `RecipeManager.getRecipes()`                 | `recipeManager.getRecipes.*`            |
- * | `CraftingListingBuilder.buildListing()`      | `craftingListing.buildListing*`         |
- * | `CraftingListingBuilder.buildRecipeDetail()` | `craftingListing.buildRecipeDetail*`    |
- * | `RecipeVisibilityService.getVisibleRecipes()`| `recipeVisibility.getVisibleRecipes*`   |
- * | `InventoryListingBuilder.buildListing()`     | `inventoryListing.buildListing*`        |
- * | `AlchemyListingBuilder.buildListing()`       | `alchemyListing.buildListing*`          |
- * | `RunJournalBuilder.buildListing()`           | `runJournal.buildListing`               |
- * | Identity resolution — MISS and HIT apart     | `identity.*`                            |
- * | `CraftingEngine.findComponentItems`          | `craftingEngine.findComponentItems*`    |
- * | `SignatureValidator.validateSystem()`        | `signatureValidator.validateSystem`     |
- * | Recipe graph construction / layout           | `graph.*`                               |
- * | `IngredientSet.resolveIngredientSelection()` | `ingredientSet.resolveIngredientSelection` |
- * | `RecipeManager.save()` / `CraftingSystemManager.save()` | `*.save`                     |
- * | `CraftingSystemManager` normalization/import | `craftingSystemManager.normalizeImport` |
- * | Pure browser models + pagination             | `recipeBrowserModel.*`, `componentBrowserModel.*`, `browserPagination.*` |
+ * The benchmark case registry (issue 1071). `setup(context)` builds whatever the case needs and is
+ * NEVER timed.
  */
 import { countingEnumerations } from './scaleCounters.js';
 import { INVENTORY_SERIES } from './scaleInventory.js';
@@ -38,8 +9,7 @@ import { createBenchWorld, hydrateRecipes, useHydratedRecipes } from './scaleWor
 
 // STATICALLY IMPORTED, unlike `worldScopeStores` and `scopedEntityReads`, which the module bag
 // loads lazily because they reach `src/config/settings.js` and that must not be evaluated before
-// `installFoundryEnv()`. Neither of these two does: the World Vocabulary store takes its settings
-// seams by injection with no module-level default, and the projection is pure.
+// `installFoundryEnv()`.
 import { createWorldVocabularyStore } from '../../../src/systems/WorldVocabularyStore.js';
 import { buildWorldScopeState } from '../../../src/ui/svelte/stores/worldScopeProjection.js';
 
@@ -47,68 +17,27 @@ import { buildWorldScopeState } from '../../../src/ui/svelte/stores/worldScopePr
 const BULK_ROWS = 5;
 
 /**
- * The CORPUS-axis series for the player crafting open: 25 / 50 / 100 rows against a token
- * 20-stack inventory.
- *
- * The inventory-axis counterpart lives in `held-inventory` and varies stacks against a pinned
- * corpus. Running one path along two orthogonal series is what makes a regression attributable
- * to an axis rather than merely visible in one aggregate number.
- * @type {readonly number[]}
+ * The CORPUS-axis series for the player crafting open: 25 / 50 / 100 rows against a token 20-stack
+ * inventory.
  */
 const CORPUS_ROW_SERIES = Object.freeze([25, 50, 100]);
 
-/**
- * How many world-scope entities each issue-1359 case seeds (issue 1359, epic 1357).
- *
- * Half the 5,000-component library, deliberately, so BOTH halves of both unions are
- * non-degenerate: 2,500 world entities with a membership record for the bench system beside a
- * 5,000-entry in-system array. A fixture where the world corpus were empty would take each
- * union's degenerate branch and measure nothing — which is exactly the gap these cases exist to
- * close, since every OTHER case in this registry either runs against a hand-built stub that never
- * calls `_normalizeSystem` or seeds no world setting at all.
- *
- * WHETHER THOSE 2,500 IDS OVERLAP THE IN-SYSTEM ARRAY IS PER CASE, and it decides what each
- * case's counts can distinguish. See `worldComponentScope`.
- */
+/** How many world-scope entities each issue-1359 case seeds (issue 1359, epic 1357). */
 const WORLD_SCOPE_ENTITIES = 2500;
 
 /**
- * How many times the scoped union case REPEATS the same read.
- *
- * The point is not the wall clock: it is that `identityIndexBuilds` stays at ONE across all of
- * them. A memo that was silently rebuilt per call would be `SCOPED_UNION_READS` builds, each
- * O(world entities + memberships), and the committed count is what says which of the two is
- * happening. One read could never distinguish them.
+ * How many times the scoped union case REPEATS the same read. The point is not the wall clock: it
+ * is that `identityIndexBuilds` stays at ONE across all of them.
  */
 const SCOPED_UNION_READS = 25;
 
-/**
- * The prefix that turns an in-system component id into one the in-system array does NOT carry.
- *
- * See `worldComponentScope`: which of the two rosters a case seeds decides what its counts can
- * distinguish, so the choice is a per-case argument rather than a single shared fixture.
- */
+/** The prefix that turns an in-system component id into one the in-system array does NOT carry. */
 const WORLD_ONLY_ID_PREFIX = 'world-only-';
 
 /**
  * The world component scope payload for one bench world, in the PERSISTED shape.
  *
- * THE TWO ROSTERS ARE NOT INTERCHANGEABLE, and picking the wrong one makes a case blind to the
- * failure it exists to catch.
- *
- * - `overlap: true` draws the roster from the FIRST `WORLD_SCOPE_ENTITIES` in-system components,
- *   so every world row COLLIDES with a legacy row. That is what the READ UNION case wants: the
- *   union's "world wins on an id collision" branch is what decides all 2,500 of them. Its row
- *   count is 5,000 either way, so the row count alone cannot tell a two-half union from the
- *   legacy half alone — which is why that case also commits `scopedUnionWorldWins`.
- * - `overlap: false` mints ids the in-system array does not carry, so the BASIS union is
- *   strictly WIDER than the legacy array: 5,000 + 2,500. A basis that ignored the world store
- *   would answer 5,000, and a roster drawn from the in-system ids could not show the difference.
- *
- * @param {object} world
- * @param {object} [options]
  * @param {boolean} [options.overlap] Whether the roster reuses in-system ids. Defaults to `true`.
- * @returns {object}
  */
 function worldComponentScope(world, { overlap = true } = {}) {
   const scoped = world.fixture.components.slice(0, WORLD_SCOPE_ENTITIES);
@@ -131,9 +60,6 @@ function worldComponentScope(world, { overlap = true } = {}) {
 /**
  * A real `CraftingSystemManager` holding the bench system, with a LOADED world component scope
  * store injected — the seam `src/main.js` fills from `game.fabricate`.
- *
- * @param {object} world
- * @returns {{manager: object, store: object}}
  */
 function scopedManager(world) {
   world.settings.set('componentScope', worldComponentScope(world));
@@ -147,26 +73,10 @@ function scopedManager(world) {
   return { manager, store };
 }
 
-/**
- * How many times the world-scope publish is measured (issue 1392, epic 1357, PR 7a).
- *
- * The manager republishes `worldScope` on every settings-bridge reload and on every crafting
- * data change, so the cost that matters is per publish rather than per session. Five is enough
- * to make a per-publish regression visible in the timing without turning an untimed
- * 2,500-entity setup into the dominant term.
- */
+/** How many times the world-scope publish is measured (issue 1392, epic 1357, PR 7a). */
 const WORLD_SCOPE_PUBLISHES = 5;
 
-/**
- * The world vocabulary payload for one bench world, derived from the fixture's OWN vocabulary.
- *
- * Derived rather than synthesised, because a vocabulary of invented names would join against
- * nothing: every reference count would be 0 and the case would measure the degenerate branch of
- * exactly the pass it exists to measure.
- *
- * @param {object} world
- * @returns {object}
- */
+/** The world vocabulary payload for one bench world, derived from the fixture's OWN vocabulary. */
 function worldVocabularyPayload(world) {
   const entry = (name) => ({ id: String(name).trim().toLowerCase(), name: String(name) });
   const distinct = (values) => [...new Set(values.filter(Boolean))];
@@ -180,48 +90,16 @@ function worldVocabularyPayload(world) {
 /** Rows the alchemy workbench listing is bounded to. */
 const ALCHEMY_ROWS = 100;
 
-/**
- * Rows the GM recipe-browser case is bounded to.
- *
- * Bounded hard, and by the PRE-FIX cost rather than the post-fix one. Before issue 1074 the
- * row projection ran one full O(sets²) audit per row, so this case is O(rows³): measured on
- * this checkout at 23 ms for 25 rows, 1.27 s for 100 and 10.4 s for 200. Two hundred is the
- * largest bound at which a regression re-exposes itself in seconds rather than in hours,
- * which is what makes this a guard a reviewer can actually run rather than one that would
- * only ever be skipped. Post-fix it is a fraction of a second.
- */
+/** Rows the GM recipe-browser case is bounded to (issue 1074). */
 const GM_ROWS = 200;
 
-/**
- * The recipe library's default page size (`RECIPE_DEFAULT_PAGE_SIZE`).
- *
- * Restated here rather than imported so a benchmark case never depends on a `src/` constant
- * that a product decision could move underneath a committed baseline — the number a baseline
- * was measured at has to be readable in this file.
- */
+/** The recipe library's default page size (`RECIPE_DEFAULT_PAGE_SIZE`). */
 const GM_BROWSER_PAGE_SIZE = 25;
 
-/**
- * Recipes the adversarial ingredient-solver case runs.
- *
- * Bounded hard. Each rich recipe carries 3 sets x 3 groups x 3 options, and every matcher
- * invocation costs a full 5,000-component candidate scan, so 200 recipes measured 38 s and
- * 1.03 BILLION candidate examinations on this checkout. Twelve keeps the same shape and the
- * same per-node signal at a cost the drift test can re-derive.
- */
+/** Recipes the adversarial ingredient-solver case runs. */
 const SOLVER_RECIPES = 12;
 
-/**
- * Serialized payload bytes for a world-setting write.
- *
- * `#1070` names whole-corpus serialization as its #1 persistence risk and asks for the BYTES,
- * not just the time, because bytes are machine-invariant and time is not: every connected
- * client re-runs `JSON.stringify` over this exact payload twice to detect the change.
- *
- * @param {Map<string, unknown>} settings
- * @param {string} key
- * @returns {number}
- */
+/** Serialized payload bytes for a world-setting write. */
 function settingBytes(settings, key) {
   const value = settings.get(key);
   return value === undefined ? 0 : JSON.stringify(value).length;
@@ -236,10 +114,7 @@ function worldFor(context, options = {}) {
   });
 }
 
-/**
- * The corpus-axis cases: filtering, browser models, serialization, normalization.
- * @returns {object[]}
- */
+/** The corpus-axis cases: filtering, browser models, serialization, normalization. */
 function simpleCorpusCases() {
   return [
     {
@@ -297,12 +172,9 @@ function simpleCorpusCases() {
       description: 'The pure GM component browser projection over a 5,000-component library.',
       setup: (context) => ({
         world: worldFor(context),
-        // The browser model consumes PROJECTED rows, not domain components: it reads
-        // `essences` as an array of `{id, name}` and `salvageSummary.resultGroupCount`, where
-        // the domain component carries an essence-quantity MAP and a full salvage definition.
-        // Projecting here (untimed) keeps the timed region on the model rather than on a shape
-        // adaptation the real GM store performs upstream — and, more to the point, a fixture
-        // handed the wrong shape filters to zero rows and reports a fast, meaningless number.
+        // The browser model consumes PROJECTED rows, not domain components: it reads `essences` as
+        // an array of `{id, name}` and `salvageSummary.resultGroupCount`, where the domain
+        // component carries an essence-quantity MAP and a full salvage definition.
         components: context.fixture.components.map((component) => ({
           ...component,
           essences: Object.keys(component.essences ?? {}).map((id) => ({ id, name: id })),
@@ -443,14 +315,10 @@ function simpleCorpusCases() {
         scopedUnionRows: union.length,
         // THE ROW COUNT ALONE IS BLIND. This roster overlaps the in-system array exactly, so
         // `scopedUnionRows` is 5,000 whether the world half participated or was dropped on the
-        // floor. Only a world row carries `member` — it is stamped by the three-layer resolver
-        // and a legacy row passes through verbatim — so this is the count that moves, from 2,500
-        // to 0, the moment the membership-filtered pass stops contributing.
+        // floor.
         scopedUnionWorldWins: union.filter((entry) => entry.member === true).length,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
-        // The join payload cost of the new key, at this scale. World settings are delivered whole
-        // to every client and every edit rebroadcasts the whole value, so the BYTES are the fact
-        // #1070 asks for rather than the time.
+        // The join payload cost of the new key, at this scale.
         worldScopeBytes: settingBytes(world.settings, 'componentScope'),
       }),
       teardown: ({ world }) => {
@@ -471,9 +339,7 @@ function simpleCorpusCases() {
         'the in-system array instead of taking its degenerate branch.',
       setup: (context) => {
         const world = worldFor(context);
-        // DISJOINT, unlike the read-union case above. A roster drawn from the in-system ids would
-        // make the basis 5,000 whether or not the world half was consulted, so the count could
-        // not distinguish a real union from the legacy array alone. See `worldComponentScope`.
+        // DISJOINT, unlike the read-union case above.
         world.settings.set('componentScope', worldComponentScope(world, { overlap: false }));
         world.settings.set('craftingSystems', [world.system]);
         const store = world.modules.worldScopeStores.createComponentScopeStore();
@@ -493,11 +359,7 @@ function simpleCorpusCases() {
           (total, system) => total + (system.components?.length ?? 0),
           0
         ),
-        // MANAGER-DERIVED, and the only count here that can move. The other four are identical to
-        // the unscoped `craftingSystemManager.normalizeImport` case plus two facts read off the
-        // settings map, so a basis that ignored the world store outright would leave every one of
-        // them unchanged. This one is the basis the normalize run prunes against, asked of the
-        // manager itself: 5,000 in-system ids plus a disjoint 2,500-id world roster.
+        // MANAGER-DERIVED, and the only count here that can move.
         scopedBasisComponentIds: manager._scopeBasis(manager.getSystem(world.system.id))
           .componentIds.size,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
@@ -530,9 +392,7 @@ function simpleCorpusCases() {
         availableRecipes: listing.counts.available,
       }),
     })),
-    // APPENDED, never inserted ahead of the cases above. A profile's FIRST case absorbs a
-    // one-off index build over the fixture's shared arrays, and several committed counts here
-    // depend on which case warmed which array first.
+    // APPENDED, never inserted ahead of the cases above.
     {
       id: 'craftingSystemManager.getComponentsForSystem.worldScoped',
       profile: 'simple-corpus',
@@ -557,17 +417,9 @@ function simpleCorpusCases() {
       counts: ({ world }, components) => ({
         scopedUnionReads: SCOPED_UNION_READS,
         scopedUnionRows: components.length,
-        // THE ROW COUNT ALONE IS BLIND, exactly as in `scopedUnionRead`: this roster overlaps
-        // the in-system array, so the row count is 5,000 whether or not the world half
-        // participated. Only a MERGED row carries `member`.
-        //
-        // NOT `scopedUnionWorldWins`, which is what the issue-1359 case above still calls the
-        // identical measurement. That spelling described a rule issue 1370 INVERTED: while
-        // `## CraftingSystem` requirement 36 holds the world layer wins no key, row or order
-        // the in-system record decides. What this counts is how many rows the world half
-        // CONTRIBUTED to, which is what makes it a non-degenerate two-half union. The older
-        // case keeps its spelling because renaming it would move a committed baseline this
-        // change must not move; the two count the same thing.
+        // THE ROW COUNT ALONE IS BLIND, exactly as in `scopedUnionRead`: this roster overlaps the
+        // in-system array, so the row count is 5,000 whether or not the world half participated
+        // (issue 1370).
         scopedUnionMergedRows: components.filter((entry) => entry.member === true).length,
         worldScopeEntities: WORLD_SCOPE_ENTITIES,
         worldScopeBytes: settingBytes(world.settings, 'componentScope'),
@@ -613,9 +465,7 @@ function simpleCorpusCases() {
       },
     },
     // APPENDED, never inserted ahead of the cases above — see the append rule stated on the
-    // issue-1370 case earlier in this profile. A profile's FIRST case absorbs a one-off index
-    // build over the fixture's shared arrays, and several committed counts here depend on which
-    // case warmed which array first.
+    // issue-1370 case earlier in this profile.
     {
       id: 'worldScopeProjection.buildWorldScopeState',
       profile: 'simple-corpus',
@@ -720,11 +570,8 @@ function richCorpusCases() {
         }
         return selections;
       },
-      // `searchNodes` is the acceptance number for #1083 and is read straight off the seam
-      // #1072 exposed (`searchStats`), never re-derived here. It is the ONLY count that can
-      // show search being avoided rather than merely made cheaper: the matcher and candidate
-      // counters fall when a node gets cheaper too, so on their own they cannot distinguish
-      // the two, and the node cap is stated in nodes.
+      // `searchNodes` is the acceptance number for #1083 and is read straight off the seam #1072
+      // exposed (`searchStats`), never re-derived here.
       counts: (_state, selections) => ({
         selectionsResolved: selections.length,
         selectionsSatisfied: selections.filter((selection) => selection.success).length,
@@ -829,9 +676,7 @@ function alchemyCases() {
       setup: (context) => {
         const recipes = hydrateRecipes(context.modules, context.fixture.recipes.slice(0, GM_ROWS));
         const world = worldFor(context, { recipes });
-        // A corpus copy is a `getRecipes` call that materialises a cohort array. Counted on
-        // the manager rather than inside `src/`, matching how every other fixture-side
-        // counter here rides on the inputs instead of the code under measurement.
+        // A corpus copy is a `getRecipes` call that materialises a cohort array.
         const readRecipes = world.recipeManager.getRecipes.bind(world.recipeManager);
         world.recipeManager.getRecipes = (filters) => {
           context.counters.bump('recipeCorpusCopies');
@@ -978,29 +823,10 @@ function alchemyCases() {
 const JOURNAL_ACTIVE_RUNS = 25;
 const JOURNAL_HISTORY_RUNS = 25;
 
-/**
- * Where in the corpus the Journal's runs are drawn from, and it is not the front.
- *
- * `alchemy-knowledge` brew-discovers its first 100 recipes, so runs taken from the front are
- * ALL revealed and the case's `redactedRuns` count reads zero — a non-vacuity guard that can
- * never fire, on a pass in which the redaction gate only ever answers one way. Past the
- * learned slice the answer is decided by book membership instead, and the actor holds half the
- * books, so both answers occur.
- */
+/** Where in the corpus the Journal's runs are drawn from, and it is not the front. */
 const JOURNAL_RUN_OFFSET = 200;
 
-/**
- * One synthetic crafting run per recipe, in the shape `RunJournalBuilder` projects.
- *
- * Deliberately minimal and RNG-free: what this profile measures is the per-run redaction
- * question, not step detail, and a richer run body would add cost that has nothing to do with
- * the term under measurement.
- *
- * @param {object[]} recipes
- * @param {string} systemId
- * @param {string} phase
- * @returns {object[]}
- */
+/** One synthetic crafting run per recipe, in the shape `RunJournalBuilder` projects. */
 function journalRuns(recipes, systemId, phase) {
   return recipes.map((recipe, index) => ({
     id: `${phase}-run-${index}`,
@@ -1015,19 +841,7 @@ function journalRuns(recipes, systemId, phase) {
   }));
 }
 
-/**
- * THE ALCHEMY REVEAL PATH (issue 1228).
- *
- * Both cases here measure the same term on two surfaces: how many held documents the
- * per-recipe recipe-item matcher is OFFERED. That number is what #1077 set out to bound and
- * what these two builders still carried unbounded, and it is committed here rather than left
- * to a wall clock because it is the only reading that can distinguish "the snapshot is
- * threaded" from "the snapshot is present but built without its matcher" — the two states are
- * identical on every inventory-READ counter and on every correctness assertion.
- *
- * `visibilityCounters` is module-global, so it is zeroed between `setup` and the single
- * counted `run` rather than read as a delta — the same discipline the signature cases apply.
- */
+/** THE ALCHEMY REVEAL PATH (issue 1228). */
 function alchemyKnowledgeCases() {
   return [
     {
@@ -1125,10 +939,7 @@ function alchemyKnowledgeCases() {
             ...context.fixture,
             system: {
               ...context.fixture.system,
-              // The ONLY two fields that differ from the profile's own system. `item` and
-              // `knowledge` modes populate `access.knowledge`, which routes the exhaustion
-              // read to the evidence branch and past the collection entirely — so a case in
-              // either mode would record zero here and prove nothing.
+              // The ONLY two fields that differ from the profile's own system.
               resolutionMode: 'simple',
               visibilityMode: 'global',
             },
@@ -1146,13 +957,9 @@ function alchemyKnowledgeCases() {
       counts: (world, listing) => ({
         listedRecipes: listing.summaries.length,
         availableRecipes: listing.counts.available,
-        // The exhaustion ANSWER, committed as an answer-equality term rather than as a
-        // non-vacuity one, and it reads ZERO: this profile authors no use caps, so every
-        // held book is uncapped and no row is exhausted. That is the correct answer and the
-        // one the threading must not change. Non-vacuity of the READ is `candidateWalks`
-        // below — a corpus whose recipes carried no book reference would report the identical
-        // row counts and skip the collection entirely, and only that number shows the
-        // difference.
+        // The exhaustion ANSWER, committed as an answer-equality term rather than as a non-vacuity
+        // one, and it reads ZERO: this profile authors no use caps, so every held book is uncapped
+        // and no row is exhausted.
         exhaustedRows: listing.summaries.filter((summary) => summary.exhausted === true).length,
         ...world.modules.visibilityCounters.read(),
       }),
@@ -1160,16 +967,7 @@ function alchemyKnowledgeCases() {
   ];
 }
 
-/**
- * The dependency-graph cases.
- *
- * `deep` is the DEPTH axis (issue 1082) and it is not a bigger version of the other two. A
- * 20,000-link linear chain is the shape that made the pre-fix layout throw
- * `RangeError: Maximum call stack size exceeded` — its cycle-detection DFS was recursive and
- * unguarded, and it failed at a measured depth of 8,193. That case therefore does not merely
- * get slower without the fix; it does not complete at all, which is why its committed counts
- * are a crash regression guard rather than a performance one.
- */
+/** The dependency-graph cases (issue 1082). */
 function graphCases() {
   const shapes = ['sparse', 'dense', 'deep'];
   return shapes.flatMap((shape) => [
@@ -1192,11 +990,7 @@ function graphCases() {
       setup: (context) => ({
         world: worldFor(context),
         recipes: context.fixture.graphs[shape],
-        // The adjacency-lookup seam (issue 1082). `graphIncomingEdgesExamined` is what makes
-        // "layout performs no repeated whole-edge filtering per node" a committed number: the
-        // pre-fix ordering pass filtered ALL edges once per node per layer and examined
-        // 1,068,168 edge entries on the 3,568-edge dense fixture, so a reintroduced rescan
-        // moves this count by orders of magnitude rather than subtly.
+        // The adjacency-lookup seam (issue 1082).
         counters: context.counters,
       }),
       // The graph is rebuilt inside the timed region on purpose: `layoutGraph` MUTATES the
@@ -1220,13 +1014,8 @@ function graphCases() {
 }
 
 /**
- * The inventory-axis cases — the SERIES, reported at every point of
- * {@link INVENTORY_SERIES} rather than averaged into one number.
- *
- * One data point cannot show super-linear growth, and super-linear growth is the entire defect
- * class. Every case below is generated once per series point against the SAME 5,000-component
- * library and the SAME 20-recipe corpus, so the only thing that differs between `@100` and
- * `@1000` is the held-stack count.
+ * The inventory-axis cases — the SERIES, reported at every point of {@link INVENTORY_SERIES} rather
+ * than averaged into one number.
  */
 function heldInventoryCases() {
   return INVENTORY_SERIES.flatMap((stacks, seriesIndex) => {
@@ -1363,25 +1152,10 @@ function heldInventoryCases() {
 }
 
 /**
- * The two whole-app listing cases every inventory-bearing axis reports, parameterised by the
- * axis rather than restated per profile.
+ * The two whole-app listing cases every inventory-bearing axis reports, parameterised by the axis
+ * rather than restated per profile (issue 1204).
  *
- * Extracted when the component-library axis landed (issue 1204) and gained the same pair. The
- * two copies would have been near-identical, and SonarCloud counts `tests/**` duplication
- * exactly like `src/` — but the stronger reason is that these two cases are the SAME
- * measurement taken along two axes, and a reader comparing the series has to be able to see
- * that they were not measured slightly differently.
- *
- * `hydratedWorld` is the only real parameter. Both builders read `getExecutionSteps()`, which a
- * literal payload does not carry, so every caller hydrates its corpus first.
- *
- * @param {object} options
- * @param {string} options.profile
  * @param {string} options.suffix The series-point suffix, e.g. `@1000` or `.library@5000`.
- * @param {(context: object) => object} options.hydratedWorld
- * @param {string} options.craftingDescription
- * @param {string} options.inventoryDescription
- * @returns {object[]}
  */
 function playerAppListingCases({
   profile,
@@ -1423,19 +1197,8 @@ function playerAppListingCases({
 
 /**
  * The COMPONENT-LIBRARY axis cases (issue 1204) — the other half of the same series.
- *
- * `heldInventoryCases` above varies items against a pinned library; these vary the library
- * against a pinned 1,000-stack inventory and a pinned 6-recipe corpus. The two together are
- * what make `cost = a*components + b*items` readable as two independent slopes, which is what
- * "not proportional to `items x components`" actually asserts: an additive model produces two
- * straight lines, and a product term makes each series' slope depend on where the OTHER axis
- * was pinned. Neither series alone can distinguish those.
- *
- * All three cases run against `context.fixture` with `components` swapped for the series
- * point's prefix. `createBenchWorld` derives its system from `fixture.system` and wraps
- * `fixture.components` in `countingCandidates`, so overriding that one field is the whole of
- * what varies — the corpus, the inventory, the actors and the managers are rebuilt identically
- * at every point.
+ * `heldInventoryCases` above varies items against a pinned library; these vary the library against
+ * a pinned 1,000-stack inventory and a pinned 6-recipe corpus.
  */
 function componentLibraryCases() {
   return COMPONENT_LIBRARY_SERIES.flatMap((componentCount, seriesIndex) => {
@@ -1488,11 +1251,8 @@ function componentLibraryCases() {
             componentSourceActors: world.sourceActors,
             viewer: world.viewer,
           }),
-        // Non-vacuity of the case itself, and the fields are the ones the model actually
-        // carries rather than the ones it reads as though it should. A `null` model (an
-        // invisible recipe, a blocked system) reports zero on all three, and so does a model
-        // that hydrated but answered "missing materials" for every set — which is exactly the
-        // fast-number-for-nothing failure `scaleWorld.js` warns about on this path.
+        // Non-vacuity of the case itself, and the fields are the ones the model actually carries
+        // rather than the ones it reads as though it should.
         counts: (_state, model) => {
           const sets = model?.ingredientSets ?? [];
           return {
@@ -1505,12 +1265,11 @@ function componentLibraryCases() {
           };
         },
       },
-      // APPENDED after the three cases above, never inserted ahead of them: a profile's FIRST
-      // case absorbs a one-off index build over the fixture's shared empty
-      // `essenceDefinitions` array, so `identityIndexBuilds` reads `1 + (first case ? 1 : 0)`
-      // and `craftingListing.buildListing.library@1000` carries the committed `2`
-      // (`benchmarks/README.md`). Inserting ahead of it would move a committed number for a
-      // reason unrelated to this change.
+      // APPENDED after the three cases above, never inserted ahead of them: a profile's FIRST case
+      // absorbs a one-off index build over the fixture's shared empty `essenceDefinitions` array,
+      // so `identityIndexBuilds` reads `1 + (first case ? 1 : 0)` and
+      // `craftingListing.buildListing.library@1000` carries the committed `2`
+      // (`benchmarks/README.md`).
       {
         id: `bulkDestroy.resolveRows${suffix}`,
         profile: 'component-library',
@@ -1521,32 +1280,9 @@ function componentLibraryCases() {
           'because the term is invisible on any axis that pins the library.',
         setup: (context) => {
           const world = hydratedWorldAt(context);
-          // Rows are taken from the END of THIS series point's library, and that choice is
-          // the whole point of the case. The fixture draws its held stacks against the
-          // SMALLEST prefix, so every component the actor holds sits at a fixed low position
-          // at every series point — a reintroduced `.find()` over one of those would
-          // terminate after the same handful of comparisons at 1,000 and at 10,000, report a
-          // flat series, and prove nothing. End-of-library ids make a surviving scan cost its
-          // full length, so the reintroduced product shows up as a SLOPE.
-          //
-          // The actor therefore holds none of them and every row is correctly classified
-          // `depleted`. That is not a collapsed fixture: `_destroyOne` resolves the component
-          // and runs the FULL matcher pass over the pinned 1,000-stack inventory before it
-          // can say so, which is exactly the `rows x items x components` core. The
-          // matched-row half of the same run is measured on the other axis, by
-          // `craftingEngine.findComponentItems.bulk@N` in `held-inventory`.
-          // BOTH counting layers on this ONE case's library. `createBenchWorld` wraps every
-          // profile's array in `countingCandidates`, which sees a scan written as
-          // `components.find(...)` and is blind to `for (const c of components)` — the idiom
-          // this repository actually reaches for. Layering the enumeration counter here
-          // rather than widening the shared wrapper keeps every other committed baseline
-          // untouched (it mutates in place, so `definitionIndex`'s identity-keyed cache still
-          // sees one array) while making THIS case falsifiable against both shapes.
-          //
-          // `componentEntriesWalked` reads exactly the library size at each point: that is
-          // `buildIndex` walking `definitions.entries()` for its one cold build, which
-          // `identityCandidatesExamined` already carries. A SURPLUS over the library size is
-          // the signal — a per-row `for (const [i, c] of components.entries())`.
+          // Rows are taken from the END of THIS series point's library, and that choice is the
+          // whole point of the case. The actor therefore holds none of them and every row is
+          // correctly classified `depleted`.
           countingEnumerations(world.components, context.counters, {
             key: 'componentEnumerationsWalked',
             entriesKey: 'componentEntriesWalked',
@@ -1556,10 +1292,7 @@ function componentLibraryCases() {
             getCraftingSystem: (id) => world.craftingSystemManager.getSystem(id),
             findComponentItems: (actor, component, system) =>
               world.craftingEngine.findComponentItems(actor, component, system),
-            // Never reached, and `deleteCalls` below is the proof. A `depleted` row returns
-            // before any delete is attempted, which is what makes this case IDEMPOTENT — the
-            // harness calls `run` once for the counted pass and `reps` more times against the
-            // SAME state, so a mutating case would time an emptied pack.
+            // Never reached, and `deleteCalls` below is the proof.
             deleteItems: async (_actor, ids) => {
               deletes.push(ids);
               return [];
@@ -1577,10 +1310,7 @@ function componentLibraryCases() {
         run: ({ service, targets }) => service.run({ targets }),
         counts: ({ deletes }, report) => ({
           rows: report.items.length,
-          // Every row must have RESOLVED its component and then found no stacks. A row whose
-          // id did not resolve is classified `unknownComponent` instead and never reaches the
-          // matcher, so this single count is what stops the case reporting a fast number for
-          // a run that looked nothing up.
+          // Every row must have RESOLVED its component and then found no stacks.
           depletedRows: report.items.filter((item) => item.skipReason === 'depleted').length,
           deleteCalls: deletes.length,
           unitsDeleted: report.unitsDeleted,
@@ -1602,12 +1332,7 @@ export const BENCHMARK_CASES = Object.freeze([
   ...componentLibraryCases(),
 ]);
 
-/**
- * The cases belonging to one profile.
- *
- * @param {string} profile
- * @returns {object[]}
- */
+/** The cases belonging to one profile. */
 export function casesForProfile(profile) {
   return BENCHMARK_CASES.filter((benchmarkCase) => benchmarkCase.profile === profile);
 }

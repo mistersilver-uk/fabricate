@@ -1,42 +1,6 @@
 /**
- * The two BOUNDS this change claims for itself, each as a recorded golden (issue 1392, epic
- * 1357, PR 7a).
- *
- * ── WHY GOLDENS AND NOT A LIVE `git diff` ────────────────────────────────────────────────
- * No shipped test diffs the working checkout against `origin/main`, and a `git diff` inside a
- * test is hostile to a shallow CI checkout and to a detached reviewer snapshot — both of which
- * this repository's review lanes actually use. A recorded golden states the same claim about the
- * same bytes and keeps stating it after the branch merges, which is the half a diff cannot do.
- * The pattern is `tests/fixtures/scopedDefinitionNormalize.golden.json`'s.
- *
- * ── WHAT EACH ONE BOUNDS ─────────────────────────────────────────────────────────────────
- * 1. `adminStore.js` is a gateway file `### GM World Scoped Entity Routes` requirement 7 closes
- *    to this lane, and it was reopened for ONE named missing seam: the world-scope projection is
- *    handed no recipe corpus, so a world-wide recipe reference count was underivable from the
- *    open files. The bound is that the COUNTING did not move into this file with the argument —
- *    and the sharpest mechanical statement of that is the IMPORT SURFACE, because computing the
- *    usage here would need `buildVocabularyUsage` imported.
- *    The golden has been re-recorded TWICE since, and both times for an import that takes
- *    behaviour OUT of this gateway. Issue 1371 r19-store2 added `componentEssenceOverrideOn` — the
- *    "is a system-scope essence write an override" rule, now `systems/componentEssenceOverride.js`.
- *    Issue 1371 r20-store3 added `componentsWithResolvedEssences` — the "what does this system
- *    resolve for a component's essences" READ, now `systems/resolvedComponentEssences.js`, which
- *    the row projection, the essence usage counts, the delete-impact dialog and the override rule
- *    all consume rather than each deciding for itself which of the two maps to look at. Both move
- *    behaviour out rather than in, so the bound above is unweakened. Re-recording is the correct
- *    response to a lane that genuinely changes this surface; ADDING an import that pulls work in
- *    is still what this guard exists to red.
- * 2. `CraftingSystemManager.js` is opened for a COMMENT ONLY. `_vocabularyBasis`'s docstring now
- *    records why the world half is deliberately not wired into the category-icon prune basis;
- *    its executable body, and `_scopeBasis`'s, are byte-identical to the lane base.
- *
- * The comment-stripped form is what the second golden holds, so the docstring rewrite this
- * change SHIPS does not itself red the guard while any executable change still does.
- *
- * ── AND THE NON-VACUITY HALF ─────────────────────────────────────────────────────────────
- * Both extractors are `indexOf` slices, and an `indexOf` slice answers something plausible on a
- * miss. Each is therefore asserted to contain a named landmark BEFORE its equality clause, so a
- * broken extractor reds rather than comparing two empty strings.
+ * The two BOUNDS this change claims for itself, each as a recorded golden (issue 1392, epic 1357,
+ * PR 7a).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -46,15 +10,7 @@ import test from 'node:test';
 const repoRoot = resolve(import.meta.dirname, '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
-/**
- * Every top-level `import` statement of a module, in source order.
- *
- * `[^;]*` spans newlines, and an import statement carries no semicolon of its own before its
- * terminator, so this captures a multi-line brace list whole.
- *
- * @param {string} source
- * @returns {string}
- */
+/** Every top-level `import` statement of a module, in source order. */
 export function importSurface(source) {
   return (source.match(/^import\b[^;]*;/gm) ?? []).join('\n');
 }
@@ -62,12 +18,7 @@ export function importSurface(source) {
 /**
  * One named function or method's source, comment-stripped.
  *
- * The closer is the first line at the declaration's own indentation that is a bare `}`, which is
- * exact for both shapes this file reads: a top-level `function` and a class method.
- *
- * @param {string} source
  * @param {string} declaration the declaration line, verbatim and including its indentation.
- * @returns {string}
  */
 export function strippedFunction(source, declaration) {
   const start = source.indexOf(declaration);

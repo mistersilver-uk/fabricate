@@ -1,12 +1,4 @@
-/**
- * Issue 676 — the component category vocabulary.
- *
- * Covers AC7 (`componentCategories` and `categories` stay independent; `general` is
- * never persisted in either) at the helper layer, plus the two properties copied
- * deliberately from the recipe sibling: the reserved bucket is never stored, and
- * `Component.category` defaults to `general` through normalization rather than
- * through a migration.
- */
+/** Issue 676 — the component category vocabulary. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -39,9 +31,7 @@ describe('component category helpers (issue 676)', () => {
     assert.equal(isGeneralComponentCategory('GENERAL'), true);
     assert.equal(isGeneralComponentCategory('Reagent'), false);
     // The non-string guard, which `normalizeComponentCategory` never reaches — it early-returns
-    // first. Its live callers are the direct ones in `worldVocabulary.js` and `adminStore.js`,
-    // which hand it unvalidated stored values, and since #1663 it is ONE guard answering for
-    // both vocabularies.
+    // first.
     assert.equal(isGeneralComponentCategory(null), false);
     assert.equal(isGeneralComponentCategory(42), false);
   });
@@ -65,9 +55,7 @@ describe('component category helpers (issue 676)', () => {
   });
 
   it('localizes only general; a custom token is surfaced verbatim', () => {
-    // NOT the identity on a non-general key. Returning `key` verbatim made the custom-token
-    // assertion below pass whether or not the token was routed through `localize`, so "only the
-    // reserved bucket is localizable" — the property the module documents — was asserted by nothing.
+    // NOT the identity on a non-general key.
     const localize = (key) => (key === 'FABRICATE.Common.General' ? 'Allgemein' : `L:${key}`);
     assert.equal(getComponentCategoryLabel('general', localize), 'Allgemein');
     assert.equal(getComponentCategoryLabel('', localize), 'Allgemein');
@@ -78,25 +66,6 @@ describe('component category helpers (issue 676)', () => {
 
   it('is a SIBLING of the recipe vocabulary, not an alias of it (AC7)', () => {
     // WHAT THIS TEST PROVES, AND WHAT IT NO LONGER PROVES, SINCE #1663.
-    //
-    // The six component helpers and the six recipe helpers are now ONE implementation in
-    // `src/utils/categoryNormalization.js`, re-exported under both families of names. So
-    // `GENERAL_COMPONENT_CATEGORY === GENERAL_RECIPE_CATEGORY` is literally `x === x`, and both
-    // `normalizeCustom*` calls below are the SAME function — the disjointness loop therefore
-    // asserts only that two literal arrays written in this file are disjoint from each other.
-    // Neither assertion can see a leak.
-    //
-    // THE INDEPENDENCE STILL HOLDS WHERE IT IS SPEC'D, which is at the stored data rather than
-    // at the normaliser: `CraftingSystem.componentCategories` and `CraftingSystem.categories`
-    // are separate stored keys with separate call sites, and merging, aliasing or
-    // cross-populating them remains forbidden by `openspec/specs/data-models/spec.md`. That is
-    // the property the STORE-LEVEL suites witness — `tests/component-category-normalization.test.js`'s
-    // 'componentCategories and categories stay independent vocabularies (AC7)' over the real
-    // `CraftingSystemManager._normalizeSystem`, and `tests/admin-store-vocabulary-cascade.test.js`
-    // over the adminStore write ops — not this one.
-    //
-    // KEPT, DELIBERATELY, as the public-name smoke: both families are still reachable under
-    // their own names, from their own module paths, with the shape callers expect.
     assert.equal(GENERAL_COMPONENT_CATEGORY, GENERAL_RECIPE_CATEGORY);
 
     const componentVocabulary = normalizeCustomComponentCategories(['Reagent', 'Metal']);

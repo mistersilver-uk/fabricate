@@ -15,9 +15,7 @@ import {
 
 import { authoredComplication, visibleComplicationPair } from './helpers/complicationFixtures.js';
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 /** The shared authored-complication fixture, with a per-test id and name. */
 const complication = ({ id, name = id, ...rest } = {}) =>
@@ -32,9 +30,7 @@ function stage(id, componentId) {
   return { id, componentId, name: componentId, img: null, difficulty: 1, threshold: 1 };
 }
 
-// ---------------------------------------------------------------------------
 // The pure boundary
-// ---------------------------------------------------------------------------
 
 describe('1286: attachStageComplications — the player forecast', () => {
   const shrapnel = complication({ id: 'x1', name: 'Shrapnel' });
@@ -67,10 +63,8 @@ describe('1286: attachStageComplications — the player forecast', () => {
   });
 
   it('carries EVERY visible complication a stage authors, and not just the first', () => {
-    // The plural case, which no other fixture in this feature produces: two complications
-    // that BOTH survive redaction, on one stage. A projection that kept only the first would
-    // be invisible against a `visible` + `gmOnly` pair, and would silently under-warn a
-    // player about a consequence the runtime will still fire at them.
+    // The plural case, which no other fixture in this feature produces: two complications that BOTH
+    // survive redaction, on one stage.
     const [row] = attachStageComplications([stage('r1', 'iron')], {
       componentById: componentIndex([
         { id: 'iron', name: 'Iron', complications: [...visibleComplicationPair(), curse] },
@@ -260,11 +254,8 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
   });
 
   it('marks the complication the record NAMES, not every complication on that stage', () => {
-    // Two complications a player can see on one stage — the case the shared `visible` +
-    // `gmOnly` fixture cannot produce. One of them fired. A mark keyed on the stage alone
-    // would tell the player that BOTH happened, which is the exact false claim this
-    // function's "it marks; it never adds" contract exists to prevent, and the one a
-    // one-entry row can never expose.
+    // Two complications a player can see on one stage — the case the shared `visible` + `gmOnly`
+    // fixture cannot produce.
     const pairById = componentIndex([
       { id: 'iron', name: 'Iron', complications: visibleComplicationPair() },
     ]);
@@ -313,9 +304,7 @@ describe('1286: markFiredStageComplications — the resolved tense', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // InventoryListingBuilder — the player salvage view-model
-// ---------------------------------------------------------------------------
 
 const OWNED_ITEM = { name: 'Anvil', system: { quantity: 1 } };
 
@@ -406,11 +395,9 @@ describe('1286: InventoryListingBuilder publishes the player complication foreca
   });
 
   it('forecasts against the SALVAGE activity, which the panel it feeds is', () => {
-    // `appliesToActivity` is an equality test on one flag, so the activity token this
-    // builder passes is load-bearing in both directions at once: pass the wrong one and a
-    // salvage-only complication vanishes from the salvage panel while a crafting-only one
-    // is advertised on it. Neither is visible against a complication enabled for all three
-    // activities, which is every other fixture in this suite.
+    // `appliesToActivity` is an equality test on one flag, so the activity token this builder
+    // passes is load-bearing in both directions at once: pass the wrong one and a salvage-only
+    // complication vanishes from the salvage panel while a crafting-only one is advertised on it.
     const salvage = salvageViewModel(
       salvageSystemWith({
         complications: [
@@ -475,9 +462,7 @@ describe('1286: InventoryListingBuilder publishes the player complication foreca
   });
 });
 
-// ---------------------------------------------------------------------------
 // BulkSalvageService — the pre-run "what could go wrong" forecast
-// ---------------------------------------------------------------------------
 
 function bulkService(system, { getPlayerResultOrder = null } = {}) {
   return new BulkSalvageService({
@@ -637,18 +622,15 @@ describe('1286: BulkSalvageService.forecast — the pre-run projection', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The leaf assertion
-// ---------------------------------------------------------------------------
 
 describe('1286: progressiveStageComplications.js stays a leaf', () => {
   it('imports the pure player projection and nothing else', () => {
-    // Load-bearing, not tidiness. The salvage view-model this module decorates is read by
-    // player stores, and every mounted Svelte suite that loads one declares its module
-    // closure verbatim — so a runtime import acquired here would drag `checkRoll.js`'s
-    // sixteen-module closure into each of them, and an omission from a harness allowlist
-    // HANGS the suite (`# cancelled`) rather than failing it. Same guard, same reason, as
-    // the allowlist pinned on `complicationPlan.js` itself.
+    // Load-bearing, not tidiness. The salvage view-model this module decorates is read by player
+    // stores, and every mounted Svelte suite that loads one declares its module closure verbatim —
+    // so a runtime import acquired here would drag `checkRoll.js`'s sixteen-module closure into
+    // each of them, and an omission from a harness allowlist HANGS the suite (`# cancelled`) rather
+    // than failing it.
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
     const source = readFileSync(join(root, 'src/utils/progressiveStageComplications.js'), 'utf8');
     const specifiers = [...source.matchAll(/^\s*import\s[^'"]*['"]([^'"]+)['"]/gm)].map(

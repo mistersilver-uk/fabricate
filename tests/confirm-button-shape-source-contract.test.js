@@ -1,20 +1,7 @@
 /**
  * Source contract: no confirm in `src/**` configures its buttons with a BARE FUNCTION.
- *
- * `DialogV2.confirm` merges `yes`/`no` over a default button with `mergeObject`, which
- * iterates `Object.keys(other)` — `[]` for a function (executed against V14.365
- * `common/utils/helpers.mjs:1126` and the V13.351 build of the same helper). So
- * `yes: () => true` contributes nothing: not the callback, and — the part that reaches a
- * GM — not the LABEL, leaving a destructive confirm asking the generic *Yes*. That shape
- * shipped on ~15 call sites (issues 1132, 1154), which is why this is a guard and not a
- * comment.
- *
- * `normalizeConfirmOptions` now rescues the callback, but nothing can invent the label,
- * so the object form stays the contract.
- *
- * Deliberately line-based rather than a comment-stripping parse: a violation is always on
- * a CODE line, and skipping lines that open with a comment marker keeps the prose in the
- * docblocks that explain this defect from reading as the defect itself.
+ * `normalizeConfirmOptions` now rescues the callback, but nothing can invent the label, so the
+ * object form stays the contract.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -46,9 +33,7 @@ function sourceLines(root) {
 test('no confirm button in src is configured as a bare function', () => {
   const lines = sourceLines(SRC);
 
-  // Non-vacuity: the scan must actually be looking at the confirm call sites. If the
-  // store stops raising confirms through this seam the number moves and this fails
-  // LOUDLY rather than passing over an empty corpus.
+  // Non-vacuity: the scan must actually be looking at the confirm call sites.
   const confirmCallSites = lines.filter(
     ({ text }) => !isCommentLine(text) && /confirmDialog(?:\?\.)?\(\{/.test(text)
   ).length;

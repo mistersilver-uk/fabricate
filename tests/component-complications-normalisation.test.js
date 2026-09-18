@@ -1,18 +1,4 @@
-/**
- * Issue 1286 — `Component.complications` normalisation.
- *
- * The persisted record is TOP-LEVEL on the component (not under `salvage`), because a
- * complication is scoped to a component's participation in ANY progressive activity, and
- * because `salvage` is only valid when `features.salvage` is true — a complication on a
- * crafting OUTPUT component must survive on a system with salvage off.
- *
- * The load-bearing guarantee here is the NO-MIGRATION one: `_normalizeComponent` is an
- * allowlist rebuild, so a component's persisted bytes after a save are exactly what that
- * literal emits. A component that authored no complications must therefore keep NO
- * `complications` key at all, and an authored empty array must normalize to the same
- * absence — there is no authored-empty state to distinguish (unlike `checkModifierIds`,
- * where an empty pick is a real pick of zero).
- */
+/** Issue 1286 — `Component.complications` normalisation. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -49,9 +35,7 @@ function countingMint() {
   return () => `minted-${++minted}`;
 }
 
-// ---------------------------------------------------------------------------
 // Absence preservation — the no-migration guarantee
-// ---------------------------------------------------------------------------
 
 test('an absent complications value attaches nothing', () => {
   assert.deepEqual(authoredComplications(undefined), {});
@@ -89,9 +73,7 @@ test('only non-object/array members are dropped; the rest keep authored order', 
   );
 });
 
-// ---------------------------------------------------------------------------
 // The shape and its defaults
-// ---------------------------------------------------------------------------
 
 test('a bare authored complication normalizes to the full shape with safe defaults', () => {
   const { complications } = authoredComplications([{}], countingMint());
@@ -137,9 +119,8 @@ test('the default mint uses foundry.utils.randomID when a world is running', () 
 });
 
 test('the default mint falls back to the platform CSPRNG with no Foundry runtime', () => {
-  // The reason `mintId` is injectable at all: `foundry.utils.randomID()` is not callable
-  // under `node --test`. The fallback must still mint, or an id-less complication would
-  // persist as `undefined` and acquire a fresh id on every save.
+  // The reason `mintId` is injectable at all: `foundry.utils.randomID()` is not callable under
+  // `node --test`.
   const runtime = globalThis.foundry;
   globalThis.foundry = undefined;
   try {
@@ -251,9 +232,7 @@ test('when.checkTrigger is a trigger id or null, never an empty string', () => {
   assert.equal(complications[2].when.checkTrigger, null);
 });
 
-// ---------------------------------------------------------------------------
 // Operands: preserved, never repaired
-// ---------------------------------------------------------------------------
 
 test('the prototype’s `ne` comparator normalizes to the operator table’s `neq`', () => {
   const { complications } = authoredComplications(
@@ -341,9 +320,7 @@ test('normalisation is idempotent, so a re-save is byte-stable', () => {
   assert.equal(JSON.stringify(twice), JSON.stringify(once), 'key order is stable too');
 });
 
-// ---------------------------------------------------------------------------
 // The attach inside `_normalizeComponent`
-// ---------------------------------------------------------------------------
 
 test('a component that authored no complications keeps NO complications key', () => {
   const manager = makeManager();

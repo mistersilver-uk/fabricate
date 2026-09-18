@@ -1,14 +1,4 @@
-/**
- * Issue #701 — copy-mode recipe-id regeneration + recipe-book membership remap.
- *
- * Copy-mode `prepareForImport` regenerates every recipe id (previously it merely
- * stripped them and let the downstream `Recipe` constructor mint fresh ones) and
- * atomically remaps each `recipeItemDefinitions[].recipeIds` membership array to the
- * regenerated ids, so a copy's books resolve to the copy's recipes. Without the
- * remap every book in an imported copy pointed at dead pre-import ids and rendered
- * empty, and a faithful copy import reported every membership entry as a broken
- * `RECIPE_ITEM` reference.
- */
+/** Issue #701 — copy-mode recipe-id regeneration + recipe-book membership remap. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

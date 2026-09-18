@@ -1,25 +1,7 @@
 /**
  * `checkAffordability`'s behaviour — the world-scoped affordability answer the companion contract
- * publishes, and the macro discriminator it needed (issue 1289).
- *
- * Four claims are worth a suite of their own, because each one is a value a shape pin cannot see:
- *
- *   1. **The ladder still converts.** 10 sp affords a 1 gp cost on a 10-sp-per-gp ladder. This is
- *      the #1278 sentinel: that refactor moved the coin ladder from a crafting system to the world,
- *      and the companion's own catalogue kept reading `system?.requirements?.currency?.units`,
- *      which then answered `[]` for every system in every world while failing nothing at all.
- *      Breaking ladder resolution flips this VALUE, and a key-set-and-type pin cannot see that.
- *   2. **World scope, never a crafting system.** Asserted DIFFERENTIALLY — identical answers with
- *      the system toggle `false` and `true`, plus spies proving zero calls to EITHER route to a
- *      crafting system. Sameness alone would pass even if the toggle were read and happened not to
- *      matter.
- *   3. **The unit and the amount are resolved BEFORE any spender runs.** Asserted with a spy
- *      proving the spender was never invoked, because sameness of answer is not enough: an unknown
- *      unit prices the cost at zero, and `copperValue >= 0` is true of every purse, so the defect
- *      this guards is an unknown unit reading as AFFORDABLE.
- *   4. **A thrown macro is distinguishable from a poor actor.** Also differential: a macro that
- *      throws and a macro that returns a refusal must not answer in the same shape. Against shipped
- *      code they did.
+ * publishes, and the macro discriminator it needed (issue 1289). 1. **The ladder still converts.**
+ * 10 sp affords a 1 gp cost on a 10-sp-per-gp ladder.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -44,13 +26,7 @@ import {
 
 const KEY = 'FABRICATE.Currency.Affordability';
 
-/**
- * Every call the runtime could make to a crafting system, recorded in one place.
- *
- * BOTH routes are instrumented — the injected seam and the `game.fabricate` global fallback —
- * because a check that reached past its seam to the global would otherwise satisfy a seam-only spy
- * while still consulting a system.
- */
+/** Every call the runtime could make to a crafting system, recorded in one place. */
 const systemManagerCalls = [];
 
 globalThis.game = {
@@ -70,10 +46,6 @@ function purseHolding(sp) {
 /**
  * Ask THE standard question — can Idrin, holding 10 sp and nothing else, afford 1 gp — with each
  * case naming only what it changes about it.
- *
- * A shared question rather than a per-case one is the point in three of these suites: the
- * world-scope differential claims two calls are "the same question", and the pre-spender guards
- * claim a refusal is caused by the one field the case overrode and by nothing else.
  */
 function ask(seams, { sp = 10, ...request } = {}) {
   return checkWorldCurrencyAffordability(
@@ -274,14 +246,7 @@ describe('the unit and the amount are resolved before any spender runs', () => {
 describe('the macro arm', () => {
   const MACROS = { canAfford: 'Macro.afford', decrement: 'Macro.dec', increment: '' };
 
-  /**
-   * A resolver answering a runnable SCRIPT macro for every uuid.
-   *
-   * `MacroCoinSpender` now RESOLVES the configured uuid and gates on the document before it
-   * delegates (issue 1301), and this suite defines no `globalThis.fromUuid` — so without an
-   * injected resolver every case here would refuse at the gate and never reach its own
-   * `runMacro`, and the two cells that COUNT macro invocations would pass vacuously.
-   */
+  /** A resolver answering a runnable SCRIPT macro for every uuid (issue 1301). */
   const resolveRunnableMacro = async () => ({ type: 'script', command: 'return true;' });
 
   function macroSeams(runMacro) {

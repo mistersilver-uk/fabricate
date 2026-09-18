@@ -2,9 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSvelteApplicationMixin } from '../src/ui/svelte/SvelteApplicationMixinCore.js';
 
-// ---------------------------------------------------------------------------
 // Shared mock helpers
-// ---------------------------------------------------------------------------
 
 function makeDeps() {
   const mountCalls = [];
@@ -59,9 +57,7 @@ function buildApp(deps, overrides = {}) {
   return new TestApp();
 }
 
-// ---------------------------------------------------------------------------
 // Test 1: Throws if SVELTE_COMPONENT is not set
-// ---------------------------------------------------------------------------
 test('throws if SVELTE_COMPONENT is not set on subclass', async () => {
   const deps = makeDeps();
   const Mixed = createSvelteApplicationMixin(MockBase, deps);
@@ -86,9 +82,7 @@ test('throws if SVELTE_COMPONENT is not set on subclass', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Test 2: _renderHTML returns the context object (wrapped as reactive props)
-// ---------------------------------------------------------------------------
 test('_renderHTML returns the props object', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -101,9 +95,7 @@ test('_renderHTML returns the props object', async () => {
   assert.equal(result.bar, 'hello');
 });
 
-// ---------------------------------------------------------------------------
 // Test 3: First _replaceHTML calls mountFn with component, target, and props
-// ---------------------------------------------------------------------------
 test('first _replaceHTML calls mountFn with component, target, and props', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -120,9 +112,7 @@ test('first _replaceHTML calls mountFn with component, target, and props', async
   assert.equal(call.options.props.value, 42);
 });
 
-// ---------------------------------------------------------------------------
 // Test 4: mountFn receives props from _prepareSvelteProps if overridden
-// ---------------------------------------------------------------------------
 test('mountFn receives props from _prepareSvelteProps if overridden', async () => {
   const deps = makeDeps();
   const app = buildApp(deps, {
@@ -138,9 +128,7 @@ test('mountFn receives props from _prepareSvelteProps if overridden', async () =
   assert.equal(deps.mountCalls[0].options.props.foo, undefined);
 });
 
-// ---------------------------------------------------------------------------
 // Test 5: Second _replaceHTML does NOT call mountFn again
-// ---------------------------------------------------------------------------
 test('second _replaceHTML does not call mountFn again', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -155,9 +143,7 @@ test('second _replaceHTML does not call mountFn again', async () => {
   assert.equal(deps.mountCalls.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Test 6: Second _replaceHTML calls Object.assign on existing props
-// ---------------------------------------------------------------------------
 test('second _replaceHTML merges into existing props via Object.assign', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -174,9 +160,7 @@ test('second _replaceHTML merges into existing props via Object.assign', async (
   assert.equal(app._svelteProps.y, 'original');
 });
 
-// ---------------------------------------------------------------------------
 // Test 7: updateProps merges into reactive props
-// ---------------------------------------------------------------------------
 test('updateProps merges into reactive props', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -191,9 +175,7 @@ test('updateProps merges into reactive props', async () => {
   assert.equal(app._svelteProps.a, 99);
 });
 
-// ---------------------------------------------------------------------------
 // Test 8: updateProps before mount is a no-op (no throw)
-// ---------------------------------------------------------------------------
 test('updateProps before mount does not throw', () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -203,9 +185,7 @@ test('updateProps before mount does not throw', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Test 9: close() calls unmountFn with the mounted component
-// ---------------------------------------------------------------------------
 test('close calls unmountFn with the mounted component instance', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -221,9 +201,7 @@ test('close calls unmountFn with the mounted component instance', async () => {
   assert.equal(deps.unmountCalls[0], mountedInstance);
 });
 
-// ---------------------------------------------------------------------------
 // Test 10: close() calls super.close()
-// ---------------------------------------------------------------------------
 test('close calls super.close', async () => {
   const deps = makeDeps();
   let superCloseCalled = false;
@@ -247,9 +225,7 @@ test('close calls super.close', async () => {
   assert.ok(superCloseCalled);
 });
 
-// ---------------------------------------------------------------------------
 // Test 11: close() before mount does not call unmountFn
-// ---------------------------------------------------------------------------
 test('close before mount does not call unmountFn', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -259,9 +235,7 @@ test('close before mount does not call unmountFn', async () => {
   assert.equal(deps.unmountCalls.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Test 12: _onPosition calls onResize prop if set
-// ---------------------------------------------------------------------------
 test('_onPosition calls onResize prop callback with width and height', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -280,9 +254,7 @@ test('_onPosition calls onResize prop callback with width and height', async () 
   assert.equal(resizeArgs.height, 600);
 });
 
-// ---------------------------------------------------------------------------
 // Test 13: _onPosition does not throw if no onResize prop
-// ---------------------------------------------------------------------------
 test('_onPosition does not throw if no onResize prop is set', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -296,9 +268,7 @@ test('_onPosition does not throw if no onResize prop is set', async () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Test 14: Multiple instances do not share state
-// ---------------------------------------------------------------------------
 test('multiple instances do not share state', async () => {
   const deps = makeDeps();
 
@@ -327,9 +297,7 @@ test('multiple instances do not share state', async () => {
   assert.equal(app2._svelteMounted, true);
 });
 
-// ---------------------------------------------------------------------------
 // Test 15: _onClose unmounts the component when called directly (not via close())
-// ---------------------------------------------------------------------------
 test('_onClose unmounts the component when called directly', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -349,9 +317,7 @@ test('_onClose unmounts the component when called directly', async () => {
   assert.equal(app._svelteComponent, null);
 });
 
-// ---------------------------------------------------------------------------
 // Test 16: _onClose does not throw when no component is mounted
-// ---------------------------------------------------------------------------
 test('_onClose does not throw when no component is mounted', () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -362,9 +328,7 @@ test('_onClose does not throw when no component is mounted', () => {
   assert.equal(deps.unmountCalls.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Test 17: close() then _onClose() does not double-unmount
-// ---------------------------------------------------------------------------
 test('close followed by _onClose does not double-unmount', async () => {
   const deps = makeDeps();
   const app = buildApp(deps);
@@ -379,9 +343,7 @@ test('close followed by _onClose does not double-unmount', async () => {
   assert.equal(deps.unmountCalls.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Test 18: _onRender forwards to super._onRender
-// ---------------------------------------------------------------------------
 test('_onRender forwards to super._onRender', async () => {
   const deps = makeDeps();
   let superOnRenderArgs = null;

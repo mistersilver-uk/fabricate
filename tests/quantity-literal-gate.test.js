@@ -1,48 +1,6 @@
 /**
- * Regression gate: no module under `src/**` may re-hardcode the dnd5e/pf2e item
- * stack-quantity path (issue 1024, #853 proposal 1).
- *
- * ~31 sites used to read or write `system.quantity` directly. Each one was a
- * Tormenta20 world silently losing inventory, and — worse — a PARTIALLY routed module
- * splits the read from the write, which produces free components in one branch and
- * destroyed stacks in the other, in the same world. A thirty-second spelling would
- * reintroduce that in one surface only, which is the hardest version to notice.
- *
- * ## Shapes matched, and why each one
- *
- * The gate matches BOTH the optional-chained (`system?.quantity`) and the plain
- * (`system.quantity`) spellings, bracket access (`system['quantity']`), and the QUOTED
- * path (`'system.quantity'`) — the last being the flattened `item.update(...)` payload
- * key, which is the write half and contains no property access at all. An earlier
- * quantity gate matched only one spelling and was therefore vacuous.
- *
- * ## Comments are stripped before scanning, deliberately
- *
- * Modules that hold (or held) real call sites also DESCRIBE the field in prose, and the
- * accurate way to document this design is to name the literal. A gate that flagged prose
- * would be answered with a file-level allowlist — which would exempt exactly the modules
- * the gate exists to police. So `stripComments` blanks comment text first, and the
- * synthetic corpora below prove both that a real literal is still found and that a
- * comment-only mention is not.
- *
- * ## Known blind spot, recorded rather than papered over
- *
- * The gate sees the shapes enumerated in `SHAPES` and NOTHING else. Any spelling that is
- * not one of them is uncovered, and constant-mediated access is only the worked example:
- * before this change `SvelteCraftingSystemManagerApp.svelte.js` read the quantity via
- * `DEFAULT_QUANTITY_PATH.split('.').reduce(...)`, which contains neither spelling — no
- * grep and no gate could match it. The structural defence there is that the constant was
- * DELETED rather than re-pointed, turning that invisible miss into a build error, and the
- * final test in this file pins that deletion. Treat `SHAPES` as the whole coverage claim;
- * a new spelling needs a new shape, not an assumption that the scan generalizes.
- *
- * ## Vacuity
- *
- * A mechanical check that cannot fail is worthless, so the scanner is factored as
- * `findQuantityLiterals({ path: text })` and exercised against synthetic corpora whose
- * expected verdicts are known. The allowlist is also self-policing: each entry declares
- * an exact count that must still be matched by live source, so a stale entry fails and
- * the list can only shrink by editing a number a reviewer can see.
+ * Regression gate: no module under `src/**` may re-hardcode the dnd5e/pf2e item stack-quantity path
+ * (issue 1024, #853 proposal 1).
  */
 
 import { describe, it } from 'node:test';
@@ -55,10 +13,7 @@ import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js
 const srcRoot = join(repoRoot, 'src');
 
 /**
- * The ONE legitimate home for the literal, with the exact number of code occurrences it
- * is allowed. Declaring a count rather than a bare path is what makes the entry
- * self-policing: it must still match live source (so a stale entry fails), and growth is
- * a visible diff on a number rather than a new line in a list a reviewer skims past.
+ * The ONE legitimate home for the literal, with the exact number of code occurrences it is allowed.
  */
 const ALLOWLIST = Object.freeze({
   'src/config/stackQuantityPathPresets.js': 1,
@@ -81,16 +36,7 @@ const SHAPES = [
   { name: 'dot access', pattern: /\bsystem\s*\??\.\s*quantity\b/ },
 ];
 
-/**
- * Scan a `{ path: text }` corpus for hardcoded item stack-quantity paths.
- *
- * Taking a corpus rather than reading the filesystem is what makes this gate testable:
- * the same function that polices `src/**` can be pointed at a synthetic corpus whose
- * expected verdict is known.
- *
- * @param {Record<string, string>} sources
- * @returns {Array<{path: string, line: number, shape: string, text: string}>}
- */
+/** Scan a `{ path: text }` corpus for hardcoded item stack-quantity paths. */
 export function findQuantityLiterals(sources) {
   const findings = [];
   for (const [path, text] of Object.entries(sources || {})) {
@@ -232,10 +178,8 @@ describe('src/** carries no hardcoded item stack-quantity path', () => {
       'src/systems/CraftingEngine.js',
       'src/models/IngredientSet.js',
       'src/config/stackQuantityPathPresets.js',
-      // A `.svelte` path, so that dropping `.svelte` from `SCANNED_EXTENSIONS` reds this
-      // test rather than silently halving the corpus. Components are not a theoretical
-      // host for the literal: `SvelteCraftingSystemManagerApp.svelte.js` held one of the
-      // routed sites, and a `.svelte` file can read a stack count inline.
+      // A `.svelte` path, so that dropping `.svelte` from `SCANNED_EXTENSIONS` reds this test
+      // rather than silently halving the corpus.
       'src/ui/svelte/apps/manager/PartyExpandedBody.svelte',
     ]) {
       assert.ok(paths.includes(path), `${path} must be in the scanned corpus`);
@@ -245,10 +189,8 @@ describe('src/** carries no hardcoded item stack-quantity path', () => {
 
 describe('the constant-mediated blind spot is closed structurally', () => {
   it('componentStacking no longer exports a hardcoded quantity-path constant', async () => {
-    // `DEFAULT_QUANTITY_PATH` was read via `.split('.').reduce(...)`, so it contained
-    // NEITHER spelling of the literal and no scan above could ever have matched it.
-    // Deleting it — rather than re-pointing it — is what turned that invisible miss into
-    // a build error. Re-adding any such constant reds this test.
+    // `DEFAULT_QUANTITY_PATH` was read via `.split('.').reduce(...)`, so it contained NEITHER
+    // spelling of the literal and no scan above could ever have matched it.
     const stacking = await import('../src/systems/componentStacking.js');
     assert.equal(stacking.DEFAULT_QUANTITY_PATH, undefined);
     const source = readFileSync(resolve(srcRoot, 'systems/componentStacking.js'), 'utf8');

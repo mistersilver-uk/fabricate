@@ -1,33 +1,4 @@
-/**
- * THE CONSUMER SWEEP'S BEHAVIOURAL CONTRACT (issue 1370, epic 1357, PR 8a).
- *
- * PR 8a makes the world-scope read union LOAD-BEARING: every non-UI reader of a crafting system's
- * `components`, `essenceDefinitions` or `tools` array now enters through it. Two blind spots
- * divide the work between this file and its sibling gate, and neither covers the other:
- *
- *  - A CALL-SITE CENSUS cannot see a WRONG repoint. That is this file.
- *  - A NO-DRIFT DIFFERENTIAL cannot see a MISSING repoint. That is
- *    `tests/world-scope-reader-ledger.test.js`.
- *
- * ## THREE CLOCKS, AND ONLY THE FIRST HAS RUN
- *
- * READ ENTRY has run. AUTHORITY has not: `## CraftingSystem` requirement 36 keeps the in-system
- * arrays the source of truth, so the union answers every KEY, every ROW and the row ORDER from
- * them and the world layer supplies only the keys they do not carry. The SHED has not run either;
- * `tests/world-scope-no-shed-gate.test.js` still owns that guarantee.
- *
- * ## WHAT IS COVERED ELSEWHERE, ON PURPOSE
- *
- *  - Criterion 7(a) and 8(b) — the drift audit's POSITION in `src/main.js`, its active-GM gate and
- *    the absence of a repair write — are source-order assertions and live in
- *    `tests/scoped-definition-read-and-basis.test.js`, beside issue 1363's construction-order
- *    arms, because they are about the same point in `initialize()`.
- *  - Criterion 9 — the companion id-tier ambiguity measurement — lives in
- *    `tests/companion-pooled-holdings-read.test.js`, where the two-system party fixture,
- *    the borrowed matcher and the actor fake already are. Copying that fixture here would add a
- *    near-identical block to the new-code duplication gate to say something the existing suite
- *    can say in eight lines.
- */
+/** THE CONSUMER SWEEP'S BEHAVIOURAL CONTRACT (issue 1370, epic 1357, PR 8a). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -80,9 +51,7 @@ function componentManager(entity, options) {
   return makeManagerWithScope(CraftingSystemManager, { componentScope: scopePayload(entity, options) });
 }
 
-// -----------------------------------------------------------------------------------------------
 // Criterion 1(b) — ROW ORDER and ROW SET are the in-system array's
-// -----------------------------------------------------------------------------------------------
 
 describe('the read union answers the in-system row set, in the in-system order', () => {
   it('emits the second system’s rows in ITS order, not the world roster’s', () => {
@@ -131,16 +100,11 @@ describe('the read union answers the in-system row set, in the in-system order',
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criteria 2 and 3 — a post-migration identity edit survives, and so does an absence
-// -----------------------------------------------------------------------------------------------
 
 describe('identity is re-derived from the in-system record on every read', () => {
   it('does NOT revert a post-migration identity edit', () => {
-    // The snapshot was equal at migration time by construction. Every shipped identity writer
-    // writes the IN-SYSTEM copy — `refreshComponentMetadataForUpdatedItem` rewrites `name`, `img`
-    // and `description` in place on the `updateItem` hook — and nothing writes the world entity,
-    // so world-wins precedence would revert the GM's rename on the very next read.
+    // The snapshot was equal at migration time by construction.
     const manager = componentManager({
       id: 'comp-1',
       name: 'Ash Salt',
@@ -181,8 +145,7 @@ describe('identity is re-derived from the in-system record on every read', () =>
 
   it('re-derives an ABSENCE for an ESSENCE too', () => {
     // `WORLD_IDENTITY_FIELDS` is keyed per entity type, so the DELETE half is a DIFFERENT field
-    // list for each of the three. Proving it for components alone leaves the other two resting on
-    // a `entityType` string that nothing checks.
+    // list for each of the three.
     const manager = makeManagerWithScope(CraftingSystemManager, {
       essenceScope: scopePayload({
         id: 'fire',
@@ -225,9 +188,7 @@ describe('identity is re-derived from the in-system record on every read', () =>
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criterion 4 — an UNKNOWN world half returns the SAME OBJECT, in BOTH spellings
-// -----------------------------------------------------------------------------------------------
 
 describe('an unknown world half returns the in-system array ITSELF', () => {
   beforeEach(() => {
@@ -284,9 +245,8 @@ describe('an unknown world half returns the in-system array ITSELF', () => {
   });
 
   it('keeps EVERY row of a legacy array a null-corpus union would have reshaped', () => {
-    // A null-corpus `unionScopedDefinitions` used to drop id-less entries, de-duplicate
-    // first-wins and collapse a whitespace-padded id against its trimmed twin. Measured, this
-    // six-row array came back as two.
+    // A null-corpus `unionScopedDefinitions` used to drop id-less entries, de-duplicate first-wins
+    // and collapse a whitespace-padded id against its trimmed twin.
     const manager = new CraftingSystemManager({ getRecipes: () => [] });
     const system = {
       id: SYSTEM_ID,
@@ -306,21 +266,12 @@ describe('an unknown world half returns the in-system array ITSELF', () => {
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // THE PRODUCTION BRANCH — the lazy global probe every leaf reader actually takes
-// -----------------------------------------------------------------------------------------------
 
 describe('the seam resolves its world half through the global store probe', () => {
   // WHY THIS EXISTS. `resolveScopedEntityRead` takes its corpus either from an explicitly passed
-  // argument or, when none is passed, from `globalThis.game?.fabricate?.<accessor>?.()?.corpus?.()`.
-  // ALL of the repointed leaf readers call `resolvedComponentsFor(system)` with ONE argument, so
-  // the probe is the production branch — and nothing else in this repository drives it to a
-  // non-null corpus: the manager fixtures inject seams into the MANAGER, the benchmark cases pass
-  // the corpus explicitly, and the unknown-half suite above deletes `game.fabricate` outright.
-  //
-  // Without this, a wrong accessor name or a wrong method on the store degrades EVERY leaf reader
-  // to the raw in-system array, silently, with the whole suite green — invisible at `1.30.0`
-  // because the halves are equal, and wrong the release a world writer ships.
+  // argument or, when none is passed, from
+  // `globalThis.game?.fabricate?.<accessor>?.()?.corpus?.()`.
   const SEEDED = 'probe-comp';
 
   function seededStores() {
@@ -374,9 +325,7 @@ describe('the seam resolves its world half through the global store probe', () =
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criterion 5 — the basis, the duplicate id, and the row that must NOT come back
-// -----------------------------------------------------------------------------------------------
 
 describe('a repointed reader never narrows a Valid Id Basis', () => {
   const MANAGER_SOURCE = new URL('../src/systems/CraftingSystemManager.js', import.meta.url);
@@ -418,10 +367,8 @@ describe('a repointed reader never narrows a Valid Id Basis', () => {
 
 describe('a duplicate id resolves exactly as it did before the repoint', () => {
   it('keeps BOTH rows, in in-system order, so first-wins still answers the FIRST', () => {
-    // The retired two-pass build keyed the in-system records into a LAST-WINS map on the claim
-    // that "both shipped index builders are". `itemById` is last-wins; `buildIndex` is FIRST-wins.
-    // That map would have made a repointed `findById` answer the LAST record and a repointed
-    // listing builder emit ONE row where it emitted TWO.
+    // The retired two-pass build keyed the in-system records into a LAST-WINS map on the claim that
+    // "both shipped index builders are". `itemById` is last-wins; `buildIndex` is FIRST-wins.
     const manager = componentManager({ id: 'dup', name: 'World Dup' });
     const system = {
       id: SYSTEM_ID,
@@ -443,9 +390,8 @@ describe('a duplicate id resolves exactly as it did before the repoint', () => {
 
 describe('a row the in-system array no longer carries does NOT come back', () => {
   it('after a delete leaves the world entity and its membership behind', () => {
-    // `_deleteComponentSet` removes the in-system record, leaves the world entity and membership
-    // in place, and DISABLES the referencing recipes. A row-set rule taken from the world roster
-    // would hand the component back beside its own disabled recipes.
+    // `_deleteComponentSet` removes the in-system record, leaves the world entity and membership in
+    // place, and DISABLES the referencing recipes.
     const manager = componentManager({ id: 'deleted', name: 'Deleted Component' });
     const system = { id: SYSTEM_ID, components: [{ id: 'survivor' }] };
 
@@ -460,8 +406,7 @@ describe('a row the in-system array no longer carries does NOT come back', () =>
 
   it('after a keep-mode import creates a membered-but-recordless pair with no delete involved', () => {
     // The import path persists world rosters and membership unions while building the SYSTEM from
-    // the in-system arrays, so it can produce the same pair without any deletion. A delete-only
-    // construction would leave this producer unproven.
+    // the in-system arrays, so it can produce the same pair without any deletion.
     const manager = makeManagerWithScope(CraftingSystemManager, {
       toolScope: {
         entities: [{ id: 'imported-tool', name: 'Imported Tool' }],
@@ -486,17 +431,10 @@ describe('a row the in-system array no longer carries does NOT come back', () =>
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criterion 6 — the behaviour keys, split by whether they are a SECTION (issue 1372)
-// -----------------------------------------------------------------------------------------------
 
 describe('the NON-SECTION behaviour keys are re-derived from the in-system record', () => {
-  // THE SUITE SPLITS ALONG THE SECTION LINE, and issue 1372 is what drew the line. Arms (a), (e)
-  // and (f) are `tags`, `repairRequirements` and `enabled`, none of which is a section and none of
-  // which has an inherit switch to read - so the in-system record answers all three whatever the
-  // membership record says, exactly as issue 1370 made it. Arms (b), (c) and (d) WERE the three
-  // SECTIONS, pinned here on inheriting fixtures, and they are what made the world-scope screens'
-  // `Inheriting` pill a false statement; they now live in the suite below.
+  // THE SUITE SPLITS ALONG THE SECTION LINE, and issue 1372 is what drew the line.
   it('(a) keeps the in-system tags, and the tag matcher expands over them', () => {
     // `resolveComponent` emits `tags` UNCONDITIONALLY, so before the inversion a GM's tag edit
     // was reverted whether or not any scope had authored tags.
@@ -574,25 +512,11 @@ describe('the NON-SECTION behaviour keys are re-derived from the in-system recor
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criteria 7(c) and 8(a) — the drift report, and the detector's purity
-// -----------------------------------------------------------------------------------------------
 
 /**
  * A corpus in which ONE component's world snapshot has drifted from its in-system record on TWO
  * fields, and a second field is ABSENT in-system while present in the snapshot.
- *
- * THREE FIXTURE OBLIGATIONS, each of which fails toward an EMPTY report — which is
- * indistinguishable from a passing purity arm, so each is stated rather than assumed:
- *
- *  - The detector `continue`s past an entity type whose scope carries no entities, so an empty
- *    roster reports nothing at all.
- *  - The membership guard is DOUBLE (`if (!entity || !members.has(...)) continue;`), so the world
- *    entity AND the membership record must both be supplied. Omitting the membership record makes
- *    this report empty; that mutation was run and reddened the arm below.
- *  - The comparison is `JSON.stringify(x ?? null)`, so an explicitly-`null` field is
- *    indistinguishable from an absent one. `description` expresses absence by OMITTING the key;
- *    spelling it `description: null` makes that row vanish, and that mutation was run too.
  */
 function driftedCorpus() {
   return {
@@ -664,11 +588,6 @@ describe('the world identity drift report', () => {
     // A notification is not a report surface: core's `.notification` has no `max-height` and no
     // `overflow` and carries `pointer-events: all`, so an uncapped join over a bulk edit to a
     // 200-component library overflows the viewport and swallows pointer events for five seconds.
-    //
-    // NOT "the full list still reaches the console because `notify` defaults `console: true`".
-    // It does default that, and what it logs is the notification's own `textContent` - the CAPPED
-    // message. The full list reaches the console only because `describeWorldIdentityDrift` exists
-    // and `src/main.js` logs it, which the two arms below pin.
     const drift = [];
     for (let index = 0; index < 12; index += 1) {
       drift.push({
@@ -711,16 +630,14 @@ describe('the world identity drift report', () => {
 
   it('LOGS that list in src/main.js at `info`, and raises NO toast for it', () => {
     // The drift report is CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise
-    // repeated the whole drifted list in the notification bar and read as an alarm for a state
-    // its own copy called harmless. `src/main.js` is not executable by a unit test, so these are
-    // source assertions, the same idiom the audit's siting uses.
+    // repeated the whole drifted list in the notification bar and read as an alarm for a state its
+    // own copy called harmless.
     const dump = MAIN_SOURCE.indexOf('describeWorldIdentityDrift(worldIdentityDrift)');
     assert.notEqual(dump, -1, 'src/main.js must compose the uncapped list');
     const after = MAIN_SOURCE.slice(dump, dump + 600);
     // THE LEVEL IS PART OF THE PROMISE: `console.debug` maps to DevTools' VERBOSE level, which
-    // Chromium's default filter excludes, so a GM who presses F12 would not see the dump at all.
-    // Through the shared helper, whose `console.info?.(...)` write survives the release build; a
-    // bare `console.info(...)` statement is stripped from dist/main.js (issue 1737).
+    // Chromium's default filter excludes, so a GM who presses F12 would not see the dump at all
+    // (issue 1737).
     assert.match(
       after,
       /logMigrationNoticeDetail\('world identity drift', driftDetail\)/,
@@ -745,10 +662,9 @@ describe('the world identity drift report', () => {
   });
 
   it('is PURE: reported twice, and the reader still answers the in-system value', () => {
-    // NARROWER THAN IT LOOKS, and the limit is stated: `reportWorldIdentityDrift` is a shipped
-    // pure function this PR does not modify, so calling it twice only reds if a repair went
-    // INSIDE the detector. The placement a repair would actually take — the `src/main.js` call
-    // site — is pinned by source text in `tests/scoped-definition-read-and-basis.test.js`.
+    // NARROWER THAN IT LOOKS, and the limit is stated: `reportWorldIdentityDrift` is a shipped pure
+    // function this PR does not modify, so calling it twice only reds if a repair went INSIDE the
+    // detector.
     const { craftingSystems, scopeCorpus } = driftedCorpus();
 
     const first = reportWorldIdentityDrift(craftingSystems, scopeCorpus);
@@ -772,19 +688,12 @@ describe('the world identity drift report', () => {
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criterion 10 — the deliberate exclusions, asserted by SOURCE CONTRACT
-// -----------------------------------------------------------------------------------------------
 
 /**
  * The five reads PR 8a deliberately did NOT repoint, each pinned so a later lane "finishing the
- * sweep" has to argue with a test rather than with a comment.
- *
- * THE LAST ONE IS THE ONE THAT CANNOT BE PINNED ANYWHERE ELSE. `reportWorldIdentityDrift` reads
- * the entity arrays through a COMPUTED key (`system[ENTITY_FIELDS[entityType]]`), which the reader
- * ledger's matcher cannot see — so the ledger would neither red it as unledgered nor pin it.
- * Repointing it would make the detector compare the union against the world corpus, report zero
- * drift every session, and silently void the whole disclosure obligation.
+ * sweep" has to argue with a test rather than with a comment. THE LAST ONE IS THE ONE THAT CANNOT
+ * BE PINNED ANYWHERE ELSE.
  */
 describe('the deliberate exclusions are unchanged', () => {
   const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -851,9 +760,7 @@ describe('the deliberate exclusions are unchanged', () => {
   });
 });
 
-// -----------------------------------------------------------------------------------------------
 // Criterion 6b — the three SECTION keys follow the inherit switch (issue 1372)
-// -----------------------------------------------------------------------------------------------
 
 describe('the SECTION keys follow the inherit switch, through the manager seam', () => {
   // THROUGH THE MANAGER, not through `unionScopedDefinitions` directly, and that is the point of
@@ -921,9 +828,7 @@ describe('the SECTION keys follow the inherit switch, through the manager seam',
 
   it('(g) an INHERITING essence takes the world effect source and macro, on the SHIPPED names', () => {
     // The essence sections are the two that need a PROJECTION: `effectSource` and `macro` are new
-    // names, and every consumer reads `sourceComponentId` and `propertyMacroUuid`. Without one the
-    // resolved value lands on the row under a key nothing reads, and the rule would be true of the
-    // union\u2019s shape and false of every craft.
+    // names, and every consumer reads `sourceComponentId` and `propertyMacroUuid`.
     const manager = makeManagerWithScope(CraftingSystemManager, {
       essenceScope: scopePayload(
         { id: 'fire', name: 'Fire' },

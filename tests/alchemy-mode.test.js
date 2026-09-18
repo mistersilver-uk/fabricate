@@ -1,11 +1,10 @@
 /**
- * Tests for T-099 / T-189: Alchemy (formerly Cauldron) Crafting Resolution Mode
- * Covers:
- *   - CraftingSystemManager: alchemy resolutionMode acceptance + config normalization
- *   - CraftingSystemManager: legacy 'cauldron' normalizes to 'alchemy' (T-189 regression)
- *   - ResolutionModeService: alchemy validation + result resolution
- *   - RecipeVisibilityService: alchemy visibility rules + learnRecipeOnCraft
- *   - CraftingEngine.craftAlchemy: signature matching, no-match, success, misconfiguration
+ * Tests for T-099 / T-189: Alchemy (formerly Cauldron) Crafting Resolution Mode Covers: -
+ * CraftingSystemManager: alchemy resolutionMode acceptance + config normalization -
+ * CraftingSystemManager: legacy 'cauldron' normalizes to 'alchemy' (T-189 regression) -
+ * ResolutionModeService: alchemy validation + result resolution - RecipeVisibilityService: alchemy
+ * visibility rules + learnRecipeOnCraft - CraftingEngine.craftAlchemy: signature matching,
+ * no-match, success, misconfiguration
  */
 
 import test from 'node:test';
@@ -40,9 +39,7 @@ for (const versioned of [false, true]) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Foundry globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -60,9 +57,7 @@ globalThis.game = {
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.fromUuid = async () => null;
 
-// ---------------------------------------------------------------------------
 // Imports
-// ---------------------------------------------------------------------------
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
@@ -73,12 +68,8 @@ const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
 const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
 
-// Bucketing moved to the collector (issue 572): `_matchAlchemySignature` now consumes
-// pre-bucketed `{ item, componentId }` records. This shim builds those records through
-// the SAME production resolver the collector/palette use (system-scoped by
-// `options.system?.id`), so these tests still exercise resolution + matching end to
-// end rather than hand-supplying bucket ids. The bracket-notation call keeps the shim
-// itself out of the call-site rewrite.
+// Bucketing moved to the collector (issue 572): `_matchAlchemySignature` now consumes pre-bucketed
+// `{ item, componentId }` records.
 function matchSig(engine, items, recipes, components, validator, options = {}) {
   return engine['_matchAlchemySignature'](
     toAlchemyRecords(items, components, options?.system?.id),
@@ -89,9 +80,7 @@ function matchSig(engine, items, recipes, components, validator, options = {}) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Flag helpers (same pattern as recipe-visibility-service.test.js)
-// ---------------------------------------------------------------------------
 
 function getPathValue(object, path) {
   return String(path).split('.').reduce((value, part) => {
@@ -126,9 +115,7 @@ class FakeDocument {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
 function buildAlchemySystem(overrides = {}) {
   return {
@@ -195,9 +182,7 @@ function buildVisibilityService(system, recipes = []) {
   return new RecipeVisibilityService(recipeManager, craftingSystemManager);
 }
 
-// ============================================================================
 // CraftingSystemManager: alchemy normalization
-// ============================================================================
 
 test('CraftingSystemManager accepts alchemy as a valid resolutionMode', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -218,8 +203,7 @@ test('CraftingSystemManager normalizes alchemy config with defaults', () => {
   assert.equal(system.alchemy.consumeOnFail, true);
   assert.equal(system.alchemy.showAttemptHistoryToPlayers, true);
 
-  // An explicitly stored `false` is still honoured — the default only fills an
-  // absent flag.
+  // An explicitly stored `false` is still honoured — the default only fills an absent flag.
   const optedOut = manager._normalizeSystem({
     resolutionMode: 'alchemy',
     alchemy: { learnOnCraft: false },
@@ -260,9 +244,7 @@ test('CraftingSystemManager defaults unknown resolutionMode to simple (not alche
   assert.equal(system.resolutionMode, 'simple');
 });
 
-// ============================================================================
 // CraftingSystemManager: T-189 legacy 'cauldron' -> 'alchemy' normalization
-// ============================================================================
 
 test('CraftingSystemManager normalizes legacy cauldron resolutionMode to alchemy', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -301,10 +283,8 @@ test('CraftingSystemManager: loading persisted data with cauldron mode produces 
 
 test('CraftingSystemManager keeps only the participation flag from a legacy travel block (pre-1.1.0 import)', () => {
   // Since issue 1282 the realm library, its reveal mode and its modifier visibility are WORLD
-  // scope, so this allowlist rebuild deliberately drops all three: the 1.27.0 migration lifts
-  // them into `travelConfig`, and the first save after it is what removes the stale copy.
-  // The legacy `gatheringRegionSettings` key is still read, so a pre-1.1.0 export whose systems
-  // load before the startup migration runs still keeps its participation answer.
+  // scope, so this allowlist rebuild deliberately drops all three: the 1.27.0 migration lifts them
+  // into `travelConfig`, and the first save after it is what removes the stale copy.
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const system = manager._normalizeSystem({
     id: 'legacy-realm-sys',
@@ -321,9 +301,7 @@ test('CraftingSystemManager keeps only the participation flag from a legacy trav
   );
 });
 
-// ============================================================================
 // ResolutionModeService: alchemy validation
-// ============================================================================
 
 test('ResolutionModeService.validateRecipe: alchemy recipe with no ingredient sets is invalid', () => {
   const system = buildAlchemySystem();
@@ -445,9 +423,7 @@ test('ResolutionModeService.validateRecipe: alchemy recipe with explicit steps f
   assert.ok(result.errors.some(e => e.includes('step')), 'should error about explicit steps');
 });
 
-// ============================================================================
 // ResolutionModeService: alchemy resolveResultGroups
-// ============================================================================
 
 test('resolveResultGroups: alchemy None returns the single success group', () => {
   const system = buildAlchemySystem({ alchemy: { checkMode: 'none' } });
@@ -531,9 +507,7 @@ test('resolveResultGroups: alchemy Tiered routes the outcome to its assigned tie
   assert.equal(result.meta.disposition, 'success');
 });
 
-// ============================================================================
 // RecipeVisibilityService: alchemy visibility
-// ============================================================================
 
 test('RecipeVisibilityService: GM sees all alchemy recipes', () => {
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
@@ -550,9 +524,8 @@ test('RecipeVisibilityService: GM sees all alchemy recipes', () => {
 });
 
 test('RecipeVisibilityService: reveal-not-gate — a non-revealed global-mode recipe is NOT revealed but is still craftable', () => {
-  // global mode reveals discovery-only; learnOnCraft off + not learned => not
-  // revealed. Reveal-not-gate: craftable stays true (matched signature is the sole
-  // brew gate).
+  // global mode reveals discovery-only; learnOnCraft off + not learned => not revealed.
+  // Reveal-not-gate: craftable stays true (matched signature is the sole brew gate).
   const system = buildAlchemySystem({ alchemy: { learnOnCraft: false, consumeOnFail: true } });
   const service = buildVisibilityService(system);
   const recipe = buildRecipe('r1', [], []);
@@ -652,9 +625,7 @@ test('RecipeVisibilityService.learnRecipeOnCraft: no-op if already learned', asy
   assert.equal(learnedMap['r1'].learnedAt, 500);
 });
 
-// ============================================================================
 // SignatureValidator: alchemy signature matching
-// ============================================================================
 
 test('SignatureValidator.computeSignature returns groups for alchemy ingredient sets', () => {
   const components = [buildComponent('c1', 'Item.abc'), buildComponent('c2', 'Item.def')];
@@ -700,9 +671,7 @@ test('CraftingEngine._matchAlchemySignature matches submitted items by canonical
   assert.equal(result.recipe.id, 'alchemy-recipe');
 });
 
-// ============================================================================
 // CraftingEngine._matchAlchemySignature: essence matching
-// ============================================================================
 
 function buildEssenceItem(uuid, essences = {}) {
   return new FakeDocument({ fabricate: { essences } });
@@ -996,9 +965,7 @@ test('_buildEssenceContext resolves component-defined essences for effect transf
   assert.equal(context.essenceSources[essenceId][0].essenceTotal, 2);
 });
 
-// ============================================================================
 // CraftingEngine._consumeSubmittedAlchemyItems: quantity handling
-// ============================================================================
 
 test('_consumeSubmittedAlchemyItems consumes correct quantity when same item submitted multiple times', async () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
@@ -1029,9 +996,7 @@ test('_consumeSubmittedAlchemyItems consumes correct quantity when same item sub
   assert.equal(updateCalls[0].data['system.quantity'], 2);
 });
 
-// ============================================================================
 // CraftingEngine._matchAlchemySignature: ingredient quantity enforcement (T-260)
-// ============================================================================
 
 // An ingredient group whose single option requires `quantity` of `componentId`.
 function buildIngredientGroupQty(componentId, quantity) {
@@ -1251,18 +1216,14 @@ test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals i
   assert.equal(updateCalls.length, 0);
 });
 
-// ============================================================================
-// CraftingEngine._matchAlchemySignature: durable component identity (issue 558)
-//
-// Signature bucketing routes through the shared, list-aware, system-scoped
-// resolver `resolveComponentForItem`, so a submission is attributed to the single
-// component it IS (durable-flag-first), not to whichever component its raw
-// source-reference chain happens to overlap.
-// ============================================================================
+// CraftingEngine._matchAlchemySignature: durable component identity (issue 558). Signature
+// bucketing routes through the shared, list-aware, system-scoped resolver
+// `resolveComponentForItem`, so a submission is attributed to the single component it IS
+// (durable-flag-first), not to whichever component its raw source-reference chain happens to
+// overlap.
 
-// Convenience: the SignatureValidator these signature tests always feed the same
-// three no-op lookups plus one component set. Hoisted so the new-code duplication
-// stays under the SonarCloud gate.
+// Convenience: the SignatureValidator these signature tests always feed the same three no-op
+// lookups plus one component set.
 function buildSignatureValidator(components) {
   return new SignatureValidator({
     getSystem: () => null,
@@ -1281,9 +1242,7 @@ function buildComponentRecipe(id, componentId) {
   );
 }
 
-// A single-group signature recipe whose one option matches by tag and requires
-// `quantity` units. Used to exercise one-unit-per-group counting: the option
-// expands to every component carrying `tag`.
+// A single-group signature recipe whose one option matches by tag and requires `quantity` units.
 function buildTagGroupRecipe(id, tag, quantity) {
   return buildRecipe(
     id,
@@ -1309,11 +1268,8 @@ test('_matchAlchemySignature attributes a submission to its durable componentId 
   const components = [componentA, componentB];
   const validator = buildSignatureValidator(components);
 
-  // A submission the collector attributed to B (durable roles flag) that STILL
-  // carries a transitive duplicateSource pointing at A's source. Its raw refs
-  // ([uuid, Item.A]) genuinely overlap A, so the pre-fix flag-blind matcher
-  // credited A (non-vacuity: without the Item.A overlap this would pass for the
-  // wrong reason).
+  // A submission the collector attributed to B (durable roles flag) that STILL carries a transitive
+  // duplicateSource pointing at A's source.
   const item = roleItem({
     uuid: 'Item.owned-copy-of-A',
     duplicateSource: 'Item.A',
@@ -1354,9 +1310,8 @@ test('_matchAlchemySignature resolves a submission carrying only a bare top-leve
   const validator = buildSignatureValidator(components);
 
   // The item carries ONLY a bare top-level `registeredItemUuid` — no uuid, no
-  // _stats.compendiumSource, no duplicateSource — so `getItemSourceReferences`
-  // (and thus the shared resolver) sees nothing; only the LOCAL bare-registeredItemUuid
-  // supplement can attribute it.
+  // _stats.compendiumSource, no duplicateSource — so `getItemSourceReferences` (and thus the shared
+  // resolver) sees nothing; only the LOCAL bare-registeredItemUuid supplement can attribute it.
   const result = matchSig(engine, 
     [{ registeredItemUuid: 'Item.bare-source' }],
     [buildComponentRecipe('bare-recipe', 'bare')],
@@ -1416,10 +1371,9 @@ test('_matchAlchemySignature falls through a stale/foreign identity flag to the 
 
 test('_matchAlchemySignature resolves a cross-group multi-overlap submission to a single component (order-dependent, issue 558)', () => {
   const engine = new CraftingEngine({ getRecipes: () => [] });
-  // Component identity is now "one item = one component": a submission whose raw
-  // refs overlap components in DIFFERENT groups resolves to the FIRST match in the
-  // full set (order-dependent by design), not counted in both groups as the
-  // pre-fix flag-blind intersection did.
+  // Component identity is now "one item = one component": a submission whose raw refs overlap
+  // components in DIFFERENT groups resolves to the FIRST match in the full set (order-dependent by
+  // design), not counted in both groups as the pre-fix flag-blind intersection did.
   const componentX = component('cX', { registeredItemUuid: 'Item.X', originItemUuid: 'Item.X' });
   const componentY = component('cY', { registeredItemUuid: 'Item.Y', originItemUuid: 'Item.Y' });
   const components = [componentX, componentY];
@@ -1444,11 +1398,9 @@ test('_matchAlchemySignature resolves a cross-group multi-overlap submission to 
   assert.equal(matchesY.matched, false, 'not also counted toward the second overlapping component (cY)');
 });
 
-// ---------------------------------------------------------------------------
-// Most-specific signature resolution (issue 774): the runtime picks the unique
-// dominator among ALL matching sets and fails safe (fizzle) on an incomparable
-// tie — it no longer early-returns the first authored match.
-// ---------------------------------------------------------------------------
+// Most-specific signature resolution (issue 774): the runtime picks the unique dominator among ALL
+// matching sets and fails safe (fizzle) on an incomparable tie — it no longer early-returns the
+// first authored match.
 
 // A component whose source ref is `Item.<id>`, plus a matching per-unit submission.
 function specComponent(id) {
@@ -1472,10 +1424,9 @@ test('_matchAlchemySignature picks the most-specific set for a strict subset/sup
   const engine = new CraftingEngine({ getRecipes: () => [] });
   const components = ['c1', 'c2', 'c3'].map(specComponent);
   const validator = buildSignatureValidator(components);
-  // A={c1,c2} authored BEFORE B={c1,c2,c3}: a first-match matcher would return A
-  // for a {c1,c2,c3} submission (A matches, superset-tolerant) — this pins that the
-  // most-specific matcher returns B instead. This is the call-site test that FAILS
-  // if the matcher reverts to an early-return first match.
+  // A={c1,c2} authored BEFORE B={c1,c2,c3}: a first-match matcher would return A for a {c1,c2,c3}
+  // submission (A matches, superset-tolerant) — this pins that the most-specific matcher returns B
+  // instead.
   const recipeA = multiGroupRecipe('brew-a', ['c1', 'c2']);
   const recipeB = multiGroupRecipe('brew-b', ['c1', 'c2', 'c3']);
   const recipes = [recipeA, recipeB];
@@ -1593,9 +1544,7 @@ test('_matchAlchemySignature: an essence-group set is dominated by a set that ad
     specComponent('c2'),
   ];
   const validator = buildSignatureValidator(components);
-  // A = essence-only {restorative≥1}; B = {restorative≥1} + {c2}. B's required-group
-  // structure is a proper superset of A's, so a submission carrying the essence AND
-  // c2 must brew B, not the essence-only A.
+  // A = essence-only {restorative≥1}; B = {restorative≥1} + {c2}.
   const recipeA = buildRecipe(
     'essence-only',
     [buildIngredientSet([{ id: 'ge', options: [{ quantity: 1, match: { type: 'essence', essenceId, amount: 1 } }] }])],
@@ -1629,10 +1578,8 @@ test('_matchAlchemySignature: an essence-group set is dominated by a set that ad
   assert.equal(result.recipe.id, 'essence-plus-component', 'the essence+component superset dominates the essence-only set');
 });
 
-// ---------------------------------------------------------------------------
-// Essence as a first-class ingredient GROUP option (issue 649): differential
-// parity vs the legacy per-set map, and the group-granular essences-disabled rule.
-// ---------------------------------------------------------------------------
+// Essence as a first-class ingredient GROUP option (issue 649): differential parity vs the legacy
+// per-set map, and the group-granular essences-disabled rule.
 
 // A single-option essence group — exactly what the 1.17.0 migration produces from a
 // positive `set.essences[essenceId]` entry.

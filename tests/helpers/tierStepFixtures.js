@@ -1,14 +1,5 @@
 // Shared fixtures for the routed tier-STEP runtime (issue 975), consumed by
 // `tests/check-roll-tier-step.test.js`.
-//
-// It carries ONLY what does not already exist elsewhere in the suite: the frozen
-// tier ladder, the trigger factory, and the table driver that runs a row through
-// `runFormulaRouted` and checks it. In particular it deliberately exports NO roll
-// stub — the suite already has four (`tests/helpers/routedCheckEngine.js`,
-// `tests/helpers/gathering.js`, and module-private ones in `check-roll.test.js` and
-// `check-roll-dice.test.js`), and a fifth would be new code duplicating existing
-// code against SonarCloud's `new_duplicated_lines_density` gate. `stubRoll` is
-// re-exported from `routedCheckEngine.js` so a consumer needs one import.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,18 +11,10 @@ import { stubRoll } from './routedCheckEngine.js';
 export { stubRoll };
 
 /**
- * One five-tier ladder serving BOTH routed types: every tier carries a relative `dc`
- * delta AND a fixed `[start, end]` range, which is not a fixture convenience but the
- * shape `_normalizeRoutedOutcome` actually persists — it keeps both operands across a
- * `type` switch so switching modes in the editor destroys neither.
- *
- * Ranked ascending (worst first): ruined, poor, fair, good, superb. Two failure tiers
- * and three success ones, so a disposition-preserving step has somewhere to move AND
- * somewhere to clamp inside each subset.
- *
- * The fixed ranges leave a deliberate GAP at 13 (poor 5-8, fair 9-12, good 14-16), so
- * a "the total matched no tier at all" case is reachable without rolling off the end
- * of the ladder.
+ * One five-tier ladder serving BOTH routed types: every tier carries a relative `dc` delta AND a
+ * fixed `[start, end]` range, which is not a fixture convenience but the shape
+ * `_normalizeRoutedOutcome` actually persists — it keeps both operands across a `type` switch so
+ * switching modes in the editor destroys neither.
  */
 export const TIER_LADDER = Object.freeze([
   Object.freeze({
@@ -97,11 +80,8 @@ export function d20FaceCondition(face, groupId = 0) {
 
 /**
  * A normalized unified trigger carrying only a `tierStep` effect — the shape lane A1's
- * `_normalizeUnifiedTrigger` emits, with `outcome: 'none'` and `breakTools: false`
- * written explicitly.
- *
- * The default `id` is derived from the effect rather than a counter, so it stays
- * stable however many rows a table runs and in whatever order.
+ * `_normalizeUnifiedTrigger` emits, with `outcome: 'none'` and `breakTools: false` written
+ * explicitly.
  */
 export function tierStepTrigger({ id, mode, steps = 1, tierId = null, condition = ALWAYS } = {}) {
   return {
@@ -135,23 +115,15 @@ const ROUTED_DEFAULTS = Object.freeze({
   triggers: [],
 });
 
-/**
- * Roll `total` and run it through `runFormulaRouted` against {@link TIER_LADDER}.
- * `dice` defaults to a single d20 term showing the total; pass it explicitly when the
- * case is about per-die faces.
- */
+/** Roll `total` and run it through `runFormulaRouted` against {@link TIER_LADDER}. */
 export function runTierStepCase({ total, dice, ...overrides } = {}) {
   stubRoll(total, dice ?? [{ number: 1, faces: 20, total }]);
   return runFormulaRouted({ ...ROUTED_DEFAULTS, ...overrides });
 }
 
 /**
- * Check one row's expectations, plus the invariant that carries the whole
- * disposition-preserving design: whenever a tier routed, `data.success` and that
- * FINAL tier's own `success` agree. Without it a forced success stepping onto a
- * `success: false` tier would report `success: true` under a failure tier's name,
- * which `ResolutionModeService._resolveRoutedTierId` filters out — a zero-mutation
- * misconfiguration abort, or the full success set awarded on a "Ruined" tier.
+ * Check one row's expectations, plus the invariant that carries the whole disposition-preserving
+ * design: whenever a tier routed, `data.success` and that FINAL tier's own `success` agree.
  */
 export function assertTierStepRow(result, expected = {}, ladder = TIER_LADDER) {
   assert.equal(result.outcome, expected.outcome ?? null, 'final tier name');
@@ -172,11 +144,7 @@ export function assertTierStepRow(result, expected = {}, ladder = TIER_LADDER) {
   }
 }
 
-/**
- * Register a table of `runFormulaRouted` cases as one `test()` per row. A row is
- * `{ name, total, dice, expect, also, ...runFormulaRouted overrides }`; `also` is an
- * optional extra assertion callback receiving the result.
- */
+/** Register a table of `runFormulaRouted` cases as one `test()` per row. */
 export function tierStepTable(rows) {
   for (const { name, expect, also, ...row } of rows) {
     test(name, async () => {
@@ -187,12 +155,7 @@ export function tierStepTable(rows) {
   }
 }
 
-/**
- * The `data.tierStepApplied` shape. `triggerIds` is deliberately NOT defaulted from
- * `mode`/`steps`: `steps` is the REALIZED magnitude while a trigger id carries the
- * REQUESTED one, so any such default would quietly be wrong on exactly the clamped
- * rows that most need checking.
- */
+/** The `data.tierStepApplied` shape. */
 export function stepEvidence({ mode, steps, from, to, triggerIds, stepClamped = false }) {
   return {
     mode,

@@ -1,30 +1,12 @@
 /**
- * Phase 0 — STEP-tier Tool support (regression for the merge gap where
- * `step.toolIds` was normalized/serialized by Recipe but never merged into the
- * per-step execution-recipe view, so it was silently never gated, validated,
- * or used/broken).
- *
- * Unlike `crafting-engine-tools.test.js` (which mocks `getToolsForSet` and
- * never exercises granularity) and `recipe-tools.test.js` (which covers only
- * the recipe + ingredient-set tiers), this test wires a REAL multi-step
- * `Recipe`, a REAL `RecipeManager`, and a REAL `CraftingEngine` so the full
- * chain is exercised:
- *
- *   _buildStepRecipeView (merges step.toolIds) -> getToolsForSet via
- *   recipe.toolIds -> canCraft/evaluateCraftability gating -> _validateTools ->
- *   _applyToolBreakage (toolUsage increment + usedTools record).
- *
- * Proves a STEP-level `toolIds` requirement is:
- *   (a) gated by evaluateCraftability/canCraft (missing -> not craftable),
- *   (b) validated by _validateTools, and
- *   (c) used/broken on craft (toolUsage incremented / recorded in usedTools).
+ * Phase 0 — STEP-tier Tool support (regression for the merge gap where `step.toolIds` was
+ * normalized/serialized by Recipe but never merged into the per-step execution-recipe view, so it
+ * was silently never gated, validated, or used/broken).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load + craft flow
-// ---------------------------------------------------------------------------
 
 function getPath(obj, path) {
   return String(path).split('.').reduce((v, k) => (v == null ? undefined : v[k]), obj);
@@ -55,9 +37,7 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { nativeCraftRunManager } = await import('./helpers/native-run-manager.js');
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, { name, flags = {}, quantity = 1, parent = null } = {}) {
@@ -152,9 +132,7 @@ function stepView(engine, recipe, i) {
   return engine._buildStepRecipeView(recipe, recipe.getExecutionSteps()[i]);
 }
 
-// ---------------------------------------------------------------------------
 // (a) gating: evaluateCraftability / canCraft via the step view
-// ---------------------------------------------------------------------------
 
 test('step-tier toolIds are merged into the execution-recipe view via _buildStepRecipeView', () => {
   installSystem();
@@ -200,9 +178,7 @@ test('(a) canCraft surfaces the missing step-tier tool', () => {
   assert.equal(result.missing.tools.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // (b) validation: _validateTools enforces the step-tier tool
-// ---------------------------------------------------------------------------
 
 test('(b) _validateTools enforces the step-tier tool resolved from the merged view', async () => {
   installSystem();
@@ -223,9 +199,7 @@ test('(b) _validateTools enforces the step-tier tool resolved from the merged vi
   assert.equal(present.tools[0].item, hammer);
 });
 
-// ---------------------------------------------------------------------------
 // (c) usage/breakage on a full craft() of the tool-bearing step
-// ---------------------------------------------------------------------------
 
 test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and usedTools)', async () => {
   installSystem();
@@ -241,9 +215,8 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   const recipe = twoStepRecipe();
   const actorRef = { uuid: 'Actor.a1' };
   const ingot = new FakeItem('i1', { name: 'Ingot', parent: actorRef });
-  // The hammer carries a durable per-system roles identity so it is selectable for
-  // usage/breakage under the issue-557 durable-identity gate (a name-only match is
-  // spared). getFabricateFlag reads the doubly-nested `flags.fabricate.<key>` path.
+  // The hammer carries a durable per-system roles identity so it is selectable for usage/breakage
+  // under the issue-557 durable-identity gate (a name-only match is spared).
   const hammer = new FakeItem('h1', {
     name: 'Hammer',
     flags: { fabricate: { roles: { 'sys-1': { toolId: 'tool-hammer' } }, toolUsage: { timesUsed: 0 } } },

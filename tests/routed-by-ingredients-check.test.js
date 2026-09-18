@@ -1,11 +1,5 @@
 // Engine integration tests for the `routedByIngredients` crafting check
 // (CraftingEngine._runPassFailCheck via the _runCraftingCheck simple dispatch).
-//
-// `routedByIngredients` routes result groups by the chosen ingredient set, NOT by
-// check outcome tiers, so its check is the SAME optional pass/fail gate as
-// `simple`/`alchemy`, stored in the shared `craftingCheck.simple` slot. Regression
-// guard: this mode no longer reads `craftingCheck.routed` — a stale value authored
-// there must be ignored. These tests pin the pass/fail behaviour off the simple slot.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -71,9 +65,8 @@ test('routedByIngredients: meet mode passes on an exact-DC roll', async () => {
 // ── The simple slot is read, NOT the routed slot ──────────────────────────────
 
 test('routedByIngredients: reads craftingCheck.simple, IGNORING a stale routed slot', async () => {
-  // Author a DIFFERENT dc/formula in `routed` (the pre-migration slot). The real
-  // config lives in `simple` (DC 12); the simple DC must win, proving RI no longer
-  // reads `routed`.
+  // Author a DIFFERENT dc/formula in `routed` (the pre-migration slot). The real config lives in
+  // `simple` (DC 12); the simple DC must win, proving RI no longer reads `routed`.
   const { engine } = makeRoutedEngine({
     resolutionMode: 'routedByIngredients',
     simple: defaultSimple({ rollFormula: '1d20', dc: 12 }),

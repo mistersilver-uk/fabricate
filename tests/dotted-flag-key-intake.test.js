@@ -1,18 +1,7 @@
 /**
- * The WRITE boundary for durable-flag map keys (issue 1143).
- *
- * A crafting-system id and a recipe id are both interpolated into dotted flag paths —
- * `roles.<systemId>.componentId` for the system, and the `learnedRecipes` /
- * `discoveryProgress` per-actor maps for the recipe. `Document#update` dot-expands the
- * whole nested VALUE TREE of an `ObjectField`, so an id containing a `.` is not stored
- * under the key it was written with, and the id -> storage mapping stops being
- * injective: learning `a.b` and then `a` destroys `a.b` before any reader runs.
- *
- * Reader-side repair (`src/systems/recipeKeyedFlagEntries.js`) is best-effort, for
- * worlds that already carry such an id. Refusing the id at intake is the complete fix,
- * and these are the tests that pin it. Loading an EXISTING world must not route through
- * either guard, or a world already holding a dotted id would be bricked rather than
- * repaired — that negative is asserted here too.
+ * The WRITE boundary for durable-flag map keys (issue 1143). Reader-side repair
+ * (`src/systems/recipeKeyedFlagEntries.js`) is best-effort, for worlds that already carry such an
+ * id.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -94,9 +83,8 @@ test('1143 createRecipe refuses every unsafe id shape, and accepts a generated o
 });
 
 test('1143 a world ALREADY holding a dotted recipe id still loads (repair, not brick)', async () => {
-  // `initialize()` / `reload()` rehydrate through `Recipe.fromJSON`, never `createRecipe`,
-  // so the intake guard cannot retroactively refuse a recipe a previous version accepted.
-  // If this ever stops being true, an affected world loses its whole recipe list.
+  // `initialize()` / `reload()` rehydrate through `Recipe.fromJSON`, never `createRecipe`, so the
+  // intake guard cannot retroactively refuse a recipe a previous version accepted.
   settingsStore.set('recipes', [recipeData('imported.recipe.id')]);
   const manager = new RecipeManager();
   await manager.initialize();

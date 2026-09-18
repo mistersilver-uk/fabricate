@@ -62,8 +62,7 @@ describe('the source licensing guard reads Font Awesome Free, not Foundry’s Pr
       `the oracle must be the devDependency, not a stray stylesheet at ${FREE_STYLESHEET_PATH}`
     );
     // `readFreeIconNames` refuses a stylesheet that is not a free release, which is the check that
-    // stops a Foundry bundle being handed to this guard by mistake. A Pro bundle would not narrow
-    // anything at all while looking exactly like a run that had.
+    // stops a Foundry bundle being handed to this guard by mistake.
     assert.equal(readFreeIconNames(FREE_STYLESHEET_PATH).release.edition, 'Free');
   });
 
@@ -100,8 +99,7 @@ describe('the source licensing guard reads Font Awesome Free, not Foundry’s Pr
 
 // THE SHAPES. The defect this guard was written for wore three different shapes across five
 // components and a fourth, `class:fa-book-sparkles={…}`, that has no quoted string in it at all:
-// the icon name IS the directive name. A guard that only understood quoted class lists would have
-// reported four of the five sites and certified the fifth, so each shape is pinned here.
+// the icon name IS the directive name.
 describe('the guard sees an unlicensed name in every shape the codebase writes one', () => {
   const shapes = [
     ['a component prop', '<EmptyState icon="fas fa-book-sparkles" title={title} />'],
@@ -154,9 +152,8 @@ describe('the guard sees an unlicensed name in every shape the codebase writes o
   });
 });
 
-// THE FALSE POSITIVES THE GUARD MUST NOT RAISE. Two shipped modules teach the runtime to READ a
-// Pro prefix out of GM-authored icon data; naming a prefix is not writing an icon with it. If
-// these ever start failing, the guard has begun forbidding the code that handles Pro data safely.
+// THE FALSE POSITIVES THE GUARD MUST NOT RAISE. Two shipped modules teach the runtime to READ a Pro
+// prefix out of GM-authored icon data; naming a prefix is not writing an icon with it.
 describe('the guard is silent on the code that recognises Pro prefixes rather than writing them', () => {
   it('passes a prefix recognition set', () => {
     const source = [

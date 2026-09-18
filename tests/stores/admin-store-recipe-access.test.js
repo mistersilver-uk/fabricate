@@ -1,13 +1,6 @@
 /**
- * Per-recipe access grants in the admin store (Books & Scrolls `restricted`
- * visibility mode, Stream 3).
- *
- * Covers:
- *   - the recipe-list projection's `access` snapshot + `accessSummary`
- *     ({ characterCount, playerCount }) derived from each recipe's toJSON;
- *   - `getPcRoster()` delegating to services.getPlayerCharacterActors;
- *   - `saveRecipeAccess(recipeId, { characterIds, playerIds })` replacing the whole
- *     `access` object via recipeManager.updateRecipe (allowIncomplete) + refresh.
+ * Per-recipe access grants in the admin store (Books & Scrolls `restricted` visibility mode, Stream
+ * 3).
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

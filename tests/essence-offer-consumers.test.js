@@ -1,24 +1,4 @@
-/**
- * Issue 1036, criterion 18 — the add-new essence offer, as a CLOSED set of consumers.
- *
- * The behaviour of each consumer is proven where it renders: `recipe-edit-mounted`,
- * `component-edit-salvage-mounted`, `component-bulk-edit-panel-mounted` and
- * `component-editor-root-mounted` each drive their own control and each carry a negative
- * control that an enabled essence IS offered.
- *
- * What CANNOT be proven there is that the set is complete. A seventh add-essence control
- * added later would simply not be covered, and nothing would say so — which is exactly the
- * shape of failure this file exists to prevent. So this suite treats the consumer list as
- * the hand-maintained mirror it is and asserts, from the source tree:
- *
- * 1. every enumerated consumer still imports and applies the projection;
- * 2. no `src/ui` file filters the `essenceOptions` / `essenceDefinitions` PROP itself,
- *    which is the destructive shape the projection exists to avoid;
- * 3. every file that renders an essence add-affordance is on the enumerated list.
- *
- * It also unit-tests `visibleEssenceOptions`, the offer-plus-retained projection the three
- * quantity/picker surfaces share.
- */
+/** Issue 1036, criterion 18 — the add-new essence offer, as a CLOSED set of consumers. */
 
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -30,13 +10,7 @@ import { selectableEssenceOptions, visibleEssenceOptions } from '../src/utils/es
 const repoRoot = resolve(import.meta.dirname, '..');
 const uiRoot = join(repoRoot, 'src/ui');
 
-/**
- * The enumerated consumers, each with the projection it applies.
- *
- * `selectableEssenceOptions` for a control that only ever ADDS; `visibleEssenceOptions` for
- * a surface that is simultaneously the offer and the editing surface for what is already
- * authored, which must keep an already-carried disabled essence reachable.
- */
+/** The enumerated consumers, each with the projection it applies. */
 const CONSUMERS = Object.freeze([
   ['src/ui/svelte/apps/manager/ComponentEditView.svelte', 'visibleEssenceOptions'],
   ['src/ui/svelte/apps/ComponentEditorRoot.svelte', 'visibleEssenceOptions'],
@@ -51,19 +25,8 @@ const CONSUMERS = Object.freeze([
   ['src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte', 'visibleEssenceOptions'],
 ]);
 
-// TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal
-// is recorded rather than performed silently.
-//
-// `RecipeIngredientGroupCard` and `RecipeIngredientSetCard` were listed against
-// `selectableEssenceOptions` because their essence ADDERS chose an essence: the set-level one
-// was a picker, and the alternative one SEEDED its new row with the first selectable essence.
-// Both now create a row carrying its kind and no value, so neither offers an essence at all —
-// the offer moved into `RecipeIngredientOption`'s own name field, which is listed above and
-// which narrows it with `visibleEssenceOptions`.
-//
-// The marker list below moved with them for the same reason: `data-recipe-add="…essence…"` now
-// marks a control that CREATES AN EMPTY ESSENCE ROW, which is not an offer and cannot leak a
-// disabled essence. What marks an offer is the row's own essence field.
+// TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal is
+// recorded rather than performed silently.
 
 function read(relativePath) {
   return readFileSync(join(repoRoot, relativePath), 'utf8');
@@ -89,10 +52,7 @@ test('1036/18: every enumerated consumer imports AND applies its projection', ()
 });
 
 test('1036/18: no consumer filters the essence PROP itself', () => {
-  // The destructive shape, and the reason the projection exists at all. Filtering the prop
-  // drops a disabled essence's authored quantity through `buildComponentEditorUpdates`,
-  // wipes it across a whole selection through the bulk panel's whole-map replacement, and
-  // renders authored recipe options unresolved.
+  // The destructive shape, and the reason the projection exists at all.
   const destructive =
     /(essenceOptions|essenceDefinitions)\s*(\|\|\s*\[\])?\s*\)?\s*\.filter\s*\(/;
   for (const path of uiSourceFiles()) {
@@ -104,10 +64,9 @@ test('1036/18: no consumer filters the essence PROP itself', () => {
 });
 
 test('1036/18: the consumer list is CLOSED — no unlisted file renders an essence add', () => {
-  // The mirror guard. Every add-affordance in the manager carries a `data-recipe-add`
-  // essence token or drives an essence quantity card, so a new one is findable from source
-  // even before it has a test. Without this, a seventh consumer would silently ship
-  // unfiltered and every per-consumer test below would still be green.
+  // The mirror guard. Every add-affordance in the manager carries a `data-recipe-add` essence token
+  // or drives an essence quantity card, so a new one is findable from source even before it has a
+  // test.
   const ADD_MARKERS = [
     /data-recipe-option-essence/,
     /<EssenceQuantityCard/,
@@ -128,9 +87,7 @@ test('1036/18: the consumer list is CLOSED — no unlisted file renders an essen
   );
 });
 
-// ---------------------------------------------------------------------------
 // visibleEssenceOptions — the offer, plus whatever the caller says is in play
-// ---------------------------------------------------------------------------
 
 const OPTIONS = Object.freeze([
   Object.freeze({ id: 'air', name: 'Air', enabled: false, quantity: 0 }),

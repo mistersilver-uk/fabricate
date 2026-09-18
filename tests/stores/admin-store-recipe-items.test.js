@@ -1,12 +1,4 @@
-/**
- * Books & Scrolls recipe-item projection (issue 511).
- *
- * Covers the enriched recipe-item projection that feeds the Books & Scrolls
- * library: async name/img/type resolution via `fromUuid`, the derived linked
- * `recipes[]` (reverse ref through `recipe.recipeItemId`), the world-actor
- * `learnedByCount`, `linkMissing` for broken links, and the `setRecipeItemEnabled`
- * action.
- */
+/** Books & Scrolls recipe-item projection (issue 511). */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -34,11 +26,9 @@ beforeEach(() => {
     if (uuid === 'Item.bbb') return { name: 'Grand Codex', img: 'resolved-codex.png', type: 'book' };
     return null; // Item.zzz is a broken link
   };
-  // The learned map is persisted at the DOUBLY-nested `flags.fabricate.fabricate.
-  // learnedRecipes` path (issue 785): `normalizeFlagKey` prefixes `fabricate.` and
-  // the flattened update path nests it under the `fabricate` scope. These fixtures
-  // previously used the single-nested shape and their counts passed only because
-  // the reader was equally wrong; both are now correct together.
+  // The learned map is persisted at the DOUBLY-nested `flags.fabricate.fabricate. learnedRecipes`
+  // path (issue 785): `normalizeFlagKey` prefixes `fabricate.` and the flattened update path nests
+  // it under the `fabricate` scope.
   globalThis.game = {
     i18n: { localize: (key) => key, format: (key) => key },
     actors: {
@@ -180,12 +170,8 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
   });
 
   it('publishes the async-enriched projection under a NEW selectedSystem reference so the UI re-propagates', async () => {
-    // Regression: the phase-1 (synchronous, empty recipes[]) and phase-2 (async,
-    // enriched) publishes must be DIFFERENT selectedSystem object references. When
-    // phase-2 mutated the phase-1 object in place and re-published the same
-    // reference, Svelte's `selectedSystem` $derived never re-propagated the enriched
-    // recipeItemDefinitions, so the Books & Scrolls recipe counts froze on the empty
-    // phase-1 projection after any refresh (e.g. switching visibility mode).
+    // Regression: the phase-1 (synchronous, empty recipes[]) and phase-2 (async, enriched)
+    // publishes must be DIFFERENT selectedSystem object references.
     const store = buildStore();
     const seen = [];
     const unsub = store.viewState.subscribe((vs) => {
@@ -217,10 +203,7 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
   });
 
   it('counts ZERO for an actor whose learned map is only single-nested', async () => {
-    // The reader goes through `getFabricateFlag`, which resolves the real
-    // doubly-nested path. An actor carrying ONLY the legacy single-nested shape no
-    // writer ever produced must contribute nothing — this negative is the assertion
-    // a dual-read compatibility shim would fail, and the spec forbids such a shim.
+    // The reader goes through `getFabricateFlag`, which resolves the real doubly-nested path.
     globalThis.game.actors.contents = [
       makeFlaggedActor({ id: 'a1', flags: { fabricate: { learnedRecipes: { r1: 1, r2: 1 } } } }),
       makeFlaggedActor({ id: 'a2', flags: { fabricate: { learnedRecipes: { r3: 1 } } } })
@@ -242,11 +225,8 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
   });
 
   it('counts a learner whose recipe id is DOTTED, agreeing with the deletion cascade (1143)', async () => {
-    // `Document#update` nests a dotted recipe id into a subtree, so the persisted map's
-    // top level holds `imported`, not the id. Reading `Object.keys` here reported ZERO
-    // learners while `forgetLearnedRecipes` — reading through the shared entry-boundary
-    // reader — acted on the real id: the GM panel and the mutation disagreed about the
-    // same actor. Seeded in the NESTED shape Foundry really persists.
+    // `Document#update` nests a dotted recipe id into a subtree, so the persisted map's top level
+    // holds `imported`, not the id.
     const nested = (id) => ({
       imported: { recipe: { [id]: { learnedAt: 1, sourceItemUuid: null } } }
     });
@@ -273,18 +253,10 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     assert.equal(recipeItemById(vs, 'codex').learnedByCount, 1);
   });
 
-  // -------------------------------------------------------------------------
-  // The recipe-library search must not reach book membership (issue 1462)
-  // -------------------------------------------------------------------------
-  //
-  // `setRecipeSearch` awaits a full `refresh()`, so the poisoned projection was published
-  // from the moment the GM typed — while they were still standing in the recipe library,
-  // long before they navigated to Books & Scrolls and saw every row read `Incomplete`.
-  // The store, not the surface, is where this is asserted.
-  //
-  // Every case below carries a CONTROL proving the search is live. Without it the whole
-  // block passes just as happily on a store where the term silently did nothing, which is
-  // the failure mode a regression here would actually take.
+  // The recipe-library search must not reach book membership (issue 1462). `setRecipeSearch` awaits
+  // a full `refresh()`, so the poisoned projection was published from the moment the GM typed —
+  // while they were still standing in the recipe library, long before they navigated to Books &
+  // Scrolls and saw every row read `Incomplete`.
 
   const NO_MATCH = 'zzzz-matches-nothing';
 
@@ -321,10 +293,7 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
   });
 
   it('keeps the learned-by count of a book intact while a search matching nothing is live', async () => {
-    // A POSITIVE control first, in the same test. The learner index resolves the doubly
-    // nested `flags.fabricate.fabricate.learnedRecipes` path, so a fixture that got the
-    // shape wrong yields an index resolving nothing and "unchanged under a search" is then
-    // satisfied by 0 === 0 — a green test over a broken assertion.
+    // A POSITIVE control first, in the same test.
     globalThis.game.actors.contents = [
       makeFlaggedActor({ id: 'a1', flags: { fabricate: { fabricate: { learnedRecipes: { r1: 1 } } } } })
     ];
@@ -347,19 +316,9 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     );
   });
 
-  // The legacy-basis guard. This PASSES today and must keep passing; it exists to fail
-  // against the substitution the issue itself proposed — handing the enrichment the raw
-  // `systemRecipes` already in scope at the call site.
-  //
-  // Raw manager models carry the `recipeItemId` scalar only. The PROJECTED rows derive it
-  // through `recipeItemDefinitionsContaining`, which falls back from that scalar to
-  // `linkedRecipeItemUuid` → `originItemUuid`. Here the uuid leg is the ONLY thing joining
-  // the recipe to the book, so raw models yield 0 where this demands 1: a permanent
-  // membership regression on every un-migrated world, traded for a search-only one.
-  //
-  // Its mutation proof is therefore NOT reverting the `rosterRecipes` argument. No search is
-  // active here, so `rosterRecipes` and `recipes` are the same array and that revert is a
-  // no-op for this test. The mutation is the raw substitution.
+  // The legacy-basis guard. This PASSES today and must keep passing; it exists to fail against the
+  // substitution the issue itself proposed — handing the enrichment the raw `systemRecipes` already
+  // in scope at the call site.
   it('resolves legacy uuid-only book membership from projected rows, not raw recipe models', async () => {
     const system = makeSystem({
       recipeItemDefinitions: [

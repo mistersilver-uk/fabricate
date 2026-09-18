@@ -21,11 +21,9 @@ test('#775: a default-constructed (hand-authored) recipe has importSource === nu
 });
 
 test('#775/#1087: toJSON OMITS importSource for a hand-authored recipe, and absence rebuilds null', () => {
-  // Issue 775 made the key unconditional so the never-prune guard could not be lost to a
-  // dropped `toJSON` line; issue 1087 made it conditional again, because `null` was being
-  // written into every recipe in every world write to say what absence already says. The
-  // guard is unchanged — what matters is that the RECONSTRUCTED value is null, which is the
-  // structural absence of provenance the prune reads.
+  // Issue 775 made the key unconditional so the never-prune guard could not be lost to a dropped
+  // `toJSON` line; issue 1087 made it conditional again, because `null` was being written into
+  // every recipe in every world write to say what absence already says.
   const json = new Recipe({ name: 'Hand Authored' }).toJSON();
   assert.ok(!('importSource' in json), 'a null provenance is not written');
   assert.equal(Recipe.fromJSON(json).importSource, null, 'and absence rebuilds as null');

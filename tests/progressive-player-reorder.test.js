@@ -1,10 +1,6 @@
 /**
- * Issue 651 Phase 4 — runtime honour of the player's progressive result order.
- *
- * The two caller sites own order (D0: `resolveProgressiveAward` orders nothing). These
- * tests pin the COMPOSITION at each site: deleting the `applyPlayerResultOrder` call from
- * `_resolveProgressiveResultGroups` or from `_resolveSalvageResultGroups` must each flip a
- * test red, and deleting the D2 capture must flip the salvage resume test red.
+ * Issue 651 Phase 4 — runtime honour of the player's progressive result order. The two caller sites
+ * own order (D0: `resolveProgressiveAward` orders nothing).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,9 +23,7 @@ const { ResolutionModeService } = await import('../src/systems/ResolutionModeSer
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { SalvageRunManager } = await import('../src/systems/SalvageRunManager.js');
 
-// ---------------------------------------------------------------------------
 // Recipe path — ResolutionModeService._resolveProgressiveResultGroups
-// ---------------------------------------------------------------------------
 
 // Each result costs its own difficulty; a budget of 3 awards exactly the first 3 stages
 // in whatever order the list is in, so `awardedResultIds` reads out the applied order.
@@ -132,9 +126,7 @@ test('recipe: reordering never drops a stage when the budget covers everything',
   assert.equal(awardedIds(service, makeRecipe(), 99).length, RESULTS.length);
 });
 
-// ---------------------------------------------------------------------------
 // D6 — one flat id list reconciles every step; ids are NOT unique across steps
-// ---------------------------------------------------------------------------
 
 test('D6: one flat id list reorders a multi-step recipe step by step', () => {
   // Progressive reads `allGroups[0]`, and a step's own resultGroups win over the recipe's,
@@ -182,9 +174,7 @@ test('D6: a result id COLLIDING across two steps ranks independently in each', (
   );
 });
 
-// ---------------------------------------------------------------------------
 // Salvage path — order read from the RUN RECORD (D2)
-// ---------------------------------------------------------------------------
 
 const SALVAGE_SYSTEM = {
   id: 'sys-1',
@@ -219,8 +209,7 @@ const salvageComponent = (salvage = {}) => ({
 });
 
 test('salvage: the order captured on the run decides the award', () => {
-  // Mutation this catches: delete the applyPlayerResultOrder call from
-  // _resolveSalvageResultGroups.
+  // Mutation this catches: delete the applyPlayerResultOrder call from _resolveSalvageResultGroups.
   const engine = new CraftingEngine({}, null, null);
   const groups = engine._resolveSalvageResultGroups(
     salvageComponent(),
@@ -249,9 +238,7 @@ test('salvage: allowPlayerResultReorder false pins the authored order', () => {
 });
 
 test('salvage: RUNLESS uses the authored order — there is no settings fallback', () => {
-  // The seam would return an order, but no run means no captured order. If someone
-  // "fixes" the runless gap with a settings read, the resume path starts reading the
-  // executing user's order again and F3 is back.
+  // The seam would return an order, but no run means no captured order.
   const engine = new CraftingEngine({}, null, null, null, null, null, null, {
     getPlayerResultOrder: () => ['s-c', 's-b', 's-a'],
   });
@@ -272,14 +259,11 @@ test('salvage: an unwired engine (no options bag) behaves exactly as pre-651', (
   assert.equal(engine.getPlayerResultOrder({ scope: 'salvage', id: 'x' }), null);
 });
 
-// ---------------------------------------------------------------------------
 // D2's capture site — start → resume → award through the PERSISTED run
-// ---------------------------------------------------------------------------
 
 /**
- * An actor whose `setFlag` DEEP-MERGES like Foundry's, and whose `update` honours the
- * `-=` deletion syntax. The D2 test must round-trip through real persistence
- * (`container.active[runId]`), not an in-memory object a stub happened to keep.
+ * An actor whose `setFlag` DEEP-MERGES like Foundry's, and whose `update` honours the `-=` deletion
+ * syntax.
  */
 function makeMergingActor(id = 'actor-1') {
   const flags = {};
@@ -375,15 +359,9 @@ function setupSalvageGame({ userId, worldTime, salvageRunManager, actor }) {
 }
 
 test('D2: a world-time resume awards down the order stamped by run.userId, not the executing user', async () => {
-  // The sharp assertion. `createRun` stamps `userId` (the STARTING user), so the resume
-  // can be run as somebody else and still be pinned. This is what makes F3 —
-  // `SalvageRunManager.processWorldTime` iterating every actor on every client with no
-  // owner filter — structurally unreachable: the resume reads no settings at all.
-  //
-  // Mutation this catches: DELETE THE CAPTURE (`resultOrder:` from createRun's payload).
-  // The read site then finds no order, falls back to authored, and salvage silently never
-  // reorders — while the read-site tests above still pass, because they inject a run that
-  // already has an order.
+  // The sharp assertion. `createRun` stamps `userId` (the STARTING user), so the resume can be run
+  // as somebody else and still be pinned. Mutation this catches: DELETE THE CAPTURE (`resultOrder:`
+  // from createRun's payload).
   const actor = makeMergingActor();
   const salvageRunManager = new SalvageRunManager();
   setupSalvageGame({ userId: 'player-alice', worldTime: 100, salvageRunManager, actor });
@@ -449,18 +427,11 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
   SALVAGE_SYSTEM.components.pop();
 });
 
-// ---------------------------------------------------------------------------
 // The capture KEY is scoped per (systemId, componentId) — issue 766.
-// ---------------------------------------------------------------------------
 
 test('salvage: the captured order key is scoped per (systemId, componentId), never componentId alone', async () => {
-  // Mutation this catches: REVERT the engine's capture key to `salvage:<componentId>`
-  // (drop the `${craftingSystemId}:` term). Component ids are NOT globally unique, so the
-  // systemId is load-bearing — the store's WRITE key and the engine's READ key must match
-  // exactly, or the captured order silently reads empty (and a same-componentId order in
-  // another system leaks in). Only the store's write key was pinned before this test; the
-  // engine's read key had none, so the exact one-sided desync the design warned about
-  // shipped green.
+  // Mutation this catches: REVERT the engine's capture key to `salvage:<componentId>` (drop the
+  // `${craftingSystemId}:` term).
   const actor = makeMergingActor();
   const salvageRunManager = new SalvageRunManager();
   setupSalvageGame({ userId: 'player-alice', worldTime: 100, salvageRunManager, actor });

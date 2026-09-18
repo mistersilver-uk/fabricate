@@ -1,21 +1,6 @@
 /**
  * The Foundry globals the View Lab installs before it imports any Fabricate runtime module.
- *
- * The point of this file is to be SMALL. Fabricate's own architecture already keeps Foundry at
- * arm's length — the stores inject every side effect, and the app classes route every read through
- * the `game.fabricate` facade — so the lab does not need to reimplement Fabricate. It needs to
- * satisfy the handful of globals that `src/main.js` and the settings module genuinely touch, and
- * then let the REAL `Fabricate` facade, the REAL managers, and the REAL listing builders run.
- *
- * Two globals are load-bearing in ways that are easy to miss:
- *
- * - `game.settings` is the entire persistence layer. Backing it with a Map is what lets
- *   `CraftingSystemManager.initialize()` load real systems and normalize them for real.
- * - `foundry.applications.api.ApplicationV2` must merely EXIST as a class at import time, because
- *   `SvelteFabricateApp` extends it at module scope. The lab never renders through ApplicationV2 —
- *   it borrows `_buildServices`/`_prepareSvelteProps` off the prototype — so a bare class is
- *   enough, and using the real seam builder is what removes any chance of the lab's service bag
- *   drifting from production's.
+ * `game.settings` is the entire persistence layer.
  */
 import { createLabRoll } from './labRoll.js';
 import { installLabRandom } from './labRandom.js';
@@ -24,10 +9,6 @@ import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFl
 
 /**
  * Compose the Map key for one setting.
- *
- * Exported so the world seeder and the shim cannot drift apart. They did once: the two files used
- * different separators, so every seeded value was invisible to `getSetting` and the app rendered
- * perfectly with nothing in it — a failure that looks like a data bug and is actually a key bug.
  *
  * @param {string} namespace Settings namespace.
  * @param {string} key Setting key.
@@ -39,9 +20,6 @@ export function settingsKey(namespace, key) {
 
 /**
  * Foundry's `game.settings`, backed by a Map.
- *
- * `register` records the declared default so a `get` before any `set` returns what production
- * would return — several managers read a setting during `initialize()` before anything writes one.
  *
  * @param {Map<string, unknown>} store Seeded values, keyed `namespace\0key`.
  * @returns {object} A `game.settings`-shaped object.
@@ -176,22 +154,7 @@ function createHooks() {
     off(_event, id) {
       registrations.delete(id);
     },
-    // Inert, and that is a finding rather than laziness.
-    //
-    // `Hooks.once('ready')` in `src/main.js` runs `processFabricateWorldTime` and four flag
-    // auto-stamps that the lab therefore never runs, so tool and component identity resolves through
-    // the name-matching fallback tier rather than the tier-1 `roles` flag production reaches first.
-    // Dispatching the event is the only faithful route, because none of those functions is exported.
-    //
-    // It was tried and reverted. The same body reaches `addModuleButtonsToItemsDirectory`, which
-    // injects a button into Foundry's Items sidebar and `console.error`s when it is absent — and the
-    // lab has no sidebar by design. Satisfying it would mean building a facsimile of Foundry chrome,
-    // which is the one thing this harness must not do; muting the error would blind the gate that
-    // catches real fixture defects. Neither trade is worth what the unrun body currently buys: no
-    // captured surface draws the identity tier, and `ownedItem` sets its uuid from the component's
-    // declared `originItemUuid`, so the source-ref tier resolves correctly anyway.
-    //
-    // Tracked in issue #953, with that reasoning, rather than left as a silent gap.
+    // Inert, and that is a finding rather than laziness (issue 953).
     callAll: () => true,
     call: () => true,
     registrations,
@@ -217,25 +180,8 @@ function createTextEditor(documents) {
   };
 }
 
-/**
- * The two dnd5e Starter Heroes the smoke imports, reconstructed.
- *
- * HONEST LIMIT. Everything else the smoke seeds — systems, components, recipes, tools, inventories,
- * gathering library — is the smoke's own code replayed verbatim. These two actors are not: the real
- * `dnd5e.heroes` compendium is a LevelDB pack with snappy-compressed blocks, which cannot be read
- * without a decoder the lab does not carry. So their identity is reconstructed from what the smoke
- * demonstrably uses — the names appear on its own actor-sheet frames, and the portraits come from
- * the dnd5e system's own class art.
- *
- * The seed sorts the index by name and imports the first two `character` entries, so the order here
- * is what decides which is the crafter and which the travel member.
- */
-/**
- * The prefix every routed notification carries.
- *
- * `Fabricate | ` is what `scripts/view-lab-screenshots.mjs` scopes its warning gate to, so this is
- * not decoration — it is the token that decides whether a warning fails a capture.
- */
+/** The two dnd5e Starter Heroes the smoke imports, reconstructed. */
+/** The prefix every routed notification carries. */
 const NOTIFICATION_PREFIX = 'Fabricate | notification: ';
 
 const DND5E_STARTER_HEROES = Object.freeze([
@@ -277,21 +223,8 @@ function createHeroPacks() {
  * Install every Foundry global the Fabricate runtime reads, and return a disposer.
  *
  * @param {object} world The lab world (see `../world/labWorld.js`) supplying documents and actors.
- * @returns {{restore: () => void, randomID: (length?: number) => string}}
  */
-/**
- * A calendar, because `game.time.calendar` is never null in a booted V13 world.
- *
- * `Time#initializeCalendar` constructs one unconditionally from
- * `CONFIG.time.worldCalendarClass`, so `null` is not a state Foundry can be in. The lab had it null,
- * and the consequence was visible: `getWorldTimeComponents` bails on a missing `timeToComponents`,
- * `worldTimeLabel` then returns `''`, and every "Day N, <phase>" label on the Journal screen and
- * every maturing time-gate rendered EMPTY — a blank where production has text, which reads as a
- * Fabricate layout bug in a published frame.
- *
- * Simplified Gregorian, matching Foundry's own default. `day` is a 0-based day-of-year, which is
- * what `timeToComponents` returns and what `worldTimeLabel` compensates for.
- */
+/** A calendar, because `game.time.calendar` is never null in a booted V13 world. */
 const LAB_CALENDAR = Object.freeze({
   days: { hoursPerDay: 24, minutesPerHour: 60, secondsPerMinute: 60, daysPerYear: 365 },
   timeToComponents(time = 0) {
@@ -314,17 +247,9 @@ const LAB_CALENDAR = Object.freeze({
 });
 
 /**
- * The two `Roll` statics Fabricate reads, and nothing else.
- *
- * `checkRoll.js` returns null the moment `Roll.replaceFormulaData` is missing, so every check card
- * fell through to the RAW formula: a published frame printed `1d20 + @prof` where Foundry prints
- * `1d20 + 3`. That is an under-show rather than a lie, but it is a visible content difference across
- * roughly fifteen recipes, and the fidelity register never disclosed it.
- *
- * Both methods are pure string work — no dice engine is involved in resolving a formula for DISPLAY.
- * They are kept here, byte-identical, and handed to `createLabRoll` as the statics of the real `Roll`
- * class installed below; `labRoll.js` explains why rolling — once refused on this very spot — is now
- * computed from the seeded stream instead.
+ * The two `Roll` statics Fabricate reads, and nothing else. `checkRoll.js` returns null the moment
+ * `Roll.replaceFormulaData` is missing, so every check card fell through to the RAW formula: a
+ * published frame printed `1d20 + @prof` where Foundry prints `1d20 + 3`.
  */
 const LAB_ROLL_STATICS = {
   replaceFormulaData(formula, data = {}, { missing = 'NaN' } = {}) {
@@ -342,30 +267,7 @@ const LAB_ROLL_STATICS = {
   },
 };
 
-/**
- * THE PLAYER ROSTER A CROWDED WORLD HAS, seeded on request rather than by default (issue 1515).
- *
- * `game.users.players` holds ONE non-GM user in the resting lab world, which is truthful for a
- * two-seat table and leaves two states of the Access route's Players roster unreachable: it pages
- * at seven and its per-roster search only has something to miss once there is something to find.
- * Two frames photograph those states, and nothing else in the corpus asks for them — so this
- * table is OPT-IN, reached only through `mount.js`'s `manyPlayers` query flag, and every other
- * frame keeps the roster it had.
- *
- * SEVEN, and the number is derived rather than chosen: the roster pages at
- * `GrantAccessInspector.svelte`'s `ROSTER_PAGE_SIZE` of six, so seven added to the resting one is
- * the smallest roster that fills a page AND has a second one. `tests/view-lab-cases.test.js`
- * re-derives that arithmetic from this table and from the component's own constant rather than
- * restating either, because a fixture that quietly fell to six would publish a full page with no
- * bar under a case named for the bar.
- *
- * NAMES AND ROLES ARE BOTH LOAD-BEARING. The manager sorts this roster by name
- * (`SvelteCraftingSystemManagerApp.svelte.js`'s `getWorldUsers`), so the names decide which six
- * land on page one and an alphabet is the only way to make that stable and readable. The roles
- * decide the subtitle each row draws, and the two a grantable user can actually hold — Player and
- * Trusted Player — are both represented, because a roster drawing one subtitle eight times
- * photographs a field that could be a constant.
- */
+/** THE PLAYER ROSTER A CROWDED WORLD HAS, seeded on request rather than by default (issue 1515). */
 const LAB_EXTRA_PLAYER_USERS = Object.freeze([
   { id: 'user-lab-player-bram', name: 'Bram Holt', role: 1, css: '#a3c9a8' },
   { id: 'user-lab-player-cass', name: 'Cass Vane', role: 2, css: '#e0b1cb' },
@@ -398,11 +300,7 @@ export function installFoundryShim(world) {
     id: 'user-lab-player',
     name: 'Lab Player',
     isGM: false,
-    // DECLARED, and it was not before (issue 1515). `Users#players` is
-    // `!u.isGM && u.hasRole('PLAYER')`, so a roster entry with no role at all is not a player
-    // Foundry would put in that array — and the manager reads the field to draw each row's
-    // subtitle, which rendered `None` for the one user the lab had. A role-NONE user cannot be
-    // granted a recipe, so the frame was drawing an ungrantable target in a grant roster.
+    // DECLARED, and it was not before (issue 1515).
     role: 1,
     color: { css: '#8ecae6' },
   };
@@ -433,45 +331,15 @@ export function installFoundryShim(world) {
         return actor;
       },
     }),
-    // THE WORLD ITEM ROSTER, SEEDED FROM THE DOCUMENT INDEX RATHER THAN LEFT EMPTY.
-    //
-    // This started as `createCollection([])`, so `game.items.contents` held only the Items a
-    // frame created at runtime through `Item.createDocuments`. Every screen that resolves a
-    // linked game-world Item reads this collection — `getWorldItemOptions` in
-    // `SvelteCraftingSystemManagerApp.svelte.js` maps it directly — so the world Tool and
-    // Component screens were photographed against a roster no GM has: an EMPTY one.
-    //
-    // Two consequences, and both were invisible. `toolSourceSnapshot` falls back
-    // `worldItem || managedItem || tool`, so a linked tile drew the TOOL's own name and art and
-    // looked entirely correct while never once exercising the resolved-Item path it exists for.
-    // And `sourceMissing` requires a non-empty roster on purpose — a roster that has not loaded
-    // must not be mistaken for a broken link — so `ItemDropZone`'s `missing` face was
-    // unreachable in the lab by construction, which is what made a case for it fail the whole
-    // capture rather than one frame.
-    //
-    // The index already mints an Item per component, tool and recipe item (`buildDocumentIndex`);
-    // it was simply never wired to the collection the product reads. Actors and scenes share the
-    // index and are filtered out by uuid prefix.
+    // THE WORLD ITEM ROSTER, SEEDED FROM THE DOCUMENT INDEX RATHER THAN LEFT EMPTY. Two
+    // consequences, and both were invisible.
     items: createCollection(
       Array.from(world.documents?.values?.() ?? []).filter((document) =>
         String(document?.uuid ?? '').startsWith('Item.')
       )
     ),
     // `current` is what the Manager's Travel → Map Region Links tab reads; `active` is what the
-    // three canvas windows fall back to (issue 1520). `InteractablesManagerApp._scene()` is
-    // `globalThis.canvas?.scene ?? globalThis.game?.scenes?.active ?? null`, and it is the only
-    // reader of `scenes.active` in the product — so this one key is the whole of what those
-    // windows need. Both name the same scene here, which is the ordinary Foundry state.
-    //
-    // NOT a synthetic `globalThis.canvas`, and the difference is not cosmetic. `canvas` appears
-    // nowhere in this shim today and `canvas?.` is read 33 times across 5 product files, so a
-    // partial canvas would flip every EXISTING lab frame from the absent branch to a
-    // present-but-incomplete one. THE CAVEAT THAT LEAVES: `_gridSize()` reads `canvas`
-    // exclusively and therefore takes its 100 fallback in every lab frame, so any grid-derived
-    // geometry in a captured frame is the fallback's rather than a scene's. Nothing rendered by
-    // the three windows is grid-derived today — the fallback reaches only the Drawing-marker
-    // create seam, which no case drives — but a case that ever photographs a created marker's
-    // size is photographing 100, not the lab scene's grid.
+    // three canvas windows fall back to (issue 1520).
     scenes: Object.assign(createCollection(world.scenes ?? []), {
       current: world.scenes?.[0] ?? null,
       active: world.scenes?.[0] ?? null,
@@ -501,13 +369,7 @@ export function installFoundryShim(world) {
 
   globalThis.game = game;
 
-  /**
-   * A world `Item` collection good enough for the smoke's seed.
-   *
-   * `Item.createDocuments` is the seed's only document-creation call, and everything downstream
-   * resolves those items through `fromUuid` — `csm.addItemFromUuid` in particular — so a created
-   * item MUST land in the uuid index or the whole seed registers nothing.
-   */
+  /** A world `Item` collection good enough for the smoke's seed. */
   globalThis.Item = {
     async createDocuments(specs = []) {
       return specs.map((spec) => {
@@ -538,8 +400,7 @@ export function installFoundryShim(world) {
   };
   /**
    * Enough of a document to satisfy the smoke's seed: an id, a uuid the index resolves, and the
-   * embedded-collection call it uses. `Scene` needs `createEmbeddedDocuments('Region', …)` because
-   * the seed attaches Fabricate interactable behaviours to regions.
+   * embedded-collection call it uses.
    */
   const makeDocument = (spec, prefix, extra = {}) => {
     const id = random.randomID(16);
@@ -568,11 +429,6 @@ export function installFoundryShim(world) {
     document.uuid = `${prefix}.${id}`;
     // Real V13 semantics: `getFlag` walks dotted keys, `update` expands and deep-merges, `-=key`
     // deletes, and `updateSource` exists so `setFabricateFlag` takes the branch production takes.
-    //
-    // This is also where the old literal-key `getFlag` did the most damage. Under `--smoke-fixtures`
-    // the crafting actor IS a `makeDocument` hero, so every `learnedRecipes`, `roles`, `toolUsage`
-    // and `toolBroken` read on it — and on every item it embeds — answered `null` and rendered a
-    // pristine, unworn, unlearned frame regardless of what the fixture seeded.
     document.getFlag = makeGetFlag(document);
     document.setFlag = makeSetFlag(document);
     installUpdateSemantics(document);
@@ -610,35 +466,14 @@ export function installFoundryShim(world) {
     },
   };
 
-  // A CONSTRUCTOR, not the old two-static object. `evaluateCheckRoll` bails on
-  // `typeof globalThis.Roll !== 'function'` before it ever calls `options.prompt`, so an object
-  // here made every crafting/salvage/alchemy roll prompt unreachable — including issue 855's new
-  // check-modifier fieldset. See `labRoll.js` for why rolling is now computed rather than refused.
-  // The two statics keep their original bodies; only the constructor is new.
+  // A CONSTRUCTOR, not the old two-static object (issue 855).
   globalThis.Roll = createLabRoll({
     random: random.random,
     replaceFormulaData: LAB_ROLL_STATICS.replaceFormulaData,
     validate: LAB_ROLL_STATICS.validate,
   });
 
-  // A run that SUCCEEDS posts a chat card. Without this the engine's `ChatMessage.create` throws,
-  // the engine catches it and logs, and the driver's console-error gate fails the whole case — so
-  // the lab could photograph a gather that was blocked, in progress, or missing a tool, but never
-  // one that worked. The alternative considered and rejected was turning the system's `chatOutput`
-  // feature off, which would have hidden a missing seam rather than supplied one, and would have
-  // made the frame a picture of a configuration the fixture does not otherwise use.
-  //
-  // Nothing renders the returned document — the chat log is Foundry's, not Fabricate's, and is one
-  // of the disclosed gaps — so this is a sink with a realistic shape, not a stub pretending to be a
-  // chat log.
-  //
-  // `createChatMessage` is hoisted out of the literal instead of `createDocuments` calling
-  // `globalThis.ChatMessage.create`, because that self-reference made the property's type
-  // circular: the object was still being inferred at the point it referred to itself, so the
-  // callback's return type resolved to nothing and Sonar read the `.map` as a callback with no
-  // return AND the `Promise.all` as an aggregator over non-thenables (S3796, a BLOCKER, plus
-  // S4123). Both were artefacts of the cycle, not of the behaviour. Naming the function breaks it
-  // and the two entry points stay one implementation.
+  // A run that SUCCEEDS posts a chat card.
   const createChatMessage = async (spec = {}) =>
     makeDocument({ ...spec, _id: `lab-chat-${chatMessageSequence++}` }, 'ChatMessage');
 
@@ -653,20 +488,8 @@ export function installFoundryShim(world) {
       return { alias: options.actor?.name ?? 'Fabricate', actor: options.actor?.id ?? null };
     },
 
-    // Visibility, and why BOTH statics are modelled rather than the one this lab's version needs.
-    //
-    // Production asks for `applyMode` first and falls back to `applyRollMode`, because V14 renamed
-    // the static and deprecated the old name (`client/documents/chat-message.mjs`: `applyMode` at
-    // :151, `applyRollMode` at :654 carrying a `logCompatibilityWarning` until v16). Fabricate
-    // supports both, so the shim has to answer for both or the lab silently exercises one branch.
-    //
-    // These were absent while the production call was OPTIONAL (`applyRollMode?.(...)`), which made
-    // a missing static a silent no-op: the lab rendered a bulk salvage card that had never had any
-    // visibility applied and looked correct doing it. Issue 1286 made the call unconditional so a
-    // future rename cannot quietly turn a whispered GM card into table-wide chat, and that turned
-    // the same gap into a thrown TypeError that failed `player-inventory-bulk-report`. Both
-    // outcomes came from the shim, not from production — the fail-closed call is right, and a lab
-    // that cannot answer a documented static is what was wrong.
+    // Visibility, and why BOTH statics are modelled rather than the one this lab's version needs
+    // (issue 1286).
     applyMode(chatData, mode) {
       const data = chatData ?? {};
       let whisper = data.whisper ?? [];
@@ -680,9 +503,7 @@ export function installFoundryShim(world) {
       return data;
     },
     applyRollMode(chatData, mode) {
-      // The deprecated spelling maps the legacy token and delegates, exactly as V14 does. Kept
-      // deliberately: production reaches it only when `applyMode` is absent, and a lab that
-      // omitted it could never exercise that fallback at all.
+      // The deprecated spelling maps the legacy token and delegates, exactly as V14 does.
       const V14_MODE_BY_LEGACY = {
         publicroll: 'public',
         gmroll: 'gm',
@@ -693,34 +514,14 @@ export function installFoundryShim(world) {
     },
   };
 
-  // The smoke's world-document block opens by deleting stale data from a previous run. In a lab
-  // realm there is never any, so these are no-ops — but they must EXIST, because the seed calls
-  // them unconditionally and a missing static would abort the whole replay on its first line.
+  // The smoke's world-document block opens by deleting stale data from a previous run.
   for (const collection of [globalThis.Item, globalThis.Actor, globalThis.Scene, globalThis.User]) {
     collection.deleteDocuments = async () => [];
     collection.updateDocuments = async (updates = []) => updates;
   }
 
   // Notifications are Fabricate TELLING THE USER something went wrong, so swallowing them is the
-  // most expensive stub in this file. It hid `manager-import-report` for the whole of increment 2:
-  // the case fed `renderSystemImportDialog` a payload with no `system` key, `validateImportData`
-  // rejected it, production called `ui.notifications.error('Invalid file: ...')`, and the no-op
-  // above dropped it — so the capture passed and published a clean systems browser under the name
-  // "Import report". Routing to `console` hands them to the driver's existing console gate, which
-  // makes an errored notification FAIL the frame instead of silently retitling it.
-  //
-  // `info` stays quiet, and that is checked rather than assumed: `CompendiumImporter` calls
-  // `notifications.info(message, { progress: true, console: false })` on every progress tick and
-  // reads the return value, so routing it would both flood the gate and contradict the caller's
-  // own `console: false`.
-  //
-  // THE PREFIX IS LOAD-BEARING. The driver's warning gate collects on `Fabricate |`, so a message
-  // prefixed anything else is dropped by Playwright and never seen. This shipped once as
-  // `fabricate notification:`, which matches nothing: `error` still failed a capture (the gate
-  // takes every console error), but `warn` was behaviourally identical to the no-op it replaced,
-  // and whether a warning was fatal depended on whether the PRODUCT string happened to already
-  // begin `Fabricate | `. Two `CraftingSystemManager` warnings did; the import path's validation
-  // warnings, its failed-recipe summary, and every localized `FABRICATE.Admin.*` warning did not.
+  // most expensive stub in this file.
   globalThis.ui = {
     notifications: {
       info: () => {},
@@ -745,8 +546,7 @@ export function installFoundryShim(world) {
 
   /**
    * ApplicationV2 exists only so `SvelteFabricateApp`/`SvelteCraftingSystemManagerApp` can extend
-   * it at module scope. The lab borrows `_buildServices` off the prototype and never constructs an
-   * application, so nothing below this class is exercised.
+   * it at module scope.
    */
   class LabApplicationV2 {
     static DEFAULT_OPTIONS = { classes: [], window: {}, position: {} };
@@ -768,10 +568,7 @@ export function installFoundryShim(world) {
     }
   }
 
-  // A REAL DialogV2, drawn from Foundry's own `client/applications/api/dialog.mjs`. It used to be
-  // `class {}`, which made `confirmDialog` return false unconditionally (`foundryBridge.js`:105) —
-  // so every Fabricate confirmation was unreachable and three registry cases could photograph the
-  // screen behind a dialog but never the dialog. See `../foundryDialog.js`.
+  // A REAL DialogV2, drawn from Foundry's own `client/applications/api/dialog.mjs`.
   const dialogs = createLabDialogV2({ localize: world.i18n.localize });
 
   globalThis.foundry = {
@@ -796,8 +593,6 @@ export function installFoundryShim(world) {
     randomID: random.randomID,
     /**
      * Player frames must render as a NON-GM viewer or redaction never engages and the frame lies.
-     * The world is built as GM (initialization migrates and writes), then the viewer is flipped
-     * before the player services are constructed.
      *
      * @param {'gm'|'player'} role Which viewer the render represents.
      */
@@ -806,10 +601,6 @@ export function installFoundryShim(world) {
     },
     /**
      * Grow the world's non-GM roster to the crowded shape two Access frames need (issue 1515).
-     *
-     * Called from `mount.js` after the world is built and before the manager's services are, for
-     * `setViewer`'s reason: `getWorldUsers()` reads `game.users.players` when the projection is
-     * built, so the roster has to be in place by then and nothing re-reads it afterwards.
      *
      * @returns {number} How many non-GM users the roster now holds, so a caller can assert it.
      */

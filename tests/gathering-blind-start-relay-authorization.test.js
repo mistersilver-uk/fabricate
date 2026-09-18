@@ -1,22 +1,6 @@
 /**
- * Issue 1288 — the blind-run relay's actor authorization must read the RELAYED
- * requester, and nothing about whoever is running the code.
- *
- * `applyGatheringBlindStart` re-runs a player's blind start on the ELECTED GM's client
- * with `viewer: requester` (the server-attested socket sender). Every gate the player
- * would have faced is therefore re-evaluated on a client whose ambient user is a GM — and
- * a GM is Foundry OWNER of every actor in the world. `Actor#isOwner` is defined as
- * `testUserPermission(game.user, 'OWNER')`, so an ownership predicate whose first
- * disjunct reads it short-circuits to `true` before the relayed requester is ever
- * consulted. The authorization was inert exactly where it ran: an authenticated player
- * could emit a blind start naming an `actorUuid` they did not own and the GM client would
- * start the attempt for it.
- *
- * These cases run the REAL production wiring from `main.js` — the same
- * `isGatheringActorSelectableByUser` predicate injected as `isActorSelectable` and the
- * same `createGatheringSelectableActorsGetter` composition — against a fixture actor whose
- * `isOwner` is derived from the installed ambient user the way Foundry derives it. A
- * fixture that hard-codes `isOwner: true` cannot see this defect at all.
+ * Issue 1288 — the blind-run relay's actor authorization must read the RELAYED requester, and
+ * nothing about whoever is running the code.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -34,17 +18,7 @@ import {
 /** An authenticated player who owns nothing — the relay's threat model. */
 const INTRUDER = Object.freeze({ id: 'user-intruder', isGM: false });
 
-/**
- * Run `body` with `user` installed as the ambient Foundry user, then restore.
- *
- * The ambient user is the ONLY thing that distinguishes the GM-side apply from the
- * player-side start these tests contrast, so it is installed explicitly rather than left
- * to a module-scoped global that would leak between cases.
- *
- * @param {object} user
- * @param {Function} body
- * @returns {Promise<*>}
- */
+/** Run `body` with `user` installed as the ambient Foundry user, then restore. */
 async function withAmbientUser(user, body) {
   const previous = globalThis.game;
   // A real roster, not just the ambient user: `getGatheringRunViewer` resolves a run's
@@ -60,13 +34,7 @@ async function withAmbientUser(user, body) {
   }
 }
 
-/**
- * `src/main.js`'s two ambient identity seams for a run, verbatim.
- *
- * `new GatheringRunManager()` takes the default `getUserId`, which is `game.user.id`, and
- * the engine is injected with `getRunViewer: getGatheringRunViewer`. Both are supplied
- * here because the defect they combine to produce is invisible with either one stubbed.
- */
+/** `src/main.js`'s two ambient identity seams for a run, verbatim. */
 const PRODUCTION_RUN_IDENTITY = {
   getUserId: () => globalThis.game?.user?.id ?? null,
   getRunViewer: ({ run }) =>
@@ -74,13 +42,9 @@ const PRODUCTION_RUN_IDENTITY = {
 };
 
 /**
- * The engine's two actor seams, wired exactly as `src/main.js` wires them: the predicate
- * verbatim, and the selectable-actor getter composed over the same predicate with the
- * ambient user as its viewer DEFAULT. Substituting a permissive stub here would test the
- * fixture rather than the shipped composition.
- *
- * @param {object} actor
- * @returns {{isActorSelectable: Function, getSelectableActors: Function}}
+ * The engine's two actor seams, wired exactly as `src/main.js` wires them: the predicate verbatim,
+ * and the selectable-actor getter composed over the same predicate with the ambient user as its
+ * viewer DEFAULT.
  */
 function productionActorGates(actor) {
   return {
@@ -152,11 +116,8 @@ test('a GM acting as themselves may still select any actor', async () => {
 
 test('an explicitly null viewer denies rather than throwing, on the path that defaults to one', async () => {
   // Dropping the `isOwner` disjunct made the second disjunct REACHABLE, and Foundry's
-  // `testUserPermission` reads `user.isGM` as its first statement — so an unguarded call
-  // throws for every actor whenever the viewer is null. That shape is representable:
-  // `GatheringListingBuilder.listForActor` and `getTaskDropBreakdown` both default
-  // `viewer = null`, and `createGatheringSelectableActorsGetter`'s own viewer default only
-  // fires for `undefined`, so an explicit null travels all the way to the predicate.
+  // `testUserPermission` reads `user.isGM` as its first statement — so an unguarded call throws for
+  // every actor whenever the viewer is null.
   const actor = blindActor({ ownerIds: [BLIND_PLAYER.id] });
   const world = makeBlindWorld({ actor, ...productionActorGates(actor) });
 
@@ -216,14 +177,7 @@ test('the ownership predicate reads the passed user only, whatever the ambient u
 });
 
 test('a relayed blind run is OWNED by its requester, so it is still blind at maturity', async () => {
-  // The second instance of the same class (issue 1288). Authorization was not the only
-  // thing on this path reading the ambient user: `GatheringRunManager.createRun` stamped
-  // `userId` from `game.user`, which on the elected GM's client is the GM — for a run the
-  // PLAYER requested. `getGatheringRunViewer` reads that field back at maturity, so the
-  // run matured under a GM viewer, `_isOpaqueBlindTask` returned false, and the terminal
-  // history written to the player's OWN actor flag named the drawn task in plain — for
-  // every blind timed run in the game, since a player never has the permission to write
-  // the blind store and so every one of them is relayed.
+  // The second instance of the same class (issue 1288).
   const actor = blindActor({ ownerIds: [BLIND_PLAYER.id] });
   const world = makeBlindWorld({
     actor,

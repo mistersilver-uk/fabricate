@@ -1,25 +1,9 @@
-/**
- * Tests for T-097: CompendiumImporter service.
- *
- * Tests:
- *   1. Successful import: system + recipes created, correct counts
- *   2. Exact UUID match: component retains UUID, method reported as 'exact'
- *   3. Source+name UUID override: stale UUID remapped, old UUID added to fallbacks
- *   4. Unresolved link reporting: component with no match marked unresolved
- *   5. Fallback ID retention across re-import
- *   6. Additional fallback IDs merged into component
- *   7. overwriteExisting:false skips existing system (returns skipped)
- *   8. __SYSTEM_ID__ placeholder replaced in all recipes
- *   9. Collision detection: existing recipe generates collision entry
- *  10. Invalid pack data: missing system field throws error
- */
+/** Tests for T-097: CompendiumImporter service. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry global stubs
-// ---------------------------------------------------------------------------
 
 let _idCounter = 0;
 globalThis.foundry = {
@@ -36,17 +20,13 @@ globalThis.game = {
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 globalThis.fromUuid = async () => null; // default: uuid not found
 
-// ---------------------------------------------------------------------------
 // Module import
-// ---------------------------------------------------------------------------
 
 const { CompendiumImporter, createDefaultProgressReporter } = await import(
   '../src/systems/CompendiumImporter.js'
 );
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeComponent(overrides = {}) {
   return {
@@ -96,11 +76,9 @@ function makeMockSystemManager({ systems = [], createdSystems = [], updatedSyste
   };
 }
 
-// STATEFUL recipe-manager double (issue 775): a real backing store so the prune
-// assertions are non-vacuous — `getRecipes({craftingSystemId})` returns the persisted
-// set and `deleteRecipe` actually removes from it. `createRecipe`/`updateRecipe` fold
-// their result into the store (matching the real map mutation), so provenance stamping
-// and gone-from-map/idempotence assertions reflect reality rather than a spy log.
+// STATEFUL recipe-manager double (issue 775): a real backing store so the prune assertions are
+// non-vacuous — `getRecipes({craftingSystemId})` returns the persisted set and `deleteRecipe`
+// actually removes from it.
 function makeMockRecipeManager({
   existingRecipes = {},
   // Recipes already persisted in the store (with craftingSystemId + importSource), used
@@ -175,9 +153,7 @@ function makeMockRecipeManager({
   };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 test('T-097: successful import creates system and recipes', async () => {
   globalThis.fromUuid = async (uuid) => uuid === 'Compendium.source.items.iron-ore' ? {} : null;
@@ -644,9 +620,7 @@ test('T-097: null pack data throws error', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// #492 — gathering authoring import (F1 replace-by-system-id, F3 GM gate, refs)
-// ---------------------------------------------------------------------------
+// 492 — gathering authoring import (F1 replace-by-system-id, F3 GM gate, refs)
 
 // Minimal env-store double: persists whatever the importer's replace-by-system-id
 // merge writes (the merge logic lives in the importer, not the store).
@@ -747,9 +721,7 @@ test('#492: unresolved component source items fold into unresolvedReferences', a
   assert.equal(sourceItemRefs[0].referenceValue, 'Compendium.source.items.iron-ore');
 });
 
-// ---------------------------------------------------------------------------
-// #700 — component source-reference field upcast (pre-1.16.0 legacy names)
-// ---------------------------------------------------------------------------
+// 700 — component source-reference field upcast (pre-1.16.0 legacy names)
 
 // A component carrying ONLY the pre-1.16.0 field names, mirroring an export
 // produced before issue 560's rename.
@@ -858,9 +830,7 @@ test('#700: new names win when both legacy and renamed source fields are present
   assert.ok(!('sourceUuid' in comp));
 });
 
-// ---------------------------------------------------------------------------
-// #776 — batched import persistence + progress feedback
-// ---------------------------------------------------------------------------
+// 776 — batched import persistence + progress feedback
 
 function resetGame(overrides = {}) {
   globalThis.game = { packs: [], fabricate: null, user: { isGM: true }, ...overrides };
@@ -918,10 +888,9 @@ test('#776: composite overwrite=true fixture preserves counts and ordered collis
   resetGame();
   globalThis.fromUuid = async () => null;
 
-  // overwriteExisting is a run-global flag, so a single run cannot mix skip and
-  // overwrite outcomes; this fixture pins the overwrite branch (new + overwrite +
-  // validation-error recipe) with an existing system so the system collision is
-  // emitted BEFORE the recipe collision.
+  // overwriteExisting is a run-global flag, so a single run cannot mix skip and overwrite outcomes;
+  // this fixture pins the overwrite branch (new + overwrite + validation-error recipe) with an
+  // existing system so the system collision is emitted BEFORE the recipe collision.
   const existingSystem = { id: 'test-system', name: 'Test System', components: [] };
   const updatedSystems = [];
   const saveCalls = [];
@@ -959,9 +928,8 @@ test('#776: composite overwrite=false fixture skips the existing recipe and repo
   resetGame();
   globalThis.fromUuid = async () => null;
 
-  // Mutually exclusive with the overwrite=true fixture above: overwriteExisting is a
-  // single run-global flag. A NEW system is used so the run reaches Phase 4 rather
-  // than the existing-system early-skip return.
+  // Mutually exclusive with the overwrite=true fixture above: overwriteExisting is a single
+  // run-global flag.
   const saveCalls = [];
   const systemManager = makeMockSystemManager({});
   const recipeManager = makeMockRecipeManager({
@@ -1186,9 +1154,7 @@ test('#776: import emits progress at phase boundaries, ticks through recipes, an
   assert.equal(saveCalls.length, 1, 'the recipe batch is flushed once');
 });
 
-// ---------------------------------------------------------------------------
-// #794 — terminal progress-indicator state on the throw path (default reporter)
-// ---------------------------------------------------------------------------
+// 794 — terminal progress-indicator state on the throw path (default reporter)
 
 // A crafting-system manager whose createSystem rejects with a caller-supplied error
 // instance, so the throw-path tests can assert the ORIGINAL error propagates unchanged.
@@ -1445,9 +1411,7 @@ test('#776: a nonzero run where every recipe is skipped writes nothing (imported
   assert.equal(saveCalls.length, 0, 'an all-skipped nonzero run issues no batch save');
 });
 
-// ---------------------------------------------------------------------------
-// #775 — provenance-aware pruning of recipes removed from import payloads
-// ---------------------------------------------------------------------------
+// 775 — provenance-aware pruning of recipes removed from import payloads
 
 const PRUNE_DELETE_OPTIONS = { notify: false, emitChange: false, persist: false, cleanupFlags: false };
 

@@ -395,12 +395,8 @@ test('salvage routed: a tier-step trigger surfaces data.tierStepApplied on the c
   assert.equal(r.data.tierStepApplied.steps, 1, 'the REALIZED magnitude');
 });
 
-// The two below drive the REAL `salvage()` pipeline rather than calling
-// `_postSalvageChatMessage` with a hand-supplied `tierStep:`. That direct call
-// exercised the card, not the JOIN: both engine call sites pass
-// `tierStep: tierStepForCard(checkResult)`, and deleting either argument shipped green
-// (issue 975 review). Crafting is covered end to end by `craftForChatCard`; these are
-// its salvage twins, one per call site.
+// The two below drive the REAL `salvage()` pipeline rather than calling `_postSalvageChatMessage`
+// with a hand-supplied `tierStep:` (issue 975).
 
 test('salvage routed: the FAILURE path threads the runtime tier-step evidence into the card', async () => {
   stubStepRoll();
@@ -426,17 +422,10 @@ test('salvage routed: the SUCCESS path threads the runtime tier-step evidence in
   assert.ok(chatMessages[0].content.includes('FABRICATE.Chat.TierStepUp'), 'the up key');
 });
 
-// ── The PRE-RESOLVED roll decision (issue 859) ──────────────────────────────
-//
-// `rollDecision` is `promptCheckRoll`'s return shape MINUS `confirmed`, so
-// `evaluateCheckRoll` treats it as a pre-resolved `choice` and runs the identical
-// downstream code (the check-modifier append, `applyD20Advantage`, the `Roll.validate`
-// net, `effectiveRollMode`). One prompt answer therefore drives N rolls of a bulk run.
-//
-// It is attached by `CraftingEngine._salvageRollOptions` — NOT by
-// `buildInteractiveRollOptions`, which is shared with the crafting and gathering paths
-// and wires no pre-resolved-roll support at all. That one helper is a single gate serving
-// all three salvage runners, so a fourth runner cannot ship without it.
+// The PRE-RESOLVED roll decision (issue 859). `rollDecision` is `promptCheckRoll`'s return shape
+// MINUS `confirmed`, so `evaluateCheckRoll` treats it as a pre-resolved `choice` and runs the
+// identical downstream code (the check-modifier append, `applyD20Advantage`, the `Roll.validate`
+// net, `effectiveRollMode`).
 
 /** Record the formula every `new Roll(...)` is constructed with, and its chat post. */
 function stubRecordingRoll(total) {
@@ -460,13 +449,7 @@ function stubRecordingRoll(total) {
   return seen;
 }
 
-/**
- * Run one salvage check, capturing every `rollOptions` bag the runners built.
- *
- * `prompt` is replaced with a RECORDING stub rather than left as the real
- * `promptCheckRoll`, so "the prompt is not invoked" is an assertion about a call count
- * rather than about the absence of a dialog nothing would have opened headlessly anyway.
- */
+/** Run one salvage check, capturing every `rollOptions` bag the runners built. */
 async function runWithDecision(engine, system, component, options = {}) {
   const bags = [];
   const promptCalls = [];
@@ -601,11 +584,8 @@ test("a decision's roll mode reaches the chat post", async () => {
 });
 
 test('a decision supplied with NO prompt still applies bonus, advantage and roll mode', async () => {
-  // The load-bearing half of `evaluateCheckRoll`'s predicate:
-  // `interactive === true && (Boolean(preResolved) || typeof options.prompt === 'function')`.
-  // Without the `Boolean(preResolved) ||` half, a decision supplied without a prompt is
-  // silently discarded and the BASE formula rolls — the bulk run's bonus, advantage and
-  // roll mode all vanish with no error anywhere.
+  // The load-bearing half of `evaluateCheckRoll`'s predicate: `interactive === true &&
+  // (Boolean(preResolved) || typeof options.prompt === 'function')`.
   const engine = makeEngine();
   const seen = stubRecordingRoll(16);
   const { result } = await runWithDecision(
@@ -621,9 +601,8 @@ test('a decision supplied with NO prompt still applies bonus, advantage and roll
 });
 
 test('a decision is NEVER read as a cancellation', async () => {
-  // `rollDecision` carries no `confirmed` key, and the evaluator's early exit is
-  // `choice.confirmed === false`. A future tightening to `!choice.confirmed` would turn
-  // EVERY bulk roll into a cancellation — twenty-five silent no-ops per gesture.
+  // `rollDecision` carries no `confirmed` key, and the evaluator's early exit is `choice.confirmed
+  // === false`.
   const engine = makeEngine();
   stubRecordingRoll(18);
   const decision = { bonus: null, rollMode: undefined, advantage: 'normal' };

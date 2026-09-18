@@ -1,10 +1,9 @@
 /**
- * CraftingEngine — the system-level alchemy checkMode additions (issue 554):
- *   - `_runCraftingCheck` dispatch on `alchemy.checkMode` (none/simple/tiered);
- *   - the matched Simple-FAILURE path (`_resolveAlchemySimpleFailure`): consume via
- *     alchemy.consumeOnFail, produce the reserved failure group (nothing when empty),
- *     learn on match, and a distinct produced-on-failure disposition; and
- *   - the timed twin (`_finishAlchemySimpleFailure`) which never re-consumes.
+ * CraftingEngine — the system-level alchemy checkMode additions (issue 554): - `_runCraftingCheck`
+ * dispatch on `alchemy.checkMode` (none/simple/tiered); - the matched Simple-FAILURE path
+ * (`_resolveAlchemySimpleFailure`): consume via alchemy.consumeOnFail, produce the reserved failure
+ * group (nothing when empty), learn on match, and a distinct produced-on-failure disposition; and -
+ * the timed twin (`_finishAlchemySimpleFailure`) which never re-consumes.
  */
 
 import test from 'node:test';
@@ -116,12 +115,9 @@ test('checkMode=tiered with no routed formula is a misconfiguration', async () =
   assert.equal(result.misconfigured, true);
 });
 
-// --- Timed twin (`_finishTimedStep` path): never re-consumes ----------------
-// The immediate `craft()` failure path is covered end-to-end in
-// `alchemy-craft-integration.test.js` (through the REAL craft() + _createResultItems,
-// no heavy stubs). The timed twin is only reachable via a matured time gate, so it
-// is exercised here at the helper boundary — the one seam integration can't reach
-// cheaply — to prove it produces + learns WITHOUT re-consuming.
+// Timed twin (`_finishTimedStep` path): never re-consumes ---------------- The immediate `craft()`
+// failure path is covered end-to-end in `alchemy-craft-integration.test.js` (through the REAL
+// craft() + _createResultItems, no heavy stubs).
 
 function failureHarness({ consumeOnFail = true, learnOnCraft = true, failureGroupItems = ['potion-of-sludge'] } = {}) {
   const system = makeSystem({ checkMode: 'simple', consumeOnFail, learnOnCraft }, { simple: { rollFormula: '1d20', dc: 15 } });

@@ -1,42 +1,5 @@
 /**
  * THE NO-SHED GUARANTEE, AS A GATE (issue 1363, criterion 7; third test REPLACED at issue 1370).
- *
- * The triad's unanimous ruling is that `1.30.0` DEFERS the shed: every lifted field still has live
- * production readers, and shedding `Component.name` while they read it blanks every screen in the
- * world on the first save, permanently, because `_normalizeSystem` is an allowlist rebuild.
- *
- * ## THREE CLOCKS, AND ONLY ONE OF THEM HAS RUN
- *
- * PR 8a runs the READ ENTRY clock: production readers now enter through the read union, so the
- * third test's original claim - "no production reader anywhere under src is repointed" - is what
- * that PR exists to make false. It is REPLACED below rather than deleted, by a gate on WHERE the
- * union may be entered from. The AUTHORITY clock has NOT run: `## CraftingSystem` requirement 36
- * keeps the in-system arrays authoritative, and the union answers every key, every row and the row
- * order from them. The SHED clock has NOT run either, and the second test below is still the whole
- * of that guarantee - a repointed reader does not shed a field, and `_normalizeSystem` must keep
- * emitting all three arrays with every lifted identity field verbatim.
- *
- * AN EARLIER FORM OF THIS GUARANTEE WAS VACUOUS FOUR WAYS, and each is fixed here:
- *
- *  1. It asserted a NAME IS NOT FOUND, so deleting the three methods kept it green. This one is a
- *     POSITIVE EXISTENCE ANCHOR over all SIX names — the three `CraftingSystemManager` read-union
- *     methods AND the three module functions a repoint would more naturally target.
- *  2. It named only the three methods, so a repoint at `resolveComponentScope` (the module
- *     function) would have sailed past it.
- *  3. It would have tripped on the legitimate call in `tests/helpers/scale/benchmarkCases.js`.
- *     The walk is rooted at `src/` ALONE, which excludes it BY CONSTRUCTION rather than by an
- *     exclusion list a later lane can widen. (Its sibling exemption — a line-local marker for
- *     the manager's three delegating closures — was RETIRED at issue 1370: those closures no
- *     longer exist, so the marker exempted nothing while remaining available to re-arm by
- *     accident. The manager's own method headers fall to `DEFINITION` instead.)
- *  4. Its emit half passed key-presence against an empty-array mutation. This one asserts CONTENT:
- *     three entities in, length three out, identity fields verbatim.
- *
- * A FILE-PATH ALLOWLIST IS FORBIDDEN. The precedent this is built on resolves the definition and
- * gated-call problem with one, and copying it here would be self-defeating: `_normalizeSystem`
- * spans the SAME FILE as three of the legitimate callers, so a file skip would put mutation (i)
- * in a skipped file and the gate would stay green against the defect it exists to catch. The two
- * exemptions are LINE-LOCAL instead.
  */
 
 import assert from 'node:assert/strict';
@@ -87,27 +50,15 @@ const CALL = new RegExp(`(?:${NAMES})\\(`);
 /**
  * A DEFINITION, ANCHORED. The precedent's unanchored line-start form silently EXEMPTS a
  * prettier-wrapped repoint whose call name lands at the start of a continuation line, leaving the
- * gate green against the defect it exists to catch. With the trailing `\\)\\s*\\{` anchor,
- * `resolveScopedTools`'s own header falls to `DEFINITION` itself, which is what makes this
- * description literally true. (It used to fall to a line-local call-site marker; that constant
- * was retired at issue 1370 along with the delegating closures it exempted.)
+ * gate green against the defect it exists to catch (issue 1370).
  */
 const DEFINITION = new RegExp(
   `^\\s*(?:export\\s+)?(?:async\\s+)?(?:function\\s+)?(?:${NAMES})\\([^)]*\\)\\s*\\{`
 );
-/**
- * A CALL held as a VALUE rather than invoked by name.
- *
- * `CALL` requires `name(`, so a door built by putting a scope function in a dispatch table and
- * invoking it through the table — which is exactly how `scopedEntityReads.js` builds the door
- * ~20 leaf readers use — is INVISIBLE to it. That is not a hole to disclaim: it is the PR's own
- * primary entry point, so the gate matches it too and the assertion below names it.
- */
+/** A CALL held as a VALUE rather than invoked by name. */
 const VALUE_HELD = new RegExp(`:\\s*(?:${NAMES})\\b(?!\\()`);
 
-// ---------------------------------------------------------------------------
 // 1. The POSITIVE existence anchor
-// ---------------------------------------------------------------------------
 
 test('all SIX read-union names exist, so this gate cannot pass by their absence', async () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -124,9 +75,7 @@ test('all SIX read-union names exist, so this gate cannot pass by their absence'
   assert.equal(typeof modules[2].resolveToolScope, 'function');
 });
 
-// ---------------------------------------------------------------------------
 // 2. The CONTENT assertion — three entities in, length three out, verbatim
-// ---------------------------------------------------------------------------
 
 /** A record carrying every source-link identity field the world entity lifts. */
 function linked(record, uuid) {
@@ -168,12 +117,6 @@ test('_normalizeSystem still EMITS components, essenceDefinitions and tools, wit
     assert.equal(Array.isArray(normalized[field]), true, `${field} must be emitted`);
     assert.equal(normalized[field].length, 3, `${field}: three entities in, THREE out`);
     // CONTENT, not key presence: an empty-array mutation passes a presence test and fails this.
-    //
-    // THE FIELD LIST IS DERIVED FROM `WORLD_IDENTITY_FIELDS`, never hand-written. A hand-written
-    // list covered 5 of the 16 `(entityType, field)` pairs, so dropping `originItemUuid`,
-    // `registeredItemUuid` or `colorToken` from the normalizer survived this gate — the very
-    // shape of unguarded hand-maintained mirror the repository's own rules forbid, inside the
-    // gate that claims the no-shed guarantee.
     for (const [index, record] of normalized[field].entries()) {
       assert.equal(record.id, source[index].id, `${field}[${index}].id must be verbatim`);
       for (const identityField of WORLD_IDENTITY_FIELDS[entityType]) {
@@ -187,9 +130,7 @@ test('_normalizeSystem still EMITS components, essenceDefinitions and tools, wit
   }
 });
 
-// ---------------------------------------------------------------------------
 // 3. The recursive walk, rooted at `src/` alone
-// ---------------------------------------------------------------------------
 
 /** The manager method a line belongs to, by the one-method-per-two-space-indent convention. */
 function enclosingMethod(lines, index) {
@@ -220,14 +161,7 @@ function unionCallSites() {
 }
 
 test('the read union is entered from EXACTLY two doors, and both are named here', () => {
-  // REPLACES issue 1363's "no production reader is repointed". PR 8a repoints the reader set
-  // through TWO doors and no others: the shared seam's dispatch table, which every reader
-  // holding a system RECORD enters, and the manager's four read accessors, which every reader
-  // holding a MANAGER enters. A third entry point appearing here means some path is building
-  // its own union instead of sharing the memoized one.
-  //
-  // The seam's three rows are VALUE-HELD, so an earlier form of this test could not see them and
-  // promised exactness it did not check. They are matched now.
+  // REPLACES issue 1363's "no production reader is repointed".
   assert.deepEqual(unionCallSites(), [
     'src/systems/CraftingSystemManager.js :: getComponentsForSystem',
     'src/systems/CraftingSystemManager.js :: getEssenceDefinition',

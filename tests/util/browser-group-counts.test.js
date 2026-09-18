@@ -1,10 +1,4 @@
-/**
- * The shared category-total model behind both GM libraries' group headers (issue 676).
- *
- * Both studios group the PAGE, so a header that reports only its rendered count says
- * "General · 25 components" above page 1 of a 282-strong bucket. These are the pure
- * counts the header's second number comes from.
- */
+/** The shared category-total model behind both GM libraries' group headers (issue 676). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

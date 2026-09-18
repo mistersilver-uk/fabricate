@@ -1,24 +1,6 @@
 /**
- * The instrumentation seams every optimisation in the performance programme proves itself
- * against (issue 1072).
- *
- * This file tests the SEAMS; `tests/scale-regression-guards.test.js` tests the guards built
- * on them. The split matters because a guard that stops measuring is indistinguishable from
- * a guard that passes, so the machinery underneath it needs its own non-vacuity coverage.
- *
- * Three seams needed real work — the rest of the codebase is already constructor-injected
- * and needed none:
- *
- *  1. `RecipeManager` read `game.fabricate?.getCraftingSystemManager?.()` inline at twelve
- *     sites including `_validateSignatures`, so the alchemy signature path — the one the
- *     quadratic `validateSystem` lives on — could only be instrumented by installing a
- *     global shim.
- *  2. `CraftingSystemManager` did not implement `getRecipesForSystem` /
- *     `getComponentsForSystem`, the contract `SignatureValidator` has always documented.
- *     Seven call sites hand-rolled adapter closures instead, so there was no runtime method
- *     to attach a counter to.
- *  3. The ingredient solver computed `{nodes, capHit}` and threw them away, which made both
- *     this issue's and #1083's ingredient bounds unfalsifiable.
+ * The instrumentation seams every optimisation in the performance programme proves itself against
+ * (issue 1072).
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,9 +25,7 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { SETTING_KEYS } = await import('../src/config/settings.js');
 
-// ---------------------------------------------------------------------------
 // Seam 3 — solver search statistics
-// ---------------------------------------------------------------------------
 
 function ingredientSet(componentIds) {
   return new IngredientSet({
@@ -65,24 +45,13 @@ const heldItem = (id, componentId) => ({
   system: { quantity: 1 },
 });
 
-/**
- * The solver calls `matcher(option, item)` — option FIRST. Getting that order wrong makes
- * every option fail to match, which still produces a valid-looking unsatisfiable result, so
- * the tests below assert `success` explicitly rather than trusting the fixture.
- */
+/** The solver calls `matcher(option, item)` — option FIRST. */
 const matchHeldComponent = (option, item) =>
   item?.flags?.fabricate?.componentId === option?.match?.componentId;
 
 /**
  * A CONTENDED set: every group requires the SAME component, so they compete for the same held
- * stacks and none of them can be resolved on its own.
- *
- * This shape is why the node-count assertions below moved off `ingredientSet()` (issue 1083).
- * That fixture gives every group its own dedicated stack, so no two groups can interact — and
- * once the solver stopped searching what it can resolve directly, both its "small" and "large"
- * cases reported zero nodes and the monotonicity assertion compared 0 with 0. That is not a
- * broken statistic, it is the statistic reporting the optimisation working; the assertion needs
- * a fixture whose search is real, which is this one.
+ * stacks and none of them can be resolved on its own (issue 1083).
  */
 function contendedSet(groupCount) {
   return new IngredientSet({
@@ -98,9 +67,8 @@ const sharedStacks = (count) =>
   Array.from({ length: count }, (_unused, index) => heldItem(`i${index}`, 'c-shared'));
 
 describe('issue 1072 — the ingredient solver reports its own search cost', () => {
-  // `nodes` is the only deterministic measure of assignment work. A wall-clock reading is a
-  // product of tree size and per-node cost that it cannot separate, and #1083 moved both terms.
-  // Discarding this number left #1083's bounds unfalsifiable.
+  // `nodes` is the only deterministic measure of assignment work. A wall-clock reading is a product
+  // of tree size and per-node cost that it cannot separate, and #1083 moved both terms.
   it('surfaces searchStats on a satisfied selection', () => {
     const result = contendedSet(2).resolveIngredientSelection(
       sharedStacks(2),
@@ -117,10 +85,8 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
   });
 
   it('surfaces searchStats on the greedy fallback taken when no assignment exists', () => {
-    // Two groups compete for ONE stack, so the search proves unsatisfiability and falls through
-    // to the greedy pass. Both exits must carry the statistic or a caller has to branch on which
-    // one produced the result — and the UNSATISFIABLE case is the expensive one worth measuring,
-    // because it is the branch that explores the whole space before giving up.
+    // Two groups compete for ONE stack, so the search proves unsatisfiability and falls through to
+    // the greedy pass.
     const result = contendedSet(2).resolveIngredientSelection(
       sharedStacks(1),
       matchHeldComponent
@@ -150,11 +116,7 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
   });
 
   it('reports ZERO nodes when nothing in the set contends', () => {
-    // The other half of the same seam, and the reason the fixtures above had to change. Each
-    // group here has its own dedicated stack, so no group's choice can constrain another's and
-    // there is nothing for a backtracking search to decide. `nodes === 0` is the observable
-    // form of #1083's "ordinary direct-component recipes resolve without entering the DFS": a
-    // `>= 0` assertion would be satisfied by the old whole-set search too.
+    // The other half of the same seam, and the reason the fixtures above had to change.
     const items = [heldItem('i0', 'c-0'), heldItem('i1', 'c-1'), heldItem('i2', 'c-2')];
     const result = ingredientSet(['c-0', 'c-1', 'c-2']).resolveIngredientSelection(
       items,
@@ -171,9 +133,7 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
   });
 });
 
-// ---------------------------------------------------------------------------
 // Seam 2 — the accessors SignatureValidator duck-typed
-// ---------------------------------------------------------------------------
 
 describe('issue 1072 — CraftingSystemManager implements the SignatureValidator contract', () => {
   async function managerWithSystem() {
@@ -200,9 +160,8 @@ describe('issue 1072 — CraftingSystemManager implements the SignatureValidator
   });
 
   it('returns the recipes of a system, unfiltered by enablement', async () => {
-    // Unfiltered on purpose: the validator scopes its own scan to enabled recipes, so an
-    // accessor that pre-filtered would give two places that decide what "the recipes of a
-    // system" means.
+    // Unfiltered on purpose: the validator scopes its own scan to enabled recipes, so an accessor
+    // that pre-filtered would give two places that decide what "the recipes of a system" means.
     const { systemManager, system } = await managerWithSystem();
     assert.deepEqual(
       systemManager.getRecipesForSystem(system.id).map((r) => r.id),
@@ -212,16 +171,10 @@ describe('issue 1072 — CraftingSystemManager implements the SignatureValidator
   });
 });
 
-// ---------------------------------------------------------------------------
 // Seam 1 — RecipeManager's injected system-manager collaborator
-// ---------------------------------------------------------------------------
 
 describe('issue 1072 — RecipeManager reaches its system manager through the constructor', () => {
-  /**
-   * Install a `game.fabricate` whose accessor EXPLODES. Any RecipeManager path still
-   * reading the global fails loudly instead of quietly resolving the right system by the
-   * wrong route — which is what "injected consistently" has to mean to be worth asserting.
-   */
+  /** Install a `game.fabricate` whose accessor EXPLODES. */
   function hostileGlobalEnv() {
     installFoundryEnv();
     globalThis.game.fabricate = {
@@ -255,11 +208,8 @@ describe('issue 1072 — RecipeManager reaches its system manager through the co
       getCraftingSystemManager: () => makeSystemManager(system, () => [...manager.recipes.values()]),
     });
 
-    // The realistic enable transition: the candidate is STORED and still disabled, its
-    // collider is stored and enabled. `_validateSignatures` substitutes the candidate at
-    // its target state so the scan sees the collision the enable would create — a
-    // candidate that is not in the store is simply absent from the scan and would make
-    // this assertion pass for the wrong reason.
+    // The realistic enable transition: the candidate is STORED and still disabled, its collider is
+    // stored and enabled.
     const candidate = makeSignatureRecipe({
       id: 'r-candidate',
       componentId: 'c-0',
@@ -297,9 +247,7 @@ describe('issue 1072 — RecipeManager reaches its system manager through the co
   });
 });
 
-// ---------------------------------------------------------------------------
 // The probes themselves
-// ---------------------------------------------------------------------------
 
 describe('issue 1072 — the probes cannot report a vacuous zero', () => {
   it('counts calls through a facade without mutating the wrapped object', () => {

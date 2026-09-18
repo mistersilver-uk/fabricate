@@ -1,14 +1,4 @@
-/**
- * Unit tests for the interactive check-roll seam (issue: interactive roll prompt).
- *
- * Covers `evaluateCheckRoll`'s optional interactive behaviour and the runner-level
- * cancel short-circuit:
- *  1. Interactive + prompt returns {confirmed:false} -> cancelled, no Roll, no toMessage.
- *  2. Interactive + {confirmed:true, bonus} -> bonus appended, rolled, toMessage posted.
- *  3. Interactive but no ChatMessage -> rolled, no throw, no toMessage.
- *  4. Non-interactive (default) -> no prompt, no toMessage, original result shape.
- *  5. Runner-level cancel short-circuit (passFail/progressive/routed).
- */
+/** Unit tests for the interactive check-roll seam (issue: interactive roll prompt). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -23,9 +13,7 @@ import {
   runFormulaRouted,
 } from '../src/systems/checkRoll.js';
 
-// ---------------------------------------------------------------------------
 // Stubs
-// ---------------------------------------------------------------------------
 
 /** The most recently constructed fake Roll (null when none constructed). */
 let lastRoll = null;
@@ -53,20 +41,9 @@ function installRollStub() {
       return { class: 'FakeRoll', formula: this.formula, total: this.total, terms: [], dice: [] };
     }
     /**
-     * Approximate Foundry's `Roll.validate` with a parenthesis-balance check, so the
-     * interactive safety net can reject a malformed situational bonus (e.g. "oops)"
-     * → "1d20 + (oops))", unbalanced) while accepting "1d20 + (2)".
-     *
-     * Deliberately a `this`-DEPENDENT static. Foundry's real `Roll.validate` does
-     * `new this(formula)` internally (`client/dice/roll.mjs`), so calling it detached
-     * (`const validate = Roll.validate; validate(f)`) leaves `this` undefined, throws
-     * inside Foundry's own try/catch, and returns false for EVERY formula — silently
-     * dropping the bonus from every roll. A `this`-free stub cannot see that bug, which
-     * is exactly how it shipped. Mirror the `this`-dependence so it stays catchable.
-     *
-     * Returns false (rather than throwing) when detached, matching what Foundry really
-     * does, so a regression surfaces as a clean formula assertion. Deliberately does NOT
-     * call `new this(...)`: constructing a FakeRoll would clobber the `lastRoll` tracker.
+     * Approximate Foundry's `Roll.validate` with a parenthesis-balance check, so the interactive
+     * safety net can reject a malformed situational bonus (e.g. "oops)" → "1d20 + (oops))",
+     * unbalanced) while accepting "1d20 + (2)".
      */
     static validate(formula) {
       if (this?.prototype !== FakeRoll.prototype) return false;
@@ -103,9 +80,7 @@ function clearStubs() {
 
 const actor = { name: 'Tinker', getRollData: () => ({}) };
 
-// ---------------------------------------------------------------------------
 // 1. Cancelled prompt
-// ---------------------------------------------------------------------------
 
 test('evaluateCheckRoll: cancelled prompt returns cancelled and never rolls or posts chat', async () => {
   installRollStub();
@@ -138,9 +113,7 @@ test('evaluateCheckRoll: cancelled prompt returns cancelled and never rolls or p
   }
 });
 
-// ---------------------------------------------------------------------------
 // 2. Confirmed with situational bonus -> appended + posted to chat
-// ---------------------------------------------------------------------------
 
 test('evaluateCheckRoll: confirmed prompt appends bonus, rolls, and posts to chat', async () => {
   installRollStub();
@@ -172,9 +145,7 @@ test('evaluateCheckRoll: confirmed prompt appends bonus, rolls, and posts to cha
   }
 });
 
-// ---------------------------------------------------------------------------
 // 2b. Invalid situational bonus -> roll the BASE formula, never a failure
-// ---------------------------------------------------------------------------
 
 test('evaluateCheckRoll: an invalid situational bonus is ignored and the base formula is rolled', async () => {
   installRollStub();
@@ -219,11 +190,8 @@ test('evaluateCheckRoll: a valid situational bonus appends "+ (2)" to the formul
   }
 });
 
-// Regression, as reported: "Inputting a whole number into situational bonus does not add
-// it to the total roll amount. This also seems to apply to trying 2d20, 3d6, or any
-// combination of dice." A DICE bonus must reach the rolled formula too — Foundry's
-// `Roll.validate` accepts a non-deterministic term because it calls `evaluateSync` with
-// `strict: false` (`client/dice/terms/dice.mjs` throws only when `strict` is set).
+// Regression, as reported: "Inputting a whole number into situational bonus does not add it to the
+// total roll amount.
 test('evaluateCheckRoll: a dice situational bonus is appended to the rolled formula', async () => {
   installRollStub();
   installChatStub();
@@ -274,9 +242,7 @@ test('runFormulaPassFail: an invalid bonus rolls the base formula and does not f
   }
 });
 
-// ---------------------------------------------------------------------------
 // 3. Interactive but no ChatMessage -> still rolls, no throw, no toMessage
-// ---------------------------------------------------------------------------
 
 test('evaluateCheckRoll: interactive with no ChatMessage rolls without posting to chat', async () => {
   installRollStub();
@@ -297,9 +263,7 @@ test('evaluateCheckRoll: interactive with no ChatMessage rolls without posting t
   }
 });
 
-// ---------------------------------------------------------------------------
 // 4. Non-interactive default -> no prompt, no chat, original shape
-// ---------------------------------------------------------------------------
 
 test('evaluateCheckRoll: non-interactive default does not prompt or post chat', async () => {
   installRollStub();
@@ -528,9 +492,7 @@ test('evaluateCheckRoll: no options behaves exactly as before (no prompt/chat)',
   }
 });
 
-// ---------------------------------------------------------------------------
 // 5. Runner-level cancel short-circuit
-// ---------------------------------------------------------------------------
 
 test('runFormulaPassFail: cancelled roll short-circuits without crit/DC logic', async () => {
   installRollStub();
@@ -616,9 +578,7 @@ test('runFormulaRouted: cancelled roll short-circuits', async () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // 6. Non-interactive runner still rolls + returns normal result
-// ---------------------------------------------------------------------------
 
 test('runFormulaPassFail: non-interactive rollOptions rolls and evaluates normally', async () => {
   installRollStub();
@@ -642,9 +602,7 @@ test('runFormulaPassFail: non-interactive rollOptions rolls and evaluates normal
   }
 });
 
-// ---------------------------------------------------------------------------
 // 7. Advantage / Disadvantage transform (2d20kh1 / 2d20kl1)
-// ---------------------------------------------------------------------------
 
 test('evaluateCheckRoll: advantage rewrites a plain d20 to 2d20kh1 (before any bonus)', async () => {
   installRollStub();
@@ -722,11 +680,7 @@ test('evaluateCheckRoll: advantage is a no-op for a non-d20 formula (defensive)'
   }
 });
 
-// ---------------------------------------------------------------------------
 // 8. Crit preservation on an advantage (2d20kh1) roll — §3 verification.
-//    The kept (active) die face must reach a `diceGroup anyDie == 20` trigger
-//    through `rolledDiceGroups` (active-only faces) + `resolveForcedOutcome`.
-// ---------------------------------------------------------------------------
 
 function installKeptDieRoll() {
   // A 2d20kh1 pool: the kept die is a natural 20 (active), the dropped die a 5

@@ -1,35 +1,6 @@
 /**
- * Issue 570 — copy-import component-id regeneration + within-payload reference remap.
- *
- * Acceptance (a)-(f), each driving the REAL production call site
- * `CraftingSystemExporter.prepareForImport(payload, 'copy')` end-to-end (no value is
- * fed straight into the transform helper). RED against pre-#570 base, which preserves
- * component ids on copy:
- *   (a) regenerate + remap every D1 category
- *   (b) residual closure — two copies from one origin share no component id
- *   (c) behaviour-preserving live-model isomorphism
- *   (d) no-dangle completeness (collector + independent literal-path sweep)
- *   (e) keep-mode untouched (green by design)
- *   (f) key-aware NEGATIVE — no blanket string-replace (green by design)
- *
- * AMENDED BY ISSUE 1364, which RETRACTS mint-everything in favour of MATCH-OR-MINT. Copy mode now
- * binds an incoming component to the destination world entity its SOURCE REFERENCES name, and
- * mints only when nothing matches. Cases (a), (c), (d) and (f) are unchanged in substance and run
- * against an EMPTY destination index, where every component is unmatched and therefore mints —
- * which is exactly the pre-1364 behaviour they were written for.
- *
- * Case (b) INVERTS, and that inversion is the point of the change rather than a casualty of it.
- * Two copies from one origin used to share no component id; they now share one for every LINKED
- * component, because sharing an id is what stops the second import creating a second world record
- * for an item the destination already holds. The old guarantee survives, restated: two copies
- * share an id only when each INTERSECTS THE SAME destination world entity — so an UNLINKED
- * component, which intersects none, still mints a disjoint id on every import.
- *
- * It is NOT "when their own sets intersect each other": a destination entity's set may have been
- * widened by the `1.30.0` grouping's union, so two records sharing no reference at all can each
- * intersect it, and what keeps them on distinct ids is the INJECTIVE binding rather than the
- * intersection relation (`openspec/specs/import-export/spec.md` -> Copy-mode identifier
- * rebinding).
+ * Issue 570 — copy-import component-id regeneration + within-payload reference remap. Case (b)
+ * INVERTS, and that inversion is the point of the change rather than a casualty of it.
  */
 
 import assert from 'node:assert/strict';
@@ -61,12 +32,7 @@ const EMPTY_WORLD_ENTITY_INDEX = Object.freeze({
   tools: Object.freeze([]),
 });
 
-/**
- * The real production copy-mode call site, against a given destination index.
- *
- * @param {object} [worldEntityIndex]
- * @returns {object}
- */
+/** The real production copy-mode call site, against a given destination index. */
 function copyImport(worldEntityIndex = EMPTY_WORLD_ENTITY_INDEX) {
   return prepareForImport(buildCopyImportComponentFixture(), 'copy', { worldEntityIndex });
 }
@@ -108,9 +74,7 @@ function liveRecipeComponentIds(recipeJson) {
   return ids;
 }
 
-// ---------------------------------------------------------------------------
 // (a) Regenerate + remap every D1 category
-// ---------------------------------------------------------------------------
 
 test('(a) copy-import regenerates every component id and remaps every D1 reference site', () => {
   const keep = prepareForImport(buildCopyImportComponentFixture(), 'keep');
@@ -148,9 +112,7 @@ test('(a) copy-import regenerates every component id and remaps every D1 referen
   }
 });
 
-// ---------------------------------------------------------------------------
 // (b) Residual closure
-// ---------------------------------------------------------------------------
 
 test('(b) a second copy from one origin BINDS to the first copy\'s world entities (issue 1364)', () => {
   // The shared, GROWING destination index: the first import's world entities are what the second
@@ -191,9 +153,7 @@ test('(b) a second copy from one origin BINDS to the first copy\'s world entitie
   }
 });
 
-// ---------------------------------------------------------------------------
 // (c) Behaviour-preserving live-model isomorphism
-// ---------------------------------------------------------------------------
 
 test('(c) the copied system is craftable identically to its origin (live-model isomorphism)', () => {
   const keep = prepareForImport(buildCopyImportComponentFixture(), 'keep');
@@ -239,9 +199,7 @@ test('(c) the copied system is craftable identically to its origin (live-model i
   );
 });
 
-// ---------------------------------------------------------------------------
 // (d) No dangle — completeness (collector + independent literal-path sweep)
-// ---------------------------------------------------------------------------
 
 test('(d) no within-payload component reference dangles after the copy transform', async () => {
   const copy = copyImport();
@@ -270,9 +228,7 @@ test('(d) no within-payload component reference dangles after the copy transform
   }
 });
 
-// ---------------------------------------------------------------------------
 // (e) keep-mode untouched
-// ---------------------------------------------------------------------------
 
 test('(e) keep-mode leaves every component id and reference byte-identical', () => {
   const keep = prepareForImport(buildCopyImportComponentFixture(), 'keep');
@@ -290,9 +246,7 @@ test('(e) keep-mode leaves every component id and reference byte-identical', () 
   }
 });
 
-// ---------------------------------------------------------------------------
 // (f) Key-aware NEGATIVE — no blanket string-replace
-// ---------------------------------------------------------------------------
 
 test('(f) a non-reference value equal to a component id is NOT rewritten', () => {
   const copy = copyImport();
@@ -318,14 +272,11 @@ test('(f) a non-reference value equal to a component id is NOT rewritten', () =>
   assert.notEqual(copy.system.components[0].salvage.resultGroups[0].id, regeneratedOre);
 });
 
-// ---------------------------------------------------------------------------
 // Scope pin — the transform lives on the real prepareForImport('copy') path
-// ---------------------------------------------------------------------------
 
 test('scope pin: rebindCopyComponentIds is the exported copy transform on importReferenceResolver', () => {
-  // A refactor that moves the remap out of importReferenceResolver (or drops the
-  // export) breaks this pin, and the acceptance cases above pin it to the real
-  // prepareForImport('copy') call site.
+  // A refactor that moves the remap out of importReferenceResolver (or drops the export) breaks
+  // this pin, and the acceptance cases above pin it to the real prepareForImport('copy') call site.
   assert.equal(
     typeof rebindCopyComponentIds,
     'function',

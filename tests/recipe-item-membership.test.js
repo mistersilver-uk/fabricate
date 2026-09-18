@@ -1,26 +1,4 @@
-/**
- * The ONE implementation of recipe↔book membership (issue 1155).
- *
- * The rule used to be written out five times — twice in `CraftingSystemManager`, once in
- * `RecipeVisibilityService`, once in `utils/recipeDeleteImpact.js` and once in the admin
- * recipe-row projection — and the copies had already drifted: the row projection had no
- * `linkedRecipeItemUuid` → `originItemUuid` leg, so on an un-migrated world the GM
- * browser's book column and the delete card's impact statement could name different books
- * for the same recipe. `tests/recipe-book-membership-basis.test.js` is where the readers
- * are held to ONE answer through their real call shapes; this suite holds the leaf they
- * all now ask to its own contract.
- *
- * Two things here are worth more than the rest:
- *
- *   - the legacy fallback ORDER, including its refusal to fall through on a dangling
- *     `recipeItemId`. Both directions are asserted, because a change that simply disabled
- *     the uuid leg would satisfy the refusal on its own;
- *   - the INJECTED data access. `CraftingSystemManager` and `RecipeVisibilityService`
- *     answer the `recipeIds[]` leg from the retained index (issue 1076) rather than a
- *     per-check scan, so the seam that unification introduced is "the lookup disagrees
- *     with the scan". Both forms are run over one battery so that seam cannot open
- *     quietly.
- */
+/** The ONE implementation of recipe↔book membership (issue 1155). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -140,11 +118,7 @@ describe('recipeItemDefinitionsContaining — the legacy fallback order', () => 
   });
 });
 
-/**
- * The battery, as `(name, definitions, recipe, marker)`. Every shape the rule can take,
- * run twice: once through the leaf's own scan and once through the index-backed lookup the
- * two hot readers inject.
- */
+/** The battery, as `(name, definitions, recipe, marker)`. */
 const BATTERY = [
   ['unlinked recipe, legacy basis', definitions, { id: 'r1' }, false],
   ['membership by recipeIds', () => definitions({ a: ['r1'] }), { id: 'r1' }, true],
@@ -175,9 +149,7 @@ const BATTERY = [
 
 describe('recipeItemDefinitionsContaining — data access is injected, the rule is not', () => {
   it('answers identically through the retained index and through the plain scan', () => {
-    // The seam unification introduced. An injected lookup substitutes HOW a set of
-    // definitions is found; the moment it substitutes WHICH question is asked, the two
-    // hot readers quietly stop agreeing with the delete card and the browser row again.
+    // The seam unification introduced.
     let compared = 0;
     for (const [name, buildDefinitions, recipe, marker] of BATTERY) {
       const scanned = recipeItemDefinitionsContaining(buildDefinitions(), recipe, marker);
@@ -245,14 +217,7 @@ describe('recipeItemDefinitionsContaining — data access is injected, the rule 
   });
 
   it('diverges on whitespace-padded stored recipeIds, a seam closed by normalizer trimming on load', () => {
-    // The index keys buckets on `String(recipeId)` untrimmed, while the scan trims. On a
-    // stored recipeId like `' r1 '`, the scan finds a match (after trimming both sides),
-    // but the index looks for the key `'r1'` and misses (because the key is `' r1 '`). This
-    // is not a defect in the field: `CraftingSystemManager._normalizeRecipeItemDefinition`
-    // trims `recipeIds` on EVERY load, so a padded id can never exist at runtime — the seam
-    // is closed in practice. But the battery must exercise it to ensure the two lookups stay
-    // honest; a test without this case would silently pass even if someone accidentally
-    // removed a trim somewhere.
+    // The index keys buckets on `String(recipeId)` untrimmed, while the scan trims.
     const defs = definitions({ a: [' r1 '] });
     const scanned = ids(recipeItemDefinitionsContaining(defs, { id: 'r1' }, true));
     const indexed = ids(

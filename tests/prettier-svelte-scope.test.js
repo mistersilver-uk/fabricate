@@ -1,83 +1,13 @@
 /**
- * Guard: Prettier must actually reach `.svelte` components.
- *
- * Before issue 923 the Prettier gate was silently vacuous over components. `.prettierignore`
- * carried a `*.svelte` entry, so `prettier --check "src/**\/*.svelte"` matched ZERO files, printed
- * "All matched files use Prettier code style!" and exited 0. A gate that reports success while
- * inspecting nothing is worse than no gate: CI is green, so nobody looks.
- *
- * That state is one line away from returning, and only ONE of the two ways back announces itself:
- *
- *   - Deleting `"plugins"` from `.prettierrc.json` fails LOUDLY. `format:check` names
- *     `src/**\/*.svelte` explicitly, so Prettier matches the files, finds no parser for them and
- *     exits 2 with "No parser could be inferred". No guard needed for that path.
- *   - Re-adding `*.svelte` to `.prettierignore` is SILENT. `format:check` prints "All matched
- *     files use Prettier code style!" and exits 0 — the exact failure mode this gate exists to
- *     eliminate, sailing straight through CI.
- *
- * Issue 946 found a THIRD, more general way back that the guards below used to miss entirely:
- * appending `--ignore-path <a file that ignores *.svelte>` to the `format:check` SCRIPT ITSELF.
- * The tests that proved the command's scope did so by reconstructing the question through the
- * Prettier Node API with their OWN `ignorePath` array, never observing the argv the command
- * actually runs with, and the only command-level check was a substring match
- * (`command.includes(componentGlob)`) that a flag appended after the glob leaves untouched. So
- * this file now closes both halves: `assertGateArgv` (`tests/helpers/gateScope.js`) pins the
- * `format`/`format:check` scripts' PARSED argv by equality rather than substring, and a real,
- * PATH-free execution of `format:check` (`runPrettierCheck`) proves the real command reaches the
- * real component corpus, with a positive control proving Prettier actually reports an
- * unformatted component rather than reporting clean by construction.
- *
- * Issue 1017 added the last piece: that execution runs the real CLI over the live working tree, so
- * a file appearing or vanishing mid-run used to surface as a bare CLI error with nothing to say
- * the tree had moved. The failure report now discriminates on Prettier's EXIT CODE — 1 is
- * Prettier's own verdict about files it read, 2 is an operational error and no verdict at all —
- * and adds what it observed of the tree either side of the run. See `formatCheckReport` for why
- * the notes are additive rather than a substitution, and why additive does not mean last.
- *
- * `formatCheckReport` is the one thing here that a green run never inspects, so it gets the same
- * treatment as the positive control above: `describe('the failure report ...')` calls it directly
- * for each exit code. Without that, deleting its exit-2 note, breaking the constant that selects
- * it, or making its listing note unreachable all leave this file 11/11 green — measured, which is
- * why those tests exist.
+ * Guard: Prettier must actually reach `.svelte` components. Issue 946 found a THIRD, more general
+ * way back that the guards below used to miss entirely: appending `--ignore-path <a file that
+ * ignores *.svelte>` to the `format:check` SCRIPT ITSELF (issue 923).
  */
 
 /**
  * Issue 1168: this file's runtime is governed by the `--test-timeout` on the `test` script in
  * `package.json`, and CANNOT be narrowed to just this file with a `describe`/`it` `{ timeout }`
- * option — that was tried and measured to not work, not assumed. `node:test` wraps every file
- * passed to the CLI in an implicit test whose own deadline is inherited from `--test-timeout`;
- * inheritance only flows DOWNWARD (a child adopts its parent's timeout as its own default), never
- * upward as an override. A `{ timeout: 300000 }` on the describe below, on the slow `it` inside
- * it, or on a describe wrapping this whole file's content, all still got cancelled at the CLI's
- * shorter value in testing, reported as `not ok 1 - <filepath>` rather than by the name of
- * whichever inner node supposedly owned the longer budget — the same shape the original bug
- * report showed. So the 300000 lives on the `test` script itself, applying to all files, not just
- * this one.
- *
- * The corpus-wide `format:check` invocation below (`inspects the real component corpus, not a
- * reconstruction of it`) is the reason: measured at ~7.5s run alone on an idle machine, ~17.8s as
- * part of a full idle `npm test`, and up to 128.1s under the kind of concurrent load this repo's
- * lane gates actually produce (2-3 other full `npm test` runs in flight at once) — well past the
- * previous 60000ms cap, which is exactly what turned a slow-but-healthy run into a `# cancelled 1`
- * that read as a flake. Narrowing this back down "to tidy it" reintroduces that.
- *
- * THOSE NUMBERS GREW WITH ISSUE #1660. `format:check` is `prettier --check .` now, so the real
- * argv this executes covers the repository rather than about eighty paths: ~24s run alone, against
- * the ~7.5s above. That is a deliberate cost and it is worth naming beside its neighbour, because
- * the same change moved a 23-second ESLint check OUT of `npm test` on the grounds that CPU-bound
- * seconds here starve the browser-backed suites. The two are not in conflict, but they are close
- * enough that the difference should be stated rather than left to be rediscovered: this test was
- * ALREADY executing a real Prettier run, so #1660 added ~16s to an existing cost, while
- * `lint:debt` would have added ~272s of entirely new work. If this ever needs to come down, the
- * lever is running it in a CI job of its own — not narrowing the argv, which is the one thing
- * that would make it stop testing what it exists to test.
- *
- * ONE MORE THING THE GLOB TOOK AWAY. Dropping `prettier-plugin-svelte` from `.prettierrc.json`
- * used to make `format:check` exit 2 with "No parser could be inferred", because the script named
- * `src/**\/*.svelte` and Prettier refuses a file it was handed and cannot parse. Under
- * `prettier --check .` it exits 0 — directory expansion just skips such a file. Measured, not
- * assumed. So the `resolves a Svelte parser` and `registers prettier-plugin-svelte` assertions
- * below are no longer belt-and-braces over a loud CLI failure; they ARE the gate.
+ * option — that was tried and measured to not work, not assumed.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -88,7 +18,6 @@ import { fileURLToPath } from 'node:url';
 // Deep entry point on purpose. `npm test` runs Node with `--conditions=browser` (the mounted
 // component harness needs it), and Prettier's export map answers the `browser` condition with
 // `standalone.mjs` — a bundle with no filesystem access, so no `getFileInfo`/`resolveConfig`.
-// `prettier/index.mjs` is reachable through the package's `"./*"` export and is the Node build.
 import * as prettier from 'prettier/index.mjs';
 // The same walker `scripts/compare-svelte-render.mjs` uses, so "every component" means one thing.
 import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
@@ -97,20 +26,13 @@ import { assertGateArgv, runPrettierCheck } from './helpers/gateScope.js';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const componentGlob = 'src/**/*.svelte';
 
-// Mirrors the Prettier 3 CLI, which defaults `--ignore-path` to BOTH files. Passing them
-// explicitly (rather than relying on the API default, which is no ignore file at all) is what
-// makes this test read the repository's real exclusions instead of a convenient empty set.
+// Mirrors the Prettier 3 CLI, which defaults `--ignore-path` to BOTH files.
 const ignorePath = [path.join(repoRoot, '.gitignore'), path.join(repoRoot, '.prettierignore')];
 
 const components = listSvelteComponents(path.join(repoRoot, 'src'));
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 
-// The file scope `format` and `format:check` share. Issue #1660 made both a glob over the
-// repository, so this is one entry where it was eighty-one — the exclusions live in
-// `.prettierignore`, with a stated reason each, and `tests/lint-coverage.test.js` asserts the
-// resulting coverage is a superset of what the enumeration reached. Both scripts are still pinned
-// FROM this one list rather than as two separately-typed arrays, so the two pins cannot drift
-// apart from each other by a copy-paste edit to only one of them.
+// The file scope `format` and `format:check` share (issue 1660).
 const GATE_TARGETS = ['.'];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
 const FORMAT_CHECK_ARGV = ['prettier', '--check', ...GATE_TARGETS];
@@ -136,62 +58,14 @@ const FIXTURE_ARGV = ['--plugin', SVELTE_PLUGIN_PATH, '--no-config'];
 const UNFORMATTED_COMPONENT = '<script>\n  let x = 1\n</script>\n\n<div>{x}</div>\n';
 const FORMATTED_COMPONENT = '<script>\n  let x = 1;\n</script>\n\n<div>{x}</div>\n';
 
-/**
- * Prettier's exit codes, which are the only trustworthy verdict this test has.
- *
- * `1` is Prettier's own answer about files it READ: at least one of them is unformatted. `2` is an
- * operational error — Prettier reporting that it could not do the job, not a verdict about
- * formatting. `legacy-cli.mjs` sets it at six distinct sites, so exit 2 is a CLASS rather than one
- * cause, and the report below names the class instead of diagnosing a member of it.
- *
- * Measured against this repository's own binary, because guessing here is how the previous wording
- * came to be wrong. `output` is stdout and stderr together, the way the report below joins them:
- *
- *   | condition                                       | exit | output                                        |
- *   |-------------------------------------------------|------|-----------------------------------------------|
- *   | glob matched no file                            | 2    | `All matched files use Prettier code style!`  |
- *   | no parser inferable (`--no-config` on `.svelte`)| 2    | `Error occurred when checking code style ...` |
- *   | parse error in a component's MARKUP             | 2    | `Error occurred when checking code style ...` |
- *   | parse error in an embedded `<script>`           | 0/1  | the SyntaxError, then the ordinary verdict    |
- *   | present but unformatted                         | 1    | `Code style issues found in the above file.`  |
- *
- * The two parse-error rows are one condition to a READER and two to the CLI, which is why they are
- * listed apart rather than jointly as "a parse error". A markup error throws out of the plugin and
- * is an operational error. An error inside an embedded `<script>` is swallowed, that region is
- * reproduced verbatim, and the exit code is then whatever the rest of the file deserves — measured
- * at 0 when the surrounding markup was already formatted, so a component Prettier could not fully
- * parse can pass `--check` with the SyntaxError printed beside the clean sweep.
- *
- * Two things follow, and both are why this file reads the exit code rather than the output. The
- * stdout line is NOT constant at exit 2 — the empty glob prints the clean sweep, the missing parser
- * does not — so no single sentence identifies the condition. And exit 2 OUTRANKS exit 1: the CLI
- * sets 1 only `if (... && !process.exitCode)`, so a run that both matched nothing and found real
- * formatting problems exits 2 while its output complains about code style.
- */
+/** Prettier's exit codes, which are the only trustworthy verdict this test has. */
 const PRETTIER_UNFORMATTED = 1;
 const PRETTIER_OPERATIONAL_ERROR = 2;
 
 /**
  * The failure report for a non-zero `format:check`: this test's own reading of the run, then
- * Prettier's output verbatim and complete.
- *
- * The notes are ADDITIVE, never a replacement, and that is the whole design. The realistic
- * collision is someone adding a new unformatted `.svelte` while this runs — the listing moved AND
- * Prettier genuinely complained — and a report that substituted "the worktree changed" for
- * Prettier's message would eat the real failure and send the reader to re-run a gate that will
- * fail again for the reason it just discarded.
- *
- * ADDITIVE DOES NOT MEAN LAST, which is the ordering this file learned the hard way. Measured on a
- * forced exit 2: appended, the note landed at TAP line 1670 against a lede at line 183, because
- * `--log-level debug` puts ~270 `resolve config from ...` lines in between — and the reader's
- * SECOND line was `All matched files use Prettier code style!`, the exact sentence the note exists
- * to contradict, 1,487 lines before the contradiction arrived. So the discriminating clause is
- * folded into the lede and the notes precede the verbatim block. Prettier's output is unabridged
- * either way; only its position moved.
- *
- * The exit code is the discriminator. The listing diff is only enrichment: it names WHICH paths
- * moved, and it is reported at any exit code, because a moving tree is worth knowing about
- * whatever Prettier concluded.
+ * Prettier's output verbatim and complete. The notes are ADDITIVE, never a replacement, and that is
+ * the whole design.
  *
  * @param {{status: number, stdout: string, stderr: string}} result The Prettier run.
  * @param {string[]} before Components listed immediately before the invocation.
@@ -275,11 +149,7 @@ describe('Prettier covers Svelte components', () => {
   });
 
   // `inferredParser: 'svelte'` above comes from Prettier core's own language metadata and is
-  // reported even with no plugin loaded, so it does NOT prove a parser exists. The plugin
-  // registration is the half that does, and Prettier 3 removed plugin auto-loading: the
-  // devDependency alone leaves `.svelte` unparseable. Dropping this entry is the loud failure
-  // path (`format:check` exits 2), so this assertion is documentation of WHY the entry exists
-  // rather than the only thing standing between us and a regression.
+  // reported even with no plugin loaded, so it does NOT prove a parser exists.
   it('registers prettier-plugin-svelte in the resolved config', async () => {
     const config = await prettier.resolveConfig(
       path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte')
@@ -291,13 +161,7 @@ describe('Prettier covers Svelte components', () => {
   });
 
   // The plugin's own options are pinned at the values that produced the landed formatting rather
-  // than inherited. `svelteAllowShorthand` in particular decides whether `attr={attr}` is printed
-  // as `{attr}`, which this repository's source-text contracts assert against in ~140 places; a
-  // plugin major flipping any of these defaults would otherwise re-churn every component on the
-  // next `npm update`, with nothing recording that the current behaviour was chosen.
-  //
-  // `svelteStrictMode` is deliberately absent: prettier-plugin-svelte 4 removed it, and setting
-  // it makes every Prettier invocation print "Ignored unknown option".
+  // than inherited.
   it('pins the plugin options that decide component formatting', async () => {
     const config = await prettier.resolveConfig(
       path.join(repoRoot, 'src/ui/svelte/apps/manager/ExplainerCard.svelte')
@@ -316,11 +180,8 @@ describe('Prettier covers Svelte components', () => {
   });
 
   // Both globs, not just the checked one: `format` writing a scope that `format:check` does not
-  // verify lets an unformatted component through CI, and the reverse makes `npm run format`
-  // unable to fix what CI rejects. Pinned by EQUALITY on the parsed argv, not by substring — see
-  // the header comment and issue 946: a `command.includes(componentGlob)` check is unmoved by a
-  // flag appended after the glob (e.g. a decoy `--ignore-path`), while an equality pin on the
-  // tokenized array sees the extra element immediately.
+  // verify lets an unformatted component through CI, and the reverse makes `npm run format` unable
+  // to fix what CI rejects (issue 946).
   it('pins the format and format:check scripts by argv equality', () => {
     assertGateArgv(packageJson, 'format', FORMAT_ARGV);
     assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
@@ -354,8 +215,7 @@ describe('the argv pin actually fails on the reported hole', () => {
 
   it('fails when the corpus target is removed from the script', () => {
     // `prettier --check` with nothing to check exits 0 having looked at no file at all, which is
-    // the same silent success issue 946 reported by a different route. The argv pin must see the
-    // missing element.
+    // the same silent success issue 946 reported by a different route.
     const withoutTarget = {
       scripts: {
         'format:check': packageJson.scripts['format:check'].replace(' .', ''),
@@ -375,19 +235,15 @@ describe('the argv pin actually fails on the reported hole', () => {
 });
 
 describe('format:check actually reaches the component corpus when executed', () => {
-  // The execution half of the fix: run the REAL, pinned `format:check` argv through Prettier's
-  // real CLI entry point (PATH-free — see `runPrettierCheck`), not a reconstruction through the
-  // Node API. `--log-level debug` is appended only to make Prettier log which files it resolved
-  // config for; it does not change which files match or are ignored (verified against a decoy
-  // --ignore-path while building this test: the debug log goes from ~250 `.svelte` lines to
-  // zero, with the exit code staying 0 either way — the exact silent failure issue 946 reports).
+  // The execution half of the fix: run the REAL, pinned `format:check` argv through Prettier's real
+  // CLI entry point (PATH-free — see `runPrettierCheck`), not a reconstruction through the Node API
+  // (issue 946).
   it('inspects the real component corpus, not a reconstruction of it', () => {
     const argv = assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
     // Listed immediately either side of the invocation, deliberately rather than reusing the
     // module-level `components`: that binding is computed at load and separated from this run by
     // five async tests which each call `getFileInfo` over all 267 components, so comparing against
-    // it would widen the window being described by seconds for no gain. These two calls bracket
-    // the run and nothing else.
+    // it would widen the window being described by seconds for no gain.
     const before = listSvelteComponents(path.join(repoRoot, 'src'));
     const result = runPrettierCheck([...argv.slice(1), '--log-level', 'debug']);
     const after = listSvelteComponents(path.join(repoRoot, 'src'));
@@ -459,23 +315,10 @@ describe('format:check actually reaches the component corpus when executed', () 
   });
 });
 
-/**
- * The diagnostic itself, called directly.
- *
- * Everything above only ever reads `formatCheckReport` through a passing assertion, which never
- * looks at its message — so the whole of it was unproven, and measurably so: breaking the exit-2
- * constant, deleting the exit-2 note and making the listing note unreachable each left this file
- * 11/11 green. It is a pure function of `(result, before, after)`, so no CLI spawn is needed to
- * fix that; the fixtures below are the real CLI outputs, copied from runs against this
- * repository's own Prettier binary.
- */
+/** The diagnostic itself, called directly. */
 describe('the report a failing format:check would actually print', () => {
   // The exit codes here are LITERALS, not `PRETTIER_OPERATIONAL_ERROR`/`PRETTIER_UNFORMATTED`, and
-  // that is the difference between a test and a tautology. Prettier owns these numbers; the
-  // constants are only this file's names for them. Written with the constants, this suite agrees
-  // with the code by construction — measured: changing `PRETTIER_OPERATIONAL_ERROR` to 3 moved the
-  // fixture along with the branch and left all 14 tests green, which is the very hole this whole
-  // block exists to close.
+  // that is the difference between a test and a tautology.
   const EMPTY_GLOB = {
     status: 2,
     stdout: 'Checking formatting...\nAll matched files use Prettier code style!\n',
@@ -522,9 +365,7 @@ describe('the report a failing format:check would actually print', () => {
   it('reports exit 2 as an operational error, ahead of the output that contradicts it', () => {
     const report = formatCheckReport(EMPTY_GLOB, steady, steady);
     const outputAt = report.indexOf(EMPTY_GLOB.stdout);
-    // The report's own notes, with Prettier's verbatim output cut off. Scoped deliberately: the
-    // fixture's stderr IS `[error] No files matching the pattern were found`, so an unscoped match
-    // for that sentence passes on the fixture whether or not the note mentions it at all.
+    // The report's own notes, with Prettier's verbatim output cut off.
     const notes = report.slice(0, outputAt);
 
     assert.match(
@@ -532,22 +373,13 @@ describe('the report a failing format:check would actually print', () => {
       /operational error/i,
       'exit 2 is not a formatting verdict, and the reader has to be told so'
     );
-    // Named because their remedies are opposite. The earliest wording identified ONE cause ("a
-    // pattern matched no file"), which is wrong: `No parser could be inferred` reaches this same
-    // gate — it is the loud failure path the module header describes — and re-running never fixes
-    // it. Enumerate and point at Prettier's own output instead of diagnosing.
+    // Named because their remedies are opposite.
     assert.match(notes, /No parser could be inferred/, 'name the permanent cause');
     assert.match(notes, /re-run/, 'and the remedy for the transient one');
 
     // The empty-glob message is pinned as UNDECIDABLE, and pinned because it has already regressed
     // once: a revision of this note bucketed it with the transient causes and told the reader to
-    // re-run. Measured against this repository's own binary — `--check` on a literal path that is
-    // not on disk prints exactly `[error] No files matching the pattern were found: "<path>".` and
-    // exits 2, the same sentence a mid-run deletion produces, because a path that fails `lstat`
-    // falls through as a glob and fast-glob matches nothing. `format:check` pins every one of its
-    // target paths by argv equality, so a deleted or renamed target that nobody removed from
-    // GATE_TARGETS is the likeliest producer of this message, and it is permanent. The note must
-    // therefore refuse to choose, the way `readScannedDirectory`'s missing-root message does.
+    // re-run.
     const emptyGlobAt = notes.indexOf('"No files matching the pattern were found"');
     assert.ok(
       emptyGlobAt >= 0,

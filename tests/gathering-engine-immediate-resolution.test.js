@@ -93,9 +93,6 @@ function makeEngine({
   const libraryToolsMap = new Map(libraryTools.map(tool => [tool.id, tool]));
 
   // Routed tasks resolve via the system-level routed gathering check formula.
-  // Default a routed system check (named after the task's first result group) so
-  // routed harness tasks resolve unless a test opts out by passing `null`/a custom
-  // check (or `gatheringCraftingCheck: false` to assert the no-formula path).
   const effectiveCheck =
     gatheringCraftingCheck === undefined || gatheringCraftingCheck === null
       ? (task?.resolutionMode === 'routed'
@@ -807,9 +804,8 @@ test('routed task with duplicate normalized result group names aborts before ter
 });
 
 test('routed resolution with no system roll formula reports a misconfiguration diagnostic', async () => {
-  // Directly characterize `_resolveRoutedOutcome` with a routed task whose system
-  // configures no routed roll formula: a MISSING_ROUTED_CHECK diagnostic, never a
-  // terminal success/failure.
+  // Directly characterize `_resolveRoutedOutcome` with a routed task whose system configures no
+  // routed roll formula: a MISSING_ROUTED_CHECK diagnostic, never a terminal success/failure.
   const calls = {};
   const task = routedTask();
   const engine = makeEngine({ task, gatheringCraftingCheck: false, calls });
@@ -952,12 +948,8 @@ test('GM blind terminal response may include task and result details for inspect
   }
 });
 
-// ---------------------------------------------------------------------------
-// System-level gathering check (Checks editor) formula consumption (issue 437):
-// the engine rolls the system `gatheringCraftingCheck` formula via the shared
-// checkRoll resolvers. The legacy per-task `task.check` fallback has been
-// retired; without a system roll formula progressive resolution is misconfigured.
-// ---------------------------------------------------------------------------
+// System-level gathering check (Checks editor) formula consumption (issue 437): the engine rolls
+// the system `gatheringCraftingCheck` formula via the shared checkRoll resolvers.
 
 test('progressive: system gathering check formula drives the numeric award value', async () => {
   const calls = {};
@@ -1025,9 +1017,8 @@ test('progressive: with no system formula the check is misconfigured (no legacy 
 
 test('progressive: system awardMode drives the award (per-task award mode is ignored)', async () => {
   const calls = {};
-  // value 4 covers comp-a (3) with 1 left over (< comp-b 5). 'equal' would stop
-  // after comp-a; 'partial' awards comp-b too with a remainder. The system mode
-  // ('partial') drives the award; the stale per-task 'equal' is ignored.
+  // value 4 covers comp-a (3) with 1 left over (< comp-b 5). 'equal' would stop after comp-a;
+  // 'partial' awards comp-b too with a remainder.
   const task = progressiveTask({ progressive: { awardMode: 'equal' } });
   stubRoll(4);
   try {
@@ -1149,10 +1140,8 @@ test('routed: system routed formula resolves a tier name and routes to the same-
 
 test('routed: task.dcOverride shifts the base DC for the formula tier match', async () => {
   const calls = {};
-  // Roll 18 with a per-task dcOverride of 20 misses the success tier (delta 0 →
-  // threshold 20) but lands the failure tier (delta -10 → threshold 10), so no group
-  // routes and the attempt fails. (With the default dc 15 the same roll would clear
-  // the success tier — this pins that the override shifts every threshold.)
+  // Roll 18 with a per-task dcOverride of 20 misses the success tier (delta 0 → threshold 20) but
+  // lands the failure tier (delta -10 → threshold 10), so no group routes and the attempt fails.
   const task = routedTask({
     dcOverride: 20,
     failureOutcome: { mode: 'text', text: 'No useful finds.' },
@@ -1178,16 +1167,9 @@ test('routed: task.dcOverride shifts the base DC for the formula tier match', as
 
 test('routed: a winning tier whose name matches no result group is blocked, without crashing', async () => {
   const calls = {};
-  // Roll 18 vs dc 15 wins the success tier "Iron" (delta 0 → threshold 15), but the
-  // task has no result group named "Iron" — so nothing routes and the attempt
-  // resolves safely (no provider call, no result items, no throw).
-  //
-  // This test previously pinned `accepted: true` — it was a CRASH-SAFETY test, as its
-  // name said, and the empty success it documented was the routed twin of the d100 miss
-  // in issue 1027: node and stamina spent, nothing awarded, nobody told. Since gathering
-  // routes by NAME, a tier rename on the system silently unroutes every task, so this is
-  // a content bug rather than a legitimate outcome and is now reported as such. The
-  // no-throw guarantee the test was written for is unchanged and still asserted.
+  // Roll 18 vs dc 15 wins the success tier "Iron" (delta 0 → threshold 15), but the task has no
+  // result group named "Iron" — so nothing routes and the attempt resolves safely (no provider
+  // call, no result items, no throw) (issue 1027).
   const task = routedTask({
     failureOutcome: { mode: 'text', text: 'No useful finds.' },
     resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
@@ -1253,12 +1235,8 @@ test('d100: a d100 task still resolves via the d100 path regardless of a system 
   assert.deepEqual(calls.evaluateCheck, []);
 });
 
-// ---------------------------------------------------------------------------
-// `_resolveRoutedFormulaOutcome` direct characterization (issue 424): the routed
-// system check formula is the only routed resolution path. A passing tier routes
-// by name to the matching result group; a failing or unmatched tier resolves to a
-// terminal failure; no system roll formula reports a misconfiguration diagnostic.
-// ---------------------------------------------------------------------------
+// `_resolveRoutedFormulaOutcome` direct characterization (issue 424): the routed system check
+// formula is the only routed resolution path.
 
 test('_resolveRoutedFormulaOutcome: a passing tier routes to the same-named result group', async () => {
   const task = routedTask();
@@ -1334,9 +1312,7 @@ test('_resolveRoutedFormulaOutcome: a matched failure tier resolves to a termina
 });
 
 test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group is MISCONFIGURED', async () => {
-  // Tier 'Iron' wins but the only result group is named 'Copper'. This previously
-  // asserted `succeeded` with an empty result set — the routed twin of the d100 miss in
-  // issue 1027, except that here nothing rolled badly: the content is simply unrouted.
+  // Tier 'Iron' wins but the only result group is named 'Copper' (issue 1027).
   const task = routedTask({
     resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
   });
@@ -1386,19 +1362,7 @@ test('_resolveRoutedFormulaOutcome: duplicate normalized tier-name matches are M
 });
 
 test('_resolveRoutedFormulaOutcome: a tier-step trigger moves the gathering tier and reroutes by the FINAL name', async () => {
-  // Acceptance criterion 5, "gathering routed checks step" (issue 975). Tier stepping is a
-  // per-trigger effect on the unified trigger list, so it reaches gathering through the same
-  // `routed.checkBreakage.triggers` the engine already forwards to `runFormulaRouted` —
-  // there is no gathering-specific opt-in, which is the point of retiring `natStepping`.
-  //
-  // Two tiers, two same-named result groups. A total of 5 matches 'Dust' (threshold
-  // dc-10 = 5), a FAILURE tier — the exact configuration the sibling test above pins as a
-  // terminal failure. The only difference here is one `up 1` trigger, so anything that
-  // stopped the step from applying would put this test back on that test's outcome.
-  //
-  // What it proves beyond "the step ran": gathering routes by the tier NAME, so a step
-  // changes which result group a gather produces, and with no forced outcome `success`
-  // follows the final tier — a failure tier stepped up onto a success tier succeeds.
+  // Acceptance criterion 5, "gathering routed checks step" (issue 975).
   const task = routedTask({
     resultGroups: [
       { id: 'group-dust', name: 'Dust', results: [{ id: 'result-dust', componentId: 'comp-a', quantity: 1 }] },
@@ -1451,13 +1415,7 @@ test('_resolveRoutedOutcome: no system roll formula reports a MISSING_ROUTED_CHE
   assert.equal(outcome.diagnostics[0].code, 'MISSING_ROUTED_CHECK');
 });
 
-// ---------------------------------------------------------------------------
 // Interactive roll cancel: dismissing the dialog aborts with ZERO mutation.
-// Stub `foundry.applications.api.DialogV2.wait` to resolve to a cancel so the
-// real `promptCheckRoll` returns { confirmed: false } -> the routed/progressive
-// check reports a cancelled outcome -> `_resolveImmediateAttempt` returns quietly
-// before any run creation / result / tool side effect.
-// ---------------------------------------------------------------------------
 
 function stubCancelDialog() {
   const original = globalThis.foundry;
@@ -1522,14 +1480,7 @@ test('immediate interactive cancel (progressive): dismissing the roll dialog abo
   }
 });
 
-// ---------------------------------------------------------------------------
 // A routed SUCCESS tier that matches no result group.
-//
-// Gathering routes by NAME, so this is not only an authoring omission: renaming a
-// tier on the system silently unroutes every task whose groups were named for the old
-// tier. It used to report `succeeded` with an empty result set — spending the node and
-// the stamina, awarding nothing, and telling nobody.
-// ---------------------------------------------------------------------------
 
 test('a routed success tier with NO matching result group is blocked, not a silent empty success', async () => {
   const calls = {};
@@ -1588,9 +1539,8 @@ test('an unrouted success tier consumes nothing — no run, no results, no tools
 
 test('a tier whose group EXISTS but is empty still succeeds — deliberate no-award authoring', async () => {
   const calls = {};
-  // Named for the tier, but holding no results: the GM's way of saying "this tier
-  // succeeds and awards nothing". It matches by name, so it must NOT be treated as a
-  // misconfiguration — it renders the explicit nothing-found card instead.
+  // Named for the tier, but holding no results: the GM's way of saying "this tier succeeds and
+  // awards nothing".
   const task = routedTask({
     resultGroups: [{ id: 'group-iron', name: 'Iron', results: [] }]
   });
@@ -1612,23 +1562,12 @@ test('a tier whose group EXISTS but is empty still succeeds — deliberate no-aw
   }
 });
 
-// ---------------------------------------------------------------------------
-// Progressive component complications: the gathering call site (issue 1286)
-//
-// PROGRESSIVE GATHERING SHIPS DORMANT. `_libraryTaskToRuntimeTask` hardcodes
-// `resolutionMode: 'd100'` and `GatheringEconomyView` renders both formula-rolled modes
-// disabled, pending issue 683, so `_resolveProgressiveOutcome` is unreachable from any
-// GM-selectable configuration today. An end-to-end `startAttempt` test of this would
-// therefore pass VACUOUSLY — it would assert that a d100 attempt fires nothing, which is
-// true whether or not any of this works. These drive `_resolveProgressiveOutcome` and
-// `_commitTerminalSideEffects` DIRECTLY, exactly as the other dormant seams in this file
-// are exercised, so that issue 683 flips a switch onto tested behaviour.
-// ---------------------------------------------------------------------------
+// Progressive component complications: the gathering call site (issue 1286). PROGRESSIVE GATHERING
+// SHIPS DORMANT.
 
 /**
- * An authored complication; `gmOnly` by default, so every firing produces a GM
- * request. `visibility: 'visible'` is the audience the terminal response and the
- * chat card may echo — see the redaction tests below (issue 1286).
+ * An authored complication; `gmOnly` by default, so every firing produces a GM request (issue
+ * 1286).
  */
 function gatheringComplication({
   id = 'cx',
@@ -1744,8 +1683,7 @@ test('progressive gathering (DORMANT): a committed award fires its awarded stage
 
 test('progressive gathering (DORMANT): NEGATIVE CONTROL — an invalid-cost abort fires nothing', async () => {
   // `invalidCost: 'fail'` makes gathering raise INVALID_PROGRESSIVE_DIFFICULTY, and a GM
-  // misconfiguration is not a narrative outcome — matching the crafting misconfiguration
-  // gate. The abort returns before the award, so the commit is never reached at all.
+  // misconfiguration is not a narrative outcome — matching the crafting misconfiguration gate.
   const calls = {};
   const task = progressiveTask();
   const engine = makeEngine({ task, includeProgressiveResolver: false, calls });
@@ -1773,10 +1711,7 @@ test('progressive gathering (DORMANT): NEGATIVE CONTROL — a d100 outcome never
   const writer = { calls: [], deliver(args) { this.calls.push(args); return true; } };
   engine.installComplicationDelivery({ writer });
   const system = progressiveGatheringSystem({
-    // Deliberately a complication that would match on EVERY bucket. Without the mode
-    // guard a d100 stage would classify as `unreached` — never having been "awarded" by
-    // a loop that never ran — and this would fire. That is the failure mode the control
-    // exists to catch, so a `stageAwarded`-only complication would prove nothing.
+    // Deliberately a complication that would match on EVERY bucket.
     complications: {
       'comp-a': [gatheringComplication({ when: { stageAwarded: true, stageMissed: true } })]
     }
@@ -1818,32 +1753,12 @@ test('progressive gathering (DORMANT): a THROWING delivery writer never costs th
   assert.equal(calls.createResults.length, 1, 'the gathered results were still created');
 });
 
-// ---------------------------------------------------------------------------
-// Progressive component complications: redaction and chat rendering (issue 1286)
-//
-// The tests above pin the FIRING side of the seam — the plan and the GM delivery
-// writer. These pin the other half two lanes split apart and neither could test end
-// to end on its own: `_commitTerminalSideEffects` redacts the fired list with
-// `publicComplications` BEFORE it reaches the terminal response `_terminalStart`
-// returns and the chat card `_postGatheringChatMessage` posts, and that redaction is
-// keyed on the complication's own authored `visibility`, never on the acting user's
-// role. Still DORMANT for the reason recorded above: driven directly, not through
-// `startAttempt`.
-// ---------------------------------------------------------------------------
+// Progressive component complications: redaction and chat rendering (issue 1286). The tests above
+// pin the FIRING side of the seam — the plan and the GM delivery writer.
 
 /**
- * Stub `globalThis.game` and `globalThis.ChatMessage` for the tests below, which
- * drive `_terminalStart` / `_postGatheringChatMessage` all the way to a posted chat
- * card. No test above this line needs either global: none sets `chatOutput: true`,
- * so `_postGatheringChatMessage` returns before touching them.
- *
- * `isGM` defaults to `true` DELIBERATELY (issue 1286, `_terminalStart`'s docblock,
- * `complicationPlan.js`'s `publicComplications`): the redaction below is a filter on
- * the complication's OWN authored `visibility`, never on the acting user's role. A
- * filter that read `game.user.isGM` instead — the exact leak `publicComplications`'s
- * docblock names — would still pass a test where the acting user is a player, so the
- * redaction tests below pin the correct behaviour under the adversarial condition
- * where it would actually leak: a GM running (or relaying) the attempt.
+ * Stub `globalThis.game` and `globalThis.ChatMessage` for the tests below, which drive
+ * `_terminalStart` / `_postGatheringChatMessage` all the way to a posted chat card (issue 1286).
  */
 function stubGatheringChat({ isGM = true, userId = 'gm-1' } = {}) {
   const messages = [];
@@ -1871,16 +1786,9 @@ function stubGatheringChat({ isGM = true, userId = 'gm-1' } = {}) {
 }
 
 /**
- * Drive a progressive gathering resolution all the way through
- * `_commitTerminalSideEffects` AND `_terminalStart` — the full seam from the roll to
- * the response a player reads and the chat card a player sees. `driveProgressiveGathering`
- * above stops at `_commitTerminalSideEffects`; the redaction tests below must also
- * inspect the terminal RESPONSE and the posted chat CONTENT.
- *
- * Returns `sideEffects: null, response: null` for a misconfigured outcome, mirroring
- * production: `_resolveProgressiveOutcome` returns before `_commitTerminalSideEffects`
- * is ever reached (see `resolveProgressiveAward`'s `INVALID_PROGRESSIVE_DIFFICULTY`
- * comment above).
+ * Drive a progressive gathering resolution all the way through `_commitTerminalSideEffects` AND
+ * `_terminalStart` — the full seam from the roll to the response a player reads and the chat card a
+ * player sees.
  */
 async function driveProgressiveGatheringToResponse({
   engine,
@@ -2056,13 +1964,8 @@ test('gathering chat card (issue 1286): an empty complications list is byte-iden
 });
 
 test('progressive gathering complications (issue 1286): NEGATIVE CONTROL — an invalidCost abort fires nothing even if _commitTerminalSideEffects were reached directly', async () => {
-  // `resolveProgressiveAward`'s own comment says the abort "returns before the
-  // award, so `_commitTerminalSideEffects` is never reached" — production never
-  // calls it here. This defends the SITE itself rather than trusting that comment:
-  // even handed the misconfigured outcome directly, `awardsResultsFor` refuses it
-  // (status is 'misconfigured', neither 'succeeded' nor 'failed') and the
-  // misconfigured `checkResult` carries no `resolutionMeta` for
-  // `_fireGatheringComplications` to read either way.
+  // `resolveProgressiveAward`'s own comment says the abort "returns before the award, so
+  // `_commitTerminalSideEffects` is never reached" — production never calls it here.
   const calls = {};
   const task = progressiveTask();
   const engine = makeEngine({ task, includeProgressiveResolver: false, calls });

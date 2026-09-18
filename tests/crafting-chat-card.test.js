@@ -1,13 +1,6 @@
 /**
- * Unit tests for the pure crafting chat card formatter
- * (`buildCraftingChatContent`). No Foundry globals required.
- *
- * The final section covers the SHARED fired-complications block (issue 1286), which lives
- * in `CraftingChatCard.js` and is consumed by all FOUR card builders. Its cases import the
- * other three builders too, because the two claims being made — "escaped and
- * double-quoted, whatever the definition author wrote" and "byte-identical when nothing
- * fired" — are claims about the renderer across every card that draws it, and asserting
- * them one card at a time in four suites is how three of them end up unasserted.
+ * Unit tests for the pure crafting chat card formatter (`buildCraftingChatContent`). No Foundry
+ * globals required (issue 1286).
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,11 +37,7 @@ function successModel(overrides = {}) {
   };
 }
 
-/**
- * The text inside the rendered tier-step notice, or null when no note rendered.
- * Reading the note in isolation keeps a "carries no count" assertion from being
- * satisfied (or defeated) by an unrelated quantity elsewhere in the card.
- */
+/** The text inside the rendered tier-step notice, or null when no note rendered. */
 function tierStepNoteOf(content) {
   const match = /fabricate-craft-chat__tier-step">([^<]*)</.exec(content);
   return match ? match[1] : null;
@@ -204,12 +193,9 @@ test('substitutes the realized {steps} magnitude into the localized relative not
 });
 
 test('the SHIPPED relative note strings carry {steps}, and the card substitutes into them', () => {
-  // Every other assertion here (and in `tests/salvage-chat-card.test.js`) stubs
-  // `localize` with its own COPY of the sentence, so the substitution is exercised
-  // against a fixture of the string rather than against the string. Deleting `{steps}`
-  // from `lang/en.json` would render "Stepped up tier(s)" to every player with the
-  // whole suite green. This is the one place the real value is read; it covers the
-  // salvage suite's stub too, since both card modules render these same two keys.
+  // Every other assertion here (and in `tests/salvage-chat-card.test.js`) stubs `localize` with its
+  // own COPY of the sentence, so the substitution is exercised against a fixture of the string
+  // rather than against the string.
   for (const key of ['TierStepUp', 'TierStepDown']) {
     const value = LANG.FABRICATE.Chat[key];
     assert.equal(typeof value, 'string', `FABRICATE.Chat.${key} must be a string leaf`);
@@ -279,9 +265,7 @@ test('routes every label through the localize function', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // The shared fired-complications block, across all four builders (issue 1286)
-// ---------------------------------------------------------------------------
 
 /** The four builders, keyed by the card each one draws. */
 const BUILDERS = Object.freeze({
@@ -291,13 +275,7 @@ const BUILDERS = Object.freeze({
   bulk: buildBulkSalvageChatContent,
 });
 
-/**
- * One model per builder, none of which mentions complications.
- *
- * These are the exact inputs the goldens below were captured from, against the build at
- * this branch's base commit. Keeping the pair adjacent is the whole point: a golden whose
- * model has drifted proves nothing.
- */
+/** One model per builder, none of which mentions complications. */
 const NO_COMPLICATION_MODELS = Object.freeze({
   crafting: {
     status: 'succeeded',
@@ -348,15 +326,8 @@ const NO_COMPLICATION_MODELS = Object.freeze({
 });
 
 /**
- * The markup each builder produced for the model above BEFORE the complications block
- * existed, captured from the base build under the identity localizer.
- *
- * This is the acceptance criterion "a component with no complications produces a chat card
- * string identical to the pre-change build, for all four builders", stated as the only
- * thing that can actually falsify it. A structural assertion — "the card contains no
- * complications section" — would still pass if the block had been threaded in a way that
- * moved a section, changed a class or dropped a filter, which is exactly the class of
- * regression byte-identity is being demanded against.
+ * The markup each builder produced for the model above BEFORE the complications block existed,
+ * captured from the base build under the identity localizer.
  */
 const PRE_CHANGE_CARDS = Object.freeze({
   crafting:
@@ -420,19 +391,11 @@ test('a complication with no prose and no source renders just its name', () => {
   assert.ok(!html.includes('__complication-source'), 'no empty source span');
 });
 
-// ---------------------------------------------------------------------------
 // Two firings of ONE complication, told apart by their stage position (issue 1286)
-// ---------------------------------------------------------------------------
 
 /**
- * The exact case the per-result-entry ruling created: a component staged TWICE that went
- * wrong twice. Two firings, two independently rolled consequences, and — before the stage
- * position reached the row — two byte-identical rows.
- *
- * The positions are 3 and 5, deliberately not 1 and 2. They are places in the PLAYER'S
- * ordered stage list, which counts every stage including the ones that author no
- * complication, so a 1..N renumbering of the complication rows themselves would be a
- * different number naming a row that list does not have.
+ * The exact case the per-result-entry ruling created: a component staged TWICE that went wrong
+ * twice.
  */
 const TWICE_STAGED = Object.freeze([
   {
@@ -549,14 +512,7 @@ test('the position sentence is a real shipped key, and reads as the panel number
   );
 });
 
-/**
- * Every attribute in `html` whose value is NOT double-quoted, by name.
- *
- * Hand-walked rather than regex-scanned in one pass, because the interesting input is an
- * attribute VALUE that itself contains `foo='bar'` — a naive scan reports that as an
- * unquoted attribute and the guard then fails on the very case it exists to bless. After
- * a `name=` this skips to the closing double quote before looking for the next attribute.
- */
+/** Every attribute in `html` whose value is NOT double-quoted, by name. */
 function unquotedAttributes(html) {
   const offenders = [];
   for (const [, tag] of html.matchAll(/<([a-zA-Z][^>]*)>/g)) {
@@ -587,12 +543,7 @@ test('unquotedAttributes actually reports a single-quoted attribute', () => {
   assert.deepEqual(unquotedAttributes(`<li class="x" data-y="a='b'"></li>`), []);
 });
 
-/**
- * A complication authored by someone hostile. Fabricate imports third-party crafting
- * systems, so this is the threat model rather than a typo: the definition arrives as data
- * and a `visible` complication puts its `name` and free-prose `description` on a card
- * every player at the table renders.
- */
+/** A complication authored by someone hostile. */
 const HOSTILE = Object.freeze([
   {
     name: '<img src=x onerror=alert(1)>',
@@ -613,8 +564,7 @@ for (const card of Object.keys(BUILDERS)) {
     assert.ok(html.includes('&amp;'), 'the ampersand in the prose is escaped');
 
     // `esc` deliberately does not escape `'` — it never has — so the single quote survives
-    // verbatim. That is SAFE only because every attribute the block writes is
-    // double-quoted, which is what the scan below establishes rather than assumes.
+    // verbatim.
     assert.ok(html.includes(`it's a trap`), 'a single quote in prose is left alone');
     assert.ok(
       html.includes(`data-fabricate-complication-severity="minor' onmouseover='alert(1)"`),
@@ -624,41 +574,19 @@ for (const card of Object.keys(BUILDERS)) {
   });
 }
 
-// ---------------------------------------------------------------------------
 // The fired-complications block, RENDERED (issue 1286)
-// ---------------------------------------------------------------------------
 
-/*
- * WHY THIS IS A BROWSER GATE AND NOT A STRING ASSERTION.
- *
- * Every test above establishes that the description is in the MARKUP, and the description
- * was in the markup while being invisible on screen. The block emits its complication row
- * as one `__label` inside the shared `__item`, and that label is
- * `overflow: hidden; text-overflow: ellipsis; white-space: nowrap` inside a grid whose
- * tracks are `minmax(140px, 1fr)`. In a chat sidebar that renders the name, the component
- * and the whole free-prose description as a single ellipsed line, clipped partway through
- * the NAME — so the one piece of player-facing output this feature exists to produce never
- * reached a player, and no assertion about `html.includes(...)` could ever say so.
- *
- * `happy-dom` cannot see it either: it computes no cascade, so the label's overflow, the
- * grid's track sizing and the item's width are all absent there. It takes an engine.
- *
- * WHAT KEEPS IT FROM GOING VACUOUS. Each case renders the SAME markup twice in the SAME
- * page: once as shipped, and once with the `--complication` modifier stripped from the
- * `<li>`'s class list, which is exactly the pre-fix rendering. The stripped copy is asserted
- * to BE clipped. Without that, a gate measuring a card at some width where nothing overflows
- * would pass whether or not the rules exist.
+/**
+ * WHY THIS IS A BROWSER GATE AND NOT A STRING ASSERTION. Every test above establishes that the
+ * description is in the MARKUP, and the description was in the markup while being invisible on
+ * screen.
  */
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FABRICATE_CSS = readFileSync(resolve(REPO_ROOT, 'styles/fabricate.css'), 'utf8');
 const FOUNDRY_CSS = readFileSync(resolve(REPO_ROOT, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 
-/**
- * A description of the length the feature is FOR. The authored placeholder in the editor is
- * itself 46 characters, and a complication's prose is the sentence a GM writes for the table
- * to hear, so a one-word description would measure a case that never occurs.
- */
+/** A description of the length the feature is FOR. */
 const LONG_FIRED = Object.freeze([
   {
     name: 'Choking Dust Cloud',
@@ -686,10 +614,6 @@ after(async () => {
 /**
  * Strip the `--complication` element modifier from every complication `<li>`.
  *
- * This is the NEGATIVE CONTROL's subject and it is produced from the shipped markup rather
- * than hand-written, so the control cannot drift away from the thing it controls for: the
- * only difference between the two copies on the page is the class the new rules hang on.
- *
  * @param {string} html A rendered card.
  * @returns {string} The same card with the modifier removed.
  */
@@ -700,12 +624,6 @@ function withoutComplicationModifier(html) {
 /**
  * Measure one complication row in a real engine.
  *
- * `clipped` is read two ways because the two failures are different: a label whose content
- * is wider than its own box (`scrollWidth`) is text the ellipsis ate, and a description box
- * that starts beyond the label's right edge is a run pushed entirely off-screen. The
- * pre-fix rendering does both; asserting only one would pass a partial fix.
- *
- * @param {import('playwright').Page} page
  * @param {string} root The card container's id.
  * @param {string} block The BEM block the card draws.
  * @returns {Promise<object>} The measurements this gate asserts on.
@@ -786,27 +704,11 @@ for (const [card, block] of [
   });
 }
 
-/*
- * The other half of the same claim, and the reason the rules could be added at all: they
- * are reachable ONLY through classes a card without a fired complication never emits. The
- * goldens above already pin the string; this pins the STYLESHEET, which the goldens cannot
- * see. A rule that named `__item` or `__label` alone would move every card in every world.
- */
 /**
- * The GM-only card's row, measured at chat width (issue 1286).
- *
- * ITS OWN GATE, because its failure mode is not the player row's. The player row overflowed;
- * the GM row COLLAPSED. It hung its notes off the `<li>` as siblings of `__label`, and `__item`
- * is `display: flex` in row direction, so each note became a flex track a few characters wide
- * inside a `minmax(140px, 1fr)` grid cell — the live card drew the three-letter severity
- * `Major` as `M o r` down three lines, beside two more slivers. Nothing in the markup says so
- * and nothing in `happy-dom` can see it: it takes a cascade and an engine.
- *
- * THE NEGATIVE CONTROL is the `--gm` block modifier, stripped from the same rendered card on
- * the same page. Every rule the GM row adds is reached through that modifier — which is also
- * what keeps the player row byte-identical — so the stripped copy is the card with those rules
- * and only those rules removed.
+ * The other half of the same claim, and the reason the rules could be added at all: they are
+ * reachable ONLY through classes a card without a fired complication never emits.
  */
+/** The GM-only card's row, measured at chat width (issue 1286). */
 const GM_ROW = Object.freeze({
   name: 'The gland ruptures',
   description:
@@ -842,9 +744,7 @@ function measureGmComplication(page, rootId) {
     const severityBox = severity.getBoundingClientRect();
     return {
       sectionCount: sections.length,
-      // A STACK: every run starts at or below the bottom of the one before it. This is the
-      // claim, and it is false for every inline rendering — including the one the `--gm`
-      // rules were added to replace.
+      // A STACK: every run starts at or below the bottom of the one before it.
       stacked: runs.every((box, index) => index === 0 || box.top >= runs[index - 1].bottom - 1),
       // And INSIDE a section: the heading is its own line above its facts, not a bold word
       // run into the sentence after it.
@@ -895,9 +795,8 @@ test('the GM complication row STACKS its sections at chat width', async () => {
     const unstyled = await measureGmComplication(page, 'unstyled');
 
     assert.equal(shipped.sectionCount, 2, 'why it fired, and what happens');
-    // THE CONTROL. Without the `--gm` rules every run is an inline span, so the identity
-    // lines share lines with each other and each heading runs into its own facts. That is
-    // what makes each assertion below a measurement rather than a tautology.
+    // THE CONTROL. Without the `--gm` rules every run is an inline span, so the identity lines
+    // share lines with each other and each heading runs into its own facts.
     assert.ok(
       !unstyled.stacked,
       'the control runs the row together on shared lines'
@@ -930,9 +829,8 @@ test('the GM complication row STACKS its sections at chat width', async () => {
 });
 
 test('the stage-position span is de-emphasised on the same rule as the component it follows', () => {
-  // The class ships with the markup or the number shouts on exactly the rows that already
-  // repeat, which is the opposite of the job it was added for. It shares the source's rule
-  // rather than getting one of its own because it is context of the same kind.
+  // The class ships with the markup or the number shouts on exactly the rows that already repeat,
+  // which is the opposite of the job it was added for.
   const rule = FABRICATE_CSS.replaceAll(/\/\*[\s\S]*?\*\//g, '')
     .split('}')
     .map((chunk) => chunk.trim())

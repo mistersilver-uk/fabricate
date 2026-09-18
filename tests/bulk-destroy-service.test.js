@@ -1,21 +1,6 @@
 /**
- * `BulkDestroyService` — permanently deletes the selected components' WHOLE STACKS on
- * one actor (issue 859).
- *
- * Two hazards drive most of this file, and both are core behaviours rather than
- * Fabricate ones:
- *
- * 1. `deleteEmbeddedDocuments` is ALL-OR-NOTHING on a stale id.
- *    `#preDeleteDocumentArray` resolves every id with `collection.get(id, {strict:true})`,
- *    which THROWS on the first one it cannot find — so one id that went away between the
- *    panel snapshot and the confirm click deletes NOTHING, not even the twenty valid ids
- *    beside it.
- * 2. A `preDeleteItem` hook returning `false` drops INDIVIDUAL ids silently while the
- *    rest of the batch deletes, so a count taken from the REQUEST would tell the player
- *    it destroyed something still in their pack.
- *
- * Stale and vetoed are therefore two different stories, tracked separately, and this
- * suite pins the distinction rather than only the totals.
+ * `BulkDestroyService` — permanently deletes the selected components' WHOLE STACKS on one actor
+ * (issue 859).
  */
 
 import { describe, it } from 'node:test';
@@ -137,9 +122,8 @@ describe('BulkDestroyService.run: stale ids are filtered BEFORE the call', () =>
   });
 
   it('submits everything when the actor exposes NO live collection lookup', async () => {
-    // A defence must not be able to cause the failure it defends against: filtering
-    // against an absent `items.has` would drop every id and zero a run that would
-    // otherwise have succeeded.
+    // A defence must not be able to cause the failure it defends against: filtering against an
+    // absent `items.has` would drop every id and zero a run that would otherwise have succeeded.
     const items = [ownedItem('i1', 'Iron Ore', 3)];
     const { actor, deleteItems, deleteCalls } = deleteCapableActor({
       items,
@@ -230,9 +214,8 @@ describe('BulkDestroyService.run: unitsDeleted comes from what the delete RETURN
   });
 
   it('keeps vetoed and stale apart in ONE row that has both', async () => {
-    // The single most confusable pair. A stale id was never submitted — nothing to tell
-    // the player beyond "the panel was out of date". A vetoed id WAS submitted and
-    // refused, so that row is still in their pack and is the one they need to see.
+    // The single most confusable pair. A stale id was never submitted — nothing to tell the player
+    // beyond "the panel was out of date".
     const captured = [
       ownedItem('i1', 'Iron Ore', 4),
       ownedItem('vetoed', 'Iron Ore', 6),
@@ -449,8 +432,7 @@ describe('BulkDestroyService.run: target-actor scoping', () => {
   });
 
   it('is sequential, so row k+1 sees what row k deleted', async () => {
-    // Two rows can resolve to the same owned document — the same reason bulk salvage is
-    // sequential.
+    // Two rows can resolve to the same owned document — the same reason bulk salvage is sequential.
     const shared = ownedItem('i1', 'Iron Ore', 4);
     const { actor, deleteItems, held } = deleteCapableActor({ items: [shared] });
     const service = makeService({
@@ -474,9 +456,8 @@ describe('BulkDestroyService.run: target-actor scoping', () => {
 
 describe('BulkDestroyService.run: progress over an IRREVERSIBLE queue', () => {
   it('ticks once per target, in order, a REFUSED row included', async () => {
-    // Every target ticks, a refusal included: `_destroyOne` resolves each one, and the
-    // panel is marking the rows the player CONFIRMED. A counter that skipped the refused
-    // row would mark the wrong rows done and stop at `1 of 2` for a queue that finished.
+    // Every target ticks, a refusal included: `_destroyOne` resolves each one, and the panel is
+    // marking the rows the player CONFIRMED.
     const items = [ownedItem('i1', 'Iron Ore', 4)];
     const { actor, deleteItems } = deleteCapableActor({ items });
     const service = makeService({ findComponentItems: () => items, deleteItems });
@@ -499,11 +480,9 @@ describe('BulkDestroyService.run: progress over an IRREVERSIBLE queue', () => {
   });
 
   it('a THROWING listener never abandons a half-destroyed queue', async (t) => {
-    // Destroy is IRREVERSIBLE, and the loop is already mid-flight when the first tick
-    // fires, so a consumer's broken callback must never cost the rest of the queue — that
-    // would leave the player with a half-destroyed selection and a report that no longer
-    // describes their pack. EVERY tick throws, because the guard has to hold per call
-    // rather than once.
+    // Destroy is IRREVERSIBLE, and the loop is already mid-flight when the first tick fires, so a
+    // consumer's broken callback must never cost the rest of the queue — that would leave the
+    // player with a half-destroyed selection and a report that no longer describes their pack.
     const original = console.error;
     const logged = [];
     console.error = (...args) => logged.push(args.map(String).join(' '));

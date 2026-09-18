@@ -1,39 +1,6 @@
 /**
- * The two POOLED ALLOCATION policies, and the proof that crafting still runs on one of
- * them (issue 1342, phase 1).
- *
- * `src/systems/pooledAllocation.js` names two rules that were emergent before it:
- *
- * - **pooled order** — caller's actor order, then each actor's own item order. It is a
- *   policy rather than a detail because the drain is first-fit, so the order decides
- *   which documents are destroyed.
- * - **first-fit drain** — take `Math.min(available, remaining)` from each candidate in
- *   order, stop at the first item that is not needed.
- *
- * ## The equivalence pin is the point of this file
- *
- * `CraftingEngine._consumeComponentItems` is a salvage consume: it deletes and decrements
- * real inventory. The extraction is only allowed to be invisible, so the last describe
- * block below pins it two ways, because either alone can be fooled:
- *
- * - **behaviourally**, against an ORACLE — a literal transcription of the loop as it
- *   stood before the extraction — over a matrix of stack shapes, comparing the returned
- *   consumption records AND the exact ordered write log (delete vs update, and the update
- *   payload) document by document. This is what goes red if the call is ALTERED.
- * - **structurally**, on the method's own source text. A behavioural pin alone cannot see
- *   the call being REMOVED, because re-inlining the loop is by definition still
- *   equivalent — and an inlined copy is exactly the drift the extraction exists to
- *   prevent, since the pooled companion consume must drain the same way this does.
- *
- * Both arms were mutation-proved: re-inlining the legacy loop fails the structural arm,
- * and perturbing the call's arguments fails the behavioural arm.
- *
- * ## Fixture note
- *
- * Capacity is read with `readStackQuantity`, whose contract is "a present item is at
- * least one": an absent, unreadable or stored-`0` stack reads as `1`. The cases below
- * assert that directly, because it is the difference between decrementing a stack and
- * DELETING the document.
+ * The two POOLED ALLOCATION policies, and the proof that crafting still runs on one of them (issue
+ * 1342, phase 1).
  */
 
 import assert from 'node:assert/strict';
@@ -274,11 +241,8 @@ describe('first-fit drain', () => {
   });
 
   it('pays from one document ONCE, however many times the candidate list names it', () => {
-    // A repeat is planned as though it were two stacks: the plan writes nothing, so the second
-    // take re-reads the SAME `available` off the same unwritten document. The result is a plan
-    // reporting `satisfied` for a quantity the pool does not hold — and a caller that writes it
-    // reduces the stack, then deletes it, while publishing the larger figure. Nothing fails, so
-    // no rollback runs.
+    // A repeat is planned as though it were two stacks: the plan writes nothing, so the second take
+    // re-reads the SAME `available` off the same unwritten document.
     const item = itemFake('hide', 5);
 
     const plan = planFirstFitDrain([item, item], 8);

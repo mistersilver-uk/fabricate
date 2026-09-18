@@ -1,12 +1,6 @@
 /**
- * Guard: every `FABRICATE.App.Alchemy.*` localization key the player Alchemy UI
- * references must resolve in `lang/en.json`.
- *
- * Regression: the player strings were originally added under the legacy
- * `FABRICATE.Alchemy.*` block while the components localize `FABRICATE.App.Alchemy.*`
- * (the player-app convention, matching App.Crafting / App.Gathering / …), so the
- * whole tab rendered raw key paths. The mounted test stubs `localize` and the smoke
- * harness never asserts key resolution, so nothing caught it — this test does.
+ * Guard: every `FABRICATE.App.Alchemy.*` localization key the player Alchemy UI references must
+ * resolve in `lang/en.json`.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

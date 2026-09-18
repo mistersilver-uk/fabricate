@@ -27,16 +27,6 @@ const CATALOGUE_ICON_COUNT = 1420;
 
 // EVERY claim below, positive and negative, is made against MEMBERSHIP rather than against the
 // exclusion predicate.
-//
-// That is stronger than it used to be, and deliberately. `isExcludedIconName` answers "does any
-// exclusion pattern match this string": it consults no catalogue, so it says `false` of a typo and
-// of a name Foundry cannot render. Asserting it in the positive direction would pass while the icon
-// was absent from every picker in the module, and generating the catalogue from Foundry's bundle
-// widens that gap rather than closing it, because the predicate is now the only thing between a
-// typo and a curated entry across every name the catalogue carries.
-//
-// `findCuratedIcon` answers from the catalogue in both directions, and it resolves ALIASES, which
-// is the only honest way to ask the question of a vocabulary that offers one name per glyph.
 function assertCurated(iconNames) {
   for (const iconName of iconNames) {
     assert.ok(findCuratedIcon(iconName), `Expected "${iconName}" to be in the curated vocabulary`);
@@ -44,11 +34,7 @@ function assertCurated(iconNames) {
 }
 
 // A negative assertion is satisfied by ABSENCE, so a name the catalogue does not carry passes this
-// helper without exercising the rule its test is named for. That is not hypothetical: narrowing the
-// catalogue to the names Font Awesome publishes for free removed 62% of it in one step, and any
-// future narrowing can do the same again silently. So every name is required to be a glyph the
-// catalogue really carries BEFORE its exclusion is asserted — a name that is merely unnameable
-// belongs in the Pro-only test above, which asserts absence deliberately.
+// helper without exercising the rule its test is named for.
 function assertNotCurated(iconNames, description) {
   for (const iconName of iconNames) {
     assert.ok(
@@ -90,11 +76,7 @@ describe('essence colour tokens (issue 917)', () => {
 });
 
 describe('the catalogue Foundry can actually render', () => {
-  // The catalogue is TWO measurements, and it is worth nothing unless both are true of it. The
-  // glyphs and their aliases come from the bundle a Foundry client loads, which the predecessor of
-  // this file got wrong by reading published free metadata for a different font. The NAMES are
-  // then narrowed to the ones Font Awesome publishes for free, which is a licensing requirement
-  // rather than a preference — see the header of foundryIconCatalogue.js.
+  // The catalogue is TWO measurements, and it is worth nothing unless both are true of it.
   it('is measured from the bundle Foundry ships and narrowed to the free release', () => {
     assert.equal(FOUNDRY_ICON_BUNDLE_RELEASE.edition, 'Pro');
     assert.equal(FOUNDRY_ICON_BUNDLE_RELEASE.version, '7.2.0');
@@ -104,14 +86,7 @@ describe('the catalogue Foundry can actually render', () => {
   });
 
   // `candle-holder` is the worked example, and it runs the other way round from the way this file
-  // used to read it. Foundry renders it, a companion module offers it, and Fabricate declines it:
-  // Foundry's own bundled licence forbids a third-party package developer from having Pro icons
-  // "used, re-packaged, or referenced in code", and an icon code in a catalogue is a reference in
-  // code. Every name below is one Foundry can draw and Fabricate may not write.
-  //
-  // Asserted against the CATALOGUE, not only the curated set: these are absent because they are
-  // unnameable, not because a curation rule held them out, and a test that only checked curation
-  // would keep passing if they came back as uncurated catalogue rows.
+  // used to read it.
   it('declines the Pro-only names Foundry can render but Fabricate may not reference', () => {
     for (const iconName of [
       'candle-holder', 'cauldron', 'raygun', 'starship', 'treasure-chest', 'scythe',
@@ -130,8 +105,7 @@ describe('the catalogue Foundry can actually render', () => {
   });
 
   // `Object.freeze` is shallow, and the curated vocabulary is a FILTER of this array, so its
-  // entries are these entries. An unfrozen entry hands any caller a writable handle on a row every
-  // Fabricate picker renders from, in both sets at once, with nothing to trace it to.
+  // entries are these entries.
   it('freezes every entry, not just the array holding them', () => {
     const [entry] = FOUNDRY_ICON_DEFINITIONS;
     assert.ok(Object.isFrozen(FOUNDRY_ICON_DEFINITIONS));
@@ -139,9 +113,7 @@ describe('the catalogue Foundry can actually render', () => {
     assert.ok(Object.isFrozen(entry.aliases), 'an entry alias list must be frozen too');
   });
 
-  // Aliases are why offering one name per glyph refuses no name. They are also why the exclusions
-  // are sound: an exclusion describes what a glyph DEPICTS, and a depiction cannot be dodged by
-  // spelling.
+  // Aliases are why offering one name per glyph refuses no name.
   it('records every name the bundle gives a glyph, and resolves each of them', () => {
     const gear = findCuratedIcon('gear');
     assert.ok(gear);
@@ -181,9 +153,7 @@ describe('essenceIcons utility', () => {
   });
 
   // The membership IS this module's product, and it is what the icon-vocabulary API publishes, so
-  // the size is pinned EXACTLY rather than to a band. A band wide enough to hold the pre-widening
-  // 510 and the post-widening 750 is a band a pattern edit can move two hundred icons inside
-  // without failing anything.
+  // the size is pinned EXACTLY rather than to a band.
   it('pins the curated vocabulary to an exact size', () => {
     const curatedCount = FOUNDRY_CURATED_ICON_DEFINITIONS.length;
 
@@ -240,19 +210,7 @@ describe('essenceIcons utility', () => {
   });
 
   // THE NO-REGRESSION CONTRACT. A companion module hand-maintains its own icon list and is going to
-  // bind to this vocabulary. Seventeen of the icons its list offers were missing from the
-  // pre-widening curated set; these are the SIXTEEN of them Fabricate can now offer, every one
-  // held out before by rules drawn for "fantasy alone" and admitted now by rules that predict
-  // them. A syringe is a med-bay, a stopwatch times a training montage, a dumbbell IS the training
-  // montage, a checkered flag ends a race, and a blighted ear of wheat is the oldest fantasy plot
-  // there is. None of them is here by name on an allow-list.
-  //
-  // The seventeenth was `candle-holder`, and it is deliberately NOT here. It is a Pro-only name:
-  // Foundry draws it, and offering it would mean Fabricate referencing a Pro icon in code, which
-  // the licence Foundry ships with its own bundle forbids a third-party package developer from
-  // doing. The companion may keep offering it — it is not bound by what Fabricate can write down —
-  // so this contract is sixteen icons wide, not seventeen, and the gap is a licence rather than a
-  // regression.
+  // bind to this vocabulary. The seventeenth was `candle-holder`, and it is deliberately NOT here.
   it('carries every icon a companion offered that Fabricate is free to name', () => {
     assertCurated([
       'hand-sparkles', 'virus', 'prescription-bottle', 'pills', 'capsules', 'syringe', 'lungs',
@@ -273,9 +231,7 @@ describe('essenceIcons utility', () => {
     assertNotCurated(singleCharacters, 'Single character');
     // `comma`, `period`, `semicolon`, `apostrophe`, `tilde`, `pipe`, `accent-grave` and
     // `brackets-curly` used to stand here and are all Pro-only names, so the catalogue no longer
-    // carries anything for those assertions to be about. These are the free members of the same
-    // two patterns; the bracket family has none left, and that pattern is retained for the reason
-    // foundryIconVocabulary.js gives rather than because anything here still exercises it.
+    // carries anything for those assertions to be about.
     assertNotCurated(['at', 'hashtag', 'slash', 'quote-left', 'quote-right'], 'Punctuation mark');
     assertNotCurated(
       ['divide', 'equals', 'percent', 'plus-minus', 'not-equal'],
@@ -298,9 +254,7 @@ describe('essenceIcons utility', () => {
     ], 'Currency icon');
   });
 
-  // Treasure is not a currency sign. A coin, a sack of gold and a merchant's shop belong to every
-  // fiction that has ever had a market in it, and excluding them was the defect that pushed a
-  // companion module into keeping a rival list in the first place.
+  // Treasure is not a currency sign.
   it('admits treasure, trade and the pre-modern market', () => {
     assertCurated([
       'coins', 'sack-dollar', 'sack-xmark', 'shop', 'store', 'warehouse',
@@ -339,8 +293,7 @@ describe('essenceIcons utility', () => {
   });
 
   // The line the affordance rule draws, and it is a real one. A rack of servers, a stack of discs,
-  // a chip, a satellite dish and a laptop are DEPICTED OBJECTS. A console prompt and a square-wave
-  // chart are not: one is a software affordance, the other is literally a chart type.
+  // a chip, a satellite dish and a laptop are DEPICTED OBJECTS.
   it('admits depicted machines while excluding the console prompt and the chart', () => {
     assertCurated([
       'rocket', 'shuttle-space', 'jet-fighter', 'helicopter', 'user-astronaut',
@@ -363,11 +316,7 @@ describe('essenceIcons utility', () => {
   });
 
   // Font Awesome draws several glyphs as a ladder: five battery fills, nine temperature entries,
-  // four gauges, twenty-four clock faces. The picker shows seven or eight rows at a time and
-  // generates each label from the icon code, so a ladder spends viewports repeating one idea. One
-  // member per idea is curated — the clearest glyph for it, which need not be the bare code — plus
-  // any member that means something DIFFERENT; the steps between them, the rotations, the status
-  // badges and the scenery variants are not.
+  // four gauges, twenty-four clock faces.
   it('excludes redundant variants of a glyph the vocabulary already carries', () => {
     assertNotCurated([
       'battery-quarter', 'battery-half', 'battery-three-quarters',
@@ -390,17 +339,13 @@ describe('essenceIcons utility', () => {
     ]);
   });
 
-  // A `-slash` is not a fill level. A crossed-out droplet means "no water", which is a different
-  // statement from "water", and fiction says both — which is why the redundancy rule catches fill
-  // levels, needle positions, rotations and status badges and stops there.
+  // A `-slash` is not a fill level.
   it('keeps a crossed-out glyph, because "no water" is not less water', () => {
     assertCurated(['droplet-slash', 'user-slash', 'eye-slash', 'bell-slash']);
   });
 
   // A tick on a circle is a control saying "done"; a warning on an ear of wheat is a blighted crop
-  // and a cross on a road is a road nobody is getting down. The badge is the point of the drawing
-  // rather than a status light stuck on it, which is the line that keeps the crop failure in while
-  // the shape badges go.
+  // and a cross on a road is a road nobody is getting down.
   it('keeps a badge on a depicted object while excluding one stuck on a shape', () => {
     assertCurated(['wheat-awn-circle-exclamation', 'road-circle-xmark', 'plane-circle-exclamation']);
     assertNotCurated(['circle-check', 'square-xmark', 'circle-exclamation'], 'Shape badge');
@@ -421,10 +366,7 @@ describe('essenceIcons utility', () => {
     ], 'Relief-operation icon');
   });
 
-  // The corollary of scoping that rule by subject. A glyph Font Awesome shipped in the same release
-  // is curated whenever it depicts an ordinary object or action a character handles — including a
-  // blighted ear of wheat, which this list used to catch and no longer does, because a harvest
-  // failing is a story rather than an operation and the category's own wording never predicted it.
+  // The corollary of scoping that rule by subject.
   it('admits the ordinary objects that shipped alongside the relief pictograms', () => {
     assertCurated([
       'boxes-packing', 'people-carry-box', 'fire-burner', 'kitchen-set',
@@ -443,9 +385,7 @@ describe('essenceIcons utility', () => {
     ], 'Cause symbol');
   });
 
-  // The gender block used to take the planetary symbols with it. Mars is iron and Venus is copper:
-  // they are alchemical signs, which is Fabricate's own subject, and the widened rule keeps them
-  // while the identity-category symbols above still go.
+  // The gender block used to take the planetary symbols with it.
   it('admits the planetary and alchemical signs the gender block used to sweep up', () => {
     assertCurated(['mars', 'venus', 'mercury']);
   });
@@ -464,8 +404,7 @@ describe('essenceIcons utility', () => {
   });
 
   // The widening in one test. Every one of these was held out as "present-day clinical or domestic
-  // furniture no fiction is reaching for". General fiction reaches for all of them and science
-  // fiction reaches for the med-bay twice, so the blocks that held them are gone, not trimmed.
+  // furniture no fiction is reaching for".
   it('admits the med-bay, the kitchen and the training montage the old rule held out', () => {
     assertCurated([
       'stethoscope', 'x-ray', 'kit-medical', 'suitcase-medical', 'bandage', 'user-injured',
@@ -486,22 +425,14 @@ describe('essenceIcons utility', () => {
     ]);
   });
 
-  // Modern arms are curated, and this is a decision rather than an omission. Fabricate's subject is
-  // any fiction, so a modern or post-apocalyptic game needs a firearm, a set of restraints and a
-  // mine as much as a fantasy one needs an axe.
+  // Modern arms are curated, and this is a decision rather than an omission.
   it('admits modern arms while excluding the arrows that mean "go that way"', () => {
     assertCurated(['gun', 'handcuffs', 'land-mine-on', 'bomb', 'explosion']);
     assertNotCurated(['arrow-right', 'arrow-up-long'], 'Directional arrow');
   });
 
   // The other half of that rule, and the ONE place in this file where the predicate is the honest
-  // question rather than membership. `/^arrows?-(?!archery)/` sweeps some nine hundred directional
-  // arrows out and pulls one back, because `arrow-archery` draws a projectile rather than a
-  // direction. Both `arrow-archery` and `bow-arrow` are Pro-only names, so Fabricate may not offer
-  // either however well they fit, and there is no catalogue entry left to ask about — asserting
-  // membership here would be asserting the licence, which the catalogue's own guard already does.
-  // The lookahead is still what the rule turns on, and it is still guarded, so that promoting the
-  // icon into the free set is all it would take to get it back.
+  // question rather than membership.
   it('keeps the projectile carve-out alive, though no free name exercises it', () => {
     assert.equal(
       isExcludedIconName('arrow-archery'),
@@ -514,8 +445,7 @@ describe('essenceIcons utility', () => {
 
   // hand-spock and spaghetti-monster-flying are the two the "institution or cause" exclusion looks
   // like it should catch — one names a Star Trek trademark in its own icon code, the other is a
-  // real-world parody religion. They are curated anyway, because what stays out is a glyph whose
-  // SUBJECT is the institution, not a gesture or a symbol a fiction is free to reuse.
+  // real-world parody religion.
   it('admits scholarship, renown, and eldritch icons', () => {
     assertCurated([
       'user-clock', 'user-graduate', 'graduation-cap',

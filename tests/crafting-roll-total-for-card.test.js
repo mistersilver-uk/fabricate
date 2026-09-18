@@ -1,10 +1,6 @@
 /**
- * Unit tests for `rollTotalForCard` — the helper that picks the RAW rolled total
- * threaded onto crafting/salvage result chat cards (issue 688).
- *
- * The key case: a progressive check's `value` is the AWARDING value, which a forced
- * crit overwrites (`MAX_SAFE_INTEGER`/`0`), while `data.total` keeps the raw roll.
- * The card must show the raw roll, not the awarding sentinel.
+ * Unit tests for `rollTotalForCard` — the helper that picks the RAW rolled total threaded onto
+ * crafting/salvage result chat cards (issue 688).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

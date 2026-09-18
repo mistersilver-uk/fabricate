@@ -1,24 +1,4 @@
-/**
- * The invalidation-domain taxonomy (issue 1078 part B1, under #1070).
- *
- * ## What this file is for, and what it deliberately does NOT assert
- *
- * `DOMAIN_CONSUMERS` is the one AUTHORED mapping and `STORE_DOMAINS` is its transpose, computed
- * at load time. Asserting the transpose here would be `f(x) === f(x)` — the test would apply the
- * same operation the module applies and could not fail. So the store expectations below are
- * written out LITERALLY, from the approved taxonomy table, and the derived constant's real
- * falsifier is the mounted shell test in `tests/components/fabricate-app-root-mounted.test.js`,
- * which compares it against the shell's actual subscription behaviour.
- *
- * ## The completeness gate runs in BOTH directions
- *
- * Only checking that every PRODUCED key is classified lets a phantom row survive forever; only
- * checking that every CLASSIFIED key is produced lets a new field fall silently to the
- * every-domain fail-safe, which is safe but is also the over-broad invalidation this issue
- * exists to remove. Both directions run against the real projections — `_normalizeSystem`'s
- * return keys and `Recipe#toJSON`'s emitted keys plus the ones it omits when they are default —
- * so neither can go stale against a hand-written list.
- */
+/** The invalidation-domain taxonomy (issue 1078 part B1, under #1070). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -87,10 +67,8 @@ const APPROVED_STORE_DOMAINS = {
   ],
   // FIVE of seven. `materials-and-yield` and `resolution-config` are not there for anything the
   // gathering surfaces render: the listing runs the system-validity gate, which hides a whole
-  // system's environments from non-GM viewers on a missing routed/progressive/alchemy check
-  // formula or an alchemy signature collision. Excluding them left a GM authoring the fix while
-  // every player's Gathering tab kept hiding the system — with a well-formed, correctly
-  // attributed payload, so no fail-safe could catch it.
+  // system's environments from non-GM viewers on a missing routed/progressive/alchemy check formula
+  // or an alchemy signature collision.
   gathering: [
     'labelling',
     'materials-and-yield',
@@ -100,21 +78,7 @@ const APPROVED_STORE_DOMAINS = {
   ],
 };
 
-/**
- * The APPROVED field classifications, restated field by field.
- *
- * These exist because the completeness gate below is PRESENCE-ONLY — it asserts that every
- * produced key is classified, that no row is a phantom, and that each row is a non-empty subset
- * of the seven. None of that looks at the VALUES, and the hole is not theoretical: rewriting
- * every row that is exactly `[RESOLUTION_CONFIG]` to `[NARRATIVE]` — 17 substitutions — left the
- * whole suite green, including the mounted shell, while a GM changing a crafting check silently
- * stopped rebuilding the run journal on every client. That is the correctness direction, and it
- * is the same defect class as a wrong row in the store table one layer up.
- *
- * So the values are restated here, literally, exactly as `APPROVED_STORE_DOMAINS` is. Deriving
- * the expectation from the shipped constant would make this assertion unfailable; the cost of a
- * literal is that a deliberate reclassification is a diff in two places, which is the point.
- */
+/** The APPROVED field classifications, restated field by field. */
 const APPROVED_SYSTEM_FIELD_DOMAINS = {
   id: [...ALL_INVALIDATION_DOMAINS],
   name: ['labelling'],
@@ -180,15 +144,7 @@ const APPROVED_RECIPE_FIELD_DOMAINS = {
   teaser: ['access-and-knowledge'],
 };
 
-/**
- * Every top-level key `_normalizeSystem` actually emits.
- *
- * `toolBreakage` is AUTHORED in the input rather than left absent (issue 1363): since `1.30.0`
- * that normalizer is absence-preserving and emits no key for an unauthored authority, so
- * normalizing a bare `{}` would report a real, classified, still-producible field as PHANTOM.
- * Authoring it keeps this helper's contract — "every key a persisted system can carry" — while
- * still failing on a row for a field nothing can emit.
- */
+/** Every top-level key `_normalizeSystem` actually emits (issue 1363). */
 function producedSystemKeys() {
   const manager = new CraftingSystemManager(new RecipeManager({}));
   return new Set(Object.keys(manager._normalizeSystem({ toolBreakage: { authority: 'checkDriven' } })));
@@ -321,8 +277,7 @@ describe('the field -> domain completeness gate, in both directions', () => {
 
   it('states the MIRRORED-field rule rather than five ad-hoc rows', () => {
     // `enableTags` / `enableEssences` / `enableCategories` / `enableMultiStepRecipes` are
-    // transitional aliases of `features`, and `essences` of `essenceDefinitions`. A rule keeps a
-    // sixth alias inheriting its host's classification instead of falling to the fail-safe.
+    // transitional aliases of `features`, and `essences` of `essenceDefinitions`.
     for (const [alias, host] of Object.entries(MIRRORED_SYSTEM_FIELDS)) {
       assert.ok(SYSTEM_FIELD_DOMAINS[host], `${alias} mirrors ${host}, which must be classified`);
       assert.deepEqual(
@@ -391,12 +346,11 @@ describe('field attribution fails SAFE', () => {
   });
 
   it('routes REALM prose to the gathering store rather than to narrative', () => {
-    // The one carrier of authored prose `narrative` deliberately does not cover, and the
-    // reason is routing rather than an oversight: a realm's `description` is rendered by
+    // The one carrier of authored prose `narrative` deliberately does not cover, and the reason is
+    // routing rather than an oversight: a realm's `description` is rendered by
     // `EnvironmentCard.svelte` and `GatheringDetail.svelte`, and the `gathering` store does not
     // consume `narrative` — so filing it there would leave realm prose unable to reach the only
-    // store that renders it. Pinned because the exception is stated in the canonical spec and a
-    // prose-only claim rots silently.
+    // store that renders it.
     const gatheringDomains = new Set(STORE_DOMAINS[INVALIDATION_STORES.GATHERING]);
     // `gatheringRealms` left the crafting system in issue 1282 — the realm library is a
     // world setting, so it has no row here and `settingChangeBridge`'s travel leg announces

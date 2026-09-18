@@ -72,9 +72,8 @@ function makeEngine({
 } = {}) {
   calls.created = [];
   calls.terminal = [];
-  // Library-task shim: move any environment-authored tasks into the system
-  // library config (empty region/biome → matches every environment) so they
-  // compose in as library tasks. Library tasks are d100 drop-row resolution.
+  // Library-task shim: move any environment-authored tasks into the system library config (empty
+  // region/biome → matches every environment) so they compose in as library tasks.
   const settings = richState?._testSettings;
   if (settings && !environmentStore && Array.isArray(env.tasks) && env.tasks.length > 0) {
     const libTasks = env.tasks;
@@ -714,10 +713,8 @@ test('environment task and event toggles preserve mixed-case library IDs', async
   const store = makeEnvironmentStore();
   const saved = await store.create(
     environment({
-      // Saved DISABLED: this half of the test is about id-case preservation, and the half below
-      // is about automatic composition, which ignores `enabledTaskIds` entirely. Since issue 1315
-      // the enable gate asks automatic mode whether it composes anything, and this store has no
-      // library — but a disabled environment may always be saved without a task source.
+      // Saved DISABLED: this half of the test is about id-case preservation, and the half below is
+      // about automatic composition, which ignores `enabledTaskIds` entirely (issue 1315).
       enabled: false,
       enabledTaskIds: ['Task-Mixed'],
       disabledEventIds: ['Event-Mixed'],
@@ -1163,10 +1160,8 @@ test('environmental event resolution is mode-independent and rolls each matched 
 
 test('one d100 decides every drop row, while events roll independently', async () => {
   const { service, rollCalls } = makeRichState({
-    // One attempt roll, then one per event. 50 clears the rare row's threshold of 21 but
-    // not the common row's 91, so the SAME number sorts the haul by rarity. The two
-    // events share a rate — and so a threshold — yet only the one handed 95 fires, which
-    // is only possible if they did not share the attempt's roll.
+    // One attempt roll, then one per event. 50 clears the rare row's threshold of 21 but not the
+    // common row's 91, so the SAME number sorts the haul by rarity.
     rolls: [50, 95, 5],
     config: {
       systems: {
@@ -1755,9 +1750,8 @@ test('timed d100 missing-reference cancellation does not expose or persist runti
 });
 
 test('composeEnvironment exposes library tools through a non-enumerable __libraryTools Map', () => {
-  // Tools are now system-owned: the library is sourced from the normalized
-  // crafting system's `tools` (the second composeEnvironment arg), not the
-  // gathering config.
+  // Tools are now system-owned: the library is sourced from the normalized crafting system's
+  // `tools` (the second composeEnvironment arg), not the gathering config.
   const { service } = makeRichState();
   const systemWithTools = {
     ...system,
@@ -1824,14 +1818,7 @@ test('normalizeLibraryTask coerces toolIds entries to trimmed strings and drops 
   assert.deepEqual(task.toolIds, ['tool-axe', '7', 'tool-saw']);
 });
 
-// ---------------------------------------------------------------------------
 // Interactive d100: confirm-roll prompt + Dice So Nice animation (pooled Nd100).
-// The d100 path does NOT use a Foundry `Roll` DC — it rolls a percentile per drop
-// row/event via the `rollD100` seam. Interactive mode confirms the attempt,
-// collects an optional flat situational bonus, and (when a Foundry `Roll` exists)
-// pre-rolls a single `Nd100` pool so DSN animates all throws and the faces feed
-// the resolution in order.
-// ---------------------------------------------------------------------------
 
 function stubDialog(response) {
   const original = globalThis.foundry;
@@ -1845,13 +1832,8 @@ function stubDialog(response) {
 }
 
 /**
- * Stub `globalThis.Roll` as a fake `Nd100` pool: `evaluate()` exposes the supplied
- * faces at `dice[0].results[].result`, and `toMessage` records into `spy`.
- *
- * The interactive d100 path can construct two different kinds of `Roll`: the pooled
- * `Nd100` animation roll, and — when the situational bonus is a dice expression rather
- * than a plain number — a roll of the bonus expression itself. Only the pool exposes
- * faces; a bonus roll answers with `total`, which `bonusTotal` pins for the test.
+ * Stub `globalThis.Roll` as a fake `Nd100` pool: `evaluate()` exposes the supplied faces at
+ * `dice[0].results[].result`, and `toMessage` records into `spy`.
  */
 function stubPoolRoll(faces, spy, bonusTotal = 0) {
   const original = globalThis.Roll;
@@ -2001,10 +1983,8 @@ test('interactive d100 situational bonus shifts a borderline drop outcome', asyn
   }
 });
 
-// Regression: the bonus field is free text, so a player can enter a dice expression.
-// `Number('1d4 + 1')` is NaN, which the d100 path silently degraded to 0 — the bonus
-// vanished. It must be ROLLED and applied. Same borderline setup as above: dropRate 45
-// → threshold 56, pooled face 50, so the outcome turns entirely on the bonus.
+// Regression: the bonus field is free text, so a player can enter a dice expression. `Number('1d4 +
+// 1')` is NaN, which the d100 path silently degraded to 0 — the bonus vanished.
 test('interactive d100 dice situational bonus is rolled rather than coerced to zero', async () => {
   const calls = {};
   const { service } = makeRichState({ rolls: [1], config: d100ForageConfig(45) });

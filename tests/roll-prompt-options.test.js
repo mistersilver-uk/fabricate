@@ -6,11 +6,10 @@ import {
   promptCheckRoll,
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
-// The DialogV2 / i18n stubs are SHARED with `tests/roll-prompt-bulk.test.js` (issue
-// 859): the two prompts share `renderDieRow`, `renderBonusInput`,
-// `renderRollModePicker`, `readSharedRollChoice` and `buildRollButtons`, so a second
-// copy of the harness would be new test code duplicating new test code against
-// SonarCloud's new-code duplication gate.
+// The DialogV2 / i18n stubs are SHARED with `tests/roll-prompt-bulk.test.js` (issue 859): the two
+// prompts share `renderDieRow`, `renderBonusInput`, `renderRollModePicker`, `readSharedRollChoice`
+// and `buildRollButtons`, so a second copy of the harness would be new test code duplicating new
+// test code against SonarCloud's new-code duplication gate.
 import { checkboxGroupField, stubDialogCapture, stubI18n } from './helpers/rollPromptDialogStub.js';
 
 const PICK_DESCRIPTOR = {
@@ -42,9 +41,8 @@ const BARE_DESCRIPTOR = {
 };
 
 /**
- * `buildInteractiveRollOptions` threads the subject `name`/`activity`/`img` into
- * the options bag so the prompt can render its icon-first header. Guard that the
- * header inputs actually survive into the bag (the image fix depends on it).
+ * `buildInteractiveRollOptions` threads the subject `name`/`activity`/`img` into the options bag so
+ * the prompt can render its icon-first header.
  */
 describe('buildInteractiveRollOptions', () => {
   it('threads name, activity, and img into the options bag', () => {
@@ -97,10 +95,9 @@ describe('buildInteractiveRollOptions', () => {
     assert.equal('modifierChoice' in options, false, 'no stray key on non-playerPicks paths');
   });
 
-  // The engine NEVER omits the key: `_buildInteractiveModifierChoice` returns `null` on
-  // every deterministic / non-interactive path, so `null` — not `undefined` — is the
-  // production shape the byte-identical-bag guard has to survive. Widening the builder's
-  // test to `modifierChoice !== undefined` would keep the case above green.
+  // The engine NEVER omits the key: `_buildInteractiveModifierChoice` returns `null` on every
+  // deterministic / non-interactive path, so `null` — not `undefined` — is the production shape the
+  // byte-identical-bag guard has to survive.
   it('omits the modifierChoice key when the engine passes an explicit null', () => {
     const options = buildInteractiveRollOptions({
       interactive: true,
@@ -116,12 +113,8 @@ describe('buildInteractiveRollOptions', () => {
     );
   });
 
-  // Acceptance 11 — "the single-item salvage path is unchanged: no `rollOptions` key
-  // added (asserted)". `rollDecision` is attached by `CraftingEngine._salvageRollOptions`
-  // and NOT here, deliberately: this builder is shared with the crafting and gathering
-  // paths, which wire no pre-resolved-roll support at all, so a key added here would
-  // advertise a capability two of its three consumers do not have. These three cases
-  // are every non-bulk shape a caller passes.
+  // Acceptance 11 — "the single-item salvage path is unchanged: no `rollOptions` key added
+  // (asserted)".
   it('adds no rollDecision key on any non-bulk path', () => {
     for (const args of [
       { interactive: true, actor: { id: 'a1' }, name: 'Iron Rivets', activity: 'Crafting', dc: 12 },
@@ -218,10 +211,9 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
     }
   });
 
-  // The reader walks the group's `checked` flags rather than reading `RadioNodeList#value`,
-  // which is specified to inspect RADIO inputs only and returns `''` for a checkbox group
-  // however many boxes are ticked. Reading `.value` alone would report "nothing picked"
-  // for every multi-pick roll.
+  // The reader walks the group's `checked` flags rather than reading `RadioNodeList#value`, which
+  // is specified to inspect RADIO inputs only and returns `''` for a checkbox group however many
+  // boxes are ticked.
   it('reports a PARTIAL checkbox selection, and an empty one as an empty array', async () => {
     for (const [checkedIds, expected] of [
       [['herb'], ['herb']],
@@ -305,10 +297,7 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
     }
   });
 
-  // A row can reach the prompt with an empty label AND an empty icon. Neither may be
-  // dropped: an unlabelled radio's only accessible name would be its value chip ("+3"),
-  // and a missing `<i>` collapses the flex row's icon gutter, starting that option's
-  // label ~1.1rem left of every sibling.
+  // A row can reach the prompt with an empty label AND an empty icon.
   it('names an unlabelled modifier and still emits its icon and value chip', async () => {
     const captured = stubDialogCapture({
       situationalBonus: { value: '' },
@@ -382,10 +371,7 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
     }
   });
 
-  // Issue 1118: a ROLLING modifier's chip shows what it will roll. Its `value` is `null`
-  // and its `average` is a number the roll can never produce, so `formatSigned` would print
-  // a promise the dice cannot keep (`+2.5` beside a `1d4`). The resolver builds `display`
-  // beside the resolution it describes, and the chip prefers it.
+  // Issue 1118: a ROLLING modifier's chip shows what it will roll.
   it('shows a rolling modifier’s DICE on its chip, not a fractional average', async () => {
     const captured = stubDialogCapture({
       situationalBonus: { value: '' },

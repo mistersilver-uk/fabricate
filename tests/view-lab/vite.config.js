@@ -31,11 +31,6 @@ function mimeTypeFor(path) {
 /**
  * Serve a gitignored directory tree at a URL prefix, structure preserved.
  *
- * Structure preservation is the whole point rather than an implementation detail: `foundry2.css`
- * carries ~21 relative `url()`s (`../ui/parchment.jpg`, `../fonts/signika/…`) and Font Awesome
- * carries its own `../webfonts/…`. Only a faithful directory mount resolves them. Serving these
- * raw also keeps Vite's CSS pipeline off a 429 KB third-party stylesheet.
- *
  * @param {string} prefix URL prefix, leading and trailing slash included.
  * @param {string|null} root Absolute directory to serve, or null to disable the mount.
  * @param {string} label Human name used in the 503 body when the mount is unavailable.
@@ -75,13 +70,7 @@ function staticMount(prefix, root, label) {
   };
 }
 
-/**
- * `src/main.js` imports `../styles/fabricate.css` so the production bundle carries it. The lab
- * already loads that stylesheet itself, RAW and at `layer(modules)`, to reproduce Foundry's
- * cascade — letting Vite inject a second, unlayered copy would put it above every layer and quietly
- * invert the precedence the lab exists to get right. Same intent as `stripGlobalCss` in the
- * production `vite.config.js`, applied for the opposite reason.
- */
+/** `src/main.js` imports `../styles/fabricate.css` so the production bundle carries it. */
 function stripGlobalCssImport() {
   const NOOP_ID = '\0view-lab-global-css-noop';
   return {
@@ -105,8 +94,7 @@ export default defineConfig({
     staticMount('/@foundry-chrome/', chromeCache?.dir ?? null, 'Harvested Foundry window chrome'),
     staticMount('/@foundry-system/dnd5e/', existsSync(dnd5eRoot) ? dnd5eRoot : null, 'The dnd5e system tree'),
     // Production `styles/fabricate.css` and the layered cascade shim, both served raw so the
-    // BROWSER resolves `@import ... layer(...)`. Vite's PostCSS import inliner would flatten
-    // them and discard the layer annotations, which are what reproduce Foundry's cascade.
+    // BROWSER resolves `@import ... layer(...)`.
     staticMount('/@fabricate-styles/', join(repoRoot, 'styles'), 'The Fabricate stylesheet'),
     staticMount('/@view-lab/', resolve(import.meta.dirname), 'The View Lab cascade shim'),
     // Foundry serves its core art at /icons/; Fabricate's default images reference it that way.
@@ -118,20 +106,11 @@ export default defineConfig({
     strictPort: true,
     hmr: false,
     fs: { allow: [repoRoot, ...(chromeCache ? [chromeCache.dir] : []), ...(existsSync(dnd5eRoot) ? [dnd5eRoot] : [])] },
-    // The served asset trees are READ-ONLY and enormous — a harvest is ~7,100 files of Foundry
-    // core art alone, and the dnd5e tree is the same shape. Serving a directory puts it in the
-    // watch graph, and watching it costs one inotify handle PER FILE. On a stock Linux box
-    // `fs.inotify.max_user_watches` is 65,536 for the whole user session, so one harvest is
-    // enough to exhaust it — and the failure does not name the cause: the suite dies with
-    // `ENOSPC ... watch '<some>.webp'` from deep inside chokidar, on tests that have nothing to
-    // do with art. Nothing here is ever edited mid-run, so watching it buys nothing at any price.
+    // The served asset trees are READ-ONLY and enormous — a harvest is ~7,100 files of Foundry core
+    // art alone, and the dnd5e tree is the same shape.
     watch: {
       ignored: [
-        // Agent lane worktrees live INSIDE the repo, each a full checkout. The lab's root is
-        // the repo, so without this it watches every lane's `src/` as well as its own — tens
-        // of thousands of files that are never the ones under test — and dies with
-        // `ENOSPC ... watch '<some lane>/src/…'`, naming a file in a checkout the run has
-        // nothing to do with.
+        // Agent lane worktrees live INSIDE the repo, each a full checkout.
         '**/.worktrees/**',
         ...(chromeCache ? [join(chromeCache.dir, '**')] : []),
         ...(existsSync(dnd5eRoot) ? [join(dnd5eRoot, '**')] : []),

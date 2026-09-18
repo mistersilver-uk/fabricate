@@ -1,18 +1,6 @@
 /**
- * `CraftingSystemManager.applyBulkEditToRecipes` — the recipe set-apply write primitive
- * behind the Recipe Studio's multi-select bulk edit (issue 1010).
- *
- * It lives on `CraftingSystemManager` rather than `RecipeManager` because the book axis
- * writes `system.recipeItemDefinitions[].recipeIds` and `RecipeManager` has no `save()` for
- * that setting. The whole point of the primitive is a bounded write: at most ONE `recipes`
- * world write and at most ONE `craftingSystems` world write per apply, none for an axis
- * that changed nothing, with books written first so the membership-basis marker is
- * committed before anything reads membership against it.
- *
- * Both managers are REAL here, with only their `save()` replaced by a counter. That is what
- * gives the suite teeth: `updateRecipe`'s persistence validation, its activation gate and
- * the alchemy signature scan all run for real, so the two error branches are genuinely
- * provoked by fixture data rather than by a stub that throws on demand.
+ * `CraftingSystemManager.applyBulkEditToRecipes` — the recipe set-apply write primitive behind the
+ * Recipe Studio's multi-select bulk edit (issue 1010).
  */
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -80,9 +68,7 @@ const SYSTEM_ID = 'sys1';
 const TIER_EASY = 't-easy';
 const TIER_HARD = 't-hard';
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 /** A complete, craftable recipe: one ingredient set, one populated result group. */
 function completeRecipe(id, overrides = {}) {
@@ -113,11 +99,7 @@ function completeRecipe(id, overrides = {}) {
   };
 }
 
-/**
- * Structurally VALID but INCOMPLETE — no ingredient sets, no result groups. `updateRecipe`
- * with `allowIncomplete: true` persists it happily and then refuses the enable, which is the
- * `RecipeActivationError` branch.
- */
+/** Structurally VALID but INCOMPLETE — no ingredient sets, no result groups. */
 function shellRecipe(id, overrides = {}) {
   return {
     id,
@@ -132,10 +114,7 @@ function shellRecipe(id, overrides = {}) {
 
 /**
  * Structurally BROKEN — outcome routing naming a result group that does not exist, which
- * `_validate` reports even with `requireComplete: false`. `allowIncomplete: true` still runs
- * `validateStructure()`, so this recipe fails PERSISTENCE and is the `RecipePersistenceError`
- * branch: the class this change makes newly selectable, and the reason an uncaught throw
- * would abort the batch after the books save had already committed.
+ * `_validate` reports even with `requireComplete: false`.
  */
 function brokenRecipe(id, overrides = {}) {
   return completeRecipe(id, { outcomeRouting: { success: 'no-such-group' }, ...overrides });
@@ -367,15 +346,7 @@ describe('applyBulkEditToRecipes — the two save guarantees', () => {
 
 describe('applyBulkEditToRecipes — the three falsy-but-real axes', () => {
   // `toBulkRecipeEdit` emits `enabled: false`, `locked: false` and `checkTierId: null` — the
-  // panel's Disable, Unlock and Default DC — present if and only if staged. Each needs its
-  // OWN case: a truthiness guard drops all three while every test that stages the truthy
-  // side of the same axis keeps passing, so covering Enable does not cover Disable.
-  //
-  // Each payload below is built by the REAL producer rather than hand-written, so the
-  // precondition that documents why the case discriminates ("staged, and falsy") is an
-  // assertion about `toBulkRecipeEdit` and fails if the model stops emitting that shape.
-  // Asserting it against a literal declared two lines above documented the same intent and
-  // could not fail.
+  // panel's Disable, Unlock and Default DC — present if and only if staged.
   it('a staged DISABLE turns an enabled recipe off', async () => {
     const edit = toBulkRecipeEdit(setBulkRecipeStatus(createRecipeBulkDraft(), 'disable'));
     assert.equal(Object.hasOwn(edit, 'enabled'), true, 'staged');
@@ -501,12 +472,9 @@ describe('applyBulkEditToRecipes — the check tier axis', () => {
 });
 
 describe('applyBulkEditToRecipes — which tiers a resolution mode offers', () => {
-  // The manager resolves the active crafting-check SLOT with the SAME helper the manager
-  // root's panel resolves it with (`resolveActiveCraftingCheckFormula`), so the offer and
-  // the write cannot disagree. Each arm is pinned by behaviour rather than by reading a
-  // private back — and the three alchemy rows are the ones that caught the drift: alchemy
-  // rolls whichever slot its OWN `checkMode` names, not the simple slot a hand-rolled
-  // manager-side mode map assumed for every alchemy system.
+  // The manager resolves the active crafting-check SLOT with the SAME helper the manager root's
+  // panel resolves it with (`resolveActiveCraftingCheckFormula`), so the offer and the write cannot
+  // disagree.
   const MODES = [
     { resolutionMode: 'simple', accepts: TIER_HARD, refuses: 'routed-tier' },
     { resolutionMode: 'routedByIngredients', accepts: TIER_HARD, refuses: 'routed-tier' },
@@ -561,12 +529,6 @@ describe('applyBulkEditToRecipes — which tiers a resolution mode offers', () =
   }
 
   // THE PARITY GUARD the "kept structurally identical" comment always needed and never had.
-  //
-  // The manager root offers the bulk panel exactly
-  // `resolveRecipeCheckTierOptions(craftingCheck, resolveActiveCraftingCheckFormula(system).slot)`
-  // (`CraftingSystemManagerRoot.svelte`'s `recipeCheckTierOptions`). This asserts the WRITE
-  // accepts every id that offer contains and nothing else, over the same mode matrix — so a
-  // second hand-rolled slot derivation on either side fails here rather than at a GM's apply.
   it('accepts exactly the tier ids the panel would have offered, in every mode', async () => {
     for (const mode of MODES) {
       const system = systemData({
@@ -782,11 +744,8 @@ describe('applyBulkEditToRecipes — the book axis', () => {
 });
 
 /**
- * `booksUpdated` counts DEFINITIONS whose membership array changed; the post-apply
- * notification reports MEMBERSHIP EDGES. Those are different numbers and neither derives
- * from the other: adding one book to twelve recipes is one definition and twelve edges,
- * and adding two books to one recipe is two definitions and two edges. The GM asked "put
- * these recipes in that book", so the edge count is the one that answers them.
+ * `booksUpdated` counts DEFINITIONS whose membership array changed; the post-apply notification
+ * reports MEMBERSHIP EDGES.
  */
 describe('applyBulkEditToRecipes — the membership EDGE counts', () => {
   it('counts one addition per recipe the book did not already hold, never per definition', async () => {
@@ -855,9 +814,7 @@ describe('applyBulkEditToRecipes — the membership EDGE counts', () => {
     assert.equal(result.bookRemovals, 0);
   });
 
-  // The legacy-basis seed is a BASIS CARRY-ACROSS, not a requested edit. Counting its
-  // writes as additions would tell the GM they added members to books they never named —
-  // on the one apply where the number is largest and least explicable.
+  // The legacy-basis seed is a BASIS CARRY-ACROSS, not a requested edit.
   it('never counts the legacy-scalar seed as a requested addition', async () => {
     const fixture = makeFixture({
       recipes: [
@@ -892,11 +849,8 @@ describe('applyBulkEditToRecipes — the membership EDGE counts', () => {
 
 describe('applyBulkEditToRecipes — the membership-basis marker', () => {
   /**
-   * A legacy-basis system: no marker, every `recipeIds` empty, membership carried by the
-   * per-recipe scalars. This method mutates definitions directly and so BYPASSES the
-   * `updateRecipeItemDefinition` choke point — it is the one path where the seed could still
-   * be silently missing, and the failure it prevents is permanent: every OTHER definition's
-   * scalar-only members stranded by one write, recoverable only by re-authoring each book.
+   * A legacy-basis system: no marker, every `recipeIds` empty, membership carried by the per-recipe
+   * scalars.
    */
   function legacyFixture() {
     return makeFixture({

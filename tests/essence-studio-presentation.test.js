@@ -1,22 +1,6 @@
 /**
- * `apps/manager/essences/essenceStudio.js` — the Essence Studio's presentation adapter
- * (issue 1036).
- *
- * It sits in the coverage blind spot this repo keeps rediscovering: `npm run lint` and
- * `format:check` do not glob `src/ui/**\/*.js` while SonarCloud still indexes it. Nothing
- * but a test reaches it at all, and three of its outputs are load-bearing product rules
- * rather than cosmetics:
- *
- * - the capability pills are NEVER hidden for a disabled essence, because hiding a pill
- *   removes state;
- * - the behaviour list states the SUPPRESSION in the same words for both behaviours, and
- *   says nothing about stacking, because the two suppressions differ there and claiming
- *   otherwise would be untrue;
- * - the arithmetic row is unconditional, because a disabled essence still matches,
- *   accumulates and is consumed.
- *
- * The localizer is the identity-with-fallback shim every component uses, so the assertions
- * read against the English fallbacks rather than against key names.
+ * `apps/manager/essences/essenceStudio.js` — the Essence Studio's presentation adapter (issue
+ * 1036).
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -38,10 +22,7 @@ const format = (_key, fallback, data) =>
   );
 
 const BOTH_GATES = { effectTransferEnabled: true, propertyMacrosEnabled: true };
-// `sourceState: 'linked'` is not decoration. `hasEffectTransfer` is `sourceState !== 'none'`
-// at the store, so a HEALTHY essence is the one that also resolves; omitting the field here
-// would describe a broken link and quietly make the healthy-tone assertions test the
-// warning path.
+// `sourceState: 'linked'` is not decoration.
 const CONFIGURED = { hasEffectTransfer: true, hasPropertyMacro: true, sourceState: 'linked' };
 
 test('1036: both capability pills render for a DISABLED essence, in the muted tone', () => {
@@ -63,10 +44,7 @@ test('1036: both capability pills render for a DISABLED essence, in the muted to
 });
 
 test('1036: the Effects pill reports a BROKEN source, not merely a configured one', () => {
-  // `hasEffectTransfer` means "a source is CONFIGURED", which a `stale` or `missing` link
-  // still is. At one tone the row cannot distinguish a working link from a dead one, and
-  // the row is where most essences are ever looked at — the inspector shows one at a time
-  // and the needs-attention filter is a search, not a signal.
+  // `hasEffectTransfer` means "a source is CONFIGURED", which a `stale` or `missing` link still is.
   const healthy = essenceCapabilityPills({ ...CONFIGURED, enabled: true }, BOTH_GATES, text)[0];
   assert.equal(healthy.tone, 'info');
   // Point 4 (maintainer round): the single Effects pill's two states each carry a DISTINCT
@@ -169,9 +147,8 @@ test('1036: both behaviour rows state the SUPPRESSION in the same words, and nei
 });
 
 test('1036: no effect COUNT is invented anywhere in the behaviour list', () => {
-  // `_buildEssenceCards` produces `{id, name, img}` and no effect count; producing one needs
-  // an async `fromUuid` plus `doc.effects.size`. A number the store cannot compute is not
-  // shipped, so the prototype's "2 effects" became a count-free statement.
+  // `_buildEssenceCards` produces `{id, name, img}` and no effect count; producing one needs an
+  // async `fromUuid` plus `doc.effects.size`.
   const facts = projectEssenceBehaviourFacts(
     { ...CONFIGURED, enabled: true },
     { ...BOTH_GATES, sourceName: 'Everburning Coal' },
@@ -236,9 +213,8 @@ test('1036: a missing name is BLOCKING and a missing icon is too', () => {
 });
 
 test('1036: the tab ids are LITERALS the View Lab source scan can credit', () => {
-  // `EssenceEditorTabs` builds `id={`essence-tab-${tab.id}`}`, an interpolation the scan
-  // cannot read. The ids therefore also exist as literals in this frozen constant, which the
-  // component imports — so the ids the DOM carries and the ids `src/` declares are one list.
+  // `EssenceEditorTabs` builds `id={`essence-tab-${tab.id}`}`, an interpolation the scan cannot
+  // read.
   assert.deepEqual(
     ESSENCE_EDITOR_TABS.map((tab) => tab.id),
     ['identity', 'oncraft', 'validation']

@@ -1,11 +1,7 @@
 /**
- * Q1 — TRUE single-store KEEP-mode round-trip.
- *
- * export → import → export through ONE shared in-memory settings map + the REAL
- * GatheringEnvironmentStore, so the second export reads exactly what the import
- * persisted. The two envelopes must be deep-equal modulo volatile provenance
- * (`exportedAt`, `fabricateVersion`). Copy-mode id-rebind self-consistency is a
- * SEPARATE assertion.
+ * Q1 — TRUE single-store KEEP-mode round-trip. export → import → export through ONE shared
+ * in-memory settings map + the REAL GatheringEnvironmentStore, so the second export reads exactly
+ * what the import persisted.
  */
 
 import test from 'node:test';
@@ -80,12 +76,9 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
 
   assert.deepEqual(normalizeExportEnvelope(second), normalizeExportEnvelope(first));
 
-  // ── issue 1095, stated FIELD BY FIELD rather than left to the deep-equal ──────────
-  //
-  // The envelope comparison above is a strong guard, but it cannot distinguish "both
-  // exports carry the field" from "NEITHER does". Every field below is absence-preserving
-  // or authoredness-keyed, and the shape a dropped key produces is a legal shape — so the
-  // round-trip has to be asserted POSITIVELY, against the non-default fixture values.
+  // issue 1095, stated FIELD BY FIELD rather than left to the deep-equal. The envelope comparison
+  // above is a strong guard, but it cannot distinguish "both exports carry the field" from "NEITHER
+  // does".
   const exported = second.system;
   assert.equal(exported.modifiers, undefined, 'no per-system copy survives the round trip');
   assert.deepEqual(
@@ -93,9 +86,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
     [
       // `isRollExpression` IS present since issue 1308: the world slice is assembled through the
       // real `normalizeModifierLibrary`, which derives it, whereas the old per-system copy rode
-      // this harness's plain-store system manager and was never normalized. Asserted rather than
-      // stripped, because a derived flag that failed to survive the round trip would leave the
-      // Roll chip and the roll-shaped-expression readiness rule reading a stale classification.
+      // this harness's plain-store system manager and was never normalized.
       {
         id: 'mod-medicine',
         label: 'Medicine',
@@ -168,13 +159,8 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   assert.deepEqual(
     task.checkModifierIds,
     ['mod-medicine', 'mod-alchemy'],
-    // What this proves is the EXPORT/IMPORT path for the gathering config setting — the
-    // pick survives export, `prepareForImport`, the importer's write and a second export.
-    // It deliberately does NOT claim to exercise the task normalizers: this harness's
-    // `systemManager` is a plain `Map` stub and the gathering config is carried as a raw
-    // setting, so neither `normalizeLibraryTask` nor `_normalizeGatheringTask` runs here.
-    // Those three whitelist rebuilds are pinned in `tests/subject-check-modifier-picks.test.js`
-    // and `tests/check-modifier-activity-seams.test.js`.
+    // What this proves is the EXPORT/IMPORT path for the gathering config setting — the pick
+    // survives export, `prepareForImport`, the importer's write and a second export.
     'the gathering task pick survives export → import → export'
   );
 });
@@ -240,10 +226,7 @@ test('copy-mode: id rebind is self-consistent (env→task linkage preserved)', (
   // System + environment container ids regenerated.
   assert.equal(copy.system.id, undefined, 'system id stripped for copy');
 
-  // REALM ids are NOT regenerated (issue 1282). Realms are world scope and ride the envelope,
-  // so a copy that minted fresh ids would duplicate the world's whole geography rather than
-  // recognising it — and the copy's environments would gate on the duplicates while every other
-  // system kept gating on the originals.
+  // REALM ids are NOT regenerated (issue 1282).
   assert.deepEqual(
     copy.travelConfig.realms.map((realm) => realm.id),
     [FIXTURE_REALM_ID],

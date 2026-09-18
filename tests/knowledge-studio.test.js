@@ -1,14 +1,4 @@
-/**
- * Knowledge surface pure projection (issue 785).
- *
- * The uses derivations are pinned as ONE table over `(limitUses, maxUses,
- * timesUsed)` rather than as rendered strings, because the contract under test is
- * that `spent` is the exact complement of
- * `RecipeVisibilityService._filterNonExhausted` on BOTH axes — including the
- * `Number(timesUsed || 0)` coercion and the fail-open on a non-finite or
- * non-positive `maxUses`. A row that claimed a copy was spent while the runtime
- * still granted craftability from it would be the worst failure this surface has.
- */
+/** Knowledge surface pure projection (issue 785). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -32,8 +22,6 @@ import {
 } from '../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
 
 // (label, limitUses, maxUses, timesUsed) -> (remaining, spent, canExpend, usesChip).
-// `spent` mirrors `_filterNonExhausted`: keep when `!limitUses`, keep when maxUses
-// is not a finite number > 0, else keep while `Number(timesUsed || 0) < maxUses`.
 const USES_CASES = [
   // limitUses false: unlimited on every timesUsed, and Expend is never offered.
   ['uncapped, unused', false, 5, 0, null, false, false, 'unlimited'],

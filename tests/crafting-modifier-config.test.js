@@ -61,17 +61,13 @@ test('normalizeModifierLibrary normalizes entries, dropping malformed ones', () 
       isRollExpression: false,
       icon: 'fas fa-staff',
     },
-    // KEPT, not dropped (issue 1117). The gathering normalizer this replaces dropped an
-    // expression-less entry; the library now has an "Add modifier" button, and an entry that
-    // vanished on save the moment it was created would make that button look broken.
+    // KEPT, not dropped (issue 1117).
     { id: 'bad', label: '', expression: '', isRollExpression: false },
   ]);
 });
 
-// PER-ENTRY BOUNDS (issue 1095), absence-preserving in exactly the way `maxModifierPicks`
-// is: only a FINITE number is attached, so every unbounded FORM normalizes to the same
-// key-absent shape. `0` is a real bound and survives — which is why the guard cannot be
-// truthiness.
+// PER-ENTRY BOUNDS (issue 1095), absence-preserving in exactly the way `maxModifierPicks` is: only
+// a FINITE number is attached, so every unbounded FORM normalizes to the same key-absent shape.
 test('normalizeModifierLibrary attaches min/max only when authored', () => {
   const [bounded, floored, capped, zeroed] = normalizeModifierLibrary([
     { id: 'a', label: 'A', expression: '@a', min: -1, max: 5 },
@@ -140,9 +136,7 @@ test('the selection keeps only known policies + catalogue-valid default ids', ()
   );
 });
 
-// ONE derivation, three activities (issue 1095). Each of these normalizers is an allowlist
-// rebuild, so a key emitted by one and not another is dropped on the next save of that
-// activity — silently, and in one direction only.
+// ONE derivation, three activities (issue 1095).
 test('all THREE activity checks emit the same selection triple over the system catalogue', () => {
   const system = makeManager()._normalizeSystem({
     id: 's',
@@ -188,22 +182,9 @@ test('_normalizeCraftingCheck accepts every one of the four combination rules', 
   }
 });
 
-// ── policy copy: the card's English fallbacks mirror lang/en.json ────────────
-//
-// `CraftingModifierCatalogueCard.svelte` hard-codes an English `fallback`/`descFallback`
-// beside every `labelKey`/`descKey`, so the same sentence lives in two files. Nothing
-// renders the fallback while en.json resolves, so a one-sided edit ships two different
-// descriptions of the same option and no gate notices. Assert the mirror.
-//
-// Retargeted for issue 1055: the card authors TWO axes, so the option table is the FOUR
-// COMBINATION RULES — four options, eight label/description pairs — and it carries three
-// further hand-maintained mirrors in the `key`/`fallback` shape (the two per-rule pick-cap
-// hints, the three default-set intros, and the inert causes), pinned for the same reason.
-//
-// The inert-cause count dropped from three to TWO in issue 1094: `noPlaceholder` retired
-// with the roll-formula placeholder, so the second mirror expects seven pairs, not eight.
-// The count is asserted rather than merely iterated because a DELETED block is exactly
-// what an "every pair matches" loop cannot see.
+// policy copy: the card's English fallbacks mirror lang/en.json.
+// `CraftingModifierCatalogueCard.svelte` hard-codes an English `fallback`/`descFallback` beside
+// every `labelKey`/`descKey`, so the same sentence lives in two files (issue 1055).
 test('the modifier card fallbacks match lang/en.json exactly', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const source = readFileSync(
@@ -220,10 +201,7 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     }
   };
 
-  // The INLINE option table: three rules whose copy is activity-independent. The fourth,
-  // `bySubject`, reads its label and description out of `SUBJECT_COPY`, because they change
-  // per activity ("By recipe" / "By component" / "By gathering task") — so it is mirrored by
-  // the per-activity block below instead.
+  // The INLINE option table: three rules whose copy is activity-independent.
   assertMirrored(
     [
       ...source.matchAll(
@@ -233,16 +211,9 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     6,
     'label + description pairs across the three activity-independent combination rules'
   );
-  // SUBJECT_COPY: FOUR key/literal pairs per activity, on THREE activities (issue 1095) —
-  // the per-activity `bySubject` label, its description, its pick-cap hint and the card
-  // DESCRIPTION it shows under that rule. Twelve sentences that would otherwise drift one at
-  // a time, plus the three activity-independent card descriptions that share the shape.
-  //
-  // `leadKey`/`lead` since issue 1096's parity round: that sentence used to be a paragraph of
-  // its own above the rows (`introKey`/`intro`) and is now the card's description, in the
-  // head, because that is where the prototype states it and what it states is rule-keyed.
-  // `bySubject`'s entry in `ELIGIBILITY_COPY` is deliberately EMPTY — the sentence is
-  // per-activity there, so it comes out of `SUBJECT_COPY` — which is why this is 6 and not 7.
+  // SUBJECT_COPY: FOUR key/literal pairs per activity, on THREE activities (issue 1095) — the
+  // per-activity `bySubject` label, its description, its pick-cap hint and the card DESCRIPTION it
+  // shows under that rule.
   for (const [keyProp, valueProp, expected] of [
     ['labelKey', 'label', 3],
     ['descKey', 'desc', 3],
@@ -262,9 +233,8 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
       `${keyProp}/${valueProp} pairs`
     );
   }
-  // `\bkey:` cannot match `labelKey:`/`descKey:` (no word boundary after `l`/`c`), so
-  // this picks up only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY, INERT_COPY and
-  // NOT_ELIGIBLE_COPY tables.
+  // `\bkey:` cannot match `labelKey:`/`descKey:` (no word boundary after `l`/`c`), so this picks up
+  // only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY, INERT_COPY and NOT_ELIGIBLE_COPY tables.
   assertMirrored(
     [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
     12,
@@ -275,10 +245,8 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
       'the rule cards beside them say "the modifiers you mark selectable" in the prototype’s ' +
       'own words'
   );
-  // Everything else the card localizes INLINE, through `text(key, fallback)` — the empty
-  // state's two branches, the two bounds faults, the read-only link, the field captions.
-  // The table sweeps above cannot see any of them, which is how `ModifierCatalogueEmpty`
-  // could have drifted from `lang/en.json` unnoticed.
+  // Everything else the card localizes INLINE, through `text(key, fallback)` — the empty state's
+  // two branches, the two bounds faults, the read-only link, the field captions.
   const inline = [
     ...source.matchAll(/text\(\s*'(FABRICATE\.[^']+)',\s*\n?\s*'((?:[^'\\]|\\.)*)'\s*\)/g),
   ];
@@ -319,9 +287,8 @@ test('the subject modifier picker fallbacks match lang/en.json exactly', () => {
   }
 });
 
-// The Overview tab restates the pick-source labels for its own tri-state select, the
-// pick-cap sentences, and the inert cause from the recipe's point of view. Same mirror,
-// same failure mode, so the same guard (issue 1055).
+// The Overview tab restates the pick-source labels for its own tri-state select, the pick-cap
+// sentences, and the inert cause from the recipe's point of view (issue 1055).
 test('the recipe Overview tab modifier fallbacks match lang/en.json exactly', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const source = readFileSync(
@@ -350,11 +317,8 @@ test('_normalizeCraftingCheck coerces a genuinely unknown policy to addAll', () 
   );
 });
 
-// ── the authority axis is GONE (issue 1055) ──────────────────────────────────
-//
-// The rejected design had a second axis on this block naming how much the system
-// delegated to its recipes. It is not deprecated, it is deleted, and a normalizer that
-// still round-tripped it would keep the retired shape alive on disk.
+// the authority axis is GONE (issue 1055). The rejected design had a second axis on this block
+// naming how much the system delegated to its recipes.
 
 test('_normalizeCraftingCheck never emits a recipeModifierAuthority, even when handed one', () => {
   for (const check of [
@@ -370,12 +334,9 @@ test('_normalizeCraftingCheck never emits a recipeModifierAuthority, even when h
   }
 });
 
-// ── the pick cap is absence-preserving (issue 1055) ──────────────────────────
-//
-// ABSENCE MEANS UNLIMITED, so a normalizer that wrote a placeholder — `1`, `0`, `null` —
-// would silently bound every system that has never been asked, and truncate the recipe
-// picks already on disk. Only a real positive integer survives as a key; every unbounded
-// FORM normalizes to the same absent shape.
+// the pick cap is absence-preserving (issue 1055). ABSENCE MEANS UNLIMITED, so a normalizer that
+// wrote a placeholder — `1`, `0`, `null` — would silently bound every system that has never been
+// asked, and truncate the recipe picks already on disk.
 
 test('_normalizeCraftingCheck OMITS maxModifierPicks rather than defaulting it', () => {
   for (const maxModifierPicks of [undefined, null, 0, -1, 2.5, Infinity, NaN, 'three', {}]) {
@@ -436,18 +397,7 @@ test('_normalizeSystem preserves cap absence, and an authored cap, through a who
   assert.equal(bounded.craftingCheck.defaultModifierPolicy, 'bySubject');
 });
 
-// THE OTHER END OF THE MIGRATION'S LOAD-BEARING ORDERING.
-// `migrateUnifyModifierLibraries`'s header names the exact failure this pins: because
-// The library moved to WORLD scope in issue 1308, so `_normalizeSystem` no longer emits it and
-// the guard this test was written to hold has moved with it.
-//
-// The original hazard was that `_normalizeSystem` is an ALLOWLIST REBUILD with no `...system`
-// spread, so dropping the one-word `modifiers,` emit destroyed every GM's library on their next
-// save while leaving the whole suite green. The same hazard now reaches the SELECTIONS instead:
-// `validCatalogueIds` comes from the world store, so a manager that cannot see the library
-// filters all three activities' default sets against an empty basis and empties them at once.
-// That is what is asserted here — the ids survive a rebuild AND a re-save, which is the pass
-// that actually bites, because `updateSystem` re-normalizes an already-normalized system.
+// THE OTHER END OF THE MIGRATION'S LOAD-BEARING ORDERING (issue 1308).
 test('_normalizeSystem carries the check SELECTIONS through a whole rebuild against the world library', () => {
   const manager = makeManager();
   const catalogue = [
@@ -505,11 +455,8 @@ test('_normalizeCraftingCheck preserves sibling check fields alongside the selec
   assert.deepEqual(result.defaultModifierIds, ['med']);
 });
 
-// ── recipe pick normalizer ───────────────────────────────────────────────────
-//
-// A recipe persists a PICK and nothing else (issue 1055): `{ modifierIds }`. It may
-// choose WHICH modifiers apply, never HOW they combine, so the whole `policy` axis is
-// gone from the stored shape.
+// recipe pick normalizer. A recipe persists a PICK and nothing else (issue 1055): `{ modifierIds
+// }`.
 
 test('Recipe.craftingModifier defaults to null (inherit) when absent or malformed', () => {
   assert.equal(new Recipe({ name: 'r' }).craftingModifier, null);
@@ -526,9 +473,8 @@ test('Recipe.craftingModifier defaults to null (inherit) when absent or malforme
   }
 });
 
-// The system owns the rule outright, so a legacy `policy` left on disk by a pre-1055
-// world is DROPPED on the way in and cannot round-trip back out through `toJSON`. The
-// pick beside it survives untouched.
+// The system owns the rule outright, so a legacy `policy` left on disk by a pre-1055 world is
+// DROPPED on the way in and cannot round-trip back out through `toJSON`.
 test('Recipe.craftingModifier DROPS a legacy policy and keeps the pick, de-duplicated', () => {
   const recipe = new Recipe({
     name: 'r',
@@ -557,11 +503,7 @@ test('Recipe.craftingModifier DROPS a legacy policy and keeps the pick, de-dupli
   }
 });
 
-// ONE ID RULE FOR THREE SUBJECTS. `Recipe` used to keep its own member filter, which agreed
-// with the shared `authoredCheckModifierIds` on everything except TRIMMING: it rejected a
-// whitespace-only id but kept `' med '` verbatim. That is not a cosmetic divergence — the
-// resolver drops an id that names nothing in the catalogue, so the SAME authored id resolved
-// on salvage and gathering and was silently dropped on crafting.
+// ONE ID RULE FOR THREE SUBJECTS.
 test('the three subject picks coerce an id IDENTICALLY, padding included', () => {
   const manager = makeManager();
   const padded = ['  med  ', 'med', ' ', 3, ''];

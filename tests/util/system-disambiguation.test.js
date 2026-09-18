@@ -1,12 +1,6 @@
 /**
  * Coverage for the shared crafting-system label disambiguation
  * (`src/ui/svelte/util/systemDisambiguation.js`, issue 346).
- *
- * Two crafting systems can share a display name, making every picker / list
- * ambiguous. These helpers (1) append a short id disambiguator ONLY to colliding
- * names and (2) pick a sensible default that prefers a source-bearing system over
- * an empty same-named duplicate. In the Node runner `game.i18n` is absent, so
- * `localize` returns the key and the English fallback format applies.
  */
 
 import test from 'node:test';

@@ -39,9 +39,7 @@ const CONFIG = {
 const BETA_CHANNEL_MANIFEST = 'modules/fabricate/beta/latest/module.json';
 const BETA_TESTER_MANIFEST = 'testers/closed-beta-2026/seg/fabricate/module.json';
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.3 — resolveChannelConfig: a channel's cohorts and secret belong to THAT channel
-// ───────────────────────────────────────────────────────────────────────────
 
 test('resolveChannelConfig gives early-access its OWN cohort and secret, never the closed beta', () => {
   const resolved = resolveChannelConfig(CONFIG, 'early-access');
@@ -83,9 +81,7 @@ test('resolveChannelConfig falls back to the scalar default when no channels map
   assert.equal(resolveChannelConfig(legacy, 'early-access').source, 'undeclared');
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.4 — the pure guard
-// ───────────────────────────────────────────────────────────────────────────
 
 const target = (label, manifestKey) => ({ label, manifestKey });
 const CHANNEL = target('channel-beta', BETA_CHANNEL_MANIFEST);
@@ -185,11 +181,7 @@ test('assertPublishSafety allows a backwards move only under --allow-downgrade',
 
 test('assertPublishSafety fails closed when a rollover glued to the prerelease suffix orders backwards', () => {
   // NOT "a double-digit patch rollover" — a double-digit rollover in the part GLUED TO THE
-  // PRERELEASE SUFFIX, which is the only part compared as text. Verified against the real
-  // isNewerVersion: ('1.4.10-beta.1','1.4.9-beta.1') === false, while ('1.5.0-beta.10',
-  // '1.5.0-beta.9'), ('1.10.0-beta.1','1.9.0-beta.1') and ('1.4.10','1.4.9') are all true. So it
-  // can only fire on a channel carrying prereleases — which is why the remedy must stay on that
-  // line rather than escaping to a bare stable version.
+  // PRERELEASE SUFFIX, which is the only part compared as text.
   const verdict = safetyOf({
     version: '1.4.10-beta.1',
     state: [head(CHANNEL, '1.4.9-beta.3'), head(TESTER, '1.4.9-beta.3')],
@@ -197,18 +189,13 @@ test('assertPublishSafety fails closed when a rollover glued to the prerelease s
   assert.equal(verdict.ok, false);
   assert.match(verdict.error, /1\.4\.9-beta\.3/);
 
-  // The remedy is pinned HERE, on the input where it is counter-intuitive. `1.5.0` would satisfy
-  // the guard (isNewerVersion('1.5.0','1.4.9-beta.3') === true) and strand the beta channel at a
-  // bare stable head, no longer ahead of the public registry — so the next public release would
-  // offer the whole private cohort a manifest rewrite out of it.
+  // The remedy is pinned HERE, on the input where it is counter-intuitive.
   assert.match(verdict.error, /MINOR bump \(e\.g\. 1\.5\.0-beta\.1\)/);
   assert.doesNotMatch(verdict.error, /e\.g\. 1\.5\.0\)/);
 });
 
 test('assertPublishSafety derives the remedy from the HEAD, not from the version being published', () => {
-  // 1.4.1 refused by a 1.5.0 head. Bumping the VERSION's minor gives 1.5.0 — the head itself, which
-  // the guard would then ALLOW (an equal head is not a backwards move), moving nothing and leaving
-  // the cohort silent. The remedy must clear the head: 1.6.0.
+  // 1.4.1 refused by a 1.5.0 head.
   const verdict = safetyOf({
     version: '1.4.1',
     state: [head(CHANNEL, '1.5.0')],
@@ -235,8 +222,7 @@ test('assertPublishSafety suggests one remedy that clears EVERY refused head', (
 test('every remedy the guard prints is one Foundry would actually accept over the head', () => {
   // THE PROPERTY, not a string. The refusal promises the remedy "is the only change that makes
   // Foundry compare the new build as newer" — so assert exactly that, over a corpus, and no future
-  // edit to suggestMinorBump can quietly make the sentence false again. Both previous versions of
-  // this function pass individual pinned examples and fail here.
+  // edit to suggestMinorBump can quietly make the sentence false again.
   const corpus = [
     '1.4.0',
     '1.4.1',
@@ -320,9 +306,7 @@ test('assertPublishSafety fails closed when a staged target has no head record a
   assert.match(verdict.error, /no head was read for tester-closed-beta-2026/);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.4 — fetchPublishState: 404 is absent, 403 is a hard error
-// ───────────────────────────────────────────────────────────────────────────
 
 const reader = (responses) => ({
   getObject: async (key) => responses[key] ?? { status: 404, body: null },
@@ -361,8 +345,6 @@ test('fetchPublishState treats a 403 as a HARD ERROR, never an absent head', asy
 });
 
 // The one production step no injected S3 port can reach: turning an AWS error into 403-vs-404.
-// Get this wrong in either direction and every head in the channel reads as absent, the guard
-// allows every publish, and nothing else in the pipeline notices.
 test('s3StatusFromError keeps a denial a denial and a miss a miss', () => {
   assert.equal(s3StatusFromError({ $metadata: { httpStatusCode: 403 } }), 403);
   assert.equal(s3StatusFromError({ name: 'AccessDenied' }), 403);
@@ -392,21 +374,14 @@ test('fetchPublishState refuses a head manifest it cannot read', async () => {
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.4 — the headline: main() writes NOTHING when a head is Foundry-newer
-// ───────────────────────────────────────────────────────────────────────────
 
 /**
  * A `main()` harness with every world-touching collaborator injected: no Vite build, no zip binary,
- * no AWS. `puts` is the assertion surface — the one-way door in Phase 2 rests on it staying empty
- * whenever the guard refuses.
+ * no AWS (issue 1565).
  *
- * The injected `zip` writes the 9-byte string `zip-bytes`, over which a zip reader throws, so the
- * archive-completeness gate (issue 1565) is stubbed for every test that is not about it and
- * `realArchiveGate` arms it with a real `zipDirectory` over a real `distDir` for the one that is.
- * @param {{heads?: Record<string, {status: number, body: string|null}>,
- *   exists?: (key: string) => boolean, distFiles?: Record<string, string>,
- *   realArchiveGate?: boolean}} options
+ * @param {{heads?: Record<string, {status: number, body: string|null}>, exists?: (key: string) =>
+ * boolean, distFiles?: Record<string, string>, realArchiveGate?: boolean}} options
  * @returns {Promise<object>} The harness.
  */
 async function makeHarness({
@@ -485,14 +460,7 @@ async function makeHarness({
   return { run, runWithBuild, puts, gets, calls, configPath };
 }
 
-// Issue 1565, in the file that owns the "ZERO PutObject" invariant. The archive gate is the newest
-// thing standing between a build and the bucket, so it belongs to that invariant too: an archive
-// short a chunk its own entry script references must be refused during STAGING, with the door to
-// Phase 2 never opened.
-//
-// It asserts the gate's own message and the missing member's name rather than a bare rejection —
-// `main()` has many refusals that also happen before any write, and a status-only assertion cannot
-// tell this one from those.
+// Issue 1565, in the file that owns the "ZERO PutObject" invariant.
 test('main() performs ZERO PutObject calls when a staged archive is short a referenced chunk', async () => {
   const missingChunk = 'chunks/absent-DEADBEEF.js';
   const harness = await makeHarness({
@@ -582,10 +550,7 @@ test('main() publishes over a newer head only under --allow-downgrade', async ()
 });
 
 test('main() --dry-run touches no bucket at all: no reads, no writes', async () => {
-  // The guard and the upload loop currently share one `if (!dryRun)` block. That is load-bearing:
-  // a dry run has no credentials, so hoisting the head read out of that block to "also print the
-  // verdict on a dry run" would hoist it into a code path where every GetObject 403s — and, worse,
-  // would leave the upload loop behind it. Pin BOTH halves: zero gets AND zero puts.
+  // The guard and the upload loop currently share one `if (!dryRun)` block.
   const harness = await makeHarness({
     heads: { [BETA_CHANNEL_MANIFEST]: manifestAt('1.5.0-beta.1') },
   });
@@ -602,8 +567,7 @@ test('main() --dry-run touches no bucket at all: no reads, no writes', async () 
 
 test('main() refuses a built manifest whose required field is absent OR empty', async () => {
   // The empty-string arm is the one that matters: a `title: ''` is a well-formed JSON manifest that
-  // Foundry will happily install and display as nameless. `undefined` would be caught by almost
-  // anything; `''` is caught only by this check.
+  // Foundry will happily install and display as nameless.
   for (const broken of [{ title: '' }, { compatibility: '' }, { version: undefined }]) {
     const harness = await makeHarness();
     await assert.rejects(
@@ -724,9 +688,7 @@ test('runCheckHeads reads every private target of the channel it is asked about'
   assert.equal(report.safety.ok, true);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.2 — the shipped release.s3.config.json
-// ───────────────────────────────────────────────────────────────────────────
 
 test('the shipped config declares the three channels, each with its own cohort and secret', async () => {
   const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
@@ -752,8 +714,7 @@ test('the shipped config declares the three channels, each with its own cohort a
 
 test('the shipped config names no superseded tester group and no superseded secret', async () => {
   // Every OTHER assertion in this file runs against the synthetic local CONFIG, so all of them stay
-  // green if the shipped file is never touched. This sweep and the deepEqual above are the two that
-  // actually read what ships.
+  // green if the shipped file is never touched.
   const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
   const channels = Object.values(shipped.channels);
 
@@ -779,8 +740,7 @@ test('the shipped config names no superseded tester group and no superseded secr
 
 test('every channel in the shipped config declares at most ONE tester group', async () => {
   // release-s3.js resolves ONE segment per channel and applies it to every group in the array, so a
-  // second entry would silently share the first's segment. Adding one is a deliberate cohort
-  // decision and must break this test rather than pass.
+  // second entry would silently share the first's segment.
   const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
 
   let withGroups = 0;

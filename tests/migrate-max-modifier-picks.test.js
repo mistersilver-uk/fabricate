@@ -1,17 +1,4 @@
-/**
- * Issue 1055 — 1.20.0: cap the modifier picks of systems already on `playerPicks`.
- *
- * Before this change `playerPicks` meant "the player picks EXACTLY ONE modifier". The
- * change generalizes it to a bounded multi-pick governed by `craftingCheck.maxModifierPicks`,
- * and `resolveMaxModifierPicks` reads an ABSENT cap as UNLIMITED — so without this stamp
- * the upgrade would silently widen every existing `playerPicks` system from "pick one" to
- * "pick everything" and jump its check-modifier scalar from `max(...)` to the full sum.
- *
- * This covers the per-rule stamp (and the three rules deliberately left unbounded),
- * purity, idempotence, the no-throw guarantee, the runner registration and downgrade
- * target, and the IMPORT-side mirror — including the branch a bundle from the shipping
- * build actually takes.
- */
+/** Issue 1055 — 1.20.0: cap the modifier picks of systems already on `playerPicks`. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -53,9 +40,7 @@ function migrateOne(craftingCheck, recipes = []) {
     .craftingCheck;
 }
 
-// ---------------------------------------------------------------------------
 // The stamp — `playerPicks` only
-// ---------------------------------------------------------------------------
 
 test('1.20.0 stamps maxModifierPicks = 1 onto a pre-existing playerPicks system', () => {
   const check = migrateOne({ defaultModifierPolicy: 'playerPicks' });
@@ -67,11 +52,7 @@ test('1.20.0 stamps maxModifierPicks = 1 onto a pre-existing playerPicks system'
   );
 });
 
-// The OTHER three rules are deliberately left absent, i.e. unlimited. `addAll` and
-// `highest` do not select at all; `byRecipe` selects, but its historical behaviour was
-// NOT single-pick — a recipe already on disk may legitimately have picked several, and
-// `resolveEligibleModifierIds` TRUNCATES to the cap, so a stamp of 1 would silently
-// discard picks the GM authored.
+// The OTHER three rules are deliberately left absent, i.e. unlimited.
 test('1.20.0 leaves every rule other than playerPicks unbounded', () => {
   for (const defaultModifierPolicy of ['addAll', 'highest', 'byRecipe']) {
     const check = migrateOne({ defaultModifierPolicy });
@@ -84,9 +65,8 @@ test('1.20.0 leaves every rule other than playerPicks unbounded', () => {
   }
 });
 
-// `byRecipe` is valid persisted data now, not a legacy token: it is a first-class
-// combination rule (the recipe author selecting at recipe-edit time), so nothing maps or
-// retires it at either level.
+// `byRecipe` is valid persisted data now, not a legacy token: it is a first-class combination rule
+// (the recipe author selecting at recipe-edit time), so nothing maps or retires it at either level.
 test('1.20.0 leaves a persisted byRecipe rule, and every recipe pick, exactly as authored', () => {
   const { systems, recipes } = migrateMaxModifierPicks({
     systems: [system({ defaultModifierPolicy: 'byRecipe' })],
@@ -108,9 +88,7 @@ test('1.20.0 leaves an unrecognized rule alone rather than repairing it', () => 
   assert.equal(Object.hasOwn(check, MAX_PICKS), false);
 });
 
-// ---------------------------------------------------------------------------
 // The stamp is CONDITIONAL — an authored cap always wins
-// ---------------------------------------------------------------------------
 
 test('1.20.0 NEVER overwrites an authored cap', () => {
   for (const authored of [1, 2, 5]) {
@@ -161,9 +139,7 @@ test('1.20.0 stamps per system, from that system’s own rule', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Purity, idempotence and the no-throw guarantee
-// ---------------------------------------------------------------------------
 
 test('1.20.0 is pure and clone-first — the input payload is never touched', () => {
   const input = {
@@ -237,9 +213,7 @@ test('applyMaxModifierPicks is the shared per-system transform', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // Runner registration
-// ---------------------------------------------------------------------------
 
 test('the 1.20.0 registry entry carries a lossless downgradeTo target', () => {
   const runner = new MigrationRunner({ getSetting: () => undefined, setSetting: async () => {} });
@@ -297,9 +271,7 @@ test('the runner does not re-run 1.20.0 once the world is at that version', asyn
   );
 });
 
-// ---------------------------------------------------------------------------
 // The import-side mirror — branch-INDEPENDENT
-// ---------------------------------------------------------------------------
 
 function bundle(overrides = {}) {
   return {
@@ -311,10 +283,8 @@ function bundle(overrides = {}) {
 }
 
 test('migrateExportPayload stamps the cap on a payload ALREADY at the current schema', () => {
-  // The one that matters in practice: every bundle written by the shipping build carries
-  // the current `schemaVersion`, so `migrateExportPayload` returns through its early
-  // branch. A derivation reachable only from the legacy branch would never run on a real
-  // bundle — the same trap `upcastLegacyTools` is called in both branches to avoid.
+  // The one that matters in practice: every bundle written by the shipping build carries the
+  // current `schemaVersion`, so `migrateExportPayload` returns through its early branch.
   const current = bundle({
     schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
     system: system({ defaultModifierPolicy: 'playerPicks' }),
@@ -337,10 +307,9 @@ test('migrateExportPayload stamps the cap on a LEGACY schema-1 payload too', () 
 });
 
 test('migrateExportPayload leaves a bySubject bundle and its subject picks unbounded', () => {
-  // The rule TOKEN was renamed by `1.22.0` (issue 1095), so the upcast chain rewrites a
-  // bundle's `byRecipe` on the way in — which is asserted in
-  // `tests/migrate-system-check-modifier-catalogue.test.js`. What THIS case owns is
-  // unchanged: `1.20.0` stamps no cap on a subject-selecting rule and destroys no pick.
+  // The rule TOKEN was renamed by `1.22.0` (issue 1095), so the upcast chain rewrites a bundle's
+  // `byRecipe` on the way in — which is asserted in
+  // `tests/migrate-system-check-modifier-catalogue.test.js`.
   const migrated = migrateExportPayload(
     bundle({
       schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,

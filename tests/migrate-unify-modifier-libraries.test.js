@@ -1,20 +1,6 @@
 /**
- * Issue 1117 — 1.23.0: merge a system's TWO modifier libraries into one `system.modifiers`.
- *
- * The transform itself is small; what needs pinning is everything around it.
- *
- *  - THE MERGE ORDER and the retirement of BOTH old keys.
- *  - THE COLLISION RULE. Two independently authored libraries can carry the same id, and
- *    the resolution must be deterministic rather than last-write-wins. The check entry keeps
- *    the id and the gathering entry is re-keyed — because the gathering side's references
- *    all live inside the same `gatheringConfig` block this migration is already rewriting,
- *    so renaming it is a CLOSED rewrite, while the check side's references reach into the
- *    `recipes` world setting this migration never sees.
- *  - THE REFERENCE REWRITE. A re-key with no rewrite is silent data loss: the drop row would
- *    name an id the library no longer carries, and the gathering runtime reports that as a
- *    misconfigured attempt rather than as a missing modifier.
- *  - THE REGISTRY ENTRY, whose `downgradeLosesData` declaration is what routes the label
- *    into the registry-wide rule in `tests/migration-runner.test.js`.
+ * Issue 1117 — 1.23.0: merge a system's TWO modifier libraries into one `system.modifiers`. THE
+ * MERGE ORDER and the retirement of BOTH old keys.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -157,9 +143,7 @@ test('1.23.0 rewrites EVERY gathering reference to a re-keyed entry', () => {
     'and an event reference'
   );
 
-  // The invariant those three assertions exist to protect, stated once: every reference
-  // resolves. A rename with a missed site is not a partial success, it is a misconfigured
-  // gathering attempt at runtime.
+  // The invariant those three assertions exist to protect, stated once: every reference resolves.
   const libraryIds = new Set(systemOf(result).modifiers.map((entry) => entry.id));
   const referenced = [
     ...task.dropRows.flatMap((row) => row.characterModifiers.map((ref) => ref.modifierId)),
@@ -184,9 +168,8 @@ test('1.23.0 is idempotent, and never clobbers an authored unified library', () 
   assert.deepEqual(twice.systems, once.systems, 'a second pass finds nothing to do');
   assert.deepEqual(twice.gatheringConfig, once.gatheringConfig);
 
-  // A half-migrated system CONVERGES: the unified library wins and the legacy keys are
-  // dropped without overwriting it. That is what makes idempotence independent of the
-  // version gate, which the View Lab depends on directly.
+  // A half-migrated system CONVERGES: the unified library wins and the legacy keys are dropped
+  // without overwriting it.
   const half = world();
   half.systems[0].modifiers = [{ id: 'authored', label: 'Authored', expression: '@a' }];
   const converged = migrateUnifyModifierLibraries(half);
@@ -311,8 +294,6 @@ test('1.23.0 is registered as the highest version, with a downgrade target that 
     'the label names the runner-ordering precondition the merge depends on'
   );
   // NOT the tail of the registry any more: issue 1096's routed DC-source entry follows it.
-  // Asserting its POSITION rather than its presence is what this is for — an entry inserted
-  // out of version order would run at the wrong point.
   assert.ok(
     registry.findIndex((migration) => migration.version === '1.23.0') < registry.length,
     'the entry is registered in version order'
@@ -368,12 +349,8 @@ test('the export upcast composes with 1.22.0: a PRE-1.22.0 bundle keeps its cata
   );
 });
 
-// The whole point of the 1.23.0 move: ONE library, read by the normalizer that owns it.
-//
-// Since issue 1308 that normalizer is `normalizeModifierLibrary`, not `_normalizeSystem` — the
-// library became a WORLD setting and the crafting system stopped carrying a copy. What this still
-// pins is that 1.23.0's OUTPUT is well-formed for whoever owns it next, which for an upgrade path
-// running both migrations in one pass is the 1.28.0 lift.
+// The whole point of the 1.23.0 move: ONE library, read by the normalizer that owns it (issue
+// 1308).
 test('the merged library normalizes as the modifier library, bounds and all', () => {
   const merged = systemOf(migrateUnifyModifierLibraries(world()));
   const normalized = normalizeModifierLibrary(merged.modifiers);
@@ -397,9 +374,8 @@ test('the merged library normalizes as the modifier library, bounds and all', ()
   ]);
 });
 
-// The shared per-system transform is what lets the world migration and the export upcast
-// have ONE derivation rather than two copies. It is exercised directly so a caller that
-// hands it a system with no gathering block is covered.
+// The shared per-system transform is what lets the world migration and the export upcast have ONE
+// derivation rather than two copies.
 test('applyUnifiedModifierLibrary tolerates an absent gathering block', () => {
   const system = { id: 's', checkModifiers: structuredClone(CHECK_LIBRARY) };
   assert.equal(applyUnifiedModifierLibrary(system), 0, 'no gathering entries, no collisions');

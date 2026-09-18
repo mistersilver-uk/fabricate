@@ -1,22 +1,15 @@
 /**
- * Unit tests for T-053: Disabled recipe editing and re-enabling
- *
- * Covers:
- *   AC1 - Disabled recipe remains in recipe list (enabled=false)
- *   AC2 - GM can update fields on a disabled recipe
- *   AC3 - GM can re-enable a disabled recipe
- *   AC4 - Re-enabled recipe persists after save/reload cycle
- *   AC5 - Non-GM cannot toggle recipe enabled state
- *   AC6 - Full disable -> edit -> re-enable flow
- *   AC7 - RecipeManager _buildDraft preserves enabled=false
+ * Unit tests for T-053: Disabled recipe editing and re-enabling. Covers: AC1 - Disabled recipe
+ * remains in recipe list (enabled=false) AC2 - GM can update fields on a disabled recipe AC3 - GM
+ * can re-enable a disabled recipe AC4 - Re-enabled recipe persists after save/reload cycle AC5 -
+ * Non-GM cannot toggle recipe enabled state AC6 - Full disable -> edit -> re-enable flow AC7 -
+ * RecipeManager _buildDraft preserves enabled=false
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals
-// ---------------------------------------------------------------------------
 
 globalThis.foundry = {
   utils: {
@@ -33,16 +26,12 @@ globalThis.game = {
   user: { isGM: true, name: 'GM' }
 };
 
-// ---------------------------------------------------------------------------
 // Module imports — after globals
-// ---------------------------------------------------------------------------
 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 let savedData = null;
 
@@ -85,9 +74,7 @@ function makeRecipe(overrides = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // AC1 - Disabled recipe remains in recipe list
-// ---------------------------------------------------------------------------
 
 test('AC1 - disabled recipe appears in getRecipes() without enabled filter', async () => {
   const manager = makeManager();
@@ -100,9 +87,7 @@ test('AC1 - disabled recipe appears in getRecipes() without enabled filter', asy
   assert.equal(all[0].enabled, false);
 });
 
-// ---------------------------------------------------------------------------
 // AC2 - GM can update fields on a disabled recipe
-// ---------------------------------------------------------------------------
 
 test('AC2 - GM can update fields on a disabled recipe without re-enabling it', async () => {
   const manager = makeManager();
@@ -115,9 +100,7 @@ test('AC2 - GM can update fields on a disabled recipe without re-enabling it', a
   assert.equal(updated.enabled, false, 'enabled should remain false after field update');
 });
 
-// ---------------------------------------------------------------------------
 // AC3 - GM can re-enable a disabled recipe
-// ---------------------------------------------------------------------------
 
 test('AC3 - GM can re-enable a disabled recipe', async () => {
   const manager = makeManager();
@@ -130,9 +113,7 @@ test('AC3 - GM can re-enable a disabled recipe', async () => {
   assert.equal(updated.enabled, true);
 });
 
-// ---------------------------------------------------------------------------
 // AC4 - Re-enabled recipe persists after save/reload cycle
-// ---------------------------------------------------------------------------
 
 test('AC4 - re-enabled recipe persists in saved data', async () => {
   const manager = makeManager();
@@ -148,9 +129,7 @@ test('AC4 - re-enabled recipe persists in saved data', async () => {
   assert.equal(saved.enabled, true, 'saved data should reflect enabled: true');
 });
 
-// ---------------------------------------------------------------------------
 // AC5 - Non-GM cannot toggle recipe enabled state
-// ---------------------------------------------------------------------------
 
 test('AC5 - non-GM cannot update recipe enabled state', async () => {
   const manager = makeManager();
@@ -170,9 +149,7 @@ test('AC5 - non-GM cannot update recipe enabled state', async () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // AC6 - Disable -> edit other fields -> re-enable flow
-// ---------------------------------------------------------------------------
 
 test('AC6 - full disable/edit/re-enable flow preserves all changes', async () => {
   const manager = makeManager();
@@ -190,9 +167,7 @@ test('AC6 - full disable/edit/re-enable flow preserves all changes', async () =>
   assert.equal(final.description, 'Edited while disabled', 'description should be preserved');
 });
 
-// ---------------------------------------------------------------------------
 // AC7 - Recipe model preserves enabled=false (draft build equivalent)
-// ---------------------------------------------------------------------------
 
 test('AC7 - Recipe model preserves enabled=false when constructed from data', () => {
   const data = makeRecipe({ enabled: false });

@@ -1,6 +1,5 @@
-// Unit tests for the shared check-roll helpers (src/systems/checkRoll.js),
-// extracted from the crafting engine and reused by the salvage (and later
-// gathering) check runners.
+// Unit tests for the shared check-roll helpers (src/systems/checkRoll.js), extracted from the
+// crafting engine and reused by the salvage (and later gathering) check runners.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -34,9 +33,8 @@ const MIXED_ACTIVE_RESULTS = Object.freeze([
   Object.freeze({ result: 6 }),
 ]);
 
-// Captures the first argument every `evaluate()` call receives, so the
-// non-interactive option (defect 3) can be asserted. Reset per test via
-// `evaluateArgs.length = 0`.
+// Captures the first argument every `evaluate()` call receives, so the non-interactive option
+// (defect 3) can be asserted. Reset per test via `evaluateArgs.length = 0`.
 const evaluateArgs = [];
 function stubRoll(total, dice = []) {
   evaluateArgs.length = 0;
@@ -269,9 +267,7 @@ test('shim: a surviving placeholder is stripped, and the scalar still appends ex
   delete globalThis.Roll;
 });
 
-// A formula the shim empties is NOT a check. Without this guard `new Roll('')` throws —
-// `Roll.parse('')` returns `[]` and `_evaluateASTAsync` dereferences `node.class` — and
-// the runner's try/catch turns that into a rolled, and therefore CONSUMING, failure.
+// A formula the shim empties is NOT a check.
 test('shim: a formula that strips to empty never constructs a Roll', async () => {
   const rolledFormulas = stubCraftingModRoll();
   const actor = { getRollData: () => ({}) };
@@ -285,12 +281,8 @@ test('shim: a formula that strips to empty never constructs a Roll', async () =>
   delete globalThis.Roll;
 });
 
-// A NON-ADDITIVE placement is refused positionally, never by asking `Roll.validate` about
-// the residue. `max(@craftingmod, 2)` is the case that makes the distinction load-bearing:
-// its residue `max(, 2)` is a formula real Foundry ACCEPTS — `FunctionTerm`'s head is
-// `Expression?`, so it parses with zero argument terms, `Math.max()` yields `-Infinity`
-// and `Roll#total`'s `Number(this._total) || 0` lets that through — so a validate-driven
-// rule would roll `-Infinity` against the DC on every craft, forever, silently.
+// A NON-ADDITIVE placement is refused positionally, never by asking `Roll.validate` about the
+// residue.
 test('shim: runFormulaPassFail does not FAIL a craft whose formula strips to empty', async () => {
   const rolledFormulas = stubCraftingModRoll();
   for (const formula of ['1d20 * @craftingmod', 'max(@craftingmod, 2)', '(@craftingmod)d6']) {
@@ -322,9 +314,8 @@ test('shim: resolveCheckFormulaDisplay reports no formula for a placeholder-only
 
 // ── interactive playerPicks: the DEFERRED modifier term (issues 770 P2, 1094) ──
 
-// The interactive `playerPicks` descriptor: eligible modifiers + the best legal
-// pre-selection. Herbalism (5) is the default; Medicine (3) is the override option.
-// `maxPicks: 1` is the single-pick descriptor the radio group renders.
+// The interactive `playerPicks` descriptor: eligible modifiers + the best legal pre-selection.
+// Herbalism (5) is the default; Medicine (3) is the override option.
 const PICK_CHOICE = {
   modifiers: [
     { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
@@ -441,11 +432,8 @@ test('playerPicks: an unknown chosen id contributes 0, so no term is appended', 
   delete globalThis.Roll;
 });
 
-// ── multi-pick playerPicks: the returned SELECTION (issue 1055) ──────────────
-//
-// The prompt now returns `chosenModifierIds` (an array). `evaluateCheckRoll` reads it
-// back in a fixed precedence — array first, the historical scalar second, the
-// descriptor's own pre-selection third — and SUMS the survivors.
+// multi-pick playerPicks: the returned SELECTION (issue 1055). The prompt now returns
+// `chosenModifierIds` (an array).
 
 /** Roll the interactive path once and report the formula that reached `Roll`. */
 async function rollChoice(modifierChoice, choice) {
@@ -464,12 +452,9 @@ async function rollChoice(modifierChoice, choice) {
   return rolled;
 }
 
-// ── a chosen ROLLING modifier (issue 1118) ──────────────────────────────────
-//
-// A descriptor option carries `formula` instead of `value` when its expression rolls, and
-// the chosen fragment is appended VERBATIM as its own flavoured term. It is taken from the
-// descriptor rather than rebuilt here, so the chip the player was offered and the term that
-// rolls are one derivation.
+// a chosen ROLLING modifier (issue 1118). A descriptor option carries `formula` instead of `value`
+// when its expression rolls, and the chosen fragment is appended VERBATIM as its own flavoured
+// term.
 const DICE_PICK_CHOICE = {
   modifiers: [
     { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
@@ -532,11 +517,9 @@ test('playerPicks: a rolling PRE-SELECTION is what a headless confirm rolls', as
   );
 });
 
-// ── advantage belongs to the AUTHORED check, not to a modifier (issue 1118 review) ──
-//
-// `parsePlainDiceGroups` splits on parens AND flavour brackets, so `(1d20)[Modifiers]`
-// tokenises to a plain `1d20`. Without scoping, a check with no d20 of its own would offer
-// Advantage and the transform would rewrite the MODIFIER's die.
+// advantage belongs to the AUTHORED check, not to a modifier (issue 1118 review).
+// `parsePlainDiceGroups` splits on parens AND flavour brackets, so `(1d20)[Modifiers]` tokenises to
+// a plain `1d20`.
 const D20_MODIFIER_CHOICE = {
   modifiers: [
     { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
@@ -635,18 +618,15 @@ test('playerPicks: a multi-pick selection SUMS the chosen modifiers', async () =
   );
 });
 
-// `chosenModifierIds: []` is an ANSWER, not an absence. The player unticked everything,
-// which contributes 0 and appends nothing; falling through to the descriptor default here
-// would silently roll a modifier the player deliberately declined.
+// `chosenModifierIds: []` is an ANSWER, not an absence.
 test('playerPicks: an EMPTY chosenModifierIds is an answer and beats the default', async () => {
   assert.equal(
     await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: [] }),
     '1d20',
     'an empty array contributes 0 rather than falling back to the pre-selection'
   );
-  // The negative control: with NO selection field at all, the same descriptor DOES fall
-  // through to its pre-selection — so `(0)` above is the empty array being honoured
-  // rather than a dead path.
+  // The negative control: with NO selection field at all, the same descriptor DOES fall through to
+  // its pre-selection — so `(0)` above is the empty array being honoured rather than a dead path.
   assert.equal(
     await rollChoice(MULTI_PICK_CHOICE, {}),
     '1d20 + 8[Modifiers]',
@@ -675,10 +655,8 @@ test('playerPicks: the read-back precedence is ids, then the scalar, then the de
   );
 });
 
-// The prompt is a UI control, so its cap is NOT the invariant: this layer re-derives the
-// legal selection from the descriptor and never trusts what came back. Survivors are
-// taken in ELIGIBLE-SET order and truncated — deliberately NOT best-N — so cheating the
-// prompt can never pay more than a legal pick.
+// The prompt is a UI control, so its cap is NOT the invariant: this layer re-derives the legal
+// selection from the descriptor and never trusts what came back.
 const OVER_LARGE_CHOICE = {
   modifiers: [
     { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
@@ -767,12 +745,9 @@ test('playerPicks: a cancelled prompt aborts with no appended term and no roll',
   delete globalThis.Roll;
 });
 
-// eval == display is an acceptance criterion of #855, and the SITUATIONAL-BONUS branch
-// is where it can silently break: `effectiveFormula` gets the bonus appended, and only
-// the paired `resolved = resolveCheckFormulaDisplay(...)` recompute keeps the journal /
-// `resolvedFormula` in step. Without it a player who types `+2` sees `1d20 + 3[Modifiers]`
-// while `1d20 + 3[Modifiers] + (2)` actually rolls. Both tests assert the ROLLED string and the
-// DISPLAYED string are the same string.
+// eval == display is an acceptance criterion of #855, and the SITUATIONAL-BONUS branch is where it
+// can silently break: `effectiveFormula` gets the bonus appended, and only the paired `resolved =
+// resolveCheckFormulaDisplay(...)` recompute keeps the journal / `resolvedFormula` in step.
 test('playerPicks: eval == display with a situational bonus (and advantage) composed on top', async () => {
   const rolledFormulas = stubCraftingModRoll();
   const actor = { getRollData: () => ({}) };
@@ -811,10 +786,8 @@ test('interactive: eval == display when only a situational bonus is appended (no
   delete globalThis.Roll;
 });
 
-// The chat-flavor thread: the chosen modifier's label rides the existing flavor so the
-// posted roll says WHICH modifier the player picked. `stubCraftingModRoll`'s evaluated
-// roll has no `toMessage`, and the post is wrapped in a swallow-everything try/catch, so
-// the append is only observable through a roll stub that records the payload.
+// The chat-flavor thread: the chosen modifier's label rides the existing flavor so the posted roll
+// says WHICH modifier the player picked.
 function stubCraftingModChatRoll() {
   const posted = [];
   stubCraftingModRoll();
@@ -883,9 +856,8 @@ test('playerPicks: an empty base flavor gets the label alone, never an orphan bu
   delete globalThis.Roll;
 });
 
-// A multi-pick selection is ONE bullet segment with the labels comma-joined inside it,
-// so the flavor does not grow a separator per modifier. The single-pick output above is
-// unchanged, which is the point of joining inside the segment rather than outside it.
+// A multi-pick selection is ONE bullet segment with the labels comma-joined inside it, so the
+// flavor does not grow a separator per modifier.
 test('playerPicks: multiple picked labels join with ", " INSIDE one bullet segment', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
@@ -954,13 +926,8 @@ test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', a
   delete globalThis.Roll;
 });
 
-// THE BACK-COMPAT GUARANTEE (issue 1055), pinned in BOTH halves because only the pair
-// says anything. `playerPicks` sums the BEST LEGAL selection, so the CAP is what decides
-// the arithmetic: at 1 — the bound `1.20.0` stamps onto every pre-existing `playerPicks`
-// system — it is `max(3,5)` and identical to `highest`, which is what those worlds always
-// rolled; unbounded it is the plain sum, because picking everything is then legal.
-// Asserting only the unbounded half would let a regression that silently capped, or
-// silently uncapped, every world ship green.
+// THE BACK-COMPAT GUARANTEE (issue 1055), pinned in BOTH halves because only the pair says
+// anything.
 test('playerPicks non-interactive: a cap of 1 resolves the scalar exactly as highest', async () => {
   const rolledFormulas = stubCraftingModRoll();
   const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
@@ -984,9 +951,8 @@ test('playerPicks non-interactive: a cap of 1 resolves the scalar exactly as hig
 test('playerPicks non-interactive: UNBOUNDED resolves the scalar as the full sum', async () => {
   const rolledFormulas = stubCraftingModRoll();
   const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
-  // No `maxModifierPicks`: absence is UNLIMITED, so the best legal selection is
-  // everything, and everything sums. A system reaching this state on purpose is a GM who
-  // cleared the cap; a system reaching it by accident is what the migration prevents.
+  // No `maxModifierPicks`: absence is UNLIMITED, so the best legal selection is everything, and
+  // everything sums.
   await evaluateCheckRoll('1d20', actor, {
     craftingModifier: { ...MOD_CONTEXT, systemPolicy: 'playerPicks' },
   });
@@ -994,9 +960,8 @@ test('playerPicks non-interactive: UNBOUNDED resolves the scalar as the full sum
   delete globalThis.Roll;
 });
 
-// Truth table: {default-select, pick-override, cancel, non-interactive} ×
-// {rolled/display formula, pass-fail mutation}. Threaded through runFormulaPassFail so
-// the cancel row also pins the zero-mutation contract.
+// Truth table: {default-select, pick-override, cancel, non-interactive} × {rolled/display formula,
+// pass-fail mutation}.
 test('playerPicks truth table: selection state → appended term + pass/fail disposition', async () => {
   const actor = { getRollData: () => ({}) };
   const promptFor = (response) => async () => response;
@@ -1143,8 +1108,7 @@ test('runFormulaPassFail: meet comparison passes at/above the DC', async () => {
 });
 
 test('runFormulaPassFail: a forced-failure trigger overrides the comparison; label drives the message', async () => {
-  // total 2 would meet dc 1, but the trigger matches the rolled group total (1) and
-  // forces failure.
+  // total 2 would meet dc 1, but the trigger matches the rolled group total (1) and forces failure.
   stubRoll(2, [{ number: 1, faces: 20, total: 1 }]);
   const r = await runFormulaPassFail({
     formula: '1d20',
@@ -1322,9 +1286,8 @@ test('runFormulaRouted: no tier matches → outcome null, success false', async 
 });
 
 test('runFormulaRouted: clampToNearest routes a below-lowest total to the lowest tier', async () => {
-  // Same below-everything roll as above (total 4, lowest threshold "bad" at 10), but
-  // clampToNearest routes to that closest tier instead of a null outcome. The clamped
-  // tier carries its own success flag ("bad" is success:false).
+  // Same below-everything roll as above (total 4, lowest threshold "bad" at 10), but clampToNearest
+  // routes to that closest tier instead of a null outcome.
   stubRoll(4, [{ number: 1, faces: 20, total: 4 }]);
   const r = await runFormulaRouted({
     formula: '1d20',
@@ -1641,14 +1604,8 @@ test('runFormulaRouted: a throwing roll fails with a labelled message', async ()
   assert.match(r.message, /Salvage check roll failed/);
 });
 
-// ── classifyCheckTotal (issue 1097) ─────────────────────────────────────────
-//
-// The Checks Studio's odds histogram buckets every enumerated face through this
-// function, and `runFormulaRouted` resolves a real roll through it too. That makes
-// "they cannot drift" a property of the code rather than a promise — but only if the
-// EXTRACTION was faithful, and a differential test over the two REAL functions is the
-// only thing that shows it was. Two hand-written models agreeing proves nothing about
-// either.
+// classifyCheckTotal (issue 1097). The Checks Studio's odds histogram buckets every enumerated face
+// through this function, and `runFormulaRouted` resolves a real roll through it too.
 
 const { classifyCheckTotal } = await import('../src/systems/checkRoll.js');
 
@@ -1719,9 +1676,8 @@ const CLASSIFIER_CASES = [
   ],
   [
     // The forced-outcome BYPASS of the recipe minimum, which no other case reaches: a forced
-    // success reroutes to Fine, whose `start` clears the minimum, while an UNFORCED total in
-    // Rough would be blocked by it. Without this case the `!forced &&` guard on the gate can
-    // be deleted and every other parity assertion stays green.
+    // success reroutes to Fine, whose `start` clears the minimum, while an UNFORCED total in Rough
+    // would be blocked by it.
     'a forced FAILURE bypasses the recipe minimum gate',
     {
       type: 'fixed',
@@ -1855,10 +1811,8 @@ test('classifyCheckTotal: a forced outcome BYPASSES the recipe minimum-success-t
     diceGroups: [{ groupId: 0, group: '1d20', sum: STEP_TOTAL, results: [STEP_TOTAL] }],
   };
   const unforced = classifyCheckTotal({ ...args, triggers: [] });
-  // A forced FAILURE, deliberately: it reroutes to the WORST failing tier, which ranks
-  // below the recipe minimum. A forced SUCCESS reroutes to the best succeeding tier, which
-  // clears the minimum on its own — so a test built on one would pass whether or not the
-  // bypass existed, which is exactly the vacuous proof this case replaces.
+  // A forced FAILURE, deliberately: it reroutes to the WORST failing tier, which ranks below the
+  // recipe minimum.
   const forced = classifyCheckTotal({
     ...args,
     triggers: [totalTrigger({ value: STEP_TOTAL, outcome: 'failure' })],

@@ -1,26 +1,12 @@
-/**
- * Shared minimal Foundry environment for RecipeManager / CraftingSystemManager unit tests.
- *
- * Installs the small `globalThis.foundry`/`game`/`ui` shims those managers read at runtime and
- * returns the mutable bits tests assert against. Centralising it keeps the per-test boilerplate from
- * being duplicated across suites.
- */
+/** Shared minimal Foundry environment for RecipeManager / CraftingSystemManager unit tests. */
 import { FABRICATE_SETTINGS_NAMESPACE } from '../../src/config/settings.js';
 import { isWorldScopedSettingKey, settingPermissionError } from './settings.js';
 
 let idSeq = 0;
 
 /**
- * Install the `foundry.utils` / `ui.notifications` / `fromUuid` shims a model-layer suite
- * needs before its dynamic imports, WITHOUT touching `globalThis.game`.
- *
- * `installFoundryEnv` below owns `game` as well, which a suite that builds its own
- * settings store, pack list, or GM identity cannot use. This is the smaller half those
- * suites otherwise repeat verbatim — the copy is what the SonarCloud duplication gate
- * counts, and it counts `tests/**` exactly like `src/`.
- *
- * Call it at module scope, above the `await import(...)` of the module under test: the
- * managers read these globals while their own module graph is being evaluated.
+ * Install the `foundry.utils` / `ui.notifications` / `fromUuid` shims a model-layer suite needs
+ * before its dynamic imports, WITHOUT touching `globalThis.game`.
  */
 export function installFoundryUtilsEnv() {
   globalThis.foundry = {

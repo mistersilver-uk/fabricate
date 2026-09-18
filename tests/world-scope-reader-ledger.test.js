@@ -1,70 +1,6 @@
 /**
- * THE READER LEDGER, AS A FAIL-CLOSED GATE (issue 1370, epic 1357, PR 8a, criterion 11).
- *
- * PR 8a repoints every non-UI reader of a crafting system's `components`, `essenceDefinitions` or
- * `tools` array at the world-scope read union. A no-drift differential cannot see a MISSING
- * repoint, and the sweep that produced the reader set was mechanical — so the set is closed HERE,
- * by naming every remaining raw read in the tree and refusing to accept a new one silently.
- *
- * ## THREE OBLIGATIONS, AND THE THIRD IS THE ONE THAT IS EASY TO OMIT
- *
- *  1. **An UNLEDGERED SITE REDS.** Revert one repoint and the scan finds a site the ledger does
- *     not name.
- *  2. **A STALE ANCHOR REDS.** Edit a ledger anchor and its file no longer contains it.
- *  3. **A POSITIVE CONTROL: the scan must PROVE it found things.** Obligation 1 alone cannot
- *     carry that: a vacuous scan finds no unledgered site, so it passes. The design this gate
- *     REJECTED read each ledgered file directly for obligation 2, which never touched the
- *     matcher either — measured, BOTH stayed green against a matcher matching nothing. As
- *     SHIPPED, obligation 2 reads the scan's own `rows`, so a vacuous matcher reds it too; the
- *     control below is what makes that true rather than incidental. This gate is the SOLE
- *     discharge of the omitted-reader finding, so a vacuous matcher would otherwise silently
- *     reinstate it while every acceptance criterion stayed green.
- *
- * The precedent is the direct sibling: `tests/world-scope-no-shed-gate.test.js` records an earlier
- * form of that guarantee which "asserted a NAME IS NOT FOUND, so deleting the three methods kept
- * it green", and the fix there was the same one taken here — a POSITIVE EXISTENCE ANCHOR, plus a
- * meta-test pinning the matcher itself.
- *
- * ## THE MATCHER CARRIES NO RECEIVER PREDICATE, DELIBERATELY
- *
- * It is `/\.(?:components|essenceDefinitions|tools)\b/g` over `src/**\/*.js` less `src/ui/**` and
- * `src/migration/**`, comments stripped. A receiver heuristic is a thing that can be got WRONG,
- * and the whole purpose of the totals below is to detect a matcher that has been got wrong — so
- * removing the heuristic closes that class by construction rather than by threshold. False
- * positives (`toolValidation.tools`, `SALVAGE_CHAT_KEYS.tools`, `model.components`,
- * `item.tools`) and the seven files that are not readers at all are LEDGERED with a stated reason,
- * exactly as the manager's writer surface is. Narrowing the matcher to make them drop out is the
- * vacuity this control exists to catch.
- *
- * ## THE KEY IS `(file, anchor, count)`, NOT `(file, anchor)`
- *
- * Three byte-identical lines in `CraftingSystemManager.js` share one anchor while being alchemy
- * pre-validation, the `updateItem` metadata walk and `_deleteComponentSet` — three different
- * reasons under one entry. Without the count a NEW unrepointed reader spelled like an existing
- * ledgered anchor would be invisible, and an entry's stated reason would not describe every site
- * it covers. That entry carries a COMPOUND reason for exactly that reason.
- *
- * ## TWO BLIND SPOTS THE MATCHER CANNOT CLOSE, NAMED SO A CLEAN SCAN IS NOT MISTAKEN FOR AN
- * ## EXHAUSTIVE ONE
- *
- *  - **A COMPUTED KEY is unmatchable.** `src/systems/worldIdentityDrift.js` reads the entity
- *    arrays as `system[ENTITY_FIELDS[entityType]]`, so this scan sees nothing in that file. It is
- *    the one reader that MUST keep reading the raw setting, and it would neither red here as
- *    unledgered nor be pinned here. `tests/world-scope-consumer-sweep.test.js` pins it instead.
- *  - **DESTRUCTURING is unmatchable, and is the ONE remaining hole.** `const { components } =
- *    system` does not match, and no receiver appears before the name to anchor on. A BRACKET
- *    access with a string literal — `system['components']` — used to share this hole and no
- *    longer does; it is matched, and the header on `MATCHER` records what that cost.
- *
- * ## THE COMMITTED TOTALS, AND WHY THE DELTA'S BASE MEASUREMENT IS NOT THE LIVE FLOOR
- *
- * `BASE_SCAN` is the delta's own measurement of `origin/main` at `7304be93`, reproduced here
- * before the first edit of this PR. It CANNOT be a floor on the post-sweep tree, and the arithmetic
- * says why: the sweep's whole purpose is to remove raw reads, and it removed 82 of the 228 matched
- * lines. `SCAN_TOTALS` is therefore asserted as an EXACT EQUALITY against the live tree rather
- * than as a floor — which is strictly stronger, because a floor tolerates over-matching in one
- * direction and a matcher narrowed to a subset in the other, and an equality tolerates neither.
- * A vacuous matcher answers zero against a committed 146 and reds immediately.
+ * THE READER LEDGER, AS A FAIL-CLOSED GATE (issue 1370, epic 1357, PR 8a, criterion 11). 1. **An
+ * UNLEDGERED SITE REDS.** Revert one repoint and the scan finds a site the ledger does not name.
  */
 
 import assert from 'node:assert/strict';
@@ -74,18 +10,8 @@ import { describe, it } from 'node:test';
 import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
 
 /**
- * The matcher: a DOT access, or a BRACKET access with a string literal.
- *
- * NO RECEIVER PREDICATE on the dot form, deliberately — see the module note.
- *
- * The bracket form is the one place a receiver IS required, and only to tell
- * `system['components']` from an ARRAY LITERAL. Measured: without the receiver the pattern also
- * matches `domainsForSystemFields(['components'])` and `Object.freeze(['components', …])`,
- * adding eleven false sites across FIVE files — `repairItemData.js`, `settingChangeBridge.js`,
- * `CraftingSystemManager.js`, `importReferenceResolver.js` and `worldIdentityDrift.js`, three of
- * which the scan does not otherwise reach at all. The receiver must abut the bracket, because
- * `of ['components', …]` puts a word character before a SPACE and a bracket. Adding this form
- * moved no total: 162 / 146 / 19 / 118 / 17 / 45 before and after.
+ * The matcher: a DOT access, or a BRACKET access with a string literal. The bracket form is the one
+ * place a receiver IS required, and only to tell `system['components']` from an ARRAY LITERAL.
  */
 const MATCHER =
   /(?:\.|[\w$)\]]\[\s*['"])(?:components|essenceDefinitions|tools)\b/g;
@@ -93,12 +19,7 @@ const MATCHER =
 /** The two directories the sweep deliberately did not enter. */
 const EXCLUDED_PREFIXES = Object.freeze(['src/ui/', 'src/migration/']);
 
-/**
- * Every reason a raw read may still be here, each drawn from the delta's `#### D5`.
- *
- * A reason not in this map fails the first test below, so a new entry cannot be waved through
- * with a freehand excuse.
- */
+/** Every reason a raw read may still be here, each drawn from the delta's `#### D5`. */
 const REASONS = Object.freeze({
   writer:
     "the manager's own authoring and writer surface: a reader repoint would make the manager " +
@@ -124,12 +45,7 @@ const REASONS = Object.freeze({
     'memo guard tuple or a paged browser model',
 });
 
-/**
- * The delta's measurement of `origin/main` at `7304be93`, before this PR's first edit.
- *
- * Kept because it is what makes the live totals below legible: the sweep removed 82 of these 228
- * matched lines and 120 of the 282 matches, and 13 of the 32 files lost every site they had.
- */
+/** The delta's measurement of `origin/main` at `7304be93`, before this PR's first edit. */
 const BASE_SCAN = Object.freeze({
   matches: 282,
   lines: 228,
@@ -140,13 +56,7 @@ const BASE_SCAN = Object.freeze({
 });
 
 /**
- * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor.
- *
- * `162 -> 163` at issue 1371 r21-store4: `_overrideInheritedEssencesBeforeStrip` walks
- * `system.components` to find the rows the essence delete AFFECTS, which is the same
- * authoring-accessor question every other `for (const component of system.components || [])` in
- * that file asks — it mutates those rows in place before the one `save()`, so it must read the
- * record the save writes and not the read union's merged copies.
+ * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor (issue 1371).
  */
 const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique validated-tool/receipt reads in the same two engine files.
@@ -159,9 +69,8 @@ const SCAN_TOTALS = Object.freeze({
 });
 
 /**
- * Every surviving raw read, keyed `(file, anchor, expected occurrence count)` with the reason it
- * is still here. A COMPOUND reason means one anchor covers sites with different reasons — the
- * exact case the count exists to make visible.
+ * Every surviving raw read, keyed `(file, anchor, expected occurrence count)` with the reason it is
+ * still here.
  */
 const LEDGER = Object.freeze([
   // #1648: validated tool pairs and durable effect receipts, never system libraries.
@@ -292,16 +201,7 @@ const LEDGER = Object.freeze([
   ['src/utils/componentBrowserModel.js', "page: paged.components,", 1, 'not-a-system'],
 ]);
 
-/**
- * NAMED LIVE ANCHORS in four distinct files, the other half of the positive control.
- *
- * The delta named `src/main.js` and `src/canvas/InteractableManager.js` among its four, measured
- * against the PRE-sweep tree; both lost every site they had to this PR's own repoint, so they
- * cannot anchor a control on the tree that ships. `CraftingSystemManager.js` and
- * `CompendiumImporter.js` take their places, and the four still span four distinct classes of
- * surviving read: a writer surface, a false-positive receiver, an `Array.isArray` guard and the
- * import path.
- */
+/** NAMED LIVE ANCHORS in four distinct files, the other half of the positive control. */
 const POSITIVE_ANCHORS = Object.freeze([
   [
     'src/systems/CraftingSystemManager.js',
@@ -361,10 +261,8 @@ describe('the world-scope reader ledger', () => {
     assert.equal(ledgerByKey.size, LEDGER.length, 'and no two entries share a (file, anchor) key');
   });
 
-  // -----------------------------------------------------------------------------------------
   // THE POSITIVE CONTROL — measured, obligations 1 and 2 both stay GREEN against a matcher that
   // matches nothing, so neither of them can stand in for this.
-  // -----------------------------------------------------------------------------------------
 
   it('finds EXACTLY the committed totals, so a matcher that matched nothing reds here', () => {
     const { totals } = scan();
@@ -392,9 +290,7 @@ describe('the world-scope reader ledger', () => {
     assert.equal(new Set(POSITIVE_ANCHORS.map(([file]) => file)).size, 4);
   });
 
-  // -----------------------------------------------------------------------------------------
   // OBLIGATION 1 — an unledgered site reds
-  // -----------------------------------------------------------------------------------------
 
   it('leaves NO live raw read unledgered, and no ledgered read miscounted', () => {
     const { rows } = scan();
@@ -416,9 +312,7 @@ describe('the world-scope reader ledger', () => {
     );
   });
 
-  // -----------------------------------------------------------------------------------------
   // OBLIGATION 2 — a stale anchor reds
-  // -----------------------------------------------------------------------------------------
 
   it('carries no STALE anchor: every ledgered line still exists in its file', () => {
     const { rows } = scan();
@@ -428,9 +322,7 @@ describe('the world-scope reader ledger', () => {
     assert.deepEqual(stale, [], 'a ledger entry whose line is gone is an excuse for nothing');
   });
 
-  // -----------------------------------------------------------------------------------------
   // The matcher itself, pinned — the meta-test the sibling gate added for the same reason
-  // -----------------------------------------------------------------------------------------
 
   it('matches a RAW read and stops matching a REPOINTED one', () => {
     const raw = 'const components = Array.isArray(system?.components) ? system.components : [];';

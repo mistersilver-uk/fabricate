@@ -22,9 +22,7 @@ const { ARCHIVE_CHUNK_GATE_LABEL, assertArchiveChunkCompleteness } = await impor
   '../scripts/lib/releaseZipChunks.js'
 );
 
-// ───────────────────────────────────────────────────────────────────────────
 // deriveS3Layout() tests
-// ───────────────────────────────────────────────────────────────────────────
 
 const baseOpts = {
   moduleId: 'fabricate',
@@ -149,9 +147,7 @@ test('deriveS3Layout uses stable labels for staging/logging', () => {
   assert.equal(testerTargets[0].label, 'tester-closed-beta-2026');
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // Secret tester path segment (closed-beta URL rotation)
-// ───────────────────────────────────────────────────────────────────────────
 
 test('deriveS3Layout inserts the secret segment between group and module id', () => {
   const { testerTargets } = deriveS3Layout({ ...baseOpts, testerSegment: 's3cr3t' });
@@ -201,9 +197,7 @@ test('redactSegment masks the secret segment, and is a no-op without one', () =>
   assert.equal(redactSegment('no secret here'), 'no secret here');
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // getFlag() tests
-// ───────────────────────────────────────────────────────────────────────────
 
 test('getFlag returns the value following a flag', () => {
   assert.equal(getFlag(['--version', '0.2.0-rc.1'], '--version'), '0.2.0-rc.1');
@@ -221,9 +215,7 @@ test('getFlag returns null when the flag is last with no value', () => {
   assert.equal(getFlag(['--dry-run', '--version'], '--version'), null);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.1 / 1.3 — assertPublishSafety: the provenance decision table
-// ───────────────────────────────────────────────────────────────────────────
 
 const CH = {
   label: 'channel-beta',
@@ -318,9 +310,7 @@ for (const [name, mutate] of [
 }
 
 test('assertPublishSafety treats a guard-side sourceSha of "unknown" as absent (never a match)', () => {
-  // The zip carries a REAL, identified sha — so the zip-side check would PASS. Only the guard-side
-  // `unknown` branch can fail this case; pairing it with an identified zip isolates that branch (a
-  // `if (sourceSha === 'unknown') return true` mutation would flip this to a resume and be caught).
+  // The zip carries a REAL, identified sha — so the zip-side check would PASS.
   const body = { id: 'fabricate', version: '1.4.0' };
   const state = [
     rec({
@@ -368,9 +358,7 @@ test('assertPublishSafety allows a same-version content swap under --overwrite',
   assert.deepEqual(verdict.skipZipKeys, []);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.3 — the manifest body is compared in its S3-serialised (PUT) form
-// ───────────────────────────────────────────────────────────────────────────
 
 test('the resume check compares the S3-serialised body, not the dist form with its trailing newline', () => {
   const body = { id: 'fabricate', version: '1.4.0', manifest: 'u' };
@@ -396,9 +384,7 @@ test('the resume check compares the S3-serialised body, not the dist form with i
   assert.equal(misread.ok, false);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.1 / 1.2 — fetchPublishState surfaces manifest + zip provenance; 404 ⇒ null
-// ───────────────────────────────────────────────────────────────────────────
 
 test('fetchPublishState returns {version,etag,body} manifests and {etag,size,metadata} zips', async () => {
   const manifestBody = JSON.stringify({ version: '1.4.0' });
@@ -419,9 +405,7 @@ test('fetchPublishState returns {version,etag,body} manifests and {etag,size,met
   assert.equal(state[1].zip, null);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.2 / 1.7 — provenanceMetadata + the build-profile tripwire (pure)
-// ───────────────────────────────────────────────────────────────────────────
 
 test('provenanceMetadata keys the stamp on version, source sha and build profile', () => {
   assert.deepEqual(provenanceMetadata('1.4.0', 'deadbeef', 'community'), {
@@ -453,9 +437,7 @@ test('assertUniformBuildProfile returns the shared profile, or fails naming issu
   assert.doesNotMatch(error.message, /edition/);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // 1.4 — buildCopyObjectParams: REPLACE must re-supply ContentType + CacheControl
-// ───────────────────────────────────────────────────────────────────────────
 
 test('buildCopyObjectParams issues REPLACE and re-supplies ContentType + CacheControl', () => {
   const params = buildCopyObjectParams('b', {
@@ -490,10 +472,8 @@ test('buildCopyObjectParams percent-encodes CopySource per segment, preserving s
   assert.ok(params.CopySource.startsWith('my-bucket/testers/closed-beta/'));
 });
 
-// ───────────────────────────────────────────────────────────────────────────
-// 1.2 / 1.4 / 1.5 / 1.6 / 1.7 — through main(): conditional writes, read-back,
-// provenance stamping, backfill, and the tripwire writing NOTHING
-// ───────────────────────────────────────────────────────────────────────────
+// 1.2 / 1.4 / 1.5 / 1.6 / 1.7 — through main(): conditional writes, read-back, provenance stamping,
+// backfill, and the tripwire writing NOTHING
 
 const MAIN_CONFIG = {
   moduleId: 'fabricate',
@@ -509,15 +489,7 @@ const TE_MANIFEST = 'testers/closed-beta-2026/seg/fabricate/module.json';
 
 /**
  * A `main()` harness with a tiny STATEFUL S3 double: manifest writes are reflected so the
- * post-publish read-back sees the version just published. `staleReadBack` forces the read-back to
- * come back at a different version, proving a partial publish fails the run.
- *
- * `realArchiveGate` swaps TWO collaborators together, because they only make sense together: the
- * default `zip` writes the 9-byte string `zip-bytes`, which no zip reader can parse, so the
- * archive-completeness gate (issue 1565) is stubbed out for every test that is not about it. The
- * one test that IS about it needs a real `zipDirectory` over a real `distDir`, which is why
- * `distFiles` exists — and an `esmodules` entry in the built manifest, without which the gate
- * refuses for a DIFFERENT reason and the proof would be measuring the wrong refusal.
+ * post-publish read-back sees the version just published (issue 1565).
  */
 async function makeMain({
   config = MAIN_CONFIG,
@@ -540,9 +512,7 @@ async function makeMain({
   await writeFile(configPath, JSON.stringify(config));
 
   // Per-KEY staleness: `staleReadBack` may be a boolean (every manifest reads back stale) or a
-  // predicate naming WHICH keys do. Per-key lets a test hold the channel manifest current while only
-  // the tester manifest reads back stale — which must STILL fail the run, pinning the "verify every
-  // manifest" loop against a `staged.slice(0, 1)` mutation.
+  // predicate naming WHICH keys do.
   const isStale = typeof staleReadBack === 'function' ? staleReadBack : () => staleReadBack;
   const store = {};
   const puts = [];
@@ -598,13 +568,7 @@ const manifestPut = (puts, key) =>
 const zipPut = (puts, key) =>
   puts.find((p) => p.key === key && p.contentType === 'application/zip');
 
-// Issue 1565's composition proof for THIS publish path. release-s3 builds with `--no-zip` and
-// makes its own archives through scripts/lib/zip.js, so gating scripts/release.js alone would have
-// left every channel and cohort archive unproven.
-//
-// It asserts the GATE'S OWN MESSAGE and the missing member's NAME, not merely that the run
-// rejected: `main()` refuses for a dozen other reasons, several of them also before any write, so
-// a bare `assert.rejects` would pass just as happily with the gate deleted.
+// Issue 1565's composition proof for THIS publish path.
 test('main() refuses to publish a staged archive short a chunk its entry script references', async () => {
   const missingChunk = 'chunks/absent-DEADBEEF.js';
   const harness = await makeMain({
@@ -707,10 +671,7 @@ test('main() fails the run when a post-publish read-back advertises a stale vers
 });
 
 test('main() fails when ONLY the tester manifest reads back stale — every target is verified', async () => {
-  // The channel manifest reads back current; only the tester manifest is stale. A partial publish
-  // (channel written, tester not established) must NOT report green — so this pins the read-back
-  // loop over EVERY target (a `staged.slice(0, 1)` mutation that verifies only the channel passes
-  // all other tests but must fail here).
+  // The channel manifest reads back current; only the tester manifest is stale.
   const harness = await makeMain({
     heads: {
       [CH_MANIFEST]: {

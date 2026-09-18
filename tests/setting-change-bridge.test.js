@@ -16,9 +16,8 @@ describe('handleFabricateSettingChange', () => {
     assert.equal(handled, true);
     assert.deepEqual(emitted, [
       ['fabricate.craftingSystemsChanged', [{ id: 's1' }]],
-      // The scoped signal rides beside the published hook on BOTH replication branches (issue
-      // 1078 part B1). This double reports no scopes, so the payload is the unattributable one
-      // every consumer routes broadly — the safe answer for a manager that cannot name a delta.
+      // The scoped signal rides beside the published hook on BOTH replication branches (issue 1078
+      // part B1).
       ['fabricate.craftingDataChanged', { source: 'systems', scopes: [] }],
     ]);
   });
@@ -93,11 +92,9 @@ describe('handleFabricateSettingChange', () => {
     );
   });
 
-  // --- World currency (issue 1278) -----------------------------------------------------
-  // Currency used to be per-system state, so editing it wrote `requirements` on a crafting
-  // system and the systems branch above announced `resolution-config` for THAT system. The
-  // ladder is world scope now and no system record changes, so this branch is the ONLY thing
-  // that tells a connected player's shell a GM moved the coins.
+  // World currency (issue 1278) ----------------------------------------------------- Currency used
+  // to be per-system state, so editing it wrote `requirements` on a crafting system and the systems
+  // branch above announced `resolution-config` for THAT system.
   it('reloads the world currency store and scopes the change to PARTICIPATING systems', () => {
     const emitted = [];
     let loadCalls = 0;
@@ -142,9 +139,7 @@ describe('handleFabricateSettingChange', () => {
     ]);
   });
 
-  // The WORLD character libraries leg (issue 1308). It departs from the currency leg above in two
-  // ways, and both are silent when got wrong — which is why they are pinned here rather than left
-  // to the fact that the leg "looks like" its siblings.
+  // The WORLD character libraries leg (issue 1308).
   it('reloads the character-libraries store and announces the UNION of all three domains', () => {
     const emitted = [];
     const order = [];
@@ -162,9 +157,7 @@ describe('handleFabricateSettingChange', () => {
     });
 
     assert.equal(handled, true);
-    // ORDERING IS A MUST, not an accident. Every consumer of the announcements reads the
-    // libraries back through this store, so announcing first hands them the pre-edit libraries
-    // and caches that as the new truth.
+    // ORDERING IS A MUST, not an accident.
     assert.equal(order[0], 'load', 'the store is re-read BEFORE anything is announced');
 
     const [republish, change] = emitted;
@@ -175,13 +168,6 @@ describe('handleFabricateSettingChange', () => {
       [
         // EVERY system, not just participants: there is no participation flag here by design, so
         // any system may reference any entry by id.
-        //
-        // And all THREE domains. Before the move the two libraries lived on the crafting system
-        // and were classified separately — `modifiers: [resolution-config]` and
-        // `characterPrerequisites: [labelling, access-and-knowledge]` — so an edit to either
-        // announced its own domains through the `craftingSystems` write. One setting cannot say
-        // WHICH library moved, so narrowing this to `resolution-config` alone (which is exactly
-        // what copying the currency leg produces) silently stops announcing the other two.
         { systemId: 'alpha', domains: ['labelling', 'resolution-config', 'access-and-knowledge'] },
         { systemId: 'beta', domains: ['labelling', 'resolution-config', 'access-and-knowledge'] },
       ],
@@ -254,28 +240,23 @@ describe('handleFabricateSettingChange', () => {
   });
 });
 
-// The registrations live in a `ready` callback that no test under the `npm test` glob can
-// reach — nothing calls `fabricate.initialize()` — so they are pinned at the source, which is
-// the convention `player-character-actor-types.test.js` established for exactly this edge.
-// Each pin below was mutation-proved: the line was removed or altered and the assertion went
-// red before being restored.
+// The registrations live in a `ready` callback that no test under the `npm test` glob can reach —
+// nothing calls `fabricate.initialize()` — so they are pinned at the source, which is the
+// convention `player-character-actor-types.test.js` established for exactly this edge.
 describe('main.js settings hook wiring', () => {
   const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/main.js'), 'utf8');
 
   it('registers BOTH settings hooks on ONE shared listener', () => {
-    // The first-ever write to a world setting is a CREATE, not an update (issue 1024), so a
-    // world that has never stored `fabricate.recipes` propagates its first GM edit to nobody
-    // until reload without the `createSetting` leg. They share one listener so the two cannot
-    // drift, which `player-character-actor-types.test.js` and `item-stack-quantity.test.js`
-    // both depend on.
+    // The first-ever write to a world setting is a CREATE, not an update (issue 1024), so a world
+    // that has never stored `fabricate.recipes` propagates its first GM edit to nobody until reload
+    // without the `createSetting` leg.
     assert.match(mainSource, /Hooks\.on\('updateSetting', handleFabricateSettingDocumentChange\);/);
     assert.match(mainSource, /Hooks\.on\('createSetting', handleFabricateSettingDocumentChange\);/);
   });
 
   it('hands the bridge the LIVE collaborators, resolved per call', () => {
-    // `fabricate.recipeManager` is assembled during `ready`, so a value captured at wiring
-    // time would be stale for the rest of the session. The factory is a thunk for that
-    // reason, and the listener must call it rather than close over a snapshot.
+    // `fabricate.recipeManager` is assembled during `ready`, so a value captured at wiring time
+    // would be stale for the rest of the session.
     const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
     assert.ok(targetsStart > -1, 'the targets factory is still present');
     // Anchored on the closing LINE (newline + the two-space indent), not on a bare `});`.
@@ -296,10 +277,7 @@ describe('main.js settings hook wiring', () => {
         `the targets factory must carry ${property}`
       );
     }
-    // And the listener must INVOKE it. Pinning only where the property lives says nothing
-    // about whether a leg uses it: deleting the call left this suite fully green while every
-    // replicated GM edit stopped reaching any manager, because the bridge's behavioural tests
-    // build their targets locally and nothing else can see a wiring regression here.
+    // And the listener must INVOKE it.
     assert.match(
       mainSource,
       /handleFabricateSettingChange\(key, fabricateSettingChangeTargets\(\)\);/,
@@ -308,16 +286,10 @@ describe('main.js settings hook wiring', () => {
   });
 });
 
-// --- World scope stores (issue 1359, epic 1357) ---------------------------------------------
-// A client that booted before the migrating GM wrote keeps `isSeeded() === false` for the whole
-// session. That is harmless while this change is additive — but once the epic's migration strips
-// the in-system arrays, that client has an unseeded world corpus AND an empty legacy corpus, so
-// its union read answers NOTHING and it sees no components, essences or tools at all until reload.
+// World scope stores (issue 1359, epic 1357) --------------------------------------------- A client
+// that booted before the migrating GM wrote keeps `isSeeded() === false` for the whole session.
 describe('the world scope legs', () => {
-  // FOUR LEGS SINCE ISSUE 1392, and the fourth is not a scoped-entity store. Each row carries
-  // its own factory, its own replicated payload and its own probe, because the World Vocabulary
-  // has no `entities` sub-key and no entity roster to read back — parameterising those three is
-  // what lets one loop state one claim about all four rather than a fourth hand-written copy.
+  // FOUR LEGS SINCE ISSUE 1392, and the fourth is not a scoped-entity store.
   const SCOPES = [
     {
       name: 'componentScope',
@@ -365,9 +337,6 @@ describe('the world scope legs', () => {
     it(`reloads the ${scope.name} store BEFORE announcing, so a consumer reads the post-edit corpus`, async () => {
       // THE ORDER IS THE WHOLE POINT. Every consumer that reacts reads the corpus back through the
       // store, so announcing first hands it the pre-edit value and caches that as the new truth.
-      // Proven by a consumer that reads from INSIDE the announcement, rather than by asserting a
-      // call order — a `['load','emit']` order assertion passes against a `load()` that read the
-      // wrong key.
       const module = await import(scope.module);
       const values = new Map();
       const store = module[scope.factory]({
@@ -403,19 +372,9 @@ describe('the world scope legs', () => {
   }
 
   it('drives EVERY store `src/main.js` hands the bridge, with the exemptions stated inline', () => {
-    // ── THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
+    // THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
     // `WORLD_STORE_LEGS` is an unexported frozen array, and the `SCOPES` table above is a
-    // hand-maintained copy of part of it. Before this, a store registered, constructed, loaded
-    // and handed to the bridge with NO leg was invisible: the key is not handled, nothing
-    // reports the miss, and the client's corpus stays at whatever it read at boot for the whole
-    // session. That is the exact failure the three issue-1359 legs exist to prevent, and it was
-    // reachable again for every later store.
-    //
-    // KEYED ON `fabricateSettingChangeTargets()` AND NOT ON `WORLD_SCOPED_SETTING_KEYS`. The
-    // targets factory is the actual enumeration of stores the bridge can drive; the key set has
-    // 27 members against 6 legs and carries no store information at all, so keying on it would
-    // need a ~21-entry hand-maintained exemption list — a second unguarded mirror in place of
-    // the first.
+    // hand-maintained copy of part of it.
     const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/main.js'), 'utf8');
     const bridgeSource = readFileSync(
       resolve(import.meta.dirname, '..', 'src/config/settingChangeBridge.js'),

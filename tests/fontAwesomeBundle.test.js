@@ -1,11 +1,4 @@
-/**
- * The catalogue generator's reading of Foundry's Font Awesome bundle.
- *
- * The committed catalogue is the artifact; this covers the derivation, because CI has no Foundry
- * install and cannot rerun the generator. Everything under test here is pure and fed a fixture
- * cut in the shape of the real stylesheet — the woff2 reader is the one function that is not, and
- * it is exercised by running the generator rather than by a synthetic font.
- */
+/** The catalogue generator's reading of Foundry's Font Awesome bundle. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -73,8 +66,7 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
   });
 
   // Foundry 13.351's stylesheet contains no comment at all, so there is no banner and no patch
-  // number in it. Throwing there is what made the generator unrunnable against a Foundry 13
-  // install; the generation and the edition are still stated, just by the family names.
+  // number in it.
   it('falls back to the font-family literals when the build stripped the banner', () => {
     assert.deepEqual(parseFontAwesomeRelease(V13_STYLESHEET_FIXTURE), {
       edition: 'Pro',
@@ -89,8 +81,7 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
   });
 
   // Font Awesome 7 assigns a glyph with the `--fa` custom property rather than a `content` rule, so
-  // a `::before` scrape finds almost nothing. The utility classes match the same selector shape and
-  // must fall out by construction, because they assign no glyph.
+  // a `::before` scrape finds almost nothing.
   it('finds only the rules that assign a glyph, never the utility classes', () => {
     const rules = parseIconGlyphRules(STYLESHEET_FIXTURE);
     const names = rules.flatMap((rule) => rule.names);
@@ -116,12 +107,8 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
     assert.equal(parseGlyphCodepoint('A'), 0x41);
   });
 
-  // CSS Syntax §4.3.7 lets an escape end at a single whitespace instead of at six digits, and
-  // that is how the bundle spells `.fa-0` through `.fa-9`: `"\30 "`. Reading the terminator as
-  // part of the value fails the hex test and falls through to the first DIGIT CHARACTER's own
-  // codepoint, so all ten digits come back as `0x33`. They still reach the catalogue today only
-  // because `0x33` happens to sit in the classic face and not in brands — and the codepoint is
-  // the ONLY input to that filter, so ten icons' membership is currently decided by accident.
+  // CSS Syntax §4.3.7 lets an escape end at a single whitespace instead of at six digits, and that
+  // is how the bundle spells `.fa-0` through `.fa-9`: `"\30 "`.
   it('ends a hex escape at its whitespace terminator rather than reading the terminator', () => {
     assert.equal(parseGlyphCodepoint(`${BACKSLASH}30 `), ZERO);
     assert.equal(parseGlyphCodepoint(`${BACKSLASH}39 `), 0x39);
@@ -135,8 +122,6 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
 });
 
 // Every `font-family` literal each bundle really declares, in the order its stylesheet emits them.
-// Foundry 14's list is the trap: it carries the Font Awesome 5 aliases the project keeps for
-// stylesheets written against the old family names, so a first-match read of that file answers 5.
 const V13_FONT_FAMILIES = [
   'Font Awesome 6 Pro',
   'Font Awesome 6 Duotone',
@@ -210,11 +195,7 @@ describe("reading the edition out of the bundle's licence", () => {
 });
 
 // Cut in the shape of Foundry 13's bundle, which writes TWO declarations for all but a handful of
-// its icons: `--fa` and the duotone companion `--fa--fa`. 4,159 of that bundle's 4,656 icon rules
-// take this shape and 495 do not, and the 495 are all brands — so a reader that required the
-// closing `"` to be followed by `}` reported a Foundry 13 install as having 495 icons and no
-// classic glyph at all. The last two entries are the two rules whose values contain a brace and a
-// quote; the brace one is the reason the terminator has to be read rather than assumed.
+// its icons: `--fa` and the duotone companion `--fa--fa`.
 const TWO_DECLARATION_FIXTURE = [
   '@charset "utf-8";',
   '.fa{font-family:var(--fa-style-family,"Font Awesome 6 Pro")}',
@@ -257,10 +238,7 @@ describe('reading a bundle that assigns each glyph twice', () => {
 });
 
 describe('recognising a retired Font Awesome spelling', () => {
-  // A marker is a whole hyphen-delimited token. Every name below is one the bundle really
-  // declares, on the side of the line its own group puts it: `fire-alt` is an alias of
-  // `fire-flame-curved`, `home-lg` of `house-chimney`, `battery-5` of the same glyph as
-  // `battery-full`, and `comment-alt-dots` of `message-dots`.
+  // A marker is a whole hyphen-delimited token.
   it('marks the retired spellings the bundle keeps as aliases', () => {
     for (const name of [
       'fire-alt',
@@ -296,9 +274,7 @@ describe('recognising a retired Font Awesome spelling', () => {
   });
 
   // The rule over-matches three shapes, and this pins that it does: a bare ordinal, a trailing
-  // `-broken` and a trailing `-o` are all names in their own right here. It costs nothing because
-  // each is the only name its glyph carries — `preferredIconName` ranks the names of ONE glyph —
-  // and the curated vocabulary excludes single characters for its own reasons anyway.
+  // `-broken` and a trailing `-o` are all names in their own right here.
   it('over-matches a handful of single-name glyphs, inertly', () => {
     assert.equal(isRetiredVariantName('0'), true);
     assert.equal(isRetiredVariantName('image-broken'), true);
@@ -329,9 +305,7 @@ describe('choosing which of a glyph names the vocabulary offers', () => {
     'message-dots'
   ]);
 
-  // `-alt` retires a spelling wherever it sits in the name, not only at the end. Font Awesome's
-  // `comment` family is far larger than its `message` family, so without the retired rule the
-  // family tie-break below would offer `comment-alt-dots` — a label reading "Comment Alt Dots".
+  // `-alt` retires a spelling wherever it sits in the name, not only at the end.
   it('drops a retired-variant spelling, including one buried mid-name', () => {
     assert.equal(preferredIconName(['fire-alt', 'fire-flame-curved'], counts), 'fire-flame-curved');
     assert.equal(preferredIconName(['comment-alt-dots', 'message-dots'], counts), 'message-dots');
@@ -398,9 +372,7 @@ describe('building the catalogue', () => {
       brandCodepoints
     });
 
-    // `0` is here because its rule is written `--fa:"\30 "`. Misreading that escape hands the
-    // filter `0x33`, which this fixture's classic face does not carry, and the digit silently
-    // leaves the catalogue — which is the whole defect, seen end to end.
+    // `0` is here because its rule is written `--fa:"\30 "`.
     assert.deepEqual(
       catalogue.map((entry) => entry.iconCode),
       ['0', 'baby-carriage', 'candle-holder', 'gear', 'gears', 'plus']
@@ -412,9 +384,8 @@ describe('building the catalogue', () => {
     );
   });
 
-  // A logo is exactly a glyph only the brands face draws, which is measurable. The block of
-  // company names this replaces was not: it could only ever exclude the brands somebody had
-  // noticed.
+  // A logo is exactly a glyph only the brands face draws, which is measurable. The block of company
+  // names this replaces was not: it could only ever exclude the brands somebody had noticed.
   it('excludes a glyph the brands face draws', () => {
     const catalogue = buildIconCatalogue({
       cssText: STYLESHEET_FIXTURE,

@@ -1,7 +1,6 @@
 /**
- * Journal authoring matches prototype SHA-256 453d147b1d1d27652aee4ac69764d77aaddf66e53f7ae9272513e0a1fd3d954c.
- * Names, cardinalities and stock are reference facts with core raster art, never UI projections.
- * Local and CI runs require no prototype file, decoded script or image.
+ * Journal authoring matches prototype SHA-256
+ * 453d147b1d1d27652aee4ac69764d77aaddf66e53f7ae9272513e0a1fd3d954c.
  */
 const fixed = (id, quantity = 1) => ({ id, quantity });
 const price = (unit, amount) => ({ currency: unit, amount });
@@ -125,10 +124,8 @@ export const JOURNAL_PROTOTYPE_RECIPES = Object.freeze({
       ),
     ],
   },
-  // CANONICAL EXTENSION, not a prototype account: a currency-only ingredient set, which D-031
-  // rules is valid and authorable. It is the one shape whose start receipt records a payment and
-  // no items at all, and no prototype account has it — so without this the surface that renders
-  // that receipt has no frame.
+  // CANONICAL EXTENSION, not a prototype account: a currency-only ingredient set, which D-031 rules
+  // is valid and authorable.
   permit: {
     name: 'File a Guild Permit',
     mode: 'simple',
@@ -573,9 +570,7 @@ function seedGathering(content, components, template) {
       // `dcOverride`, NOT `dc`. A task-level `dc` is read by nothing: the base DC is
       // `_resolveGatheringRoutedDc`'s `task.dcOverride` -> routed slot `dc` -> 15
       // (`src/systems/GatheringEngine.js`), and `routedOutcomeBand` in `RunJournalBuilder.js`
-      // mirrors that chain. Spelled `dc` the authored 10 was inert and every balehound band
-      // rendered off the 15 fallback, so the gathering-check frames could not be read as
-      // parity evidence for the DC they claim to show.
+      // mirrors that chain.
       dcOverride: 10,
       resultGroups: tiers.map(([id, name, _dc, _success, awards]) => ({
         id,
@@ -641,10 +636,8 @@ export async function stockJournalPrototype(actor, content, state = null) {
   }
   if (!stock.length) return;
   const byId = new Map(content.components.map((entry) => [entry.id, entry]));
-  // `keepId` so each stocked stack keeps a readable, stable owned address
-  // (`<actor uuid>.Item.<component id>`) rather than an index-dependent one. The cases and
-  // fixtures that name a specific carrier pin that address, and an id that shifted with
-  // stocking order would make those pins meaningless.
+  // `keepId` so each stocked stack keeps a readable, stable owned address (`<actor
+  // uuid>.Item.<component id>`) rather than an index-dependent one.
   await actor.createEmbeddedDocuments(
     'Item',
     stock.map(([id, quantity]) => {

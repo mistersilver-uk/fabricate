@@ -1,14 +1,7 @@
 /**
- * `MacroExecutor` — the direct-evaluation seam for GM-authored script macros.
- *
- * The behavioural cases pin the three payload aliases, the ambient Foundry globals and the
- * error passthrough. The last two cases pin the JUSTIFICATION for bypassing
- * `Macro#canUserExecute` (issue 1286): the executing client may now be a GM, so the reason
- * that bypass was originally documented with — "the script still runs as the current player
- * with no added server or document authority" — is false, and the source must not carry it.
- * A comment is the only carrier that reason has ever had, so a source assertion is the only
- * thing that can keep it honest; a hand-maintained justification with no guard is exactly
- * the kind of mirror that rots silently.
+ * `MacroExecutor` — the direct-evaluation seam for GM-authored script macros. The behavioural cases
+ * pin the three payload aliases, the ambient Foundry globals and the error passthrough (issue
+ * 1286).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,25 +16,10 @@ const MACRO_EXECUTOR_SOURCE = readFileSync(
   'utf8'
 );
 
-/**
- * The same source with every comment removed.
- *
- * Needed because the justification below TALKS ABOUT the `type === 'script'` gate at
- * length, so a raw-text assertion that the gate is absent is satisfied by nothing and
- * defeated by the prose explaining why it is absent. The two views are kept separate rather
- * than one being derived ad hoc inside a case, so it is obvious which claim is about the
- * code and which is about the reasoning.
- */
+/** The same source with every comment removed. */
 const MACRO_EXECUTOR_CODE = MACRO_EXECUTOR_SOURCE.replaceAll(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
 
-/**
- * The same source as ONE line, with comment leaders and line breaks collapsed to single
- * spaces.
- *
- * Prose assertions read this rather than the raw text: a sentence that happens to wrap
- * across two comment lines is the same sentence, and a guard that failed when someone
- * reflowed a paragraph would be reworded away rather than satisfied.
- */
+/** The same source as ONE line, with comment leaders and line breaks collapsed to single spaces. */
 const MACRO_EXECUTOR_PROSE = MACRO_EXECUTOR_SOURCE.replaceAll(
   /\s*(?:\*|\/\/)?\s*\n\s*(?:\*|\/\/)?\s*/g,
   ' '
@@ -121,11 +99,9 @@ test('MacroExecutor.run propagates a command-thrown error unchanged', async () =
 });
 
 test('MacroExecutor.run still bypasses canUserExecute — the code is deliberately unchanged', async () => {
-  // The gate the bypass is ABOUT. A macro document that refuses the current user must still
-  // run, because the point of the seam is to let a player-initiated activity execute
-  // GM-selected automation the player holds no document permission for. If this ever starts
-  // failing, the bypass was removed rather than re-justified, and five callers with three
-  // different disclosure contracts changed behaviour at once.
+  // The gate the bypass is ABOUT. A macro document that refuses the current user must still run,
+  // because the point of the seam is to let a player-initiated activity execute GM-selected
+  // automation the player holds no document permission for.
   const macro = {
     command: 'return 42;',
     canUserExecute: () => false,
@@ -149,9 +125,8 @@ test('the bypass justification records GM-side execution, not "no added authorit
     'the source says out loud that the executing client may be a GM'
   );
 
-  // The three links of the chain that bounds it INSTEAD. Each is named because a
-  // justification that cited only one of them would be a weaker claim than the one the
-  // socket actually makes.
+  // The three links of the chain that bounds it INSTEAD. Each is named because a justification that
+  // cited only one of them would be a weaker claim than the one the socket actually makes.
   for (const link of ['ADDRESSING ONLY', 'ATTESTED SENDER', 'ACTOR AUTHORIZATION']) {
     assert.ok(MACRO_EXECUTOR_PROSE.includes(link), `the justification names ${link}`);
   }

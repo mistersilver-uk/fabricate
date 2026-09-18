@@ -1,22 +1,7 @@
 /**
- * Regression guard for issue #642: the PUBLIC `game.fabricate.exportSystem()`
- * dropped the gathering authoring bundle because its `buildExportPayload(...)`
- * call passed only three arguments, defaulting `gatheringEnvironments` to `[]` and
- * `gatheringConfig` to `{}`. The admin-store UI path passed all five, so the two
- * export paths diverged and the public-API round-trip became lossy in the export
- * direction only.
- *
- * WHY NOT `import '../src/main.js'`: `src/main.js` imports the global stylesheet
- * (`../styles/fabricate.css`) and the compiled Svelte apps at module load, so it
- * cannot be imported under plain `node --test` (documented in
- * `tests/helpers/fabricateFacadeHarness.js`). This suite therefore combines the
- * repo's established pattern for that constraint:
- *   1. a BEHAVIOURAL parity test that drives the REAL `GatheringEnvironmentStore`
- *      + real `buildExportPayload` through faithful reproductions of BOTH export
- *      paths' argument resolution (public API vs admin store), and
- *   2. a SOURCE-CONTRACT guard pinned to `src/main.js`'s actual `exportSystem`
- *      closure — the assertion that FAILS on the pre-fix 3-arg code and passes
- *      after the fix (mutation-sensitive to the dropped args).
+ * Regression guard for issue #642: the PUBLIC `game.fabricate.exportSystem()` dropped the gathering
+ * authoring bundle because its `buildExportPayload(...)` call passed only three arguments,
+ * defaulting `gatheringEnvironments` to `[]` and `gatheringConfig` to `{}`.
  */
 
 import test from 'node:test';
@@ -158,11 +143,9 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
   );
 
   // The SEVEN-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
-  // `buildExportPayload(system, recipes, version)` does NOT match and fails here, and neither
-  // does the five-arg call that dropped the world currency ladder (issue 1278) nor the six-arg
-  // call that dropped the world realm library (issue 1282). Every parameter of
-  // `buildExportPayload` after `version` is defaulted, so a dropped argument is silent — an
-  // export that simply carries an empty slice rather than one that throws.
+  // `buildExportPayload(system, recipes, version)` does NOT match and fails here, and neither does
+  // the five-arg call that dropped the world currency ladder (issue 1278) nor the six-arg call that
+  // dropped the world realm library (issue 1282).
   assert.match(
     closure,
     /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig,\s*characterLibraries,\s*componentScope,\s*essenceScope,\s*toolScope\s*\)/,
@@ -196,16 +179,9 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
 });
 
 test("source contract: the Manager's Export button passes the same args as the public API", () => {
-  // The OTHER half of issue #642, and the half that had no guard at all until issue 1282 found
-  // it drifting again. `game.fabricate.exportSystem` and the Manager's Export button are two
-  // paths to one payload; the test above pins only the first, so the second silently fell a
-  // world slice behind — twice, once for currency and once for the realm library.
-  //
-  // Every parameter of `buildExportPayload` after `version` is DEFAULTED, so neither drift
-  // throws. It exports an empty slice, the round-trip loses data in the export direction only,
-  // and nothing anywhere reports it. That is why this is pinned on the source rather than left
-  // to the behavioural parity test above, which resolves its own arguments through the harness
-  // and therefore cannot see a real call site forget one.
+  // The OTHER half of issue #642, and the half that had no guard at all until issue 1282 found it
+  // drifting again. Every parameter of `buildExportPayload` after `version` is DEFAULTED, so
+  // neither drift throws.
   const closure = adminStoreSource.slice(
     adminStoreSource.indexOf('async function exportSystem(systemId) {'),
     adminStoreSource.indexOf('async function importSystem() {')
@@ -242,13 +218,9 @@ test("source contract: the Manager's Export button passes the same args as the p
 });
 
 test('both export call sites pass every parameter the exporter declares', () => {
-  // A guard on the guards. The two source contracts above name their arguments literally, so a
-  // NEW slice added to `buildExportPayload` would leave both of them green while both call
-  // sites silently defaulted it — the same failure mode one level up. This reads the exporter's
-  // own parameter list and fails the moment it grows past what those patterns pin.
-  // Matched to the closing `\n) {` rather than to the first `)`, because a parameter's `//`
-  // rationale contains one — `(issue 1278)` truncated the list to five and made this guard
-  // pass for the wrong reason.
+  // A guard on the guards. The two source contracts above name their arguments literally, so a NEW
+  // slice added to `buildExportPayload` would leave both of them green while both call sites
+  // silently defaulted it — the same failure mode one level up (issue 1278).
   const signature = /export function buildExportPayload\(([\s\S]*?)\n\) \{/.exec(exporterSource);
   assert.ok(signature, "located buildExportPayload's declaration");
   const declared = signature[1]

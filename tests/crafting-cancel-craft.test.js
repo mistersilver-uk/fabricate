@@ -1,17 +1,4 @@
-/**
- * Player cancel of an in-progress craft (issue 848).
- *
- * A timed craft consumes ingredients + currency at START and produces results at
- * FINISH, so a mid-run cancel occurs AFTER consumption, BEFORE production. This pins
- * the reversal truth table for CraftingEngine.cancelCraft / reverseRunConsumption:
- *   - refund ON  -> consumed ingredients restored + currency refunded + run removed
- *                   (archived as cancelled) + nothing produced;
- *   - refund OFF -> run removed, nothing restored, nothing produced;
- *   - owner scope -> a non-owned actor is refused;
- *   - idempotent -> a finished (non-active) run cannot be cancelled.
- * The consumption is simulated via the run manager's START-phase snapshot
- * (markStepPrepared), the same shape the timed-craft START path persists.
- */
+/** Player cancel of an in-progress craft (issue 848). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -77,9 +64,8 @@ class FakeActor {
     this._failCreate = failCreate;
     this._failUpdate = failUpdate;
     // When set, the actor has a SCHEMA: a payload naming a path outside it is pruned by
-    // `SchemaField`, the diff is empty, and `Document#update` resolves `undefined` having
-    // written nothing. That is the shape a mis-typed GM currency path produces, and it is the
-    // only way to drive it — a fake that applies every key it is handed cannot model it.
+    // `SchemaField`, the diff is empty, and `Document#update` resolves `undefined` having written
+    // nothing.
     this._schemaPaths = schemaPaths ? new Set(schemaPaths) : null;
   }
   getFlag(ns, key) {
@@ -97,10 +83,8 @@ class FakeActor {
       return undefined;
     }
     for (const [path, value] of Object.entries(payload)) setProperty(this, path, value);
-    // Resolves THE DOCUMENT, as a real `Document#update` does when it applied a change.
-    // `ActorPropertyCoinSpender.refund` judges its write by this return (issue 1301), so a
-    // stub resolving `undefined` asserts the empty-diff case that means nothing was written —
-    // which would make every currency refund on this fixture report a failure.
+    // Resolves THE DOCUMENT, as a real `Document#update` does when it applied a change (issue
+    // 1301).
     return this;
   }
   async createEmbeddedDocuments(type, data) {
@@ -405,12 +389,7 @@ test('a mid-reversal RESTORE failure cannot double-restore: run is archived, not
   assert.equal(second.success, false, 'the archived run cannot be re-cancelled');
 });
 
-// ---------------------------------------------------------------------------
 // Truthful reversal reporting (issue 902).
-//
-// `partialRefund` means "some inputs came back, some did not". A reversal that
-// recovered NOTHING is a total failure and §RunModel forbids reporting it as partial.
-// ---------------------------------------------------------------------------
 
 test('a reversal that recovers NOTHING (no currency recorded) reports partialRefund:false', async () => {
   const system = makeSystem();
@@ -524,21 +503,9 @@ test('multi-step cancel reverses ONLY the consumed-but-unresolved step, never a 
   );
 });
 
-// ---------------------------------------------------------------------------
-// AC-33 (issue 1301) — a DISCARDED currency write is reported to the craft path
-//
-// This is the declared behaviour change `ActorPropertyCoinSpender.refund` makes, asserted at
-// the level a player actually experiences it. `Document#update` resolves `undefined` when the
-// whole diff is empty, which is exactly what a GM-authored `actorPath` that is not in the
-// actor's data model produces: `SchemaField` prunes the unknown key, with no error, no hook
-// and no notification. The spender answered `{ valid: true }` regardless, so a refund that
-// wrote nothing reported success — and nothing in the tree pinned that answer.
-//
-// The fixture restores a consumed INPUT as well as failing the currency refund, because
-// `partialRefund` is `!reversal.ok && (reversal.restored.length > 0 || currencyRecovered)`:
-// a mis-typed path makes `refundedGroups` zero, so a currency-only fixture would answer
-// `partialRefund: false` and the interesting half of the criterion would be untestable.
-// ---------------------------------------------------------------------------
+// AC-33 (issue 1301) — a DISCARDED currency write is reported to the craft path. This is the
+// declared behaviour change `ActorPropertyCoinSpender.refund` makes, asserted at the level a player
+// actually experiences it.
 
 /** The world ladder with `gp` pointing at a path no actor carries. */
 const MISTYPED_CURRENCY_UNITS = [

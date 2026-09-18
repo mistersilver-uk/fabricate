@@ -42,9 +42,7 @@ import {
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 // The gate fakes are SHARED with tests/screenshot-evidence-matching.test.js rather than copied:
 // `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis while `tests/**` duplication
-// counts against the new-code gate. `captureConsole` is the error-capturing variant the
-// `::error::<code>` assertions below need — the module-local `captureLog` sets
-// `console.error = () => {}` and would swallow exactly the line under test.
+// counts against the new-code gate.
 import {
   captureConsole,
   gateCheckArgv,
@@ -71,9 +69,8 @@ function gitVerifyStub(verifiable) {
   return run;
 }
 
-// Capture console.log output produced while `fn()` runs, restoring the real console
-// afterwards. Used to assert the plan path's "No UI changes detected." line without a
-// subprocess.
+// Capture console.log output produced while `fn()` runs, restoring the real console afterwards.
+// Used to assert the plan path's "No UI changes detected." line without a subprocess.
 async function captureLog(fn) {
   const lines = [];
   const realLog = console.log;
@@ -89,9 +86,8 @@ async function captureLog(fn) {
   return lines;
 }
 
-// Run `runAssert(root)` against a temp dir seeded with `test-results/<name>`
-// fixtures, cleaning up afterwards. Module-scope so the per-test collect setup is
-// shared rather than repeated scaffolding in each `collect` test.
+// Run `runAssert(root)` against a temp dir seeded with `test-results/<name>` fixtures, cleaning up
+// afterwards.
 function withScreenshotFixtures(fixtures, runAssert) {
   const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-screenshots-'));
   try {
@@ -393,9 +389,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('maps the issue-767 system-details dirty frame to its own view id', () => {
-    // The SystemEditView (chip) republishes BOTH the clean settings frames and the
-    // dedicated dirty frame; CraftingSystemManagerRoot (the guard + lifted draft)
-    // republishes only the dirty frame.
+    // The SystemEditView (chip) republishes BOTH the clean settings frames and the dedicated dirty
+    // frame; CraftingSystemManagerRoot (the guard + lifted draft) republishes only the dirty frame.
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
     assert.deepEqual(byId['manager-system-edit-dirty'], ['manager-system-edit-dirty']);
 
@@ -414,9 +409,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('maps a system/ settings-list child card to the system-edit frame (issue 768)', () => {
-    // The list-ergonomics work touches CharacterPrerequisitesCard, which renders
-    // INSIDE the system-edit frame. A change to any `system/` card must map to
-    // `manager-system-edit` rather than falling through to the generic UI frame.
+    // The list-ergonomics work touches CharacterPrerequisitesCard, which renders INSIDE the
+    // system-edit frame.
     const cardIds = mapChangedFilesToViews([
       'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
     ]).map(view => view.id);
@@ -424,10 +418,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('maps the issue-800 description frames to their OWN view ids', () => {
-    // Three dedicated ids, each with exactly one smokeLabel. Appending them to
-    // `manager-components` would be silently useless: `collect` publishes only
-    // `candidates[0]` from a filename-sorted list, so the BEFORE/AFTER pair that
-    // constitutes the evidence would never both reach the PR.
+    // Three dedicated ids, each with exactly one smokeLabel.
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
     for (const id of [
       'manager-components-description-before',
@@ -437,8 +428,7 @@ describe('UI PR screenshot evidence', () => {
       assert.deepEqual(byId[id], [id], `${id} must be its own single-frame view`);
     }
 
-    // The normalizer republishes all three; the repair module republishes only the
-    // repaired frame.
+    // The normalizer republishes all three; the repair module republishes only the repaired frame.
     const normalizerIds = mapChangedFilesToViews([
       'src/utils/plainTextDescription.js',
     ]).map(view => view.id);
@@ -490,10 +480,7 @@ describe('UI PR screenshot evidence', () => {
 
   it('maps the issue-772 bulk-edit frame to its OWN view id and its four triggers', () => {
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
-    // A dedicated id with exactly one smoke label. Appending the label to
-    // `manager-components` would be silently useless: `collect` publishes only
-    // `candidates[0]` from a path-sorted list, so the staged bulk state — the whole point
-    // of the evidence — would never reach the PR.
+    // A dedicated id with exactly one smoke label.
     assert.deepEqual(byId['manager-components-bulk-edit'], ['manager-components-bulk-edit']);
     assert.equal(
       byId['manager-components'].includes('manager-components-bulk-edit'),
@@ -501,13 +488,9 @@ describe('UI PR screenshot evidence', () => {
       'the browser view must not also claim the bulk-edit label',
     );
 
-    // The browser view, any file in the browser's own directory, the three shared bulk
-    // primitives, the staging inset, the shared selection primitive and both pure models all
-    // republish the frame. The primitives are the sharp case (issue 1010): they live directly
-    // under `apps/manager/`, so they match NEITHER the `components/` glob nor the `recipes/` one
-    // and are only reachable because they are enumerated by name. `BulkEditSelect` LEFT this
-    // list for issue 1371 r16-list (M23): the Component Studio draws its category as the inline
-    // `BulkStagingInset` now, so the select is the Recipe Studio's alone — asserted below.
+    // The browser view, any file in the browser's own directory, the three shared bulk primitives,
+    // the staging inset, the shared selection primitive and both pure models all republish the
+    // frame (issue 1010).
     for (const file of [
       'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
       'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
@@ -539,8 +522,7 @@ describe('UI PR screenshot evidence', () => {
     );
 
     // The narrow model triggers must NOT drag in the whole components-browser set — and in
-    // particular neither model is a Tool Studio or theme change. The per-studio staging model
-    // republishes THAT studio's three frames and nothing else.
+    // particular neither model is a Tool Studio or theme change.
     const componentBulkPanelFrames = [
       'manager-components-bulk-edit',
       'manager-components-bulk-edit-unstaged',
@@ -559,13 +541,11 @@ describe('UI PR screenshot evidence', () => {
       mapChangedFilesToViews(['src/utils/recipeBulkEditModel.js']).map(view => view.id),
       recipeBulkPanelFrames,
     );
-    // The SHARED leaf is asserted separately rather than folded in, and it is the one file
-    // here that must reach BOTH studios: `describeBulkSelection` / `toggleBulkSelection` /
+    // The SHARED leaf is asserted separately rather than folded in, and it is the one file here
+    // that must reach BOTH studios: `describeBulkSelection` / `toggleBulkSelection` /
     // `setBulkSelection` / `pruneBulkSelection` live here and each studio's own model merely
-    // re-exports them, so a change to a selection helper touches neither studio's model file.
-    // Before issue 1010 named it in the components list it mapped to zero views and published
-    // nothing at all; naming it in only ONE studio's list would be the same defect halved —
-    // a selection regression would publish three frames of the studio that did not change.
+    // re-exports them, so a change to a selection helper touches neither studio's model file (issue
+    // 1010).
     assert.deepEqual(
       mapChangedFilesToViews(['src/utils/bulkSelectionModel.js']).map(view => view.id),
       [...componentBulkPanelFrames, ...recipeBulkPanelFrames],
@@ -573,12 +553,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('routes the shared bulk-DELETE card at all three studios, not the theme fallback (issue 1132)', () => {
-    // `BulkDeleteCard.svelte` sits directly under `apps/manager/`, so it matches neither
-    // studio's directory glob. Unnamed it would map to NO recipe, fall to the generic
-    // `theme-or-global-ui` set, and publish six frames of unrelated screens as the evidence for
-    // a change to the one card the three delete affordances share — while
-    // `scripts/lib/viewLabCases.js` claimed it on the delete frames. The two registries
-    // disagreeing about one file's evidence is the exact failure the enumeration exists to stop.
+    // `BulkDeleteCard.svelte` sits directly under `apps/manager/`, so it matches neither studio's
+    // directory glob.
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     ]).map(view => view.id);
@@ -612,10 +588,8 @@ describe('UI PR screenshot evidence', () => {
       );
     }
 
-    // The recipe browser view, anything in the browser's own directory, the four shared
-    // primitives and the shared selection control all republish the frames. The primitives
-    // are the sharp case: they sit directly under `apps/manager/`, so they match NEITHER
-    // studio's directory glob and are reachable only because both lists enumerate them.
+    // The recipe browser view, anything in the browser's own directory, the four shared primitives
+    // and the shared selection control all republish the frames.
     for (const file of [
       'src/ui/svelte/apps/manager/RecipesBrowserView.svelte',
       'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
@@ -638,10 +612,8 @@ describe('UI PR screenshot evidence', () => {
       byId['manager-recipes-bulk-edit'].matches.map(String),
     );
 
-    // The BLOCKED frame carries one trigger the other two do not: the browser model that
-    // derives the row's `Can't enable` pill. That frame is the only one which photographs
-    // the pill and the panel's pre-flight count together, so a change to the derivation must
-    // republish it — and must NOT republish the two frames that show neither.
+    // The BLOCKED frame carries one trigger the other two do not: the browser model that derives
+    // the row's `Can't enable` pill.
     const pillDerivation = mapChangedFilesToViews(['src/utils/recipeBrowserModel.js'])
       .map(view => view.id);
     assert.ok(pillDerivation.includes('manager-recipes-bulk-edit-blocked'));
@@ -674,9 +646,7 @@ describe('UI PR screenshot evidence', () => {
       byId['manager-components-bulk-edit'].matches.map(String),
     );
 
-    // The PROGRESSIVE frame does NOT conscript the global primitives its section is built
-    // from. `Chip` and `Stepper` have no `VIEW_RECIPES` entry at all, and naming them on
-    // this one frame would route every future change to them at a components screenshot.
+    // The PROGRESSIVE frame does NOT conscript the global primitives its section is built from.
     for (const primitive of [
       'src/ui/svelte/components/Chip.svelte',
       'src/ui/svelte/components/Stepper.svelte',
@@ -691,11 +661,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('routes the shared essence card to the EDITOR frames as well as the browser ones (issue 772)', () => {
-    // `EssenceQuantityCard` lives under `components/` — the BROWSER's directory, because
-    // the bulk panel renders it — but the component EDITOR renders it too. Without the
-    // explicit entry on `manager-component-edit`, a change to the card would route evidence
-    // only to the browser frames and never to the editor ones: matching-nothing-forever's
-    // quieter cousin, and green the whole time.
+    // `EssenceQuantityCard` lives under `components/` — the BROWSER's directory, because the bulk
+    // panel renders it — but the component EDITOR renders it too.
     const ids = mapChangedFilesToViews([
       'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     ]).map(view => view.id);
@@ -771,13 +738,8 @@ describe('UI PR screenshot evidence', () => {
       'player-crafting-run-summary',
     ]);
     assert.deepEqual(views[1].smokeLabels, ['player-crafting-stacked']);
-    // One label per progressive view, and the reordered state is its OWN view rather than
-    // a preferred label on the resting one. Listing both on one view does NOT work:
-    // `collect` picks `candidates[0]` from an array sorted by FILENAME and never consults
-    // smokeLabels order, so the lower-numbered resting frame won and the reordered frame
-    // — the only one where the thresholds must have been recomputed and the live region
-    // must have text to hide — never reached the PR. The earlier arrangement asserted
-    // that intent here and passed while publishing the wrong frame.
+    // One label per progressive view, and the reordered state is its OWN view rather than a
+    // preferred label on the resting one.
     assert.deepEqual(views[2].smokeLabels, ['player-crafting-progressive']);
     assert.deepEqual(views[3].smokeLabels, ['player-crafting-progressive-reordered']);
     assert.deepEqual(views[4].smokeLabels, ['player-crafting-progressive-fixed']);
@@ -788,12 +750,7 @@ describe('UI PR screenshot evidence', () => {
   it('maps all four player crafting essence icon states to dedicated evidence views', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 
-    // RE-DRIVEN from the surviving co-located matchers (issue 1506). All four recipes used to
-    // name `CraftingEssenceThumb.svelte` as well, and this test drove all four from that one
-    // path; the change retired that component into the shared art tile, so the path can never
-    // match again. Each recipe is now driven from the surface it actually photographs, which is
-    // also the check that has teeth: a recipe left resting on a deleted matcher alone would
-    // collect nothing and this loop would say so.
+    // RE-DRIVEN from the surviving co-located matchers (issue 1506).
     const drivenBy = {
       'player-crafting-essence-legacy': 'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
       'player-crafting-essence-ingredient': 'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
@@ -809,9 +766,7 @@ describe('UI PR screenshot evidence', () => {
       assert.match(harness, new RegExp(`screenshot\\(page, '${id}'\\)`));
     }
 
-    // And none of the four DEDICATED recipes claims the retired path any more. It still selects
-    // the broad `apps/crafting/` frames, which is the glob's business and not this loop's; what
-    // must not survive is a single-label essence recipe resting on a matcher that can never fire.
+    // And none of the four DEDICATED recipes claims the retired path any more.
     assert.deepEqual(
       mapChangedFilesToViews(['src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte'])
         .map((view) => view.id)
@@ -919,12 +874,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps the new rail fixtures off page one of the player recipe browser', () => {
-    // The browser sorts A→Z and pages at 12, and `selectCraftingRecipeByMode` only
-    // iterates the rows in the DOM — page one. A fixture that displaces the last page-one
-    // row silently re-points `player-crafting-ingredient-routed`, `-routed-by-check` and
-    // the craft behind `-run-summary`/`-roll-result` at an UNCRAFTABLE display fixture,
-    // and every one of those frames still passes while showing the wrong recipe. This is
-    // the guard that fails instead.
+    // The browser sorts A→Z and pages at 12, and `selectCraftingRecipeByMode` only iterates the
+    // rows in the DOM — page one.
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
     const recipeNames = [
       ...harness.matchAll(/createRecipe\(\{[^}]*?\bname: '([^']+)'/g),
@@ -945,9 +896,8 @@ describe('UI PR screenshot evidence', () => {
   it('re-points the pinned crafting selectors the requirement rail moved', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 
-    // DEAD: a first-class essence requirement is no longer an essence thumb in the ingredient
-    // image grid, so this selector matches nothing and would time out. Issue 1506 retired that
-    // component outright, so the class it named cannot be rendered by anything.
+    // DEAD: a first-class essence requirement is no longer an essence thumb in the ingredient image
+    // grid, so this selector matches nothing and would time out (issue 1506).
     assert.equal(
       harness.includes(`.crafting-essence-thumb`),
       false,
@@ -1040,9 +990,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/systems/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
-    // #1429 — the vocabulary tab strip, extracted OUT of `TagsCategoriesView`. The recipes key on
-    // an exact `TagsCategoriesView.svelte` path, so an extraction silently leaves the new file
-    // matching no recipe at all and its changes publish an unrelated frame.
+    // 1429 — the vocabulary tab strip, extracted OUT of `TagsCategoriesView`.
     assert.deepEqual(
       idsFor('src/ui/svelte/apps/manager/VocabularyTabs.svelte').sort(byCodePoint),
       ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
@@ -1070,10 +1018,9 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(views[0].smokeLabels, ['player-inventory']);
   });
 
-  // Issue 675. The `player-salvage` glob is NARROW on purpose: `apps/inventory/**`
-  // would return two ids for the two ordinary inventory files above and break that
-  // exact-equality assertion — and it would force a salvage frame onto every future
-  // unrelated inventory touch.
+  // Issue 675. The `player-salvage` glob is NARROW on purpose: `apps/inventory/**` would return two
+  // ids for the two ordinary inventory files above and break that exact-equality assertion — and it
+  // would force a salvage frame onto every future unrelated inventory touch.
   it('maps only the salvage tree to the player-salvage recipe, and to BOTH recipes', () => {
     for (const file of [
       'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
@@ -1116,10 +1063,8 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-misconfigured'], ['player-salvage-misconfigured']);
   });
 
-  // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so
-  // `collect` publishes it; appending its label to `player-salvage` would never publish it.
-  // Its narrow glob onto SalvageToolRequirements.svelte adds it alongside the broader
-  // inventory/salvage frames, without disturbing the player-salvage deep-equality above.
+  // Issue 777: the required-tools disclosure frame is its own recipe (one file per id) so `collect`
+  // publishes it; appending its label to `player-salvage` would never publish it.
   it('maps the issue-777 required-tools frame to its changed source', () => {
     const ids = mapChangedFilesToViews([
       'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',
@@ -1130,11 +1075,9 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-salvage-tools'], ['player-salvage-tools']);
   });
 
-  // Issue 766: the multi-system collapse frame is its own recipe (one file per id) so
-  // `collect` publishes it; the existing player-inventory capture walk selects a
-  // single-system item and cannot reach the selector. Its narrow glob onto
-  // InventorySystemSelector.svelte adds it alongside the broad inventory frame, without
-  // disturbing the player-inventory deep-equality above.
+  // Issue 766: the multi-system collapse frame is its own recipe (one file per id) so `collect`
+  // publishes it; the existing player-inventory capture walk selects a single-system item and
+  // cannot reach the selector.
   it('maps the issue-766 multi-system frame to its changed source', () => {
     const ids = mapChangedFilesToViews([
       'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
@@ -1145,11 +1088,7 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(byId['player-inventory-multi-system'], ['player-inventory-multi-system']);
   });
 
-  // Issue 797: the recipe-item Validation tab is brought to parity with the recipe
-  // Validation tab. TWO dedicated view ids (all-clear + mixed-failing), each its own
-  // single-frame view — `collect` publishes only `candidates[0]` from a filename-sorted
-  // list, so both frames must be separate views to reach the PR. Both map to the
-  // validation tab file AND the editor shell that hosts it.
+  // Issue 797: the recipe-item Validation tab is brought to parity with the recipe Validation tab.
   it('maps the issue-797 recipe-item Validation frames to their own view ids', () => {
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
     assert.deepEqual(byId['manager-recipe-item-validation'], ['manager-recipe-item-validation']);
@@ -1211,16 +1150,13 @@ describe('UI PR screenshot evidence', () => {
       // progressive ordered stages, and the alchemy two-slot shape.
       'manager-recipe-edit-results',
       'manager-recipe-edit-results-multistep',
-      // The collapsed multi-step editor (issue 710): the read-only steps card the
-      // editor renders when the system's multi-step feature is off. It is a recipe-edit
-      // frame (RecipeOverviewTab/RecipeEditView), so every editor file republishes it.
+      // The collapsed multi-step editor (issue 710): the read-only steps card the editor renders
+      // when the system's multi-step feature is off.
       'manager-recipe-edit-collapsed',
       'manager-recipe-edit-results-progressive',
       'manager-recipe-edit-results-alchemy',
       'manager-recipe-edit-tools',
-      // The MODE-CONDITIONAL context rail's restricted (access) branch. It is the
-      // only frame captured against a restricted-visibility system; the others
-      // run against a system whose mode drives the Books & Scrolls branch.
+      // The MODE-CONDITIONAL context rail's restricted (access) branch.
       'manager-recipe-edit-access-rail',
       // The Books & Scrolls tab body (issue 796): its own frame so the linked-book grid
       // fix reaches a PR (collect publishes only candidates[0] per view id).
@@ -1271,9 +1207,8 @@ describe('UI PR screenshot evidence', () => {
     // The dedicated frame carries exactly its own single smoke label.
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));
     assert.deepEqual(byId['manager-checks-crafting-modifiers'], ['manager-checks-crafting-modifiers']);
-    // The shared pill multi-select renders in BOTH the Checks default set and the
-    // recipe Overview override, so it maps to the dedicated modifier frame and every
-    // recipe-edit frame.
+    // The shared pill multi-select renders in BOTH the Checks default set and the recipe Overview
+    // override, so it maps to the dedicated modifier frame and every recipe-edit frame.
     const pillIds = idsFor('src/ui/svelte/components/ModifierPillSelect.svelte');
     assert.ok(pillIds.includes('manager-checks-crafting-modifiers'));
     assert.ok(pillIds.includes('manager-recipe-edit-normal'));
@@ -1420,9 +1355,8 @@ describe('UI PR screenshot evidence', () => {
       ciHeadSha: 'ci-head',
       runGit: gitHead,
     }), 'ci-head');
-    // An explicit empty CI input disables the process.env.GITHUB_SHA default so
-    // this assertion deterministically exercises the local git-head fallback in
-    // both local and CI environments.
+    // An explicit empty CI input disables the process.env.GITHUB_SHA default so this assertion
+    // deterministically exercises the local git-head fallback in both local and CI environments.
     assert.equal(resolveScreenshotHeadSha({ ciHeadSha: '', runGit: gitHead }), 'local-head');
     assert.deepEqual(calls, [['rev-parse', '--verify', 'HEAD']]);
   });
@@ -1501,10 +1435,7 @@ describe('UI PR screenshot evidence', () => {
   it('rejects failed, degraded, mismatched, stale, and wrong-target ordinary runs', () => {
     const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const cases = [
-      // The refusal names the condition that tripped and the value it measured (issue
-      // #1019). It deliberately no longer contains the old "failed or degraded smoke
-      // summary" literal: keeping that substring alive would have made back-compat with a
-      // test literal into back-compat with the ten-word message the change exists to remove.
+      // The refusal names the condition that tripped and the value it measured (issue #1019).
       [
         changedFileEvidenceFixtures(changedFiles, { summaryPatch: { passed: false } }),
         /^ {2}passed: false — /m,
@@ -1547,19 +1478,12 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  // ── The refusal diagnostic at the call site (issue #1019) ────────────────
-  //
-  // Direct-call tests of `explainSmokeSummaryRefusal` live in
-  // `tests/foundry-smoke-summary.test.js`. These exercise the gate itself, because a
-  // builder that is never reached is a builder whose absence no test can detect: the
-  // mutation that established the need for this block replaced the whole throw with
-  // `new Error('MUTANT …')` and this suite still returned 83 pass / 0 fail.
+  // The refusal diagnostic at the call site (issue #1019). Direct-call tests of
+  // `explainSmokeSummaryRefusal` live in `tests/foundry-smoke-summary.test.js`.
   const EVIDENCE_CHANGED_FILES = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
 
-  // One shared driver over the existing `summaryPatch` extension point, which spreads last
-  // and reaches both fixture factories. Table-driven rather than a dozen copied blocks:
-  // SonarCloud Automatic Analysis ignores `sonar.cpd.exclusions`, so near-identical
-  // `tests/**` fixtures count against the new-code duplication gate exactly like `src/`.
+  // One shared driver over the existing `summaryPatch` extension point, which spreads last and
+  // reaches both fixture factories.
   const refuseWith = (summaryPatch, assertMessage) => {
     withScreenshotFixtures(
       changedFileEvidenceFixtures(EVIDENCE_CHANGED_FILES, { summaryPatch }),
@@ -1580,17 +1504,9 @@ describe('UI PR screenshot evidence', () => {
     );
   };
 
-  // Each fixture sets EXACTLY ONE field off-nominal, with the other four at their accepting
-  // values, so removing that disjunct from the gate's predicate flips this test to FAIL.
-  // The natural pair `{ passed: false, stepFailures: 2 }` would kill nothing — `passed !==
-  // true` short-circuits the disjunction — and `{ passed: true, stepFailures: 1 }` is not a
-  // summary the harness can emit. That is the point of it, not a defect in the fixture.
-  //
-  // Every note is pinned to its FULL literal, terminated by `$`. Anchoring on the value and
-  // leaving the note open-ended (`stepFailures: 1 — /m`) pins the half a reader does not need
-  // help with and leaves the explanatory half — the only part carrying the failure semantics —
-  // free: `'one or more phase steps did not pass'` could be replaced with its own negation, or
-  // emptied, and this suite stayed green.
+  // Each fixture sets EXACTLY ONE field off-nominal, with the other four at their accepting values,
+  // so removing that disjunct from the gate's predicate flips this test to FAIL. Every note is
+  // pinned to its FULL literal, terminated by `$`.
   it('names each disqualifying evidence condition on its own, with the value it measured', () => {
     const cases = [
       [{ passed: false }, /^ {2}passed: false — the run did not record a successful verdict$/m],
@@ -1616,14 +1532,7 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  // THE GATE-OPENING MUTANTS, all of them. Each of the gate's five disjuncts compares with
-  // `!==` so that a summary simply MISSING the key refuses; every weakening to a positive test
-  // — `stepFailures > 0`, `passed === false`, `degraded === true`, `rendererCrashed === true` —
-  // accepts that summary instead and opens the gate to a stale or truncated artifact. The
-  // single-condition fixtures above survive all four (measured), because they set the key to a
-  // present off-nominal value. Only an ABSENT key kills them, so all five keys are covered here
-  // rather than just the two counts. `summaryPatch: { key: undefined }` is how a key goes
-  // absent: JSON.stringify drops it.
+  // THE GATE-OPENING MUTANTS, all of them.
   const ACCEPTING_VALUE = Object.freeze({
     passed: 'true',
     stepFailures: '0',
@@ -1631,12 +1540,7 @@ describe('UI PR screenshot evidence', () => {
     degraded: 'false',
     rendererCrashed: 'false',
   });
-  // The note an absent key is reported with. A `not recorded` value beside the note for a
-  // RECORDED one asserts as observed exactly what went unobserved — `rendererCrashed: not
-  // recorded — the page reported a renderer crash` claims a crash on a summary carrying no
-  // crash flag — so the note is pinned here in full, at the gate, alongside the value.
-  // `passed` is excluded deliberately: "the run did not record a successful verdict" is true
-  // of an absent verdict as well as a false one, so it keeps its single precise note.
+  // The note an absent key is reported with.
   const ABSENT_SIGNAL_NOTE =
     'the summary did not record this signal, so this run cannot be shown to have been clean';
   it('refuses a summary whose evidence-condition key is absent entirely, for every condition', () => {
@@ -1654,26 +1558,17 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  // A source-scan drift guard over the predicate itself, because the fixtures above can only
-  // ever cover the conditions someone remembered to write one for. It pins the exact five
-  // comparisons AND that they are what guards the builder call, so a sixth condition, a dropped
-  // disjunct, a weakened operator, or a detached builder all fail here in one assertion.
+  // A source-scan drift guard over the predicate itself, because the fixtures above can only ever
+  // cover the conditions someone remembered to write one for.
   it('gates on exactly five evidence conditions, each a strict !== against its accepting value', () => {
     const source = readFileSync(new URL('../scripts/ui-pr-screenshot-evidence.mjs', import.meta.url), 'utf8');
-    // WHEN THIS REGEX STOPS MATCHING — the predicate is hoisted to a named const, extracted to
-    // a helper, or reformatted — RE-ANCHOR IT ON WHEREVER THE THROW WENT. Do NOT relax it to
-    // scan the comparisons alone. The `throw new Error(explainSmokeSummaryRefusal(summary));`
-    // tail is the only half of this test proving the five comparisons guard THE BUILDER CALL
-    // rather than sitting in some unrelated `if` elsewhere in the file; dropping it is the
-    // cheapest way to make this test green again and it leaves a detached builder undetected,
-    // which is the exact defect (a builder nothing reaches) this block exists to catch.
+    // WHEN THIS REGEX STOPS MATCHING — the predicate is hoisted to a named const, extracted to a
+    // helper, or reformatted — RE-ANCHOR IT ON WHEREVER THE THROW WENT.
     const guarded = /\n {2}if \(\n([\s\S]*?)\n {2}\) \{\n {4}throw new Error\(explainSmokeSummaryRefusal\(summary\)\);/.exec(source);
     assert.ok(Boolean(guarded), 'the five-condition predicate must guard the refusal builder');
-    // Sorted both sides: the SET of comparisons is the contract, their order in the disjunction
-    // is not, and pinning the order turns a harmless reordering into a failure whose cheapest
-    // repair is to edit the expectation — training the reader to edit this test rather than
-    // read it. A comparator is mandatory (`unicorn/require-array-sort-compare`; a bare `.sort()`
-    // is also a new-code BUG to SonarCloud, which scans `tests/**` the lint glob does not).
+    // Sorted both sides: the SET of comparisons is the contract, their order in the disjunction is
+    // not, and pinning the order turns a harmless reordering into a failure whose cheapest repair
+    // is to edit the expectation — training the reader to edit this test rather than read it.
     const byName = (a, b) => a.localeCompare(b);
     assert.deepEqual((guarded[1].match(/summary\.\w+ !== (?:true|false|0)/g) ?? []).sort(byName), [
       'summary.consoleErrorCount !== 0',
@@ -1711,9 +1606,7 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
-  // The incident from issue #1019, replayed. A first-match-wins builder would emit "the run
-  // did not pass" and nothing else here — the exact class-of-fault message this change exists
-  // to remove — and ship green, so both tripped conditions must be named.
+  // The incident from issue #1019, replayed.
   it('replays the reported incident: names both tripped conditions and quotes every error', () => {
     const interfaceError = "pageerror: Cannot read properties of undefined (reading 'INTERFACE')";
     refuseWith(
@@ -1756,9 +1649,8 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
-  // `collect` prints this through `console.error(error.message)` with no `::error::`
-  // annotation, which is what makes a multi-line message safe. An annotation would collapse
-  // it to the first line in a GitHub log and silently undo the whole change.
+  // `collect` prints this through `console.error(error.message)` with no `::error::` annotation,
+  // which is what makes a multi-line message safe.
   it('emits a multi-line refusal carrying no workflow-command annotation', () => {
     refuseWith({ passed: false }, (message) => {
       assert.ok(message.split('\n').length > 5, 'the refusal is multi-line');
@@ -1795,12 +1687,9 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  // Both regressions below made `collect` throw for evidence that was entirely valid,
-  // so the documented
-  // `test:foundry:screenshots --target-labels=$(screenshots:ui:targets)` -> `collect`
-  // workflow could not complete. Neither was caught before because the fixture helper
-  // mirrored the buggy expectations: it built `targetLabels` with the same raw
-  // `flatMap` the validator used, and gave every frame a clip-shaped width/height.
+  // Both regressions below made `collect` throw for evidence that was entirely valid, so the
+  // documented `test:foundry:screenshots --target-labels=$(screenshots:ui:targets)` -> `collect`
+  // workflow could not complete.
   it('accepts a run whose target labels are deduped across views that share a label', () => {
     // `manager-default-selection` belongs to the systems view AND the
     // theme-or-global-ui fallback, so any change matching both yields a raw flatMap
@@ -1841,9 +1730,7 @@ describe('UI PR screenshot evidence', () => {
     // `screenshot()` records `options.clip?.width ?? null`, so a full-page frame — most
     // of the walk — declares null. Comparing real pixels against null was fatal.
     const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
-    // Null the DECLARED geometry only. Patching it through `capturePatch` would also
-    // shrink the generated PNG, since the helper builds pixels from the same array —
-    // that would test a zero-sized image, not an unclipped one.
+    // Null the DECLARED geometry only.
     const fixtures = changedFileEvidenceFixtures(changedFiles);
     const manifest = JSON.parse(fixtures['screenshot-manifest.json']);
     manifest.captures = manifest.captures.map(capture => ({
@@ -2120,10 +2007,8 @@ describe('UI PR screenshot evidence', () => {
       emitted.add(match[1]);
     }
     // Issue 855: the interactive crafting-check roll prompt routes through
-    // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot()
-    // as a variable — so the literal lives in the helper CALL, not in a screenshot() call.
-    // Until this pattern was registered the label was invisible to this guard, so no
-    // VIEW_RECIPES entry could reference the only frame that shows the prompt.
+    // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot() as a
+    // variable — so the literal lives in the helper CALL, not in a screenshot() call.
     for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*page\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
@@ -2136,15 +2021,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps every matches entry resolving to a real repo path (issue 676)', () => {
-    // NOTHING asserted this before, and the gap is silent-by-construction: a recipe
-    // whose `matches` names a DELETED file simply matches nothing, forever, all green.
-    // `manager-component-edit-difficulty` matched ONLY ComponentDifficultyInspector, so
-    // deleting that inspector would have stranded its frame with no signal at all.
-    //
-    // Patterns are anchored `^…$` over repo-relative paths, so a purely literal one can
-    // be recovered by stripping the anchors and unescaping. A pattern with a real
-    // wildcard (a directory glob like `component/.+\.svelte`) is checked by walking the
-    // repo for at least one match instead.
+    // NOTHING asserted this before, and the gap is silent-by-construction: a recipe whose `matches`
+    // names a DELETED file simply matches nothing, forever, all green.
     const literalPathOf = (source) => {
       // BOTH anchors are required. An unanchored suffix pattern (`/\.css$/`, the
       // theme-or-global-ui catch-all) has no metacharacters left once escapes are
@@ -2374,9 +2252,8 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('resolves the first VERIFIABLE default base, skipping candidates git cannot verify', () => {
-    // origin/main fails rev-parse but origin/HEAD verifies → returns origin/HEAD. This
-    // kills a "return candidates[0] regardless of verify" mutant, which would wrongly
-    // return origin/main.
+    // origin/main fails rev-parse but origin/HEAD verifies → returns origin/HEAD. This kills a
+    // "return candidates[0] regardless of verify" mutant, which would wrongly return origin/main.
     assert.equal(resolveDefaultBase({ runGit: gitVerifyStub(['origin/HEAD', 'main']) }), 'origin/HEAD');
 
     // origin/main and origin/HEAD both fail → falls through to local main.
@@ -2521,13 +2398,9 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  // ── The `check` command's flag wiring (issue 1133) ─────────────────────────────────────────
-  //
-  // The gate's own decision logic lives in `scripts/lib/screenshotEvidenceMatching.js` and is
-  // driven end to end by `tests/screenshot-evidence-matching.test.js`. What is pinned HERE is the
-  // adapter's flag surface, and above all its UNCHANGED DEFAULT: `npm run screenshots:ui:check`
-  // passes no `--await-capture`, so it must behave exactly as it did before this change — no
-  // polling, no API call, and the same message.
+  // The `check` command's flag wiring (issue 1133). The gate's own decision logic lives in
+  // `scripts/lib/screenshotEvidenceMatching.js` and is driven end to end by
+  // `tests/screenshot-evidence-matching.test.js`.
 
   const CHECK_UI_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
 
@@ -2594,12 +2467,8 @@ describe('UI PR screenshot evidence', () => {
 
   it('check without --await-capture keeps today behaviour exactly on a published managed block', async () => {
     // The two cases above are the only "unchanged default" coverage there was, and NEITHER body
-    // carries a managed block — one has no evidence at all and the other a human-pasted image, which
-    // short-circuits on the outside-the-block precedence rule. So the path that actually matches
-    // published frames was asserted-but-uncovered on this invocation, and it had regressed: with no
-    // `--head-sha` the gate has no head to judge staleness against, and comparing frames against the
-    // empty default classed every one of them stale. A body a maintainer can see the screenshots in
-    // failed `no-frames-for-this-head`, quoting an empty SHA.
+    // carries a managed block — one has no evidence at all and the other a human-pasted image,
+    // which short-circuits on the outside-the-block precedence rule.
     const paths = writeCheckInputs({
       body: managedScreenshotBlock({
         prNumber: 1133,
@@ -2650,8 +2519,7 @@ describe('UI PR screenshot evidence', () => {
 
   it('--await-capture turns the same inputs into an awaited, matched decision', async () => {
     // The same PR that fails above passes here, because the producer's run concludes and the body
-    // it republished carries this head's frames. This is the flag's whole point, and it is what
-    // makes the two default-path cases above a real control rather than an assertion about nothing.
+    // it republished carries this head's frames.
     const headSha = 'f'.repeat(40);
     const paths = writeCheckInputs({ body: 'No evidence yet.' });
     const published = managedScreenshotBlock({

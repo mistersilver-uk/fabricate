@@ -1,36 +1,4 @@
-/**
- * Mount a REAL overlay component inside a chosen host, for the positioning proof (issue 1466).
- *
- * Everything here except the surrounding window chrome is production code, reached through the
- * real Svelte plugin: the component is imported from `src/`, its own `<style>` is injected by the
- * compiler exactly as it is in the shipped bundle, and `styles/fabricate.css` is served raw so the
- * popover gets its real `position: absolute`. That matters more than usual here — the subject is a
- * decision the component's SCRIPT makes at runtime, so a hand-written copy of its markup would
- * prove nothing at all.
- *
- * The host is chosen by query string so one page serves every scenario:
- *
- *   ?host=manager   `.fabricate-manager`, the manager's Svelte root inside its window
- *   ?host=app       `.fabricate-app`, the player window's ApplicationV2 frame
- *   ?host=none      a positioned container inside NO application root
- *
- * `?component=` picks `popover` (SearchablePopover), `icon` (IconPicker), `source`
- * (EssenceSourceSelector), `color` (ManagerColorPicker), `actorbar` (ActorSelectTopBar — a
- * real PRODUCT surface rather than a bare primitive, mounted only in the player host it ships
- * in), `menu` (ActionMenu) or `duration` (RecipeDurationEditor, manager-only for the same
- * reason in reverse: its panel takes `position: absolute` from a rule rooted at
- * `.fabricate-manager`, so it is a manager surface and not a shared primitive).
- *
- * `menu` is the only one mounted inside a SHORT, CLIPPING scroller rather than the shared tall
- * one, because the question it answers is different: every picker above asks whether a panel
- * lands at its trigger, and the action menu additionally asks whether it ESCAPES the scrolling
- * column its trigger sits in. `.manager-environment-tab-panel` is `overflow: auto` in the
- * product, so a row menu opened near the bottom of a long Tasks list was cut off by the panel's
- * own edge before issue 1477 portaled it.
- * `?frameLeft=` / `?frameTop=` place the window, so the test can assert against a host whose
- * origin is far from the viewport's — which is the entire discriminating fact. With the frame at
- * the origin every arrangement looks identical.
- */
+/** Mount a REAL overlay component inside a chosen host, for the positioning proof (issue 1466). */
 import { mount } from 'svelte';
 
 import ActionMenu from '../../../src/ui/svelte/components/ActionMenu.svelte';
@@ -57,11 +25,6 @@ function element(tag, className, styles) {
 /**
  * Build the host chain and return the element the component mounts into.
  *
- * Each chain reproduces the real nesting between the application root and the component, because
- * the intermediate elements are not inert: `.fabricate-manager` is the positioned, clipping grid
- * the manager's overlays rely on, and the player app's content column is the scroller an overlay
- * has to escape.
- *
  * @returns {HTMLElement} The mount target.
  */
 function buildHost() {
@@ -83,11 +46,7 @@ function buildHost() {
   if (hostKind === 'app') {
     // `SvelteFabricateApp.svelte.js`: `classes: ['fabricate', 'fabricate-app',
     // 'fabricate-app-window']`, plus the `application` class ApplicationV2 puts on every framed
-    // window. The third of those is DELIBERATELY omitted here: it carries only the player
-    // window's drag-resize size floor (issue 1520 split that off the shared `fabricate-app` area
-    // class), and this fixture sizes its frame inline, so the floor would be noise. What the
-    // fixture is testing is `fabricate-app` as a POSITIONED portal host, which is the part of
-    // the real class list that matters to `resolveOverlayHost`.
+    // window (issue 1520).
     const frame = element('div', 'application fabricate fabricate-app', frameStyles);
     const content = element('section', 'window-content');
     const shell = element('div', 'fabricate-app-shell');
@@ -123,13 +82,9 @@ target.append(element('div', 'fixture-spacer', { height: '90px' }));
 
 const mountPoint = element('div', 'fixture-mount');
 
-// ── THE CLIPPING COLUMN (issue 1477) ────────────────────────────────────────────────────────
-// For the action menu only, the trigger is put inside a SHORT `overflow: auto` box, near its
-// bottom edge, and the box is the element the test measures the panel against. That box is the
-// fixture's stand-in for `.manager-environment-tab-panel`, the scroller the composition list
-// actually lives in — and it is what makes the clipping question askable at all. Mounted into the
-// shared tall scroller the menu would fit whether or not it was portaled, and the measurement
-// would pass on the unfixed tree.
+// THE CLIPPING COLUMN (issue 1477) ──────────────────────────────────────────────────────── For the
+// action menu only, the trigger is put inside a SHORT `overflow: auto` box, near its bottom edge,
+// and the box is the element the test measures the panel against.
 if (componentKind === 'menu') {
   const column = element('div', 'clipping-column');
   const spacer = element('div', 'clipping-spacer');
@@ -141,10 +96,6 @@ if (componentKind === 'menu') {
 
 /**
  * A stand-in for `services.actorBar`, matching the read surface `ActorSelectTopBar` uses.
- *
- * Plain rather than reactive: this fixture opens the picker once and measures it, so nothing here
- * has to survive a store update. Two actors, one with an image and one without, so the trigger and
- * the rows both draw their real shapes.
  *
  * @returns {object} The store shape the bar reads.
  */
@@ -169,14 +120,7 @@ function actorBarStore() {
   };
 }
 
-/**
- * The seven overlay subjects this fixture can mount, by `?component=`.
- *
- * All three of the `src/ui/svelte/components/` pickers are here rather than only `IconPicker`
- * (issue 1470), because the CSS half of the defect is PER FAMILY: each carries its own class
- * family and its own namespace roots, so one of them positioning correctly outside the manager
- * says nothing about the other two.
- */
+/** The seven overlay subjects this fixture can mount, by `?component=` (issue 1470). */
 const COMPONENTS = {
   icon: [IconPicker, { value: 'fas fa-fire', buttonTitle: 'Choose an icon' }],
   source: [
@@ -192,9 +136,7 @@ const COMPONENTS = {
   ],
   color: [ManagerColorPicker, { colorToken: 'sage', buttonTitle: 'Choose a colour' }],
   // THE SIXTH COPY OF THE POSITIONING PASS (issue 1500), and the only one of the six that had no
-  // row here. It is the sharpest of them for one reason: its panel is `width: max-content` and it
-  // deliberately does NOT write the layout's width, so a consolidation that wrote one would fix
-  // the box at 340px and no other row in this file could see it.
+  // row here.
   duration: [
     RecipeDurationEditor,
     {
@@ -202,9 +144,7 @@ const COMPONENTS = {
       onChange: () => {},
     },
   ],
-  // THE overflow action menu (issue 1477). Four verbs, so the panel is decisively taller than the
-  // 120px clipping column it opens inside: a panel that had NOT escaped could not extend past the
-  // column's bottom edge, which is the first of the test's two readings.
+  // THE overflow action menu (issue 1477).
   menu: [
     ActionMenu,
     {
@@ -232,19 +172,9 @@ const COMPONENTS = {
       onChoose: () => {},
     },
   ],
-  // THE PRIMITIVE'S FIRST PLAYER-WINDOW ADOPTER (issue 1475), and the reason it is a whole
-  // product surface rather than another bare picker: the entry above proves `SearchablePopover`
-  // CAN land in `.fabricate-app`, and nothing in the product depended on that. This one does.
-  //
-  // It is also the sharper measurement of the two, because the panel is now anchored to a trigger
-  // sitting in a full-width bar rather than to a picker in the middle of a pane — the arrangement
-  // that has to survive is "panel below the bar's own control", and the shipped alternative it
-  // replaced was an `position: absolute` panel inside the bar with no portal at all.
-  //
-  // `activeTab: 'gathering'` deliberately: it draws the bar's right-hand context cluster, so the
-  // trigger is measured in a bar of realistic width, and it is the one populated tab that renders
-  // no `ComponentSourcesBar` (which would want a `services` bag this fixture has no business
-  // faking).
+  // THE PRIMITIVE'S FIRST PLAYER-WINDOW ADOPTER (issue 1475), and the reason it is a whole product
+  // surface rather than another bare picker: the entry above proves `SearchablePopover` CAN land in
+  // `.fabricate-app`, and nothing in the product depended on that.
   actorbar: [
     ActorSelectTopBar,
     {

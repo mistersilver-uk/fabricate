@@ -1,11 +1,6 @@
 /**
- * Unit tests for the pure salvage chat card formatter
- * (`buildSalvageChatContent`). No Foundry globals required.
- *
- * Salvage reuses the crafting card's `buildResultCard` renderer, so these assert
- * the salvage-specific labels/model mapping AND that the rendered card shares the
- * crafting card's markup (the `fabricate-craft-chat` classes) — i.e. it reads as a
- * salvage analogue of the crafting card, not a second unrelated format (issue 675).
+ * Unit tests for the pure salvage chat card formatter (`buildSalvageChatContent`). No Foundry
+ * globals required (issue 675).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,14 +1,6 @@
 /**
- * Integration tests for T-026: End-to-End Crafting Flow
- *
- * Tests the full crafting pipeline: validate, consume, create result.
- * Covers specs 004 (resolution modes) and 005 (recipes and steps).
- *
- * Groups:
- *   1. Simple mode — validate, consume, create result
- *   2. Multi-step — start, advance, complete
- *   3. Routed check — check macro returns outcome, name-matched to a result group
- *   4. Progressive mode — check macro returns value, awards based on difficulty
+ * Integration tests for T-026: End-to-End Crafting Flow. Tests the full crafting pipeline:
+ * validate, consume, create result.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,9 +9,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { Tool } from '../src/models/Tool.js';
 
-// ---------------------------------------------------------------------------
 // Globals required for the modules to load
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -33,13 +23,9 @@ globalThis.ui = {
   notifications: { info: () => {}, warn: () => {}, error: () => {} }
 };
 
-// ---------------------------------------------------------------------------
 // Shared builder helpers
-// ---------------------------------------------------------------------------
 
-/**
- * Build a fake actor item that tracks delete() and update() calls.
- */
+/** Build a fake actor item that tracks delete() and update() calls. */
 function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = null } = {}) {
   return {
     id,
@@ -68,9 +54,7 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = 
   };
 }
 
-/**
- * Build a fake compendium/world item (source item) with toObject() as CraftingEngine expects.
- */
+/** Build a fake compendium/world item (source item) with toObject() as CraftingEngine expects. */
 function makeSourceItem(name, opts = {}) {
   const data = {
     name,
@@ -112,9 +96,7 @@ function makeActor({ id = 'actor-1', items = [] } = {}) {
   };
 }
 
-/**
- * Build an ingredient set that matches a specific item by id.
- */
+/** Build an ingredient set that matches a specific item by id. */
 function makeIngredientSet({ id = 'set-1', ingredientItem, quantity = 1 } = {}) {
   const ingredient = {
     systemItemId: ingredientItem.id,
@@ -162,9 +144,7 @@ function makeRecipe({
   return recipe;
 }
 
-/**
- * Build a crafting system config.
- */
+/** Build a crafting system config. */
 function makeSystem({
   id = 'sys-1',
   resolutionMode = 'simple',
@@ -190,9 +170,7 @@ function makeSystem({
   return sys;
 }
 
-/**
- * Build a ResolutionModeService wired to a specific system.
- */
+/** Build a ResolutionModeService wired to a specific system. */
 function makeResolutionService(system) {
   const craftingSystemManager = {
     getSystem: (id) => (system && id === system.id ? system : null)
@@ -200,9 +178,7 @@ function makeResolutionService(system) {
   return new ResolutionModeService(craftingSystemManager);
 }
 
-/**
- * Build a RecipeManager mock that uses item identity (by id) for ingredient matching.
- */
+/** Build a RecipeManager mock that uses item identity (by id) for ingredient matching. */
 function makeRecipeManager({ ingredientItem, toolItem = null, toolModel = null, ingredientSet } = {}) {
   return {
     canCraft(_actors, _recipe) {
@@ -220,9 +196,7 @@ function makeRecipeManager({ ingredientItem, toolItem = null, toolModel = null, 
   };
 }
 
-/**
- * Set globalThis.game with a system configuration.
- */
+/** Set globalThis.game with a system configuration. */
 function setupGame(system) {
   globalThis.game = {
     fabricate: {
@@ -237,9 +211,7 @@ function setupGame(system) {
   };
 }
 
-// ===========================================================================
 // Group 1: Simple mode — validate, consume, create result
-// ===========================================================================
 
 test('simple mode: successful craft consumes ingredient and creates result item', async () => {
   const system = makeSystem({
@@ -361,9 +333,7 @@ test('simple mode: exact quantity match deletes ingredient item', async () => {
   assert.equal(herb.updateCalled, false, 'ingredient should not be updated when deleted');
 });
 
-// ===========================================================================
 // Group 2: Multi-step — start, advance, complete
-// ===========================================================================
 
 /**
  * Build a minimal CraftingRunManager for multi-step tests.
@@ -621,9 +591,7 @@ test('multi-step: craft() returns failure when step ingredient is insufficient',
   assert.match(result.message, /Missing required items/i);
 });
 
-// ===========================================================================
 // Group 3: Routed check — check macro returns outcome, name-matched to a result group
-// ===========================================================================
 
 function makeLegacyOutcomeRoutingSystem(id = 'sys-legacy-routing') {
   return makeSystem({
@@ -646,9 +614,8 @@ function makeLegacyOutcomeRoutingRecipeFixture(system) {
   const herb = makeItem({ id: 'herb-routing', name: 'Herb', quantity: 5 });
   const ingredientSet = makeIngredientSet({ id: 'set-routing', ingredientItem: herb, quantity: 1 });
 
-  // Canonical routed + check (the 1.4.0 migration output): groups are
-  // name-matched against the outcome. The non-reserved outcomes `critical`/`pass`
-  // name their groups; the reserved `fail` outcome takes the failure path.
+  // Canonical routed + check (the 1.4.0 migration output): groups are name-matched against the
+  // outcome.
   const step = {
     id: 'step-1', name: 'Step 1',
     ingredientSets: [ingredientSet],
@@ -766,9 +733,7 @@ test('routed check: check failure returns failure without creating results', asy
   assert.equal(craftingActor.createdItems.length, 0, 'no items created on check failure');
 });
 
-// ===========================================================================
 // Group 4: Progressive mode — check macro returns value, awards based on difficulty
-// ===========================================================================
 
 function makeProgressiveSystem(id = 'sys-prog') {
   return makeSystem({
@@ -915,12 +880,8 @@ test('progressive mode: budget exceeding all costs awards all results', async ()
   assert.ok(names.includes('Item B'), 'Item B should be created');
 });
 
-// ===========================================================================
-// Group 5: Check-failure breakTools — the engine-evaluated forced-failure crit
-// breaks the owned tool on the breakToolsOnFail path. Each half (the
-// engine check surfacing data.breakTools, and _applyToolBreakage forcing a
-// never-breaking tool) is unit-proven; this exercises the craft() glue end to end.
-// ===========================================================================
+// Group 5: Check-failure breakTools — the engine-evaluated forced-failure crit breaks the owned
+// tool on the breakToolsOnFail path.
 
 // An owned tool item whose Foundry flag set is tracked in a plain map, so
 // flagBroken on-break writes are observable without a Foundry runtime.
@@ -946,9 +907,8 @@ test('check-failure breakTools: a forced-failure engine crit breaks the owned to
   const system = makeSystem({
     id: 'sys-break',
     resolutionMode: 'simple',
-    // The routed/tier `data.breakTools` legacy bridge only force-breaks under
-    // checkDriven authority (issue 419 either-or rule): a check never breaks tools
-    // under toolSpecific.
+    // The routed/tier `data.breakTools` legacy bridge only force-breaks under checkDriven authority
+    // (issue 419 either-or rule): a check never breaks tools under toolSpecific.
     toolBreakage: { authority: 'checkDriven' },
     craftingCheck: {
       enabled: true,
@@ -1085,19 +1045,10 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
   );
 });
 
-// ===========================================================================
-// Group N (issue 1098): the CRAFTING failure award
-//
-// Until this issue `craft()` returned inside `if (!checkResult.success)` before any
-// resolution ran, so a failed craft produced nothing whatever a recipe authored — the
-// reserved `role: 'failure'` result set was reachable only through the alchemy-Simple
-// path, and a routed recipe could not bind a result set to a failure tier at all.
-//
-// EVERY TEST HERE DRIVES `craft()`, never the producer alone. The producer could select
-// the right group and the branch still report an empty award on three separate seams —
-// the return value, the run record and the chat card — and a producer-level test cannot
-// see any of them.
-// ===========================================================================
+// Group N (issue 1098): the CRAFTING failure award. Until this issue `craft()` returned inside `if
+// (!checkResult.success)` before any resolution ran, so a failed craft produced nothing whatever a
+// recipe authored — the reserved `role: 'failure'` result set was reachable only through the
+// alchemy-Simple path, and a routed recipe could not bind a result set to a failure tier at all.
 
 /** The markup root only a CRAFTING/SALVAGE card carries — never a dice post. */
 const CRAFT_CARD_MARKUP = 'fabricate-craft-chat';
@@ -1120,13 +1071,7 @@ function captureCraftChat(t) {
   return created;
 }
 
-/**
- * A run manager that RETAINS the `completeStepFailure` payload.
- *
- * `makeRunManager` above deliberately drops it — every earlier test asserts on the run's
- * status alone — and the whole point of this group is that the award reaches the record
- * that lands in the actor's Fabricate run-container flag.
- */
+/** A run manager that RETAINS the `completeStepFailure` payload. */
 function makeFailureRecordingRunManager() {
   const base = makeRunManager(1);
   const payloads = [];
@@ -1272,10 +1217,7 @@ test('craft(): the failure award is reported on the return value, the run record
   assert.equal(recorded[0].name, 'Sludge', 'in the SUCCESS branch shape, name captured at award time');
   assert.ok(recorded[0].actorUuid && recorded[0].itemUuid);
 
-  // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the
-  //    poster. `buildResultCard`'s failure branch built its sections from `model.consumed`
-  //    and `model.tools` ONLY and never read `model.results`, so a threaded award rendered
-  //    as nothing — an argument-level assertion passes on a card that shows nothing.
+  // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the poster.
   const card = created.find((payload) => String(payload.content).includes(CRAFT_CARD_MARKUP));
   assert.ok(card, 'the crafting card was posted');
   assert.match(String(card.content), /Sludge/, 'the failure card renders the produced item');
@@ -1302,13 +1244,10 @@ test('craft(): a failed check under never produces nothing, byte-for-byte as bef
 
 test('craft(): under never, resolution is never ASKED — the short-circuit is before selection', async (t) => {
   captureCraftChat(t);
-  // "`never` short-circuits BEFORE any group is selected" is a statement about WHEN, and
-  // the item count cannot see it: the resolver's own failure branch is policy-gated too,
-  // so removing the engine's gate leaves both the award and the count at zero while the
-  // recipe's whole result model has been walked on every failed craft.
-  //
-  // This is the assertion that makes the engine gate load-bearing rather than defence in
-  // depth, and it is why the gate is the FIRST statement of `_produceCraftingFailureResults`.
+  // "`never` short-circuits BEFORE any group is selected" is a statement about WHEN, and the item
+  // count cannot see it: the resolver's own failure branch is policy-gated too, so removing the
+  // engine's gate leaves both the award and the count at zero while the recipe's whole result model
+  // has been walked on every failed craft.
   const setup = makeCraftingFailureSetup('never');
   // Shadow the ONE method on the instance rather than spreading the service: it is a class
   // instance, so a spread copy loses every prototype method the engine also calls.
@@ -1356,9 +1295,8 @@ test('craft(): always on a recipe authoring NO failure result set produces nothi
 
 test('craft(): the failure award does not change what a failed craft COSTS', async (t) => {
   captureCraftChat(t);
-  // A failure AWARD and a failure COST are separate decisions, and the consumption
-  // toggles alone own the second. This recipe awards on failure AND keeps its
-  // ingredients, which is only expressible if the two are genuinely independent.
+  // A failure AWARD and a failure COST are separate decisions, and the consumption toggles alone
+  // own the second.
   const { engine, craftingActor, sourceActor, recipe, herb } = makeCraftingFailureSetup('always');
 
   await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -1369,11 +1307,7 @@ test('craft(): the failure award does not change what a failed craft COSTS', asy
 
 // ── routedByCheck: the single-result-group exemption is a TRAP on the failure path ────
 
-/**
- * A routed-by-check system whose relative tiers carry ONE failure-marked tier.
- * `resultGroupCount: 1` reproduces the single-group exemption; `2` gives the failure tier
- * a group of its own to route to.
- */
+/** A routed-by-check system whose relative tiers carry ONE failure-marked tier. */
 function makeRoutedFailureSetup(failureResultPolicy, { resultGroupCount = 1 } = {}) {
   const system = makeSystem({
     id: 'sys-routed-fail',
@@ -1410,11 +1344,8 @@ function makeRoutedFailureSetup(failureResultPolicy, { resultGroupCount = 1 } = 
     return null;
   };
 
-  // The single-group case declares NO `checkOutcomeIds` at all, which is what makes it a
-  // purely NAME-routed recipe and lets the single-group exemption actually fire. Declaring
-  // one would resolve the failure tier and then report `unrouted-tier` instead — a
-  // misconfiguration, which no policy awards — so the trap would never be reached and the
-  // test would pass against an engine that still had it.
+  // The single-group case declares NO `checkOutcomeIds` at all, which is what makes it a purely
+  // NAME-routed recipe and lets the single-group exemption actually fire.
   const groups = [
     {
       id: 'rg-fine',
@@ -1472,11 +1403,9 @@ function makeRoutedFailureSetup(failureResultPolicy, { resultGroupCount = 1 } = 
 
 test('craft(): a routed failed check NEVER takes the single-group exemption and awards the success set', async (t) => {
   captureCraftChat(t);
-  // THE CRAFTING ANALOGUE OF CF1. Under `routedByCheck` a step with exactly one result
-  // group takes the single-group exemption, which was written for the success path and
-  // returns that group with `disposition: 'success'` for any non-keyword outcome. Awarding
-  // on anything but an explicit failure disposition therefore hands a failed craft its
-  // full SUCCESS output — silent, exploitable, and invisible to a length-only assertion.
+  // THE CRAFTING ANALOGUE OF CF1. Under `routedByCheck` a step with exactly one result group takes
+  // the single-group exemption, which was written for the success path and returns that group with
+  // `disposition: 'success'` for any non-keyword outcome.
   const { engine, craftingActor, sourceActor, recipe } = makeRoutedFailureSetup('always', {
     resultGroupCount: 1,
   });

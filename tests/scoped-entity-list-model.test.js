@@ -1,20 +1,7 @@
 /**
- * The pure half of the scoped-entity list shells (issue 1380, epic 1357).
- *
- * Three things are asserted here that a mounted test cannot state cheaply or at all:
- *
- *  - the TWO IDENTITY SHAPE FACTS are DERIVED from the lifted identity field lists, with the
- *    key-space bridge pinned NON-VACUOUS before any per-type answer is read. A broken bridge
- *    answers `false` everywhere, and `sourceLinked: false` on a component is indistinguishable
- *    from the correct `false` on an essence — so the set-equality assertions below are only
- *    worth anything after the lists they read are proved non-empty;
- *  - the TWO MEMOS, by counting. `searchOf` is invoked exactly once per entry per
- *    `(entries, searchOf)` change, and the system-row resolution is O(N) index reads rather than
- *    O(N x S). Both are stated as integers rather than as inequalities so an implementation that
- *    filters twice is caught rather than argued about;
- *  - that this module RESTATES NEITHER shipped pure model. Selection reduction and page
- *    arithmetic each already exist once, and a second copy is what the file they live in exists
- *    to prevent.
+ * The pure half of the scoped-entity list shells (issue 1380, epic 1357). the TWO IDENTITY SHAPE
+ * FACTS are DERIVED from the lifted identity field lists, with the key-space bridge pinned
+ * NON-VACUOUS before any per-type answer is read.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -22,20 +9,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
-// BY PATH, and the path matters. `src/systems/importReferenceResolver.js` exports a same-named
-// `WORLD_SCOPE_ENTITY_TYPES` whose values are PLURAL; under that import
-// `WORLD_SCOPE_DESCRIPTORS['components']` is `undefined`, `projectWorldScopeEntity` takes its
-// empty branch, and every per-type clause below passes vacuously off an empty projection. The
-// defined-guard in the first test is what makes that a red rather than a green.
+// BY PATH, and the path matters.
 import {
   emptyWorldScopeEntityState,
   projectWorldScopeEntity,
   WORLD_SCOPE_DESCRIPTORS,
 } from '../src/ui/svelte/stores/worldScopeProjection.js';
 import { paginateRows } from '../src/utils/browserPagination.js';
-// ALL THREE SHIPPED SORTS, run rather than restated. The ordering case below asserts they agree
-// with each other AND with this model, because "the three shipped browser models" was claimed by
-// a gate that imported one of them — see that case for what each version failed to catch.
+// ALL THREE SHIPPED SORTS, run rather than restated.
 import { sortComponents } from '../src/utils/componentBrowserModel.js';
 import { sortEssences } from '../src/utils/essenceBrowserModel.js';
 import { sortRecipes } from '../src/utils/recipeBrowserModel.js';
@@ -98,10 +79,8 @@ describe('the two identity shape facts are derived, and the bridge is pinned', (
   });
 
   it('reads the bridge OUT OF THE PRODUCTION MODULE, and every key it names is non-empty', () => {
-    // THE PIN ABOVE USES THIS FILE'S OWN COPY of the bridge, so it cannot see production drop
-    // its own. This one reads the map the derivation actually indexes with, so deleting the
-    // bridge — and reading `WORLD_IDENTITY_FIELDS[entityType]` singular — reds HERE, before the
-    // set equalities below get a chance to report a plausible all-`false` answer.
+    // THE PIN ABOVE USES THIS FILE'S OWN COPY of the bridge, so it cannot see production drop its
+    // own.
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/stores/worldScopeProjection.js'),
       'utf8'
@@ -148,10 +127,8 @@ describe('the two identity shape facts are derived, and the bridge is pinned', (
   });
 
   it('publishes a PER-ENTRY source-link answer over all three fields', () => {
-    // The descriptor says whether the TYPE has the fields; this says whether this entity filled
-    // one in, and it is what decides which badge a GM sees. It is answered beside the ONE list of
-    // field names, so a consumer never restates them — a restatement goes stale on a rename while
-    // `sourceLinked` stays correct and every type-level gate stays green.
+    // The descriptor says whether the TYPE has the fields; this says whether this entity filled one
+    // in, and it is what decides which badge a GM sees.
     const projected = projectWorldScopeEntity({
       entityType: 'component',
       corpus: {
@@ -289,11 +266,7 @@ describe('scopedEntityListModel filters', () => {
 
   it('sorts by the shipped vocabulary and by a lane descriptor', () => {
     const model = createScopedEntityListModel();
-    // EVERY KEY CARRIES BOTH DIRECTIONS (issue 1372). `systems-asc` was missing while
-    // `systems-desc` shipped, which was invisible while the frame offered one flat `<select>` of
-    // composite sort ids and became a live defect the moment it offered the prototype's key
-    // picker beside a direction toggle: composing `systems-asc` fell through to the default and
-    // silently produced name order.
+    // EVERY KEY CARRIES BOTH DIRECTIONS (issue 1372).
     assert.deepEqual(SCOPED_LIST_SORTS, ['name-asc', 'name-desc', 'systems-asc', 'systems-desc']);
     assert.deepEqual(
       model.project({ entries, sort: 'name-asc' }).rows.map((row) => row.id),
@@ -322,18 +295,9 @@ describe('scopedEntityListModel filters', () => {
   });
 
   it('orders names EXACTLY as the three shipped browser models do', () => {
-    // ── PINNED BY RUNNING THE SHIPPED SORT, NOT BY RESTATING IT ─────────────────────────────
-    // This case previously built its expectation from a hand-written `localeCompare` inside
-    // this file and claimed that pinned the order "against the shipped comparator". It did not.
-    // Measured: giving `componentBrowserModel.js` a `{ numeric: true }` collator — creating the
-    // exact scoped-list-versus-studio divergence this collator exists to answer — left this
-    // suite at 19 passed, 0 failed. A restatement is proof against ICU moving under the
-    // repository and no proof whatsoever against the browser models moving, which is the only
-    // direction that has ever moved.
-    //
-    // `sortEssences` is imported and RUN. Its `name` key falls through `SORT_VALUES` to the bare
-    // `localeCompare` all three studios share, so the expectation is now produced by the code
-    // the claim is about.
+    // PINNED BY RUNNING THE SHIPPED SORT, NOT BY RESTATING IT ───────────────────────────── This
+    // case previously built its expectation from a hand-written `localeCompare` inside this file
+    // and claimed that pinned the order "against the shipped comparator".
     const NAMES = ['Zinc', 'Écorce', 'Ash 10', 'Ash 2', 'Ash', 'ash', 'Birch'];
     const named = (name, index) => ({
       id: `e-${index}`,
@@ -344,11 +308,7 @@ describe('scopedEntityListModel filters', () => {
     const model = createScopedEntityListModel();
     const { rows } = model.project({ entries: NAMES.map((name, index) => named(name, index)) });
 
-    // ALL THREE, because the claim is about all three. The first repair imported only
-    // `sortEssences`, and giving `componentBrowserModel.js` a numeric collator STILL left this
-    // suite green — the same overstatement one step smaller. Asserting the three agree with each
-    // other first also catches the studios drifting apart, which is a defect in its own right and
-    // one nothing else in the repository measures.
+    // ALL THREE, because the claim is about all three.
     const rowsOf = (name) => ({ name });
     const orders = {
       components: sortComponents(NAMES.map(rowsOf)).map((row) => row.name),
@@ -364,10 +324,7 @@ describe('scopedEntityListModel filters', () => {
       'this list and the studios one route away must order one corpus one way'
     );
 
-    // THE FIXTURE INCLUDES A CASE-ONLY PAIR ON PURPOSE. The sort key used to be lowercased,
-    // which made the two compare equal here and kept their input order while the studios put
-    // the lowercase one first — the divergence this collator exists to remove, reintroduced one
-    // line above it. A fixture without such a pair cannot see that.
+    // THE FIXTURE INCLUDES A CASE-ONLY PAIR ON PURPOSE.
     assert.ok(
       NAMES.filter((name) => name.toLowerCase() === 'ash').length === 2,
       'the case-only pair is gone, so the lowercased-key regression is unobservable here'
@@ -410,9 +367,7 @@ describe('the two memos, counted', () => {
   }
 
   it('invokes searchOf EXACTLY once per entry per (entries, searchOf) change', () => {
-    // THE QUERY MATCHES EVERY ROW ON PURPOSE. `Array.prototype.sort` invokes its comparator zero
-    // times over a set of one, so a narrow query would let a comparator that re-derives the
-    // search string survive this count entirely.
+    // THE QUERY MATCHES EVERY ROW ON PURPOSE.
     const entries = corpus();
     let calls = 0;
     const searchOf = (entry) => {
@@ -492,8 +447,7 @@ describe('nothing shipped is restated', () => {
 
   it('imports the shipped selection reducer and page arithmetic INTO THE FRAME', () => {
     // Asserted on the frame rather than on the model because the model must not own either: the
-    // composition is what reaches for them. Pinned by equality on the imported bindings so
-    // deleting one and inlining its arithmetic reds here rather than only in a behaviour test.
+    // composition is what reaches for them.
     for (const name of [
       'toggleBulkSelection',
       'setBulkSelection',

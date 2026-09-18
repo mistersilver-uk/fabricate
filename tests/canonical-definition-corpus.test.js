@@ -1,31 +1,7 @@
 /**
- * The pinned canonical form for a crafting-definition corpus (issues 1080, 1233).
- *
- * `tests/helpers/canonicalizeDefinitionCorpus.js` is how the storage-layout programme
- * answers "did we lose data", so its own failure mode is the expensive one: a form that is
- * deterministic because it DISCARDS is worse than a form that is non-deterministic, because
- * every downstream acceptance goes green while measuring less. This suite is written against
- * that risk, and it has three halves.
- *
- * 1. **Determinism.** The same stored bytes, hydrated twice, canonicalize identically — for
- *    a legacy-shaped corpus and for a migrated one. This is the property that did not hold
- *    under version 1, and the legacy fixture exercises the flat `ingredients` shape
- *    DIRECTLY, because a fixture that seeds explicit `ingredientGroups` ids has not tested
- *    the case at all.
- * 2. **Detection.** Four corpus mutations — a dropped recipe, a dropped component
- *    reference, a renumbered `craftingSystemId`, a stripped durable identity leaf — must
- *    each make the comparison differ. Every one of those is a 16-character alphanumeric id
- *    or a reference to one, i.e. exactly what widening the minted-id pattern would have
- *    swallowed.
- * 3. **Non-vacuity.** The fixture is proved to actually mint (the same bytes canonicalize
- *    DIFFERENTLY in the degraded shape-only mode), the authored ids are proved to have the
- *    mintable shape, and the migrated corpus is proved to mint nothing.
- *
- * The Foundry environment here is deliberately NOT `installFoundryUtilsEnv()`: that shared
- * stub returns a sequential `rid-N`, which is not the shape `foundry.utils.randomID()`
- * produces and, being sequential per process, would make two hydrates of the same bytes
- * differ in a way no real world does while hiding the shape collision this issue is about.
- * A test double that is looser than the thing it stands for produces false passes.
+ * The pinned canonical form for a crafting-definition corpus (issues 1080, 1233). 1.
+ * **Determinism.** The same stored bytes, hydrated twice, canonicalize identically — for a
+ * legacy-shaped corpus and for a migrated one.
  */
 
 import assert from 'node:assert/strict';
@@ -45,11 +21,7 @@ const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 /**
  * A faithful stand-in for `foundry.utils.randomID()` — 16 characters of the same alphabet,
- * unpredictable per call. Core builds it from `Math.random().toString(36)`; this draws from
- * the platform CSPRNG instead, because SonarCloud rules `Math.random()` out (S2245) and the
- * property under test is only that the value is unpredictable and 16 alphanumerics long.
- *
- * @returns {string}
+ * unpredictable per call.
  */
 function mintCoreId() {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -123,14 +95,7 @@ const STORED_METADATA = Object.freeze({
 
 /**
  * The registered source item carrying the durable per-system identity Fabricate stamps with
- * `stampItemDataRoleIdentity` — `flags.fabricate.fabricate.roles[systemId][roleKey]`. It is
- * in the corpus because it is the shape that stresses the authored-versus-minted rule
- * hardest: the roles map is KEYED by a 16-character system id and its leaves are
- * 16-character definition ids, so a form that decided by shape would renumber the entire
- * durable identity graph and report identity loss as equivalence.
- *
- * @param {string|null} mutation
- * @returns {object}
+ * `stampItemDataRoleIdentity` — `flags.fabricate.fabricate.roles[systemId][roleKey]`.
  */
 function identityItemRecord(mutation) {
   const perSystem =
@@ -147,13 +112,11 @@ function identityItemRecord(mutation) {
 /**
  * A corpus in the LEGACY stored shape: flat `ingredients` inside an ingredient set
  * (`IngredientSet._legacyIngredientsToGroups`), a flat top-level `results` alias
- * (`Recipe._normalizeResultGroups`), an ingredient set and a step with no id, and no
- * `metadata` block. Hydrating it mints ids at seven distinct call sites and stamps a
- * `metadata` block from the clock.
+ * (`Recipe._normalizeResultGroups`), an ingredient set and a step with no id, and no `metadata`
+ * block.
  *
- * @param {string|null} [mutation] One of `dropRecipe`, `dropComponentRef`,
- *   `renumberSystemId`, `stripIdentityFlag` — the four detection cases.
- * @returns {{recipes: object[], items: object[]}}
+ * @param {string|null} [mutation] One of `dropRecipe`, `dropComponentRef`, `renumberSystemId`,
+ * `stripIdentityFlag` — the four detection cases.
  */
 function legacyStoredCorpus(mutation = null) {
   const coalOption =
@@ -194,12 +157,9 @@ function legacyStoredCorpus(mutation = null) {
 }
 
 /**
- * The same domain content in the MIGRATED stored shape: every group, set, step and result
- * carries its own authored id and every recipe carries a stored `metadata` block, so
- * hydrating it mints nothing at all.
- *
- * @param {string|null} [mutation]
- * @returns {{recipes: object[], items: object[]}}
+ * The same domain content in the MIGRATED stored shape: every group, set, step and result carries
+ * its own authored id and every recipe carries a stored `metadata` block, so hydrating it mints
+ * nothing at all.
  */
 function migratedStoredCorpus(mutation = null) {
   const coalOption =
@@ -298,12 +258,8 @@ function migratedStoredCorpus(mutation = null) {
 }
 
 /**
- * One independent LOAD of a stored corpus: hydrate the recipes through the real model and
- * keep an untouched snapshot of the bytes they were hydrated from.
- *
- * @param {(mutation: string|null) => {recipes: object[], items: object[]}} builder
- * @param {string|null} [mutation]
- * @returns {{records: object[], storedRecords: object[]}}
+ * One independent LOAD of a stored corpus: hydrate the recipes through the real model and keep an
+ * untouched snapshot of the bytes they were hydrated from.
  */
 function loadCorpus(builder, mutation = null) {
   const stored = builder(mutation);
@@ -376,9 +332,7 @@ describe('the same stored bytes canonicalize identically', () => {
   });
 
   it('is not vacuous: the same bytes canonicalize DIFFERENTLY under shape-only rules', () => {
-    // This is version 1's rule 4 verbatim, and it is the defect issue 1233 exists for. If
-    // this assertion ever flips, the fixture has stopped minting and every determinism
-    // assertion above has stopped proving anything.
+    // This is version 1's rule 4 verbatim, and it is the defect issue 1233 exists for.
     const first = loadCorpus(legacyStoredCorpus);
     const second = loadCorpus(legacyStoredCorpus);
     assert.notEqual(
@@ -601,13 +555,8 @@ describe('the boundaries of the provenance rule are refused rather than guessed'
   });
 
   it('refuses stored bytes that describe none of the records, rather than comparing nothing', () => {
-    // A conversion that re-minted every NESTED authored id is real identity loss, and the
-    // correct pre-conversion bytes see it. Empty bytes would not: with no stored strings,
-    // every id classifies as hydrate-minted and BOTH corpora collapse to the same
-    // `minted-NNNN` sequence — equal, under a reassuring `provenance: 'stored'` stamp. That
-    // shape is reachable by sequencing rather than carelessness: once a forward conversion
-    // has retired the pre-conversion setting, `ClientSettings#get` serves the registered `[]`
-    // default, so reading "the stored bytes" at the wrong point produces exactly `[]`.
+    // A conversion that re-minted every NESTED authored id is real identity loss, and the correct
+    // pre-conversion bytes see it.
     const corpus = (setId, groupId) => [
       {
         id: RECIPE_ALPHA_ID,
@@ -632,10 +581,9 @@ describe('the boundaries of the provenance rule are refused rather than guessed'
   });
 
   it('still permits the degraded mode for a caller that supplies no bytes at all', () => {
-    // Omitting and supplying-empty are different claims: omitting says "I hold no bytes" and
-    // is answered with the loudly stamped shape-only mode, while supplying says "these ARE
-    // the bytes this corpus came from" and must be true. An empty CORPUS is undescribed by
-    // nothing, so it stays permitted.
+    // Omitting and supplying-empty are different claims: omitting says "I hold no bytes" and is
+    // answered with the loudly stamped shape-only mode, while supplying says "these ARE the bytes
+    // this corpus came from" and must be true.
     const literal = [{ id: RECIPE_ALPHA_ID, name: 'Alpha Ingot' }];
     assert.equal(canonicalizeDefinitionCorpus(literal).provenance, 'shape');
     assert.equal(
@@ -662,12 +610,8 @@ describe('the boundaries of the provenance rule are refused rather than guessed'
 
 describe('the non-deterministic hydrate defaults the canonical form is written against', () => {
   /**
-   * Rules 4 and 5 are a hand-maintained mirror of the model layer: rule 4 covers the
-   * `randomID()` call sites and rule 5 covers the one `Date.now()` default. A new
-   * non-deterministic default added to `src/models/` would be invisible to both, and the
-   * form would go quietly non-deterministic again — so the set is pinned here.
-   *
-   * @returns {Record<string, string>}
+   * Rules 4 and 5 are a hand-maintained mirror of the model layer: rule 4 covers the `randomID()`
+   * call sites and rule 5 covers the one `Date.now()` default.
    */
   function modelSources() {
     const sources = collectWorkingTreeSources(['src/models'], ['.js']);
@@ -712,9 +656,7 @@ describe('the non-deterministic hydrate defaults the canonical form is written a
   });
 
   it('pins that every minted id is assigned to an `id` key', () => {
-    // Rule 4 only decides provenance at `MINTING_KEYS`. A call site that minted into some
-    // other field would be invisible to it, and the form would go non-deterministic again
-    // with every test still green — so the two counts are compared rather than assumed.
+    // Rule 4 only decides provenance at `MINTING_KEYS`.
     assert.deepEqual(
       occurrencesByFile(/\bid\s*[:=]\s*[^;\n]*randomID\(\)/g),
       occurrencesByFile(/randomID\(\)/g),
@@ -723,11 +665,8 @@ describe('the non-deterministic hydrate defaults the canonical form is written a
   });
 
   it('pins that no serialization table can omit an `id`', () => {
-    // The companion half of the assertion above, and the reason rule 4 may COLLECT only at
-    // `id` while SUBSTITUTING everywhere. A minted id is substituted at a reference position
-    // only because it was first collected at its own `id` key; a serialization table that
-    // dropped `id` would delete that defining occurrence, leaving the reference emitted
-    // verbatim and the form non-deterministic with the pin above still green.
+    // The companion half of the assertion above, and the reason rule 4 may COLLECT only at `id`
+    // while SUBSTITUTING everywhere.
     const tables = {
       RECIPE_OMITTED_WHEN_DEFAULT,
       INGREDIENT_SET_OMITTED_WHEN_DEFAULT,

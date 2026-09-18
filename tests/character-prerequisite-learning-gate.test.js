@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 
-// Character-prerequisite learning gate (issue 544), integrated with the issue-511
-// books/scrolls model: the gate lives on a recipe item's `caps.learn`
-// (`characterPrerequisiteIds`) and is evaluated at every learn entry point next to
-// the existing recipe `prerequisite`.
+// Character-prerequisite learning gate (issue 544), integrated with the issue-511 books/scrolls
+// model: the gate lives on a recipe item's `caps.learn` (`characterPrerequisiteIds`) and is
+// evaluated at every learn entry point next to the existing recipe `prerequisite`.
 
 function getPathValue(obj, key) {
   return String(key)
@@ -68,9 +67,6 @@ class FakeActor extends FakeDoc {
 }
 
 // The path here is an ARBITRARY dotted key paired with this file's own fake roll data.
-// It is not an assertion about any game system's shape, and specifically not about pf2e,
-// whose real prerequisite paths must root at `actor.` — see
-// tests/character-prerequisites.test.js, which pins the shipped preset bundles.
 const EXPERT = { id: 'p-expert', name: 'Expert Crafter', path: 'skills.cra.rank', op: 'gte', value: 2 };
 
 // `limitLearning` defaults ON: the character-prerequisite gate is only enforced when

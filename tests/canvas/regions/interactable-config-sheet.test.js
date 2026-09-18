@@ -1,11 +1,7 @@
 /**
  * Coverage for the config-sheet registration + tile discoverability seams
- * (`interactableConfigSheet.js`):
- *  - assignInteractableConfigSheet: registers against a fake DocumentSheetConfig,
- *    idempotent, defensive on a differing API shape.
- *  - resolveInteractableConfigTarget: resolves a linked Tile's reverse flags to
- *    the owning behaviour `{ sceneId, regionId, behaviorId }`.
- *  - shouldOfferInteractableConfigEntry: GM-only + Fabricate-visual gate.
+ * (`interactableConfigSheet.js`): - assignInteractableConfigSheet: registers against a fake
+ * DocumentSheetConfig, idempotent, defensive on a differing API shape.
  */
 
 import { describe, it } from 'node:test';
@@ -18,10 +14,9 @@ import {
 } from '../../../src/canvas/regions/interactableConfigSheet.js';
 
 class FakeRegionBehavior {}
-// Stands in for the CORE `foundry.applications.sheets.RegionBehaviorConfig`, which
-// is the document sheet now registered for `fabricate.interactable` so
-// `behavior.sheet` resolves (our rich Svelte InteractableConfigApp is NOT a
-// DocumentSheet and is reached via the Tile/Token HUD instead).
+// Stands in for the CORE `foundry.applications.sheets.RegionBehaviorConfig`, which is the document
+// sheet now registered for `fabricate.interactable` so `behavior.sheet` resolves (our rich Svelte
+// InteractableConfigApp is NOT a DocumentSheet and is reached via the Tile/Token HUD instead).
 class FakeRegionBehaviorConfig {}
 const FakeSheet = FakeRegionBehaviorConfig;
 

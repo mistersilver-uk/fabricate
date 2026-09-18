@@ -1,14 +1,4 @@
-/**
- * The GM Knowledge mutation collaborator (issue 785).
- *
- * These four bodies used to sit inline in `SvelteCraftingSystemManagerApp`, where
- * every acceptance bullet they carry was reachable only through a live Foundry
- * Application and could therefore only be asserted as source text. Extracted, each
- * rule is asserted on a fake's CALL LOG, which is what the acceptance actually asks
- * for: delete calls `item.delete()` exactly once and `item.update` never; a delete
- * writes no `learnedRecipes` and no `recipeItemLearning`; erase passes the EXACT
- * options object.
- */
+/** The GM Knowledge mutation collaborator (issue 785). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

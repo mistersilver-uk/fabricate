@@ -1,26 +1,7 @@
 /**
  * The `game.fabricate` half of the companion contract (issue 1289, T5) — the two `stable`
- * delegators, the shared authorization preamble they sit on, and the member table that says
- * where every member is read from.
- *
- * WHY A REPRODUCTION (and not the real `Fabricate` class): `src/main.js` imports the global
- * stylesheet and Svelte UI at module load, so it cannot be imported under plain `node --test`.
- * This suite drives the shared facade harness — whose copies of `_requireGmActor` and the two
- * delegators are FAITHFUL COPIES of that file — wired to the REAL grant, the REAL affordability
- * reader, the REAL `RecipeVisibilityService` predicate and the REAL flag writer, so the only
- * reproduced code is the delegation itself. A source-contract guard at the foot of the file
- * then pins that reproduction against the production text IN BOTH DIRECTIONS, which is what
- * stops the copy drifting into a proof of its own correctness.
- *
- * Three acceptance criteria live here:
- *
- *   6.  The `gmOnly` / `noActor` / `notReady` triple, asserted PRE-`ready` so it pins
- *       GM -> actor -> readiness as an ORDER rather than a set. (T2 owns the other half of
- *       that criterion — `recipeNotFound` and `systemNotFound` — which is the grant's own.)
- *   13. Shape pins for every `stable` member's answer: the key set and the type of each key,
- *       plus one VALUE, so the pin bites on its own rather than only when a key moves.
- *   14. Every member resolves through its declared `host` and `path` — never by assuming a
- *       facade function — and appears verbatim in `docs/api/index.md`'s member table.
+ * delegators, the shared authorization preamble they sit on, and the member table that says where
+ * every member is read from.
  */
 
 import assert from 'node:assert/strict';
@@ -78,18 +59,7 @@ const RECIPE = { id: 'recipe-1', name: 'Brew Healing Potion', craftingSystemId: 
 /** Flat `knowledge` is the one non-alchemy mode under which a learned entry is observable. */
 const OBSERVABLE_SYSTEM = { id: 'system-1', visibilityMode: 'knowledge' };
 
-/**
- * The grant's target: an actor double that can be WRITTEN to as well as read.
- *
- * The shared `makeFacadeActor` double is read-only — it keeps its flag store in a closure and
- * exposes no writer — and `setFabricateFlag` answers `null` for a document with neither
- * `update`+`updateSource` nor `setFlag`. A grant against that double would report success
- * having persisted nothing, and every shape pin below would be a pin on a fiction.
- *
- * `setFlag` WITHOUT `updateSource` is deliberate: that pair is the branch the real writer
- * takes for a lightweight collaborator, so "wrote once" and "wrote nothing" are both
- * observable on the route production would actually use.
- */
+/** The grant's target: an actor double that can be WRITTEN to as well as read. */
 function makeGrantTargetActor(id, { ownerUserIds = [] } = {}) {
   const owners = new Set(ownerUserIds);
   const flags = { fabricate: {} };
@@ -125,14 +95,7 @@ function makeGrantTargetActor(id, { ownerUserIds = [] } = {}) {
   };
 }
 
-/**
- * A `globalThis.Roll` the check-roll members can actually roll with.
- *
- * The two Standalone Check Roll members reach the REAL runners through their seam bag, so the
- * facade half of their gate table is only assertable with a dice engine present — and the
- * prompt-spy count that distinguishes "refused" from "rolled and then refused" is only
- * meaningful when the runner really would have opened the dialog.
- */
+/** A `globalThis.Roll` the check-roll members can actually roll with. */
 function installDice() {
   class FakeRoll {
     constructor(formula) {
@@ -155,14 +118,7 @@ function installDice() {
   globalThis.ChatMessage = { getSpeaker: ({ actor } = {}) => ({ alias: actor?.name ?? '' }) };
 }
 
-/**
- * The Standalone Check Roll seam bag the harness facade injects, with its call records.
- *
- * `isElectedExecutor` and `hasDiceEngine` are what the eight-cell gate table turns on, and the
- * two prompt seams are what make "this client did not open a dialog" assertable at all: both
- * production prompts AUTO-CONFIRM where there is no `DialogV2`, so a headless run cannot tell
- * a refusal from a confirmation without them.
- */
+/** The Standalone Check Roll seam bag the harness facade injects, with its call records. */
 function makeCheckSeams({ elected = true, diceEngine = true } = {}) {
   const calls = { prompt: 0, promptBulk: 0, bags: [] };
   return {
@@ -235,17 +191,9 @@ function standUpFacade({
   return { facade, resolveRecipeCalls, checkCalls: checkSeams.calls, checkSeams: checkSeams.seams };
 }
 
-// ---------------------------------------------------------------------------
 // Criterion 6 — the shared preamble, PRE-`ready`, as an order
-// ---------------------------------------------------------------------------
 
-/**
- * The two `stable` members, each with the member-specific strings its refusals must carry.
- *
- * Table-driven because the claim is that ONE rule serves both members while each answers in
- * its OWN words — and a per-member copy of these cases would be unable to fail on the second
- * half of that claim.
- */
+/** The two `stable` members, each with the member-specific strings its refusals must carry. */
 const STABLE_MEMBERS = [
   {
     name: 'grantRecipeKnowledge',
@@ -260,9 +208,7 @@ const STABLE_MEMBERS = [
     extraKeys: ['affordable'],
   },
   {
-    // The third ACTOR-TARGETED member. `resolveBulkCheckDecision` is deliberately absent: it
-    // takes no `actorId`, is GM-gated inline, and can never answer `noActor` — its own gate
-    // outcomes are asserted separately below.
+    // The third ACTOR-TARGETED member.
     name: 'rollActorCheck',
     keys: CHECK_ROLL_MESSAGE_KEYS,
     call: (facade, actorId) =>
@@ -272,12 +218,9 @@ const STABLE_MEMBERS = [
 ];
 
 /**
- * Assert one answer is a well-formed `stable` contract answer: frozen, exactly the documented
- * key set, each key of the documented type, and a `message` that is a localization key
- * resolving to a real string leaf.
- *
- * This is criterion 13's shape half, applied to every answer this suite produces rather than
- * to a hand-picked few — which is what makes an answer that GREW a field fail here.
+ * Assert one answer is a well-formed `stable` contract answer: frozen, exactly the documented key
+ * set, each key of the documented type, and a `message` that is a localization key resolving to a
+ * real string leaf.
  */
 function assertStableAnswerShape(member, result) {
   assert.ok(Object.isFrozen(result), `${member.name}: an answer crosses the boundary frozen`);
@@ -368,12 +311,8 @@ describe('criterion 6 — the gate order is GM -> actor -> readiness, not a set'
       });
 
       it('is ORDERED, not merely a set: flipping one fact at a time moves the answer', async () => {
-        // The three cases above each hold two facts wrong at once, so any of them would also
-        // pass against an implementation that answered in a DIFFERENT order. These two
-        // differentials are what make the order itself the subject: the same pre-`ready`
-        // call answers `gmOnly` while the user is a player and `notReady` the moment it is
-        // not, and answers `noActor` while the id is stale and `notReady` the moment it is
-        // not. An order-agnostic implementation cannot produce both pairs.
+        // The three cases above each hold two facts wrong at once, so any of them would also pass
+        // against an implementation that answered in a DIFFERENT order.
         const actor = makeGrantTargetActor('actor-1', { ownerUserIds: [PLAYER.id] });
         // Each stand-up REPLACES `globalThis.game`, and the facade reads it live, so the two
         // halves of a differential are run one after another rather than built up front.
@@ -391,11 +330,8 @@ describe('criterion 6 — the gate order is GM -> actor -> readiness, not a set'
   }
 
   it('resolves the actor through the OWNERSHIP-gated resolver, not a bare collection read', () => {
-    // "Un-actable-as" is unreachable through either member today, because the GM gate runs
-    // first and `_resolveCraftingActor` bypasses its predicate for a GM. That is the correct
-    // behaviour and not an omission — but it means no behavioural case can distinguish the
-    // gated resolver from `game.actors.get`, so the claim is pinned at the source instead.
-    // It is what keeps the property true if the GM gate is ever relaxed to an assistant tier.
+    // "Un-actable-as" is unreachable through either member today, because the GM gate runs first
+    // and `_resolveCraftingActor` bypasses its predicate for a GM.
     const preamble = mainMethodSource('_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {');
     assert.ok(
       preamble.includes('this._resolveCraftingActor(actorId)'),
@@ -409,9 +345,7 @@ describe('criterion 6 — the gate order is GM -> actor -> readiness, not a set'
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-4 / AC-13 — the gate table over (isGM, callSite, isElectedExecutor)
-// ---------------------------------------------------------------------------
 
 /** A GM-owned actor the check members can roll for. */
 function rollableActor() {
@@ -477,10 +411,7 @@ describe('AC-4 — all eight cells of (isGM, callSite, elected), each with its p
       COMPANION_OUTCOMES.noActor
     );
 
-    // A GM with an unresolvable actor AND an invalid call site answers `noActor`. This is the
-    // cell that pins the recorded ordering cost: a stale `actorId` is reported before any
-    // call-site check, on every client, rather than two different ways depending on which
-    // screen the GM is looking at. Combining only ONE failure at a time leaves it unasserted.
+    // A GM with an unresolvable actor AND an invalid call site answers `noActor`.
     const both = standUpFacade({ actors: [] });
     assert.equal(
       (
@@ -498,11 +429,7 @@ describe('AC-4 — all eight cells of (isGM, callSite, elected), each with its p
 
 describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the request', () => {
   it('cannot be handed an actor that overrides the one the ownership gate resolved', async () => {
-    // The mutation this exists for is `{ actor: gate.actor, …, ...request }`. It passes every
-    // MODULE-level criterion, because the leaf reads named keys and ignores the rest — but a
-    // caller-supplied `actor` wins the spread, and the roll is then taken for an actor the
-    // gate never resolved and the caller may not own. The gate would have passed on a
-    // DIFFERENT actor entirely.
+    // The mutation this exists for is `{ actor: gate.actor, …, ...request }`.
     const owned = makeGrantTargetActor('actor-1');
     const impostor = { id: 'actor-99', name: 'Impostor', getRollData: () => ({}) };
     const hostilePrompt = { calls: 0 };
@@ -514,8 +441,7 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
       formula: '1d20',
       dc: 15,
       // `interactive: true` is what makes the prompt count below an assertion rather than a
-      // decoration. Defaulted false, the dialog is off the path entirely and the caller's own
-      // prompt could not have been called whatever the delegator did.
+      // decoration.
       interactive: true,
       actor: impostor,
       prompt: () => {
@@ -617,9 +543,7 @@ describe('AC-13 — resolveBulkCheckDecision refuses gmOnly and notReady, but NE
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 13 — the answer shapes, and one value
-// ---------------------------------------------------------------------------
 
 describe('criterion 13 — every stable answer keeps its key set, its types, and its value', () => {
   it('grantRecipeKnowledge answers the granted shape, and persists what it reports', async () => {
@@ -662,10 +586,7 @@ describe('criterion 13 — every stable answer keeps its key set, its types, and
   });
 
   it('checkAffordability answers a SHORTFALL by value: 1 sp cannot buy 1 gp', async () => {
-    // The value half of this criterion. A key-set-and-type pin is value-insensitive by
-    // construction, so this case is what fails if the ladder ever stops converting — and the
-    // shortfall text is asserted NON-EMPTY because `message` is a localization key and the
-    // spender's own free text has nowhere else to ride.
+    // The value half of this criterion.
     const purse = new CurrencyCraftingActorFake('Idrin', { currency: { sp: 1 } });
     const { facade } = standUpFacade({ actors: [purse] });
 
@@ -724,24 +645,14 @@ describe('criterion 13 — every stable answer keeps its key set, its types, and
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 6 (pooled half) — the SET-valued preamble, as an ORDER and a SPLIT
-// ---------------------------------------------------------------------------
 
 const POOLED_COMPONENT = { id: 'component-iron', name: 'Iron Ore' };
 const POOLED_SYSTEM = { id: 'system-1', components: [POOLED_COMPONENT], tools: [] };
 
 /**
- * The two pooled members, each with its own refusal strings, its own answer shape and the
- * request it makes.
- *
- * Table-driven for the reason `STABLE_MEMBERS` above is: the claim is that ONE set-valued rule
- * serves both members while each answers in its OWN words and its OWN shape, and a per-member
- * copy of these cases could not fail on the second half of that claim.
- *
- * `extra` is each member's derived fields as a REFUSAL answers them — the read's empty readings,
- * the consume's vacuous `null` total beside its empty ledger — so every case below asserts the
- * WHOLE answer rather than a token.
+ * The two pooled members, each with its own refusal strings, its own answer shape and the request
+ * it makes.
  */
 const POOLED_MEMBERS = [
   {
@@ -781,14 +692,7 @@ function pooledRefusal(member, outcome, messageData = null) {
   return expected;
 }
 
-/**
- * The two pooled seam bags, recording WHICH actor documents the leaves were handed.
- *
- * The record is the point: a delegator that resolved its own actors, or forwarded the caller's
- * raw addresses, would pass every outcome assertion while handing the leaf something other than
- * what the gate resolved. `findComponentItems` is shared by both bags exactly as production's
- * two bags bind the same published matcher.
- */
+/** The two pooled seam bags, recording WHICH actor documents the leaves were handed. */
 function makePooledSeams() {
   const seen = { actorUuids: [] };
   const findComponentItems = (actor, component) => {
@@ -862,9 +766,7 @@ describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split
         const actor = makePooledActor('actor-1', 'Actor.actor-1');
         // The SAME document at a second address, exactly as a LINKED token answers: `Token#actor`
         // returns `this.baseActor`, so these two well-formed, visibly different addresses are one
-        // pool. `overBound` below cannot stand in for this case — it is 33 copies of one address
-        // and is refused by the BOUND, so it reads as covering duplication while never reaching
-        // the rule.
+        // pool.
         const linked = makePooledActor('actor-2', 'Actor.actor-2');
         linked.uuidAliases = ['Scene.scene-1.Token.token-1.Actor.actor-2'];
         const overBound = Array.from({ length: POOLED_ACTORS_MAX + 1 }, () => actor.uuid);
@@ -875,24 +777,16 @@ describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split
           ['carrying a non-string', [actor.uuid, 42]],
           ['carrying an empty string', [actor.uuid, '   ']],
           // The one an outcome-blind gate gets wrong, and the reason the split exists: SOME of
-          // these resolve. Pooling over fewer actors than the caller believes is the harm both
-          // members refuse, because a consume would then draw from a different set than the
-          // read reported.
+          // these resolve.
           ['only PARTLY resolved', [actor.uuid, 'Actor.nobody']],
-          // An address that resolves to something that is not an actor. `fromUuidSync` answers
-          // whatever the address names, so without the `documentName` test this Item would be
-          // scanned for components and — on the consume — written to.
+          // An address that resolves to something that is not an actor.
           ['addressing a document that is not an actor', [actor.uuid, 'Item.iron-ore']],
           // A pack address. `fromUuidSync` resolves one as `collection.get(id) ?? index.get(id)`,
-          // so BEFORE anything loads the pack it answers an index entry with no `documentName`
-          // and after it answers a real Actor — load-state-dependent behaviour on the member that
-          // DELETES. The `locked` flag is no defence: it guards the collection's own management
-          // methods client-side and the server backend never reads it.
+          // so BEFORE anything loads the pack it answers an index entry with no `documentName` and
+          // after it answers a real Actor — load-state-dependent behaviour on the member that
+          // DELETES.
           ['addressing a compendium template actor', [actor.uuid, 'Compendium.pack.Actor.tpl']],
-          // The repeat, said the two ways a caller reaches it. The first is a companion
-          // prepending the acting character to a party list, which the published ordering rule
-          // ("the caller's order IS the allocation policy") actively invites; the second needs no
-          // mistake at all, because the two addresses name one document in Foundry's own model.
+          // The repeat, said the two ways a caller reaches it.
           ['repeating one address', [actor.uuid, actor.uuid]],
           ['naming ONE document at TWO addresses', [linked.uuid, ...linked.uuidAliases]],
         ];
@@ -970,9 +864,7 @@ describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split
   });
 
   it('addresses the TOKEN actor its address names, never the world prototype sharing its id', async () => {
-    // The whole reason these two members take a UUID. A synthetic token actor's `id` IS its
-    // base actor's, so an id-keyed resolution silently answers about the wrong document — a
-    // tolerable ambiguity for a member that gives, and a corrupting one for one that deletes.
+    // The whole reason these two members take a UUID.
     const prototype = makePooledActor('actor-1', 'Actor.actor-1', 9);
     const token = makePooledActor('actor-1', 'Scene.scene-1.Token.token-1.Actor.actor-1', 1);
     const { facade, seen } = standUpPooledFacade({ actors: [prototype], documents: [token] });
@@ -1000,21 +892,11 @@ describe('criterion 6 (pooled half) — GM -> actors -> readiness, and the split
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 14 — every member resolves through its declared host and path
-// ---------------------------------------------------------------------------
 
 const DOCS_API_INDEX = readFileSync(resolve(import.meta.dirname, '../docs/api/index.md'), 'utf8');
 
-/**
- * Just the member TABLE, sliced out of the page.
- *
- * Scoped rather than matched against the whole file, because the prose beneath the table
- * legitimately names members too — `getCraftingEngine().findComponentItems` appears there in
- * its carve-out paragraph. A whole-file `includes` therefore passes for a member that has
- * been dropped FROM THE TABLE, which is what criterion 14 is actually about; the first draft
- * of this suite stayed green through exactly that mutation.
- */
+/** Just the member TABLE, sliced out of the page. */
 const DOCS_MEMBER_TABLE = (() => {
   const header = '| Member | Promise | Read from | What it answers |';
   const start = DOCS_API_INDEX.indexOf(header);
@@ -1024,20 +906,14 @@ const DOCS_MEMBER_TABLE = (() => {
 })();
 
 /**
- * A facade in the state `bindFabricateGlobal` publishes it in: constructed, but with
- * `initialize()` not yet run. Every collaborator is at its constructor default, which is what
- * the `handle` tier's `null`-before-readiness promise is a claim about.
+ * A facade in the state `bindFabricateGlobal` publishes it in: constructed, but with `initialize()`
+ * not yet run.
  */
 function makeUninitializedFacade() {
   return new FabricateFacadeUnderTest();
 }
 
-/**
- * The same facade after `initialize()` would have run. `getCraftingEngine()` answers an object
- * on the REAL `CraftingEngine` prototype, so the eighth member — a method on the object a
- * `handle` accessor RETURNS, and the row a flat name list could not have described — resolves
- * against the real method rather than a stub that would agree with anything.
- */
+/** The same facade after `initialize()` would have run. */
 function makeInitializedFacade() {
   return new FabricateFacadeUnderTest({
     ready: true,
@@ -1119,9 +995,8 @@ describe('criterion 14 — the member table resolves, and says where', () => {
   });
 
   it('names every member verbatim in the published docs table', () => {
-    // The eighth member's NAME is the literal `getCraftingEngine().findComponentItems`, while
-    // its `path` is the bare `findComponentItems` on the engine host. A docs check that
-    // matched the path would pass on the wrong string, so this matches the name.
+    // The eighth member's NAME is the literal `getCraftingEngine().findComponentItems`, while its
+    // `path` is the bare `findComponentItems` on the engine host.
     assert.equal(
       DOCS_MEMBER_TABLE.trimEnd().split('\n').length,
       COMPANION_MEMBERS.length + 2,
@@ -1140,9 +1015,7 @@ describe('criterion 14 — the member table resolves, and says where', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // SOURCE CONTRACT — the harness copies, pinned against src/main.js both ways
-// ---------------------------------------------------------------------------
 
 const PREAMBLE = '_requireGmActor(actorId, { gmOnlyKey, noActorKey }) {';
 const GRANT =
@@ -1154,28 +1027,13 @@ const AWARD =
   'async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {';
 const CREDIT =
   'async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {';
-/**
- * The pooled members' own signatures, and the SET-valued preamble they sit on (issue 1342).
- *
- * These need a SECOND fidelity block rather than a row in the loop below, and the reason is
- * mechanical: that loop asserts the literal `this._requireGmActor(actorId,`, which a plural
- * preamble taking `actorUuids` cannot satisfy. Loosening the existing assertion to match both
- * would stop it proving that the SINGULAR members delegate to the singular rule — so the claims
- * are stated separately, each about the preamble its members actually use.
- */
+/** The pooled members' own signatures, and the SET-valued preamble they sit on (issue 1342). */
 const PLURAL_PREAMBLE = '_requireGmActors(actorUuids) {';
 const READ_POOLED = 'async readPooledHoldings({ actorUuids = null, costs = null } = {}) {';
 const CONSUME_POOLED =
   'async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {';
 
-/**
- * Every claim below is asserted over BOTH texts.
- *
- * Pinning production alone catches production weakening and says nothing about the mirror
- * drifting away from it — a divergence that is behaviourally identical on the fixtures at
- * hand is invisible to every case above, and issue 1202 hit exactly that. So dropping either
- * gate from either side fails this suite.
- */
+/** Every claim below is asserted over BOTH texts (issue 1202). */
 function bothTexts(signature) {
   return [
     ['production', mainMethodSource(signature)],
@@ -1183,15 +1041,7 @@ function bothTexts(signature) {
   ];
 }
 
-/**
- * The same text with whole-line `//` comments removed.
- *
- * Every ABSENCE assertion below reads this rather than the raw slice, because a comment that
- * NAMES the forbidden call satisfies a raw `includes` check — and both methods here carry a
- * comment explaining precisely why they do not call `_requireReady()`. The first draft of
- * this suite went red on exactly that, which is the argument for the helper rather than for
- * rewording the comment: the next comment would reintroduce it.
- */
+/** The same text with whole-line `//` comments removed. */
 function codeOnly(body) {
   return body
     .split('\n')
@@ -1223,11 +1073,6 @@ describe('the harness copies are faithful to src/main.js', () => {
     for (const signature of [GRANT, AFFORD, ROLL, AWARD, CREDIT]) {
       for (const [label, body] of bothTexts(signature)) {
         // The trailing `{` the first two members carry is deliberately NOT pinned here.
-        // `rollActorCheck` passes a module-level frozen key pair instead of an inline object
-        // literal, because that literal IS the duplicated run between `src/main.js` and this
-        // harness — the one measured at 139 tokens for the grant, over SonarJS's minimum. The
-        // claim this assertion makes is delegation to the shared preamble with the caller's
-        // own `actorId`; each member's own refusal STRINGS are pinned per member below.
         assert.ok(
           body.includes('const gate = this._requireGmActor(actorId,'),
           `${label} ${signature} no longer delegates its gate to the shared preamble`
@@ -1289,10 +1134,7 @@ describe('the harness copies are faithful to src/main.js', () => {
         `${label} obtains its seams from the one hoisted bag, never a restated literal`
       );
       // The refusal is built by THIS member's own builder, and the gate outcome wins over
-      // readiness. Both halves are one substitution away from a cross-member vocabulary leak
-      // — `bulkCheckDecisionResult(...)` here answers a non-GM in the BULK member's words and
-      // in its answer SHAPE — and the behavioural cases that would catch it all run against
-      // the mirror, so production's copy is pinned where it is written.
+      // readiness.
       assert.ok(
         body.includes('return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);'),
         `${label} must answer its OWN refusal shape, with the gate outcome ahead of readiness`
@@ -1332,11 +1174,7 @@ describe('the harness copies are faithful to src/main.js', () => {
     }
   });
 
-  /**
-   * The eight seams the ONE bag binds, each to the collaborator production actually ships.
-   *
-   * `[key, the exact binding, what the wrong binding does in production]`.
-   */
+  /** The eight seams the ONE bag binds, each to the collaborator production actually ships. */
   const SEAM_BINDINGS = [
     [
       'isElectedExecutor',
@@ -1378,21 +1216,9 @@ describe('the harness copies are faithful to src/main.js', () => {
   ];
 
   it('AC-5 — the ONE seam bag binds every seam to the collaborator production ships', () => {
-    // PRODUCTION ONLY, and that asymmetry is the whole reason this assertion exists rather
-    // than an oversight. `bothTexts` has nothing to compare here: the harness mirror
-    // SUBSTITUTES the bag for an injected one, by design, because every seam in it is a
-    // Foundry collaborator the harness has none of. `src/main.js` is never imported by any
-    // unit test either — this suite reads it as TEXT — so with the bag substituted in the
-    // mirror and unread in production, all eight bindings were held correct by nothing.
-    //
-    // What the existing pins prove is that a bag is CALLED (`this._companionCheckSeams()`
-    // appears in both delegator bodies). They say nothing about what is IN it, and ESLint
-    // catches a misspelled identifier but never a swap between two real ones. Each row below
-    // is a single substitution that otherwise survives the entire suite.
-    //
-    // D12 hoisted the bag to one private to keep the mirror's duplicated run down, and that
-    // removed even the second copy a reviewer could have diffed it against — which is why
-    // the two new members needed this pin where the shipped two did not.
+    // PRODUCTION ONLY, and that asymmetry is the whole reason this assertion exists rather than an
+    // oversight. What the existing pins prove is that a bag is CALLED
+    // (`this._companionCheckSeams()` appears in both delegator bodies).
     const bag = mainMethodSource('_companionCheckSeams() {');
     const keys = [...bag.matchAll(/^ {6}(\w+):/gm)].map(([, key]) => key);
     assert.deepEqual(
@@ -1404,13 +1230,8 @@ describe('the harness copies are faithful to src/main.js', () => {
     // silently shrank to nothing would satisfy `deepEqual([], [])` above only if the expected
     // list were empty too, but the substring checks below would pass over a short string.
     assert.ok(bag.length > 400, `non-vacuity: the seam bag sliced to ${bag.length} characters`);
-    // Whitespace-normalized, and each binding matched with its TRAILING SEPARATOR left off,
-    // so the claims survive a reformat of `src/main.js`. That is a live possibility rather
-    // than a hypothetical: the file is currently OUTSIDE the `format:check` globs, and
-    // Prettier's `trailingComma: 'es5'` would add a comma to the last property here and wrap
-    // the ~165-character `rollActorCheck` signature the moment it is brought inside them.
-    // The lookahead is what keeps the match a whole binding — `runFormulaPassFailToo` is a
-    // different function, and a bare `includes` could not tell them apart.
+    // Whitespace-normalized, and each binding matched with its TRAILING SEPARATOR left off, so the
+    // claims survive a reformat of `src/main.js`.
     const squashed = bag.replaceAll(/\s+/g, ' ');
     for (const [key, binding, harm] of SEAM_BINDINGS) {
       const whole = new RegExp(`${binding.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`);
@@ -1423,18 +1244,9 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('AC-29 — each new delegator keeps its OWN refusal strings, where hoisting put them', () => {
-    // `bothTexts` returns a METHOD-BODY slice, and D12 hoisted these pairs out of that slice —
-    // so the body-level assertion above proves delegation to the shared preamble and can say
-    // nothing about WHICH strings each member delegates with. This is a SOURCE-FIDELITY pin
-    // over a parameter that is currently inert, and saying so is the point: both delegators
-    // read `gate.outcome` and discard `gate.message`, and each builder derives `message` from
-    // its own table, so giving a hoisted pair another member's strings changes no answer today.
-    // It is pinned anyway because the pair is part of the preamble's published shape, because
-    // one shipped member (`resetActorKnowledge`) does answer with `gate.message` and a sixth
-    // could, and because a mirror carrying another member's strings is drift in the one
-    // artefact every facade-level case for these two members runs against — there is no
-    // Foundry smoke by design. The claim this comment used to make, that the swap makes a
-    // refused award report itself in the grant's words, was simply false.
+    // `bothTexts` returns a METHOD-BODY slice, and D12 hoisted these pairs out of that slice — so
+    // the body-level assertion above proves delegation to the shared preamble and can say nothing
+    // about WHICH strings each member delegates with.
     const PAIRS = [
       [AWARD, 'awardComponents', 'AWARD_COMPONENTS_GATE_KEYS', 'COMPONENT_AWARD_MESSAGE_KEYS', COMPONENT_AWARD_MESSAGE_KEYS],
       [CREDIT, 'creditCurrency', 'CREDIT_CURRENCY_GATE_KEYS', 'CURRENCY_CREDIT_MESSAGE_KEYS', CURRENCY_CREDIT_MESSAGE_KEYS],
@@ -1462,11 +1274,6 @@ describe('the harness copies are faithful to src/main.js', () => {
       }
     }
     // The half the two assertions above CANNOT make, and the reason the hole was worth closing.
-    // They are file-scoped: they prove both constants are correctly defined, and stay green while
-    // `awardComponents` hands the preamble `CREDIT_CURRENCY_GATE_KEYS`. That mis-wiring is inert
-    // TODAY only because these two discard `gate.message` — and one shipped member,
-    // `resetActorKnowledge`, already answers with it, so the day a sixth does the same the
-    // mis-wiring goes live with nothing red. The claim belongs in the member's own BODY.
     for (const [signature, member, constant] of PAIRS) {
       for (const [label, body] of bothTexts(signature)) {
         assert.ok(
@@ -1478,11 +1285,8 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('AC-29 — `_worldCurrencySeams()` binds the same seams in both texts', () => {
-    // The bag D12 mitigation 1 hoisted, and the one `checkAffordability` was RETARGETED onto,
-    // so a mirror that omits a binding takes the whole currency surface with it. The mutation
-    // this closes is dropping `actorInventoryCoinSpender` here: every facade-level currency
-    // case that does not use that strategy stays green, and the hoist introduced to shorten
-    // the mirror has silently broken it.
+    // The bag D12 mitigation 1 hoisted, and the one `checkAffordability` was RETARGETED onto, so a
+    // mirror that omits a binding takes the whole currency surface with it.
     const BINDINGS = [
       ['getCurrencyConfig', 'getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null'],
       ['actorPropertyCoinSpender', 'actorPropertyCoinSpender: this.actorPropertyCoinSpender'],
@@ -1516,19 +1320,10 @@ describe('the harness copies are faithful to src/main.js', () => {
 
   it('binds every seam `awardComponents` injects, to the collaborator production ships', () => {
     // PRODUCTION-SIDE ONLY, and that asymmetry is the reason this pin is needed rather than an
-    // excuse for not having one: the mirror INJECTS this bag — production reaches `fromUuid`,
-    // the live crafting-system manager and the real engine, none of which exist under
-    // `node --test` — so every facade-level case for this member runs against a bag the suite
-    // supplied, and nothing else looks at the one production builds.
-    //
-    // Two of its mutations are silent to the entire suite, and one of them makes a `stable`
-    // member THROW. Renaming `resolveSystem` leaves the leaf calling `seams.resolveSystem(...)`
-    // on `undefined`, in `awardComponents`' own body BEFORE the per-entry `try` — so the first
-    // real call raises a `TypeError` out of a member that publishes "never throws". Dropping
-    // `findComponentItems` is silent the other way: every entry answers `awardFailed`, and the
-    // member's published claim to resolve its stack targets through the ONE shipped resolver is
-    // disconnected in production while every stacking case here keeps passing against the
-    // injected bag.
+    // excuse for not having one: the mirror INJECTS this bag — production reaches `fromUuid`, the
+    // live crafting-system manager and the real engine, none of which exist under `node --test` —
+    // so every facade-level case for this member runs against a bag the suite supplied, and nothing
+    // else looks at the one production builds.
     const AWARD_SEAM_BINDINGS = [
       [
         'resolveSystem',
@@ -1583,15 +1378,10 @@ describe('the harness copies are faithful to src/main.js', () => {
           false,
           `${label} ${signature} must REFUSE notReady, never throw it`
         );
-        // The structurally identical hole the shipped contract already had to close: a
-        // `{ ...request, actor }` forward passes every MODULE-level criterion while letting a
-        // companion inject an `actor` that overrides the resolved one, a `prompt` that bypasses
-        // the dialog, or a `speaker` impersonating another actor in chat.
-        //
-        // ANY spread, not a named one. `...request` is a SPELLING — `...arguments[0]`,
-        // `...options` and `...{ ...request }` all reopen the same hole — and a spelling is
-        // what a mutation walks straight past. The delegators need no spread at all, so their
-        // ABSENCE is a property.
+        // The structurally identical hole the shipped contract already had to close: a `{
+        // ...request, actor }` forward passes every MODULE-level criterion while letting a
+        // companion inject an `actor` that overrides the resolved one, a `prompt` that bypasses the
+        // dialog, or a `speaker` impersonating another actor in chat.
         assert.equal(
           code.includes('...'),
           false,
@@ -1616,16 +1406,13 @@ describe('the harness copies are faithful to src/main.js', () => {
       assert.ok(gmAt < gateAt, `${label} reads addresses before it has established a GM`);
       // It threads NO refusal string. Both pooled delegators discard `gate.message` and answer
       // through their own result builder, which derives the member's words from its own table by
-      // outcome — so a key here could only restate that string in a second place. Reintroducing
-      // one would be reintroducing the thing whose only failure mode was someone editing it.
+      // outcome — so a key here could only restate that string in a second place.
       assert.equal(
         codeOnly(body).includes('Key'),
         false,
         `${label} threads a refusal string through a preamble whose \`message\` nobody reads`
       );
-      // Addressed by UUID, never by id. `game.actors.get` cannot tell an unlinked token actor
-      // from its world prototype — the synthetic actor's `id` IS the base actor's — so an
-      // id-keyed resolution here would let a member that DELETES take from the wrong document.
+      // Addressed by UUID, never by id.
       assert.ok(
         body.includes('globalThis.fromUuidSync?.(uuid) ?? null'),
         `${label} no longer resolves its actors by ADDRESS`
@@ -1641,11 +1428,9 @@ describe('the harness copies are faithful to src/main.js', () => {
         body.includes("if (addressed?.documentName !== 'Actor') return null;"),
         `${label} accepts an address that resolves to a document which is not an actor`
       );
-      // And the pack test beside it. `fromUuidSync` answers a pack address as
-      // `collection.get(id) ?? index.get(id)`, so the SAME uuid is refused as an index entry
-      // before anything loads the pack and admitted as a real Actor afterwards. Without this the
-      // consume would issue `deleteEmbeddedDocuments` against a compendium TEMPLATE, and whether
-      // it did would depend on what else the world had opened.
+      // And the pack test beside it. `fromUuidSync` answers a pack address as `collection.get(id)
+      // ?? index.get(id)`, so the SAME uuid is refused as an index entry before anything loads the
+      // pack and admitted as a real Actor afterwards.
       assert.ok(
         body.includes('addressed.inCompendium === true ? null : addressed'),
         `${label} admits a compendium actor, whose embedded documents a consume would delete`
@@ -1661,13 +1446,6 @@ describe('the harness copies are faithful to src/main.js', () => {
   /**
    * Each pooled member with the two things only IT may name: its own answer builder and its own
    * leaf.
-   *
-   * TWO and not three. The hoisted key trio these members used to carry is gone: the SET-valued
-   * preamble's `message` was read by nobody — both delegators branch on `gate.outcome` and answer
-   * through the builder, which derives the member's words from its own table by outcome — so the
-   * trio, its mirror copy and the pin over both bought one failure mode, someone editing a
-   * string. What remains is named per member rather than asserted as a shape, because swapping
-   * the builder or the leaf in PRODUCTION is invisible to a suite that runs the mirror.
    */
   const POOLED_DELEGATORS = [
     [READ_POOLED, 'pooledHoldingsReadResult', 'readPooledHoldingsAcrossActors'],
@@ -1695,21 +1473,13 @@ describe('the harness copies are faithful to src/main.js', () => {
           body.includes('if (gate.outcome || this.ready !== true) {'),
           `${label} ${signature} lost the single guard that keeps the preamble ahead of readiness`
         );
-        // The bound rides on the refusal. `InvalidActorUuids` interpolates `{max}`, so dropping
-        // `gate.messageData` puts literal braces in front of a GM — and no outcome assertion
-        // anywhere would notice.
+        // The bound rides on the refusal.
         assert.ok(
           body.includes('gate.messageData'),
           `${label} ${signature} drops the gate's own interpolation data from its refusal`
         );
         // The RESOLVED documents, as the leaf's FIRST argument — which is what makes a
-        // caller-supplied `actors` in the request structurally unable to reach a seam. Pinned at
-        // the CALL and not merely somewhere in the body: `body.includes('gate.actors')` alone is
-        // satisfied by transposed arguments, and both leaves take `(actors, request, seams)`, so
-        // a transposition would hand the request where the pool belongs.
-        // Whitespace-tolerant, because the two texts are formatted differently on purpose:
-        // `src/main.js` is outside the `format:check` globs and this mirror is not, so Prettier
-        // wraps the mirror's call and leaves production's on one line.
+        // caller-supplied `actors` in the request structurally unable to reach a seam.
         assert.match(
           body,
           new RegExp(String.raw`${leaf}\(\s*gate\.actors\s*,`),
@@ -1736,13 +1506,7 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('AC-31 — each pooled member answers in its OWN words WITHOUT a threaded refusal string', () => {
-    // The inverse of the pin this replaces. That one asserted three key strings per member
-    // against the source and admitted, in its own comment, that "a swap changes no answer
-    // TODAY" — so its only failure mode was someone editing a string. The strings were inert
-    // because each pooled delegator discards `gate.message` and answers through its own result
-    // builder, which resolves the member's own table BY OUTCOME. So the claim worth pinning is
-    // that no such constant exists to be mis-wired, and the claim worth TESTING is behavioural:
-    // the words a refusal actually carries. Both are done here.
+    // The inverse of the pin this replaces.
     for (const [label, source] of [
       ['production', MAIN_SOURCE],
       ['the harness mirror', HARNESS_SOURCE],
@@ -1781,11 +1545,7 @@ describe('the harness copies are faithful to src/main.js', () => {
 
   it('AC-31 — the two pooled delegators are NOT adjacent, in either text', () => {
     // A MEASURED siting rather than an aesthetic one, and the acceptance criterion this change
-    // carries. Adjacent, near-identical delegators concatenate into ONE duplicated run across
-    // `src/main.js` and this mirror, and the pair measures over SonarJS's 100-token floor where
-    // each member alone measures under it — the effect first recorded for `creditCurrency`.
-    // Asserting a whole OTHER member sits between them is what makes the siting checkable; a
-    // character-distance threshold would only measure how much prose was written.
+    // carries.
     for (const [label, source] of [
       ['production', MAIN_SOURCE],
       ['the harness mirror', HARNESS_SOURCE],
@@ -1802,11 +1562,10 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('AC-31 — binds every seam the two pooled members inject, as production ships them', () => {
-    // PRODUCTION-SIDE ONLY, for the reason the award bag's pin states: the mirror INJECTS both
-    // bags — production reaches the live crafting-system manager, the real engine and
-    // `game.users`, none of which exist under `node --test` — so every facade-level case for
-    // these two members runs against a bag the suite supplied, and nothing else looks at the
-    // one production builds.
+    // PRODUCTION-SIDE ONLY, for the reason the award bag's pin states: the mirror INJECTS both bags
+    // — production reaches the live crafting-system manager, the real engine and `game.users`, none
+    // of which exist under `node --test` — so every facade-level case for these two members runs
+    // against a bag the suite supplied, and nothing else looks at the one production builds.
     const POOLED_BAGS = [
       [
         '_pooledHoldingsSeams() {',
@@ -1898,13 +1657,10 @@ describe('the harness copies are faithful to src/main.js', () => {
       'assigned in exactly one place, so its version cannot differ between init and ready'
     );
     // `getRecipeVisibilityService()` hands out the live service UNGATED, so an unbounded
-    // self-benefiting write published beside the class constructors — or re-exported from
-    // this module — would be reachable by any player from the console with no gate at all.
-    // The gated facade method is the only authorised route, by design.
+    // self-benefiting write published beside the class constructors — or re-exported from this
+    // module — would be reachable by any player from the console with no gate at all.
     const exportBlockStart = source.indexOf('export const __test');
-    // GUARDED, because both assertions below are ABSENCE assertions. `indexOf` answers `-1`
-    // for a marker that has been renamed, `slice(-1)` is the file's last character, and both
-    // would then pass over a one-character string, silently, forever.
+    // GUARDED, because both assertions below are ABSENCE assertions.
     assert.ok(
       exportBlockStart >= 0,
       'src/main.js still declares a test-only export block for this slice to start at'

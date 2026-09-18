@@ -1,40 +1,7 @@
 /**
- * `__FABRICATE_BUILD_VERSION__` MUST BE DEFINED IN THE `build` CONFIG AND ONLY THERE
- * (issue 1565).
- *
- * The module compares the version its running build was made from against the installed module
- * version to detect a stale cached entry script. That comparison is only as good as the define:
- * with it absent from a production build the identifier is a free variable, the `typeof` guard in
- * `src/main.js` yields `''`, and the check silently no-ops — the exact invisible failure this
- * change exists to remove, moved one layer down where no runtime test can see it.
- *
+ * `__FABRICATE_BUILD_VERSION__` MUST BE DEFINED IN THE `build` CONFIG AND ONLY THERE (issue 1565).
  * WHY `serve` MUST NOT CARRY IT, which is the other half of the invariant and the reason this file
- * asserts an absence as hard as it asserts a presence. `tests/helpers/extension-composition-
- * harness.js` starts Vite with `createServer({ root: repoRoot, ... })` and NO `configFile`, so
- * default config discovery loads the root `vite.config.js` and every mounted Svelte suite inherits
- * whatever the `serve` branch defines. Those suites install the View Lab Foundry shim, which
- * reports `0.0.0-viewlab` as the installed version of any module, and they dispatch `ready` — so a
- * baked version present in serve mode differs from the installed one and the stale-entry check
- * fires a user-facing "reload to complete the update" notice on every mounted run. Serve mode also
- * has nothing to detect: `npm run dev` reads its installed version from the same tracked
- * `module.json` the config falls back to, so the check would compare a value with itself. The
- * invariant is therefore uniform — the define exists in a production build and nowhere else —
- * and restoring symmetry between the two returns would reintroduce that notice.
- *
- * TWO CONFIGS, NOT ONE. `vite.config.js` returns EARLY for `command === 'serve'`, so each branch
- * is a separate object and each is asserted here against its own contract. Both assertions first
- * pin which branch they were handed (`server` versus `build`), so neither can pass vacuously if
- * the factory's shape changes.
- *
- * THE QUOTING IS PINNED, not incidental. A `define` value is substituted as an EXPRESSION, so
- * `1.9.5` would be spliced in as arithmetic and `0.1.0` is a syntax error that fails the build.
- * The value must therefore be a JSON-quoted string, and this asserts the quotes rather than the
- * parsed version.
- *
- * The config is re-imported per env value with a distinct `?v=N` query because ESM caches a
- * module per specifier (the precedent is `tests/release-config.test.js`). Unlike that file, this
- * one drags in `vite`, the Svelte plugin and `rollup-plugin-visualizer` — the first two are
- * already imported under this harness by `tests/components/overlay-portal-host-position.test.js`.
+ * asserts an absence as hard as it asserts a presence.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -118,9 +85,7 @@ for (const [label, envValue] of [
   ['empty', ''],
 ]) {
   test(`the serve config defines no build version with FABRICATE_BUILD_VERSION ${label}`, async () => {
-    // The absence is the product requirement, not a gap: see the file header. A define here is
-    // inherited by every mounted suite (they start Vite on this repo root with no `configFile`)
-    // and makes the stale-entry notice fire against the View Lab shim's `0.0.0-viewlab`.
+    // The absence is the product requirement, not a gap: see the file header.
     const config = await serveConfigFor(envValue);
     assert.ok(
       !Object.hasOwn(config.define ?? {}, DEFINE_NAME),

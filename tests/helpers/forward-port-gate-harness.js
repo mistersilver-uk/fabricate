@@ -1,17 +1,4 @@
-/**
- * The throwaway-repository harness the forward-port's EXECUTED tests run against.
- *
- * `tests/forward-port-content-gate.test.js` (issue #1418) and
- * `tests/forward-port-complete-merge.test.js` (issue #1439) both drive real shell scripts with the
- * real `git` over real constructed merges, and both need the same repository, the same `gh` stub and
- * the same conflicted fixture. Two copies of that setup would be two near-identical ~80-line blocks
- * in `tests/**`, which SonarCloud's new-code duplication gate measures per-diff and fails at 3%.
- *
- * ── WHY BASH IS SPAWNED ─────────────────────────────────────────────────────────────────────────
- * The scripts run on `ubuntu-latest` under bash, and Windows development hosts get bash from the git
- * installation this repository already requires. A missing bash FAILS rather than skipping: a
- * silently skipped execution test is the state these files exist to leave behind.
- */
+/** The throwaway-repository harness the forward-port's EXECUTED tests run against (issue 1418). */
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -42,18 +29,9 @@ export const GH_CALLED = 'GH-STUB-WAS-CALLED';
 
 // A literal seven-character marker run at column 0 in this file would be a marker as far as the
 // gate's own A6 check is concerned, and `CONTRIBUTING.md`'s forward-port runbook is under the same
-// rule — the region most likely to conflict next is the one that documents conflicts. The fixtures
-// below therefore let git write its own markers rather than spelling any out.
+// rule — the region most likely to conflict next is the one that documents conflicts.
 
-/**
- * The real `git`, resolved ONCE and by absolute path, before any stub directory exists.
- *
- * The version-assertion test stubs `git` to claim an old version and pass everything else through. A
- * passthrough written as a bare `exec git "$@"` re-resolves through `PATH` — which the gate runs with
- * the stub directory PREFIXED — so the stub execs itself, forever. That is not a hypothetical: it
- * hung this suite, silently, the first time it was written, and a hang is reported as `# cancelled`
- * rather than `# fail`.
- */
+/** The real `git`, resolved ONCE and by absolute path, before any stub directory exists. */
 export const REAL_GIT = resolveExecutable('git') ?? '';
 
 const BASE_LINES = Array.from({ length: 10 }, (_, index) => `line ${index + 1}`);
@@ -107,11 +85,7 @@ export function createGateHarness(t) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'forward-port-gate-'));
   t.after(() => rmSync(directory, { recursive: true, force: true, maxRetries: 3 }));
 
-  // `timeout` is not optional here. Without it a wedged child hangs the whole file, and node:test
-  // reports a hang as `# cancelled`, not `# fail` — a shape this repository already reads as load
-  // flake, on what is the slowest file in `tests/*.test.js`. A `git` stub whose passthrough
-  // re-resolved through the stub-prefixed PATH did exactly that while this suite was being written.
-  // Callers may raise it; they may not remove it.
+  // `timeout` is not optional here.
   const run = (command, args, options = {}) =>
     spawnSync(command, args, { cwd: directory, encoding: 'utf8', timeout: 60000, ...options });
 
@@ -150,8 +124,7 @@ export function createGateHarness(t) {
 
   /**
    * Run one of the scripts exactly as a workflow step does: from the repository's root, with `gh`
-   * resolved through `PATH`. The stub directory is prefixed from INSIDE bash, off `$PWD`, so no
-   * Windows path has to be translated into whatever form this host's bash wants in `PATH`.
+   * resolved through `PATH`.
    */
   const runScript = (script, environment = {}) => {
     const result = run(
@@ -224,17 +197,6 @@ export function buildDivergentForwardPort(harness) {
  * The shape a CONFLICTED forward-port has, with all four path classes the resolution checks
  * distinguish present at once. The merge is NOT performed; `main` is left at its own tip.
  *
- *   `f.txt`           both lines rewrote the SAME line — a genuine conflict, so it appears among
- *                     `git merge-tree --write-tree`'s stage entries.
- *   `shared.txt`      both lines edited DIFFERENT regions — the automatic merge COMPOSES a blob
- *                     equal to neither parent's, with no conflict and no marker. This is the
- *                     v1.9.1 shape, and a resolution must be allowed to correct it.
- *   `mainonly.txt`    changed on `main` only, so the merge copies main's blob verbatim.
- *   `releaseonly.txt` changed on `release` only, so the merge copies release's blob verbatim.
- *
- * The last two are what makes the permitted-path check falsifiable: a subset check whose set is
- * accidentally everything passes silently against a fixture in which every path was conflicted.
- *
  * @param {ReturnType<typeof createGateHarness>} harness The repository.
  * @returns {{base: string, mainTip: string, releaseTip: string}} The topology.
  */
@@ -304,11 +266,7 @@ export function buildRedundantConflictedForwardPort(harness) {
 
 /**
  * Produce a resolution commit exactly as a maintainer does: run the merge, let it conflict, resolve
- * the working tree, and commit. Its parents are therefore genuinely `origin/main` then
- * `origin/release` because git recorded them, rather than because a test asserted it.
- *
- * `main` is left AT the resolution; callers verifying the gate rewind it and rebuild the merge the
- * way the completion script does.
+ * the working tree, and commit.
  *
  * @param {ReturnType<typeof createGateHarness>} harness The repository.
  * @param {() => void} resolve Writes and deletions that resolve the conflict.
@@ -331,10 +289,6 @@ export function resolveConflictInto(harness, resolve) {
 
 /**
  * Build the merge the completion script builds, and move `main` onto it.
- *
- * Used where the test is about the GATE's checks rather than about the completion script: it is the
- * same `git commit-tree <tree> -p <p1> -p <p2>` production performs, with each part overridable so a
- * check can be shown to fail.
  *
  * @param {ReturnType<typeof createGateHarness>} harness The repository.
  * @param {{tree: string, parents: string[], message?: string}} shape What to build.

@@ -1,12 +1,6 @@
 /**
  * What the version smoke's Font Awesome arms claim, and whether each claim can be satisfied by the
  * bundle its arm boots.
- *
- * The probe fixtures below are not invented: each is the exact evidence
- * `scripts/foundry-icon-bundle-assert.mjs` returned when it was run, through a real browser,
- * against the stylesheet and licence extracted from the corresponding Foundry release archive.
- * They are here so the pairing — each arm against BOTH bundles — is checked by `npm test`, which
- * has no Foundry install, rather than only by a smoke run that boots one generation at a time.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -176,9 +170,7 @@ describe('choosing sentinels a smoke arm can honestly assert', () => {
   ]);
 
   // An `absent` sentinel passes by NOT being found, so a name Fabricate does not actually offer
-  // would let the v13 arm pass against a v14 container and read as a healthy run. This is also
-  // what refuses a Pro-only sentinel: the committed catalogue is intersected with Font Awesome
-  // Free, so a name that is not in the free release is not in the catalogue either.
+  // would let the v13 arm pass against a v14 container and read as a healthy run.
   it('names only icons the committed catalogue carries', () => {
     for (const sentinel of everySentinel) {
       assert.ok(

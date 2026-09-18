@@ -22,13 +22,6 @@ import {
 } from '../src/utils/iconVocabulary.js';
 
 // A stylesheet fixture shaped like the one a Foundry 13 client actually exposes.
-//
-// Foundry 13 declares its Font Awesome stylesheet as a LAYERED core style, and its layout emits a
-// layered style as `@import "…" layer(variables)` inside an inline `<style>` rather than as a
-// `<link>`. `document.styleSheets` therefore holds ONE sheet whose only rule is a `CSSImportRule`,
-// and `CSSImportRule` does not inherit from `CSSGroupingRule`: it exposes `.styleSheet`, not
-// `.cssRules`. A fixture built as a flat rules array cannot see that, which is exactly how a
-// reader that measured zero glyphs on every v13 client passed its tests.
 const makeStyle = (declarations) => ({
   getPropertyValue: (name) => declarations[name] ?? '',
 });
@@ -88,13 +81,7 @@ describe('version-aware Foundry icon definitions', () => {
     );
   });
 
-  // THE LICENCE CONSTRAINT AT RUNTIME. On any generation the module measures rather than assumes,
-  // the map it measures comes from the CLIENT'S OWN Font Awesome — which is Pro, and declares every
-  // Pro-only name. The only thing keeping those names out of the rebuilt vocabulary is that the
-  // rebuild walks the COMMITTED catalogue's names and looks each one up in the measurement, rather
-  // than walking the measurement. That direction is the whole enforcement, it is one word wide, and
-  // reversing it reads like a tidy-up: iterating the measured map instead passes every other test
-  // in this suite while handing back `candle-holder`.
+  // THE LICENCE CONSTRAINT AT RUNTIME.
   it('never rebuilds a name the committed catalogue may not reference, even when the client draws it', () => {
     const glyphs = new Map([
       ['gear', '--fa:"\\f013"'],
@@ -212,8 +199,7 @@ describe('version-aware Foundry icon definitions', () => {
 
   // Chromium resolves the escape when it serializes `content` (the literal private-use character)
   // and preserves the raw token stream of a custom property, and Foundry 13's bundle sets BOTH on
-  // different rules for the same glyph. Keyed on the declaration text, one glyph became two picker
-  // rows; keyed on the CODEPOINT, it is one.
+  // different rules for the same glyph.
   it('groups a raw --fa escape and a resolved content character as one glyph', () => {
     const glyphs = measureLoadedFontAwesomeGlyphs(
       makeImportingDocument([
@@ -277,10 +263,8 @@ describe('an unreadable or unparsed bundle never empties a picker', () => {
     });
   });
 
-  // `currentFoundryMajor()` cannot always tell which generation it is on, and v14 is the one
-  // branch that never measures. Defaulting the unknown case to v14 would offer a v13 client the
-  // whole Font Awesome 7 name list, every added name of which draws as a blank square and any of
-  // which a GM can persist into world data.
+  // `currentFoundryMajor()` cannot always tell which generation it is on, and v14 is the one branch
+  // that never measures.
   it('measures rather than assuming the newest generation when it cannot tell', () => {
     const originalGame = globalThis.game;
     globalThis.game = undefined;
@@ -369,9 +353,7 @@ describe('human icon search aliases', () => {
 });
 
 // The search-alias tables are a hand-maintained mirror of a GENERATED catalogue, so a key that
-// resolves to nothing is invisible: it costs nothing at load and simply never fires. Three had
-// already stranded — `user-wizard` (the icon is `hat-wizard`), and the `anvil` and `armor` name
-// tokens, neither of which appears in any name the bundle ships.
+// resolves to nothing is invisible: it costs nothing at load and simply never fires.
 describe('the search-alias tables cannot strand a key', () => {
   it('hangs every icon-keyed alias list on an icon the vocabulary offers', () => {
     for (const iconName of USER_SEARCH_ALIAS_KEYS.iconNames) {
@@ -443,8 +425,7 @@ describe('icon search ranks the row a GM named above the rows that mention it', 
   });
 
   // Every row used to carry the literal `fas solid` in its search text, so the second keystroke of
-  // `solid`, `lightning`, `asterisk` or `astronaut` matched the entire vocabulary. Nothing read it:
-  // a caller filtering by weight reads `variant`.
+  // `solid`, `lightning`, `asterisk` or `astronaut` matched the entire vocabulary.
   it('does not match every row on the style prefix and weight it shares with them', () => {
     const curated = getEssenceIconOptions();
 

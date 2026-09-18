@@ -1,8 +1,4 @@
-/**
- * Q5 — fixture completeness guard. Fails if the shared multi-feature fixture is
- * missing any feature the issue's acceptance checklist requires, so the fixture
- * cannot silently drift below required coverage.
- */
+/** Q5 — fixture completeness guard. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

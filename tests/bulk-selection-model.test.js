@@ -1,26 +1,6 @@
 /**
- * The row-agnostic bulk selection model shared by the manager's browsers (issues 772, 1010).
- *
- * These cases MOVED here from `component-bulk-edit-model.test.js` when the helpers
- * themselves moved to `src/utils/bulkSelectionModel.js`; they were not copied. A copy is
- * the very thing the extraction exists to prevent — SonarCloud fails on
- * `new_duplicated_lines_density > 3%`, and `sonar.cpd.exclusions` is inert under Automatic
- * Analysis, so `tests/**` counts towards it just as `src/**` does.
- *
- * The semantics pinned here are the ones the plan called easy to get subtly wrong:
- *
- * - the page-selection state being computed over the RENDERED rows while the
- *   select-all-results affordance covers ALL filtered rows, with an EMPTY page reading
- *   `none` rather than the `'all'` a naive `every()` over `[]` would produce;
- * - `count` being the WHOLE selection rather than its intersection with the page;
- * - every selection helper returning a NEW `Set`, which is what makes the lifted browser
- *   state propagate.
- *
- * The helpers are exercised under their own names here, and the last case pins the aliased
- * re-export the component surfaces still import — the "no call site changed" claim that
- * made this extraction safe to do in one move.
- *
- * Top-level under `tests/` deliberately: the `npm test` glob covers `tests/*.test.js`.
+ * The row-agnostic bulk selection model shared by the manager's browsers (issues 772, 1010). The
+ * semantics pinned here are the ones the plan called easy to get subtly wrong:
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -122,9 +102,7 @@ describe('bulk selection model (issue 772) — the selection set', () => {
   });
 
   it('componentBulkEditModel re-exports all four under the names its call sites import', () => {
-    // The Component Studio's Svelte surfaces still import `…ComponentSelection`. This is
-    // the identity that let the helpers move without one of them changing, so a mis-aliased
-    // re-export must fail here rather than surface as a hung or obscure mounted suite.
+    // The Component Studio's Svelte surfaces still import `…ComponentSelection`.
     assert.equal(describeComponentSelection, describeBulkSelection);
     assert.equal(toggleComponentSelection, toggleBulkSelection);
     assert.equal(setComponentSelection, setBulkSelection);
@@ -133,12 +111,7 @@ describe('bulk selection model (issue 772) — the selection set', () => {
 });
 
 describe('bulk selection model (issue 1132) — the id coercion', () => {
-  // IT TRIMS, and that is not cosmetic. `describeRecipeDeleteImpact` — the leaf the recipe
-  // set delete's STATEMENT counts through — trims the ids it is handed, while the WRITE
-  // normalizes through here. The two sides therefore disagreed about `' r1 '`: the card
-  // stated `deletable: 1` and the write reported `deleted: 0`. Unreachable through the
-  // shipped callers, which forward the describer's already-trimmed ids, and closed anyway,
-  // because the whole design rests on the two sides being unable to disagree.
+  // IT TRIMS, and that is not cosmetic.
   it('trims, so the describer and the writer cannot mean different ids', () => {
     assert.deepEqual(normalizeSelectionIds([' r1 ', 'r2	']), ['r1', 'r2']);
   });

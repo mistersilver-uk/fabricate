@@ -1,7 +1,6 @@
 /**
  * Proves every predicate `tests/helpers/svelteStructureContract.js` exports, and that its header
- * still states the policy the helper exists to enforce (issue 1658). The helper lives outside the
- * `npm test` glob, so without this file nothing runs its guarantees.
+ * still states the policy the helper exists to enforce (issue 1658).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

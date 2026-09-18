@@ -1,21 +1,7 @@
 /**
- * Fix 2 — `InteractableBrowserApp.show()` re-entrancy coalescing.
- *
- * The V13 scene-control button fires the launch handler 2–3× per activation, so
- * concurrent `show()` calls can arrive while the first render is still in flight.
- * Guarding only on `rendered` constructed a SECOND app instance whose render
- * collided with the first in ApplicationV2 `_updatePosition` ("el.parentElement
- * is null"). `show()` must coalesce concurrent calls onto a SINGLE window.
- *
- * The real class extends `SvelteApplicationMixin(ApplicationV2)` and imports a
- * `.svelte` root, so it cannot be `new`'d under `node:test`. This suite pins the
- * BEHAVIORAL CONTRACT two ways:
- *  1. A faithful re-implementation of the static `show()` (the same coalescing
- *     decision) driven by a fake app with an async render — asserting two
- *     back-to-back calls construct exactly ONE instance and resolve to it.
- *  2. A source guard that the shipped `show()` actually carries the coalescing
- *     shape (no second `new` once an instance exists; an in-flight render is
- *     awaited), so the contract test cannot silently drift from the real code.
+ * Fix 2 — `InteractableBrowserApp.show()` re-entrancy coalescing. The V13 scene-control button
+ * fires the launch handler 2–3× per activation, so concurrent `show()` calls can arrive while the
+ * first render is still in flight.
  */
 
 import test from 'node:test';
@@ -31,10 +17,9 @@ const appSource = readFileSync(
 );
 
 /**
- * A minimal harness mirroring the static `show()` contract of
- * `InteractableBrowserApp`: a single shared `_instance`, an in-flight
- * `_renderPromise`, and a fake app whose `render()` resolves on the next turn.
- * `constructs` counts how many app instances are created.
+ * A minimal harness mirroring the static `show()` contract of `InteractableBrowserApp`: a single
+ * shared `_instance`, an in-flight `_renderPromise`, and a fake app whose `render()` resolves on
+ * the next turn.
  */
 function makeHarness({ renderShouldReject = false } = {}) {
   let constructs = 0;
@@ -188,8 +173,7 @@ test('after a render rejection a later successful show() constructs and renders 
   assert.equal(RecoverApp._instance, null, 'failed render left no live instance');
   assert.equal(constructs, 1, 'one failed construct');
 
-  // The NEXT show() must build a NEW instance and render it (recovery, not a
-  // dead-instance reuse).
+  // The NEXT show() must build a NEW instance and render it (recovery, not a dead-instance reuse).
   const recovered = await RecoverApp.show();
   assert.equal(constructs, 2, 'a fresh instance is constructed after the failure');
   assert.equal(RecoverApp._instance, recovered, 'the new instance becomes the singleton');

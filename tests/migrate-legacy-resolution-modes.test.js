@@ -1,25 +1,18 @@
 /**
- * Tests for the 1.4.0 migration
- * (src/migration/migrateLegacyResolutionModes.js): hard-migrating legacy
- * `mapped`/`tiered` resolution modes to the first-class routed modes
- * (`mapped → routedByIngredients`, `tiered → routedByCheck`), with the tiered
- * group-name reconciliation
- * (rename + fan-in split + drop `outcomeRouting`), orphan/unrouted/reserved-keyword
- * edge cases, the post-rename collision hard-delete + JSON log, idempotency, and
- * purity.
- *
- * node:test + node:assert/strict. Pure functions; no Foundry globals.
+ * Tests for the 1.4.0 migration (src/migration/migrateLegacyResolutionModes.js): hard-migrating
+ * legacy `mapped`/`tiered` resolution modes to the first-class routed modes (`mapped →
+ * routedByIngredients`, `tiered → routedByCheck`), with the tiered group-name reconciliation
+ * (rename + fan-in split + drop `outcomeRouting`), orphan/unrouted/reserved-keyword edge cases, the
+ * post-rename collision hard-delete + JSON log, idempotency, and purity.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { migrateLegacyResolutionModes } from '../src/migration/migrateLegacyResolutionModes.js';
 
-// ---------------------------------------------------------------------------
-// Fixture helpers (DRY: every case builds from these tiny shape factories so the
-// suite never re-declares the same large literal — satisfies the Sonar new-code
-// duplication gate the way migrate-remove-system-provider.test.js does).
-// ---------------------------------------------------------------------------
+// Fixture helpers (DRY: every case builds from these tiny shape factories so the suite never
+// re-declares the same large literal — satisfies the Sonar new-code duplication gate the way
+// migrate-remove-system-provider.test.js does).
 
 function group(id, name, results = [{ id: `${id}-r` }]) {
   return { id, name, results };
@@ -52,9 +45,7 @@ function groupsByName(groups) {
   return Object.fromEntries(groups.map((g) => [g.name, g]));
 }
 
-// ---------------------------------------------------------------------------
 // System + mapped recipes
-// ---------------------------------------------------------------------------
 
 test('mapped system → routedByIngredients; its recipes carry verbatim (no provider)', () => {
   const out = migrate([mappedSystem()], [recipe('sys-mapped')]);
@@ -80,9 +71,7 @@ test('non-legacy systems and their recipes are left untouched', () => {
   assert.equal(out.recipes.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Tiered group-name reconciliation
-// ---------------------------------------------------------------------------
 
 test('tiered recipe → routedByCheck; routed groups renamed to outcome, outcomeRouting dropped', () => {
   const recipes = [
@@ -210,9 +199,7 @@ test('reconciliation applies per-step as well as at the recipe level', () => {
   assert.equal('outcomeRouting' in r.steps[0], false, 'step outcomeRouting removed');
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency, purity, absent keys
-// ---------------------------------------------------------------------------
 
 test('is idempotent — re-running over migrated data is a no-op', () => {
   const recipes = [

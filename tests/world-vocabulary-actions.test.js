@@ -1,19 +1,6 @@
 /**
- * The World Vocabulary write path, and the GATED two-store deletion cascade (issue 1392, epic
- * 1357, PR 7a).
- *
- * ── WHY THE ASSERTIONS ARE ON THE PERSISTED PAYLOAD AND NOT ON `store.get()` ──────────────
- * Both stores publish their cache BEFORE awaiting the write, which is what stops a GM's second
- * edit reading a pre-first-edit corpus. The recorded cost is that a REJECTED write leaves the
- * cache ahead of the setting — and unlike a landed write no `updateSetting` fires, so the
- * replication bridge's `load()` never runs and the divergence persists until reload. Asserting
- * on `get()` would therefore report a torn write as a clean one.
- *
- * ── AND WHY BOTH STORES SHARE ONE `Map`-BACKED SEAM ──────────────────────────────────────
- * Both take their accessors by injection, so the whole cascade runs against real stores and a
- * real settings map. `makeSettingsSeam({isGM: false})` is deliberately NOT used: it rejects
- * EVERY world-scoped key, and the whole point of case (ii) is that exactly ONE of the two writes
- * fails.
+ * The World Vocabulary write path, and the GATED two-store deletion cascade (issue 1392, epic 1357,
+ * PR 7a).
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -33,7 +20,6 @@ import { createWorldScopeActions } from '../src/ui/svelte/stores/worldScopeActio
 /**
  * Two real stores over one settings map, with an optional PER-KEY write refusal.
  *
- * @param {object} [options]
  * @param {string|null} [options.rejectKey] the one setting key whose write rejects.
  */
 function world({ rejectKey = null } = {}) {
@@ -124,7 +110,6 @@ test('deleting a world tag drops it from the defaults that carry it and nothing 
   // The key is ABSENT rather than an empty array, and that is the scope normalizer's own rule
   // rather than the planner's: `attachLabels` omits an empty list on every normalize, on the
   // `complications` doctrine that an authored empty carries no meaning distinct from absence.
-  // Both states resolve identically through `resolveComponentTags`.
   assert.deepEqual(
     persistedDefaults(values).c1.tags ?? [],
     [],
@@ -146,10 +131,7 @@ test('deleting a recipe category rewrites no world default at all', async () => 
 });
 
 test('a REFUSED vocabulary write leaves the entry on disk, the defaults cleared, and answers false', async () => {
-  // THE TORN WRITE THE ORDERING IS CHOSEN FOR. Leg one has landed and leg two has not, so the
-  // residue is an unused vocabulary entry — re-deletable, and leg one is idempotent so retrying
-  // converges. The OTHER order would leave a world default naming an entry no vocabulary offers,
-  // a state only re-authoring fixes.
+  // THE TORN WRITE THE ORDERING IS CHOSEN FOR.
   const { values, actions } = world({ rejectKey: WORLD_VOCABULARY_SETTING_KEY });
   assert.equal(
     await actions.vocabulary.removeEntry('componentCategories', 'reagent'),
@@ -169,9 +151,7 @@ test('a REFUSED vocabulary write leaves the entry on disk, the defaults cleared,
 });
 
 test('a REFUSED defaults write abandons the cascade and changes NOTHING', async () => {
-  // THE GATE, not merely the order. `mutate` has no try/catch, `VocabularyPanel` calls
-  // `onRemove(row)` unawaited, and a world-setting write really can reject — so an unawaited or
-  // ungated second write would delete the vocabulary entry while its defaults still carry it.
+  // THE GATE, not merely the order.
   const { values, actions } = world({ rejectKey: SETTING_KEYS.COMPONENT_SCOPE });
   const vocabularyBefore = JSON.stringify(persistedVocabulary(values));
   const defaultsBefore = JSON.stringify(values.get(SETTING_KEYS.COMPONENT_SCOPE));

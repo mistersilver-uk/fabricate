@@ -1,50 +1,6 @@
 /**
- * WHAT STILL POLICES `scripts/` NOW THAT THE GATE IS A GLOB.
- *
- * `npm run lint` and `npm run format:check` used to enumerate the `scripts/` files they covered
- * one by one, and this file existed to compare that list against what was on disk: issue #933 was
- * filed because adding a script was not enough to get it linted, someone had to remember the list
- * too, and the miss was announced by SonarCloud after push rather than by any local gate.
- *
- * Issue #1660 removed the list. Both scripts are globs, so a new `scripts/` file is linted the
- * moment it lands and the omission this file was written to catch cannot happen any more. What it
- * keeps are the three checks the glob does NOT subsume:
- *
- * 1. NOTHING UNDER `scripts/` IS IGNORED. The inversion moves the hiding place rather than
- *    removing it: a file goes unlinted now by being excluded, not by being left off a list, and an
- *    exclusion is exactly as silent. `eslint.debt.js` is the sanctioned way to carry a not-yet-
- *    clean file, and it disables only the rules that file fails — an `ignores` entry would take it
- *    out of ESLint's reach entirely. So `isPathIgnored` is asked about every enumerated file.
- *
- * 2. THE `LINTED_EXTENSIONS` MIRROR. `eslint.config.js` block 6 gives `scripts/**` its Node
- *    globals through a `files: ['scripts/**\/*.{js,mjs,cjs}']` glob. An extension that glob names
- *    and this enumeration does not is a file invisible to every check here; an extension this
- *    names and the glob does not is a file linted without `require` or `process` declared. The
- *    two lists are held equal by reading the glob back out of the config.
- *
- * 3. THE SHELL RATCHET, which has nothing to do with either gate. `.sh` is parsed by no linter and
- *    formatted by no formatter in this repository, and the measurement is in `SHELL_SCRIPTS`
- *    below: a syntax error introduced into `forward-port-content-gate.sh` gave `bash -n` exit 2
- *    while `lint`, `format:check`, `lint:md` and both forward-port suites passed.
- *
- * WHERE THE REST OF THE RATCHET WENT. The `scripts/` debt is `ESLINT_DEBT.scripts` now, one of
- * five groups in `eslint.debt.js`. Its exact count is pinned by `DEBT_COUNTS.scripts` in
- * `tests/lint-coverage.test.js` — still pinned EXACTLY rather than capped, because a `<=` ceiling
- * loosens by one slot every time debt is paid down. Staleness ("this entry reports nothing any
- * more") is `npm run lint:debt`, a step of the `lint` CI job, because answering it means linting
- * the largest files in the tree and twenty-three CPU-bound seconds do not belong in the unit-test
- * job.
- *
- * WHY PATHS ARE NORMALISED TO POSIX. `readdirSync(…, { recursive: true })` yields `lib\zip.js` on
- * a Windows dev machine and `lib/zip.js` on the `ubuntu-latest` runner, while `eslint.debt.js`
- * stores forward slashes on both. Enumerated paths are normalised before any comparison.
- *
- * NON-VACUITY. A guard that stops looking at anything must not keep reporting success, so the
- * inputs are asserted alive: the enumeration is non-empty AND still reaches at least one file in a
- * SUBDIRECTORY (which a `readdirSync` that lost `{ recursive: true }` would not), and the baseline
- * is non-empty. The subdirectory check is structural rather than a named file on purpose —
- * pinning one path would turn that file's deletion into a false report of broken recursion, whose
- * obvious "fix" is to repoint the constant at a top-level script and silently disable the check.
+ * WHAT STILL POLICES `scripts/` NOW THAT THE GATE IS A GLOB. 2. THE `LINTED_EXTENSIONS` MIRROR
+ * (issue 933).
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -62,46 +18,17 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPTS_DIRECTORY = 'scripts';
 
 /**
- * The extensions this enumeration considers lintable.
- *
- * Must cover every extension the `scripts/**` glob in `eslint.config.js` block 6 configures.
- * Anything ESLint is set up for but this does not enumerate is a hole the ratchet cannot see: such
- * a file would be ungated, unacknowledged, and invisible here all at once. That invariant is a
- * hand-maintained mirror, so it is not left to a comment — `eslintConfiguredScriptExtensions`
- * reads the glob back out of the config and a test compares the two.
+ * The extensions this enumeration considers lintable. Must cover every extension the `scripts/**`
+ * glob in `eslint.config.js` block 6 configures.
  */
 const LINTED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs']);
 
-/**
- * The `files` glob of `eslint.config.js` block 6, captured for its extension list.
- *
- * Anchored on `files:` and not on the bare glob text, because the same literal appears in that
- * block's prose comment; matching the comment would let the real glob drift behind it.
- */
+/** The `files` glob of `eslint.config.js` block 6, captured for its extension list. */
 const ESLINT_SCRIPTS_GLOB = /files:\s*\[\s*'scripts\/\*\*\/\*\.\{([^}]+)}'/;
 
 /**
- * The `.sh` files under `scripts/`, pinned as a list.
- *
- * SHELL IS NOT COVERED BY THE MACHINERY ABOVE, AND CANNOT BE.
- * ----------------------------------------------------------
- * `LINTED_EXTENSIONS` mirrors the `scripts/**` glob in `eslint.config.js` block 6 and is asserted
- * against it, so adding `.sh` there is not an option: it would immediately fail that mirror test,
- * and ESLint cannot parse shell anyway. Prettier has no shell parser either. So a `.sh` file under
- * `scripts/` is invisible to every gate this repository runs — not linted, not formatted, not in
- * `eslint-debt.txt`, and not visible to the ratchet, which stays green with nothing
- * acknowledged.
- *
- * That was demonstrated rather than assumed: a syntax error introduced into
- * `scripts/forward-port-content-gate.sh` gave `bash -n` exit 2 while `lint`, `format:check`,
- * `lint:md` and both forward-port suites passed. It would have surfaced for the first time
- * mid-release, on the highest-consequence automated write this repository performs.
- *
- * So shell gets its own two-part ratchet: this pinned list, which a new `.sh` cannot join by
- * accident, and the `bash -n` parse below. The list is pinned rather than derived for the same
- * reason `DEBT_COUNTS` is pinned exactly in `tests/lint-coverage.test.js` — a derived list would
- * grow silently, and
- * growth here means a new unlinted shell script on the release path.
+ * The `.sh` files under `scripts/`, pinned as a list. So shell gets its own two-part ratchet: this
+ * pinned list, which a new `.sh` cannot join by accident, and the `bash -n` parse below.
  */
 const SHELL_SCRIPTS = [
   'scripts/forward-port-complete-merge.sh',
@@ -135,8 +62,6 @@ function enumerateScriptFiles() {
 /**
  * `bash -n` over one file: parse it, run nothing.
  *
- * The path is POSIX-separated because it is handed to bash, not to a Windows program.
- *
  * @param {string} file A repository-relative POSIX path.
  * @returns {{status: number|null, stderr: string, error?: Error}} What bash reported.
  */
@@ -153,10 +78,6 @@ function baselinedScriptFiles() {
 
 /**
  * The extensions `eslint.config.js` block 6 configures for `scripts/**`, read back from the config.
- *
- * Returns `null` when the glob cannot be found, so the caller can fail as VACUOUS rather than pass
- * on an empty match — a reformat that moved the glob out of this pattern's reach would otherwise
- * silently disarm the comparison, which is the failure mode this whole file exists to prevent.
  */
 function eslintConfiguredScriptExtensions() {
   const config = readFileSync(path.join(REPO_ROOT, 'eslint.config.js'), 'utf8');
@@ -206,11 +127,7 @@ test('LINTED_EXTENSIONS covers every extension the ESLint scripts/ glob configur
 });
 
 test('every scripts/ file ESLint configures is a file ESLint actually reaches', async () => {
-  // The inversion's own failure mode (issue #1660). The gate is `eslint .` now, so a `scripts/`
-  // file goes unlinted by being IGNORED rather than by being left off a list — and an `ignores`
-  // entry is every bit as silent as the omission it replaced. `eslint.debt.js` is the sanctioned
-  // way to carry a not-yet-clean file, and it keeps the file linted for every rule it does pass;
-  // an `ignores` entry would not.
+  // The inversion's own failure mode (issue #1660).
   const eslint = new ESLint();
   const unreachable = [];
   for (const file of enumerateScriptFiles()) {
@@ -244,10 +161,8 @@ test('the baselined scripts/ list is distinct and POSIX-separated', () => {
   const baselined = baselinedScriptFiles();
   assert.equal(new Set(baselined).size, baselined.length, 'ESLINT_DEBT.scripts has a duplicate');
 
-  // The enumeration half is the load-bearing one: it is what would carry `lib\zip.js` on Windows
-  // if the normalisation above were dropped. The baseline half is close to unreachable by
-  // accident, since a lone `\` in a JS string literal is an escape and only a written `\\` trips
-  // it — it is asserted anyway so the two sides are held to one rule.
+  // The enumeration half is the load-bearing one: it is what would carry `lib\zip.js` on Windows if
+  // the normalisation above were dropped.
   const backslashed = [...baselined, ...enumerateScriptFiles()].filter((file) =>
     file.includes(String.fromCodePoint(92))
   );
@@ -260,8 +175,7 @@ test('the baselined scripts/ list is distinct and POSIX-separated', () => {
 
 test('no shell script under scripts/ arrives without joining the shell ratchet', () => {
   // The only assertion standing between this repository and a second unlinted `.sh` on the release
-  // path. `SHELL_SCRIPTS` is not derived from disk on purpose: derived, it would absorb a new file
-  // silently, which is exactly what happened to the npm gate list this whole file exists to police.
+  // path.
   assert.deepEqual(
     enumerateScriptFilesWith(new Set(['.sh'])).sort(byPath),
     [...SHELL_SCRIPTS].sort(byPath),
@@ -286,9 +200,7 @@ test('every shell script under scripts/ PARSES, so a syntax error cannot wait fo
 });
 
 test('the bash parse check can actually fail', () => {
-  // Guarding the guard, in the style every anti-vacuity check here follows. A `bash -n` that
-  // silently exits 0 on everything — a wrong path, a bash that ignores its argument — would report
-  // success forever, which is the failure mode this file was written to attack.
+  // Guarding the guard, in the style every anti-vacuity check here follows.
   const directory = mkdtempSync(path.join(os.tmpdir(), 'shell-ratchet-'));
   try {
     const broken = path.join(directory, 'broken.sh');

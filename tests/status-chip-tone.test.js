@@ -1,17 +1,5 @@
 /**
  * THE TONE MAP IS TOTAL, AND EVERY VALUE IT NAMES IS A TONE `Chip` ACTUALLY PAINTS (issue 1506).
- *
- * The map exists because the two components disagree about an unrecognised tone in opposite
- * SILENT directions: the retired pill resolved one to `subtle`, and `Chip` drops it — no class,
- * no error, no failing test. So the failure this file has to be able to see is not "the mapper
- * threw", it is "the mapper returned a name `Chip` will quietly ignore".
- *
- * That is why the expectation is DERIVED from `Chip.svelte`'s own `TONES` literal — through the
- * shared reader `tests/helpers/chipTone.js`, which the converted suites use to read a rendered
- * chip's tone off the same vocabulary — rather than typed here: a hand-typed list of `Chip`'s tones is a second copy of the vocabulary, and a copy
- * cannot see the original change. `Chip` survives this change, so reading it from disk is a
- * landed assertion rather than a transient one — the retired pill is NOT read here for exactly
- * that reason, since this same phase deletes it.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -24,11 +12,7 @@ import {
 
 import { CHIP_TONES } from './helpers/chipTone.js';
 
-/**
- * The whole domain, pinned by NAME rather than by count. Both retired vocabularies are in it:
- * the status pill's six, and the look-alike badges' `neutral` — which the journal's cancelled
- * run and the crafting badge's locked recipe emit, and which the pill never had.
- */
+/** The whole domain, pinned by NAME rather than by count. */
 const DOMAIN = ['subtle', 'success', 'accent', 'danger', 'warning', 'info', 'neutral'];
 
 describe('statusChipTone', () => {

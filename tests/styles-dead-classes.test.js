@@ -1,25 +1,4 @@
-/**
- * `styles/fabricate.css` may not carry a rule block that matches nothing (issue 1498).
- *
- * THE RATCHET IS AT ZERO AND HAS NO BASELINE. Issue 1498 deleted 367 blocks — 2,736 lines of
- * 26,849 — so there is nothing left to grandfather, and a baseline list would only be somewhere
- * for the next dead rule to be parked. A rule that matches no element cannot move a pixel, which
- * is what makes deleting one safe; the corollary is that authoring one is free, invisible, and
- * exactly what this gate exists to catch on the pull request that does it.
- *
- * WHAT "MATCHES NOTHING" MEANS is `scripts/lib/stylesheetLiveClasses.js`, in full, and this gate
- * runs the very functions the deletion ran rather than a restatement of them. That sharing is the
- * point: a gate written to its own copy of the rules would drift from the sweep it protects, and
- * the first symptom would be a false red on a rule somebody had just proved live.
- *
- * THE FAILURE THIS GATE CANNOT SEE BY ITSELF is a class the helper wrongly calls live. Such a
- * class keeps its rules, the gate stays green, and nothing has been checked. Two things guard that
- * side. `tests/stylesheet-live-classes.test.js` proves each liveness rule on a synthetic corpus
- * where a wrong answer is a failing assertion. And the two chat-card families are asserted live
- * here BY NAME, because they are the families the sweep was most likely to get wrong — their
- * classes are built as `${block}__section`, with the dynamic part first — and no View Lab case
- * renders a chat card, so no frame could have shown the mistake.
- */
+/** `styles/fabricate.css` may not carry a rule block that matches nothing (issue 1498). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -37,21 +16,7 @@ import {
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHEET = 'styles/fabricate.css';
 
-/**
- * The one exemption, and it is temporary.
- *
- * `manager-layout.test.js` uses `.manager-availability-option` as REFERENCE GEOMETRY, so the
- * availability menu's three classes are owned by issue 1480 rather than by the sweep that wrote
- * this gate: deleting them here would have taken that test's measuring stick with them. Issue 1480
- * is open with no pull request. When it lands, delete this constant — the gate goes red if the
- * rules are still there and nothing renders them, which is the correct prompt.
- *
- * THREE, NOT FOUR, SINCE ISSUE 1515: `.manager-availability-picker` was the fourth, declared here
- * and emitted nowhere, and that change swept it. The exemption also stopped being the only thing
- * standing between this gate and the rest of the family, because the same change RE-ROOTED every
- * class the primitive still writes at `fabricate-pill-select`; what the prefix now covers is the
- * hand-rolled listbox `SearchablePopover` replaced, and nothing else.
- */
+/** The one exemption, and it is temporary (issue 1480). */
 const AVAILABILITY_MENU_PREFIX = 'manager-availability-';
 
 /** The chat-card block prefixes, whose every declared class must be live. See the file header. */

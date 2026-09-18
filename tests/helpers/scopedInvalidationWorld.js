@@ -1,14 +1,4 @@
-/**
- * A settings-backed two-manager world, wired exactly as a REMOTE client's is.
- *
- * Extracted from `tests/reload-scoped-invalidation.test.js` when issue 1078 part B1 added a
- * second suite over the same fixture. A copy would be ~90 near-identical lines, which the
- * SonarCloud new-code duplication gate counts against `tests/**` exactly as it counts `src/**`.
- *
- * `installFoundryEnv()` runs at module scope and the managers are imported dynamically after
- * it, because both read Foundry globals during module evaluation. Importing this helper is
- * therefore what installs the environment for the suite that imports it.
- */
+/** A settings-backed two-manager world, wired exactly as a REMOTE client's is (issue 1078). */
 import { SETTING_KEYS } from '../../src/config/settings.js';
 
 import { installFoundryEnv } from './foundryEnv.js';
@@ -23,13 +13,7 @@ export const { REVISION_SCOPES } = await import('../../src/systems/revisionToken
 export const SYS_A = 'sys-a';
 export const SYS_B = 'sys-b';
 
-/**
- * One crafting system in its PERSISTED shape, with a named component library.
- *
- * @param {string} id
- * @param {string[]} componentNames
- * @returns {object}
- */
+/** One crafting system in its PERSISTED shape, with a named component library. */
 export function persistedSystem(id, componentNames) {
   return {
     id,
@@ -43,15 +27,7 @@ export function persistedSystem(id, componentNames) {
   };
 }
 
-/**
- * One recipe in its persisted shape, requiring the named component.
- *
- * @param {string} id
- * @param {string} systemId
- * @param {string} componentId
- * @param {object} [overrides]
- * @returns {object}
- */
+/** One recipe in its persisted shape, requiring the named component. */
 export function persistedRecipe(id, systemId, componentId, overrides = {}) {
   return Recipe.fromJSON({
     id,
@@ -75,13 +51,11 @@ export function persistedRecipe(id, systemId, componentId, overrides = {}) {
 }
 
 /**
- * A wired manager pair over one settings-backed world, loaded from the persisted corpus
- * exactly as a REMOTE client loads: through `reload()`, from the replicated setting.
+ * A wired manager pair over one settings-backed world, loaded from the persisted corpus exactly as
+ * a REMOTE client loads: through `reload()`, from the replicated setting.
  *
- * @param {object} [world]
  * @param {object[]} [world.systems] persisted systems.
  * @param {object[]} [world.recipes] persisted recipes.
- * @returns {{env: object, recipeManager: object, systemManager: object, write: Function}}
  */
 export function remoteClient({ systems = [], recipes = [] } = {}) {
   const env = installFoundryEnv();
@@ -103,11 +77,7 @@ export function remoteClient({ systems = [], recipes = [] } = {}) {
   return { env, ...pair, write };
 }
 
-/**
- * The default two-system, two-recipe world every guard test reads.
- *
- * @returns {ReturnType<typeof remoteClient>}
- */
+/** The default two-system, two-recipe world every guard test reads. */
 export function twoSystemWorld() {
   return remoteClient({
     systems: [persistedSystem(SYS_A, ['Iron Ore', 'Copper Ore']), persistedSystem(SYS_B, ['Tin Ore'])],
@@ -123,13 +93,7 @@ export function twoSystemWorld() {
 export const storedSystems = (env) => env.settings.get(SETTING_KEYS.CRAFTING_SYSTEMS);
 export const storedRecipes = (env) => env.settings.get(SETTING_KEYS.RECIPES);
 
-/**
- * The persisted corpus with ONE record rewritten, exactly as another client's save leaves it.
- *
- * Hoisted rather than repeated per test: every narrowing test is "edit one record, reload,
- * assert the other one is untouched", and a copied `map`-with-a-ternary block in each is both
- * noise and new duplicated lines the SonarCloud gate counts.
- */
+/** The persisted corpus with ONE record rewritten, exactly as another client's save leaves it. */
 export const withSystem = (env, systemId, rewrite) =>
   storedSystems(env).map((system) => (system.id === systemId ? rewrite(system) : system));
 export const withRecipe = (env, recipeId, rewrite) =>

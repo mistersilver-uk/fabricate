@@ -1,12 +1,6 @@
 /**
  * The manager root's locators, and the settle sequences around them (issue 1669, extracted from
  * `tests/components/manager-mounted.test.js`).
- *
- * The locators read the LIVE mount target through `getTarget`: a suite remounts per case, and a
- * captured element would go on addressing the previous screen and pass for the wrong reason.
- *
- * `tests/helpers/` is outside the `npm test` glob; `tests/helpers-manager.test.js` proves this
- * module from inside it.
  */
 import assert from 'node:assert/strict';
 import { flushSync, tick } from 'svelte';
@@ -18,9 +12,6 @@ import { shippedString } from './managerLocalization.js';
  * Press one control and settle the DOM: the click, the microtask its handler may await, then the
  * synchronous effect flush that renders the result.
  *
- * `await tick()` BEFORE `flushSync()` is the order every call site here already used, and it is
- * load-bearing: flushing first renders the pre-click state, so the assertion reads the old screen.
- *
  * @param {Element} element The control to press.
  */
 export async function act(element) {
@@ -30,13 +21,6 @@ export async function act(element) {
 }
 
 // Every recorded store call EXCEPT the route-scoped search clear (issue 1462).
-//
-// The root calls `store.clearLibrarySearches?.()` on every change of navigation scope and
-// lets the store's short-circuit decide whether anything happens, so a navigation the real
-// store answers as a no-op still shows up here. Cases whose subject is "which store seams did
-// this interaction reach" read through this so they keep policing the seam they named rather
-// than the total length of the array. The clear itself is asserted, positively and as a call
-// DELTA, by the `route-scoped library search clear` cases.
 function callsWithoutRouteScopedClear(calls) {
   return calls.filter((call) => call[0] !== 'clearLibrarySearches');
 }
@@ -54,15 +38,7 @@ async function settleDowntimeProvider() {
   flushSync();
 }
 
-/**
- * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157).
- *
- * A `polite` region is queued speech and a focus change cancels queued speech, so every
- * live region in the manager that is paired with a focus move writes its text AFTER the
- * move — see `src/ui/svelte/util/announceAfterFocus.js`, which owns that order. The delay is
- * IMPORTED rather than restated: a local copy of the number would silently start asserting
- * the un-delayed state the moment the rule changed it.
- */
+/** Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157). */
 async function waitForQueuedAnnouncement() {
   await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
   await tick();
@@ -83,8 +59,7 @@ function editRecipeName(target, value) {
 }
 
 // Shared assertion for a resolution-mode RadioCardGroup's option list: the rows render in the
-// expected order, each wraps a real radio in the named group, and each has a
-// non-empty description. Hoisted so the recipe/salvage tests stay DRY (Sonar gate).
+// expected order, each wraps a real radio in the named group, and each has a non-empty description.
 function assertResolutionCard(card, { optionAttr, groupName, expectedValues }) {
   assert.ok(card, 'resolution-mode card should render');
   const rows = [...card.querySelectorAll(`[${optionAttr}]`)];
@@ -123,15 +98,7 @@ export {
  * @returns {object} The locators, under the names the suites already use.
  */
 export function createManagerQueries(getTarget) {
-  // AN EXACT LABEL MATCH, SCOPED TO ONE RAIL SECTION (issue 1362). This resolved a rail button
-  // by `textContent.includes(...)` over EVERY `.manager-nav-button`, which the world scoped-entity
-  // leaves broke three separate ways: `Tools` became a substring of `Tools Catalogue`,
-  // `Tags & Categories` became an EXACT DUPLICATE across the two rail scopes, and the count badge
-  // inside the button means `textContent` carries digits as well as the label.
-  //
-  // Scoping is by CLASS rather than by DOM order, because `.first()`-style order resolution is
-  // precisely what makes an exact duplicate unrecoverable: the world leaves sit after the system
-  // entries today and nothing says they must.
+  // AN EXACT LABEL MATCH, SCOPED TO ONE RAIL SECTION (issue 1362).
   function railButton(labelText, { world }) {
     const selector = world
       ? '.manager-nav-button.manager-world-nav-item'
@@ -155,13 +122,9 @@ export function createManagerQueries(getTarget) {
     return railButton(labelText, { world: true });
   }
 
-  // ── Checks Studio navigation (issue 1096) ────────────────────────────────────────────
-  //
-  // The four activities stopped being TABS inside one view and became rail ROUTES, and the
-  // five SECTIONS of each route are what the strip across the pane switches now. So reaching
-  // a control here is two moves, not one, and both are asserted rather than optional-chained:
-  // a silently missing rail child or section button would leave every assertion below reading
-  // the previous screen and passing for the wrong reason.
+  // Checks Studio navigation (issue 1096). The four activities stopped being TABS inside one view
+  // and became rail ROUTES, and the five SECTIONS of each route are what the strip across the pane
+  // switches now.
   async function openChecksActivity(activity) {
     const child = getTarget().querySelector(`[data-checks-nav-item="${activity}"]`);
     assert.ok(child, `the Checks rail should offer a ${activity} child`);
@@ -190,20 +153,7 @@ export function createManagerQueries(getTarget) {
     return getTarget().querySelector(`#manager-world-nav-${id}`);
   }
 
-  /**
-   * Run one browse row's overflow command (issue 1515).
-   *
-   * The four browse rows carry Edit as an `<IconButton>` and their remaining verbs inside a shared
-   * `<ActionMenu>`, so a verb is reached by OPENING the row's menu and then choosing its item. The
-   * trigger is addressed inside the row — which is what proves the right record's menu opened — and
-   * the panel is addressed at the mount root, because `<ActionMenu>` portals it out of the row
-   * entirely. Exactly one menu is open at a time, which the assertion below holds rather than
-   * assumes.
-   *
-   * One helper rather than a copy per row: the six call sites differ only in the row selector and
-   * the item's label, and six near-identical open-then-click blocks are what the duplication gate
-   * fails on.
-   */
+  /** Run one browse row's overflow command (issue 1515). */
   async function openRowMenu(rowSelector) {
     const trigger = getTarget().querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`);
     assert.ok(Boolean(trigger), `${rowSelector} renders no overflow menu trigger`);
@@ -235,16 +185,8 @@ export function createManagerQueries(getTarget) {
     await act(item);
   }
 
-  // The three reads every Downtime seam case makes, named once.
-  //
-  // `downtimeTabIds` is CORE-FALLBACK ONLY (issue 1213). It reads the preview's tab strip, and
-  // provider mode no longer renders one: a companion's tabs are the rail's Downtime sub-items
-  // and nothing else. The anti-drift invariant this pair was written for (issue 1185) — "two
-  // renderings of ONE tab list, so a case that only checked one would pass through the exact
-  // drift the single list exists to prevent" — therefore now applies to core-fallback alone.
-  // In provider mode `downtimeRailIds()` is the ONLY rendering, so it is the one to assert, and
-  // a provider-mode case that navigates must click `#manager-downtime-nav-<id>` rather than
-  // `[data-downtime-tab="<id>"]`, which resolves to nothing there.
+  // The three reads every Downtime seam case makes, named once. `downtimeTabIds` is CORE-FALLBACK
+  // ONLY (issue 1213).
   function downtimeTabIds() {
     return Array.from(getTarget().querySelectorAll('[data-downtime-tab]')).map(
       (tab) => tab.dataset.downtimeTab
@@ -266,13 +208,7 @@ export function createManagerQueries(getTarget) {
   const railToggleControl = () => getTarget().querySelector('[data-manager-rail-toggle]');
 
   /**
-   * Every claim the Downtime rail lock makes about the collapse control, in one place.
-   *
-   * Named once because TWO render sites carry `[data-manager-rail-toggle]` — one per
-   * `{#if selectedSystem}` scope-card branch — and only one of them was reachable from the
-   * mounted suite before issue 1213's review. Deleting `disabled={railLockedOpen}` from the
-   * unreachable branch survived the whole suite; a shared assertion is what lets a second case
-   * mount the other branch without copying the block (which the duplication gate would fail).
+   * Every claim the Downtime rail lock makes about the collapse control, in one place (issue 1213).
    *
    * @param {() => Array<Array<unknown>>} railWrites reads the `managerRailCollapsed` writes so far.
    */
@@ -307,12 +243,9 @@ export function createManagerQueries(getTarget) {
   }
 
   /**
-   * Prove the lock is a rule about STATE rather than one control's attribute.
-   *
-   * The first press only proves the attribute: happy-dom suppresses handlers on a `disabled`
-   * button, so `toggleManagerRail`'s own `if (railLockedOpen) return;` is never reached. The
-   * second press strips the attribute first, which is the only path in this environment that
-   * reaches past the belt to the braces — delete the early return and this is what fails.
+   * Prove the lock is a rule about STATE rather than one control's attribute. The first press only
+   * proves the attribute: happy-dom suppresses handlers on a `disabled` button, so
+   * `toggleManagerRail`'s own `if (railLockedOpen) return;` is never reached.
    *
    * @param {() => Array<Array<unknown>>} railWrites reads the `managerRailCollapsed` writes so far.
    */
@@ -347,9 +280,7 @@ export function createManagerQueries(getTarget) {
     );
   }
 
-  // The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
-  // the "Crafting" parent from a non-crafting route routes straight to Recipes and
-  // expands the group; the parent also carries the recipes count badge.
+  // The gated Crafting nav group (issue 511) nests Recipes as a sub-route.
   function craftingParent() {
     return navButton('Crafting');
   }
@@ -360,10 +291,7 @@ export function createManagerQueries(getTarget) {
     );
   }
 
-  // The Crafting sub-entries currently carrying BOTH halves of the active treatment
-  // (issue 1151). Read as a list rather than a boolean so "exactly one, and it is the
-  // redirect target" is provable — "nothing is highlighted" is half of the reported
-  // dead end, and two highlighted entries would be the other failure this can catch.
+  // The Crafting sub-entries currently carrying BOTH halves of the active treatment (issue 1151).
   function activeCraftingSubitemIds() {
     return Array.from(getTarget().querySelectorAll('#manager-crafting-submenu .manager-nav-subitem'))
       .filter(
@@ -373,10 +301,8 @@ export function createManagerQueries(getTarget) {
       .map((button) => button.id.replace('manager-crafting-nav-', ''));
   }
 
-  // The ONE scope-switch driver for the route-reconciliation cases (issue 1151): set the
-  // select, dispatch a real bubbling `change`, settle, and report the rendered route.
-  // Repeating that sequence per case is precisely the near-identical block SonarCloud's
-  // new-code duplication gate counts against `tests/**` exactly as it does against `src/`.
+  // The ONE scope-switch driver for the route-reconciliation cases (issue 1151): set the select,
+  // dispatch a real bubbling `change`, settle, and report the rendered route.
   async function switchScopeSystemTo(systemId) {
     const scopeSelect = getTarget().querySelector('[data-manager-scope-select]');
     assert.ok(scopeSelect, 'the rail card exposes a system scope select');
@@ -387,14 +313,8 @@ export function createManagerQueries(getTarget) {
     return getTarget().querySelector('.fabricate-manager').dataset.managerView;
   }
 
-  // The three numbers that disagreed on one screen before issue 878: the tab mark, the
-  // inspector's at-a-glance tile, and the active panel's own entry chip. Reading all three
-  // through one helper is what lets a test assert they AGREE as well as what they agree on.
-  // The entry chip belongs to whichever panel is mounted, so `tab` must be the active tab.
-  //
-  // `tabBadge` reads `.manager-editor-tab-count` since issue 1429. The number is unchanged and
-  // so is every assertion below it; what changed is the Rail Marker Family VEHICLE carrying it,
-  // from the neutral chip to the bare mono numeral a RECORD COUNT is specified to use.
+  // The three numbers that disagreed on one screen before issue 878: the tab mark, the inspector's
+  // at-a-glance tile, and the active panel's own entry chip.
   function vocabularyCounters(tab, fact) {
     return {
       tabBadge: getTarget()
@@ -409,18 +329,6 @@ export function createManagerQueries(getTarget) {
 
   /**
    * The manager's Back verb, asserted on the route that renders it (issue 1118).
-   *
-   * `.manager-header-actions` paints Back as the SECONDARY treatment beside a Save that
-   * outranks it — `ToolEditView`, the maintainer's authority for what a manager button looks
-   * like, and `ComponentEditorHeader`, which renders its own Back into this very container.
-   * Five routes in the manager root forgot it, all five spelled the same bare
-   * `class="manager-button"`, and the omission was unassertable because four of them carried no
-   * `data-*` handle at all: the only way to name one was "the first button in the header", which
-   * is a statement about DOM order rather than about the control.
-   *
-   * So the hooks landed with the repair, and this addresses one control by name. It is scoped to
-   * `.manager-header-actions` deliberately — several of these routes render a second Back in the
-   * breadcrumb rail, which is a link and not this verb.
    *
    * @param {string} hook the control's own `data-*` attribute selector
    * @param {string} route the `currentView` it renders on, named in the failure message

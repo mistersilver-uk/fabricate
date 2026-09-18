@@ -4,12 +4,7 @@ import { afterEach, describe, it } from 'node:test';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
-/**
- * `_resolveRecipePromptImg` feeds the interactive roll-prompt header icon. It must
- * match the GM editor / listing precedence — recipe-item definition image, then
- * `recipe.img`, then the recipe default (blueprint) — and must NEVER fall back to
- * the generic item bag (an explicit product requirement).
- */
+/** `_resolveRecipePromptImg` feeds the interactive roll-prompt header icon. */
 const ITEM_BAG = 'icons/svg/item-bag.svg';
 
 function stubGame(definitionsById = {}) {
@@ -27,10 +22,8 @@ describe('CraftingEngine._resolveRecipePromptImg', () => {
     delete globalThis.game;
   });
 
-  // Inverted with issue 887: this asserted the borrow. The prompt shows the recipe's own
-  // image and never a containing book's (`data-models/spec.md` `## Recipe` requirement
-  // 16). The definition image is still stubbed with DISTINCT artwork so re-adding the
-  // borrow fails here rather than passing vacuously.
+  // Inverted with issue 887: this asserted the borrow. The prompt shows the recipe's own image and
+  // never a containing book's (`data-models/spec.md` `## Recipe` requirement 16).
   it('renders the recipe own image, never the recipe-item definition image', () => {
     stubGame({ 'ri-1': { img: 'icons/tools/smithing/anvil.webp' } });
     const engine = new CraftingEngine({});

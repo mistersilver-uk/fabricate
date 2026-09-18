@@ -15,16 +15,8 @@ const root = resolve(__dirname, '..');
 const docsDir = join(root, 'docs');
 const screenshotsDir = join(docsDir, 'img', 'screenshots');
 
-// Directories under docs/ that are generated or vendored, never authored — they
-// must not count as references (otherwise a stale build artefact could keep a
-// deleted screenshot "alive").
-//
-// `_includes`, `_layouts` and `_data` are skipped for a second reason. Jekyll's
-// template machinery lives there in .html and .json files, and this test scans
-// authored pages for literal screenshot file names. An image template under
-// `_includes` mentioning one would be a reference no page actually makes — a
-// phantom that keeps a deleted screenshot alive forever, which is exactly the
-// failure the orphan assertion below exists to catch.
+// Directories under docs/ that are generated or vendored, never authored — they must not count as
+// references (otherwise a stale build artefact could keep a deleted screenshot "alive").
 const IGNORED_DOCS_DIRS = new Set([
   '_site',
   'vendor',
@@ -35,19 +27,8 @@ const IGNORED_DOCS_DIRS = new Set([
   '_data',
 ]);
 
-// This test owns the FLAT `docs/img/screenshots/` directory and the hand-curated
-// frames in it — one, now that every curated frame a view case can reach has been
-// replaced by a generated one. `docs/img/screenshots/lab/` holds generated frames
-// and belongs to `tests/docs-screenshot-map.test.js`. Two facts keep those
-// populations apart, and both are load-bearing rather than incidental:
-//
-//   1. the readdir below is NOT recursive, so `lab/` is never enumerated here;
-//   2. the reference pattern's character class contains no `/`, so it cannot
-//      match a `screenshots/lab/<name>.webp` path either.
-//
-// Change either one and this test starts claiming frames it does not own, while
-// the map test still claims them too — and a file both tests believe the other
-// is checking is a file neither is.
+// This test owns the FLAT `docs/img/screenshots/` directory and the hand-curated frames in it —
+// one, now that every curated frame a view case can reach has been replaced by a generated one.
 const screenshotEntries = await readdir(screenshotsDir, { withFileTypes: true });
 const isGeneratedFrame = entry => entry.isFile() && extname(entry.name).toLowerCase() === '.webp';
 const screenshotFiles = screenshotEntries
@@ -56,13 +37,6 @@ const screenshotFiles = screenshotEntries
   .sort((a, b) => a.localeCompare(b, 'en'));
 
 // Everything in the flat directory that the `.webp` filter above drops.
-//
-// Without this the exemption gate is an equality over `.webp` ALONE, so a curated `.png` or
-// `.jpg` dropped in here is invisible to all four tests in this file: it is not in
-// `screenshotFiles`, so it cannot be an orphan, cannot be missing, and cannot break the
-// equality with the enumerated set. Asserting the residue is empty apart from the one
-// subdirectory that belongs to another test closes that off at the source, and keeps the
-// filter's meaning ("a generated frame is a .webp file") rather than widening it.
 const OTHER_TESTS_OWN = ['lab/'];
 const unownedEntries = screenshotEntries
   .filter(entry => !isGeneratedFrame(entry))
@@ -80,12 +54,6 @@ for (const file of docFiles) {
 }
 
 // Guard against deleted documentation screenshots silently creeping back in.
-// Every committed screenshot must earn its place by being referenced from an
-// authored docs page; an orphaned .webp (e.g. one re-added from a smoke run
-// after its docs reference was removed) fails this test. The smoke harness only
-// writes frames to the transient test-results/ directory, so a screenshot
-// reaching docs/img/screenshots/ is always a deliberate curation — this keeps
-// that set honest. See CONTRIBUTING.md for the curation workflow.
 test('every committed docs screenshot is referenced by an authored docs page', () => {
   const orphans = screenshotFiles.filter(file => !referenced.has(file));
   assert.deepEqual(
@@ -105,20 +73,7 @@ test('every docs screenshot reference resolves to a committed file', () => {
   );
 });
 
-// The whole of what is left in the flat directory, each entry saying why no view case can
-// reach it. This is the exemption the documentation screenshot provenance requirement grants,
-// and it is written down HERE rather than inferred from what happens to be on disk, because an
-// inferred exemption is not one: "it is exempt because nobody generated it" would license every
-// future hand-curated frame, which is the rule this file exists to hold.
-//
-// The test below asserts EQUALITY with the directory, in both directions. So dropping a curated
-// frame means deleting its entry, and adding one means writing a reason next to it in a diff a
-// reviewer reads — which is what "adding to it is a visible act" has to mean to be worth saying.
-//
-// What no test here can decide is whether a given artifact IS an application view — that is a
-// reviewer's judgement, and the enumeration exists to force it into a diff someone reads rather
-// than to automate it. The mechanical checks below are narrower than the name of the set: they
-// refuse an exempt frame that collides with a generated case id or with the generated map.
+// The whole of what is left in the flat directory, each entry saying why no view case can reach it.
 const NOT_AN_APPLICATION_VIEW = new Map([
   [
     'fabricate-themes.webp',

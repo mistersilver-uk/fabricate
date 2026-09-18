@@ -1,12 +1,7 @@
 /**
- * The shared `<Stepper>` adjunct-name derivation (issue 1050).
- *
- * `stepper-call-site-contract.test.js` rules that every call site names its input and BOTH of its
- * adjuncts, and it accepts `{...stepperLabels(label)}` as satisfying all three. That acceptance is
- * only sound while this helper really returns all three, so this is the other half of that rule: it
- * is what stops the source scan reading a spread as coverage of something the spread does not
- * supply. A helper that silently dropped `decrementLabel` would otherwise ship an anonymous `−`
- * button on ~20 fields at once with the contract suite still green.
+ * The shared `<Stepper>` adjunct-name derivation (issue 1050). `stepper-call-site-contract.test.js`
+ * rules that every call site names its input and BOTH of its adjuncts, and it accepts
+ * `{...stepperLabels(label)}` as satisfying all three.
  */
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -69,9 +64,8 @@ describe('stepperLabels (issue 1050)', () => {
   });
 
   it('leaves the label untranslated, because callers pass an already-localized one', () => {
-    // `Stepper` is an import-free leaf that localizes nothing; its callers resolve the field's
-    // own caption through `text(key, fallback)` first. A helper that localized the label again
-    // would turn every caption into a missing-key echo.
+    // `Stepper` is an import-free leaf that localizes nothing; its callers resolve the field's own
+    // caption through `text(key, fallback)` first.
     stubI18n();
     assert.equal(stepperLabels('Break below').ariaLabel, 'Break below');
   });

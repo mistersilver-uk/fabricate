@@ -1,17 +1,4 @@
-/**
- * Uninstall-safe world cleanup for `fabricate.interactable` behaviours + markers
- * (issue 535).
- *
- * These tests pin the pure decision + the executor edge so that a GM "prepare for
- * uninstall" sweep:
- *   - removes EXACTLY Fabricate's `fabricate.interactable` behaviours and Fabricate's
- *     own Tile/Drawing markers, and NEVER a parent Region, a foreign behaviour, or a
- *     GM-owned Token marker;
- *   - clears Fabricate's region-ownership stamp and Token reverse flags;
- *   - handles legacy/unflagged provenance conservatively (behaviour still removed,
- *     region never deleted);
- *   - is a no-op on an empty world.
- */
+/** Uninstall-safe world cleanup for `fabricate.interactable` behaviours + markers (issue 535). */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

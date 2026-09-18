@@ -192,9 +192,8 @@ describe('evaluateCheckReadiness: tier-step targets (issue 975)', () => {
   });
 
   it('reports a target authored before any tier exists', () => {
-    // The tier-count gate on the outcome rules must not swallow this: authoring the
-    // trigger first is a normal top-down order, and the relative↔fixed type switch
-    // dangles every tierId at once.
+    // The tier-count gate on the outcome rules must not swallow this: authoring the trigger first
+    // is a normal top-down order, and the relative↔fixed type switch dangles every tierId at once.
     const { checks, issues } = evaluateCheckReadiness(routedWithTargets(['a'], []), {
       mode: 'routed',
     });
@@ -230,10 +229,9 @@ describe('evaluateCheckReadiness: tier-step targets (issue 975)', () => {
   });
 });
 
-// The Validation tab's label maps are hand-maintained mirrors of the ids this
-// evaluator emits, and nothing else gates them: an id with no entry renders its own
-// raw id to the GM, and an entry whose lang key is missing renders the fallback
-// forever. Both rot silently, so they are compared as SETS here.
+// The Validation tab's label maps are hand-maintained mirrors of the ids this evaluator emits, and
+// nothing else gates them: an id with no entry renders its own raw id to the GM, and an entry whose
+// lang key is missing renders the fallback forever.
 describe('checks readiness label maps do not drift', () => {
   const readinessSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js'),
@@ -241,22 +239,17 @@ describe('checks readiness label maps do not drift', () => {
   );
   const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
-  // A check literal is `{ id, satisfied }` — the discriminator is the SECOND key, so this
-  // finds them wherever they are built, inline or inside an extracted helper.
-  //
-  // ISSUE ids are no longer extracted by source scan (issue 1095): they come from the
-  // exported `CHECK_READINESS_ISSUE_IDS` registry, which `pushIssue` REFUSES to emit
-  // outside. A scan would be the second hand-copied mirror the registry exists to remove.
+  // A check literal is `{ id, satisfied }` — the discriminator is the SECOND key, so this finds
+  // them wherever they are built, inline or inside an extracted helper (issue 1095).
   function idsBy(secondKey) {
     if (secondKey === 'severity') return [...CHECK_READINESS_ISSUE_IDS].sort();
     const pattern = new RegExp(`\\{\\s*id:\\s*'([^']+)',\\s*${secondKey}:`, 'g');
     return [...readinessSource.matchAll(pattern)].map((match) => match[1]).sort();
   }
 
-  // The two copy maps are a real MODULE now (issue 1096), shared by the Validation route and
-  // by the section-level Callout, so this reads the exported objects rather than scanning one
-  // component's source for a literal. A scan could only prove what one file spells; the
-  // import proves what both surfaces actually render from.
+  // The two copy maps are a real MODULE now (issue 1096), shared by the Validation route and by the
+  // section-level Callout, so this reads the exported objects rather than scanning one component's
+  // source for a literal.
   const LABEL_MAPS = {
     CHECK_LABELS: CHECK_TICK_LABELS,
     ISSUE_LABELS: CHECK_ISSUE_LABELS,
@@ -316,12 +309,8 @@ describe('checks readiness label maps do not drift', () => {
   }
 });
 
-// ── the retired check-modifier placeholder (issue 1094) ────────────────────
-//
-// The whole block exists because MUTATION found it missing. Changing the predicate from
-// `.present` to `.nonAdditive` left every test in this file green — killing the warning for
-// exactly the case task 6 exists to prevent, which is a GM who reads an old guide, types
-// the placeholder, and has it removed silently on the way to the roll.
+// the retired check-modifier placeholder (issue 1094). The whole block exists because MUTATION
+// found it missing.
 describe('retired placeholder readiness', () => {
   const issue = (issues, id) => issues.find((entry) => entry.id === id);
 
@@ -346,23 +335,11 @@ describe('retired placeholder readiness', () => {
     assert.equal(issue(issues, 'retiredPlaceholderInFormula'), undefined);
   });
 
-  // The SPLIT, driven from the SHARED CORPUS rather than a hand-picked list — and the
-  // difference is the whole finding. The four formulas this used to name happen to be the
-  // ones a `nonAdditive` classifier ALSO gets right, so a split asking the classifier
-  // instead of the decider passed. `1d20 * -@craftingmod`, `1d20 - @craftingmod -` and
-  // `@craftingmod +` are `nonAdditive: false` and REFUSED (their residue is structurally
-  // incomplete), and on those three the tab said "it is ignored and removed before the
-  // roll, so delete it" — advice that leaves `1d20 * ` on disk while the migration counted
-  // the same formula `untouched` and said it would not roll.
-  //
-  // Every row of the corpus is therefore asserted here, not a sample of it: the corpus IS
-  // the set of placements the shim refuses, so the tab must report every one of them as the
-  // formula-breaking case.
+  // The SPLIT, driven from the SHARED CORPUS rather than a hand-picked list — and the difference is
+  // the whole finding.
   it('raises a CRITICAL, not a warning, on every placement the shim refuses', () => {
     for (const [label, rollFormula] of RETIRED_PLACEMENT_CORPUS) {
-      // The corpus rows are refused, so the tab is being asked about the right set. Asserted
-      // in-line so a corpus row that stopped being refused fails HERE rather than silently
-      // weakening the loop below into a tautology.
+      // The corpus rows are refused, so the tab is being asked about the right set.
       assert.equal(
         planRetiredPlaceholderStrip(rollFormula).outcome,
         'refused',
@@ -399,9 +376,7 @@ describe('retired placeholder readiness', () => {
     }
   });
 
-  // THE INVARIANT THIS TAB EXISTS TO REPORT. `hasRollFormula` must agree with the
-  // `checkUsable` every other surface dispatches on, or the Validation tab ticks
-  // "Has a roll formula" green next to a check that cannot roll.
+  // THE INVARIANT THIS TAB EXISTS TO REPORT.
   it('reads hasRollFormula POST-shim, so it cannot disagree with checkUsable', () => {
     for (const [label, rollFormula] of [['placeholder only', '@craftingmod'], ...RETIRED_PLACEMENT_CORPUS]) {
       const { checks, issues } = evaluateCheckReadiness({ rollFormula });
@@ -417,9 +392,8 @@ describe('retired placeholder readiness', () => {
     assert.equal(check(checks, 'hasRollFormula').satisfied, true);
   });
 
-  // The legacy routed alias the `1.21.0` migration sweeps. Readiness reads `rollFormula`,
-  // so without this the one field the migration can rewrite is the one the GM is never
-  // told about.
+  // The legacy routed alias the `1.21.0` migration sweeps. Readiness reads `rollFormula`, so
+  // without this the one field the migration can rewrite is the one the GM is never told about.
   it('inspects the legacy routed.rollExpression alias too', () => {
     const warned = evaluateCheckReadiness({
       rollFormula: '1d20',
@@ -456,13 +430,10 @@ describe('retired placeholder readiness', () => {
   });
 });
 
-// ── the issue-id registry is a SOURCE OF TRUTH, not a convention (issue 1095, BH3/C3) ──
-//
-// Every id used to be an inline literal in the function body, so the only way to enumerate
-// the set was to call the function with enough fixtures to reach every branch — which
-// cannot prove completeness, because an unreached branch contributes nothing. Downstream
-// surfaces need the whole set (the Validation route buckets each id to a section), and a
-// hand-copied mirror of an unprovable list is how those two drift.
+// the issue-id registry is a SOURCE OF TRUTH, not a convention (issue 1095, BH3/C3). Every id used
+// to be an inline literal in the function body, so the only way to enumerate the set was to call
+// the function with enough fixtures to reach every branch — which cannot prove completeness,
+// because an unreached branch contributes nothing.
 describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', () => {
   const readinessPath = resolve(
     repoRoot,
@@ -480,14 +451,12 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     );
   });
 
-  // THE MECHANICAL GUARD, and the reason a frozen export alone is not one:
-  // `issues.push({ id: 'newThing' })` still compiles beside it, and a behavioural test can
-  // only fail for branches a fixture reaches. Every emit goes through `pushIssue`, which
-  // THROWS on an unregistered id — so an id added without registering it cannot work.
+  // THE MECHANICAL GUARD, and the reason a frozen export alone is not one: `issues.push({ id:
+  // 'newThing' })` still compiles beside it, and a behavioural test can only fail for branches a
+  // fixture reaches.
   it('refuses an unregistered id at the funnel, loudly', () => {
-    // The funnel is not exported, so it is exercised the way production reaches it: by
-    // loading a COPY of the module with one id removed from the registry. The copy is
-    // built in memory and imported as a data: URL, so nothing on disk is touched.
+    // The funnel is not exported, so it is exercised the way production reaches it: by loading a
+    // COPY of the module with one id removed from the registry.
     const mutated = source.replace("  'noRollFormula',\n", '');
     assert.notEqual(mutated, source, 'the mutation must actually change the module');
     return import(`data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`).then(
@@ -528,11 +497,8 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       // An expression NOTHING can roll (issue 1118 review): the reducer refuses `1d4]`
       // outright, with no dice engine needed. This row reaches `modifierExpressionInvalid`.
       { id: 'broken', label: 'Broken', expression: '1d4]' },
-      // A ROLL-shaped expression, kept in the sweep as a NEGATIVE control (issue 1118): a
-      // check appends it as dice now, so it must raise NOTHING. While it raised
-      // `modifierRollExpression` this row was what reached that branch, and the sweep below
-      // asserts the registry equals what these fixtures emit — so leaving the row in is what
-      // makes the retirement observable rather than merely untested.
+      // A ROLL-shaped expression, kept in the sweep as a NEGATIVE control (issue 1118): a check
+      // appends it as dice now, so it must raise NOTHING.
       { id: 'rolls', label: 'Rolls', expression: '1d4' },
     ];
     const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
@@ -568,9 +534,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       },
       { mode: 'routed' }
     );
-    // Two VALID ranges that overlap. The invalid-range fixture above cannot reach
-    // `rangeOverlap` at all: `findRangeConflicts` excludes a `start > end` span from overlap
-    // detection, so it needs a fixture of its own.
+    // Two VALID ranges that overlap.
     collect(
       {
         rollFormula: '1d20',
@@ -596,11 +560,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
         `${id} is emitted but not registered — #1096's issue-to-section map would drop it`
       );
     }
-    // THE CONVERSE, and it is the half that has teeth. `>= 10` against a 14-entry registry
-    // passed while four branches went unreached, which is exactly the state that lets a
-    // registered id ship with no branch behind it (or a branch stop emitting) unnoticed. Set
-    // EQUALITY says the sweep reaches every registered id AND that every id it reaches is
-    // registered, so registering a new one without exercising it fails here.
+    // THE CONVERSE, and it is the half that has teeth.
     assert.deepEqual(
       [...emitted].sort(),
       [...CHECK_READINESS_ISSUE_IDS].sort(),
@@ -724,10 +684,9 @@ describe('check-modifier readiness', () => {
     );
   });
 
-  // The second blocking bounds fault, and a SEPARATE id: "your minimum is above your
-  // maximum" and "this number cannot appear in a roll formula" need different repairs, and
-  // `1e21` is not an inversion. Its damage used to spread past its own entry — clamping to
-  // it poisoned the SUM and `appendCheckModifierTerm` dropped the whole term.
+  // The second blocking bounds fault, and a SEPARATE id: "your minimum is above your maximum" and
+  // "this number cannot appear in a roll formula" need different repairs, and `1e21` is not an
+  // inversion.
   it('BLOCKS on a bound the dice grammar cannot express, as its own issue', () => {
     const { checks, issues } = evaluateCheckReadiness(
       { rollFormula: '1d20' },
@@ -745,9 +704,7 @@ describe('check-modifier readiness', () => {
   });
 
   // Issue 1118. A check appends a rolling modifier AS DICE, so the rule the retired
-  // `modifierRollExpression` enforced no longer exists. Asserted from the REGISTRY as well
-  // as from a fixture, because an id that is merely never raised looks identical to one
-  // that is raised on a branch this fixture does not reach.
+  // `modifierRollExpression` enforced no longer exists.
   it('says NOTHING about an expression that rolls dice, on any rule', () => {
     const rolling = [
       { id: 'rolls', label: 'Rolls', expression: '1d4' },
@@ -800,10 +757,7 @@ describe('check-modifier readiness', () => {
     );
   });
 
-  // THE SENTENCE, not the payload. Asserting `issue.data` leaves `interpolate()` free to be
-  // a no-op — the whole suite stayed byte-identical when it was made one — and a GM would
-  // then read a literal `({names})` on a blocking issue. This drives the same two steps the
-  // Validation route and the section Callout drive: resolve the copy, then interpolate it.
+  // THE SENTENCE, not the payload.
   it('renders the named entries INTO the sentence a GM reads', () => {
     const { issues } = evaluateCheckReadiness(
       { rollFormula: '1d20' },
@@ -844,9 +798,8 @@ describe('check-modifier readiness', () => {
   // contributes nothing for EXPRESSION reasons — including three that would have failed the
   // check outright had the engine guard not dropped them first.
   it('BLOCKS on an expression that cannot contribute, whatever the reason', () => {
-    // The last four are ENGINE-only faults: they reduce cleanly and only a dice engine can
-    // refuse them, so the recorded 14.365 double has to be installed for this test to reach
-    // them at all. Without it `fragmentRolls` fails open and those rows pass vacuously.
+    // The last four are ENGINE-only faults: they reduce cleanly and only a dice engine can refuse
+    // them, so the recorded 14.365 double has to be installed for this test to reach them at all.
     const previousRoll = globalThis.Roll;
     globalThis.Roll = recordedModifierRoll();
     try {
@@ -1000,13 +953,8 @@ describe('check-modifier readiness', () => {
   });
 });
 
-// ── The issue-id → SECTION map (issue 1096) ──────────────────────────────────────────
-//
-// Three surfaces read this map: the section strip's warning dots, the rail's per-activity
-// badge and the Validation route's deep links. Bucketing "by issue id" is exactly the shape
-// that rots silently — issue 1095 added three ids at once — so the map is held to SET
-// EQUALITY against the frozen registry the evaluator itself pushes from, in both
-// directions, and each direction is proven able to fail.
+// The issue-id → SECTION map (issue 1096). Three surfaces read this map: the section strip's
+// warning dots, the rail's per-activity badge and the Validation route's deep links.
 describe('the issue-to-section map is exhaustive against the frozen registry', () => {
   const mapPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js');
   const mapSource = readFileSync(mapPath, 'utf8');
@@ -1037,11 +985,8 @@ describe('the issue-to-section map is exhaustive against the frozen registry', (
     assert.equal(sectionForIssue('notAnIssueId'), null);
   });
 
-  // BOTH NEGATIVE CONTROLS, because the assertion above can fail for two different reasons
-  // and a guard that only proves one of them is half a guard. Each mutation is applied to a
-  // COPY of the module loaded as a data: URL, and each is checked to have actually changed
-  // the source before it is trusted — a replacement that matched nothing would leave the
-  // suite green and read as "the map is fine".
+  // BOTH NEGATIVE CONTROLS, because the assertion above can fail for two different reasons and a
+  // guard that only proves one of them is half a guard.
   async function loadMutated(mutated) {
     assert.notEqual(mutated, mapSource, 'the mutation must actually change the module');
     return import(
@@ -1078,15 +1023,9 @@ describe('the issue-to-section map is exhaustive against the frozen registry', (
   });
 });
 
-// ── The readiness mode is the ENGINE'S OWN SLOT, not a second mapping (issue 1096) ─────
-//
-// `evaluateCheckReadiness` branches on `mode === 'routed'`, and no subsystem's authored
-// resolution mode is ever that string. Something has to translate; the question is WHAT
-// translates. `checkModifierResolver` already decides which `craftingCheck` sub-config the
-// engine rolls, and a second mapping beside it disagreed with it for exactly one
-// configuration — alchemy at `checkMode: 'tiered'` — so the rail badge picked its DRAFT by
-// one mapping and its RULES by the other and evaluated an untouched simple check under
-// routed rules.
+// The readiness mode is the ENGINE'S OWN SLOT, not a second mapping (issue 1096).
+// `evaluateCheckReadiness` branches on `mode === 'routed'`, and no subsystem's authored resolution
+// mode is ever that string.
 describe('readinessModeForSlot', () => {
   it('is the identity on every real slot, and names the no-check case', () => {
     assert.equal(readinessModeForSlot('routed'), 'routed');

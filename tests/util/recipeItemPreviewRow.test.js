@@ -4,9 +4,8 @@ import assert from 'node:assert/strict';
 import { buildRecipeItemPreviewRow } from '../../src/ui/svelte/util/recipeItemPreviewRow.js';
 import { DEFAULT_CRAFTING_IMAGE } from '../../src/ui/svelte/util/craftingImageDefaults.js';
 
-// The exact set of top-level keys `InventoryListingBuilder._buildRecipeItemRows`
-// emits (the contract `InventoryDetail` reads). Kept in lockstep with
-// tests/inventory-listing-builder.test.js.
+// The exact set of top-level keys `InventoryListingBuilder._buildRecipeItemRows` emits (the
+// contract `InventoryDetail` reads). Kept in lockstep with tests/inventory-listing-builder.test.js.
 const EXPECTED_KEYS = [
   'key',
   'recipeItemId',

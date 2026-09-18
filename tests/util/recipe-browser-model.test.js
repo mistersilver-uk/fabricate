@@ -114,9 +114,7 @@ describe('recipeBrowserModel — sorting', () => {
     assert.deepEqual(names(sortRecipes(rows, { key: 'results' })), ['Beta', 'Gamma', 'Alpha']);
   });
 
-  // The non-grouped path is the byte-identical pre-issue-801 order. These literal
-  // orderings pin BOTH directions per key so a bug injected into the shared
-  // `rowComparator` flips them (rather than a self-comparison against the code).
+  // The non-grouped path is the byte-identical pre-issue-801 order.
   it('pins each sort key in both directions (the flat, non-grouped path)', () => {
     assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'asc' })), ['Gamma', 'Beta', 'Alpha']);
     assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'desc' })), ['Alpha', 'Beta', 'Gamma']);
@@ -140,13 +138,7 @@ describe('recipeBrowserModel — sorting', () => {
     );
   });
 
-  // The rank and the pill must name the SAME set (issue 1010). `incomplete` is
-  // `validate() === false && validateStructure() === true`, so a STRUCTURALLY BROKEN
-  // recipe reads `incomplete: false` — and so do a dangling essence reference, a tag
-  // placeholder, an unmet resolution-mode requirement and an alchemy signature conflict.
-  // Every one of them wears the red `Can't enable` pill and none of them moved
-  // `incomplete`, so the sort literally named "needs attention" ranked the reddest rows
-  // in the browser at 0, below the amber ones.
+  // The rank and the pill must name the SAME set (issue 1010).
   it('ranks a row the browser pills as blocked, not the narrower incomplete predicate', () => {
     const structurallyBroken = makeRecipe({
       name: 'Broken',
@@ -187,9 +179,8 @@ describe('recipeBrowserModel — sorting', () => {
     );
   });
 
-  // An already-ON blocked recipe keeps rank 1, matching its amber `Incomplete` pill:
-  // nothing is being refused, because the activation gate fires only on a transition
-  // INTO the enabled state. Three ranks, three pill outcomes, no fourth rank.
+  // An already-ON blocked recipe keeps rank 1, matching its amber `Incomplete` pill: nothing is
+  // being refused, because the activation gate fires only on a transition INTO the enabled state.
   it('keeps a blocked-but-already-enabled row at the amber rank its pill paints', () => {
     const onAndBlocked = makeRecipe({ name: 'OnBlocked', enableBlocked: true, enabled: true });
     assert.equal(attentionRank(onAndBlocked), 1);
@@ -277,10 +268,8 @@ describe('recipeBrowserModel — grouping', () => {
 // category larger than the page fills consecutive pages contiguously instead of being
 // interleaved into an alphabetical slice on every page.
 describe('recipeBrowserModel — category-major grouped pagination (issue 801)', () => {
-  // Recipes order categories plain-alphabetically, `general` INCLUDED at its natural
-  // slot: alchemy < general < smithing. Names are assigned round-robin across the three
-  // categories, so a global name sort (the pre-801 order) SCATTERS them — only
-  // category-major ordering makes each category contiguous, which is what these bind.
+  // Recipes order categories plain-alphabetically, `general` INCLUDED at its natural slot: alchemy
+  // < general < smithing.
   function interleavedLibrary() {
     return buildInterleavedCategoryOrder([
       ['alchemy', 3],
@@ -402,12 +391,8 @@ describe('recipeBrowserModel — pagination boundaries', () => {
     assert.deepEqual([page.rangeStart, page.rangeEnd], [0, 0]);
   });
 
-  // Issue 1036 review: `paginateRecipes` now delegates to the shared `paginateRows`, and
-  // the one input class no pinned test covered was a `pageSize` that is falsy but NUMERIC.
-  // `Number(0)` and `Number(null)` are both finite, so neither reaches the default —
-  // they reach `Math.max(1, 0)` and clamp to a one-row page. Unreachable through
-  // `Pagination.svelte`'s `next > 0` guard, but it is what makes the extraction
-  // self-evidently neutral rather than neutral-by-argument.
+  // Issue 1036 review: `paginateRecipes` now delegates to the shared `paginateRows`, and the one
+  // input class no pinned test covered was a `pageSize` that is falsy but NUMERIC.
   it('clamps a zero or null pageSize to one row per page rather than defaulting', () => {
     for (const pageSize of [0, null]) {
       const page = paginateRecipes(rows, { pageIndex: 0, pageSize });
@@ -464,15 +449,8 @@ describe('recipeBrowserModel — row derivations', () => {
     );
   });
 
-  // Issue 1010 — BOTH authoring pills were re-pointed from `incomplete` to `enableBlocked`,
-  // and the two directions are stated separately because only one of them is a widening.
-  //
-  // `incomplete` is `validate() === false && validateStructure() === true`, so it is
-  // NARROWER than "activation would refuse this": a structurally broken recipe reads
-  // `incomplete: false`. Under the old predicate such a recipe wore no pill at all, while
-  // the bulk panel's pre-flight count and the set-apply write — which read the activation
-  // predicate — would both have counted it. That is two surfaces on one screen disagreeing
-  // about one fact, which is exactly what the shared predicate closes.
+  // Issue 1010 — BOTH authoring pills were re-pointed from `incomplete` to `enableBlocked`, and the
+  // two directions are stated separately because only one of them is a widening.
   describe('the row pill reads the activation predicate, not `incomplete`', () => {
     // A structurally broken recipe: un-enableable, yet `incomplete: false`.
     const structurallyBroken = { incomplete: false, enableBlocked: true };
@@ -498,9 +476,8 @@ describe('recipeBrowserModel — row derivations', () => {
     });
 
     it('ignores `incomplete` entirely, in both directions', () => {
-      // A recipe the activation check accepts wears no authoring pill, whatever the
-      // narrower legacy flag says — so the flag is not merely additional, it is retired
-      // from this derivation.
+      // A recipe the activation check accepts wears no authoring pill, whatever the narrower legacy
+      // flag says — so the flag is not merely additional, it is retired from this derivation.
       assert.deepEqual(
         deriveRecipeStatuses(makeRecipe({ enabled: false, incomplete: true, enableBlocked: false })),
         [{ id: 'disabled', tone: 'subtle', icon: '' }],
@@ -514,9 +491,7 @@ describe('recipeBrowserModel — row derivations', () => {
     });
 
     it('splits off/on strictly, so a row missing `enabled` is not read as off', () => {
-      // `countBlockedRecipeEnables` tests `enabled === false` strictly for exactly this
-      // reason. A looser `!enabled` here would re-open the drift on a malformed row: the
-      // pill would say "can't enable" while the panel's count ignored it.
+      // `countBlockedRecipeEnables` tests `enabled === false` strictly for exactly this reason.
       const noEnabledField = makeRecipe({ enableBlocked: true });
       delete noEnabledField.enabled;
       assert.deepEqual(
@@ -575,13 +550,7 @@ describe('recipeBrowserModel — the whole pipeline', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The library inspector's Requires / Produces lists (issue 643 §3.3).
-//
-// Both walk the same nested shape — execution scope (the recipe, or each step) ->
-// sets / result groups -> options / results — so both are exercised against the same
-// two fixtures: a single-scope recipe and a multi-step one.
-// ---------------------------------------------------------------------------
 
 const COMPONENTS = [
   { id: 'cmp-herb', name: 'Mountain Herb', img: 'icons/herb.webp' },

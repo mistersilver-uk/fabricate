@@ -1,25 +1,4 @@
-/**
- * The POOLED currency balance and debit (issue 1342, Phase 2).
- *
- * The claims worth a suite of their own are the three where a plausible implementation is quietly
- * wrong about somebody else's money:
- *
- *   1. **A pool with an unreadable member is UNREADABLE, not partial.** Summing only the actors
- *      that answered produces a number that is always too small and looks authoritative, so a gate
- *      built on it refuses parties that can pay — and a debit built on it moves the whole cost onto
- *      whichever actors Fabricate happened to see.
- *   2. **The debit is denominated in the TERMINAL BASE UNIT.** `aggregateCurrencySpends` rounds a
- *      requirement UP into a representative denomination so a single payer is never under-charged;
- *      the same rounding applied per payer over-charges the POOL by up to `baseValue - 1` each. The
- *      numeric case below is the one that can tell the two rules apart.
- *   3. **Nothing is taken that cannot be given back.** A `macro` world's `increment` macro is
- *      optional, so such a world can be perfectly valid and still have published no way to refund;
- *      the debit refuses it before it reads, let alone writes.
- *
- * Every money assertion is on `totalCopper()` — the whole ladder branch in one denomination —
- * rather than on a single rung, because a base-unit debit legitimately breaks higher coins for
- * change and a per-rung expectation would fail for the right behaviour.
- */
+/** The POOLED currency balance and debit (issue 1342, Phase 2). */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -42,8 +21,7 @@ import {
 
 /**
  * A `game` global, because `resolveCoinSpender` reads a BARE `game.fabricate?.…` on its accessor
- * fallbacks. Under Foundry the global always exists, so this models production rather than
- * papering over a defect.
+ * fallbacks.
  */
 globalThis.game = globalThis.game ?? { fabricate: {} };
 

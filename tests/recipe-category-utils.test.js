@@ -45,10 +45,7 @@ describe('recipe category helpers', () => {
   });
 
   it('is total over unusable input, on the recipe path too (issue 1663)', () => {
-    // THE RECIPE HALF, WRITTEN DOWN. Since #1663 these helpers are one implementation shared with
-    // `componentCategories.js`, whose suite already covers these inputs — so the recipe kind was
-    // covered only by a binding no reader of this file can see. These cases are the same total
-    // function asserted on the recipe names, where a reader of the recipe path will find them.
+    // THE RECIPE HALF, WRITTEN DOWN.
     assert.equal(normalizeRecipeCategory(null), GENERAL_RECIPE_CATEGORY);
     assert.equal(normalizeRecipeCategory(42), GENERAL_RECIPE_CATEGORY);
     assert.deepEqual(normalizeCustomRecipeCategories(null), []);
@@ -65,9 +62,7 @@ describe('recipe category helpers', () => {
       'General'
     );
     assert.equal(getRecipeCategoryLabel('Weapons'), 'Weapons');
-    // The NO-LOCALIZER fallback: the English literal, not the raw key. This branch was
-    // component-only until #1663 made these ONE function — which is precisely why a reader of the
-    // recipe path could not see that it was covered.
+    // The NO-LOCALIZER fallback: the English literal, not the raw key.
     assert.equal(getRecipeCategoryLabel('general'), 'General');
   });
 });

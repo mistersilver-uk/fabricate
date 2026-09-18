@@ -1,11 +1,4 @@
-/**
- * Unit coverage for the region-first PURE socket validators + routers.
- *
- * Behaviour-update writer: the active GM applies locally (no round-trip), a
- * non-GM emits. Activate routes to validateAndGrant only on the active GM.
- * Granted routes to openGrant only for the targeted local user. Bad payloads are
- * rejected. No live Foundry runtime — collaborators are injected.
- */
+/** Unit coverage for the region-first PURE socket validators + routers. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -167,9 +160,8 @@ test('mayApplyNonGmBehaviorUpdate refuses every non-node write (fail-closed)', (
   assert.equal(mayApplyNonGmBehaviorUpdate({}), false);
   assert.equal(mayApplyNonGmBehaviorUpdate(null), false);
   assert.equal(mayApplyNonGmBehaviorUpdate([{ system: { node: {} } }]), false);
-  // Prototype-pollution vector: a socket payload arrives via JSON, so an own
-  // `__proto__` key is real (JSON.parse defines it as an own property). It is not a
-  // `system.node` path → refused (and never reaches the write to pollute anything).
+  // Prototype-pollution vector: a socket payload arrives via JSON, so an own `__proto__` key is
+  // real (JSON.parse defines it as an own property).
   assert.equal(mayApplyNonGmBehaviorUpdate(JSON.parse('{"__proto__": {"polluted": true}}')), false);
   assert.equal(mayApplyNonGmBehaviorUpdate(JSON.parse('{"system": {"__proto__": {"polluted": true}}}')), false);
   // Dot-notation `-=` deletion key targeting a FOREIGN field (unset system.linkedVisual)

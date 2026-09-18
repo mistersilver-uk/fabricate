@@ -50,9 +50,7 @@ function legacyData() {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Pure function: rename consumeCatalystsOnFail → breakToolsOnFail
-// ---------------------------------------------------------------------------
 
 test('renames the consumption key on both crafting and salvage checks', () => {
   const { systems } = migrateBreakToolsOnFail(legacyData());
@@ -67,9 +65,7 @@ test('renames the consumption key on both crafting and salvage checks', () => {
   assert.equal(system.salvageCraftingCheck.consumption.consumeComponentOnFail, false, 'sibling preserved');
 });
 
-// ---------------------------------------------------------------------------
 // Pure function: strip residual dead catalysts arrays
-// ---------------------------------------------------------------------------
 
 test('strips residual dead catalysts at every recipe level', () => {
   const { recipes } = migrateBreakToolsOnFail(legacyData());
@@ -94,9 +90,7 @@ test('strips residual dead salvage catalysts and the dead gathering task.catalys
   );
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency, anomalous payloads, immutability
-// ---------------------------------------------------------------------------
 
 test('is idempotent: a second run makes no further change', () => {
   const once = migrateBreakToolsOnFail(legacyData());
@@ -129,9 +123,7 @@ test('does not mutate its inputs (deep-clones)', () => {
   assert.deepEqual(input, snapshot, 'input bundle left unchanged');
 });
 
-// ---------------------------------------------------------------------------
 // Through the runner
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(
@@ -196,11 +188,8 @@ test('runner: craftingSystems left untouched (no write) when nothing needs renam
 
   await runner.run();
 
-  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because
-  // it stamps `craftingCheck.maxModifierPicks` on every system already on the
-  // `playerPicks` combination rule. The claim this test makes is about THIS migration, so
-  // it is asserted on the persisted payload's own fields rather than on the shared
-  // setting's write count.
+  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because it stamps
+  // `craftingCheck.maxModifierPicks` on every system already on the `playerPicks` combination rule.
   const persisted = settings.store.get('craftingSystems')[0];
   assert.equal(
     persisted.craftingCheck.consumption.breakToolsOnFail,

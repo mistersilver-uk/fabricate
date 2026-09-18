@@ -1,20 +1,11 @@
 /**
- * Regression coverage for issue 765 — an explicit multi-step recipe surfaces no
- * required materials and the wrong product in the player crafting app.
- *
- * Unlike `crafting-listing-builder.test.js` (which drives the builder with plain
- * mock recipes), this suite wires a REAL `Recipe`, a REAL `RecipeManager` and a
- * REAL `ResolutionModeService` so the full step-aware projection chain is
- * exercised: `getExecutionSteps()` -> `_stepRecipeView` (tool union) ->
- * `evaluateCraftability` (bypassing the `ingredientSets.length === 0` early
- * return) -> first-step materials / per-step `steps[]` / terminal PRODUCES.
+ * Regression coverage for issue 765 — an explicit multi-step recipe surfaces no required materials
+ * and the wrong product in the player crafting app.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load + a real Recipe/RecipeManager
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -40,9 +31,7 @@ const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
 // A managed component matched by NAME (no registeredItemUuid): the item's name
 // resolves to the component id via the system component library.
@@ -184,9 +173,7 @@ function stockedActor() {
   ];
 }
 
-// ---------------------------------------------------------------------------
 // Sanity: the fixture actually carries per-step data
-// ---------------------------------------------------------------------------
 
 test('fixture sanity: the Tent recipe exposes real first-step ingredient sets', () => {
   const recipe = tentRecipe();
@@ -196,9 +183,7 @@ test('fixture sanity: the Tent recipe exposes real first-step ingredient sets', 
   assert.equal(recipe.ingredientSets.length, 0, 'top-level ingredientSets is empty (stepped)');
 });
 
-// ---------------------------------------------------------------------------
 // First-step materials + craftability (the primary defect)
-// ---------------------------------------------------------------------------
 
 test('projects the first step materials instead of an empty missingMaterials banner', () => {
   const recipe = buildOne({ recipe: tentRecipe(), items: stockedActor() });
@@ -216,9 +201,7 @@ test('reads missingMaterials from step 1 when step-1 materials are absent', () =
   assert.equal(recipe.browseStatus, 'missingMaterials');
 });
 
-// ---------------------------------------------------------------------------
 // steps[] projection
-// ---------------------------------------------------------------------------
 
 test('carries a steps[] projection with both steps requirements + per-step craftability', () => {
   const recipe = buildOne({ recipe: tentRecipe(), items: stockedActor() });
@@ -292,9 +275,7 @@ test('labels an unnamed step by its 1-based position (never the id)', () => {
   assert.notEqual(model.steps[0].id, model.steps[0].label);
 });
 
-// ---------------------------------------------------------------------------
 // PRODUCES = terminal step
-// ---------------------------------------------------------------------------
 
 test('PRODUCES resolves the TERMINAL step output (Tent), not step 1 (Truesilver)', () => {
   const recipe = buildOne({ recipe: tentRecipe(), items: stockedActor() });
@@ -305,18 +286,14 @@ test('PRODUCES resolves the TERMINAL step output (Tent), not step 1 (Truesilver)
   );
 });
 
-// ---------------------------------------------------------------------------
 // Disabled check card
-// ---------------------------------------------------------------------------
 
 test('suppresses the crafting-check card when checks are disabled with no formula', () => {
   const recipe = buildOne({ recipe: tentRecipe(), items: stockedActor() });
   assert.equal(recipe.check, null, 'no empty DC-only card for a disabled, formula-less check');
 });
 
-// ---------------------------------------------------------------------------
 // Single-step parity
-// ---------------------------------------------------------------------------
 
 test('a single-step simple recipe is unchanged: steps[] is empty', () => {
   const single = new Recipe({
@@ -405,9 +382,7 @@ test('suppresses authored recipe and step durations when time requirements are d
   assert.equal(source.steps[0].timeRequirement.minutes, 30, 'projection does not mutate authoring');
 });
 
-// ---------------------------------------------------------------------------
 // Teaser redaction keeps steps: []
-// ---------------------------------------------------------------------------
 
 test('teaser redaction: steps[] and detail are redacted for a non-GM teaser', () => {
   const recipe = tentRecipe();
@@ -456,9 +431,7 @@ test('teaser redaction: steps[] and detail are redacted for a non-GM teaser', ()
   assert.equal(model.browseStatus, 'discovery');
 });
 
-// ---------------------------------------------------------------------------
 // Tool union (D1) — mutation-killing pin
-// ---------------------------------------------------------------------------
 
 // A two-step simple recipe carrying a RECIPE-level tool AND a distinct STEP-level
 // tool on step 1, so the first-step craftability must evaluate the UNION of both.
@@ -531,9 +504,7 @@ test('a missing union tool flips first-step craftability to not craftable', () =
   assert.equal(recipe.browseStatus, 'missingMaterials');
 });
 
-// ---------------------------------------------------------------------------
 // Non-simple multi-step (Q3) — step-list body is simple-only, first step still evaluated
-// ---------------------------------------------------------------------------
 
 test('routedByCheck multi-step: first step evaluated, empty top-level result, steps: []', () => {
   const system = simpleSystem({

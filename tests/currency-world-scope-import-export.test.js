@@ -1,17 +1,7 @@
 /**
- * The two halves of carrying the WORLD currency ladder through an export/import round trip
- * (issue 1278), and the pre-v3 upcast that reads a legacy per-system export.
- *
- * Both are decisions rather than mechanics, which is why they are pinned here:
- *
- *   - **Import merges, it never replaces.** Currency is world scope, so an imported system's
- *     ladder cannot simply overwrite one the destination GM authored for unrelated systems.
- *     Units merge by id with the DESTINATION winning a collision, which is also what makes an
- *     import safe to run twice and keeps existing recipe currency costs resolving to the units
- *     their author meant.
- *   - **The upcast is branch-independent.** `migrateExportPayload` early-returns once
- *     `schemaVersion` is current, so a derivation written only on the main path silently never
- *     runs for a current-schema payload that still carries the legacy shape.
+ * The two halves of carrying the WORLD currency ladder through an export/import round trip (issue
+ * 1278), and the pre-v3 upcast that reads a legacy per-system export. Both are decisions rather
+ * than mechanics, which is why they are pinned here:
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -153,9 +143,8 @@ describe('upcasting a legacy export payload', () => {
   });
 
   it('runs on the CURRENT-schema branch too, which early-returns before the main path', () => {
-    // The trap this guards: a hand-authored or force-stamped payload can claim the current
-    // schema while still carrying the legacy shape. A derivation written only after the
-    // early return would silently never run for it.
+    // The trap this guards: a hand-authored or force-stamped payload can claim the current schema
+    // while still carrying the legacy shape.
     const payload = { schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION, system: legacySystem() };
     const migrated = migrateExportPayload(payload);
 
@@ -189,9 +178,7 @@ describe('upcasting a legacy export payload', () => {
 });
 
 describe('the export/import round trip carries the ladder into a fresh world', () => {
-  // The acceptance criterion issue 1278 states outright. It is asserted end to end rather than
-  // as a call-shape guard because every parameter of `buildExportPayload` after `version` is
-  // defaulted: a dropped argument produces an export that is silently empty, not one that throws.
+  // The acceptance criterion issue 1278 states outright.
   const worldLadder = {
     spendStrategy: 'actorProperty',
     providerId: '',
@@ -243,10 +230,7 @@ describe('the export/import round trip carries the ladder into a fresh world', (
 
 describe('the ladder survives the WHOLE import composition, not just the merge helper', () => {
   // `prepareForImport` is what both production import paths build pack data through, and it
-  // rebuilds the pack object key by key. A slice it forgets is silently dropped: the importer
-  // then reaches `_persistCurrencyConfig(undefined)`, which returns immediately, and every
-  // imported currency cost lands as an unresolvable unit id. Pinning the merge helper alone
-  // cannot catch that, because the helper is never reached.
+  // rebuilds the pack object key by key.
   const envelope = () =>
     buildExportPayload(
       { id: 'alchemy', name: 'Alchemy', requirements: { currency: { enabled: true } } },

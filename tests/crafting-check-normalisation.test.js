@@ -20,11 +20,8 @@ function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
 }
 
-// ───────────────────────────────────────────────────────────
-// Crafting check normalization (manager) — usable = authored rollFormula;
-// the legacy check-source fields (root macroUuid/successMacroUuid/
-// failureMacroUuid/checkSource/builtIn) are gone.
-// ───────────────────────────────────────────────────────────
+// Crafting check normalization (manager) — usable = authored rollFormula; the legacy check-source
+// fields (root macroUuid/successMacroUuid/ failureMacroUuid/checkSource/builtIn) are gone.
 
 test('_normalizeCraftingCheck drops the deprecated check-source fields', () => {
   const mgr = makeManager();
@@ -59,9 +56,8 @@ test('_normalizeCraftingCheck normalizes mode to the single valid value passFail
 
 test('_normalizeCraftingCheck defaults outcomes to [fail, pass] regardless of mode', () => {
   const mgr = makeManager();
-  // The dead `tiered` / `namedOutcomes` default of `['low', 'high']` is gone: an absent
-  // outcomes list always defaults to `['fail', 'pass']`, even when a legacy `tiered` mode
-  // is supplied.
+  // The dead `tiered` / `namedOutcomes` default of `['low', 'high']` is gone: an absent outcomes
+  // list always defaults to `['fail', 'pass']`, even when a legacy `tiered` mode is supplied.
   assert.deepEqual(mgr._normalizeCraftingCheck({}).outcomes, ['fail', 'pass']);
   assert.deepEqual(mgr._normalizeCraftingCheck({ mode: 'tiered' }).outcomes, ['fail', 'pass']);
   assert.deepEqual(
@@ -105,11 +101,8 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   });
 });
 
-// ───────────────────────────────────────────────────────────
-// Issue 975 — the legacy routed `natStepping` boolean converts on READ into the
-// pair of tier-stepping triggers that reproduce it. No versioned migration, and
-// the boolean itself is dropped from the normalized output.
-// ───────────────────────────────────────────────────────────
+// Issue 975 — the legacy routed `natStepping` boolean converts on READ into the pair of
+// tier-stepping triggers that reproduce it.
 
 /**
  * The exact trigger pair `_convertNatSteppingToTriggers` synthesises for a
@@ -163,10 +156,8 @@ test('_normalizeSalvageCraftingCheck migrates routed natStepping identically', (
 
 test('_normalizeGatheringCraftingCheck converts a stray routed natStepping identically', () => {
   const mgr = makeManager();
-  // No gathering check has ever persisted `natStepping` — the retired opt-in
-  // spread never re-emitted it here — so nothing converts in practice. But a
-  // hand-edited world or an import payload carrying the stray key converts the same
-  // way any other routed check does: stepping is no longer activity-scoped.
+  // No gathering check has ever persisted `natStepping` — the retired opt-in spread never
+  // re-emitted it here — so nothing converts in practice.
   const routed = mgr._normalizeGatheringCraftingCheck({
     routed: { rollFormula: '1d20', natStepping: true },
   }).routed;
@@ -188,9 +179,7 @@ test('routed natStepping conversion targets the first d20 group in the formula',
 
 test('routed natStepping conversion survives a modified d20 pool', () => {
   const mgr = makeManager();
-  // `2d20kh1` is crit-INELIGIBLE, so the crit conversion's plain-dice filter would
-  // drop it. It is deliberately not applied here: the modified pool was explicitly
-  // the design target of the old kept-face stepping rule.
+  // `2d20kh1` is crit-INELIGIBLE, so the crit conversion's plain-dice filter would drop it.
   const routed = mgr._normalizeCraftingCheck({
     routed: { rollFormula: '2d20kh1+5', natStepping: true },
   }).routed;
@@ -252,9 +241,8 @@ test('routed natStepping conversion is idempotent across a second normalize pass
 
 test('a converted nat-step trigger re-normalized still carries breakTools false', () => {
   const mgr = makeManager();
-  // The `isLegacyBreakOnly` trap: that test keys on `outcome === undefined &&
-  // breakTools === undefined`, so a synthesised trigger MUST write both explicitly.
-  // Its failure mode is every migrated system breaking tools on a natural 20.
+  // The `isLegacyBreakOnly` trap: that test keys on `outcome === undefined && breakTools ===
+  // undefined`, so a synthesised trigger MUST write both explicitly.
   const once = mgr._normalizeCraftingCheck({
     routed: { rollFormula: '1d20', natStepping: true },
   });
@@ -419,9 +407,7 @@ test('_normalizeCraftingCheck migrates progressive crits into unified triggers (
     },
   });
   assert.equal(result.progressive.awardMode, 'partial', 'award settings are preserved');
-  // Issue 651 retired the system-level reorder flag. The allowlist normalizer drops it
-  // on EVERY normalize — including on import of a legacy payload like this one — which
-  // is why a legacy import can never reintroduce it.
+  // Issue 651 retired the system-level reorder flag.
   assert.equal(
     result.progressive.allowPlayerReorder,
     undefined,

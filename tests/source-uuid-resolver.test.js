@@ -1,12 +1,9 @@
 /**
- * Unit tests for getCompendiumSourceUuid() helper (T-087)
- *
- * Covers:
- *   1. Returns _stats.compendiumSource when present (Foundry v12+)
- *   2. Falls back to flags.core.sourceId when _stats.compendiumSource is absent
- *   3. Returns null when neither field is set
- *   4. Prefers _stats.compendiumSource over flags.core.sourceId when both are set
- *   5. Handles null/undefined item gracefully
+ * Unit tests for getCompendiumSourceUuid() helper (T-087). Covers: 1. Returns
+ * _stats.compendiumSource when present (Foundry v12+) 2. Falls back to flags.core.sourceId when
+ * _stats.compendiumSource is absent 3. Returns null when neither field is set 4. Prefers
+ * _stats.compendiumSource over flags.core.sourceId when both are set 5. Handles null/undefined item
+ * gracefully
  */
 
 import test from 'node:test';
@@ -236,9 +233,8 @@ test('A2 - findStackableMatch does NOT fold an award into a candidate resolving 
   const compA = component('comp-a', { originItemUuid: 'Item.a-src' });
   const compB = component('comp-b', { originItemUuid: 'Item.b-src' });
   const components = [compA, compB];
-  // The candidate resolves to compB (roles) but shares the award source's raw ref via a
-  // transitive duplicateSource. On origin/main (raw-ref only) the award folds into it —
-  // the bug. After the fix the differing identities skip it.
+  // The candidate resolves to compB (roles) but shares the award source's raw ref via a transitive
+  // duplicateSource. On origin/main (raw-ref only) the award folds into it — the bug.
   const candidate = roleItem({
     uuid: 'Item.owned-b',
     duplicateSource: 'Item.award-src',
@@ -336,10 +332,8 @@ test('26 - getItemIdentityReferences returns [] for null/non-object', () => {
   assert.deepEqual(getItemIdentityReferences('Item.x'), []);
 });
 
-// ---------------------------------------------------------------------------
-// resolveComponentForItem — list-aware, system-scoped, per-system `roles` map +
-// legacy-scalar identity tiers with a raw-reference fall-through.
-// ---------------------------------------------------------------------------
+// resolveComponentForItem — list-aware, system-scoped, per-system `roles` map + legacy-scalar
+// identity tiers with a raw-reference fall-through.
 
 test('27 - resolveComponentForItem matches on the legacy scalar flags.fabricate.componentId even when source UUIDs differ', () => {
   // A restamp not yet run: identity carried by the legacy scalar. The scalar has no
@@ -398,10 +392,8 @@ test('A4 - read-side cross-system: one source registered in two systems resolves
 });
 
 test('A6 - systemId keying defeats copy-import id-collision: same component id in two systems resolves per system', () => {
-  // Both systems own a DIFFERENT-source component with id comp-5 (copy-import id reuse).
-  // The item's roles names comp-5 ONLY under sysA; refs decoupled. It must resolve to
-  // sysA's comp-5 and NOT sysB's. The sysB half additionally defeats any systemId-free
-  // or union-over-roles-values resolver.
+  // Both systems own a DIFFERENT-source component with id comp-5 (copy-import id reuse). The item's
+  // roles names comp-5 ONLY under sysA; refs decoupled.
   const sysA = componentSet('sysA', [component('comp-5', { originItemUuid: 'Item.a5-src' })]);
   const sysB = componentSet('sysB', [component('comp-5', { originItemUuid: 'Item.b5-src' })]);
   const item = roleItem({
@@ -476,12 +468,8 @@ test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves
   const safeItem = roleItem({ uuid: 'Item.safe', roles: { sysA: { componentId: 'comp-roles' } } });
   assert.equal(resolveComponentForItem(safeItem, components, 'sysA'), compRoles);
 
-  // Unsafe (dotted) systemId carrying a stray FLAT dotted `roles` key (the shape a naive
-  // reader would wrongly honour). Such a key can never have been WRITTEN — every stamp
-  // site skips an unsafe id and `setFlag` would nest on the dot anyway — so tier 1 is
-  // skipped and matching falls through to the load-bearing raw-ref tier (the ordinary
-  // UNSTAMPED case), NOT refused. Refusing would break crafting for a legacy dotted-id
-  // world entirely, which is worse than the pre-#556 mis-attribution it would prevent.
+  // Unsafe (dotted) systemId carrying a stray FLAT dotted `roles` key (the shape a naive reader
+  // would wrongly honour).
   const unsafeItem = roleItem({
     uuid: 'Item.unsafe',
     duplicateSource: 'Item.dup-src', // raw-ref overlaps compDup
@@ -490,9 +478,7 @@ test('A11b - an unsafe (dotted) systemId skips the roles tier and still resolves
   assert.equal(resolveComponentForItem(unsafeItem, components, 'my.system'), compDup);
 });
 
-// ---------------------------------------------------------------------------
 // matchRecipeItemDefinition — four-tier precedence, no fall-through, union refs
-// ---------------------------------------------------------------------------
 
 const BOOK_DEF = { id: 'def-book', registeredItemUuid: 'Item.book', originItemUuid: 'Compendium.mod.book', aliasItemUuids: [] };
 
@@ -558,10 +544,9 @@ test('38 - getItemMatchUuids unions registeredItemUuid, originItemUuid, and fall
 });
 
 test('39 - issue 560 (asymmetric): a synthetic { id: null, originItemUuid } def matches an owned item via the NEW field name', () => {
-  // Mirrors RecipeVisibilityService._recipeItemMatchDefinitions: an un-migrated recipe
-  // carrying only a legacy linkedRecipeItemUuid produces a synthetic def whose ONLY
-  // source ref is the renamed `originItemUuid`. The owned copy (compendium provenance)
-  // must still resolve through it — proving the matcher reads the NEW field name.
+  // Mirrors RecipeVisibilityService._recipeItemMatchDefinitions: an un-migrated recipe carrying
+  // only a legacy linkedRecipeItemUuid produces a synthetic def whose ONLY source ref is the
+  // renamed `originItemUuid`.
   const syntheticDef = { id: null, originItemUuid: 'Compendium.mod.book' };
   const ownedCopy = {
     uuid: 'Item.copy',

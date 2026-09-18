@@ -1,22 +1,15 @@
 /**
- * Unit tests for ResolutionModeService.validateRecipe (T-021)
- * Tests mode-specific validation logic for simple, routed (ingredientSet /
- * check), and progressive modes.
+ * Unit tests for ResolutionModeService.validateRecipe (T-021) Tests mode-specific validation logic
+ * for simple, routed (ingredientSet / check), and progressive modes.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
-/**
- * Build a mock crafting system config.
- * A crafting check is "usable" only when its mode carries an authored roll formula
- * (e.g. `craftingCheck.progressive.rollFormula`); `enabled` is just the on/off toggle.
- */
+/** Build a mock crafting system config. */
 function buildSystem(overrides = {}) {
   return {
     id: 'test-system',
@@ -81,9 +74,7 @@ function buildService(system) {
   return new ResolutionModeService(craftingSystemManager);
 }
 
-// ---------------------------------------------------------------------------
 // AC 1 — Simple mode: exactly 1 ingredient set and exactly 1 result group
-// ---------------------------------------------------------------------------
 
 test('simple mode — 1 ingredient set and 1 result group → valid', () => {
   const system = buildSystem({ resolutionMode: 'simple' });
@@ -161,11 +152,8 @@ test('simple mode — zero result groups → invalid', () => {
   assert.ok(result.errors.length > 0);
 });
 
-// ---------------------------------------------------------------------------
-// AC 2 — routedByIngredients: resultGroupId reference integrity (the former
-// `mapped` reference-integrity contract, now a property of the mode). The routing
-// basis is the MODE — there is no per-recipe provider to author.
-// ---------------------------------------------------------------------------
+// AC 2 — routedByIngredients: resultGroupId reference integrity (the former `mapped`
+// reference-integrity contract, now a property of the mode).
 
 test('routedByIngredients — each set has resultGroupId matching a result group → valid', () => {
   const system = buildSystem({ resolutionMode: 'routedByIngredients' });
@@ -188,9 +176,8 @@ test('routedByIngredients — resultGroupId references non-existent group → in
   });
   const result = service.validateRecipe(buildRecipe([step]));
   assert.equal(result.valid, false);
-  // The reference-integrity failure is surfaced id-free (issue 595): it names the
-  // set by position and never echoes the missing group id or the internal
-  // `resultGroupId` field name.
+  // The reference-integrity failure is surfaced id-free (issue 595): it names the set by position
+  // and never echoes the missing group id or the internal `resultGroupId` field name.
   assert.ok(
     result.errors.some((e) => /result group/i.test(e)),
     `expected error about a missing result group, got: ${JSON.stringify(result.errors)}`
@@ -240,12 +227,8 @@ test('routedByIngredients — check optional (no checks enabled still valid)', (
   assert.equal(service.validateRecipe(buildRecipe([step])).valid, true);
 });
 
-// ---------------------------------------------------------------------------
-// AC 3 — routedByCheck: reserved/duplicate ResultGroup.name rules (check routing
-// keys on the group name). A routedByCheck recipe is structurally valid regardless
-// of the system check configuration; the missing-formula gap is a SYSTEM-level
-// blocker surfaced by systemValidation, never a per-recipe error.
-// ---------------------------------------------------------------------------
+// AC 3 — routedByCheck: reserved/duplicate ResultGroup.name rules (check routing keys on the group
+// name).
 
 function buildRoutedCheckSystem(overrides = {}) {
   return buildSystem({
@@ -274,9 +257,8 @@ test('routedByCheck — distinct group names with a configured routed formula �
   assert.equal(result.errors.length, 0);
 });
 
-// A routedByCheck recipe is structurally valid regardless of the system's check
-// configuration (the missing routed formula is a SYSTEM-level blocker, not a
-// per-recipe error). Verify a complete save and a draft, with and without a formula.
+// A routedByCheck recipe is structurally valid regardless of the system's check configuration (the
+// missing routed formula is a SYSTEM-level blocker, not a per-recipe error).
 for (const requireComplete of [true, false]) {
   test(`routedByCheck — valid WITH a system routed formula (requireComplete: ${requireComplete})`, () => {
     const system = buildRoutedCheckSystem({ craftingCheck: { routed: { rollFormula: '1d20' } } });
@@ -346,10 +328,8 @@ test('routedByIngredients — reserved/duplicate group names are not a per-recip
   assert.equal(service.validateRecipe(buildRecipe([step])).valid, true);
 });
 
-// ---------------------------------------------------------------------------
-// AC 4 — Progressive mode: an authored progressive roll formula, progressive
-// config, difficulty >= 1
-// ---------------------------------------------------------------------------
+// AC 4 — Progressive mode: an authored progressive roll formula, progressive config, difficulty >=
+// 1
 
 /**
  * Build a system with progressive mode fully configured. A progressive check is
@@ -370,9 +350,7 @@ function buildProgressiveSystem(components = [], overrides = {}) {
   });
 }
 
-/**
- * Build a valid progressive step with one result group containing the given results.
- */
+/** Build a valid progressive step with one result group containing the given results. */
 function buildProgressiveStep(results = [], overrides = {}) {
   return buildStep({
     ingredientSets: [{ id: 'set-1', ingredientGroups: [] }],
@@ -436,10 +414,9 @@ test('progressive mode — missing progressive config → invalid', () => {
 });
 
 test('progressive mode — draft (requireComplete: false) with no progressive formula → valid', () => {
-  // Drafting a recipe in a progressive system that has not yet authored its progressive
-  // roll formula must succeed: that gap is a SYSTEM-level concern (systemValidation's
-  // `progressiveNoCheck`), not a per-recipe drafting error. It is still enforced when a
-  // complete recipe is required (see the two strict-mode tests above).
+  // Drafting a recipe in a progressive system that has not yet authored its progressive roll
+  // formula must succeed: that gap is a SYSTEM-level concern (systemValidation's
+  // `progressiveNoCheck`), not a per-recipe drafting error.
   const system = buildProgressiveSystem([], {
     craftingCheck: {
       enabled: false,
@@ -626,11 +603,9 @@ test('progressive mode — _getDifficulty reads difficulty from system.component
   assert.equal(result.errors.length, 0);
 });
 
-// ---------------------------------------------------------------------------
-// Incomplete authoring shells — the routed modes derive their basis from the
-// system mode and carry no per-recipe provider, so there is no missing/invalid
-// provider to author: a routed shell waives only its completeness (cardinality).
-// ---------------------------------------------------------------------------
+// Incomplete authoring shells — the routed modes derive their basis from the system mode and carry
+// no per-recipe provider, so there is no missing/invalid provider to author: a routed shell waives
+// only its completeness (cardinality).
 
 for (const mode of ['routedByIngredients', 'routedByCheck']) {
   test(`${mode} — an empty shell is waived when requireComplete is false`, () => {
@@ -676,13 +651,8 @@ test('alchemy mode — completeness (sets/groups) waived when incomplete, requir
   );
 });
 
-// ---------------------------------------------------------------------------
-// Alchemy mode — the simple/routed/progressive step-level loop NEVER runs for
-// alchemy (issue 88 / T-268). Every step-loop block is mode-gated, so alchemy
-// is validated only by its own top-level checks (>=1 set, >=1 group, no explicit
-// steps, provider VALUE). These tests guard against the per-step cardinality
-// checks leaking onto alchemy if a step ever materializes.
-// ---------------------------------------------------------------------------
+// Alchemy mode — the simple/routed/progressive step-level loop NEVER runs for alchemy (issue 88 /
+// T-268).
 
 // Matches the spurious step-loop cardinality messages that must never appear for
 // an alchemy recipe ("...in simple/routed/progressive mode", "ordered results").
@@ -692,9 +662,8 @@ const STEP_LOOP_CARDINALITY =
 test('alchemy mode — an implicit step carrying multiple sets/groups is NOT subjected to step-level cardinality checks', () => {
   const system = buildSystem({ resolutionMode: 'alchemy' });
   const service = buildService(system);
-  // The implicit step (id 'implicit-step') carries 2 sets + 2 groups — counts that
-  // would trip the simple ("exactly 1") and progressive cardinality rules if the
-  // step loop ran for alchemy. Top-level recipe data satisfies alchemy's own checks.
+  // The implicit step (id 'implicit-step') carries 2 sets + 2 groups — counts that would trip the
+  // simple ("exactly 1") and progressive cardinality rules if the step loop ran for alchemy.
   const implicitStep = buildStep({
     id: 'implicit-step',
     ingredientSets: [

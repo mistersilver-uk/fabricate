@@ -188,19 +188,15 @@ test('presets: bundles keyed by foundry system id', () => {
   }
 });
 
-// Shape sources (pf2e master; re-verify on a major pf2e release):
-//   ActorPF2e#getRollData()  src/module/actor/base.ts           -> `{ actor: this }`, no system spread
-//   CORE_SKILL_SLUGS         src/module/actor/values.ts         -> 'crafting', never 'cra'
-//   Statistic#rank           src/module/system/statistic/       -> ZeroToFour | null, on the PREPARED
-//                                                                 statistic; skill TRACE data carries
-//                                                                 value/totalModifier/dc/attribute, no rank
-//   AbilityData.mod          src/module/actor/creature/data.ts  -> abilities live under `system`
+// Shape sources (pf2e master; re-verify on a major pf2e release): ActorPF2e#getRollData()
+// src/module/actor/base.ts -> `{ actor: this }`, no system spread CORE_SKILL_SLUGS
+// src/module/actor/values.ts -> 'crafting', never 'cra' Statistic#rank src/module/system/statistic/
+// -> ZeroToFour | null, on the PREPARED statistic; skill TRACE data carries
+// value/totalModifier/dc/attribute, no rank AbilityData.mod src/module/actor/creature/data.ts ->
+// abilities live under `system`
 test('presets: every pf2e path is rooted at `actor.`, and resolves against a pf2e-shaped rollData', () => {
-  // `pf2e`'s ActorPF2e#getRollData() returns `{ actor: this }` and nothing else — it
-  // does NOT spread `system` the way `dnd5e` does. A bare `skills.…` path is therefore
-  // dead in every pf2e world, and because an unknown path degrades to 0 rather than
-  // throwing, it fails as a condition that can never be met rather than as an error.
-  // That is exactly the defect these presets shipped with, so the root is pinned here.
+  // `pf2e`'s ActorPF2e#getRollData() returns `{ actor: this }` and nothing else — it does NOT
+  // spread `system` the way `dnd5e` does.
   for (const preset of PF2E_CHARACTER_PREREQUISITE_PRESETS) {
     assert.ok(
       preset.path.startsWith('actor.'),
@@ -208,10 +204,8 @@ test('presets: every pf2e path is rooted at `actor.`, and resolves against a pf2
     );
   }
 
-  // A pf2e skill's proficiency `rank` lives on the PREPARED statistic (actor.skills),
-  // not under system.skills, whose trace data carries value/totalModifier/dc/attribute
-  // and no rank at all. Ability modifiers do live under system. This fixture reproduces
-  // both, so a preset moved to the wrong one of the two fails here.
+  // A pf2e skill's proficiency `rank` lives on the PREPARED statistic (actor.skills), not under
+  // system.skills, whose trace data carries value/totalModifier/dc/attribute and no rank at all.
   const pf2eRollData = {
     actor: {
       skills: { crafting: { rank: 2 } },

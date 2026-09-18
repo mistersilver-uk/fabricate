@@ -124,11 +124,8 @@ test('unknown, zero and physical actor conflicts retain independent row evidence
 });
 
 /**
- * The three identity disqualifiers below were each replaceable with an unconditional pass while
- * the whole corpus stayed green (issue 1648, Q-H6/Q-H7/Q-M4). The tests named for the first two
- * passed for a neighbouring reason — a fixture whose award carries no `actorUuid` makes the actor
- * rule vacuous, and a pair of conflicting prepared rows produces the same `null` — so each fixture
- * here is built to REACH the disqualifier and to match without it.
+ * The three identity disqualifiers below were each replaceable with an unconditional pass while the
+ * whole corpus stayed green (issue 1648, Q-H6/Q-H7/Q-M4).
  */
 test('a row whose recorded actor contradicts its own item uuid attributes no receipt', () => {
   const inconsistent = (fields) => ({

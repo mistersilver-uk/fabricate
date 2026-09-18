@@ -1,17 +1,4 @@
-/**
- * Recipe currency-alternative SPEND tests.
- *
- * Two layers:
- *
- *   1. Selection (IngredientSet.resolveIngredientSelection) — items-first /
- *      currency-fallback, affordability gating, the `currencySpends` field, and the
- *      no-probe back-compat (currency never chosen) that `canBeCraftedWith` relies on.
- *   2. Engine (CraftingEngine.craft) — the single-selection-source flow, the
- *      all-affordable gate before any mutation, cross-unit aggregation, dnd5e
- *      (actor.update) + pf2e (inventory.removeCoins) deduction, the half-consume
- *      abort, the probe-actor identity, the multi-step time gate, and the
- *      async-gate-fail-no-item-fallback.
- */
+/** Recipe currency-alternative SPEND tests. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -43,9 +30,7 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
 // Shared item / actor stubs
-// ---------------------------------------------------------------------------
 
 function makeItem({ id, name = `Item ${id}`, quantity = 1, componentId = null } = {}) {
   return {
@@ -159,17 +144,11 @@ function makePf2eActor({ id = 'pf2e', coins = {}, items = [] } = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Crafting-system manager stub (requirements.currency)
-// ---------------------------------------------------------------------------
 
 // Issue 1278 split currency across two scopes: the crafting system carries ONLY whether it
 // participates (`requirements.currency.enabled`), while the ladder, spend strategy and macro set
-// are world scope. A test still describes one coherent currency setup through one options object
-// — `makeCurrencySystem` builds the system half and stashes the world half here, and `setupGame`
-// publishes it on the fabricate global. The stash works because every test in this file calls
-// `makeCurrencySystem` immediately before `setupGame`; `worldCurrency` is exported from the
-// stash so a test that needs to tweak the world half (see the macro cases) can do so directly.
+// are world scope.
 let worldCurrency = null;
 
 function setupGame(systemConfig, fabricateExtra = {}) {
@@ -204,9 +183,7 @@ function makeCurrencySystem({ spendStrategy = 'actorProperty', units, enabled = 
   };
 }
 
-// ---------------------------------------------------------------------------
 // IngredientSet / Recipe / RecipeManager builders for the engine
-// ---------------------------------------------------------------------------
 
 function currencyOption(unit, amount) {
   return { quantity: 1, match: { type: 'currency', unit, amount } };
@@ -263,15 +240,8 @@ function makeRecipeManager({ craftingActorRef } = {}) {
         (ing, it) => manager.ingredientMatchesItem(recipe, ing, it),
         { affordCurrency: manager._probe?.(craftingActor || craftingActorRef) }
       );
-      // Mirror the real evaluateCraftability missing-ingredient mapping so
-      // _formatMissingItems surfaces the currency option's getDescription.
-      //
-      // UNGUARDED MIRROR (issue 1493). Nothing asserts this stays faithful to
-      // RecipeManager._buildIngredientState / evaluateCraftability, so a change to the real
-      // missing-ingredient mapping — the currency projection issue 1493 adds there is exactly
-      // such a change — leaves this copy stating the old shape while every engine test below
-      // still passes. If a currency assertion here disagrees with the same assertion made
-      // against the real RecipeManager in section 3, suspect this mapping first.
+      // Mirror the real evaluateCraftability missing-ingredient mapping so _formatMissingItems
+      // surfaces the currency option's getDescription (issue 1493).
       const missingIngredients = (selection.missingGroups || [])
         .map((mg) => mg?.ingredient || mg?.group?.options?.[0] || null)
         .filter(Boolean)
@@ -324,9 +294,7 @@ function makeEngine(system, { actorInventoryCoinSpender = null, actorPropertyCoi
 // Expose the affordance helper to the manager stub probe wiring.
 globalThis.__currencyAffordance = await import('../src/systems/currencyAffordance.js');
 
-// ===========================================================================
 // 1. Selection-level tests
-// ===========================================================================
 
 test('selection: items-first even when a currency option is authored first', () => {
   setupGame(makeCurrencySystem());
@@ -382,11 +350,10 @@ test('selection: no-probe back-compat — authored currency is never chosen (ite
 });
 
 test('selection: an essence option still beats currency, and a block that cannot fund backtracks INTO it', () => {
-  // Issue 917 pulls the essence option out of its group's in-place branches into a
-  // last-placed block node, which puts "items strictly beat currency" squarely in
-  // play: the group must still try the block first, and a block that cannot fund
-  // must be able to re-branch onto the currency option rather than reporting the
-  // group missing.
+  // Issue 917 pulls the essence option out of its group's in-place branches into a last-placed
+  // block node, which puts "items strictly beat currency" squarely in play: the group must still
+  // try the block first, and a block that cannot fund must be able to re-branch onto the currency
+  // option rather than reporting the group missing.
   setupGame(makeCurrencySystem());
   const essenceOption = { quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 4 } };
   const set = makeSet([[essenceOption, currencyOption('gp', 5)]]);
@@ -423,9 +390,7 @@ test('selection: first AFFORDABLE currency option wins among multiple currency o
   assert.deepEqual(selection.currencySpends.map((s) => `${s.amount} ${s.unit}`), ['5 gp']);
 });
 
-// ===========================================================================
 // 2. Engine-craft tests
-// ===========================================================================
 
 test('engine: currency-only recipe succeeds and decrements dnd5e currency (no item consumed)', async () => {
   const system = makeCurrencySystem();
@@ -478,8 +443,7 @@ test('engine: insufficient currency aborts with an Insufficient-currency message
 test('engine: the insufficient-currency message names the unit, never its generated id', async () => {
   // Issue 1410's likeliest surface: `_formatMissingItems` renders precisely when the player CANNOT
   // AFFORD the cost — which is when they go looking for what it is — and it calls
-  // `Ingredient.getDescription()` directly, bypassing RecipeManager's resolvers entirely. The
-  // model cannot fix itself: only this call site can reach the unit ladder.
+  // `Ingredient.getDescription()` directly, bypassing RecipeManager's resolvers entirely.
   const system = makeCurrencySystem({
     units: [
       {
@@ -508,11 +472,7 @@ test('engine: the insufficient-currency message names the unit, never its genera
 });
 
 test('engine: an INCOMPLETE currency requirement does not render as a zero-amount cost', async () => {
-  // The engine twin of the resolver's incomplete-match test. Both call sites read the handler's
-  // own `isComplete`, so a match carrying a unit but no positive amount falls through to the
-  // generic description rather than telling the player they need "0 Coins" — which is the same
-  // class of confusing cost text this issue was filed for. Without this, dropping the engine
-  // guard survives the suite.
+  // The engine twin of the resolver's incomplete-match test.
   const system = makeCurrencySystem({
     units: [
       {
@@ -697,10 +657,8 @@ test('engine: multi-step time gate — a waiting step does NOT spend currency', 
   const sourceActor = makeDnd5eActor({ id: 'src' });
   const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 5 } });
 
-  // A run manager whose run is ALREADY armed (a pre-seeded timeGate) and whose
-  // gate is NOT yet proceedable: this call is a poll of a maturing gate, not the
-  // START that arms it. Currency was spent at START (a prior call), so this poll
-  // spends nothing.
+  // A run manager whose run is ALREADY armed (a pre-seeded timeGate) and whose gate is NOT yet
+  // proceedable: this call is a poll of a maturing gate, not the START that arms it.
   const runManager = {
     findActiveRunForRecipe: () => null,
     getActiveRun: () => null,
@@ -733,9 +691,7 @@ function recipeResultGroups() {
   return [{ id: 'rg', results: [{ id: 'r', componentId: 'comp-out', quantity: 1 }] }];
 }
 
-// ===========================================================================
 // 3. Real RecipeManager craftability display (plan-review item 6)
-// ===========================================================================
 
 test('RecipeManager.evaluateCraftability: unaffordable currency shows the Insufficient-currency description', () => {
   const system = makeCurrencySystem();
@@ -768,10 +724,8 @@ test('RecipeManager.evaluateCraftability: an affordable actor flips a currency-o
 });
 
 test('RecipeManager.evaluateCraftability: currency option costLabel resolves the unit to a human label, never the id', () => {
-  // The reporter's repro (issue 763): a currency unit whose stored abbreviation was baked
-  // to its own generated id must render its LABEL in the player crafting-app cost row, not
-  // the id. A multi-option group (currency + item) is required so an option choice is
-  // emitted (options.length > 1).
+  // The reporter's repro (issue 763): a currency unit whose stored abbreviation was baked to its
+  // own generated id must render its LABEL in the player crafting-app cost row, not the id.
   const generatedUnitId = 'K9grZcOMgO9Xbm41';
   const system = makeCurrencySystem({
     units: [
@@ -806,10 +760,9 @@ test('RecipeManager.evaluateCraftability: currency option costLabel resolves the
 });
 
 test('RecipeManager.evaluateCraftability: currency option NAME and group name resolve the unit, never the id', () => {
-  // Issue 1410, the sibling of 763 above: the cost row was already correct while every surface
-  // fed by the DESCRIPTION path still printed the raw id, so one unit rendered two different ways
-  // in the same view. The reporter's shape: a generated id, an authored label, and an
-  // abbreviation, which takes display precedence.
+  // Issue 1410, the sibling of 763 above: the cost row was already correct while every surface fed
+  // by the DESCRIPTION path still printed the raw id, so one unit rendered two different ways in
+  // the same view.
   const generatedUnitId = CURRENCY_UNIT_ID;
   const system = makeCurrencySystem({
     units: [
@@ -836,9 +789,7 @@ test('RecipeManager.evaluateCraftability: currency option NAME and group name re
   assert.ok(optionChoice, 'a multi-option group emits an option choice');
   const currencyOption_ = optionChoice.options.find((option) => option.isCurrency);
 
-  // The player-facing option NAME. This one is load-bearing: the option choice reads
-  // `visual.name || _resolveIngredientDescription(...)`, so the visual's own currency branch has
-  // to resolve the unit too — a resolver-only fix leaves exactly this surface broken.
+  // The player-facing option NAME.
   assert.equal(currencyOption_.name, '1 Coins');
   assert.ok(
     !currencyOption_.name.includes(generatedUnitId),
@@ -892,10 +843,7 @@ test('RecipeManager: an UNNAMED currency group falls back to a resolved default 
 
 test('RecipeManager: a single-option currency group resolves BOTH its tile name and description', () => {
   // One group, one currency option, so the currency IS the chosen option and no option choice is
-  // emitted at all. That makes this the only fixture that reaches two paths the multi-option test
-  // cannot: `_resolveGroupDescription`'s chosen-option branch (the GM summary caption) and
-  // `_resolveIngredientVisual` at its second call site (the tile name). A full revert of the
-  // visual edit survives every other test in this file; it does not survive this one.
+  // emitted at all.
   const result = evaluateCoins([makeSet([[currencyOption(CURRENCY_UNIT_ID, 3)]])]);
   const state = (result.ingredientStates || [])[0];
   assert.ok(state, 'a single-option currency group still emits an ingredient state');
@@ -920,8 +868,7 @@ test('RecipeManager: an INCOMPLETE currency match keeps its pre-fix description'
 
 test('RecipeManager: an orphaned currency unit id still renders, rather than blanking the cost', () => {
   // The documented last resort: a cost referencing a unit the ladder no longer carries keeps
-  // printing the raw id, because a stale id reads better than an empty cost. Pinned so the fix
-  // above cannot be "tidied" into swallowing the reference.
+  // printing the raw id, because a stale id reads better than an empty cost.
   const system = makeCurrencySystem({
     units: [
       {
@@ -976,14 +923,8 @@ test('RecipeManager.evaluateCraftability: currency option costLabel prefers an a
   assert.equal(currencyOption_.costLabel, '100 PP');
 });
 
-// ===========================================================================
-// 4. Per-group spend SETTLEMENT (issue 902)
-//
-// `spendCurrencySpends` must report which aggregated groups actually settled, so a
-// timed craft can record the settlement rather than the plan. Failure is injected at
-// the `spender.spend` seam: `checkCurrencySpends` runs over every group and aborts
-// before any mutation, so an underfunded actor never reaches the deduction at all.
-// ===========================================================================
+// 4. Per-group spend SETTLEMENT (issue 902). `spendCurrencySpends` must report which aggregated
+// groups actually settled, so a timed craft can record the settlement rather than the plan.
 
 const { aggregateCurrencySpends, spendCurrencySpends } = globalThis.__currencyAffordance;
 const { validateCurrencyProfile } = await import('../src/systems/currencyProfile.js');
@@ -1107,15 +1048,10 @@ test('spend: a fully successful spend settles every group and records the whole 
 });
 
 test('engine: a THROWN currency lookup fails closed in both directions', async () => {
-  // The engine's own try/catch around the deduction and the refund is the last line of
-  // defence, and both branches are reachable: a corrupt or mid-migration crafting-system
-  // read throws out of `getCurrencyRequirementConfig` -> `resolveCurrencyContext`, so
-  // neither `spendCurrencySpends` nor `refundCurrencySpends` returns at all.
-  //
-  // The spend branch must report TOTAL NON-SETTLEMENT: returning the planned spends here
-  // would be issue 902's exact defect reached by another door — the run would record a
-  // plan that never settled and a later cancel would mint it. The refund branch must
-  // report TOTAL FAILURE: absent group detail is unknown-and-failed, never "all refunded".
+  // The engine's own try/catch around the deduction and the refund is the last line of defence, and
+  // both branches are reachable: a corrupt or mid-migration crafting-system read throws out of
+  // `getCurrencyRequirementConfig` -> `resolveCurrencyContext`, so neither `spendCurrencySpends`
+  // nor `refundCurrencySpends` returns at all (issue 902).
   const system = makeCurrencySystem({ units: SINGLE_TERMINAL_CURRENCY_UNITS });
   setupGame(system);
   globalThis.game.fabricate.getCraftingSystemManager = () => ({
@@ -1142,9 +1078,8 @@ test('engine: a THROWN currency lookup fails closed in both directions', async (
 });
 
 test('engine: async-gate failure (macro) does not fall back to an unselected item plan', async () => {
-  // A macro strategy whose canAfford macro reports failure must abort with zero mutation —
-  // never silently item-craft. Here the group is currency-only so there is no item plan at all,
-  // and the failing async gate must keep the result uncreated.
+  // A macro strategy whose canAfford macro reports failure must abort with zero mutation — never
+  // silently item-craft.
   const system = makeCurrencySystem({
     spendStrategy: 'macro',
     units: [{ id: 'gp', label: 'Gold', abbreviation: 'gp', contains: [] }],
@@ -1158,37 +1093,16 @@ test('engine: async-gate failure (macro) does not fall back to an unselected ite
   const craftingActor = makeDnd5eActor({ id: 'craft', currency: { gp: 100 } });
   const engine = makeEngine(system);
 
-  // The macro probe is optimistic (sync), so canCraft passes selection. The async gate then
-  // runs the canAfford macro via MacroExecutor.run; with no resolvable macro the spender
-  // returns invalid, so the gate must abort with zero mutation and never item/currency-craft.
+  // The macro probe is optimistic (sync), so canCraft passes selection.
   globalThis.fromUuid = async () => null;
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(result.success, false, 'unconfirmable async gate must not item/currency-craft');
   assert.equal(craftingActor.createdItems.length, 0, 'no result created on async-gate failure');
 });
 
-// ===========================================================================
 // 4. The craft-failure message NAMES the misconfiguration (issue 1493)
-// ===========================================================================
 
-/**
- * The reported defect, end to end from `CraftingEngine.craft`.
- *
- * A world whose currency configuration cannot be resolved refused the option SILENTLY: the probe
- * read constant-`false`, so `IngredientSet` never selected the currency option, so the spend list
- * was empty, so the engine's currency gate short-circuited before its error branch — and the craft
- * died in `_formatMissingItems` telling a player holding 500 gp
- * `Insufficient currency. Requires 100 gp.: have 0, need 1`. The player is accused of being poor
- * and the GM is told nothing.
- *
- * That suppression is why every assertion below drives `engine.craft` rather than
- * `checkCurrencySpends`: a unit assertion on the gate's return PASSES ON THE BROKEN TREE, because
- * the gate is never handed any spends to reject.
- *
- * Three fixtures, because the causes are structurally different and no one of them reaches the
- * others: an INVALID profile, a valid profile whose spender has no adapter, and a valid profile
- * with no spender at all.
- */
+/** The reported defect, end to end from `CraftingEngine.craft`. */
 
 // (a) `actorProperty` with the actor data path cleared — trips `collectUnitStrategyErrors`, so the
 // profile itself is invalid and `resolveCurrencyContext` sets `error`.
@@ -1204,14 +1118,12 @@ const HAVE_NEED_RATIO = /have \d+, need \d+/;
 // `context.error` guard, `checkCurrencySpends`) renders for EVERY currency misconfiguration cause
 // (issue 1493 round-2 follow-up) — replacing the composed, per-cause sentence that read as a
 // skippable paragraph once there were three or more validator errors, with the sole actionable
-// clause landing last past the toast's autodismiss. Imported rather than re-typed so this test
-// cannot silently drift from the literal the source actually renders.
+// clause landing last past the toast's autodismiss.
 const CURRENCY_SETUP_MESSAGE = CURRENCY_SETUP_INCOMPLETE_MESSAGE;
 
 /**
  * Stub `console.warn`, run the (possibly async) `run()`, and return its result alongside the
- * captured calls, restoring the original afterward. Used below to prove the raw validator reason
- * is still logged for diagnosis even though it no longer appears in the player-facing message.
+ * captured calls, restoring the original afterward.
  */
 async function captureConsoleWarn(run) {
   const original = console.warn;
@@ -1262,11 +1174,7 @@ test('engine: a broken ladder reports the constant action-first message, not pov
 });
 
 test('engine: a valid ladder with no registered inventory adapter also gets the constant message, with the cause logged', async () => {
-  // (b) `actorInventory` that VALIDATES (pf2e denominations), with no adapter registered. Fixture
-  // (a) cannot reach this branch: `collectUnitStrategyErrors` checks `denomination` under
-  // `actorInventory` and `actorPath` under `actorProperty`, so a cleared path is never even read.
-  // This is `ActorInventoryCoinSpender.describeUnavailable()`'s sentence reaching a human for the
-  // first time — now via `console.warn` rather than the player toast.
+  // (b) `actorInventory` that VALIDATES (pf2e denominations), with no adapter registered.
   const system = makeCurrencySystem({ spendStrategy: 'actorInventory' });
   setupGame(system);
   globalThis.game.system = { id: 'dnd5e' };
@@ -1297,8 +1205,7 @@ test('engine: a valid ladder with no registered inventory adapter also gets the 
 
 test('engine: a valid ladder with NO coin spender at all also gets the constant message, with the cause logged', async () => {
   // (c) The null-spender path — `resolveCoinSpender` returns `null`, so there is no object to ask
-  // and the reason has to be composed by `resolveCurrencyContext` itself. This is the case the
-  // first design of this fix could not serve at all, because it only asked the spender.
+  // and the reason has to be composed by `resolveCurrencyContext` itself.
   const system = makeCurrencySystem({ spendStrategy: 'actorInventory' });
   setupGame(system);
   globalThis.game.system = { id: 'dnd5e' };
@@ -1327,9 +1234,7 @@ test('engine: a valid ladder with NO coin spender at all also gets the constant 
 
 test('engine: a GENUINELY poor actor on a sound ladder still reads Insufficient currency, with no ratio', async () => {
   // The control the reason must NOT swallow, plus the unconditional half of the have/need drop:
-  // there is no configuration reason here, and the ratio is gone anyway. `have 0, need 1` counts
-  // ingredient OCCURRENCES — the quantity is not the price and a coin balance is not an item
-  // count — so it reported neither the cost nor the shortfall.
+  // there is no configuration reason here, and the ratio is gone anyway.
   const system = makeCurrencySystem();
   setupGame(system);
   globalThis.game.system = { id: 'dnd5e' };
@@ -1345,9 +1250,8 @@ test('engine: a GENUINELY poor actor on a sound ladder still reads Insufficient 
 });
 
 test('engine: a missing ITEM still reports its have/need ratio, which the currency drop must not touch', async () => {
-  // The scope guard for the unconditional drop. `have`/`need` are meaningful for a component —
-  // they count the same thing on both sides — so the currency branch must be the only one to lose
-  // them.
+  // The scope guard for the unconditional drop. `have`/`need` are meaningful for a component — they
+  // count the same thing on both sides — so the currency branch must be the only one to lose them.
   const system = makeCurrencySystem();
   setupGame(system);
   globalThis.game.system = { id: 'dnd5e' };

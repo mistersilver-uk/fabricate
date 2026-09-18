@@ -1,18 +1,4 @@
-/**
- * Issue 557 — durable-identity gate for destructive/consumptive tool selection.
- *
- * Central acceptance across BOTH surfaces (crafting + gathering): an owned item is
- * consumed or destroyed on the tool-breakage path ONLY when it matches the tool by
- * durable identity (durable flag, or own uuid/compendium source). A decoy that
- * satisfies only the wide PRESENCE gate — via a transitive `_stats.duplicateSource`
- * reference or by name alone — is spared from breakage but still satisfies presence.
- *
- * Anti-vacuity (delta A1/A2): both surfaces drive the REAL `RecipeManager`
- * (`installSystem` + `new RecipeManager()`) over components carrying real
- * `registeredItemUuid`, so a decoy actually resolves through source refs and the durable
- * gate is the only thing preventing `delete()`. No fake `componentId === item.id`
- * matcher and no `matchTools: () => ({ items })` stub is used here.
- */
+/** Issue 557 — durable-identity gate for destructive/consumptive tool selection. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -52,9 +38,8 @@ const { component, roleItem } = await import('./helpers/componentIdentityFixture
 const HAMMER_SRC = 'Item.hammer-src-uuid';
 
 // The first-class Tool (issue 561): it carries its OWN source refs, so both presence
-// (`resolveToolForItem`) and durable-identity breakage (`itemIsToolByDurableIdentity`)
-// resolve owned items against the tool itself, not through a component. The system exposes
-// it in `tools`; the breakage-config variants below share its id so they resolve to it.
+// (`resolveToolForItem`) and durable-identity breakage (`itemIsToolByDurableIdentity`) resolve
+// owned items against the tool itself, not through a component.
 const HAMMER_LIBRARY_TOOL = {
   id: 'tool-hammer',
   componentId: 'c-hammer',
@@ -94,10 +79,8 @@ function installSystem(system) {
 
 const ACTOR_REF = { uuid: 'Actor.a1' };
 
-// Build an owned tool item on top of the shared `roleItem` fixture (A4-compliant
-// durable-flag surface) and add the mutation methods the breakage path calls. The
-// `toolUsage` flag is OBSERVABLE (a live `timesUsed` counter) so a `limitedUses`
-// usage-increment gate can be asserted, not just the `delete()` side effect.
+// Build an owned tool item on top of the shared `roleItem` fixture (A4-compliant durable-flag
+// surface) and add the mutation methods the breakage path calls.
 function ownedTool(spec = {}) {
   const item = roleItem(spec);
   item.parent = ACTOR_REF;
@@ -165,9 +148,7 @@ function compendiumHammer() {
   return ownedTool({ uuid: 'Item.pack-hammer', compendiumSource: HAMMER_SRC, name: 'Hammer' });
 }
 
-// ===========================================================================
 // Crafting acceptance — real RecipeManager, real CraftingEngine
-// ===========================================================================
 
 async function craftingBreakage(items, tool = HAMMER_TOOL, options = {}) {
   installSystem(hammerSystem());
@@ -234,12 +215,9 @@ test('crafting: a durable limitedUses tool IS usage-incremented', async () => {
   assert.equal(tool.timesUsed, 1, 'a durable tool must be usage-incremented');
 });
 
-// ---------------------------------------------------------------------------
-// checkDriven skipped evidence (issue 568): the spec clause "a presence-only match
-// ... is spared ... and recorded as a skipped tool" emits `spared: true` evidence
-// ONLY under checkDriven authority (silent under the default toolSpecific). Cover
-// BOTH presence-only antecedents — transitive duplicate-source and name-only.
-// ---------------------------------------------------------------------------
+// checkDriven skipped evidence (issue 568): the spec clause "a presence-only match ... is spared
+// ... and recorded as a skipped tool" emits `spared: true` evidence ONLY under checkDriven
+// authority (silent under the default toolSpecific).
 
 for (const makeDecoy of [duplicateSourceDecoy, nameDecoy]) {
   test(`crafting checkDriven: a spared ${makeDecoy.name} is recorded as a skipped tool`, async () => {
@@ -253,10 +231,8 @@ for (const makeDecoy of [duplicateSourceDecoy, nameDecoy]) {
   });
 }
 
-// ===========================================================================
-// Gathering acceptance — real matchGatheringTools + real RecipeManager +
-// shared createToolBreakageRuntime
-// ===========================================================================
+// Gathering acceptance — real matchGatheringTools + real RecipeManager + shared
+// createToolBreakageRuntime
 
 function gatheringRuntime(craftingSystemManager) {
   return createToolBreakageRuntime({
@@ -347,12 +323,7 @@ test('gathering: a durable limitedUses tool IS usage-incremented', async () => {
   assert.equal(tool.timesUsed, 1, 'a durable tool must be usage-incremented');
 });
 
-// ---------------------------------------------------------------------------
-// checkDriven skipped evidence on the shared runtime (issue 568). `plan()` and
-// `apply()` each emit the spared entry independently — `apply()` `continue`s before
-// the pendingPlans lookup, so it is driven directly here (no prior plan()). Under
-// checkDriven the flag lives BOTH top-level and in nested `evidence`.
-// ---------------------------------------------------------------------------
+// checkDriven skipped evidence on the shared runtime (issue 568).
 
 function assertSparedSkipped(entry, decoy) {
   assert.equal(entry.spared, true, 'top-level spared flag');
@@ -378,9 +349,7 @@ for (const makeDecoy of [duplicateSourceDecoy, nameDecoy]) {
   }
 }
 
-// ===========================================================================
 // Fail-safe spare — resolveToolIdentityMatcher defaults to () => false
-// ===========================================================================
 
 test('gathering fail-safe: a present item is SPARED when no identity matcher is resolvable', async () => {
   installSystem(hammerSystem());

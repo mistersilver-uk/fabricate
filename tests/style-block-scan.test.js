@@ -1,50 +1,6 @@
 /**
  * Direct proof for the CSS declaration scanner in `tests/helpers/styleBlockScan.js` (issue 1391).
- *
- * The gate that consumes it — `tests/components/control-height-ladder.test.js` — can only assert
- * a TOTAL, and a total cannot tell a subtly wrong scanner from a right one on the days the two
- * happen to agree. Every correctness property this scanner has lives here instead, because each
- * of them was got wrong at least once while it was being built:
- *
- *   - `min-height: 240px` matched as `40px`, on a substring. Fourteen phantom occurrences.
- *   - a CSS comment mentioning `40px` was counted as a declaration.
- *   - a `<style>` named in Svelte docblock PROSE opened a scanned block that never closed, so a
- *     naive extractor read from that line to end of file as CSS.
- *   - one-level `var()` resolution reddened a declaration reading a token at one hop and
- *     SILENTLY PASSED two derived from the same token at two.
- *   - substituting a definition for `var(--x, 36px)` DELETED the fallback, and with it a real
- *     occurrence.
- *   - the declaration pattern was widened to read `HEIGHT:`, and the scan then dropped it
- *     against an all-lowercase property list one line later, so the widening reached nothing.
- *
- * None of those is hypothetical and none was caught by reading the code. Each was caught by
- * reading output, so each is pinned here.
- *
- * ── WHY THE FIXTURES ARE STRINGS, AND WHY ONE OF THEM IS NOT ────────────────────────────
- * `UI_PATH_PATTERN` in `scripts/lib/viewLabCases.js` is `/^(src\/ui\/|styles\/)|\.(svelte|css)$/`,
- * and the second alternation is NOT anchored to a directory — so `isUiFile` returns true for
- * `tests/fixtures/anything.svelte`. A COMMITTED fixture with either extension would arm the
- * screenshot-evidence gate for a change that renders nothing at all. Helper proofs therefore take
- * source as strings.
- *
- * One proof cannot: `the scan reaches a value written only into a token` is end to end by
- * definition — it exists to show that the filesystem walker, the Svelte `<style>` extractor and
- * the resolver feed ONE definition namespace, so a token declared in a `.css` resolves inside a
- * `.svelte` block. It used to point at the real tree, where `styles/fabricate.css` declared a
- * 40px thumbnail token that `BooksScrollsView.svelte` read. Issue 1399 inlined that pair with the
- * rest of the legacy token generations, and the tree now holds no token-mediated retired height
- * at all — so the capability had to stop depending on the corpus happening to contain one.
- *
- * It is therefore built as REAL FILES in a tmpdir and read through `collectStyleCorpus`, which
- * already takes `roots`. `scanPixelValues` would accept an in-memory `{path: text}` object, and
- * that is the cheap version to refuse: it bypasses `collectWorkingTreeSources`, `styleTextFor`
- * and `maskNonStyleRegions` entirely, and would replace an end-to-end capability proof with a
- * resolver-only one. A tmpdir root is never reached by `isUiFile` and is never committed, so it
- * costs nothing the string fixtures were avoiding.
- *
- * `tests/helpers/` is outside the `npm test` glob and `tests/*.test.js` is inside it, which is
- * why this file exists at all — the same arrangement, for the same reason, as
- * `tests/source-scan.test.js`.
+ * `min-height: 240px` matched as `40px`, on a substring.
  */
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -91,22 +47,7 @@ test('a comment is blanked, and its offsets are kept', () => {
   const across = stripCssComments('.a {\n/* one\ntwo\nthree */\nheight: 30px;\n}');
   assert.equal(declarationsIn('a.css', across).at(-1).line, 5);
 
-  // The CALL SITE, not the function. Every assertion above reaches `stripCssComments` directly,
-  // so deleting the call from `styleTextFor` leaves all of them green — which is how that call
-  // shipped unproven while its sibling `maskNonStyleRegions(source)`, on the line above it, was
-  // proved by `the ManagerButton prose trap stays shut`. This goes through `styleTextFor`.
-  //
-  // The mechanism is live in the corpus rather than hypothetical, and the worked example is
-  // RE-MEASURED here rather than re-pointed: it named `apps/manager/Chip.svelte:187`, a path that
-  // moved at issue 1506 and a line that was already stale before it — 187 was a JSDoc block, not
-  // the commented-out declaration the sentence describes. Measured on this tree, disabling the
-  // stripping adds 155 declarations across 26 files, and the shape is exactly the one described:
-  // `src/ui/svelte/components/Chip.svelte:399` writes
-  // `.manager-header-actions .manager-chip { min-height: 34px }` inside a prose comment arguing
-  // that a layered global rule cannot beat this block, and its interior `{` gives DECLARATION a
-  // real boundary to anchor on. NONE of those 155 carries a retired control height — re-measured,
-  // not carried — so a corpus-level guard would still be vacuous and this has to be a composition
-  // assertion.
+  // The CALL SITE, not the function (issue 1506).
   const superseded = '/* superseded: .old-toolbar { min-height: 40px; } */\n.a { height: 28px; }';
   assert.deepEqual(
     declarationsIn('a.css', styleTextFor('a.css', superseded)).map(
@@ -127,12 +68,9 @@ test('a pixel literal matches on a numeric boundary, never a substring', () => {
   assert.deepEqual(pixelValuesIn('calc(40px + 240px)'), [40, 240]);
   assert.deepEqual(pixelValuesIn('height: 40pxx'), [], 'a trailing letter is not the unit');
 
-  // ── THE LOOKBEHIND ──────────────────────────────────────────────────────────────────────
-  // `240px` above is protected by greediness alone — delete the lookbehind and it stays correct,
-  // so asserting it proves nothing about the boundary. These two are the ONLY shapes measured to
-  // flip when the lookbehind is deleted, and they cover a half of `[\w.]` each. Chosen by
-  // deleting it and reading which assertions reddened, not by reasoning about the pattern:
-  // reasoning is how the earlier draft came to credit it with a case it does not guard.
+  // THE LOOKBEHIND ────────────────────────────────────────────────────────────────────── `240px`
+  // above is protected by greediness alone — delete the lookbehind and it stays correct, so
+  // asserting it proves nothing about the boundary.
   assert.deepEqual(
     pixelValuesIn('background: url(icon40px.svg)'),
     [],
@@ -145,30 +83,20 @@ test('a pixel literal matches on a numeric boundary, never a substring', () => {
       'four tenths of a pixel, because the `\\.\\d+` branch matches from the dot'
   );
 
-  // ── THE `\.\d+` BRANCH ──────────────────────────────────────────────────────────────────
-  // This is the branch's proof, not the lookbehind's. Measured across all three variants,
-  // `.40px` yields 0.4 shipped AND with the lookbehind deleted; delete the branch instead and
-  // it yields nothing at all. `.4px` is valid CSS, and a length the scanner cannot see is the
-  // one direction of error this gate cannot afford.
+  // THE `\.\d+` BRANCH ────────────────────────────────────────────────────────────────── This is
+  // the branch's proof, not the lookbehind's.
   assert.deepEqual(
     pixelValuesIn('height: .40px'),
     [0.4],
     'a leading-dot decimal is four tenths of a pixel, not forty of them and not nothing'
   );
 
-  // ── UNITS ARE CASE-INSENSITIVE ──────────────────────────────────────────────────────────
-  // `40PX` is forty pixels by the CSS grammar. The corpus holds none today, which is exactly
-  // why nothing else would notice: the bypass costs one keystroke and it sits in the Svelte
-  // half stylelint cannot reach. Nothing downstream re-filters the unit, so this one assertion
-  // does cover the whole scan — unlike the property casing, which needs the composition proof
-  // in `an uppercase property name survives the whole scan, not just the extraction`.
+  // UNITS ARE CASE-INSENSITIVE ────────────────────────────────────────────────────────── `40PX` is
+  // forty pixels by the CSS grammar.
   assert.deepEqual(pixelValuesIn('height: 40PX'), [40], 'a CSS unit is ASCII case-insensitive');
 
-  // ── PINNED LIMIT: THE MATCHER IS SIGN-BLIND ─────────────────────────────────────────────
-  // `-8px` tallies as `8px` because a `-` is neither `\w` nor `.`, so the lookbehind does not
-  // exclude it. Unreachable for heights — no control is negative pixels tall — but ordinary for
-  // the spacing gate that comes next. Pinned so that making it sign-aware is a deliberate edit
-  // here rather than a surprise in a baseline.
+  // PINNED LIMIT: THE MATCHER IS SIGN-BLIND ───────────────────────────────────────────── `-8px`
+  // tallies as `8px` because a `-` is neither `\w` nor `.`, so the lookbehind does not exclude it.
   assert.deepEqual(
     pixelValuesIn('margin: -8px auto'),
     [8],
@@ -198,16 +126,7 @@ test('a declaration is read only at a real declaration boundary', () => {
 
 test('an uppercase property name survives the whole scan, not just the extraction', () => {
   // EXTRACTION IS NOT SELECTION, and asserting the first as though it were the second is how the
-  // property-name widening shipped inert. `DECLARATION` was widened to `[a-zA-Z]` so a `HEIGHT:`
-  // could not evade the gate, and it does read the name perfectly — after which
-  // `scanPixelValues` dropped it against an all-lowercase property list one line later.
-  // Measured end to end BEFORE the fold: `height: 40px` and `height: 40PX` scored one occurrence
-  // each, `HEIGHT: 40px` and `MIN-HEIGHT: 36px` scored ZERO. The pattern was right and the gate
-  // still had the one-keystroke bypass the widening was written to close.
-  //
-  // Every assertion here therefore goes through `scanPixelValues`. The `declarationsIn`
-  // assertion that used to stand in for this one is green under that defect, which is the same
-  // helper-level-pass-presented-as-composition shape the `stripCssComments` call site had.
+  // property-name widening shipped inert.
   const occurrences = (css, properties, values) =>
     scanPixelValues({ corpus: { 'a.css': css }, properties, values }).occurrences;
 
@@ -245,16 +164,9 @@ test('an uppercase property name survives the whole scan, not just the extractio
 });
 
 test('a held-opaque definition is not substituted, but its fallback still is', () => {
-  // The option the spacing ratchet is built on (issue 1448). Its gate bans EVERY pixel literal
-  // in padding/margin/gap, so a scan that substituted the published scale would resolve
-  // `padding: var(--fab-space-3)` to `12px` and report the one thing the spec asks for as debt —
-  // 2989 occurrences against 1005 on the shipped corpus, which is not an edge case but the whole
-  // sanctioned population.
-  //
-  // Both directions are asserted from ONE corpus, because "opaque" only means anything against
-  // the answer the same input gives without it. The `--local` token is the control: holding the
-  // scale opaque must not stop any OTHER token resolving, or the ratchet would lose the
-  // laundering it exists to catch.
+  // The option the spacing ratchet is built on (issue 1448). Both directions are asserted from ONE
+  // corpus, because "opaque" only means anything against the answer the same input gives without
+  // it.
   const corpus = {
     'a.css': [
       ':root { --fab-space-3: 12px; --local: 7px; }',
@@ -284,9 +196,6 @@ test('a held-opaque definition is not substituted, but its fallback still is', (
 
 test('accept is a predicate over the value, not a list of values', () => {
   // `scanPixelValues` takes a closed list because "32, 36 and 40 are retired" is a closed list.
-  // The spacing gate's prohibition is open — every literal outside two exempt bands — and
-  // enumerating that as a list means choosing a ceiling, which is a bypass the day anyone writes
-  // a bigger number than the one whoever wrote the list imagined.
   const corpus = { 'a.css': '.a { gap: 3px; } .b { gap: 1px; } .c { gap: 4000px; }' };
   const { occurrences } = scanPixelDeclarations({
     corpus,
@@ -332,11 +241,7 @@ test('a <style> opener must be the whole line, and prose naming one opens nothin
 });
 
 test('the ManagerButton prose trap stays shut', () => {
-  // A PINNED proof against the real tree rather than a fixture of it. This file mentions
-  // `<style>` in docblock prose — explaining that it has none — and carries no closing tag
-  // anywhere in its 190 lines, so a naive `indexOf('<style')` reads from line 67 to EOF as CSS.
-  // It is inert today only because that prose happens to hold no CSS-shaped text, which is
-  // exactly why it needs a test rather than luck.
+  // A PINNED proof against the real tree rather than a fixture of it.
   const file = 'src/ui/svelte/components/ManagerButton.svelte';
   const source = readFileSync(join(repoRoot, file), 'utf8');
 
@@ -355,11 +260,7 @@ test('the ManagerButton prose trap stays shut', () => {
 });
 
 test('every Svelte file carrying a real block is in the corpus, and only those', () => {
-  // The line anchor's COST, which nothing pinned until now. A block whose opener is not alone on
-  // its line contributes zero — one `<style lang="postcss">.a{height:36px}</style>` would drop a
-  // whole component's CSS out of the gate, arrive with no baseline row and red nothing, which is
-  // the failure shape this whole scanner exists to avoid. Measured today: 180 openers, 180
-  // closers, 180 contributing files, no mismatch in either direction.
+  // The line anchor's COST, which nothing pinned until now.
   const carriesBlock = Object.entries(collectWorkingTreeSources(['src'], ['.svelte']))
     .filter(([, source]) => source.includes('</style>'))
     .map(([file]) => file)
@@ -383,9 +284,7 @@ test('every Svelte file carrying a real block is in the corpus, and only those',
 
 test('var() resolution runs to a fixed point, not one level', () => {
   // The chain `styles/fabricate.css` actually ships: a token, a token derived from it through a
-  // calc(), and readers at one hop and at two. Under one-level resolution the two-hop readers
-  // keep an unresolved `var()` and pass while the one-hop reader reds — one edit, two silent
-  // passes and an inconsistency nobody would think to look for.
+  // calc(), and readers at one hop and at two.
   const defined = definitions({
     '--chip': ['36px'],
     '--row': ['calc(var(--chip) + (2 * var(--space)) + 2px)'],
@@ -478,8 +377,7 @@ test('a selector list splits on its separators only, not on every comma', () => 
   assert.deepEqual(splitSelectorList('.a .ok, .b .oops'), ['.a .ok', '.b .oops']);
 
   // The shape that made `String#split(',')` red a rule wholly inside its area: ONE selector
-  // carrying a comma inside a functional pseudo-class. Eleven of the 5044 rules in the two
-  // shipped stylesheets have it today, all eleven already `.fabricate-manager` rules.
+  // carrying a comma inside a functional pseudo-class.
   assert.deepEqual(
     splitSelectorList('.fabricate-manager .x input:is([type="text"], [type="number"])'),
     ['.fabricate-manager .x input:is([type="text"], [type="number"])'],
@@ -502,16 +400,7 @@ test('a selector list splits on its separators only, not on every comma', () => 
 
 test('a rule is cited at the line its own selector starts on, not at its brace', () => {
   // THE HELPER'S OWN PROOF, mirroring the live-corpus invariant in `token-generation-gate.test.js`
-  // now that `rulesIn` is shared. That one asserts over the two shipped stylesheets, which is the
-  // stronger statement and stays where it is; this one is the fixture that says WHICH shapes the
-  // line number comes from, so the next caller of `rulesIn` finds the guarantee documented beside
-  // the helper rather than inside one gate that happens to still use it.
-  //
-  // The distinction only shows where a selector and its `{` are on DIFFERENT lines. A rule written
-  // `.a { … }` is cited identically by a correct implementation and by one that records the line
-  // of the brace, so a fixture built only from single-line rules proves nothing — which is the
-  // trap, because almost every rule a reader writes by hand is single-line. Two of the four rules
-  // below are therefore multi-line, and they are the two that move.
+  // now that `rulesIn` is shared.
   const lines = [
     '.first {', //                     1
     '  color: red;', //                2
@@ -550,9 +439,7 @@ test('a rule is cited at the line its own selector starts on, not at its brace',
   );
 
   // The same invariant the live corpus asserts, over the fixture: the cited line holds the first
-  // token of the selector. Written this way as well as by exact number because it is the form the
-  // gates depend on — a failure message sends its reader to a line, and this is what makes that
-  // line the right one.
+  // token of the selector.
   for (const rule of rules) {
     const [head] = rule.selector.split(/\s/u);
     assert.ok(
@@ -575,9 +462,8 @@ test('the real corpus is both stylesheets, and its custom properties come from b
     'Svelte scoped blocks must be in the corpus — they are the half stylelint cannot reach'
   );
 
-  // ONE definition namespace, fed by both walkers — asserted structurally rather than by naming
-  // a token. Naming one is how this assertion came to pin a legacy token that issue 1399 then
-  // deleted; a property of the corpus cannot be retired out from under the check.
+  // ONE definition namespace, fed by both walkers — asserted structurally rather than by naming a
+  // token (issue 1399).
   const stylesheetOnly = collectCustomProperties({
     'styles/fabricate.css': corpus['styles/fabricate.css'],
   });
@@ -589,16 +475,7 @@ test('the real corpus is both stylesheets, and its custom properties come from b
   assert.ok(stylesheetOnly.size > 0, 'the global sheet declares custom properties');
   assert.ok(svelteOnly.size > 0, 'Svelte scoped blocks declare custom properties too');
 
-  // THOSE TWO FLOORS ARE THE CHECK. `defined ⊇ stylesheetOnly` and `defined ⊇ svelteOnly` hold
-  // BY CONSTRUCTION — `defined` is built over a superset of each input — so the two containment
-  // loops that stood here could not fail in any tree, and they have been removed rather than
-  // left reading as verification. What can fail is a walker going quiet: either half dropping to
-  // zero satisfies every downstream absence gate built on this corpus.
-  //
-  // The one MERGE property a text scan can get wrong is discarding a repeat definition, which is
-  // why the name below is asserted rather than the map's shape. `--fab-stepper-fill-height` is
-  // declared at two different heights, and a merge that overwrote instead of appending would
-  // leave one — silently making `resolveValueCandidates` certain where it should be ambiguous.
+  // THOSE TWO FLOORS ARE THE CHECK.
   assert.ok(
     (defined.get('--fab-stepper-fill-height') ?? []).length > 1,
     'a token defined at more than one height must keep every definition'
@@ -608,21 +485,6 @@ test('the real corpus is both stylesheets, and its custom properties come from b
 test('the scan reaches a value written only into a token', () => {
   // END TO END over a synthetic corpus of REAL FILES (issue 1399 — see the fixture note in the
   // header for why it is no longer the real tree, and why an in-memory corpus will not do).
-  //
-  // The `.svelte` block carries NO pixel literal on the declaring line: the 40 lives only in a
-  // `.css` in the same corpus. A text-only scan cannot see it, and with a text-only scan the
-  // cheapest way to pay a ratchet down would be to move the literal into a token and leave the
-  // pixel exactly where it is.
-  //
-  // Both files are load-bearing. The `.css` proves a stylesheet root is walked and read whole;
-  // the `.svelte` proves `maskNonStyleRegions` runs, because the markup above its block carries
-  // `height: 36px` as PROSE which must NOT be scanned — so the assertion on the matched values
-  // fails if the mask is dropped, rather than only the assertion on the resolved text.
-  //
-  // The SEMICOLON in that prose is doing the work. `DECLARATION` requires `^` or one of `;{}`
-  // before a property name, so the earlier wording — "docblock writes height: 36px in PROSE" —
-  // could never have matched with the mask off either, and the trap it claimed to set was shut
-  // from both sides. Do not tidy the punctuation away.
   const root = mkdtempSync(join(tmpdir(), 'fabricate-style-corpus-'));
   try {
     writeFileSync(join(root, 'tokens.css'), ':root {\n  --fixture-thumb: 40px;\n}\n');

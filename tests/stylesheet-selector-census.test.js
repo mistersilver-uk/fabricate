@@ -1,48 +1,6 @@
 /**
  * The merge predicate of `scripts/lib/stylesheetSelectorCensus.js`, proved on a synthetic corpus.
- *
- * WHY SYNTHETIC, AND WHY THIS FILE IS NOT OPTIONAL. The helper's customer is issue 1501, which ran
- * it over `styles/fabricate.css` and found ZERO mergeable pairs — because zero selector LISTS
- * repeat in the same at-context at all. That is a real measurement and a useless specification: a
- * predicate that returned nothing, a walk that matched nothing, and a census that never got past
- * its first filter all produce the identical report. So every branch the sheet could not exercise
- * is exercised here, against inputs written to exercise it, where a wrong answer is a failing
- * assertion rather than a quietly empty list. The same argument
- * `tests/stylesheet-live-classes.test.js` makes for the liveness rules, and this file follows its
- * shape: one table of `{id, css}` rows with the expectations as data on the row.
- *
- * ── THE THREE ROWS CHOSEN BY MUTATION RATHER THAN BY TASTE ──────────────────────────────
- * Most of the table below reads like documentation. Three rows do not, and they are here because
- * deleting the branch each one covers leaves EVERY OTHER ROW GREEN:
- *
- *   - LONGHAND EXPANSION, in BOTH directions. `background` against `background-color` and
- *     `background-color` against `background` are both real conflicts, and a `property === property`
- *     implementation sees neither. One direction alone is not enough: an implementation that
- *     expanded only the intervening rule's property passes the first and fails the second.
- *   - THE UNCONDITIONAL `!important` BLOCK. An `!important` declaration wins from anywhere in the
- *     sheet, so it has to bypass the admission gates entirely. Its row pairs with a control that
- *     removes only the `!important` and merges, so the row cannot pass because the blocker was
- *     admitted for some other reason.
- *   - COMMENT STRIPPING. `ruleBlocks` returns offsets into the ORIGINAL text, so a caller slicing
- *     its own declarations gets the comments too unless it strips first. A commented-out
- *     declaration read as live is a FALSE `BLOCKED BY`, which is a silently deferred adoption
- *     rather than a loud failure — the one error shape a zero-merge measurement cannot reveal.
- *
- * ── THE CENSUS AND THE MERGE PREDICATE ARE DIFFERENT QUESTIONS ──────────────────────────
- * `selectorAppearances` counts every selector-list MEMBER; `identicalListPairs` pairs rules whose
- * whole LIST matches. The `shared between two lists` row is the one that separates them: the
- * census reports `.a .b` twice and the merge predicate reports no candidate at all. That is the
- * shape almost all of the real sheet's repetition takes, so a reader who conflates the two figures
- * concludes there are 124 merges waiting to be done.
- *
- * ── WHY THE NINE "SANDWICH" ROWS ARE A TABLE, NOT NINE FIXTURES ─────────────────────────
- * Nine of the rows below (criterion (c), the property and specificity admission gates, `!important`
- * and comment stripping) are the identical three-rule shape — a `.a .b` declaration, one
- * intervening rule, and a second `.a .b` declaration — with only the intervening rule and, for the
- * longhand/shorthand pair, which side states which form, actually varying. Writing that shape out
- * nine times is what a token-based duplication detector reads as nine copies of the same fixture
- * once string literals are normalised; `sandwichRow` below assembles the shape ONCE, and each row
- * in `SANDWICH_TABLE` states only the piece that makes it a different test.
+ * WHY SYNTHETIC, AND WHY THIS FILE IS NOT OPTIONAL (issue 1501).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -63,15 +21,7 @@ import {
 
 const REPOSITORY = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * The census's WHOLE script surface, not the one module that happened to hold the defect.
- *
- * A property stated of one file is a property one file has. All three of these are read by the
- * same author working on the same census — the predicate, the liveness rules it shares, and the
- * command-line entry point that prints the report — and all three sit in the `lint` and
- * `format:check` globs, which say nothing about control bytes. Naming one leaves the identical
- * defect free to land next door, where the gate is not looking.
- */
+/** The census's WHOLE script surface, not the one module that happened to hold the defect. */
 const SEARCHABLE_MODULES = Object.freeze([
   'scripts/lib/stylesheetSelectorCensus.js',
   'scripts/lib/stylesheetLiveClasses.js',
@@ -80,13 +30,6 @@ const SEARCHABLE_MODULES = Object.freeze([
 
 /**
  * The census's sources have to stay searchable, and only a byte-level assertion can say they are.
- *
- * A raw control character used as a key separator is behaviourally perfect and invisible in every
- * review: `git` still diffs the file as text, prettier and eslint round-trip it, and the module's
- * own tests pass. What it costs is `grep`, `rg` and `file`, all of which classify a file holding
- * one NUL as binary and report a match without the line — in a repository whose whole workflow is
- * grep-driven, that is a module nobody can navigate. The separator is spelled as an escape instead,
- * which is the same character at runtime and ordinary text on disk.
  */
 test('the census sources carry no control characters, so grep can read them', () => {
   for (const module of SEARCHABLE_MODULES) {
@@ -112,9 +55,7 @@ const sheet = (...blocks) => blocks.flat().join('\n');
 
 /**
  * Assembles the "sandwich" shape ONCE: a `.a .b` declaration, one intervening rule, and a second
- * `.a .b` declaration. `firstDecl`/`lastDecl` default to the plain property test's colours; the
- * longhand/shorthand pair is the only row that has to override them, because there the PAIR's own
- * property is what is under test rather than the intervening rule's.
+ * `.a .b` declaration.
  */
 function sandwichRow({
   id,
@@ -301,16 +242,7 @@ const OTHER_ROWS = [
   },
 ];
 
-/**
- * One synthetic stylesheet per row, with the verdict the predicate must reach on it.
- *
- * `pairs` is how many rule pairs satisfy (a) and (b) — the only pairs a merge could act on.
- * `verdicts` is one `"<verdict>: <reason>"` string per pair, in order, asserted WHOLE: the reason
- * carries the blocking property as the author wrote it and the line it was written on, and both
- * are what a reader checks the finding against. `repeated` is what the CENSUS says about the same
- * corpus, keyed `(at-context, selector)`, which is a different question and often a different
- * answer.
- */
+/** One synthetic stylesheet per row, with the verdict the predicate must reach on it. */
 const MERGE_ROWS = [...OTHER_ROWS, ...SANDWICH_TABLE.map(sandwichRow)];
 
 /** Every repeated selector of one corpus, as `"<selector> x<appearances>"`, in first-line order. */
@@ -338,8 +270,7 @@ test('every merge rule holds on its synthetic row', () => {
     if (row.forced) {
       // (a) AND (b) DISQUALIFY A PAIR BEFORE IT IS A PAIR, so neither branch of `mergeVerdict` is
       // reachable through `identicalListPairs` and both would otherwise be dead code proved by
-      // nothing. Asked directly, the predicate has to say which clause refused, and say it in the
-      // words the census report prints.
+      // nothing.
       const { earlier, later, verdict } = row.forced;
       const forced = mergeVerdict(rules, earlier, later);
       assert.equal(
@@ -392,15 +323,7 @@ const UTILITY = block('.fabricate .fab-truncate', 'overflow: hidden;');
 /** One scoped-walk corpus: the donor, the given intervening rule, then the utility. */
 const bandedSheet = (middle) => sheet(DONOR, middle, UTILITY);
 
-/**
- * The corpus criterion 5's two walks disagree about.
- *
- * `.intruder` is (0,3,0) — inside the closed band between the donor's (0,4,0) and the utility's
- * (0,2,0), and equal to NEITHER endpoint, so the census walk can only admit it through the
- * `.fabricate-manager` ancestor token the donor shares with it. Over an interval of ten thousand
- * lines that clause is what makes the census walk useless for an adoption: the shared ancestor is
- * the manager root, and the whole manager sheet is a blocker.
- */
+/** The corpus criterion 5's two walks disagree about. */
 const SCOPED_CSS = bandedSheet(block('.fabricate-manager .panel .intruder', 'overflow: visible;'));
 
 /** The same corpus with the intervening rule moved BELOW the band and given a matchable subject. */
@@ -408,11 +331,6 @@ const OUT_OF_BAND_CSS = bandedSheet(block('.fabricate-manager > *', 'overflow: v
 
 /**
  * The same corpus with a MULTI-MEMBER intervening rule, one member in the band and one above it.
- *
- * `.fabricate-manager .donor` is (0,2,0) — inside the band and equal to its low endpoint — and its
- * subject is a class the donor element carries. `.fabricate-manager .panel .card .other.is-open` is
- * (0,5,0), ABOVE the band's high endpoint. A walk that bands the rule on its highest member reads
- * the pair as (0,5,0), skips it, and clears an adoption a live rule overrides.
  */
 const MULTI_MEMBER_CSS = bandedSheet(
   block(
@@ -429,13 +347,7 @@ const MULTI_MEMBER_STRANGER_CSS = bandedSheet(
   )
 );
 
-/**
- * The scoped walk over one corpus, from the donor at index 0 to the utility at index 2.
- *
- * `reversed` passes the SAME interval with its endpoints the other way round, which is how a caller
- * naming the donor first and the utility second writes it when the utility precedes the donor in
- * the sheet.
- */
+/** The scoped walk over one corpus, from the donor at index 0 to the utility at index 2. */
 function scopedWalk(css, classes, { reversed = false } = {}) {
   const rules = censusRules(css);
   return scopedBlockerWalk({

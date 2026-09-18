@@ -1,17 +1,7 @@
 /**
- * Salvage chat output (issue 675): the salvage analogue of craft-chat-output.
- *
- * Covers `_postSalvageChatMessage` directly — the chatOutput gate on/off, the
- * success and failure payloads, broken-tool resolution — plus an integration proof
- * that `salvage()` posts on success but stays silent on a cancelled prompt.
- *
- * The second half covers COMPONENT COMPLICATIONS on the salvage path (issue 1286), and it
- * covers them end-to-end through `salvage()` rather than through the poster alone. That is
- * deliberate: the disclosure guarantee being asserted is that a `gmOnly` complication
- * reaches no player-readable surface, and the salvage RUN RECORD — an actor flag the owning
- * player can read — is one of those surfaces and is written by `salvage()`, not by the
- * card. Asserting only the card would leave the durable half unasserted, which is the
- * failure mode the delta calls out by name.
+ * Salvage chat output (issue 675): the salvage analogue of craft-chat-output. The second half
+ * covers COMPONENT COMPLICATIONS on the salvage path (issue 1286), and it covers them end-to-end
+ * through `salvage()` rather than through the poster alone.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -167,17 +157,9 @@ test('_postSalvageChatMessage: a ChatMessage.create failure never throws out of 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Component complications (issue 1286)
-// ---------------------------------------------------------------------------
 
-/**
- * Build the two complications every case below uses, through the REAL normalizer.
- *
- * Hand-written literals would drift from the persisted shape the moment a key moved, and
- * the whole redaction contract is keyed on one of those keys (`visibility`), so a fixture
- * that spelled it slightly wrong would silently make every assertion below vacuous.
- */
+/** Build the two complications every case below uses, through the REAL normalizer. */
 function complicationsFor({ visibility, when, name, description, severity = 'major' }) {
   return authoredComplications([
     {
@@ -280,9 +262,7 @@ test('_postSalvageChatMessage: a suppressed bulk row posts no complication card'
   assert.equal(chatCreated.length, 0, 'suppressed means suppressed');
 });
 
-// ---------------------------------------------------------------------------
 // End-to-end through salvage(): the card, the run record and the return
-// ---------------------------------------------------------------------------
 
 /** A minimal owned item the engine can consume. */
 function stubItem(id, name) {
@@ -326,13 +306,8 @@ function stubActor(items) {
 }
 
 /**
- * Drive a two-stage progressive salvage whose budget covers the first stage only, with
- * whatever complications the caller hung on the two result components.
- *
- * `isGM: true` is not incidental. `visibility` is redacted on the AUDIENCE and never on the
- * acting user's role, so a GM salvaging on a player's behalf must write and post exactly
- * what a player would. Running every case below as a GM is what proves that: a role-keyed
- * filter would pass a player-run test and fail here.
+ * Drive a two-stage progressive salvage whose budget covers the first stage only, with whatever
+ * complications the caller hung on the two result components. `isGM: true` is not incidental.
  */
 async function runProgressiveSalvage({ awardedComplications, missedComplications }) {
   resetChat();

@@ -1,14 +1,6 @@
 /**
- * Tests for CraftingSystemManager.repairItemData — the GM maintenance
- * action behind the settings-menu "Repair Item Data" button.
- *
- *  1. A world item that IS a component source (matched by identity) is stripped of a
- *     transitive duplicateSource and stamped with flags.fabricate.roles[sys].componentId.
- *  2. Matching is by IDENTITY (own uuid / compendium source), NOT duplicateSource —
- *     an item whose duplicateSource points at a component source is NOT mis-stamped.
- *  3. A stale roles[sys].componentId flag on a non-source item is cleared.
- *  4. An already-correct source item is a no-op.
- *  5. Locked packs are counted+skipped; unlocked packs are processed.
+ * Tests for CraftingSystemManager.repairItemData — the GM maintenance action behind the
+ * settings-menu "Repair Item Data" button.
  */
 
 import test from 'node:test';
@@ -43,9 +35,7 @@ function makeItem({
     name,
     pack,
     _stats: { duplicateSource, compendiumSource },
-    // Components now carry a per-system durable identity map. getFabricateFlag/
-    // setFabricateFlag store at flags.fabricate['fabricate.roles.<sys>.componentId']
-    // via getProperty/dotted-key traversal — mirror that nesting here (single system sys1).
+    // Components now carry a per-system durable identity map.
     flags: componentFlag
       ? { fabricate: { fabricate: { roles: { sys1: { componentId: componentFlag } } } } }
       : {},
@@ -165,14 +155,8 @@ test('repair — requires GM', async () => {
   await assert.rejects(() => mgr.repairItemData(), /GM/);
 });
 
-// ---------------------------------------------------------------------------
-// Description backfill (issue 800) — DEFINITION-driven, not item-driven.
-//
-// The identity leg above walks ITEMS and skips locked packs, because it writes flags
-// INTO pack items. Descriptions only READ, through fromUuid, which resolves a locked
-// pack fine — and a locked system pack is exactly where the reported
-// `@UUID[Compendium.dnd5e.equipment24.…]` lives. So this leg must NOT ride that walk.
-// ---------------------------------------------------------------------------
+// Description backfill (issue 800) — DEFINITION-driven, not item-driven. The identity leg above
+// walks ITEMS and skips locked packs, because it writes flags INTO pack items.
 
 const LOCKED_PACK_UUID = 'Compendium.dnd5e.equipment24.Item.supplies';
 
@@ -263,12 +247,10 @@ test('repair — is idempotent: a second run reports unchanged', async () => {
 });
 
 test('repair — a source that RESOLVES but is BLANK never wipes the stored description', async () => {
-  // The data-loss guard, pinned. This is the only thing between a GM's Repair click and
-  // the silent destruction of every description whose source item happens to carry no
-  // prose of its own — and deleting the guard leaves the rest of the suite green,
-  // because the neighbouring "no resolvable source" test short-circuits in sweep 1 and
-  // never reaches the write. This one resolves a real document with an EMPTY
-  // description, so it exercises sweep 2's compare-and-store.
+  // The data-loss guard, pinned. This is the only thing between a GM's Repair click and the silent
+  // destruction of every description whose source item happens to carry no prose of its own — and
+  // deleting the guard leaves the rest of the suite green, because the neighbouring "no resolvable
+  // source" test short-circuits in sweep 1 and never reaches the write.
   const { component, run } = buildDescriptionRepairManager({ sourceDescription: '' });
   const original = component.description;
   assert.ok(original, 'precondition: the definition starts with text worth losing');

@@ -1,14 +1,4 @@
-/**
- * Issue 1024 — GM-configurable player-character actor types.
- *
- * The reported bug: a Fallout `robot` PC is absent from Fabricate's actor-selection
- * bar, the GM stamina roster, the manager's Access and Knowledge rosters, and the
- * party member picker, because the predicate was hardcoded to `actor.type ===
- * 'character'`.
- *
- * These cases cover the pure core, the picker's markup and read-back, the persistence
- * round trip, the settings-menu registration, and the player-write guardrail.
- */
+/** Issue 1024 — GM-configurable player-character actor types. */
 
 import test, { describe, it, after, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -246,11 +236,8 @@ describe('buildActorTypeOptions', () => {
 // --- the dialog markup (criterion 5) ----------------------------------------
 
 /**
- * A model of the CLIENT `foundry.utils.cleanHTML` (`client/utils/helpers.mjs`), which
- * is the one DialogV2 actually calls: a non-allowlisted element is deleted along with
- * its WHOLE SUBTREE. The server/database implementation (`sanitize-html`) keeps the
- * inner text instead, and a stub modelled on that one would pass output the real
- * dialog renders differently.
+ * A model of the CLIENT `foundry.utils.cleanHTML` (`client/utils/helpers.mjs`), which is the one
+ * DialogV2 actually calls: a non-allowlisted element is deleted along with its WHOLE SUBTREE.
  */
 const ALLOWED_TAGS = new Set(['P', 'FIELDSET', 'LEGEND', 'LABEL', 'INPUT', 'SPAN']);
 
@@ -340,9 +327,8 @@ describe('buildActorTypeDialogContent', () => {
       'a NAMED locked row would be read back and persist ["character"] into a setting' +
         ' documented as holding only ADDITIONAL types'
     );
-    // The suffix is INSIDE the label, so it joins the accessible name rather than being
-    // invisible in forms mode. (There is no `game.i18n` here, so `localize` yields the
-    // key — which also pins WHICH key the suffix comes from.)
+    // The suffix is INSIDE the label, so it joins the accessible name rather than being invisible
+    // in forms mode.
     const label = cleaned.querySelector(`label[for="${locked.id}"]`);
     assert.match(label.textContent, /PlayerCharacterActorTypes\.AlwaysIncluded/);
   });
@@ -376,11 +362,8 @@ describe('buildActorTypeDialogContent', () => {
   });
 
   it('renders a raw type id in a typeface the friendly label does not use', () => {
-    // The two are adjacent on one row ("Player Character" then `character`), so nothing
-    // but their presentation says which is the human name and which is the literal the
-    // world declares. Asserting the DECLARATIONS rather than a class name, because a
-    // class alone styles nothing: this dialog is core-chromed and the rule would have to
-    // live in `styles/fabricate.css`, which the module docblock explains it cannot.
+    // The two are adjacent on one row ("Player Character" then `character`), so nothing but their
+    // presentation says which is the human name and which is the literal the world declares.
     const cleaned = cleanLikeClient(content());
     const row = cleaned.querySelector('input[value="robot"]').closest('label');
     const rawId = row.querySelector('.fabricate-actor-type-id');
@@ -392,10 +375,8 @@ describe('buildActorTypeDialogContent', () => {
   });
 
   it('gives a label-less type the RAW treatment, not the friendly one', () => {
-    // `quest-pages.quest` has no `CONFIG.Actor.typeLabels` entry, so `actorTypeLabel`
-    // fell back to the id and label === id. Rendering that fallback in the friendly
-    // typeface would make the one row a GM most needs to recognise — a type this world
-    // does not translate — the only row that lies about which kind of string it is.
+    // `quest-pages.quest` has no `CONFIG.Actor.typeLabels` entry, so `actorTypeLabel` fell back to
+    // the id and label === id.
     const cleaned = cleanLikeClient(content());
     const row = cleaned.querySelector('input[value="quest-pages.quest"]').closest('label');
     assert.equal(row.querySelector('.fabricate-actor-type-label'), null);
@@ -407,10 +388,8 @@ describe('buildActorTypeDialogContent', () => {
   });
 
   it('does not read a `--fab-*` COLOUR token, which would be the dark theme against Foundry light', () => {
-    // The colour tokens are declared on bare `:root` and unconditionally carry the dark
-    // "fabricate" theme. This dialog wears core chrome and follows FOUNDRY's theme, so a
-    // parchment-on-dark token here is unreadable in a light-themed world. Font family is
-    // theme-independent and stays allowed.
+    // The colour tokens are declared on bare `:root` and unconditionally carry the dark "fabricate"
+    // theme.
     const tokens = [...content().matchAll(/var\(\s*(--fab-[a-z0-9-]+)/gi)].map((m) => m[1]);
     assert.deepEqual([...new Set(tokens)], ['--fab-font-mono']);
   });
@@ -619,11 +598,10 @@ describe('openPlayerCharacterTypesDialog', () => {
   }
 
   it('asks for an explicit pixel width instead of inheriting `width: "auto"`', async () => {
-    // `ApplicationV2.DEFAULT_OPTIONS.position` is `{width: "auto"}` and DialogV2 does not
-    // override it; `_updatePosition` then skips its clamp and leaves the <dialog> at its
-    // `fit-content` default, so the window grew to the intro paragraph's ONE-LINE
-    // max-content width — near the full viewport, to hold five short checkbox rows.
-    // A number is what engages `Math.clamp(targetWidth, minWidth, maxWidth)`.
+    // `ApplicationV2.DEFAULT_OPTIONS.position` is `{width: "auto"}` and DialogV2 does not override
+    // it; `_updatePosition` then skips its clamp and leaves the <dialog> at its `fit-content`
+    // default, so the window grew to the intro paragraph's ONE-LINE max-content width — near the
+    // full viewport, to hold five short checkbox rows.
     const harness = runDialog({ declared: ['character', 'robot'] });
     await harness.run();
     assert.equal(typeof harness.config().position?.width, 'number');
@@ -798,9 +776,8 @@ describe('player-write guardrail for the actor-types key', () => {
   });
 
   it('the bar re-seed persists a CLIENT-scoped key, which a player may write', async () => {
-    // `refreshSelectableActors` routes its re-seed through `selectActor`, which persists
-    // the remembered actor. That key is client-scoped, so the player seam accepts it —
-    // the guardrail is that no WORLD key appears in `writes`.
+    // `refreshSelectableActors` routes its re-seed through `selectActor`, which persists the
+    // remembered actor.
     const seam = makeSettingsSeam({ isGM: false });
     await seam.setSetting(SETTING_KEYS.LAST_GATHERING_ACTOR, 'pc-1');
     assert.deepEqual(seam.writes, [{ key: SETTING_KEYS.LAST_GATHERING_ACTOR, value: 'pc-1' }]);
@@ -808,30 +785,23 @@ describe('player-write guardrail for the actor-types key', () => {
   });
 });
 
-// --- discoverability: the two empty-state strings ---------------------------
-//
-// GoldenGamin's player opens Fabricate, owns a `robot`, and reads "No selectable
-// characters." That string IS the bug report, and it stayed the string a Fallout GM saw
-// until they found a settings menu they had no reason to know existed. The GM-facing one
-// was worse: "No character actors exist in this world yet." asserts an absence while the
-// GM is looking at three robots.
+// discoverability: the two empty-state strings. GoldenGamin's player opens Fabricate, owns a
+// `robot`, and reads "No selectable characters." That string IS the bug report, and it stayed the
+// string a Fallout GM saw until they found a settings menu they had no reason to know existed.
 
 describe('empty-state copy', () => {
   const lang = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
   const barEmpty = lang.FABRICATE.App.ActorBar.NoActors;
-  // Issue 1182 rehomed this string with the World > Parties pane rebuild: the pane is
-  // world-scoped, so its copy moved out of the selected-system `Travel.*` namespace and
-  // the whole `Travel.Members.*` subtree was retired.
-  // Issue 1035 split it across a short title and a body, mirroring `travelActorEmpty`
-  // below, so tone is judged on both joined.
+  // Issue 1182 rehomed this string with the World > Parties pane rebuild: the pane is world-scoped,
+  // so its copy moved out of the selected-system `Travel.*` namespace and the whole
+  // `Travel.Members.*` subtree was retired.
   const partyEmpty = [
     lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfigured,
     lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfiguredHint,
   ].join(' ');
-  // The TRAVEL-ACTOR picker's equivalent (issue 1182), gated alongside the member one so
-  // the two cannot drift: they answer the same GM question about the same setting on the
-  // same card, and only one of them being honest is the failure this loop exists to stop.
-  // The reason is split across a short title and a body, so tone is judged on both joined.
+  // The TRAVEL-ACTOR picker's equivalent (issue 1182), gated alongside the member one so the two
+  // cannot drift: they answer the same GM question about the same setting on the same card, and
+  // only one of them being honest is the failure this loop exists to stop.
   const travelActorEmpty = [
     lang.FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActors,
     lang.FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActorsDetail,
@@ -857,9 +827,8 @@ describe('empty-state copy', () => {
   });
 
   it('the PLAYER-facing bar string names the cause and addresses the GM in the THIRD person', () => {
-    // The menu is display-gated on SETTINGS_MODIFY, so the player who reads this string
-    // has no such entry in their sidebar. Telling them to open it is a dead end for
-    // exactly the user who sees it most.
+    // The menu is display-gated on SETTINGS_MODIFY, so the player who reads this string has no such
+    // entry in their sidebar.
     assert.match(barEmpty, /player-character type/i, 'names the cause');
     assert.match(barEmpty, /ask your GM/i, 'and points at the person who can fix it');
     assert.equal(
@@ -870,13 +839,8 @@ describe('empty-state copy', () => {
   });
 
   it('neither string implies an unconfigured actor is banned, and neither promises a way to pick it', () => {
-    // Two failure modes, and the copy has to miss BOTH. Implying a ban is wrong:
-    // authorization is ownership-based (`isGatheringActorSelectableByUser`) and this change
-    // does not narrow it. But promising the actor "can still be used for crafting and
-    // gathering attempts" is also wrong, because every UI path runs through the narrowed
-    // bar list and `actorBarStore.selectScopedActor` no-ops for an owned non-PC — so a
-    // player who goes looking finds nothing. The honest line is "not blocked, but not
-    // pickable here".
+    // Two failure modes, and the copy has to miss BOTH. Implying a ban is wrong: authorization is
+    // ownership-based (`isGatheringActorSelectableByUser`) and this change does not narrow it.
     assert.match(barEmpty, /does not block/i, 'no implied ban');
     assert.match(barEmpty, /cannot be picked here/i, 'and no promised affordance');
     assert.equal(
@@ -903,29 +867,24 @@ describe('empty-state copy', () => {
   it('the travel-actor string names the setting, its side effect, and the way round it', () => {
     assert.match(travelActorEmpty, /Player Character Actor Types/, 'names the setting');
     assert.match(travelActorEmpty, /module settings/i, 'and where to find it');
-    // The setting is SHARED with the member picker, so widening it for a travel actor also
-    // widens party membership. A GM who is not told that discovers it by finding a vehicle
-    // offered as a party member.
+    // The setting is SHARED with the member picker, so widening it for a travel actor also widens
+    // party membership.
     assert.match(travelActorEmpty, /eligible party members/i, 'states the shared consequence');
     // And the escape hatch, because the type list is not the only way to assign one.
     assert.match(travelActorEmpty, /drag/i, 'offers the unfiltered drop path');
   });
 });
 
-// --- live propagation wiring (source pins) ----------------------------------
-//
-// The GM ticks the box; four surfaces must re-project WITHOUT a reload. These are the
-// app-module edges that carry the signal, and none of them is reachable from
-// `node --test` without a Foundry client, so they are pinned at the source.
+// live propagation wiring (source pins). The GM ticks the box; four surfaces must re-project
+// WITHOUT a reload.
 
 describe('the player-character-types hook is wired at every consuming edge', () => {
   const read = (relativePath) =>
     readFileSync(resolve(import.meta.dirname, '..', relativePath), 'utf8');
 
   it('main.js registers the shared setting handler on BOTH createSetting and updateSetting', () => {
-    // The FIRST EVER write to a world setting is a create, not an update, so a GM
-    // ticking `robot` for the first time — the exact reported journey — would otherwise
-    // propagate to nobody. `updateSetting` alone was the shipped state.
+    // The FIRST EVER write to a world setting is a create, not an update, so a GM ticking `robot`
+    // for the first time — the exact reported journey — would otherwise propagate to nobody.
     const main = read('src/main.js');
     assert.match(main, /Hooks\.on\('updateSetting', handleFabricateSettingDocumentChange\);/);
     assert.match(main, /Hooks\.on\('createSetting', handleFabricateSettingDocumentChange\);/);

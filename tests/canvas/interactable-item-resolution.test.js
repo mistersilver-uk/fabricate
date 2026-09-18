@@ -1,10 +1,7 @@
 /**
- * Fix 4 — `resolveItemUuidToTool`: map a dropped Foundry Item uuid to a
- * crafting-system Tool by resolving the item to the single component it IS through
- * the list-aware, system-scoped `resolveComponentForItem`, then matching the tool
- * whose componentId equals the resolved id. Pure + injected fakes; no live Foundry.
- * Also covers the `classifyInteractableDrop` Tier-2 integration and the issue-559
- * durable-identity guard.
+ * Fix 4 — `resolveItemUuidToTool`: map a dropped Foundry Item uuid to a crafting-system Tool by
+ * resolving the item to the single component it IS through the list-aware, system-scoped
+ * `resolveComponentForItem`, then matching the tool whose componentId equals the resolved id.
  */
 
 import test from 'node:test';
@@ -29,9 +26,8 @@ function systemWith({ id, tools, components }) {
 // World item with a uuid that a component claims as its source.
 const AXE_ITEM = { uuid: 'Item.axe-1', _stats: { compendiumSource: 'Compendium.world.tools.Item.axe-src' } };
 
-// A dropped item carrying a durable `flags.fabricate.roles` identity (and optional
-// raw refs), beside AXE_ITEM which has no getFlag. Mirrors getFabricateFlag's
-// 'fabricate.<key>' normalization.
+// A dropped item carrying a durable `flags.fabricate.roles` identity (and optional raw refs),
+// beside AXE_ITEM which has no getFlag. Mirrors getFabricateFlag's 'fabricate.<key>' normalization.
 function droppedItemWithComponentFlag({ uuid, roles, componentId, duplicateSource, compendiumSource } = {}) {
   return {
     uuid,
@@ -84,11 +80,7 @@ test('matches via the compendium source-uuid chain (resolveComponentForItem raw-
 });
 
 test('#559 / issue 561: a dropped item whose durable identity names a DIFFERENT tool is not mis-resolved via an inherited duplicateSource', () => {
-  // The system has tool-axe (source Item.axe-src) and an unrelated tool-other. The dropped
-  // item carries a durable `roles[sys].toolId` naming tool-other AND a duplicateSource
-  // overlapping tool-axe's source ref. A flag-blind raw-ref fall-through would match tool-axe
-  // via duplicateSource; the resolver instead honours the durable tool identity and resolves
-  // to tool-other, never the Woodaxe.
+  // The system has tool-axe (source Item.axe-src) and an unrelated tool-other.
   const systems = [systemWith({
     id: 'sysA',
     components: [

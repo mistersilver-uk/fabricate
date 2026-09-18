@@ -1,19 +1,7 @@
 /**
- * Unit coverage for the region-first `InteractableManager` seams (Phase 1c).
- *
- * The PURE routing logic (classification, region-spawn shaping, activation
- * eligibility/validation) is covered in `interactable-resolution.test.js` and
- * `tests/canvas/regions/*`. This suite exercises the thin Foundry edge:
- *   - register() now binds ONLY `dropCanvasData` + `controlToken` (the abandoned
- *     tile-click stage listener / hover+permission wraps / drawTile enablement
- *     are gone);
- *   - the dropCanvasData SUPPRESSION CONTRACT + GM gate;
- *   - the transaction-like Region + linked-Tile spawn (and orphan rollback);
- *   - the activation round-trip orchestration (onRegionEnter prompt gate,
- *     validateAndGrant, openGrant) via injected app/prompt seams.
- *
- * The manager reads its collaborators through `globalThis` fakes (`game`,
- * `Hooks`, `canvas`, `foundry.documents.TileDocument`, `ui.notifications`).
+ * Unit coverage for the region-first `InteractableManager` seams (Phase 1c). The PURE routing logic
+ * (classification, region-spawn shaping, activation eligibility/validation) is covered in
+ * `interactable-resolution.test.js` and `tests/canvas/regions/*`.
  */
 
 import test from 'node:test';
@@ -42,11 +30,7 @@ function restoreGlobals(saved) {
 }
 
 /**
- * A coherent fake Foundry runtime that records created Region + Tile documents
- * and notifications. The created Region exposes a `behaviors` collection holding
- * the nested `fabricate.interactable` behaviour (so the manager can write the
- * linked-visual ref back). Region/Tile create may be forced to fail to exercise
- * the transaction-like rollback.
+ * A coherent fake Foundry runtime that records created Region + Tile documents and notifications.
  */
 function installFakeFoundry({
   isGM = true,
@@ -454,13 +438,9 @@ test('(d) dialog cancel → NO region created (abort)', async () => {
 // --- onRegionEnter prompt gate ----------------------------------------------
 
 /**
- * A `fabricate.interactable` behaviour on a region on a scene, wired the way real
- * Foundry wires them: `behavior.parent` is the region, `region.parent` is the
- * scene, and every token document in `scene.tokens` has that same scene as its
- * `parent`. The scene carries `grid.size` because the containment re-check
- * computes the token CENTRE from the document footprint and that grid — a
- * grid-less scene degrades the centre to the document top-left, which reproduces
- * the issue-999 defect instead of testing the fix.
+ * A `fabricate.interactable` behaviour on a region on a scene, wired the way real Foundry wires
+ * them: `behavior.parent` is the region, `region.parent` is the scene, and every token document in
+ * `scene.tokens` has that same scene as its `parent`.
  */
 function interactableBehavior({ system, sceneId = 'scene-1', regionId = 'region-1', behaviorId = 'beh-1', testPoint = () => true, tokens = [], gridSize = 100 } = {}) {
   const scene = gridScene({ id: sceneId, gridSize });
@@ -701,9 +681,8 @@ test('onRegionExit dismisses the prompt by ref UNCONDITIONALLY (no mover gate)',
     const me = { id: 'u-1', isGM: false };
     const other = { id: 'u-2', isGM: false };
     globalThis.game.user = me;
-    // A DIFFERENT user (e.g. the GM staged the token and the player walks it out)
-    // moved the token out; this client still dismisses by ref. dismiss() is itself
-    // ref-matched + a no-op when this client is not showing the prompt.
+    // A DIFFERENT user (e.g. the GM staged the token and the player walks it out) moved the token
+    // out; this client still dismisses by ref.
     manager.onRegionExit(
       { user: other, data: { token: { document: { isOwner: false } } } },
       interactableBehavior({ system: TOOL_SYSTEM })
@@ -775,20 +754,7 @@ test('_requestActivation warns + aborts when NO active GM is connected', () => {
 
 // --- validateAndGrant (active GM) → grant emit/local open --------------------
 
-/**
- * Shared harness for the validateAndGrant tests, mirroring `setupReprompt`.
- *
- * It installs the fake runtime with THIS client as the active GM, the requesting
- * user, the actor-control verdict, and the behaviour the request ref resolves to
- * — and critically resolves `game.scenes.get(sceneId)` to the SAME scene object
- * that is `region.parent`, as real Foundry guarantees. `tokens` may be a factory
- * `(scene) => tokenDocs` so token documents can be parented to that scene.
- *
- * Every validateAndGrant test previously repeated ~25 lines of this wiring, which
- * is both a duplication-gate liability and how the containment collaborator went
- * uncovered: the old scene stub carried no tokens, so the re-check short-circuited
- * before it ever reached a containment call.
- */
+/** Shared harness for the validateAndGrant tests, mirroring `setupReprompt`. */
 function setupValidateAndGrant({
   system = TOOL_SYSTEM,
   tokens = [],
@@ -851,9 +817,8 @@ test('validateAndGrant emits a tool grant (with activeCanvasTool) to the request
 test('validateAndGrant REJECTS a non-GM requester who does NOT control the named actor (no grant, no open)', async () => {
   const saved = snapshotGlobals();
   try {
-    // The validating client is the active GM, but the REQUESTER (u-1) is a
-    // non-GM player who does NOT own actor a1 (testUserPermission → false).
-    // The actor-control gate must reject before any grant is emitted/opened.
+    // The validating client is the active GM, but the REQUESTER (u-1) is a non-GM player who does
+    // NOT own actor a1 (testUserPermission → false).
     const { manager, emits, request } = setupValidateAndGrant({ canControlActor: false });
     let opened = null;
     manager.openGrant = (payload) => { opened = payload; };
@@ -902,12 +867,9 @@ test('validateAndGrant notifies LOCALLY (no socket) when the GM requester is den
   }
 });
 
-// --- validateAndGrant containment re-check (issue 999) -----------------------
-//
-// The re-check runs on the ACTIVE GM'S client, which may not be viewing the
-// requester's scene, so no token document here has a placeable (`object`). The
-// region rect covers 100..200 on both axes; on a 100px grid a 1x1 token document
-// at (60,60) has its top-left OUTSIDE and its centre (110,110) INSIDE.
+// validateAndGrant containment re-check (issue 999). The re-check runs on the ACTIVE GM'S client,
+// which may not be viewing the requester's scene, so no token document here has a placeable
+// (`object`).
 const CONTAINMENT_RECT = { x: 100, y: 100, w: 100, h: 100 };
 
 /** A region testPoint recording every submitted point on `calls`. */
@@ -924,10 +886,9 @@ function recordingRectTestPoint(calls, rect = CONTAINMENT_RECT) {
 test('validateAndGrant ADMITS a token whose CENTRE is inside on a GM client with no rendered canvas (issue 999)', async () => {
   const saved = snapshotGlobals();
   try {
-    // The headline regression: the GM validating this request is not viewing the
-    // scene, so `tokenDoc.object` is null and the old code fell back to the
-    // token's top-left anchor — ~70px off-centre for a Medium token — and denied
-    // a player standing squarely in the region.
+    // The headline regression: the GM validating this request is not viewing the scene, so
+    // `tokenDoc.object` is null and the old code fell back to the token's top-left anchor — ~70px
+    // off-centre for a Medium token — and denied a player standing squarely in the region.
     const points = [];
     const { manager, emits, request } = setupValidateAndGrant({
       testPoint: recordingRectTestPoint(points),
@@ -1127,20 +1088,16 @@ test('openGrant opens a gathering-task session scoped to env+task with NO node o
 // --- issue 332: re-prompt after the gathering window closes ------------------
 
 /**
- * Build a canvas scene fake usable by BOTH the close re-prompt resolver
- * (`scene.tokens` + `selectRepromptTokenDoc`) and the existing re-prompt path
- * (`interactableBehaviorsContainingToken` over `scene.regions`, then
- * `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`). The single
- * interactable region's containment is controlled by `regionContains`.
+ * Build a canvas scene fake usable by BOTH the close re-prompt resolver (`scene.tokens` +
+ * `selectRepromptTokenDoc`) and the existing re-prompt path (`interactableBehaviorsContainingToken`
+ * over `scene.regions`, then `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`).
  */
 const REPROMPT_REF = { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' };
 
 /**
- * Build a canvas scene fake usable by BOTH the close re-prompt resolver
- * (`scene.tokens` + `selectRepromptTokenDoc`) and the existing re-prompt path
- * (`interactableBehaviorsContainingToken` over `scene.regions`, then
- * `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`). The single
- * interactable region's containment is controlled by `regionContains`.
+ * Build a canvas scene fake usable by BOTH the close re-prompt resolver (`scene.tokens` +
+ * `selectRepromptTokenDoc`) and the existing re-prompt path (`interactableBehaviorsContainingToken`
+ * over `scene.regions`, then `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`).
  */
 function buildRepromptScene({ system = TOOL_SYSTEM, regionContains = true, actorId = 'actor-1', tokenInScene = true, isOwner = true } = {}) {
   const scene = { id: 'scene-1', tokens: { contents: [] } };
@@ -1158,11 +1115,10 @@ function buildRepromptScene({ system = TOOL_SYSTEM, regionContains = true, actor
 }
 
 /**
- * Shared harness for the issue-332 close-reprompt tests: installs the fake
- * runtime, a non-GM controlling user, the re-prompt scene (as the active +
- * lookup scene unless `viewedScene` overrides the active one), an app `show`
- * recorder, and a prompt recorder injected into the manager. Returns the
- * collectors so each test only writes its distinct assertions.
+ * Shared harness for the issue-332 close-reprompt tests: installs the fake runtime, a non-GM
+ * controlling user, the re-prompt scene (as the active + lookup scene unless `viewedScene`
+ * overrides the active one), an app `show` recorder, and a prompt recorder injected into the
+ * manager.
  */
 function setupReprompt(sceneOpts = {}, { viewedScene } = {}) {
   installFakeFoundry({ isGM: false });

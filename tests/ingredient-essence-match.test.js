@@ -1,16 +1,7 @@
 /**
- * Tests for the `essence` ingredient match type (issue 649): a requirement
- * alternative may be an essence requirement (`match: { type:'essence', essenceId,
- * amount }`) alongside component/tags/currency, making "component OR essence"
- * authorable.
- *
- * Covers the same contract surface as the currency handler tests:
- *   - `_normalizeMatch` round-trips an essence match (trimmed id, clamped amount)
- *     and normalizes BEFORE the component fallback (essenceId/amount preserved)
- *   - `componentId`/`tag` derive null for an essence option
- *   - `validate({requireComplete})` accept/reject + `requireComplete:false` leniency
- *   - alternatives thread `requireComplete`
- *   - the `getDescription` essence arm
+ * Tests for the `essence` ingredient match type (issue 649): a requirement alternative may be an
+ * essence requirement (`match: { type:'essence', essenceId, amount }`) alongside
+ * component/tags/currency, making "component OR essence" authorable.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

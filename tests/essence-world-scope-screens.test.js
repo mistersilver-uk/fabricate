@@ -1,20 +1,6 @@
 /**
- * The four ESSENCE world-scope screens: the decisions that are decidable without a DOM
- * (issue 1372, epic 1357).
- *
- * ── WHAT THIS FILE OWNS, AND WHAT IT DELIBERATELY DOES NOT ────────────────────────────────────
- * Everything here is either a PURE model answer (the store's write semantics, the projection's
- * counts, the addressability filter, the validation check set) or a SOURCE CONTRACT that no
- * mounted render can express (which prop names each screen declares). The rendered half — the
- * absent source affordance, the three-state indicator, the inherited-section lock — is
- * `tests/components/essence-world-scope-screens-mounted.test.js`, because each of those is a
- * question about the DOM.
- *
- * ── EVERY ASSERTION CARRIES ITS OWN NON-VACUITY ───────────────────────────────────────────────
- * Several of these are ABSENCE claims — "the picker offers no system-local id", "no other
- * membership record was touched" — and an absence claim over an empty set is the cheapest green
- * there is. Each one is therefore paired with the positive half that proves the set it is
- * measuring is real.
+ * The four ESSENCE world-scope screens: the decisions that are decidable without a DOM (issue 1372,
+ * epic 1357).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -65,12 +51,7 @@ const ROSTER = [
   { id: 'sys-c', name: 'Emberwatch' },
 ];
 
-/**
- * A world essence corpus, from records this file states outright.
- *
- * @param {object} [options]
- * @returns {{entities: object[], defaults: object[], membership: object[]}}
- */
+/** A world essence corpus, from records this file states outright. */
 function corpusOf({ membership = [], defaults = [] } = {}) {
   return {
     entities: [
@@ -84,16 +65,7 @@ function corpusOf({ membership = [], defaults = [] } = {}) {
 
 // ── (1) THE SOURCE CONTRACT: NO SCREEN DECLARES A PROP ITS CALL SITE DOES NOT SUPPLY ──────────
 
-/**
- * The attribute names one call site passes, read off the root's own markup.
- *
- * The scan is TERMINATED on the closing `/>` at the opening tag's own indentation, never on the
- * first `>`: every one of these sites carries an inline arrow function whose `=>` would end the
- * scan a dozen attributes early.
- *
- * @param {string} componentName
- * @returns {string[]}
- */
+/** The attribute names one call site passes, read off the root's own markup. */
 function staticAttributesAt(componentName) {
   const lines = rootSource.split('\n');
   const index = lines.findIndex((line) => line.trim() === `<${componentName}`);
@@ -120,50 +92,13 @@ function staticAttributesAt(componentName) {
   return names;
 }
 
-// ── (1b) THE REQUIREMENT-7 CORRECTION, EVIDENCED ON THE REOPENING CHANGE'S OWN DIFF ───────────
-//
-// `### GM World Scoped Entity Routes` requirement 7 closes `CraftingSystemManagerRoot.svelte` to
-// this epic's later lanes, and its own amendment says the closure "is void for a seam the
-// enumeration does not name": reopening the file to supply a NAMED missing seam is a correction,
-// reopening it to build a screen is a violation, and "the distinction is not decidable from a
-// diff's file names, so a correction claim is EVIDENCED on the reopening change's own diff — by
-// an unchanged-render or import-surface assertion".
-//
-// The seam the enumeration missed is the inspector's deep link to the world definition
-// (`proto:1676`-`1678`): `EssenceBrowserInspector` is rendered by the shell with explicit props
-// and no bundle spread, so — unlike every scoped page — a prop declared on it would take its
-// default forever and no lane outside this file could reach it.
-//
-// THERE ARE NOW TWO SEAMS, and each carries its own bounded evidence.
-//
-// SEAM 1 is the inspector's deep link. Its evidence is the pair below: the render change is one
-// attribute on one child that was already rendered here, and the callback delegates to a shell
-// function this file already owns and already calls at three other sites.
-//
-// SEAM 2 (issue 1372) is the page header's `+ New essence` action. The prototype puts one button
-// in the header band, right-aligned on the title line (`essences.png`), where the screen shipped a
-// full-width name-field band above the list — and the header band is rendered HERE, by the
-// `.manager-header-actions` chain, so no page can reach it.
-//
-// SEAM 2 GROWS THE IMPORT SURFACE BY EXACTLY ONE SPECIFIER, and that is why the assertion below
-// is a bound rather than an equality with the shipped nine. `mintEssenceId` slugs a new record's
-// id and resolves a collision by suffix; the alternative to importing it was a second copy of that
-// logic in the gateway, which is the failure the one-implementation rule exists to prevent. The
-// bound is what keeps the reopening honest: the leaf is `scoped/essenceScoped.js`, which imports
-// nothing itself, the import is NAMED rather than a namespace, and the handler composes two things
-// this file already owns.
-//
-// SEAM 3 (issue 1372, maintainer parity round 4) is the entry editor's EXPLICIT SAVE. The screen
-// buffers its edit now, and the two things that act on a buffered edit are renderable only here:
-// the header's `← Back` / `Save essence` pair, because `.manager-header` is a sibling of
-// `.manager-main` and no page can render into it, and the unsaved-changes prompt, because leaving
-// by the rail or the breadcrumb never reaches the page at all.
-//
-// ITS BOUND IS THE SAME SHAPE AS SEAM 2's. The render is ONE shared component in the header-actions
-// chain rather than a hand-rolled pair, so the world tool entry takes it verbatim; the flush and
-// the guard delegate to `scoped/scopedEntryDraft.js`, which imports nothing itself; and the prompt
-// is the SHIPPED three-way essence one rather than a new dialog — a second prompt saying the same
-// thing in different words is how two screens end up disagreeing about one verb.
+// (1b) THE REQUIREMENT-7 CORRECTION, EVIDENCED ON THE REOPENING CHANGE'S OWN DIFF. `### GM World
+// Scoped Entity Routes` requirement 7 closes `CraftingSystemManagerRoot.svelte` to this epic's
+// later lanes, and its own amendment says the closure "is void for a seam the enumeration does not
+// name": reopening the file to supply a NAMED missing seam is a correction, reopening it to build a
+// screen is a violation, and "the distinction is not decidable from a diff's file names, so a
+// correction claim is EVIDENCED on the reopening change's own diff — by an unchanged-render or
+// import-surface assertion" (issue 1372).
 
 describe('requirement 7 correction — the reopened gateway grew a seam, not a dependency', () => {
   /** Every module specifier the gateway imports, in source order. */
@@ -195,13 +130,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
 
   it('SEAM 2 imports NAMED helpers from a leaf that imports nothing itself', () => {
     // A NAMESPACE import would turn this line into a permanent door: every future addition to the
-    // leaf would be reachable from the gateway with no diff here at all. The named form makes the
-    // next thing the gateway wants from that module a visible edit to this file and to this test.
-    //
-    // `essenceShortValueName` joined `mintEssenceId` at the round-8 parity pass: the editor rail's
-    // macro card is titled after its VALUE now, and a macro stored as a uuid whose document has
-    // not resolved has to fall back to its terminal segment — the same trim the list row's summary
-    // line prints — or the card reads `No macro` for a macro that is configured.
+    // leaf would be reachable from the gateway with no diff here at all.
     assert.match(
       rootSource,
       /import \{ essenceShortValueName, mintEssenceId \} from '\.\/scoped\/essenceScoped\.js';/,
@@ -253,19 +182,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       attributes.includes('onOpenWorldDefinition'),
       'the inspector call site carries the one callback the seam needs'
     );
-    // The RENDER bound, pinned to a literal. It is still ONE existing child with no new element,
-    // no new branch and no new screen — what moved is the prop set, and the pin is what makes a
-    // silent addition to a gateway call site visible.
-    //
-    // `onDuplicate` is GONE (issue 1372, maintainer parity round 8): duplicating wrote a second
-    // `system.essenceDefinitions` entry with its own name, icon and colour — a system-owned
-    // essence — from the same rail whose banner says identity is the Essence Catalogue's.
-    //
-    // The six that arrived are the two layers the reference states on this rail and could not:
-    // `systemName` and `inherited` are what turn the `ON CRAFT` list into `ON CRAFT IN <system>`
-    // with a provenance per card, and `systemRows` / `memberCount` / `rosterSize` /
-    // `membershipActions` / `onOpenSystemRules` are the `SYSTEM RULES n / m` panel's, which is
-    // the catalogue's own `SystemRulesRoster` composed here rather than a second copy.
+    // The RENDER bound, pinned to a literal (issue 1372).
     assert.deepEqual(
       attributes,
       [
@@ -301,15 +218,8 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
   });
 
   it('SEAM 3 renders the action pair through ONE shared component, not a hand-rolled pair', () => {
-    // The RENDER bound: ONE ELEMENT PER WORLD ENTRY ROUTE, each in its own branch, and never a
-    // pair of buttons a screen spells out for itself. A hand-rolled copy is exactly the recipe
-    // drift `design-system/spec.md` orders "back before save" to prevent.
-    //
-    // The count is THREE because the world tool entry took this component next (issue 1373) and
-    // the world COMPONENT entry took it third (issue 1371) - which is what this seam was
-    // extracted for, and this is the lane the note below asked to come here and say so. All
-    // three world entry routes now render it; the count stays asserted rather than unbounded so
-    // that a second pair inside one branch still reds.
+    // The RENDER bound: ONE ELEMENT PER WORLD ENTRY ROUTE, each in its own branch, and never a pair
+    // of buttons a screen spells out for itself (issue 1373).
     assert.equal(
       [...rootSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
       3,
@@ -343,10 +253,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
   });
 
   it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {
-    // THE HALF A MOUNT CANNOT REACH. `setView` is the shell's, and the rail, the breadcrumb and
-    // the header's own Back all pass through it — so an editor whose guard is wired only to its
-    // own Back button loses an unsaved edit on the other two ways out, silently, and every
-    // mounted assertion about the page stays green.
+    // THE HALF A MOUNT CANNOT REACH.
     assert.match(
       rootSource,
       /function confirmWorldEssenceEntryRouteExit\(/,
@@ -395,9 +302,7 @@ describe('the entry editor buffers exactly the identity fields an essence lifts 
   it('declares the SAME list as `WORLD_IDENTITY_FIELDS.essences`, in the same order', () => {
     // `WorldEssenceEntryPage` states the list rather than importing it, because its dependency
     // graph is copied module by module into three hand-rolled mounted trees and an omission there
-    // HANGS a suite rather than failing it. A stated list is a MIRROR, and a mirror rots silently:
-    // a field added to the world identity set and not to this one is simply never editable, on the
-    // one screen that exists to edit it, with every other test green.
+    // HANGS a suite rather than failing it.
     const entrySource = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte'),
       'utf8'
@@ -415,21 +320,8 @@ describe('the entry editor buffers exactly the identity fields an essence lifts 
   });
 });
 
-// ── (1c) THE ENTRY EDITOR'S LIVE-PREVIEW FOOTER ───────────────────────────────────────────────
-//
-// `EssenceBehaviorPreview` renders the footer strip, and it is no longer optional. The reference
-// draws it at the foot of the entry editor's preview panel (`proto:3537`) as it does on all six
-// of its editors (`proto:6138`, `6155`, `6209`).
-//
-// THE SUPPRESSION PROP IS GONE WITH ITS ONE CALLER (issue 1372, maintainer parity round 8). The
-// browser inspector was the site that passed `showLiveNote={false}`, and it no longer renders
-// this component at all — it draws the reference's `ON CRAFT IN <system>` cards, which answer a
-// different question. Both remaining callers are editors whose preview recomputes on every
-// keystroke, so both say so and neither has a choice to make.
-//
-// A source assertion rather than a mount, and the pairing is what makes it non-vacuous: a check
-// that the entry page merely lacks the prop would pass just as well if the note had been deleted
-// from the primitive, so the primitive's own unconditional render is asserted in the same breath.
+// (1c) THE ENTRY EDITOR'S LIVE-PREVIEW FOOTER. `EssenceBehaviorPreview` renders the footer strip,
+// and it is no longer optional (issue 1372).
 
 describe('the world essence entry editor keeps the live-preview note', () => {
   const entrySource = readFileSync(
@@ -523,15 +415,8 @@ describe('criterion 3 — no essence screen declares a prop its call site does n
 /**
  * A world essence action family over an in-memory corpus in the store's PERSISTED shape.
  *
- * MAPS, NOT ARRAYS, and that is the store's contract rather than a convenience: `persistedShape`
- * reads `defaults` and `membership` as objects keyed by entity id and by `membershipKey`, and an
- * array fixture normalises to EMPTY there — every write would then report success against a
- * corpus that had silently lost its records, and every "nothing else was touched" assertion
- * would pass over two empty maps.
- *
  * @param {{defaults?: object[], membership?: object[]}} corpus in the PROJECTION's array shape,
- *   which this converts, so one fixture literal drives both halves of the file.
- * @returns {{actions: object, read: () => object}}
+ * which this converts, so one fixture literal drives both halves of the file.
  */
 function actionsOver(corpus) {
   const toPersisted = (source) => ({
@@ -670,10 +555,7 @@ describe('criterion 9 — the world-defaults effectSource picker refuses a syste
   it('offers the world component id and the document UUID, and NOT the system-local id', () => {
     const offered = worldAddressableEffectSources(CANDIDATES, WORLD_COMPONENTS).map((c) => c.id);
     assert.deepEqual(offered, ['wc-ember', 'Item.kTz9QpLm2xR4vB1a']);
-    // NON-VACUITY IN BOTH DIRECTIONS. Without the world roster the first candidate is refused
-    // too, which proves the roster is what admits it rather than the shape test admitting
-    // everything; and every candidate is admitted once each is world-addressable, which proves
-    // the filter is not simply dropping the third by position.
+    // NON-VACUITY IN BOTH DIRECTIONS.
     assert.deepEqual(worldAddressableEffectSources(CANDIDATES, []).map((c) => c.id), [
       'Item.kTz9QpLm2xR4vB1a',
     ]);
@@ -752,11 +634,8 @@ describe('criterion 12 — every added validation check actually RENDERS', () =>
   });
 
   it('renders each one as a PRESENT row in its own group, not merely without throwing', () => {
-    // THE TRAP THIS CATCHES: `essenceValidationPresentation` FILTERS before it maps, precisely so
-    // a check the evaluator did not return is dropped rather than rendered from a half-object. A
-    // check registered in `ESSENCE_VALIDATION_CHECKS` but omitted from `CHECK_PRESENTATION` — or
-    // returned by the evaluator but never grouped — therefore disappears in SILENCE. Only a
-    // presence assertion catches it, and asserting "nothing threw" catches none of it.
+    // THE TRAP THIS CATCHES: `essenceValidationPresentation` FILTERS before it maps, precisely so a
+    // check the evaluator did not return is dropped rather than rendered from a half-object.
     const essence = { name: 'Ash', icon: 'fas fa-fire', description: 'Cinders' };
     const rendered = new Set();
     for (const context of [
@@ -782,8 +661,7 @@ describe('criterion 12 — every added validation check actually RENDERS', () =>
 
   it('leaves the SHIPPED seven-check tab byte-identical when no scope context is supplied', () => {
     // The shipped essence editor supplies neither `scope: 'world'` nor `membershipKnown`, and it
-    // must go on reporting exactly the seven checks it always did. Without this the eight new
-    // rows would land on a screen that cannot answer any of them.
+    // must go on reporting exactly the seven checks it always did.
     const shipped = essenceEditorValidation(
       { name: 'Ash', icon: 'fas fa-fire', description: 'Cinders' },
       {}
@@ -803,23 +681,9 @@ describe('criterion 12 — every added validation check actually RENDERS', () =>
 // ── (5) THE PRESENTATION LEAF ─────────────────────────────────────────────────────────────────
 
 describe('the effectSource SECTION is a block, and every screen that names it reads one', () => {
-  // ── THE DEFECT THIS PINS ────────────────────────────────────────────────────────────────
+  // THE DEFECT THIS PINS ────────────────────────────────────────────────────────────────
   // `effectSource` is the only section stored as a BLOCK over three shipped field names, and
-  // `essenceSectionValueName` reads a section value as a string or as `{id, name}`. Handed the
-  // block it found neither and answered `''`, so THREE screens reported an authored world default
-  // as unset at once: the catalogue card read `No default effect source`, the entry editor's card
-  // wore its `No default` pill over a `Drop the item…` prompt, and the system rules editor's
-  // inherit note read `The world default is unset, so this section resolves to nothing` directly
-  // above a locked tile naming a value.
-  //
-  // All three were unreachable until issue 1372 made an inheriting section resolve to its world
-  // default AND seeded one in the lab world, which is why every one of them shipped: the
-  // migration writes every membership record fully overriding, so no locked card could be drawn
-  // and no world-default card had a reason to be read.
-  //
-  // THE THREE SCREEN-LEVEL READS are asserted as SOURCE TEXT below, because each is a one-line
-  // call inside a `.svelte` and a mounted test that rendered them would need the world corpus,
-  // the projection and the shell — three seams away from the one-line fact.
+  // `essenceSectionValueName` reads a section value as a string or as `{id, name}` (issue 1372).
 
   it('answers the referent a block names, preferring the component id', () => {
     assert.equal(
@@ -890,8 +754,7 @@ describe('the effectSource SECTION is a block, and every screen that names it re
 
   it('and the locked cards render the WORLD layer rather than the draft', () => {
     // The `World default` pill sat over the two fields the UNLOCKED card edits — the draft's own
-    // source and macro — so a locked card labelled this system's own value as the world's. Equal
-    // by construction on a migrated world, and wrong the moment either side moved.
+    // source and macro — so a locked card labelled this system's own value as the world's.
     const tab = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte'),
       'utf8'
@@ -980,11 +843,7 @@ describe('the essence world-scope presentation leaf', () => {
 /**
  * `1.34.0` retires the losers' ids when it merges equivalent world essences, and the references it
  * deliberately leaves pointing at a retired id are harmless only while that id matches no
- * definition. Reissuing it makes a stale key resolve to a different essence's quantity.
- *
- * Not theoretical: the shell mints from a fixed placeholder name, so the shipped sequence is
- * `new-essence`, `new-essence-2`, `new-essence-3` — dense, deterministic, and reclaimed by the
- * next `+ New essence` press.
+ * definition.
  */
 describe('a retired essence id is never reissued', () => {
   it('treats a retired id as taken even though no live entity holds it', () => {
@@ -1040,8 +899,7 @@ describe('a retired essence id is never reissued', () => {
 
   it('reads every shape an unmerged or hand-edited world can hold as "no retired ids"', () => {
     // A world that never merged has no setting, a migration that found nothing to merge leaves
-    // `{}`, and a hand-edited setting may hold anything. None may throw on the publish path, and
-    // none may read as a retired id.
+    // `{}`, and a hand-edited setting may hold anything.
     const shapes = [undefined, null, {}, { retired: null }, { retired: [] }, { retired: 'ash' }, 7];
     for (const essenceMergeMap of shapes) {
       const { worldScope } = buildWorldScopeState({ systems: ROSTER, essenceMergeMap });
@@ -1062,10 +920,6 @@ describe('a retired essence id is never reissued', () => {
     // Matched as a live statement, never as a substring: a bare `match` is satisfied by the call
     // commented out, which is the shape a bisect or a revert produces, so the pin would certify a
     // shell that mints a hardcoded id and reclaims a retired one on the next press.
-    //
-    // What it does not prove: nothing in the repo presses `[data-world-essence-create]`, and
-    // `manager-mounted.test.js` is the only suite that mounts `CraftingSystemManagerRoot`, so a
-    // press-and-observe case belongs there. Do not read this regex as coverage of the act.
     const [, args] =
       rootSource.match(/\n {4}const id = mintEssenceId\(([\s\S]*?)\n {4}\);/) ?? [];
     assert.ok(args, 'the shell mints the new world essence id from a LIVE statement');
@@ -1104,11 +958,7 @@ describe('the shared-definition callout names the record its pill claims', () =>
 /**
  * The rules route draws two medallions for one essence — this callout and the page header's
  * `Medallion` + `<h1>`, whose name the breadcrumb repeats — rendered from different files, and
- * requirement 13 makes sourcing them from different layers a defect. Only this section joins them.
- *
- * Read from source because the subject is a `$derived` in the shell, and `manager-mounted.test.js`
- * is the only suite that mounts the shell. Each statement is matched whole, so a commented-out or
- * partially reverted chain fails rather than matching as a substring.
+ * requirement 13 makes sourcing them from different layers a defect.
  */
 describe('the rules route header draws the same layer the callout below it does', () => {
   /**
@@ -1147,8 +997,7 @@ describe('the rules route header draws the same layer the callout below it does'
 
   it('leaves the TINT reading the in-system projection, because M29 already put the world colour there', () => {
     // `adminStore` overlays the world `colorToken` onto the in-system row, so routing the tint
-    // through `essenceRulesWorldEntry` would swap one correct read for another. The callout's rule,
-    // restated at the second site that draws the same medallion.
+    // through `essenceRulesWorldEntry` would swap one correct read for another.
     const tint = shellDerived('essenceEditTint');
     assert.ok(tint, 'the tint is declared as a live `$derived` too');
     assert.ok(
@@ -1165,9 +1014,6 @@ describe('the rules route header draws the same layer the callout below it does'
  * own `essenceMergeMap`, so deleting the one argument `adminStore.js` supplies leaves this file
  * green while the product publishes `retiredIds: []` on every world forever — the failure
  * `tests/world-vocabulary-admin-store-composition.test.js` already records against this call.
- *
- * The subject is therefore the published `viewState`, from the real `createAdminStore` over the
- * shared services double, with `getSetting` answering as a settings registry would.
  */
 describe('the gateway hands the merge map to the projection', () => {
   /**
@@ -1206,9 +1052,7 @@ describe('the gateway hands the merge map to the projection', () => {
   });
 
   it('publishes no retired ids rather than THROWING when the setting is unregistered', async () => {
-    // The shape a services double answering only the keys it knows produces. A real client
-    // registers this key at init (`BASE_DEFINITIONS`) and answers the `{}` default, but
-    // `game.settings.get` raises on an unregistered key, so an unguarded read takes the publish down.
+    // The shape a services double answering only the keys it knows produces.
     const worldScope = await publishedWorldScope((key) => {
       if (key === 'worldEssenceMergeMap') throw new Error('is not a registered game setting');
       return key === 'lastManagedCraftingSystem' ? 'sys1' : '';

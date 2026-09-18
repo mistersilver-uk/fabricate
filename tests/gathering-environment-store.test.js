@@ -105,11 +105,8 @@ function environment(overrides = {}) {
     enabled: true,
     selectionMode: 'targeted',
     sceneUuid: 'Scene.stale',
-    // Manual composition, because that is what `enabledTaskIds` alone means after issue 1315:
-    // the environment composes exactly this picked list. It used to be left mode-less — hence
-    // automatic — and still counted as a task source, because the enable gate consulted
-    // `enabledTaskIds` in any mode. Automatic ignores that list entirely, so the gate now asks
-    // the composition predicate there and this fixture has to say which mode it means.
+    // Manual composition, because that is what `enabledTaskIds` alone means after issue 1315: the
+    // environment composes exactly this picked list.
     compositionMode: 'manual',
     enabledTaskIds: ['lib-task'],
     ...overrides
@@ -177,8 +174,7 @@ test('validation permits an automatic environment backed by a matching library t
   assert.deepEqual(automatic.enabledTaskIds, []);
 
   // Issue 1315: manual composes exactly `enabledTaskIds`, so a force list is not a task source
-  // there — it is not consulted at all. This environment composes nothing, and the gate that
-  // used to accept it did so through a guard that read `forcedTaskIds` in manual mode.
+  // there — it is not consulted at all.
   const manualForced = store.validate(
     environment({
       id: 'env-manual-forced',
@@ -516,9 +512,7 @@ test('load never throws on a stale includedRealmId (validation is save-time only
   assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRealmIds, ['gone']);
 });
 
-// ---------------------------------------------------------------------------
 // Legacy-acceptance fallback on read (imports bypass the 1.0.0 startup migration)
-// ---------------------------------------------------------------------------
 
 test('_normalizeEnvironment accepts legacy hazard-schema keys and values on read', () => {
   const { store } = makeMemoryStore();

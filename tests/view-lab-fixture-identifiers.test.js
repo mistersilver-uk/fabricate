@@ -1,19 +1,6 @@
 /**
- * Every fixture identifier a case names must exist in the lab world.
- *
- * `tests/view-lab-cases.test.js` checks that a selector's HOOKS exist in `src/` — the class names
- * and attribute names — and it deliberately strips attribute VALUES before doing so, because those
- * values are fixture ids and live here rather than in `src/`. Nothing then checked them there. That
- * left the registry's largest hand-maintained mirror unguarded: roughly fifty component, recipe,
- * tool, task, event, environment and actor ids, plus every `query.system`.
- *
- * A renamed fixture id is caught today only by a capture run — which needs harvested Foundry chrome,
- * so it does not run on a fork PR, does not run without credentials, and is not part of `npm test`.
- * Between the rename and the next successful capture, the case silently cannot reach its state.
- *
- * The check is exact-value, not substring: `sm-longsword` must BE an id in the world, not merely
- * appear somewhere in the file. Substring matching is how the sibling guard in `view-lab-cases`
- * passed over six broken selectors before it was tightened.
+ * Every fixture identifier a case names must exist in the lab world. The check is exact-value, not
+ * substring: `sm-longsword` must BE an id in the world, not merely appear somewhere in the file.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -93,17 +80,7 @@ function labYieldEntryIds() {
   );
 }
 
-/**
- * Every modifier-library entry id the lab world declares.
- *
- * READ FROM THE AUTHORED SHAPE, not from `system.modifiers`. The fixture authors the library
- * where the pre-`1.23.0` world carried it — `craftingCheck.checkModifiers` — and the lab boot
- * runs every migration over it, so the key the DOM is eventually built from does not exist in
- * `buildLabContent()` at all. Deriving from `system.modifiers` produced an EMPTY set, which
- * then rejected every id a case legitimately names.
- *
- * @returns {string[]}
- */
+/** Every modifier-library entry id the lab world declares. */
 function modifierLibraryIds() {
   return content.systems.flatMap((system) =>
     [
@@ -125,9 +102,7 @@ const IDENTITY_SOURCES = {
   'data-environment-id': new Set(content.environments.map((entry) => entry.id)),
   'data-knowledge-actor': new Set(actors.map((entry) => entry.id)),
 
-  // The ten below were the gap this file's own header describes and did not actually close. Each
-  // pins a fixture id in a selector, so a rename is caught only by a capture run — which does not
-  // run on fork PRs, and which is the slowest possible place to learn about a typo.
+  // The ten below were the gap this file's own header describes and did not actually close.
   'data-recipe-edit': new Set(content.recipes.map((entry) => entry.id)),
   'data-component-select': new Set(content.components.map((entry) => entry.id)),
   // The recipe browser's bulk selection control (issue 1010) — the exact mirror of
@@ -136,28 +111,18 @@ const IDENTITY_SOURCES = {
   // would otherwise surface only in a capture run.
   'data-recipe-select': new Set(content.recipes.map((entry) => entry.id)),
   'data-system-id': new Set(content.systems.map((entry) => entry.id)),
-  // The system Modifiers card's per-entry row and its roll note (issue 1118). Both pin a
-  // library entry id, and `manager-system-edit-modifier-rolls` opens one by id in its steps and
-  // asserts the note by id in its `expectSelector` — so a renamed entry would break the case in
-  // two places and be caught by neither until a capture run.
+  // The system Modifiers card's per-entry row and its roll note (issue 1118).
   'data-world-modifier': new Set(modifierLibraryIds()),
   'data-world-modifier-roll-note': new Set(modifierLibraryIds()),
   // The essence browser's bulk selection control (issue 1036) — the exact mirror of
-  // `data-component-select` and `data-recipe-select` above. The essence bulk-edit case pins
-  // fixture ids in its row ticks, so a rename would otherwise surface only in a capture run.
-  // Derived from the SYSTEM's declared vocabulary for the same reason `data-essence-id` is:
-  // deriving it from the essences components happen to carry would falsely reject a
-  // declared-but-uncarried essence.
+  // `data-component-select` and `data-recipe-select` above.
   'data-essence-select': new Set(
     content.systems.flatMap((system) =>
       (system.essenceDefinitions ?? []).map((essence) => essence.id)
     )
   ),
   // From the SYSTEM's declared vocabulary, which is what `adminStore` builds the browser's rows
-  // from and therefore what `EssenceBrowserView` writes into the attribute. Deriving these from the
-  // essences components happen to carry passes today only because the two coincide: it would
-  // falsely reject a declared-but-uncarried essence (the fixture authors exactly that deliberately
-  // for the `runic` TAG) and falsely accept an essence key typo'd onto a component.
+  // from and therefore what `EssenceBrowserView` writes into the attribute.
   'data-essence-id': new Set(
     content.systems.flatMap((system) =>
       (system.essenceDefinitions ?? []).map((essence) => essence.id)
@@ -187,9 +152,8 @@ const IDENTITY_SOURCES = {
     )
   ),
   // The carrier's key is `item.uuid || item.id`, and an owned item's uuid is the component's
-  // `originItemUuid` — which `component()` DEFAULTS to `Item.<id>` but two components override to
-  // a shared uuid. Rebuilding the default instead of reading the field admitted a value the DOM
-  // never carries and rejected the one it does.
+  // `originItemUuid` — which `component()` DEFAULTS to `Item.<id>` but two components override to a
+  // shared uuid.
   'data-essence-carrier': new Set(
     content.components.map((entry) => entry.originItemUuid ?? `Item.${entry.id}`)
   ),
@@ -206,14 +170,6 @@ function attributePairs(selector) {
 /**
  * The identifier pins in a selector that `IDENTITY_SOURCES` recognises, each marked with whether
  * its value exists in the lab world.
- *
- * A pin whose attribute name `IDENTITY_SOURCES` does not recognise, or whose value is empty, is not
- * returned at all — the caller never sees it, exactly as the original step loop silently skipped it.
- * Both the step sweep and the `expectSelector` sweep below call this so their extraction and
- * matching cannot drift apart.
- *
- * @param {string} selector
- * @returns {{name: string, value: string, known: boolean}[]}
  */
 function identifierPins(selector) {
   const pins = [];
@@ -225,25 +181,8 @@ function identifierPins(selector) {
   return pins;
 }
 
-// `data-popover-option` is deliberately absent from IDENTITY_SOURCES, and the widening it was
-// left out FOR has since happened. The attribute has one producer, `SearchablePopover.svelte`,
-// which stamps it for any option carrying a `dataId`; when this note was written one caller
-// supplied one — `RecipeBulkEditPanel.svelte`, with `dataId: book.id` — so its whole value space
-// was recipe book ids, and the component's own contract already named the Travel tab's pickers as
-// the intended adopters: an option needs an identity handle because "without one the only handle is
-// the display label, which is localized and therefore not a selector".
-//
-// Issue 1504 widened it much further than that. `Select` stamps EVERY row, so the attribute now
-// carries page sizes, recipe categories, scoped-list sort keys and check-tier ids
-// beside the book ids — none of them a lab-world record, several not identifiers at all.
-// A source set defined from recipe book ids would by now falsely reject eleven legitimate steps
-// across ten cases, which is exactly what the absence is here to prevent (issue #1021).
-//
-// Twenty of the twenty-five `expectSelector`-bearing cases key on an attribute IDENTITY_SOURCES does
-// not recognise — `data-bulk-book-state`, `data-essence-view`, `data-inventory-bulk-panel`,
-// `data-inventory-bulk-queue-row`, and others — and fall through `identifierPins`'s skip for the
-// same reason a step naming one of those attributes would. Widening IDENTITY_SOURCES to cover them
-// is out of scope here (issue #1021); this sweep only guards the five that already resolve.
+// `data-popover-option` is deliberately absent from IDENTITY_SOURCES, and the widening it was left
+// out FOR has since happened (issue 1504).
 
 test('every query.system names a real lab crafting system', () => {
   const known = new Set(Object.values(LAB_SYSTEM_IDS));
@@ -292,10 +231,7 @@ test('every fixture id an expectSelector names exists in the lab world', () => {
   }
 
   // This sweep is prospective: today every recognised expectSelector pin duplicates a value its own
-  // case's steps already pinned, so a rename is caught by the step sweep first. A guard that
-  // currently catches nothing needs a guard of its own, because one wired to the wrong field or run
-  // over an always-empty collection passes exactly as loudly as a correct one. Counting the pins
-  // the loop above actually visited, rather than recomputing them here, is what makes that visible.
+  // case's steps already pinned, so a rename is caught by the step sweep first.
   assert.ok(
     recognized > 0,
     'this sweep visited no expectSelector pin IDENTITY_SOURCES recognises, so the assertion below ' +
@@ -321,25 +257,7 @@ test('the identity sources are populated, so the checks above are not vacuous', 
   assert.ok(Object.values(LAB_SYSTEM_IDS).length >= 5, 'expected one system per resolution mode');
 });
 
-/**
- * The lab world Item roster reaches `game.items`, which is the collection the product reads.
- *
- * `buildDocumentIndex` has always minted an Item per component, tool and recipe item, but the
- * shim built `game.items` as an EMPTY collection and only appended what a frame created at
- * runtime. `getWorldItemOptions` in `SvelteCraftingSystemManagerApp.svelte.js` maps that
- * collection directly, so every screen resolving a linked game-world Item was photographed
- * against a roster no GM has.
- *
- * It was invisible in both directions. `toolSourceSnapshot` falls back
- * `worldItem || managedItem || tool`, so a linked tile drew the TOOL's own name and art and
- * looked entirely correct while never exercising the resolved-Item path. And `sourceMissing`
- * requires a NON-EMPTY roster by design — a roster that has not loaded must not read as a broken
- * link — so `ItemDropZone`'s `missing` face could not render in the lab at all, and the case
- * written for it failed the whole capture rather than one frame.
- *
- * This asserts the wiring, not a count: a non-empty roster, every entry an Item, and a uuid the
- * index does not mint answering nothing. The third is what the `missing` face depends on.
- */
+/** The lab world Item roster reaches `game.items`, which is the collection the product reads. */
 test('the lab seeds game.items from the document index, Items only', async () => {
   const { installFoundryShim } = await import('./view-lab/foundry/installFoundryShim.js');
   const documents = buildDocumentIndex(content, actors);
@@ -460,8 +378,7 @@ test('every persisted history-data record is already in the shape its manager wr
     assert.ok(records.length > 0, `${state} persists a terminal record`);
     for (const record of records) {
       // `nativeHistoryRecord` is the normalizer the managers persist through, so a record that is
-      // not already its own normal form carries a field no writer produces. This is what stops a
-      // proposed field being inserted into a fixture after the fact and photographed as evidence.
+      // not already its own normal form carries a field no writer produces.
       assert.deepEqual(nativeHistoryRecord(record), record, `${state}/${record.id}`);
       const rows = receipts(record);
       assert.ok(rows.length > 0 || record.createdResults?.length === 0, `${state} has receipts`);
@@ -1000,10 +917,7 @@ test('alchemy Journal uses a supplied authored recipe revealed to its player, no
   const run = containers.craftingRuns.active['lab-v1-alchemy'];
   assert.equal(run.recipeId, 'al-r-fire');
   const ingredientSet = recipes.find((recipe) => recipe.id === run.recipeId).ingredientSets[0];
-  // Match on the source-reference UNION, as production does. A real owned item's uuid is
-  // `<actor.uuid>.Item.<id>`; its origin lives in `flags.core.sourceId`, which is what
-  // `getItemSourceReferences` folds in. Comparing `held.uuid` only worked while the lab
-  // double conflated the two.
+  // Match on the source-reference UNION, as production does.
   const matches = (option, held) => {
     const component = seeded.components.find((entry) => entry.id === option.match.componentId);
     return Boolean(component) && getItemSourceReferences(held).includes(component.originItemUuid);
@@ -1110,10 +1024,8 @@ test('Journal error fixture refuses repeated initial loads and retries until exp
   assert.equal(await services.listJournalForActor('actor'), listing);
 });
 
-// The only two fixtures allowed to arm a clock without a start receipt, and each is a WITNESS
-// to that exact shape rather than a case that merely needs one. The seven cases that used to
-// shelter here — an editable requirement rail on a counting-down stage — are repaired: four are
-// unbegun and three keep the receipt their clock implies (issue 1648, M18/D-028).
+// The only two fixtures allowed to arm a clock without a start receipt, and each is a WITNESS to
+// that exact shape rather than a case that merely needs one (issue 1648).
 const EDITABLE_GATED_STATES = new Set([
   // The deliberate pre-D-026 witness: a run the shipped release armed, which is exactly this
   // shape and is what its frame exists to photograph.
@@ -1124,9 +1036,8 @@ const EDITABLE_GATED_STATES = new Set([
 
 test('no Journal fixture arms a clock the product could not have armed', () => {
   // Under D-026/D-028 a stage cannot hold a `timeGate` without a `preparedConsumption`: both
-  // `markStepStarted` and the legacy `_startTimedStep` write the receipt before they arm the
-  // gate. A fixture that armed one anyway depicted a state the product can no longer create,
-  // which is how the whole active cohort came to model the deadlocked shape (issue 1648).
+  // `markStepStarted` and the legacy `_startTimedStep` write the receipt before they arm the gate
+  // (issue 1648).
   const offenders = [];
   for (const state of Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS)) {
     if (EDITABLE_GATED_STATES.has(state)) continue;

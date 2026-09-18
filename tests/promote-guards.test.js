@@ -124,8 +124,7 @@ test('the beta backwards refusal names a REACHABLE remedy: bring the release lin
   // Issue #1001. The old message named only "push the feature work to main so beta.yml mints a
   // newer beta", which is unreachable in exactly the state that produces this refusal: while the
   // prerelease line is itself numbered below v1.6.0, the next version it mints (1.4.0-beta.69) is
-  // below it too. The only operation that raises the line is the forward-port, and the refusal must
-  // say so — a refusal whose printed remedy cannot work is the defect this issue exists to remove.
+  // below it too.
   const verdict = evaluateRegistryLeadTarget({
     channel: 'beta',
     sourceChannel: 'early-access',

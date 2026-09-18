@@ -1,17 +1,7 @@
 /**
- * THE DEFERRED-ENTRY NOTICES (issue 1565) — the whole of what `src/main.js` cannot be made to
- * prove about them.
- *
- * `src/main.js` statically imports CSS, so no test can import it; every existing guard over it
- * reads its SOURCE TEXT. A source-text guard can pin a dispatch's position and can never
- * execute a classification, a fallback, a retain-and-reuse decision or a swallow/rethrow
- * contract — which is why all four live in `src/utils/deferredEntryNotice.js` and are asserted
- * here by running them.
- *
- * The measured reason this suite exists in this shape: `tests/item-directory-manager-launch.test.js`
- * used unanchored `assert.match` over a sliced region, and appending a `.catch(...)` to the call
- * site it guards left both of its regexes matching. A grep cannot catch the defect that a
- * reporter fails to report.
+ * THE DEFERRED-ENTRY NOTICES (issue 1565) — the whole of what `src/main.js` cannot be made to prove
+ * about them. `src/main.js` statically imports CSS, so no test can import it; every existing guard
+ * over it reads its SOURCE TEXT.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -28,13 +18,7 @@ import {
 /** A localizer that resolves nothing, so every builder falls back to its literal sentence. */
 const noLocalizer = () => undefined;
 
-/**
- * A reporter over recording stubs.
- *
- * `notify` hands back an incrementing handle shaped like core's (`{ id }`), because
- * `Notifications#has` is only callable with `id > 0` and the reporter's live-notice probe is
- * capability-checked against exactly that.
- */
+/** A reporter over recording stubs. */
 function reporterHarness({ hasNotice, handle } = {}) {
   const logged = [];
   const notified = [];
@@ -63,9 +47,7 @@ const CHUNK_FAILURE = new TypeError(
 );
 
 test('every engine’s dynamic-import failure text produces the reload notice', () => {
-  // The three real texts, one per engine. Chromium/Edge, Firefox, Safari — verified against the
-  // engines' own wording rather than paraphrased, because this classification is the only thing
-  // standing between the user and the generic no-cause notice.
+  // The three real texts, one per engine.
   const engineTexts = [
     'Failed to fetch dynamically imported module: https://host/modules/fabricate/chunks/a.js',
     'error loading dynamically imported module: https://host/modules/fabricate/chunks/a.js',
@@ -186,16 +168,9 @@ test('a reported failure writes exactly one console line and one un-mirrored not
 
   assert.equal(logged.length, 1, 'exactly one console write per failure');
   assert.equal(logged[0][0], CHUNK_FAILURE, 'the console carries the underlying error');
-  // THE SEAM TAKES THE ERROR ALONE, and that shape is load-bearing rather than tidy: it leaves
-  // the console line's own text referenced by the console CALL and by nothing else, which is what
-  // lets `tests/release-build.test.js` find that call in the built bundle and pin its LEVEL.
-  // WHAT THAT ASSERTION DOES NOT REST ON is the literal's mere presence, and an earlier version of
-  // this comment had it backwards. `vite.config.js` does declare `console.log`/`info`/`debug`
-  // pure, but Rolldown may drop such a call only when its RETURN VALUE IS UNUSED — and `src/main.js`
-  // writes this one from a concise arrow that returns it, so a level regression here leaves both
-  // the call and the literal in `dist/main.js`. (The stale-entry write IS a statement, and does
-  // strip.) Either way a spy here cannot see a level at all, which is why the level is not
-  // asserted in this suite.
+  // THE SEAM TAKES THE ERROR ALONE, and that shape is load-bearing rather than tidy: it leaves the
+  // console line's own text referenced by the console CALL and by nothing else, which is what lets
+  // `tests/release-build.test.js` find that call in the built bundle and pin its LEVEL.
   assert.equal(logged[0].length, 1, 'the console seam receives the error and nothing else');
   assert.ok(
     DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE.length > 0,
@@ -220,9 +195,8 @@ test('a second failure while the notice is still live logs but does not re-notif
   assert.equal(logged.length, 2, 'the console carries each failure');
   assert.equal(notified.length, 1, 'the user is not notified again over a visible notice');
 
-  // Once it has drained — a non-permanent notice lasts five seconds — a further failure must
-  // notify again. A once-per-session flag would leave this user with nothing, which is the
-  // invisible failure this change exists to remove.
+  // Once it has drained — a non-permanent notice lasts five seconds — a further failure must notify
+  // again.
   live = false;
   report(CHUNK_FAILURE);
   assert.equal(logged.length, 3);
@@ -236,10 +210,7 @@ test('a hasNotice-less, id-less or throwing probe never throws and always notifi
   assert.equal(withoutProbe.notified.length, 2, 'no probe means no suppression');
 
   // The View Lab's shim returns `undefined` from `warn`/`error`, and `Notifications#has` THROWS on
-  // that — and on any handle without `id > 0` — so the probe must never be reached with one. NOT
-  // because a queued notice lacks an id: `notify` assigns `id: this.#id++` before pushing, and
-  // `has` searches the queue ahead of the active set, so a queued notice reads as live, which is
-  // the behaviour this reporter wants.
+  // that — and on any handle without `id > 0` — so the probe must never be reached with one.
   const idless = reporterHarness({ hasNotice: () => true, handle: () => undefined });
   const nullHandle = reporterHarness({ hasNotice: () => true, handle: () => null });
   const zeroId = reporterHarness({ hasNotice: () => true, handle: () => ({ id: 0 }) });

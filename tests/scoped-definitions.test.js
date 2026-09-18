@@ -1,14 +1,4 @@
 // The entity-AGNOSTIC half of Scoped Entity Definitions (issue 1358, part of epic 1357).
-//
-// Every assertion in here holds identically for components, essences and tools, so it is written
-// ONCE in `runScopedEntityContract` and driven three times from `ENTITY_CONTRACTS`. That is a
-// requirement rather than a preference: SonarCloud's duplication detector reads `tests/**` and does
-// not honour `sonar.cpd.exclusions`, so three near-identical copies of these blocks would fail the
-// new-code duplication gate on their own.
-//
-// The genuinely per-entity rules — the component category fallback and its missing `enabled` key,
-// the essence soft disable, the tool repairRequirements seed and the breakage authority — live in
-// `tests/entity-scope-resolvers.test.js`.
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
@@ -93,14 +83,8 @@ const ENTITY_CONTRACTS = [
  * The adversarial inputs criterion 7 enumerates, built fresh per call so one suite's mutation
  * cannot leak into another's.
  *
- * EVERY CASE CARRIES ITS EXPECTED OUTPUT LENGTH, because "DROPPED rather than repaired"
- * (`## Scoped Entity Definitions` requirement 10) is a statement about a COUNT and a shape
- * assertion cannot see it: a normalizer that repaired an id-less entry to `{ id: '' }` still
- * satisfies `typeof entry.id === 'string'` on every entry it emits.
- *
- * @param {string} section
  * @returns {Array<[string, unknown, number, number]>} why, input, expected world length, expected
- *   membership length.
+ * membership length.
  */
 function adversarialInputs(section) {
   const cyclicSection = { note: 'a section value that points at itself' };
@@ -172,9 +156,7 @@ function adversarialInputs(section) {
   ];
 }
 
-/**
- * Build a normalized world default and a normalized membership record for one entity.
- */
+/** Build a normalized world default and a normalized membership record for one entity. */
 function seedCorpus(contract, { systemId = SYSTEM_ID } = {}) {
   const worldDefaults = contract.normalizeWorld([{ id: ENTITY_ID, ...contract.worldSections }]);
   const memberships = contract.normalizeRecords([{ entityId: ENTITY_ID, systemId }]);
@@ -240,9 +222,7 @@ function runScopedEntityContract(contract) {
   test(`${label} scope: an overriding switch that stores NO value still answers the world value`, () => {
     // This record is REACHABLE, not adversarial junk: `setSectionInheritance` produces it whenever
     // the world default is itself unauthored, and `normalizeMembership` emits it for import,
-    // copy-mode and the 1.30.0 migration — none of which go near the UI's seeding path. Resolving
-    // it as an override of nothing means a tool that stops breaking, or an essence whose property
-    // macro silently stops running.
+    // copy-mode and the 1.30.0 migration — none of which go near the UI's seeding path.
     const { worldDefault } = seedCorpus(contract);
     const [record] = contract.normalizeRecords([
       { entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: { [section]: false } },
@@ -410,10 +390,9 @@ function runScopedEntityContract(contract) {
 
   test(`${label} scope: a non-boolean inherit value is DROPPED rather than coerced`, () => {
     const { worldDefault } = seedCorpus(contract);
-    // The `typeof value === 'boolean'` sweep in the adversarial test above CANNOT see a
-    // coercion — `Boolean(x)` satisfies it by construction — and a TRUTHY non-boolean coerces
-    // to the same `true` a dropped key resolves to. Only the ABSENCE of the key, plus the
-    // resolve a FALSY one would otherwise flip, can tell dropped from coerced.
+    // The `typeof value === 'boolean'` sweep in the adversarial test above CANNOT see a coercion —
+    // `Boolean(x)` satisfies it by construction — and a TRUTHY non-boolean coerces to the same
+    // `true` a dropped key resolves to.
     for (const notABoolean of ['yes', 0, '', null, 1, {}]) {
       const [record] = contract.normalizeRecords([
         { entityId: ENTITY_ID, systemId: SYSTEM_ID, inherit: { [section]: notABoolean } },
@@ -487,8 +466,7 @@ for (const contract of ENTITY_CONTRACTS) runScopedEntityContract(contract);
 
 test('membershipKey composes entity THEN system around the separator, exactly', () => {
   // Written as a LITERAL rather than as `${a}${SEP}${b}`, which would re-implement the function
-  // under test and pin nothing about the separator. The argument order matters beyond aesthetics:
-  // this key IS the persisted record identity that the first-wins de-duplication reads.
+  // under test and pin nothing about the separator.
   assert.equal(membershipKey('ash-salt', 'blacksmithing'), 'ash-salt|blacksmithing');
   assert.equal(MEMBERSHIP_KEY_SEPARATOR, '|');
   assert.notEqual(
@@ -515,11 +493,7 @@ test('defineScope answers a frozen descriptor over a DEFENSIVE copy of the secti
   }, TypeError, 'the frozen descriptor refuses a structural flip');
 });
 
-// --- The dependency boundary (criterion 9) ----------------------------------------------------
-//
-// PARSED, never substring-searched. A substring search is defeated by any indirection or barrel
-// re-export and is false-failed by an unrelated comment, so this extracts real specifiers and
-// resolves them relative to the file. Comments are stripped first for the same reason.
+// The dependency boundary (criterion 9). PARSED, never substring-searched.
 
 const SYSTEMS_DIR = fileURLToPath(new URL('../src/systems/', import.meta.url));
 const PRIMITIVE_PATH = path.join(SYSTEMS_DIR, 'scopedDefinitions.js');
@@ -533,10 +507,6 @@ function stripComments(source) {
  * Every module specifier the file really imports: `import ... from`, bare `import '…'`, re-export
  * `export ... from`, and dynamic `import('…')` in BOTH its quoted and its template-literal
  * spellings.
- *
- * The template-literal pattern deliberately refuses an interpolation (`[^`$]`), because a computed
- * specifier is not a specifier this extractor can read — `assertEveryDynamicImportIsReadable`
- * below fails such a file outright rather than letting it pass as "no forbidden import found".
  */
 function extractImportSpecifiers(source) {
   const code = stripComments(source);

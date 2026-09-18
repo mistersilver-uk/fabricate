@@ -1,26 +1,9 @@
-/**
- * `grantRecipeKnowledge` — the companion contract's GM knowledge grant (issue 1289, T2).
- *
- * Covers acceptance criteria 1-5 and 7. The `isObservable` seam is wired to the REAL
- * `RecipeVisibilityService.isLearnedKnowledgeObservable` rather than a stub, and the flag
- * seams to the REAL `getFabricateFlag` / `setFabricateFlag`, because a stubbed predicate
- * would pass whatever the grant asked it and prove nothing about the pairing these tests
- * exist to pin. Criteria 1-4 are the observability 2x2 (alchemy x observable); 3 and 4 are
- * mirrors of 1 and 2 and go RED against the withdrawn "learn mode OR alchemy" predicate, in
- * opposite directions.
- *
- * The actor double carries `update` and `setFlag` but deliberately NO `updateSource`, which
- * is the shape `setFabricateFlag` routes to `setFlag` for. That is why "zero writes" is
- * asserted as BOTH spies empty: asserting only the one the writer happens to use would pass
- * for a grant that wrote through the other.
- */
+/** `grantRecipeKnowledge` — the companion contract's GM knowledge grant (issue 1289, T2). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals, set before the service module is imported.
-// ---------------------------------------------------------------------------
 
 globalThis.foundry = {
   utils: {
@@ -44,14 +27,11 @@ const { COMPANION_OUTCOMES, GRANTED_BY_MAX_LENGTH, KNOWLEDGE_GRANT_MESSAGE_KEYS 
 const { readLearnedRecipeEntries } = await import('../src/systems/recipeKeyedFlagEntries.js');
 const { assertContractResult } = await import('./helpers/companionContractOutcomes.js');
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 const FLAG_SCOPE = 'fabricate';
-// `getFabricateFlag`/`setFabricateFlag` prefix the key, so the durable path under the
-// scope is doubly nested. Spelled from the shared constant so a rename cannot leave the
-// fixture reading a flag nothing writes.
+// `getFabricateFlag`/`setFabricateFlag` prefix the key, so the durable path under the scope is
+// doubly nested.
 const FLAG_PATH = `${FLAG_SCOPE}.${LEARNED_RECIPES_FLAG_KEY}`;
 
 function readPath(root, path) {
@@ -71,13 +51,7 @@ function writePath(root, path, value) {
   target[leaf] = value;
 }
 
-/**
- * The actor the grant writes to.
- *
- * `learned` is seeded in the shape Foundry has ALREADY PERSISTED — a dotted recipe id is
- * passed pre-expanded as the subtree `Document#update` really stores it as — rather than
- * flat, so a fixture cannot lie about the persisted shape the way the pre-1143 doubles did.
- */
+/** The actor the grant writes to. */
 class GrantActor {
   constructor({ id = 'actor-1', name = 'Idrin', learned = null, refuseWrites = false } = {}) {
     this.id = id;
@@ -101,9 +75,8 @@ class GrantActor {
     return value;
   }
 
-  // Present so the double is a plausible Actor, and so "zero writes" can be asserted over
-  // both write routes. `setFabricateFlag` only takes this route when `updateSource` also
-  // exists, which it deliberately does not here.
+  // Present so the double is a plausible Actor, and so "zero writes" can be asserted over both
+  // write routes.
   async update(changes) {
     this.updateCalls.push(changes);
     return this;
@@ -167,9 +140,7 @@ function assertNoWrites(actor, why) {
   assert.deepEqual(actor.updateCalls, [], `${why}: no update write`);
 }
 
-// ---------------------------------------------------------------------------
 // Criterion 1 — a genuinely non-observable system refuses, and writes NOTHING
-// ---------------------------------------------------------------------------
 
 test('1289 C1 a non-observable system refuses knowledgeNotObservable with zero writes', async () => {
   // Non-alchemy `item`: the reveal switch's `item` arm forces `knowledgeMode: 'item'`, so
@@ -194,14 +165,11 @@ test('1289 C1 a non-observable system refuses knowledgeNotObservable with zero w
   assert.deepEqual(persistedLearnedMap(actor), seed, 'the persisted map reads back unchanged');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 2 — `global` alchemy with craft-time auto-learn OFF SUCCEEDS
-// ---------------------------------------------------------------------------
 
 test('1289 C2 a grant on GLOBAL alchemy with learnOnCraft off succeeds and writes the entry', async () => {
-  // The alchemy switch's `default:` arm reads the learned map UNCONDITIONALLY; `learnOnCraft`
-  // gates only the brew-discovery union. So a granted entry here IS revealed, and refusing it
-  // (as an earlier revision did) would have withheld the member's whole reason for existing.
+  // The alchemy switch's `default:` arm reads the learned map UNCONDITIONALLY; `learnOnCraft` gates
+  // only the brew-discovery union.
   const system = craftingSystem({ resolutionMode: 'alchemy', visibilityMode: 'global' });
   const { service, seams } = harness({ system });
   const actor = new GrantActor({ learned: {} });
@@ -231,9 +199,7 @@ test('1289 C2 a grant on GLOBAL alchemy with learnOnCraft off succeeds and write
   assert.equal(access.visible, true, 'the granted recipe is revealed to its owner');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 3 — mirror: flat `knowledge` over a residual `knowledge.mode: 'item'`
-// ---------------------------------------------------------------------------
 
 test('1289 C3 flat knowledge over a residual item sub-mode succeeds, and the evaluator agrees', async () => {
   // The state a migrated world reaches when the GM clicks "Knowledge":
@@ -267,9 +233,7 @@ test('1289 C3 flat knowledge over a residual item sub-mode succeeds, and the eva
   assert.equal(access.visible, true, 'predicate and evaluator cannot drift apart');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 4 — mirror: alchemy `item` / `restricted` with auto-learn off REFUSES
-// ---------------------------------------------------------------------------
 
 test('1289 C4 alchemy item/restricted with auto-learn off refuses, and the evaluator hides the entry', async () => {
   // `access` present with nobody granted, so the `restricted` arm genuinely hides the recipe
@@ -316,9 +280,7 @@ test('1289 C4b alchemy item/restricted becomes observable the moment auto-learn 
   }
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 5 — idempotency, including a dot-expanded legacy id
-// ---------------------------------------------------------------------------
 
 test('1289 C5 an already-known recipe answers alreadyKnown with success true and zero writes', async () => {
   const system = craftingSystem({ visibilityMode: 'knowledge' });
@@ -356,9 +318,7 @@ test('1289 C5 a DOT-EXPANDED legacy id is not re-granted, which a bare index wou
   assertNoWrites(actor, 'a dot-expanded already-known id');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 6 (the part this lane owns) — the recipe and system resolution gates
-// ---------------------------------------------------------------------------
 
 test('1289 C6 an unknown recipe refuses recipeNotFound before any system or flag is touched', async () => {
   const system = craftingSystem({ visibilityMode: 'knowledge' });
@@ -389,9 +349,7 @@ test('1289 C6 a recipe whose system does not resolve refuses systemNotFound', as
 
   const result = await grantRecipeKnowledge({ actor, recipeId: orphan.id }, seams);
 
-  // Asserted WHOLE, not by outcome alone. `Grant.SystemNotFound` reads "No crafting system
-  // found for {recipe}.", so a refusal that dropped its interpolation bag would still carry
-  // the right outcome and the right key while showing a GM the braces (issue 1289 C3).
+  // Asserted WHOLE, not by outcome alone (issue 1289).
   assertContractResult(result, {
     success: false,
     outcome: COMPANION_OUTCOMES.systemNotFound,
@@ -401,9 +359,7 @@ test('1289 C6 a recipe whose system does not resolve refuses systemNotFound', as
   assertNoWrites(actor, 'an unresolvable system');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 7 — the written shape, and `grantedBy` refusals
-// ---------------------------------------------------------------------------
 
 test('1289 C7 the granted entry is four SCALARS and round-trips through the entry reader', async () => {
   const system = craftingSystem({ visibilityMode: 'knowledge' });
@@ -489,9 +445,7 @@ test('1289 C7 exactly GRANTED_BY_MAX_LENGTH characters is accepted, one more is 
   assert.equal(persistedLearnedMap(actor)[RECIPE.id].grantedBy.length, GRANTED_BY_MAX_LENGTH);
 });
 
-// ---------------------------------------------------------------------------
 // A refused write is reported, never thrown
-// ---------------------------------------------------------------------------
 
 test('1289 a write Foundry refuses answers grantFailed rather than rejecting', async () => {
   const system = craftingSystem({ visibilityMode: 'knowledge' });

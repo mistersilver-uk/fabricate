@@ -1,22 +1,7 @@
 /**
- * Issue 772 — the component browser's pure bulk selection + staging model.
- *
- * Everything the bulk edit feature can be reasoned about without a DOM lives in
- * `src/utils/componentBulkEditModel.js`; the Svelte surfaces are wiring. This suite
- * therefore owns the semantics the plan pinned as easy to get subtly wrong:
- *
- * - the three-state tag cycle, and the invariant that a tag is never BOTH staged for
- *   addition and staged for removal;
- * - `essences` / `difficulty` being emitted on PRESENCE of their staged flag, never on
- *   the truthiness of their value — a staged all-zero map is the "clear essences on
- *   every selected component" instruction;
- * - a removal-only draft counting as a change, so `Apply` enables for it.
- *
- * The SELECTION half moved to `bulk-selection-model.test.js` with the helpers themselves
- * (issue 1010) — page-selection state, the select-all-results affordance, and every helper
- * returning a NEW `Set` are pinned there, against the shared model's own names.
- *
- * Top-level under `tests/` deliberately: the `npm test` glob covers `tests/*.test.js`.
+ * Issue 772 — the component browser's pure bulk selection + staging model. Everything the bulk edit
+ * feature can be reasoned about without a DOM lives in `src/utils/componentBulkEditModel.js`; the
+ * Svelte surfaces are wiring.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -137,9 +122,8 @@ describe('component bulk edit model (issue 772) — the staged draft', () => {
   });
 
   it('toggleBulkEssencesStaged arms and disarms the axis while keeping the staged map', () => {
-    // Acceptance 16: on a fresh draft every essence is already 0, and `Stepper` emits
-    // nothing at the zero boundary — so the indicator is the ONLY way to stage a
-    // clear-everything edit.
+    // Acceptance 16: on a fresh draft every essence is already 0, and `Stepper` emits nothing at
+    // the zero boundary — so the indicator is the ONLY way to stage a clear-everything edit.
     const armed = toggleBulkEssencesStaged(createComponentBulkDraft());
     assert.equal(armed.essencesStaged, true);
     assert.deepEqual(armed.essences, {});
@@ -289,12 +273,10 @@ describe('component browser state (issue 772)', () => {
   });
 });
 
-// ── The system bulk panel's inset anatomy (issue 1371 r16-list, maintainer rulings M23/M24) ──
-//
-// The panel draws each axis as the reference's inline inset — a search well, a fixed window of
-// rows each carrying an `n/N` count of how many SELECTED components already carry the value, and
-// a pager — and its foot names the staged axes. All of that is arithmetic over the draft and the
-// projected cards, so it lives here where it can be pinned without a DOM.
+// The system bulk panel's inset anatomy (issue 1371 r16-list, maintainer rulings M23/M24). The
+// panel draws each axis as the reference's inline inset — a search well, a fixed window of rows
+// each carrying an `n/N` count of how many SELECTED components already carry the value, and a pager
+// — and its foot names the staged axes.
 describe('component bulk edit model (issue 1371 r16-list) — the staged-axis list the foot names', () => {
   it('names no axis on a fresh draft, and each axis in the reference’s order once staged', () => {
     assert.deepEqual(stagedBulkAxes(createComponentBulkDraft()), []);

@@ -1,12 +1,4 @@
-/**
- * Issue 561 — first-class Tools acceptance (A1–A9).
- *
- * Every capability/repro here is RED on `28c3ca49` and green after: on pristine `main`
- * there is no `addToolFromUuid` / `autoStampToolSources` / `deleteTool` / `itemIsToolByDurableIdentity`
- * and `Tool.validate()` still requires a `componentId`, so each call throws or the assertion
- * inverts. The crafting acceptance drives the REAL `RecipeManager` / `CraftingEngine` over an
- * installed system (never a bare `resolveToolForItem` call and never a stubbed matcher).
- */
+/** Issue 561 — first-class Tools acceptance (A1–A9). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,9 +58,7 @@ function sourceItem(spec, description = '') {
   return source;
 }
 
-// ---------------------------------------------------------------------------
 // A1 — register a tool directly from an Item uuid with NO component
-// ---------------------------------------------------------------------------
 
 test('A1 - addToolFromUuid registers a first-class tool (componentId null) matched through the real RecipeManager', async () => {
   const mgr = buildManager();
@@ -394,9 +384,7 @@ test('deleteTool prefers the registered source and rolls back deletion when stri
   assert.equal(saveCalls, 2);
 });
 
-// ---------------------------------------------------------------------------
 // A2 — whetstone: a tool + a component on ONE Item coexist without flag clobber
-// ---------------------------------------------------------------------------
 
 test('A2 - a component and a tool on one Item keep both roles leaves; deleting the tool spares componentId', async () => {
   const mgr = buildManager();
@@ -422,9 +410,7 @@ test('A2 - a component and a tool on one Item keep both roles leaves; deleting t
   );
 });
 
-// ---------------------------------------------------------------------------
 // A3 — the durable-identity tool-breakage path uses toolId (real matcher)
-// ---------------------------------------------------------------------------
 
 test('A3 - breakage selects the durable toolId tool and spares a duplicateSource decoy (still present)', async () => {
   const mgr = buildManager();
@@ -460,9 +446,7 @@ function ownedToolItem(spec) {
   return item;
 }
 
-// ---------------------------------------------------------------------------
 // A4 — migration converts a componentId-tool without breaking its recipes
-// ---------------------------------------------------------------------------
 
 test('A4 - migrateToolsToFirstClass copies component refs onto a legacy tool and is idempotent', () => {
   const systems = [
@@ -495,14 +479,8 @@ test('A4 - migrateToolsToFirstClass copies component refs onto a legacy tool and
   assert.equal(JSON.stringify(systems), snapshot);
 });
 
-// ---------------------------------------------------------------------------
-// Production-path derive: _normalizeSystem derives a component-linked tool's own
-// source refs + snapshot from its component (the beyond-delta compatibility bridge).
-// This is the ONLY test that routes through the REAL _normalizeSystem call site — a
-// wrong impl that drops `deriveToolSourceFromComponents(normalizedTool, items)` ships
-// green without it (A4 pre-migrates; the craftability/canvas suites reuse the shared
-// helper directly, both bypassing the production call).
-// ---------------------------------------------------------------------------
+// Production-path derive: _normalizeSystem derives a component-linked tool's own source refs +
+// snapshot from its component (the beyond-delta compatibility bridge).
 
 test('_normalizeSystem derives a component-linked tool\'s source refs + snapshot and it matches a source-only copy', () => {
   const mgr = buildManager();
@@ -532,9 +510,7 @@ test('_normalizeSystem derives a component-linked tool\'s source refs + snapshot
   assert.equal(rm.toolMatchesItem(recipe, t, sourceOnlyCopy), true);
 });
 
-// ---------------------------------------------------------------------------
 // A5 — autoStampToolSources writes roles[sys].toolId; ordering after migration
-// ---------------------------------------------------------------------------
 
 test('A5 - autoStampToolSources stamps migration-populated tool refs, skips locked/unresolvable, idempotent', async () => {
   _registry.clear();
@@ -574,9 +550,7 @@ test('A5 - autoStampToolSources stamps migration-populated tool refs, skips lock
   _registry.clear();
 });
 
-// ---------------------------------------------------------------------------
 // A6 — a dotted-systemId tool degrades to raw refs, never refuses
-// ---------------------------------------------------------------------------
 
 test('A6 - a dotted systemId resolves a tool by raw refs and _toolRoleFlagKey is null (no write, no throw)', async () => {
   const mgr = buildManager();
@@ -593,9 +567,7 @@ test('A6 - a dotted systemId resolves a tool by raw refs and _toolRoleFlagKey is
   assert.equal(rm.toolMatchesItem(recipe, mgr.getSystem('my.system').tools[0], owned), true);
 });
 
-// ---------------------------------------------------------------------------
 // A7 — name-fallback split: presence keeps it, breakage never uses it
-// ---------------------------------------------------------------------------
 
 test('A7 - a name-only item satisfies presence but is NEVER selected for usage/breakage', () => {
   const mgr = buildManager();
@@ -617,9 +589,7 @@ test('A7 - a name-only item satisfies presence but is NEVER selected for usage/b
   );
 });
 
-// ---------------------------------------------------------------------------
 // A8 — canvas item-drop resolves a first-class Tool via resolveToolForItem
-// ---------------------------------------------------------------------------
 
 test('A8 - a dropped item-sourced Tool (no component) resolves through firstToolMatch', async () => {
   const { resolveItemUuidToTool } = await import('../src/canvas/interactableItemResolution.js');
@@ -632,9 +602,7 @@ test('A8 - a dropped item-sourced Tool (no component) resolves through firstTool
   assert.deepEqual(match, { systemId: 'sysA', toolId: 'tool-chisel' });
 });
 
-// ---------------------------------------------------------------------------
 // A9 — tool repair reconciles the tools bucket via resolveToolForItem
-// ---------------------------------------------------------------------------
 
 test('A9 - repairItemData stamps an owned tool copy via the TOOL resolver', async () => {
   const mgr = buildManager();
@@ -646,11 +614,8 @@ test('A9 - repairItemData stamps an owned tool copy via the TOOL resolver', asyn
   });
   // An owned copy whose compendium source equals the tool's source ref (no durable flag yet).
   const ownedCopy = makeWorldItem({ uuid: 'Item.owned-axe', name: 'Axe', compendiumSource: 'Item.axe-src' });
-  // Dispatch-isolation decoy: it carries a LEGACY scalar `flags.fabricate.componentId`
-  // equal to a tool id but NO matching source ref. The TOOL resolver has no legacy-scalar
-  // tier, so it resolves nothing and this item is never stamped. A wrong impl routing the
-  // tools bucket through `resolveComponentForItem` WOULD read the scalar, match `tool-axe`,
-  // and mis-stamp it — so the "stays undefined" assertion pins the dispatch.
+  // Dispatch-isolation decoy: it carries a LEGACY scalar `flags.fabricate.componentId` equal to a
+  // tool id but NO matching source ref.
   const scalarDecoy = makeWorldItem({ uuid: 'Item.scalar-only', name: 'Unrelated' });
   scalarDecoy.flags = { fabricate: { fabricate: { componentId: 'tool-axe' } } };
   const actor = { items: [ownedCopy, scalarDecoy] };
@@ -686,9 +651,7 @@ test('A9 - repairItemData stamps an owned tool copy via the TOOL resolver', asyn
   };
 });
 
-// ---------------------------------------------------------------------------
 // migrateExportPayload upcast + stripTransitionalAliases preservation (D10)
-// ---------------------------------------------------------------------------
 
 test('migrateExportPayload upcasts a legacy componentId-only tool with derived refs + snapshot', () => {
   const payload = {

@@ -1,10 +1,6 @@
 /**
- * Proves that the Svelte runtime is importable and functional inside
- * `node --test` without any DOM environment.
- *
- * A `writable` store exercises the core Svelte reactivity primitive that all
- * Fabricate stores will build upon. If this import fails, the Svelte package
- * is not installed or its ESM exports are broken.
+ * Proves that the Svelte runtime is importable and functional inside `node --test` without any DOM
+ * environment.
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,8 +22,7 @@ describe('Svelte writable store (runtime smoke test)', () => {
 
     unsubscribe();
 
-    // subscribe() always emits the current value immediately, then each
-    // subsequent change.
+    // subscribe() always emits the current value immediately, then each subsequent change.
     assert.deepEqual(received, ['initial', 'updated']);
   });
 

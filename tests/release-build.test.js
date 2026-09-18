@@ -14,10 +14,7 @@ import {
   archiveNameMismatchMessage,
   releaseZipName
 } from '../scripts/lib/releaseZipChunks.js';
-// Imported, never retyped, for two reasons. A retyped copy would silently stop matching the day
-// the sentence in src/ is reworded; and each of these literals is referenced by nothing except its
-// own console write, so a copy living in this file would still match a bundle that write had been
-// stripped out of — which is exactly the regression the stale-entry assertion below has to catch.
+// Imported, never retyped, for two reasons.
 import { MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE } from '../src/migration/migrationNoticeDetail.js';
 import {
   DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
@@ -26,9 +23,7 @@ import {
 
 const { rewriteModuleJson, getRequiredFiles, validateDist, getFlag, parseReleaseVersionOptions, applyReleaseUrls } = await import('../scripts/release.js');
 
-// ───────────────────────────────────────────────────────────────────────────
 // rewriteModuleJson() tests
-// ───────────────────────────────────────────────────────────────────────────
 
 test('rewriteModuleJson strips dist/ prefix from esmodules', () => {
   const manifest = {
@@ -170,9 +165,7 @@ test('rewriteModuleJson handles missing optional fields gracefully', () => {
   assert.equal(result.id, 'fabricate');
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // release version option tests
-// ───────────────────────────────────────────────────────────────────────────
 
 test('getFlag returns a flag value and ignores following flags', () => {
   assert.equal(getFlag(['--dist-version', '0.2.0-rc.1'], '--dist-version'), '0.2.0-rc.1');
@@ -200,13 +193,10 @@ test('parseReleaseVersionOptions rejects simultaneous source and dist version fl
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────────
-// applyReleaseUrls() tests — issue #627 task 3.6
-//
-// The release artefact's in-zip module.json must bake the repository's LATEST-release manifest URL
-// (never version-pinned, never a channel URL) so public clients are not manifest-rewrite-prompted on
-// every update, while `download` stays version-pinned so the artefact fetches its own archive.
-// ───────────────────────────────────────────────────────────────────────────
+// applyReleaseUrls() tests — issue #627 task 3.6. The release artefact's in-zip module.json must
+// bake the repository's LATEST-release manifest URL (never version-pinned, never a channel URL) so
+// public clients are not manifest-rewrite-prompted on every update, while `download` stays
+// version-pinned so the artefact fetches its own archive.
 
 test('applyReleaseUrls bakes the LATEST-release manifest URL, not a version-pinned one', () => {
   const manifest = applyReleaseUrls({}, '1.5.0');
@@ -252,27 +242,15 @@ test('applyReleaseUrls mutates and returns the same manifest, preserving other f
   assert.deepEqual(result.esmodules, ['main.js']);
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // Build-wiring integration tests: ONE real build, several things proved about it.
-//
-// The pure unit tests above cannot catch a DELETED (or mis-gated) call site inside release.js's
-// main(). Only a real spawn can, and a real spawn is the expensive thing here — so the build is
-// memoised and every wiring assertion below reads the SAME dist/ and the same captured stdout.
-// The memo, not test declaration order, is what makes that safe.
-// ───────────────────────────────────────────────────────────────────────────
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-// A version no other string in the tree can collide with. That matters: the tracked version 0.1.0
-// occurs in dist/main.js for entirely unrelated reasons (a data-migration step is labelled 0.1.0),
-// so asserting the REAL version against the bundle would pass whether or not the define reached it.
+// A version no other string in the tree can collide with.
 const WIRE_VERSION = '9.9.9-wiretest';
 let wireBuild;
 
 /**
  * Run the real `--dist-version <v> --no-zip` build ONCE and hand back its stdout.
- *
- * `stdio` pipes rather than ignores because two of the assertions below are about what the script
- * PRINTS. The inner `npx vite build` inherits this pipe, so its output is in here too.
  *
  * @returns {string} Everything the build wrote to stdout.
  */
@@ -318,11 +296,8 @@ const STATIC_IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*)["'](\.{1,2}\/[^"']+\.
 
 /**
  * The source of the built file holding `literal`, among `dist/main.js` and every chunk it loads
- * STATICALLY. Rolldown hoists a module the lazy manager chunk also imports into a shared chunk, so
- * a startup write need not sit in `dist/main.js` itself; a lazily imported chunk does not count.
+ * STATICALLY.
  *
- * @param {string} distDir
- * @param {string} literal
  * @returns {string} that file's source, or `''` when no startup file holds the literal.
  */
 function startupModuleHolding(distDir, literal) {
@@ -344,20 +319,12 @@ function startupModuleHolding(distDir, literal) {
 /**
  * Pin BOTH that a module console literal reached the bundle AND the level it is written at.
  *
- * THE LEVEL NEEDS ITS OWN ASSERTION, and the first version of this file wrongly believed presence
- * implied it: `vite.config.js` declares `console.log`/`info`/`debug` pure, but
- * `manualPureFunctions` lets Rolldown drop a call only when its RETURN VALUE IS UNUSED. The
- * deferred-load line is written from a concise arrow (`log: (error) => console.error(MSG, error)`)
- * whose value IS the call's, so that one survives at any level and `includes` alone cannot see a
- * regression — measured, by rebuilding at `console.info` with the old assertion still green. The
- * stale-entry line is a bare statement and genuinely does strip. Asserting the CALL covers both.
- *
  * @param {string} bundle The built `dist/main.js`.
  * @param {string} literal The exported console literal, imported from src/ rather than retyped.
  * @param {'error'|'warn'|'info'} level The level this line must be written at. The optional-call
- *   form `console.info?.(...)` is accepted too: it is how a pure-marked level survives as a statement.
+ * form `console.info?.(...)` is accepted too: it is how a pure-marked level survives as a
+ * statement.
  * @param {string} what Names the line, for the failure message.
- * @returns {void}
  */
 function assertBundleConsoleLine(bundle, literal, level, what) {
   // Asserted BEFORE the includes(): an accidentally empty literal makes `includes('')` true for
@@ -370,9 +337,7 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
       ' out of the published build entirely'
   );
 
-  // Minifiers may either bind the literal to a name or inline it at the call site. Both shapes
-  // pin the level; accepting both keeps this from failing on a formatting choice while still
-  // failing on every level change. (Rolldown currently binds it.)
+  // Minifiers may either bind the literal to a name or inline it at the call site.
   const quoted = `["'\`]${escapeForRegExp(literal)}["'\`]`;
   const call = `console\\.${level}(?:\\?\\.)?\\(`;
   if (new RegExp(`${call}\\s*${quoted}`).test(bundle)) return;
@@ -382,19 +347,8 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
     `${what}: the literal is neither bound to an identifier nor inlined at a console call, so` +
       ' this assertion cannot locate the write — update it against the current minifier output'
   );
-  // `assert.ok(regex.test(...))` rather than `assert.match(bundle, ...)`, for READABILITY. The
-  // actual value is `dist/main.js` — 1.7 MB of minified bundle — and `node:assert` inspects the
-  // actual to build its failure report, so one `assert.match` failure here makes `node --test`
-  // emit a FAILURE REPORT of roughly 23,000 characters that still never names the console level it
-  // found. That size belongs to the REPORT, not to the printed bundle: Node caps the printed
-  // excerpt at the first 10,000 characters of the actual and closes it with a `... N more
-  // characters` tail, and the runner prints that capped excerpt twice — once in the assertion
-  // message, once in the AssertionError dump. This 1.7 MB actual and the 300 KB `src/main.js`
-  // actual guarded by `tests/item-directory-manager-launch.test.js` therefore produce reports of
-  // much the same size. The message below carries the diagnosis instead. A local choice for a
-  // whole-bundle actual, not a rule about `assert.match`.
-  // Escaped: Rolldown allocates `$`-prefixed identifiers in a large bundle, and a raw `$` in this
-  // pattern reads as an end anchor, so the assertion can fail against a correct bundle (issue 1654).
+  // `assert.ok(regex.test(...))` rather than `assert.match(bundle, ...)`, for READABILITY (issue
+  // 1654).
   const boundName = escapeForRegExp(bound[1]);
   assert.ok(
     new RegExp(`${call}\\s*${boundName}\\b`).test(bundle),
@@ -435,8 +389,7 @@ test('the built bundle carries the version this build shipped, and every console
   );
 });
 
-// D11: `npm run build` is `--no-zip`, so the archive gate has nothing to check. It must say so and
-// still exit 0 — a build that produced no archive reports that the proof did not run, never a pass.
+// D11: `npm run build` is `--no-zip`, so the archive gate has nothing to check.
 test('a --no-zip build reports the archive gate as skipped and still succeeds', () => {
   const stdout = buildWithoutZip();
   assert.ok(
@@ -448,13 +401,8 @@ test('a --no-zip build reports the archive gate as skipped and still succeeds', 
   assert.ok(stdout.includes('Build complete. dist/ is valid.'), 'the build itself must succeed');
 });
 
-// D9's negative composition proof. release.js's main() takes no `deps` and does
-// `rm -rf dist` -> build -> zip in one pass, so nothing can hand the build path a short archive.
-// `--validate-only` returns before the build, which is what makes this constructible at all.
-//
-// It asserts the GATE'S OWN MESSAGE and the missing member's NAME, never merely a non-zero exit:
-// that same branch also exits 1 from validateDist, so a status check alone would pass just as
-// happily if the gate had been deleted and dist/ merely happened to be incomplete.
+// D9's negative composition proof. release.js's main() takes no `deps` and does `rm -rf dist` ->
+// build -> zip in one pass, so nothing can hand the build path a short archive.
 test('release.js --validate-only fails on an existing archive short a referenced chunk', async () => {
   buildWithoutZip();
   const distDir = join(REPO_ROOT, 'dist');
@@ -495,10 +443,6 @@ test('release.js --validate-only fails on an existing archive short a referenced
 });
 
 // Issue 1565, r3 review finding 5. THE SKIP LINE IS ONLY HONEST WHEN dist/ HOLDS NO ARCHIVE.
-// The archive name carries a version and `--dist-version` never touches the tracked module.json,
-// so a bare `npm run release:validate` after such a build derives `fabricate-v0.1.0.zip`, misses
-// the archive that was actually produced, and used to print "this build produced no archive" —
-// exiting 0 and silently skipping the one check the maintainer ran the command for.
 test('release.js --validate-only refuses rather than reporting a skip when dist/ holds an archive under another name', async () => {
   buildWithoutZip();
   const distDir = join(REPO_ROOT, 'dist');
@@ -535,9 +479,7 @@ test('release.js --validate-only refuses rather than reporting a skip when dist/
   }
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // getRequiredFiles() tests
-// ───────────────────────────────────────────────────────────────────────────
 
 test('getRequiredFiles returns esmodule paths', () => {
   const manifest = {
@@ -616,9 +558,7 @@ test('getRequiredFiles handles multiple esmodules', () => {
   assert.ok(files.includes('vendor.js'));
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // validateDist() tests
-// ───────────────────────────────────────────────────────────────────────────
 
 async function makeTempDist(files, moduleJson) {
   const dir = await mkdtemp(join(tmpdir(), 'fabricate-dist-'));

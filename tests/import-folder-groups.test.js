@@ -1,9 +1,4 @@
-/**
- * Issue 771 — the per-folder collector for folder-aware bulk import. Groups a world
- * folder, an in-pack folder, and a whole pack into
- * `[{folderId, folderName, itemCount, itemUuids}]` — one row per distinct source folder
- * — WITHOUT `Folder#getSubfolders` (world-only) for the compendium cases.
- */
+/** Issue 771 — the per-folder collector for folder-aware bulk import. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

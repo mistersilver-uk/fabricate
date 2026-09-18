@@ -1,20 +1,6 @@
 /**
- * The World Vocabulary store, its projection and the numbers both publish (issue 1392, epic
- * 1357, PR 7a).
- *
- * ── EVERYTHING HERE GOES THROUGH `buildWorldScopeState`, NEVER `projectWorldVocabulary` ────
- * A direct call to the projection bypasses `readCorpus`, which is the shared reader the three
- * scoped-entity legs use and which probes THIS store with THEIR sub-key names inside a guard
- * that converts any throw into an unavailable projection. `{available: false, total: 0}` is a
- * legitimate published shape, so a store whose `isSeeded` threw would blank the whole screen and
- * its rail badge with no error and no failing test anywhere else. Asserting through the
- * composition is what makes that reachable.
- *
- * ── AND THE COUNTS ARE ASSERTED AGAINST REAL STORES ───────────────────────────────────────
- * `tests/components/world-vocabulary-page-mounted.test.js` hand-supplies each row's
- * `silentlyDeletable`, which is what the page receives — so deleting the COMPUTATION would not
- * red there, and the panel's own default (`totalUsage === 0`) would silently restore the
- * one-click delete on exactly the row it must never be offered for. That arm is here.
+ * The World Vocabulary store, its projection and the numbers both publish (issue 1392, epic 1357,
+ * PR 7a).
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -73,18 +59,15 @@ function componentStore(seams, seed = null) {
 const rowsById = (state, kind) => new Map(state[kind].map((row) => [row.id, row]));
 
 test('the setting key this store owns is the one `settings.js` registers', () => {
-  // A MIRROR, AND IT IS GUARDED. The store takes its seams by injection and deliberately does
-  // not import `src/config/settings.js` — that import transitively pulls `src/ui/theme.js` into
-  // every closure — so the key is restated. A drift would leave the store reading and writing a
-  // key nothing registers, which `ClientSettings#assertSetting` turns into a throw that
-  // `load()`'s guard swallows into a permanently empty vocabulary.
+  // A MIRROR, AND IT IS GUARDED. The store takes its seams by injection and deliberately does not
+  // import `src/config/settings.js` — that import transitively pulls `src/ui/theme.js` into every
+  // closure — so the key is restated.
   assert.equal(WORLD_VOCABULARY_SETTING_KEY, SETTING_KEYS.WORLD_VOCABULARY);
 });
 
 test('the derived entry id is the key the shipped reference counter joins on', () => {
-  // THE OTHER MIRROR. `vocabularyUsage.js` keys its maps with a module-private `vocabularyKey`,
-  // and every world count is `usage.get(entry.id)`. If the two ever disagreed, every entry would
-  // publish `totalUsage: 0` — and a zero-usage row offers a ONE-CLICK delete.
+  // THE OTHER MIRROR. `vocabularyUsage.js` keys its maps with a module-private `vocabularyKey`, and
+  // every world count is `usage.get(entry.id)`.
   const usage = buildVocabularyUsage(
     [{ category: '  Potions  ' }],
     [{ category: 'Reagent', tags: ['HERB'] }]
@@ -236,10 +219,7 @@ test('the reference count is real on all three vocabularies, including the world
     ],
     recipeCategories: [{ id: 'potions', name: 'Potions' }],
   });
-  // ONE WORLD COMPONENT DEFAULT CARRYING `moss`, AND NO SYSTEM COMPONENT CARRYING IT. The
-  // migration deliberately leaves world tags unauthored, so a GM-authored world tag is a grant
-  // no membership record mirrors: excluding it here would publish `Unused` for a tag every
-  // member system has been granted, under a red one-click delete.
+  // ONE WORLD COMPONENT DEFAULT CARRYING `moss`, AND NO SYSTEM COMPONENT CARRYING IT.
   const components = componentStore(seams, {
     entities: [{ id: 'c1', name: 'Moss Clump' }],
     defaults: { c1: { id: 'c1', category: 'Reagent', tags: ['moss'] } },
@@ -280,16 +260,13 @@ test('the reference count is real on all three vocabularies, including the world
   const recipeCategories = rowsById(worldScope.vocabulary, 'recipeCategories');
 
   // THE THREE EXPECTED VALUES ARE MUTUALLY DISTINCT, so a wrong-map join cannot pass by
-  // coincidence. `Reagent` is 3 and NOT 4: the world default's own `category` is excluded,
-  // because a migrated world elected it from a system that already carries it.
+  // coincidence.
   assert.equal(categories.get('reagent').totalUsage, 3);
   assert.equal(tags.get('herb').totalUsage, 2, 'a component AND a recipe tag placeholder');
   assert.equal(recipeCategories.get('potions').totalUsage, 4);
   assert.equal(tags.get('moss').totalUsage, 1, 'exactly one — the world default, counted once');
 
-  // THE SECOND NUMBER, WHICH NOTHING ELSE PRODUCES. `confirmTokensFor`'s `componentTags` branch
-  // can answer `{}` with every other assertion in this repository green, and the only symptom is
-  // that the GM reads a literal `{components}` in a destructive confirm.
+  // THE SECOND NUMBER, WHICH NOTHING ELSE PRODUCES.
   assert.deepEqual(
     tags.get('moss').confirmTokens,
     { components: 1 },
@@ -300,9 +277,8 @@ test('the reference count is real on all three vocabularies, including the world
     { components: 0 },
     'and the POSITIVE CONTROL: a tag no world default carries states a zero, not an absent token'
   );
-  // THE CATEGORY KIND STATES BOTH OF ITS OWN, and they are independent: this world default
-  // carries `Reagent` and has no membership record, so one default is affected and nothing
-  // inherits it. A branch that derived the second number from the first would read 1 here.
+  // THE CATEGORY KIND STATES BOTH OF ITS OWN, and they are independent: this world default carries
+  // `Reagent` and has no membership record, so one default is affected and nothing inherits it.
   assert.deepEqual(categories.get('reagent').confirmTokens, { defaults: 1, inheriting: 0 });
 });
 
@@ -316,8 +292,7 @@ test('silentlyDeletable is COMPUTED from the corpus, and is narrower than the co
     recipeCategories: [{ id: 'potions', name: 'Potions' }],
   });
   // TWO world component defaults carry `Reagent`, and they inherit into THREE crafting systems
-  // between them. The roster is FIVE, so neither the roster size nor the default count
-  // coincides with the expected 3.
+  // between them.
   const components = componentStore(seams, {
     entities: [
       { id: 'c1', name: 'Ash Salt' },
@@ -385,9 +360,8 @@ test('the decoration builds NEW rows and leaves `total` where it was', () => {
     recipes: [],
   });
   assert.equal(worldScope.vocabulary.total, 6, 'the decoration moves no count');
-  // THE STORE'S CACHE IS NOT WRITTEN THROUGH. `WorldVocabularyStore` replaces its corpus
-  // wholesale precisely so nothing mutates it, and the resolved-union memo elsewhere keys on
-  // corpus identity.
+  // THE STORE'S CACHE IS NOT WRITTEN THROUGH. `WorldVocabularyStore` replaces its corpus wholesale
+  // precisely so nothing mutates it, and the resolved-union memo elsewhere keys on corpus identity.
   const corpus = store.corpus();
   assert.equal(
     'totalUsage' in corpus.componentCategories[0],

@@ -1,20 +1,4 @@
-/**
- * The `1.31.0` tool-requirement backfill (issue 1373, epic 1357).
- *
- * `prerequisites` and `bonus` become world-default SECTIONS in this change, which means
- * `normalizeInherit` starts reading an ABSENT `inherit` key for either as INHERITING. Every
- * membership record `1.30.0` already wrote carries exactly that absence, so without this pass a
- * migrated world would claim to inherit a world default for a value its own crafting system
- * authored.
- *
- * ## THE PROOF THAT MATTERS IS THROUGH A REAL `load()`
- *
- * The requirement is that an ABSENT world default resolves to TODAY'S behaviour on real persisted
- * data. A hand-built corpus object cannot show that: the store's normalizers are where absence
- * either survives or is minted away, and a world SETTING preserves key absence rather than
- * defaulting it. So the resolution assertions here run over a corpus that came out of
- * `createToolScopeStore().load()` reading a settings map, not over a literal.
- */
+/** The `1.31.0` tool-requirement backfill (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -45,11 +29,9 @@ function inSystemTool(overrides = {}) {
 }
 
 /**
- * The `toolScope` payload a world that ran `1.30.0` BEFORE this change actually holds: a
- * membership record whose `inherit` map names only the two sections that existed then, and no
- * world default at all.
- *
- * @returns {object}
+ * The `toolScope` payload a world that ran `1.30.0` BEFORE this change actually holds: a membership
+ * record whose `inherit` map names only the two sections that existed then, and no world default at
+ * all.
  */
 function migratedToolScopePayload() {
   return {
@@ -150,9 +132,8 @@ test('a payload with no tool scope, or no membership map, is left exactly as fou
 });
 
 test('1.30.0 itself writes both sections, so the two upgrade orders converge on one corpus', () => {
-  // A world that has NOT reached `1.30.0` gets the pair from `buildMembershipRecord` directly,
-  // and this pass then finds nothing to do. If the two disagreed, whether a world upgraded in one
-  // hop or two would decide its behaviour.
+  // A world that has NOT reached `1.30.0` gets the pair from `buildMembershipRecord` directly, and
+  // this pass then finds nothing to do.
   const built = buildMembershipRecord(inSystemTool(), 'tools', 'tool-hammer', 'sys-a');
   assert.equal(built.inherit.prerequisites, false);
   assert.equal(built.inherit.bonus, false);
@@ -180,17 +161,11 @@ test('the 1.31.0 registry entry is registered, downgrades to 1.30.0 and loses no
   assert.match(entry.label, /prerequisites/i);
 });
 
-// ---------------------------------------------------------------------------
 // THE RESOLUTION PROOF, THROUGH A REAL STORE
-// ---------------------------------------------------------------------------
 
 /**
  * Load a `toolScope` payload the way production does: into a settings map, through a real store.
  *
- * The map holds the ALREADY-PARSED object a JSONField setting answers with, so this exercises the
- * production path rather than the store's string fallback.
- *
- * @param {object} payload
  * @returns {object} the published corpus.
  */
 function loadedCorpus(payload) {

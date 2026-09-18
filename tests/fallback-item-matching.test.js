@@ -1,23 +1,9 @@
-/**
- * Tests for T-097: Runtime fallback item ID matching in RecipeManager.
- *
- * Validates that ingredientMatchesItem() and toolMatchesItem() honor
- * aliasItemUuids between the primary UUID check and name fallback.
- *
- * Tests:
- *   1. Primary UUID matches — existing behaviour unchanged
- *   2. Fallback ID matches when primary UUID fails (ingredient)
- *   3. Fallback ID checked for tools
- *   4. Name match still works as last resort (no registeredItemUuid, no fallbacks)
- *   5. Legacy UUID-only workflows unchanged (no aliasItemUuids field)
- */
+/** Tests for T-097: Runtime fallback item ID matching in RecipeManager. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry global stubs
-// ---------------------------------------------------------------------------
 
 let _idCounter = 0;
 globalThis.foundry = {
@@ -33,26 +19,18 @@ globalThis.game = {
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
-// ---------------------------------------------------------------------------
 // Module imports
-// ---------------------------------------------------------------------------
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
-/**
- * Build a minimal managed component (system item).
- */
+/** Build a minimal managed component (system item). */
 function makeComponent({ id = 'comp1', name = 'Iron Ore', registeredItemUuid = null, aliasItemUuids = [] } = {}) {
   return { id, name, registeredItemUuid, originItemUuid: registeredItemUuid, aliasItemUuids };
 }
 
-/**
- * Build a mock actor item (world item).
- */
+/** Build a mock actor item (world item). */
 function makeItem({ uuid = 'Item.abc123', name = 'Iron Ore', compendiumSource = null, flagSourceId = null } = {}) {
   return {
     uuid,
@@ -62,9 +40,7 @@ function makeItem({ uuid = 'Item.abc123', name = 'Iron Ore', compendiumSource = 
   };
 }
 
-/**
- * Build a minimal recipe with one component ingredient.
- */
+/** Build a minimal recipe with one component ingredient. */
 function makeRecipe({ craftingSystemId = 'sys1', componentId = 'comp1' } = {}) {
   return {
     craftingSystemId,
@@ -74,16 +50,12 @@ function makeRecipe({ craftingSystemId = 'sys1', componentId = 'comp1' } = {}) {
   };
 }
 
-/**
- * Build a minimal tool referencing a component.
- */
+/** Build a minimal tool referencing a component. */
 function makeTool({ componentId = 'comp1' } = {}) {
   return { componentId };
 }
 
-/**
- * Build a minimal ingredient referencing a component.
- */
+/** Build a minimal ingredient referencing a component. */
 function makeIngredient({ componentId = 'comp1', quantity = 1 } = {}) {
   return {
     componentId,
@@ -93,9 +65,7 @@ function makeIngredient({ componentId = 'comp1', quantity = 1 } = {}) {
   };
 }
 
-/**
- * Set up game.fabricate mock with a specific component for a system.
- */
+/** Set up game.fabricate mock with a specific component for a system. */
 function setupGameFabricate(component) {
   globalThis.game.fabricate = {
     getCraftingSystemManager: () => ({
@@ -111,9 +81,7 @@ function setupGameFabricate(component) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 test('T-097: primary UUID matches — existing behaviour unchanged', () => {
   const component = makeComponent({

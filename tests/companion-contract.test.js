@@ -1,18 +1,4 @@
-/**
- * The companion contract's vocabulary (issue 1289).
- *
- * `src/systems/companionContract.js` is what a companion module reads BEFORE it calls
- * anything: the version it can check, the member set it may depend on, the outcome tokens it
- * branches on, and the two normalizers that decide what a caller is allowed to persist. None
- * of it touches Foundry, so all of it is testable here — and all of it is a published
- * promise, so the parts that may not drift are pinned by equality rather than by spot-check.
- *
- * The member RESOLUTION assertion — that each row's `host` and `path` find a real member on
- * the live facade — belongs to the facade suite, because `src/main.js` cannot be imported
- * under `node --test`. What is checked here is the property that makes that assertion
- * mechanical: every row declares a host from the closed host set and a path that is a bare
- * property name.
- */
+/** The companion contract's vocabulary (issue 1289). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -61,12 +47,8 @@ import {
 } from './helpers/companionContractOutcomes.js';
 
 /**
- * The declared member set, as `[name, host, promise, kind]`.
- *
- * Hoisted and frozen so the refusal and shape tables below are data rather than repeated
- * literals. Adding a member is deliberately a change HERE too: the compatibility promise
- * allows a new member without a version bump, and this row is where that addition becomes
- * visible to a reviewer alongside the docs table it must also appear in.
+ * The declared member set, as `[name, host, promise, kind]`. Hoisted and frozen so the refusal and
+ * shape tables below are data rather than repeated literals.
  */
 const EXPECTED_MEMBERS = Object.freeze([
   ['schemaVersion', 'contract', 'stable', 'value'],
@@ -85,9 +67,7 @@ const EXPECTED_MEMBERS = Object.freeze([
   ['resolveBulkCheckDecision', 'facade', 'stable', 'method'],
   ['awardComponents', 'facade', 'stable', 'method'],
   ['creditCurrency', 'facade', 'stable', 'method'],
-  // Appended again for the same reason, one issue later (1342). These two are the first
-  // members addressed by actor UUID rather than by id, and `consumePooledHoldings` is the
-  // first that REMOVES value.
+  // Appended again for the same reason, one issue later (1342).
   ['readPooledHoldings', 'facade', 'stable', 'method'],
   ['consumePooledHoldings', 'facade', 'stable', 'method'],
 ]);
@@ -138,9 +118,7 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'creditFailed',
   'creditUnavailable',
   'creditNotConfigured',
-  // readPooledHoldings (issue 1342). `read` and `readFailed` are answered at BOTH levels; the
-  // six after them are READING-level only and can never be a call-level `outcome`, and
-  // `invalidCosts`/`invalidActorUuids` are the two call-level request refusals.
+  // readPooledHoldings (issue 1342).
   'read',
   'readFailed',
   'balanceNotConfigured',
@@ -157,14 +135,7 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'notAttempted',
 ]);
 
-/**
- * Every `stable` member's own key table, with the SHARED gate outcomes that member can answer.
- *
- * `shared` differs per member and that is the point: `resolveBulkCheckDecision` takes no
- * `actorId`, reads no actor and is GM-gated inline, so `noActor` is not merely unused there —
- * it is unanswerable, and declaring a key for it would be dead vocabulary a caller would
- * nonetheless write a branch for.
- */
+/** Every `stable` member's own key table, with the SHARED gate outcomes that member can answer. */
 const MEMBER_KEY_TABLES = Object.freeze([
   Object.freeze({
     name: 'grantRecipeKnowledge',
@@ -218,13 +189,7 @@ const AFFORDABILITY_ANSWERS = Object.freeze([
 
 const SIXTY_FOUR = 'f'.repeat(GRANTED_BY_MAX_LENGTH);
 
-/**
- * `grantedBy` values the contract ACCEPTS, with the value it persists.
- *
- * The boundary rows are the point: 64 characters after trimming is accepted, and whitespace
- * is trimmed BEFORE the length is measured, so a padded label at the limit is not refused for
- * padding the caller never meant to send.
- */
+/** `grantedBy` values the contract ACCEPTS, with the value it persists. */
 const ACCEPTED_GRANTED_BY = Object.freeze([
   Object.freeze({ label: 'omitted', input: undefined, value: null }),
   Object.freeze({ label: 'null', input: null, value: null }),
@@ -239,15 +204,7 @@ const ACCEPTED_GRANTED_BY = Object.freeze([
   Object.freeze({ label: 'the limit, padded', input: `  ${SIXTY_FOUR}  `, value: SIXTY_FOUR }),
 ]);
 
-/**
- * `grantedBy` values the contract REFUSES, each with the outcome it refuses with.
- *
- * Every non-string type is its own row rather than a single "not a string" case, because they
- * fail for different reasons in a reader's head — a number and a boolean look coercible, an
- * ARRAY looks like it would be dropped by the entry-boundary reader and is not, and a
- * `String` object passes a `typeof`-free duck test. Nothing here is truncated or coerced: an
- * over-long module id names a DIFFERENT module.
- */
+/** `grantedBy` values the contract REFUSES, each with the outcome it refuses with. */
 const REFUSED_GRANTED_BY = Object.freeze([
   Object.freeze({
     label: 'one character over the limit',
@@ -272,19 +229,7 @@ const REFUSED_GRANTED_BY = Object.freeze([
   Object.freeze({ label: 'a boxed String', input: new String('x'), outcome: 'invalidGrantedBy' }),
 ]);
 
-/**
- * The interpolation bag each outcome's STRING needs, spelled the way the members supply it.
- *
- * `message` is a localization key and Foundry's `format()` leaves an unsupplied `{name}`
- * verbatim, so an answer that omits one shows a GM the braces. The shared
- * `assertMessageDataCovers` checks that for every answer; these tables are what let the loops
- * below build an answer that is COMPLETE rather than one no member would ever emit.
- *
- * Deliberately LITERAL, not derived from the strings. Deriving the bag from the very text the
- * completeness assertion reads would make that assertion a tautology at exactly the two loops
- * that walk every outcome — whereas written out, a placeholder added to a string with no
- * author here fails instead.
- */
+/** The interpolation bag each outcome's STRING needs, spelled the way the members supply it. */
 const GRANT_MESSAGE_DATA = Object.freeze({
   granted: Object.freeze({ recipe: 'Balm', actor: 'Idrin' }),
   alreadyKnown: Object.freeze({ recipe: 'Balm', actor: 'Idrin' }),
@@ -341,10 +286,8 @@ test('the descriptor publishes exactly the four contract fields, frozen', () => 
   assert.ok(COMPANION_CONTRACT_SCHEMA_VERSION >= 1, 'a published version starts at 1');
   assert.equal(COMPANION_CONTRACT.members, COMPANION_MEMBERS);
   assert.equal(COMPANION_CONTRACT.outcomes, COMPANION_OUTCOMES);
-  // `callSite` is the one REQUIRED, no-default, refused-on-mismatch input the contract has,
-  // and the docs' worked examples are what an author copies. Publishing the pair is what lets
-  // them read `COMPANION.callSites.broadcast` instead of retyping a literal whose only
-  // punishment for a typo is `invalidCallSite`.
+  // `callSite` is the one REQUIRED, no-default, refused-on-mismatch input the contract has, and the
+  // docs' worked examples are what an author copies.
   assert.equal(COMPANION_CONTRACT.callSites, COMPANION_CALL_SITES);
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.members), 'the member table is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.outcomes), 'the outcome vocabulary is frozen');
@@ -383,11 +326,9 @@ test('AC-1 — the member table grew by APPENDING, and the eighth member did not
 });
 
 test('AC-2 — success is DERIVED, and every new token is declared in all three places', () => {
-  // `buildResult` computes `success` as membership of `SUCCESSFUL_OUTCOMES` AND the presence
-  // of the outcome in the member's OWN key table, so an omission from EITHER place flips a
-  // published boolean with nothing else failing. That trap already nearly fired once: omitting
-  // the two bulk outcomes would have made both of `resolveBulkCheckDecision`'s answers report
-  // `success: false`.
+  // `buildResult` computes `success` as membership of `SUCCESSFUL_OUTCOMES` AND the presence of the
+  // outcome in the member's OWN key table, so an omission from EITHER place flips a published
+  // boolean with nothing else failing.
   const SUCCEEDS = [
     ['awarded', () => componentAwardResult('awarded', null, { placements: [] })],
     ['partiallyAwarded', () => componentAwardResult('partiallyAwarded', null, { placements: [] })],
@@ -481,10 +422,7 @@ test('every declared outcome is emittable by a member, and every member outcome 
 });
 
 test('each member answers its OWN shared gate outcomes, in its OWN words', () => {
-  // PER MEMBER, not a four-way product. `resolveBulkCheckDecision` takes no `actorId`, reads
-  // no actor and is GM-gated inline, so it can never answer `noActor` — a fixed
-  // `['gmOnly','noActor','notReady']` loop asserted over every table would demand a key it
-  // must not have, and would contradict the criterion that pins its absence.
+  // PER MEMBER, not a four-way product.
   for (const { name, keys, shared } of MEMBER_KEY_TABLES) {
     for (const outcome of shared) {
       assertLocalizationKey(keys[outcome], `${name}'s ${outcome}`);
@@ -536,11 +474,8 @@ test('every outcome message key resolves to a string leaf in lang/en.json', () =
     /\{detail\}/,
     "a failed roll carries the runner's free text as messageData.detail"
   );
-  // `assertMessageDataCovers` derives its requirement FROM the string, which makes it a
-  // one-way guard: it catches a string that GAINS a placeholder and is blind to one that
-  // LOSES it. These are the other direction. Dropping `{count}` from `Decided` would leave
-  // every answer's bag over-supplied and silently correct, while a GM reads a sentence that
-  // no longer says how much of their batch was covered.
+  // `assertMessageDataCovers` derives its requirement FROM the string, which makes it a one-way
+  // guard: it catches a string that GAINS a placeholder and is blind to one that LOSES it.
   assert.match(
     localizedString(BULK_CHECK_DECISION_MESSAGE_KEYS.decided),
     /\{count\}[\s\S]*\{total\}/,
@@ -733,9 +668,8 @@ test('an affordability refusal answers affordable null, never a confident false'
 });
 
 test('an outcome a member does not declare degrades to that member’s own generic refusal', () => {
-  // The rule the contract asks of callers, applied to itself: an unrecognised outcome is a
-  // generic refusal. A `stable` member may not throw, and a `message` of `undefined` is not
-  // localizable, so neither escape is available here.
+  // The rule the contract asks of callers, applied to itself: an unrecognised outcome is a generic
+  // refusal.
   const grant = knowledgeGrantResult('someOutcomeFromALaterVersion');
   assertContractResult(grant, {
     success: false,
@@ -772,17 +706,14 @@ function checkRollRefusal(outcome, messageData = null) {
 }
 
 test('every rollActorCheck refusal answers the WHOLE refusal shape', () => {
-  // Complete expected records, so the field SET is asserted by equality rather than by
-  // spot-check. `assertContractResult` reads `node:assert/strict`, under which `deepEqual` IS
-  // `deepStrictEqual`: `{ total: undefined }` does not satisfy `total: null`.
+  // Complete expected records, so the field SET is asserted by equality rather than by spot-check.
   const refusals = ['gmOnly', 'noActor', 'notReady', 'invalidCallSite', 'notElected'];
   for (const outcome of refusals) {
     const result = checkRollResult(outcome);
     assertContractResult(result, checkRollRefusal(outcome));
     assertMessageIsFromTable(result, CHECK_ROLL_MESSAGE_KEYS, `the ${outcome} answer`);
-    // A LIST's absence is empty; a scalar's absence is meaningful. `0` or `false` here would
-    // be a confident wrong answer, and a `null` list would force every caller to guard a
-    // `.length` read.
+    // A LIST's absence is empty; a scalar's absence is meaningful. `0` or `false` here would be a
+    // confident wrong answer, and a `null` list would force every caller to guard a `.length` read.
     assert.deepEqual(result.diceGroups, []);
     assert.equal(result.total, null);
   }
@@ -886,11 +817,10 @@ test('an undeclared outcome degrades to each new member own generic refusal', ()
     false,
     'and it is not one of the seven, so no outcome is minted for a path no member can reach'
   );
-  // "Not one of the seven" and "resolves to a string" are both satisfied by ANY other
-  // member's key — `FABRICATE.Check.Roll.RollFailed` passes both — and that would be a
-  // cross-member vocabulary leak on exactly the path this deviation exists to reason about:
-  // the bulk member telling a GM its decision "could not be rolled". The namespace is the
-  // claim, so the namespace is what is pinned.
+  // "Not one of the seven" and "resolves to a string" are both satisfied by ANY other member's key
+  // — `FABRICATE.Check.Roll.RollFailed` passes both — and that would be a cross-member vocabulary
+  // leak on exactly the path this deviation exists to reason about: the bulk member telling a GM
+  // its decision "could not be rolled".
   assert.ok(
     bulk.message.startsWith('FABRICATE.Check.BulkDecision.'),
     `the bulk member's generic refusal must speak in its OWN namespace, got ${bulk.message}`

@@ -1,9 +1,4 @@
-/**
- * Phase 2 (issue 335) — pure promote-region decision for the GM Manage
- * Interactables panel. Covers source validation, tool + gathering-task promotion,
- * marker vs region-only, and that it routes through the SHARED behaviour-system
- * builder (no second builder).
- */
+/** Phase 2 (issue 335) — pure promote-region decision for the GM Manage Interactables panel. */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

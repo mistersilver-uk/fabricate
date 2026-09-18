@@ -1,22 +1,6 @@
 /**
- * Direct proof for the shared working-tree walk in `tests/helpers/sourceScan.js`.
- *
- * The walk's deliverable is not the corpus — four gates already fail loudly if that goes wrong.
- * It is the ATTRIBUTION of the two syscalls it makes, because the failure this helper exists to
- * eliminate is a bare `ENOENT ... scandir`/`open` naming a path and nothing else, which cost ~25
- * minutes to diagnose the one time it happened. An attributed message is only a deliverable if
- * something fails when it stops being said, and nothing did: the wording sits on error paths that
- * a passing corpus scan never reaches.
- *
- * Proved HERE — once — rather than in each of the four gates that walk the tree, the same choice
- * (and the same reason) as `stripComments`, which `tests/quantity-literal-gate.test.js` proves for
- * both literal gates. `tests/helpers/` is outside the `npm test` glob; `tests/*.test.js` is inside
- * it, so this file runs and the helper it imports does not run as a suite of its own.
- *
- * Two of the four messages describe a race — a file or a directory removed between its own listing
- * and its own read — which a test cannot schedule. Those two are proved by calling the guard
- * directly against a real, real-filesystem ENOENT; the other two are proved end to end through
- * `collectWorkingTreeSources`, which is what pins the call sites to the right one of the pair.
+ * Direct proof for the shared working-tree walk in `tests/helpers/sourceScan.js`. The walk's
+ * deliverable is not the corpus — four gates already fail loudly if that goes wrong.
  */
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -51,16 +35,6 @@ const ABSENT = 'no-such-path-e3b0c442';
 
 // The positive control. Everything below asserts on a failure message, so without this the whole
 // file could pass against a walk that reads nothing at all — the vacuity these gates keep finding.
-// The nested key is load-bearing twice: it proves the walk RECURSES, which is the only reason the
-// recursive listing (and therefore its attribution) exists.
-//
-// The two roots are passed in REVERSE code-point order deliberately, and that is what makes the
-// ordering assertion below a pin rather than a coincidence. `collectWorkingTreeSources` walks its
-// roots in the order given and sorts the accumulated corpus once at the end, so with the sort
-// removed this fixture comes back `b/...` first while code-point order puts `a/top.js` first —
-// measured, and true on any filesystem, because nothing about it depends on `readdir` order. A
-// single root cannot pin it: within one root the emission order IS `readdir`'s, which no standard
-// specifies, so half the possible orders leave the assertion inert without saying so.
 test('collects nested files under its roots into one code-point-ordered corpus', () => {
   const corpus = withTempTree(
     {
@@ -89,8 +63,7 @@ test('collects nested files under its roots into one code-point-ordered corpus',
 test('refuses a call that would answer with an empty corpus', () => {
   // Both argument guards, because neither fails loudly on its own: an empty `roots` or an empty
   // `extensions` yields an empty corpus, and every count assertion over an empty corpus passes —
-  // the vacuity this whole family of gates exists to catch. The extension list has no default ON
-  // PURPOSE (see the helper), so omitting it must throw rather than quietly pick one.
+  // the vacuity this whole family of gates exists to catch.
   assert.throws(
     () => collectWorkingTreeSources([], ['.js']),
     { name: 'TypeError', message: /at least one repo-relative root/ },
@@ -193,12 +166,7 @@ test('tells a dangling symbolic link apart from a moving worktree', (t) => {
 });
 
 test('never rewrites a read failure that is not ENOENT', () => {
-  // The sibling of the check below, on the `readFile` half — and the one that was missing. With
-  // the rethrow deleted, `readFileSync` on a directory (EISDIR on every platform) falls through
-  // into the dangling-symlink branch, because a directory both exists and is not a symbolic link;
-  // measured, the reported failure was `"src" is a symbolic link whose target does not exist` with
-  // `cause.code: EISDIR`. That is this issue's own defect — a real error given a confident wrong
-  // attribution — so it is proved here rather than assumed from the sibling.
+  // The sibling of the check below, on the `readFile` half — and the one that was missing.
   assert.throws(
     () => readListedSource(path.join(repoRoot, 'src'), 'src'),
     (error) => {
@@ -214,9 +182,7 @@ test('never rewrites a read failure that is not ENOENT', () => {
 
 test('never rewrites a listing failure that is not ENOENT', () => {
   // An existing path cannot report ENOENT, so this is a stable way to reach the rethrow: every
-  // platform answers `readdir` on a file with something else (ENOTDIR here). Swallowing or
-  // re-labelling it would be the same defect in the other direction — a real error described as a
-  // moving worktree, with a re-run that cannot help.
+  // platform answers `readdir` on a file with something else (ENOTDIR here).
   assert.throws(
     () => readScannedDirectory(path.join(repoRoot, 'package.json'), { isRoot: true }),
     (error) => {

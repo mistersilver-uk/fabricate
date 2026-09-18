@@ -1,8 +1,4 @@
-/**
- * The tester-secret rotation utility (issue #1761). The premium config is an injected literal here:
- * reading the private sibling would make this suite unrunnable in CI, and an `existsSync` skip
- * would report a broken parser as green.
- */
+/** The tester-secret rotation utility (issue #1761). */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
@@ -135,7 +131,6 @@ test('the plan maps one secret to every repository and group it serves, in disco
 test('the plan covers exactly the tester feeds the shipped config resolves to', () => {
   // `planRotation` is a second, independent reader of this schema, parallel to
   // `resolveChannelConfig` — which also honours a scalar back-compat branch the plan cannot see.
-  // Every other assertion here runs against the literal above and would stay green without this.
   const shipped = JSON.parse(
     readFileSync(path.join(REPOSITORY_ROOT, 'release.s3.config.json'), 'utf8')
   );
@@ -557,8 +552,7 @@ test('main --apply writes one real segment per secret and announces the new pref
 
 test('a config using the scalar channel shorthand still plans its group', () => {
   // `resolveChannelConfig` honours a scalar `channel` + `testerGroups` for a config with no
-  // `channels` map. A second reader here that walked `channels` alone would plan nothing for it,
-  // and every other case in this file would stay green.
+  // `channels` map.
   const shorthand = {
     moduleId: 'fabricate',
     baseUrl: BASE_URL,

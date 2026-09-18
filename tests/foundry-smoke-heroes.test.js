@@ -49,13 +49,7 @@ test('the smoke harness no longer ships or reads bundled actor portraits', async
   );
 });
 
-// Issue 643 §4b: the recipe editor's context rail is MODE-CONDITIONAL. Its restricted
-// (access) branch is only reachable in a `visibilityMode: 'restricted'` system whose
-// recipe actually carries a grant — and the smoke world seeded none of that, so a run
-// would silently capture the Books & Scrolls branch instead and the PR evidence would
-// show the wrong rail. These assertions are the guard: they fail if the fixture is
-// dropped, and the failure names what went missing. Issue 796: the grant also seeds four
-// extra grant-only characters so the Access tab's three-column grid is captured populated.
+// Issue 643 §4b: the recipe editor's context rail is MODE-CONDITIONAL.
 test('the smoke world seeds a restricted-visibility system so the recipe access rail is screenshottable', () => {
   assert.match(
     smokeRunSource,

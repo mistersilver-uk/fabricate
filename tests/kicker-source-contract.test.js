@@ -1,34 +1,7 @@
 /**
- * Source contract: the uppercase micro-label is written in ONE place (issue 1505).
- *
- * The eyebrow is the most-restated shape in the product, and it was never a component — it was
- * a set of CSS conventions that had drifted apart from each other. The measured proof is in the
- * conversion this file lands with: SEVEN files in `apps/crafting/detail/` each declared a
- * byte-identical `.crafting-detail-section-title` block, three of them under a comment saying
- * so in terms ("Svelte scopes CSS per component, so the rule is redefined rather than shared"),
- * and two more files in the SAME directory declared the identical treatment under two other
- * names. Nine restatements of six declarations, none of them wrong, none of them shared.
- *
- * ── WHY THIS FILE EARNS ITS PLACE WHEN NOTHING RENDERS WRONG ──────────────────────────────
- * Like the card shell and unlike the icon button's accessible name, a missed kicker is visible:
- * a section label rendered at the body size does not look like an eyebrow. What the convention
- * is NOT self-policing about is the thing this programme exists to fix — that the treatment
- * cannot be corrected in one edit, and that nobody can enumerate its callers. The tracking
- * correction this change carries is the illustration: `.11em` is one line here and would have
- * been nine before.
- *
- * ── THE CONTRACT CLASS IS A NEW TOKEN, DELIBERATELY ───────────────────────────────────────
- * `fab-kicker` is written by nothing else in the tree, which was measured before it was chosen.
- * The obvious alternative, `manager-kicker`, is NOT available: 33 `.svelte` files under `src/`
- * write it 80 times at the hand-rolled manager sites this change deliberately leaves alive, and
- * the class-only clause scans the whole `src/` corpus by SUBSTRING — so reusing it would have
- * opened this file with a 33-entry deferral table, each entry needing an exact count and a
- * reason, none of which anyone would ever read. A new token buys exactly one thing, and it is
- * the thing worth buying: the exemption below has ONE entry and no deferral row.
- *
- * The four shared clauses, and the closed-token shape a new token puts this primitive in, come
- * from `tests/helpers/primitiveSourceContract.js`, which argues both. Below are the facts they
- * are stated over and the ONE clause only this primitive raises: what it may render.
+ * Source contract: the uppercase micro-label is written in ONE place (issue 1505). The eyebrow is
+ * the most-restated shape in the product, and it was never a component — it was a set of CSS
+ * conventions that had drifted apart from each other.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -50,17 +23,12 @@ const contract = defineClosedTokenContract({
   primitive: PRIMITIVE,
 
   // 10 files render the primitive as this lands — eight in the player crafting detail tree, the
-  // manager's recipe-item Overview tab, and `StatBox`, which composes it. The floor is EXACT
-  // rather than slack: the eleventh candidate, `StepRequirementsList`'s step label, was measured
-  // and sent out of scope, because that label is the step's headline and the kicker rung ranked
-  // it below the "Requirements" label beneath it. An exact floor is the stricter ratchet, and a
-  // conversion that removes a site now has to say so here.
+  // manager's recipe-item Overview tab, and `StatBox`, which composes it.
   callSiteFloor: 10,
 
   // Pinned in its RENDERED form — `class="fab-kicker"` — rather than as a quoted JS literal,
-  // because this component writes the token straight onto the element rather than composing a
-  // class list. A prose mention in the docblock would not satisfy it: comments are stripped
-  // before the corpus is built.
+  // because this component writes the token straight onto the element rather than composing a class
+  // list.
   emits: `class="${CONTRACT_CLASS}"`,
 
   primitiveWrites: {
@@ -83,23 +51,7 @@ const contract = defineClosedTokenContract({
   hookAdvice: 'Pass the hook as `dataAttr="data-x"` and leave `dataValue` at its default',
 });
 
-/**
- * The clause that is this primitive's own: WHAT IT RENDERS, and that none of it is interactive.
- *
- * `Kicker` is the only primitive in this set whose host element is chosen by a caller, and the
- * union is a measured fact rather than a design intention — across `src/ui/svelte/**` the
- * eyebrow's hosts are 62 `<p>`, 3 `<span>` and 1 `<h3>`, and `h2` and `h4` have no caller at
- * all. Two different things could go wrong there and neither would move a frame.
- *
- * The union could WIDEN. `<svelte:element this={host}>` will render whatever it is handed, so
- * an added member is one word, and `spec.md` routes an interactive element away from a label
- * absolutely: a control is a button, a stepper or a toggle, never a micro-label wearing one.
- * A `button` or an `a` in this set would make every kicker on the screen a focus stop.
- *
- * And the union could go UNGUARDED. `host` is what closes it — an unrecognised `as` falls back
- * rather than rendering the caller's string — so a refactor that dropped the guard would make
- * the union advisory while every existing call site went on rendering exactly as before.
- */
+/** The clause that is this primitive's own: WHAT IT RENDERS, and that none of it is interactive. */
 test('the kicker renders one of three measured, non-interactive hosts, and nothing else', () => {
   const source = contract.primitiveMarkup();
 
@@ -130,24 +82,7 @@ test('the kicker renders one of three measured, non-interactive hosts, and nothi
       'rather than a feature'
   );
 });
-/**
- * THE INK, WHICH IS THE SECOND CORRECTION TO `library.html:120` AND THE ONE A PALETTE HID.
- *
- * The specimen states `--fab-text-subtle`, and this component shipped it. At 8.5px it is the
- * smallest type the product draws, and SIX of the seven palettes declare `muted` and `subtle`
- * as ALPHAS over the surface rather than as opaque values — so on the default `fabricate` theme
- * the subtle tone composites to 3.69:1 on `--fab-surface` and 3.50:1 on `--fab-surface-soft`,
- * under the 4.5:1 small-text floor. `--fab-text-muted` reads 5.42:1 and 5.00:1 at those two
- * grounds and clears the floor in all seven, `ironblood-forge` worst at 5.19:1 and 4.77:1.
- *
- * Pinned here because the failure mode was a SILENT one, and because the palette that hid it
- * is the ONE the register can be checked against: `mythwright` alone states those two tones as
- * opaque hues, and its subtle tone reads 5.28:1 from the same declaration. Six of the seven
- * fail and that one passes, so a single palette's worth of inspection agreed with the wrong
- * value and the specimen was set from the outlier rather than from the set. It is also the
- * whole reason this component exists as a component — one ink correction reaches 37 render
- * sites, including the two the conversion never touched.
- */
+/** THE INK, WHICH IS THE SECOND CORRECTION TO `library.html:120` AND THE ONE A PALETTE HID. */
 test('the kicker inks at the muted tone, which is the contrast correction the specimen carries too', () => {
   const source = readFileSync(resolve(import.meta.dirname, '..', PRIMITIVE), 'utf8');
   const base = source.slice(source.indexOf('.fab-kicker {'));
@@ -179,39 +114,9 @@ test('the kicker inks at the muted tone, which is the contrast correction the sp
 
 
 /**
- * A NESTED CHILD MUST NOT RE-DECLARE THE MARK'S INK (issue 1514).
- *
- * The component takes no `class`, no `style` and no rest spread, so a caller that needs layout
- * nests its own element INSIDE the kicker. That is the sanctioned shape and several callers use
- * it. What it also does, silently, is give the caller a second place to declare `color` on the
- * same line of text.
- *
- * While the mark and its callers both painted `--fab-text-subtle` this was invisible: label and
- * tail were one ink at two weights, and the duplicate declaration read as harmless restatement.
- * The contrast correction above is what separated them. `RecipeItemOverviewTab.svelte` nests a
- * `.manager-recipe-item-label-note` inside two of its three kickers and that rule painted the
- * subtle tone itself, so after the correction the label read 5.42:1 and the tail 3.69:1 — a
- * two-tone split inside a single 8.5px line, with the FAILING half the one left showing. It was
- * found by reading every `<Kicker>` in the tree by hand; this is that scan, mechanised, so the
- * next such caller fails instead of shipping.
- *
- * The remedy is always to DELETE the child's `color`, never to narrow the primitive: the ink is
- * right for all of its render sites, and re-breaking them to spare one caller inverts the trade.
- * Weight, tracking and case overrides on such a child are legitimate and untouched — they are
- * what makes an aside read as an aside — so this clause is about `color` alone.
- *
- * TWO WAYS THIS CLAUSE WENT VACUOUS BEFORE IT WENT GREEN, both found by mutating the known
- * offender back in rather than by reading it, and both recorded because either would have left a
- * guard that passes on a tree it is supposed to red. FIRST, the closing-tag matcher: Prettier
- * writes these tags in the dangling-bracket style, `</Kicker` newline `>`, so a literal
- * `</Kicker>` matched almost nothing and the blocks it did find had the wrong boundaries — hence
- * `\s*` before the `>`. SECOND, and less visible, the per-class rule pattern was authored through
- * a shell heredoc, which collapsed each doubled backslash to a single one — so the escaped dot
- * arrived with one backslash, which a TEMPLATE LITERAL then reads as a bare `.`, and the escaped
- * whitespace class arrived as a literal `s`. The pattern became
- * `.<class>s*{`, matched nothing, and every file reported clean. It is built with `String.raw`
- * now so the escaping is one level rather than two. A scan whose pattern cannot match is
- * indistinguishable from a corpus with nothing to find; prove it FAILS before trusting a pass.
+ * A NESTED CHILD MUST NOT RE-DECLARE THE MARK'S INK (issue 1514). The remedy is always to DELETE
+ * the child's `color`, never to narrow the primitive: the ink is right for all of its render sites,
+ * and re-breaking them to spare one caller inverts the trade.
  */
 const KICKER_BLOCK = /<Kicker\b[^>]*>([\s\S]*?)<\/Kicker\s*>/g;
 const NESTED_CLASS = /class="([\w\s-]+)"/g;

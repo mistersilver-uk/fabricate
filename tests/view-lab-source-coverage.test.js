@@ -1,18 +1,6 @@
 /**
- * Changed-file segmentation completeness.
- *
- * The View Lab's value depends on a changed file selecting the frames that show it. A component
- * inside a mounted window that no case claims does not produce NO evidence — `mapChangedFilesToCases`
- * falls back to `FALLBACK_CASE_ID` — it produces UNRELATED evidence, a frame of some other window
- * presented as proof of a change it does not contain. That is the failure this gates.
- *
- * The gate is deliberately scoped to the transitive `.svelte` import closure of the two mounted
- * roots, not to every UI file. Scoping matters more than coverage here: 326 tracked files match
- * `isUiFile()`, and 135 of them are claimed by nothing — including roots this change explicitly
- * declares out of scope, and modules the lab can never photograph (`appFactory.js`,
- * `SvelteApplicationMixinCore.js`, `actions/portal.js`). A gate demanding a claim for those has two
- * exits: build applications the change excluded, or paste a regex onto an unrelated case. The
- * second is what would happen, and it makes the mapping worse than the gap it closed.
+ * Changed-file segmentation completeness. The gate is deliberately scoped to the transitive
+ * `.svelte` import closure of the two mounted roots, not to every UI file.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -25,24 +13,7 @@ import { BROAD_SIGNAL_PATTERN, VIEW_LAB_CASES, normalizePath } from '../scripts/
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * The windows the lab mounts. Everything reachable from these is photographable.
- *
- * FIVE since issue 1520 registered the three GM canvas windows. They have to be here, and the
- * second test below is why: it fails a `sourceMatches` pattern that claims a component NO mounted
- * window renders, so the moment a case claimed `InteractableConfigRoot.svelte` while this list
- * held two roots, the registry would have looked as though it were claiming a phantom. The two
- * halves are a pair — a root registered in the case registry and not here reports its own real
- * claims as phantoms, and a root here with no case reports its whole subtree as unclaimed.
- *
- * Measured when the three were added: the closure grows by exactly three, 319 to 322. The reason
- * is NOT that they import no components — they render twelve of the shared primitives between
- * them, and an earlier revision of this note said otherwise. It is that every one of those
- * twelve was ALREADY in the closure, reachable from the manager or the player root, and already
- * claimed by a case there. So the three roots add themselves and no unclaimed subtree, which is
- * the property this list needs; a window that reached for a component nothing else renders would
- * add that component too, and the second test below is what would say so.
- */
+/** The windows the lab mounts. Everything reachable from these is photographable (issue 1520). */
 const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/FabricateAppRoot.svelte',
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
@@ -51,20 +22,9 @@ const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte',
 ];
 
-/**
- * Components inside the closure that no case claims ON PURPOSE, each with the reason.
- *
- * An entry here is a reviewed decision, not a silence. The list is itself gated below: an entry
- * that no longer resolves to a tracked file, or that has left the closure, fails — so a stale
- * exemption cannot outlive the thing it exempted.
- */
+/** Components inside the closure that no case claims ON PURPOSE, each with the reason. */
 const UNCLAIMED_BY_DESIGN = Object.freeze([
   // `Essence` LEFT THIS LIST at issue 1372, and it left rather than being kept alongside a claim.
-  // The exemption's own text names the condition that ends it — "PRs 6a, 6b and 6c ship the row
-  // that opens it and its case together, and delete this entry" — and the world essence catalogue
-  // now ships that row, so `world-essence-entry` is reachable by the walk and claims the page. An
-  // exemption left beside a live claim is a standing waiver for a component that no longer needs
-  // one, which is exactly the stale-exemption shape this file's last clause reds on.
   ...['Component', 'Tool'].map((entity) => ({
     path: `src/ui/svelte/apps/manager/scoped/World${entity}EntryPage.svelte`,
     reason:
@@ -78,14 +38,7 @@ const UNCLAIMED_BY_DESIGN = Object.freeze([
   })),
 ]);
 
-/**
- * Components a case may match even though no mounted window renders them.
- *
- * Kept EMPTY on purpose. A pattern reaching an unrenderable component is the "unrelated evidence"
- * failure, so the fix is nearly always to narrow the pattern rather than to record an exception. An
- * entry here has to be a component that is genuinely dead or genuinely out of scope AND that no
- * narrower pattern can exclude — and it is checked below, so it cannot outlive that condition.
- */
+/** Components a case may match even though no mounted window renders them. */
 const EXPECTED_OUTSIDE_CLOSURE = new Set([]);
 
 const tracked = new Set(
@@ -97,10 +50,6 @@ const tracked = new Set(
 
 /**
  * Walk the `.svelte` import closure from the mounted roots.
- *
- * Only relative specifiers are followed, and only to `.svelte` files: a bare specifier is a package,
- * and a `.js` import is logic rather than a rendered surface. Both are out of the closure by
- * construction, which is what keeps the gate to "components a frame can actually show".
  *
  * @returns {Set<string>} Repo-relative paths, normalized.
  */
@@ -144,8 +93,7 @@ test('every component a mounted window can render is claimed by some case', () =
     if (exempt.has(file)) continue;
     // Broad signals are claim-exempt because `mapChangedFilesToCases` `continue`s on them BEFORE
     // consulting `sourceMatches` at all — a shared primitive routes to the representative set by
-    // design, since attributing it to one window would select every window. Requiring a claim here
-    // would mandate data the mapper never reads: ceremony that rots.
+    // design, since attributing it to one window would select every window.
     if (BROAD_SIGNAL_PATTERN.test(file)) continue;
     const claimed = VIEW_LAB_CASES.some((viewCase) =>
       viewCase.sourceMatches.some((pattern) => pattern.test(file))
@@ -166,14 +114,6 @@ test('every component a mounted window can render is claimed by some case', () =
 test('no case claims a component that appears in no window', () => {
   // The completeness test above checks one direction — that everything renderable is claimed. This
   // is the other, and it is the direction that produces WRONG evidence rather than none.
-  //
-  // A retired combined Travel view was claimed by eight cases through a `Gathering` prefix while
-  // being imported by nothing under `src/`. So a PR editing it selected eight frames as evidence
-  // of a change none of them can contain.
-  //
-  // It also bounds pattern BREADTH, which nothing else did: the registry could be satisfied by
-  // pasting one blanket `/^src\/ui\//` onto a single case, which reports zero unclaimed and passes.
-  // An over-broad pattern now starts matching unrenderable components and fails here.
   const svelteFiles = [...tracked].filter((file) => file.endsWith('.svelte'));
   const phantom = [];
 

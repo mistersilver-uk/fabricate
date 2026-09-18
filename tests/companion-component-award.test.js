@@ -1,29 +1,5 @@
 /**
- * `awardComponents`' behaviour — the Component Award the companion contract publishes
- * (issue 1301).
- *
- * The member PLACES components on a player's sheet, which makes three claims worth a suite of
- * their own, each a VALUE that a shape pin cannot see:
- *
- *   1. **A write is judged by its own return.** Foundry document writes fail silently far more
- *      often than they reject: `createEmbeddedDocuments` resolves `[]` when a `_preCreate` hook
- *      refuses, and `Document#update` resolves `undefined` when the diff is empty — which is
- *      what a GM-authored stack-quantity path that is not in the item's data model produces.
- *      Every cell marked *(D0)* drives a RESOLVED-null or RESOLVED-undefined write, not a
- *      rejection, because a stub that models Foundry naively passes without them.
- *   2. **Partial success is expressed, and the total is derived.** Three of five entries placed
- *      is a real outcome, `placements` is index-addressed onto the caller's own request, and
- *      `awarded` is SUMMED from what the writes returned rather than from what was asked for.
- *   3. **Nothing is invented.** A world that cannot express a count of N refuses that entry
- *      rather than creating one document and reporting N, and a component the world cannot
- *      stack gets a second document rather than a count field it has no schema for.
- *
- * **The suite configures a NON-DEFAULT stack-quantity path for its whole file**, because every
- * path-threading assertion here is vacuous otherwise: an implementation that re-resolved the
- * module's ambient default at each site would satisfy an assertion written against
- * `itemStackQuantityPath()`. Each test file is its own process under `node --test`, so a
- * file-scoped `before`/`after` pair is the suite-level form of the shipped per-test
- * `t.after(resetItemStackQuantityPath)` convention.
+ * `awardComponents`' behaviour — the Component Award the companion contract publishes (issue 1301).
  */
 
 import assert from 'node:assert/strict';
@@ -62,13 +38,7 @@ import {
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
 
-/**
- * The configured path, spelled as a LITERAL everywhere below.
- *
- * Never `itemStackQuantityPath()`: comparing an implementation's answer against the live module
- * default is satisfied by an implementation that re-resolves that default at every site and
- * threads nothing, which is the exact regression the once-per-call resolution exists to prevent.
- */
+/** The configured path, spelled as a LITERAL everywhere below. */
 const QUANTITY_PATH = 'system.count.value';
 
 const SYSTEM = { id: 'sys-1', name: 'Test System', components: [] };
@@ -77,9 +47,7 @@ const KEY = 'FABRICATE.Component.Award';
 before(() => configureItemStackQuantityPath(QUANTITY_PATH));
 after(() => resetItemStackQuantityPath());
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 /** Write `value` at the configured path on `target`, creating the intermediate objects. */
 function storeQuantity(target, value) {
@@ -105,23 +73,7 @@ function makeComponent(id, extra = {}) {
   };
 }
 
-/**
- * An item document double whose `update` records its payload and applies it.
- *
- * `update` answers what a REAL `Document#update` answers: the document when it applied a
- * change. The shapes are NAMED rather than passed as the values themselves, because passing
- * `updateResult: undefined` silently takes the default and drives the opposite of the cell that
- * asked for it:
- *
- * - `'document'` — accepted AND visible on a re-read, the ordinary case;
- * - `'resolves-undefined'` — the empty-diff case, where the GM-authored path is not in the
- *   item's data model, Foundry discards the key and the promise resolves with nothing;
- * - `'resolves-null'` — the same, spelled the other way a stub might;
- * - `'document-without-applying'` — ACCEPTED and invisible: `readStoredStackQuantity` reads the
- *   PREPARED document, not `_source`, so a game system that recomputes the configured path in
- *   data preparation masks a write Foundry took. It is the shape that separates judging the
- *   write's own return from re-reading the stored value across it.
- */
+/** An item document double whose `update` records its payload and applies it. */
 function makeItem(id, { stored, updateResult = 'document' } = {}) {
   const item = {
     id,
@@ -144,13 +96,7 @@ function makeItem(id, { stored, updateResult = 'document' } = {}) {
   return item;
 }
 
-/**
- * An actor double that CREATES, counting what reached `createEmbeddedDocuments`.
- *
- * `createResult: 'empty'` is the shape that matters most: a stub returning `[]` is what a
- * refusing `_preCreate` hook, a refusing `preCreateItem` hook and a throwing `Item` constructor
- * all look like to a caller, and `createOrStackComponentItem` turns it into a `null` return.
- */
+/** An actor double that CREATES, counting what reached `createEmbeddedDocuments`. */
 let awardActorSequence = 0;
 function makeAwardActor({ createResult = 'document' } = {}) {
   const actor = {
@@ -181,14 +127,7 @@ function makeAwardActor({ createResult = 'document' } = {}) {
   return actor;
 }
 
-/**
- * The six seams, with a call record for each.
- *
- * `createOrStack` DELEGATES TO THE REAL SEAM by default rather than stubbing it, so
- * "exactly one create reached `createEmbeddedDocuments`" is a statement about shipped code and
- * so `componentStacking.js`'s own `[created] ?? null` normalisation — which every *(D0)* cell
- * leans on — is the implementation under test rather than a reproduction of it.
- */
+/** The six seams, with a call record for each. */
 function makeAwardSeams({
   components = [],
   systems = [SYSTEM],
@@ -237,9 +176,7 @@ async function runAward({ actor, awards, systemId = SYSTEM.id, callSite = 'gmAct
 /** `{ componentId, quantity }`, the only two keys an entry may carry. */
 const entry = (componentId, quantity) => ({ componentId, quantity });
 
-// ---------------------------------------------------------------------------
 // AC-3 / AC-4 / AC-5 — the answer shape, and what `placements` distinguishes
-// ---------------------------------------------------------------------------
 
 describe('AC-3 — partial success is expressed, and the total is a VALUE', () => {
   it('answers partiallyAwarded with a summed total and one record per entry, in order', async () => {
@@ -309,9 +246,7 @@ describe('AC-5 — attempted-and-failed is distinguishable from never-attempted'
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-6 — the request key set is CLOSED, at both levels
-// ---------------------------------------------------------------------------
 
 describe('AC-6 — a HOSTILE request cannot widen the answer, the seam call or the payload', () => {
   it('answers identically and hands the seam an identical, gate-owned bag', async () => {
@@ -383,9 +318,7 @@ describe('AC-6 — a HOSTILE request cannot widen the answer, the seam call or t
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-7 / AC-8 — the carve-out is unreachable, and the module cannot reach past its seams
-// ---------------------------------------------------------------------------
 
 describe('AC-7 — the published carve-out is unreachable, so a stable member cannot throw', () => {
   it('refuses an unresolvable component WITHOUT calling the resolver seam', async () => {
@@ -1197,9 +1130,7 @@ describe('AC-27 — placement records echo the caller and are DEEPLY frozen', ()
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-30 — the contract's prose cannot silently contradict its own table
-// ---------------------------------------------------------------------------
 
 describe('AC-30 — the member-count prose is checked, in two halves', () => {
   const CONTRACT_SOURCE = readFileSync(
@@ -1208,12 +1139,8 @@ describe('AC-30 — the member-count prose is checked, in two halves', () => {
   );
 
   /**
-   * The file's PROSE — every block and line comment — with the JSDoc gutter stripped and
-   * whitespace collapsed.
-   *
-   * Normalised because prose WRAPS: the claim about which members target an actor is split
-   * across a line break by `prettier`, and a scan of the raw text would silently match nothing
-   * and assert nothing. Comments only, because a number inside code is not a claim.
+   * The file's PROSE — every block and line comment — with the JSDoc gutter stripped and whitespace
+   * collapsed.
    */
   const PROSE = [
     ...[...CONTRACT_SOURCE.matchAll(/\/\*[\s\S]*?\*\//g)].map(([block]) => block),
@@ -1224,9 +1151,8 @@ describe('AC-30 — the member-count prose is checked, in two halves', () => {
     .replaceAll(/\s+/g, ' ');
 
   it('(a) carries none of the phrases this change falsified', () => {
-    // ABSENCE ONLY. A presence assertion would red on an innocent reword and its only remedy
-    // would be editing the assertion — which is exactly how a criterion becomes the next stale
-    // record. Absence reds only on a reword that KEEPS a wrong claim, which is perfect signal.
+    // ABSENCE ONLY. A presence assertion would red on an innocent reword and its only remedy would
+    // be editing the assertion — which is exactly how a criterion becomes the next stale record.
     for (const phrase of [
       'ten members',
       'Exactly ONE of the ten',
@@ -1285,19 +1211,15 @@ describe('AC-30 — the member-count prose is checked, in two halves', () => {
       CHECK_ROLL_MESSAGE_KEYS,
       COMPONENT_AWARD_MESSAGE_KEYS,
       CURRENCY_CREDIT_MESSAGE_KEYS,
-      // The pooled pair targets a SET of actors, which is still targeting an actor: both
-      // answer `noActor`, so both belong in the count the prose claims (issue 1342). Leaving
-      // them out would let the prose keep saying FIVE and stay green.
+      // The pooled pair targets a SET of actors, which is still targeting an actor: both answer
+      // `noActor`, so both belong in the count the prose claims (issue 1342).
       POOLED_HOLDINGS_READ_MESSAGE_KEYS,
       POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
     ].filter((table) => table[COMPANION_OUTCOMES.noActor] !== undefined).length;
 
     const claims = [
       {
-        // `the N members` and `N TUPLES` only. A bare "four members now gate on it" is a
-        // SUBSET count and a true statement, so a pattern that read every "<number> members"
-        // as a claim about the table's size would be the false-positive class AC-30(a) is
-        // written to avoid — with editing the assertion as its only remedy.
+        // `the N members` and `N TUPLES` only.
         label: 'the member count',
         expected: members,
         pattern: /\bthe\s+([A-Za-z]+|\d+)\s+members\b|([A-Za-z]+|\d+)\s+TUPLES\b/g,
@@ -1333,9 +1255,7 @@ describe('AC-30 — the member-count prose is checked, in two halves', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-31 — the carry map is PER CALL
-// ---------------------------------------------------------------------------
 
 describe('AC-31 — the duplicate-componentId carry map is per CALL, never module scope', () => {
   it('never takes one actor’s item as another actor’s stack target', async () => {

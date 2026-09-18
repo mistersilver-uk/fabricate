@@ -1,11 +1,6 @@
 /**
- * Coverage for the pure world-time label builder
- * (`src/ui/svelte/util/worldTimeLabel.js`). The day + clock come from injected
- * calendar `components` (NOT a worldTime/secondsPerDay division). The raw
- * `components.day` is 0-based and resets each year, so the label renders a
- * monotonic, 1-based campaign day: `day + 1` within a year, or
- * `year * daysPerYear + day + 1` across years. The current instant renders with a
- * time-of-day phrase, a future instant with HH:MM.
+ * Coverage for the pure world-time label builder (`src/ui/svelte/util/worldTimeLabel.js`). The day
+ * + clock come from injected calendar `components` (NOT a worldTime/secondsPerDay division).
  */
 
 import test from 'node:test';

@@ -1,20 +1,7 @@
 /**
- * Edge coverage for the active-GM Foundry glue in `interactableSocketBridge.js`:
- * the three mutation seams reachable over the shared `module.fabricate` socket
- * (`applyInteractableBehaviorUpdate`, `applyInteractableVisualUpdate`,
- * `applyInteractableVisualDelete`). Each seam carries an OWNERSHIP guard so a
- * drifted/reused/crafted id or uuid can never mutate or delete a foreign document.
- *
- * The visual update/delete seams additionally require a BIDIRECTIONAL link: a
- * reverse flag (mintable via a stamp-only socket write) does not by itself authorize
- * a core-data write or a delete — the linked `fabricate.interactable` behaviour must
- * forward-link back to the same document. Only the relink provenance stamp (which
- * writes no core data) is exempt. This is defense-in-depth that raises the escalation
- * bar, not a full closure — the forward link is itself socket-writable, so complete
- * closure needs socket sender authentication (tracked by issue 593).
- *
- * These drive the real functions through injected `globalThis.game` /
- * `globalThis.fromUuidSync` fakes (no live Foundry).
+ * Edge coverage for the active-GM Foundry glue in `interactableSocketBridge.js`: the three mutation
+ * seams reachable over the shared `module.fabricate` socket (`applyInteractableBehaviorUpdate`,
+ * `applyInteractableVisualUpdate`, `applyInteractableVisualDelete`) (issue 593).
  */
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
@@ -97,9 +84,8 @@ function installBehavior(behavior) {
   };
 }
 
-// Resolve the visual by uuid AND (optionally) the linked region by its uuid, so the
-// bidirectional round-trip can find the behaviour. `linkedBehavior` null → the
-// reverse flag points at a behaviour that does not resolve (fake-behaviour case).
+// Resolve the visual by uuid AND (optionally) the linked region by its uuid, so the bidirectional
+// round-trip can find the behaviour.
 function installVisual(doc, linkedBehavior = null) {
   globalThis.fromUuidSync = (uuid) => {
     if (uuid === VISUAL_UUID) return doc;
@@ -168,9 +154,8 @@ describe('applyInteractableVisualUpdate ownership guard', () => {
   });
 
   it('refuses a payload that SMUGGLES core data alongside the provenance stamp (foreign doc, no write)', async () => {
-    // The single-message exploit: a stamp is present so the naive check would allow
-    // it, but the same payload also carries hidden/texture/geometry against a foreign
-    // tile. The strict allowlist must reject the whole write.
+    // The single-message exploit: a stamp is present so the naive check would allow it, but the
+    // same payload also carries hidden/texture/geometry against a foreign tile.
     const foreign = makeVisual({});
     installVisual(foreign);
     await applyInteractableVisualUpdate({
@@ -261,18 +246,13 @@ describe('applyInteractableVisualDelete ownership guard', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Sender authentication (issue 593): handleInteractableSocketMessage gates the
-// privileged edges on the server-attested socket SENDER (the trusted 2nd callback
-// arg), not the receiver alone. These drive the full inbound dispatch through
-// real apply* seams so the sender gate is exercised end-to-end.
-// ---------------------------------------------------------------------------
+// Sender authentication (issue 593): handleInteractableSocketMessage gates the privileged edges on
+// the server-attested socket SENDER (the trusted 2nd callback arg), not the receiver alone.
 
 const GM_ID = 'gm1';
 
-// This client is the active GM (the receiver that applies). `game.user ===
-// game.users.activeGM` makes `isActiveGM()` true. `behavior`/`visual`/`linkedBehavior`
-// wire the resolvers the real apply* seams walk.
+// This client is the active GM (the receiver that applies). `game.user === game.users.activeGM`
+// makes `isActiveGM()` true.
 function installActiveGmWorld({ behavior = null, visual = null, linkedBehavior = null } = {}) {
   const gm = { id: GM_ID };
   globalThis.game = {

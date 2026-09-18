@@ -172,12 +172,8 @@ test('getFabricateFlag fails closed but setFabricateFlag surfaces an invalid sco
   );
 });
 
-// ---------------------------------------------------------------------------
-// stampItemDataRoleIdentity (issue 780): the shared write-side stamp behind every
-// creation site that needs a durable per-system identity leaf. Builds the
-// doubly-nested `flags.fabricate.fabricate.roles[systemId][roleKey]` path with a
-// dotted-systemId guard and sibling-preserving `||=`.
-// ---------------------------------------------------------------------------
+// stampItemDataRoleIdentity (issue 780): the shared write-side stamp behind every creation site
+// that needs a durable per-system identity leaf.
 
 test('stampItemDataRoleIdentity builds the doubly-nested roles path', () => {
   const itemData = {};

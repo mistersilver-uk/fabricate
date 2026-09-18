@@ -103,10 +103,9 @@ function system(overrides = {}) {
     enabled: true,
     features: { gathering: true },
     components: [{ id: 'comp-a', difficulty: 1 }],
-    // Include a failure tier so a below-success roll resolves to a genuine failure:
-    // routed gathering now clamps a below-lowest relative roll to the closest tier, so
-    // a success-only check would clamp a miss up to success. With the failure tier the
-    // fixture's sub-threshold behaviour matches the pre-clamp "no match → failure".
+    // Include a failure tier so a below-success roll resolves to a genuine failure: routed
+    // gathering now clamps a below-lowest relative roll to the closest tier, so a success-only
+    // check would clamp a miss up to success.
     gatheringCraftingCheck: routedSystemCheck({ failureTierName: 'Barren' }),
     ...overrides
   };
@@ -201,10 +200,7 @@ function makeEngine({
   return engine;
 }
 
-// A timed library task in nodes economy mode. Library tasks resolve as `d100`
-// (composeEnvironment forces it), so the per-attempt outcome status — and thus
-// node depletion under `onSuccess` — is driven by the drop/event rolls, not a
-// routed macro. `dropRate: 100` makes the find deterministic.
+// A timed library task in nodes economy mode.
 function nodesLibraryTask(overrides = {}) {
   return {
     id: 'task-a',
@@ -217,12 +213,8 @@ function nodesLibraryTask(overrides = {}) {
   };
 }
 
-// Build a real GatheringRichStateService in nodes economy mode, backed by the
-// supplied environments so its node-state writes mutate the same env objects the
-// engine reads at maturity. The store's `update` merges the patch in place so
-// `env.nodeRuntime` is observable after `commitAcceptedAttempt`. The library
-// `tasks`/`events` feed composeEnvironment, which the engine uses to resolve
-// the matured run's task (embedded `env.tasks` are ignored under richState).
+// Build a real GatheringRichStateService in nodes economy mode, backed by the supplied environments
+// so its node-state writes mutate the same env objects the engine reads at maturity.
 function makeNodesRichState(environments, { tasks = [nodesLibraryTask()], events = [], rules = null, rollD100 = () => 1 } = {}) {
   const byId = new Map(environments.map(env => [env.id, env]));
   const system = { economy: { mode: 'nodes' }, tasks, events };

@@ -1,23 +1,6 @@
 /**
  * The View Lab's frame builder is a TRANSCRIPTION of Foundry's `_renderFrame` / `_updateFrame` /
- * `#applyPosition`. A transcription is only as good as its last read of the source, and Foundry
- * upgrades on its own schedule — so this test re-reads the harvested `application.mjs` and fails
- * when the thing it was copied from has moved.
- *
- * The primary check is a digest comparison against the committed provenance record. That is
- * deliberately blunt: ANY change to Foundry's application module goes red, and the fix is to
- * re-harvest with `--write-provenance` and have a human read the diff. A structural check that
- * tried to be clever about which changes matter would quietly pass the one that mattered.
- *
- * The secondary checks are diagnostics. When the digest goes red they say WHAT moved, so the
- * failure is actionable instead of just alarming.
- *
- * SKIP POLICY. This test skips when no chrome has been harvested, because `npm test` must stay
- * runnable for anyone without a Foundry licence — that is most of the point of the main suite.
- * Two things compensate: the skip prints the command that would make it run, and setting
- * `VIEWLAB_REQUIRE_CHROME=1` turns the skip into a failure for a machine that is supposed to have
- * the cache. The provenance record itself is asserted unconditionally, so the metadata half of the
- * contract is gated everywhere.
+ * `#applyPosition`.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -75,9 +58,7 @@ function normalize(text) {
 }
 
 /**
- * Slice a brace-balanced method body out of the source. Regex alone cannot do this: `_renderFrame`
- * contains nested braces in both a template literal and an `if`, so a non-greedy match stops early
- * and a greedy one runs to the end of the class.
+ * Slice a brace-balanced method body out of the source.
  *
  * @param {string} text Module source.
  * @param {string} signature Text that opens the method.
@@ -191,9 +172,7 @@ test('_updateFrame still hides the controls button when there are no header cont
 
 test('_renderFrame still emits no controls dropdown', { skip }, () => {
   // V13 appended `<menu class="controls-dropdown"></menu>` to the frame and filled it in
-  // `_updateFrame`; V14 removed it in favour of a context menu. The transcription follows, so this
-  // asserts the ABSENCE — a V15 that reinstated the element would otherwise be a silent omission
-  // from every captured frame rather than a failure.
+  // `_updateFrame`; V14 removed it in favour of a context menu.
   const body = normalize(methodBody(source, 'async _renderFrame(options)'));
   assert.ok(
     !body.includes('controls-dropdown'),
@@ -206,9 +185,7 @@ test('_renderFrame still emits no controls dropdown', { skip }, () => {
 
 test('_getFrameButtons is still empty, so no extra header button is drawn', { skip }, () => {
   // V14 added `_renderFrameButtons`, which inserts `_getFrameButtons(options)` before the close
-  // button. ApplicationV2's returns nothing and neither Fabricate window overrides it — which is
-  // both why the frame has no extra button and why `templates/generic/frame-buttons.hbs` is not
-  // harvested. If core starts returning one by default, every frame gains a control the lab omits.
+  // button.
   assert.match(
     normalize(methodBody(source, '_getFrameButtons(options)')),
     /^\{ return \[\]; \}$/,
@@ -299,8 +276,7 @@ test('_renderHTML still builds the form the spec transcribes', { skip: skipDialo
   );
 
   // Feed the spec's template Foundry's own expressions, so each fragment it produces must appear
-  // verbatim in the method. Two fragments rather than one string: the source interposes the
-  // `: ""` arm of the content ternary between them.
+  // verbatim in the method.
   const withExpressions = normalize(
     FOUNDRY_DIALOG_SPEC.formInnerHtml('${this.options.content}', '${this._renderButtons()}')
   );
@@ -330,9 +306,7 @@ test('_renderButtons still builds each button the same way', { skip: skipDialog 
     `type="${buttonDefaults.type}"`,
     'const isDefault = !!buttonOptions.default || ((i === 0) && !buttons.some(b => b.default));',
     'button.setAttribute("type", type); button.setAttribute("data-action", action); button.setAttribute("class", cls);',
-    // V14 interposes the tooltip branch between the two toggles. Asserted as three fragments so a
-    // future reordering shows up as the specific line that moved, and so the branch itself is
-    // pinned — the lab transcribes it even though no Fabricate dialog passes a tooltip yet.
+    // V14 interposes the tooltip branch between the two toggles.
     'button.toggleAttribute("disabled", !!disabled);',
     'if ( tooltip ) { button.setAttribute("data-tooltip", ""); button.setAttribute("aria-label", _loc(tooltip)); }',
     'button.toggleAttribute("autofocus", isDefault);',

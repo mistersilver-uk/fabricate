@@ -1,22 +1,4 @@
-/**
- * Issue 555 — durable recipe-item identity + clone-safe registration (manager level).
- *
- * Pure-logic over plain fakes (no mounted components). Covers:
- *  - flow 4b: registering a duplicated (compendium-origin) book/component yields a NEW
- *    definition and leaves the original untouched;
- *  - flow 1 double-import dedups to one definition;
- *  - clone registration writes: own-uuid originItemUuid, overwritten flag, stripped
- *    duplicateSource, cleared compendiumSource;
- *  - the skipped branch stamps+strips a pre-flag source;
- *  - union source refs (registeredItemUuid + originItemUuid + fallbacks) resolve both drag routes;
- *  - the normalizer + import-shaped round-trip preserve registeredItemUuid/aliasItemUuids;
- *  - R3 auto-stamp (idempotent, world + writable pack, skips locked);
- *  - R4 repair reconciles component + recipe-item sources and actor-owned copies, with the
- *    guardrailed name-assisted re-point + audit log;
- *  - the generic _clearSourceFlag clears a stale flag off an old source (incl. the
- *    updated-branch re-point path and a throwing fromUuid);
- *  - post-review gap tests: tier-3 owned copy, component both-routes, deleted source.
- */
+/** Issue 555 — durable recipe-item identity + clone-safe registration (manager level). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,9 +21,7 @@ const { InventoryListingBuilder } = await import('../src/systems/InventoryListin
 const { matchRecipeItemDefinition, resolveComponentForItem } = await import('../src/utils/sourceUuid.js');
 const { RECIPE_ITEM_FLAG_STAMP_TARGET } = await import('../src/config/settings.js');
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
 function makeDoc({
   uuid,
@@ -95,9 +75,8 @@ function register(doc) {
   return doc;
 }
 
-// Recipe items now carry a per-system durable identity map (issue 567), the third `roles`
-// sibling after componentId (#556) and toolId (#561). Read that per-system leaf; every
-// single-system fixture here uses the id 'sys'.
+// Recipe items now carry a per-system durable identity map (issue 567), the third `roles` sibling
+// after componentId (#556) and toolId (#561).
 function recipeItemFlag(doc, systemId = 'sys') {
   return doc.getFlag('fabricate', `fabricate.roles.${systemId}.recipeItemDefinitionId`);
 }
@@ -177,9 +156,7 @@ const BOOK_SCROLL_DEFS = [
   { id: 'def-scroll', name: 'Scroll', originItemUuid: 'Item.scroll' },
 ];
 
-// ---------------------------------------------------------------------------
 // Flow 4b — a duplicated compendium-origin recipe item becomes a NEW definition
-// ---------------------------------------------------------------------------
 
 test('555 — flow 4b: registering a book duplicated from a compendium-origin book yields a new definition, original untouched', async () => {
   resetRegistry();
@@ -235,9 +212,7 @@ test('555 — flow 4b: registering a component duplicated from a compendium-orig
   assert.equal(clone.item.registeredItemUuid, 'Item.ore-copy');
 });
 
-// ---------------------------------------------------------------------------
 // Flow 1 — double-import of the same pack item dedups to ONE definition
-// ---------------------------------------------------------------------------
 
 test('555 — flow 1 double-import (NOT the bug): the same pack book imported to the world twice registers as ONE definition', async () => {
   resetRegistry();
@@ -255,9 +230,7 @@ test('555 — flow 1 double-import (NOT the bug): the same pack book imported to
   assert.equal(second.item.id, first.item.id);
 });
 
-// ---------------------------------------------------------------------------
 // Registration writes — clone strip + stamp; skipped branch recovery
-// ---------------------------------------------------------------------------
 
 test('555 — clone registration stamps the flag, strips duplicateSource, and clears compendiumSource on the source', async () => {
   resetRegistry();
@@ -299,9 +272,7 @@ test('555 — the skipped branch stamps and strips a pre-flag source (recovery p
   assert.equal(recipeItemFlag(book), first.item.id, 'the skipped branch re-stamped the durable flag');
 });
 
-// ---------------------------------------------------------------------------
 // Union source refs — both drag routes resolve; round-trip preserved
-// ---------------------------------------------------------------------------
 
 test('555 — a compendium-imported book records union source refs (registeredItemUuid + originItemUuid)', async () => {
   resetRegistry();
@@ -333,9 +304,7 @@ test('555 — the normalizer preserves registeredItemUuid + aliasItemUuids acros
   assert.deepEqual(roundTripped.aliasItemUuids, ['Item.old']);
 });
 
-// ---------------------------------------------------------------------------
 // R3 — one-shot auto-stamp
-// ---------------------------------------------------------------------------
 
 test('555 R3 — auto-stamp flags world sources, is idempotent, and skips locked packs', async () => {
   resetRegistry();
@@ -375,9 +344,7 @@ test('555 R3 — auto-stamp flags world sources, is idempotent, and skips locked
   assert.equal(second.stripped, 0);
 });
 
-// ---------------------------------------------------------------------------
 // R4 — repair reconciles both kinds + actor-owned copies + name-assist
-// ---------------------------------------------------------------------------
 
 test('555 R4 — one repair pass stamps a component source, a recipe-item source, and an actor-owned copy', async () => {
   resetRegistry();
@@ -454,9 +421,8 @@ test('555 R4 name-assist — an owned copy whose unique name matches a different
 
 test('555/567 R4 name-assist — a name matching TWO definitions WITHIN the system is skipped as ambiguous (no re-point)', async () => {
   resetRegistry();
-  // Recipe-item repair is now PER SYSTEM (issue 567), so name uniqueness — and therefore
-  // the ambiguity guard — is scoped to the system being reconciled. Two 'Tome' definitions
-  // in the SAME system make the name-assist ambiguous.
+  // Recipe-item repair is now PER SYSTEM (issue 567), so name uniqueness — and therefore the
+  // ambiguity guard — is scoped to the system being reconciled.
   const ownedCopy = makeDoc({ uuid: 'Actor.a.Item.dup', name: 'Tome', duplicateSource: 'Item.book' });
   const mgr = ownedRepairManager(
     [
@@ -488,9 +454,7 @@ test('555 R4 name-assist — a flagged owned copy is authoritative and left unto
   assert.equal(summary.repointed, 0);
 });
 
-// ---------------------------------------------------------------------------
-// _clearSourceFlag (generic, kind-agnostic)
-// ---------------------------------------------------------------------------
+// clearSourceFlag (generic, kind-agnostic)
 
 test('555/567 — _clearSourceFlag unsets a stale recipe-item roles leaf on the old source', async () => {
   resetRegistry();
@@ -512,9 +476,7 @@ test('555/567 — _clearSourceFlag leaves a roles leaf that belongs to a differe
   assert.equal(recipeItemFlag(other), 'def-2', 'a different def id is untouched');
 });
 
-// ---------------------------------------------------------------------------
 // Matcher drift — both consumers resolve through the ONE shared matcher
-// ---------------------------------------------------------------------------
 
 test('555 — RecipeVisibilityService and InventoryListingBuilder resolve identically through the shared matcher', () => {
   const defs = [
@@ -536,15 +498,7 @@ test('555 — RecipeVisibilityService and InventoryListingBuilder resolve identi
   assert.equal(fromService, shared, 'the visibility service resolves via the shared matcher');
 });
 
-// ---------------------------------------------------------------------------
 // 567 acceptance #1 — cross-system sibling coexistence, with an ISOLATED reader.
-// The load-bearing gap #567 exists to close: a source registered in TWO systems keeps
-// a durable per-system claim in EACH (writer half), and a SEPARATE owned copy whose only
-// link to A's definition is `roles.A.recipeItemDefinitionId` resolves to A's def in A's
-// set — INDEPENDENTLY of the writer half (reader half). Under the retired single scalar
-// that copy resolved to NOTHING in A's set (last-writer-wins collision); this test
-// supersedes the "555 last writer wins" writer test.
-// ---------------------------------------------------------------------------
 
 test('567 #1 — a source shared by two systems keeps a per-system roles leaf in EACH (writer half, no last-writer-wins)', async () => {
   resetRegistry();
@@ -585,10 +539,7 @@ test('567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A\'s d
   const defB = sysBDefs[0];
 
   // The reader fixture: a SEPARATE owned copy whose ONLY link to A's definition is
-  // `roles.sysA.recipeItemDefinitionId`. It carries NO uuid / compendiumSource /
-  // duplicateSource intersecting A's def source refs (so tiers 2/3/4 cannot resolve it in
-  // A's set), and its legacy scalar names B's def (ABSENT from A's set) so the scalar tier
-  // ALSO falls through in A's set. Mirrors the tools suite's scalarDecoy dispatch-isolation.
+  // `roles.sysA.recipeItemDefinitionId`.
   const readerCopy = makeDoc({
     uuid: 'Actor.x.Item.readerCopy',
     name: 'Reader Copy',
@@ -630,10 +581,8 @@ test('567 #1 — a SEPARATE owned copy linked ONLY by roles.A resolves to A\'s d
   );
 });
 
-// ---------------------------------------------------------------------------
-// Gap-closing tests (post-review): updated-branch re-point, tier-3 owned copy,
-// component both-routes, deleted-source branches
-// ---------------------------------------------------------------------------
+// Gap-closing tests (post-review): updated-branch re-point, tier-3 owned copy, component
+// both-routes, deleted-source branches
 
 test('555 — addRecipeItemFromUuid updated branch clears the flag on the OLD source when originItemUuid drifts', async () => {
   resetRegistry();
@@ -715,10 +664,8 @@ test('555 — _clearSourceFlag swallows a throwing fromUuid and does not reject'
   }
 });
 
-// ---------------------------------------------------------------------------
-// 567 acceptance #2 — a recipe-item leaf clear removes ONLY that leaf and preserves the
-// sibling componentId/toolId leaves, at BOTH clear sites.
-// ---------------------------------------------------------------------------
+// 567 acceptance #2 — a recipe-item leaf clear removes ONLY that leaf and preserves the sibling
+// componentId/toolId leaves, at BOTH clear sites.
 
 test('567 #2 — the addRecipeItemFromUuid re-point clears ONLY the recipe-item leaf, preserving sibling componentId/toolId', async () => {
   resetRegistry();
@@ -777,9 +724,7 @@ test('567 #2 — the repair owner-null branch clears ONLY the recipe-item leaf, 
   assert.equal(roleLeaf(orphan, 'sys', 'toolId'), 'tool-x', 'the sibling toolId leaf is preserved');
 });
 
-// ---------------------------------------------------------------------------
 // 567 acceptance #3 — a dotted/unsafe systemId degrades (no throw), warning once.
-// ---------------------------------------------------------------------------
 
 test('567 #3 — a dotted systemId does not throw and degrades to the source-uuid tiers, warning once', () => {
   const defs = [{ id: 'd1', name: 'Book', originItemUuid: 'Item.x' }];
@@ -806,11 +751,7 @@ test('567 #3 — a dotted systemId does not throw and degrades to the source-uui
   }
 });
 
-// ---------------------------------------------------------------------------
 // 567 acceptance #4 — the restamp target bumped 1 → 2 (v1 worlds re-run) and is idempotent.
-// The primary-GM gate lives in `runRecipeItemFlagAutoStamp` (src/main.js), version-keyed by
-// `RECIPE_ITEM_FLAG_STAMP_VERSION`; here we pin the target and the idempotency of the pass.
-// ---------------------------------------------------------------------------
 
 test('567 #4 — RECIPE_ITEM_FLAG_STAMP_TARGET is 2 so a v1-stamped world re-runs the roles backfill', () => {
   assert.equal(RECIPE_ITEM_FLAG_STAMP_TARGET, 2, 'the restamp target is bumped 1 → 2 for the roles backfill');
@@ -832,9 +773,7 @@ test('567 #4 — autoStampRecipeItemSources is idempotent: a second run performs
   assert.equal(second.stripped, 0);
 });
 
-// ---------------------------------------------------------------------------
 // 567 acceptance #5 — the restamp path lands BOTH per-system leaves for a shared source.
-// ---------------------------------------------------------------------------
 
 test('567 #5 — autoStampRecipeItemSources stamps BOTH roles.A and roles.B for a source registered in two systems', async () => {
   resetRegistry();
@@ -851,11 +790,9 @@ test('567 #5 — autoStampRecipeItemSources stamps BOTH roles.A and roles.B for 
   assert.equal(recipeItemFlag(shared, 'sysB'), 'defB', 'the roles.B leaf is stamped alongside it');
 });
 
-// ---------------------------------------------------------------------------
-// 567 acceptance #6 — legacy behaviour preserved: the id-less synthetic legacy/alchemy link
-// still resolves via the source-uuid tiers (and keeps its null id for the bulk-learn guard),
-// and a pre-upgrade owned copy carrying ONLY the legacy scalar still resolves.
-// ---------------------------------------------------------------------------
+// 567 acceptance #6 — legacy behaviour preserved: the id-less synthetic legacy/alchemy link still
+// resolves via the source-uuid tiers (and keeps its null id for the bulk-learn guard), and a
+// pre-upgrade owned copy carrying ONLY the legacy scalar still resolves.
 
 test('567 #6 — an id-less synthetic legacy link resolves via the source-uuid tier and keeps a null id', () => {
   const synthetic = { id: null, originItemUuid: 'Item.legacy' };

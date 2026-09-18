@@ -1,15 +1,7 @@
 /**
- * Integration tests for T-026: End-to-End Crafting Flow
- *
- * Exercises the full CraftingEngine.craft() pipeline across four resolution
- * modes using real ResolutionModeService and CraftingRunManager instances.
- * Only _runCraftingCheck and _createSingleResult are stubbed.
- *
- * Groups:
- *   1. Simple mode  — validate + consume + create result (AC1)
- *   2. Multistep    — start run, advance 2 steps, complete (AC2)
- *   3. Routed check — outcome routed to a name-matched result group (AC3)
- *   4. Progressive  — value-based awarding by difficulty (AC4)
+ * Integration tests for T-026: End-to-End Crafting Flow. Exercises the full CraftingEngine.craft()
+ * pipeline across four resolution modes using real ResolutionModeService and CraftingRunManager
+ * instances.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,9 +13,7 @@ import { IngredientSet } from '../src/models/IngredientSet.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { RecipeManager } from '../src/systems/RecipeManager.js';
 
-// ---------------------------------------------------------------------------
 // Globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -41,9 +31,7 @@ globalThis.foundry = {
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
-// ---------------------------------------------------------------------------
 // FakeItem
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, name, quantity = 1, componentSourceUuid = null) {
@@ -67,15 +55,7 @@ class FakeItem {
   }
 }
 
-/**
- * A FakeItem that models Foundry's STRICT embedded-document deletion (issue 917).
- *
- * On V13/V14 `Item#delete` resolves the id through `collection.get(id, {strict: true})`
- * and THROWS when it is already gone, so a duplicate consumption-plan entry for one
- * shared unit aborts mid-consumption — after earlier ingredients are deleted and
- * before any result exists. A permissive fake would pass with two entries and let
- * that contract ship unverified.
- */
+/** A FakeItem that models Foundry's STRICT embedded-document deletion (issue 917). */
 class StrictFakeItem extends FakeItem {
   constructor(id, name, quantity = 1, essences = null) {
     super(id, name, quantity);
@@ -105,9 +85,7 @@ class StrictFakeItem extends FakeItem {
   }
 }
 
-// ---------------------------------------------------------------------------
 // FakeActor
-// ---------------------------------------------------------------------------
 
 class FakeActor {
   constructor(name, items = []) {
@@ -140,9 +118,7 @@ class FakeActor {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Build a mock RecipeManager. ingredientMatchesItem compares by componentId or
@@ -177,8 +153,7 @@ function buildMockRecipeManager(canCraftResult = true) {
 
 /**
  * Build a duck-typed ingredient set.
- * @param {string} id
- * @param {Array<{componentId: string, quantity: number}>} ingredientDefs
+ *
  * @param {string|null} resultGroupId - for mapped mode
  */
 function buildIngredientSet(id, ingredientDefs, resultGroupId = null) {
@@ -200,10 +175,7 @@ function buildIngredientSet(id, ingredientDefs, resultGroupId = null) {
   return obj;
 }
 
-/**
- * Build a duck-typed recipe.
- * @param {object} opts
- */
+/** Build a duck-typed recipe. */
 function buildRecipe({
   id = 'recipe-1',
   name = 'Test Recipe',
@@ -239,9 +211,7 @@ function buildRecipe({
   return recipe;
 }
 
-/**
- * Set up globalThis.game with the given crafting system.
- */
+/** Set up globalThis.game with the given crafting system. */
 function setupGame(system) {
   globalThis.game = {
     fabricate: {
@@ -255,16 +225,12 @@ function setupGame(system) {
   };
 }
 
-/**
- * Build a ResolutionModeService wired to a system.
- */
+/** Build a ResolutionModeService wired to a system. */
 function buildResolutionService(system) {
   return new ResolutionModeService({ getSystem: (id) => (id === system.id ? system : null) });
 }
 
-/**
- * Build a crafting system config.
- */
+/** Build a crafting system config. */
 function buildSystem({
   id = 'sys-1',
   resolutionMode = 'simple',
@@ -299,9 +265,7 @@ function stubEngine(engine, checkResult, createdItem = null) {
   }
 }
 
-// ===========================================================================
 // Group 1: Simple mode integration (AC1)
-// ===========================================================================
 
 test('simple mode: validate, consume ingredients, create result item', async () => {
   const system = buildSystem({ id: 'sys-simple', resolutionMode: 'simple' });
@@ -345,8 +309,6 @@ test('simple mode: validate, consume ingredients, create result item', async () 
 
 test('simple mode: a 1-unit dual-essence carrier funding two requirements is deleted exactly once', async () => {
   // Issue 917: the essence block contributes AT MOST ONE plan entry per item key.
-  // One entry per (item, requirement) would call delete() twice on a 1-unit stack —
-  // the second on a document that is already gone, which throws mid-consumption.
   const systemId = 'sys-917-shared-essence';
   const system = buildSystem({ id: systemId });
   system.features.essences = true;
@@ -619,9 +581,8 @@ test('_createSingleResult uses deterministic loot fallback type when managed sou
 });
 
 test('misconfigured required check: craft aborts with ZERO mutation (no consume/spend/break)', async () => {
-  // A routed+check system whose required check has no authored roll formula is a
-  // GM-side misconfiguration, not a rolled failure. The craft must abort before any
-  // consumption even though the failure policy WOULD otherwise consume ingredients.
+  // A routed+check system whose required check has no authored roll formula is a GM-side
+  // misconfiguration, not a rolled failure.
   const system = buildSystem({
     id: 'sys-misconfig',
     resolutionMode: 'routedByCheck',
@@ -689,9 +650,7 @@ test('misconfigured required check: craft aborts with ZERO mutation (no consume/
   assert.equal(craftingActor._createdDocs.length, 0, 'no result items are created');
 });
 
-// ===========================================================================
 // Group 2: Multistep mode integration (AC2)
-// ===========================================================================
 
 test('multistep: start run, advance through 2 steps, complete', async () => {
   const system = buildSystem({ id: 'sys-multi', resolutionMode: 'simple' });
@@ -881,15 +840,10 @@ test('multistep: step failure records failure and stops run', async () => {
   assert.equal(craftingActor._createdDocs.length, 0, 'no items should be created on failure');
 });
 
-// ===========================================================================
 // Group 3: Legacy tiered compatibility mode integration (AC3)
-// ===========================================================================
 
-// Canonical routed + check fixture (the shape the 1.4.0 migration produces
-// from a former-tiered system): groups are matched by name. The migration renames
-// the group routed from `pass` to "pass"; the `fail` outcome is a RESERVED failure
-// keyword, so it takes the failure path and never names a group (its former target
-// stays unrenamed and unreachable by name matching).
+// Canonical routed + check fixture (the shape the 1.4.0 migration produces from a former-tiered
+// system): groups are matched by name.
 function buildLegacyOutcomeRoutingFixture() {
   const system = buildSystem({
     id: 'sys-legacy-routing',
@@ -1015,22 +969,14 @@ test("routed check: reserved 'fail' outcome takes the failure path (no group awa
 
   const craftResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
-  // `fail` is a reserved failure keyword under canonical check: it routes
-  // to the failure path and awards no result group (unlike legacy tiered, which
-  // routed `fail` to an explicit group).
+  // `fail` is a reserved failure keyword under canonical check: it routes to the failure path and
+  // awards no result group (unlike legacy tiered, which routed `fail` to an explicit group).
   assert.equal(craftResult.results.length, 0, 'reserved fail outcome awards no result group');
 });
 
-// ===========================================================================
-// Group 3b: Routed-check misconfiguration disposition (issue 95 / T-275)
-//
-// A routed+`check` craft whose check outcome matches NO result group name (and
-// is not a reserved fail/miss keyword) resolves to disposition:'misconfiguration'
-// in ResolutionModeService._routeByOutcomeName. _createResultItems propagates
-// that meta and craft() must turn it into an error result rather than reporting
-// success. The fixture's groups are named "pass" / "Weak Brew", so the outcome
-// "partial" is genuinely unroutable.
-// ===========================================================================
+// Group 3b: Routed-check misconfiguration disposition (issue 95 / T-275). A routed+`check` craft
+// whose check outcome matches NO result group name (and is not a reserved fail/miss keyword)
+// resolves to disposition:'misconfiguration' in ResolutionModeService._routeByOutcomeName.
 
 test('_createResultItems: an unmatched routed outcome returns no items and a misconfiguration meta', async () => {
   const { system, ingredientSet, step, recipe } = buildLegacyOutcomeRoutingFixture();
@@ -1152,12 +1098,8 @@ test('routed check: a misconfiguration records step failure and never reports su
 });
 
 test('routed check: a misconfiguration aborts BEFORE consuming ingredients (issue 85)', async () => {
-  // The core defect: a matched signature that resolves to an unroutable result group
-  // must abort with ZERO mutation. Before the fix, ingredients were consumed at the
-  // top of the success path and the misconfiguration was only detected AFTER — so the
-  // player lost ingredients on a GM-side misconfiguration. The source herb (id
-  // `herb-t`) IS the ingredient the recipe consumes, so it lands in the consumption
-  // plan; assert it is left untouched.
+  // The core defect: a matched signature that resolves to an unroutable result group must abort
+  // with ZERO mutation.
   const { system, herb, recipe } = buildLegacyOutcomeRoutingFixture();
   setupGame(system);
 
@@ -1207,14 +1149,8 @@ test('routed check: a misconfiguration aborts BEFORE consuming ingredients (issu
 });
 
 test('timed FINISH: an unrouted-tier misconfiguration fails the craft, never a false success (issue 85)', async () => {
-  // A timed routedByCheck step consumes at START, so a routing misconfiguration can
-  // only surface at FINISH (the check outcome is unknowable until the gate matures).
-  // Here the matured outcome "Mythic" resolves to an authored SUCCESS tier that no
-  // result group lists (a group declares checkOutcomeIds for a DIFFERENT tier), so
-  // resolution yields disposition:'unrouted-tier'. Before the fix the timed FINISH
-  // post-check only handled 'error'/'misconfiguration', so this fell through to
-  // completeStepSuccess with empty results — a false success with lost inputs. The
-  // shared _isMisconfigurationDisposition predicate now covers it in both paths.
+  // A timed routedByCheck step consumes at START, so a routing misconfiguration can only surface at
+  // FINISH (the check outcome is unknowable until the gate matures).
   const system = buildSystem({
     id: 'sys-timed-unrouted',
     resolutionMode: 'routedByCheck',
@@ -1299,9 +1235,7 @@ test('timed FINISH: an unrouted-tier misconfiguration fails the craft, never a f
   assert.equal(history[0].status, 'failed', 'the run is recorded as a failure, not a success');
 });
 
-// ===========================================================================
 // Group 4: Progressive mode integration (AC4)
-// ===========================================================================
 
 function buildProgressiveFixture() {
   const system = buildSystem({
@@ -1415,9 +1349,7 @@ test('progressive mode: zero check value awards nothing', async () => {
   assert.equal(createCalled, 0, '_createSingleResult should never be called when value is 0');
 });
 
-// ===========================================================================
 // Run lifecycle: no phantom active runs on reject/fail; kept on arm/multi-step
-// ===========================================================================
 
 function singleStep(id = 'step-1') {
   return {

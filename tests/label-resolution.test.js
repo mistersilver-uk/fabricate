@@ -1,27 +1,20 @@
 /**
- * Tests for T-090: Recipe Display Labels and Icon Fallbacks
- *
- * Covers:
- *   TC1: resolveComponentName — valid managed component returns component.name
- *   TC2: resolveComponentName — missing component returns localized fallback
- *   TC3: resolveComponentName — component with registeredItemUuid resolves via fromUuid
- *   TC4: resolveComponentImg — valid component with img returns component.img
- *   TC5: resolveComponentImg — missing component returns fallback icon
- *   TC6: Ingredient states return resolved component names (not "managed item")
- *   TC7: Tool states return resolved names (not undefined)
- *   TC8: Result description resolution via resolveComponentName
- *   TC9: Recipe icon fallback — custom img passes through unchanged
- *   TC10: Recipe icon fallback — default bag icon falls back to linked item img
- *   TC11: Recipe icon fallback — no linked item falls back to document icon
- *   TC12: Graceful degradation for broken registeredItemUuid references
- *   TC13: resolveComponentName — component with no registeredItemUuid falls back to name match
+ * Tests for T-090: Recipe Display Labels and Icon Fallbacks. Covers: TC1: resolveComponentName —
+ * valid managed component returns component.name TC2: resolveComponentName — missing component
+ * returns localized fallback TC3: resolveComponentName — component with registeredItemUuid resolves
+ * via fromUuid TC4: resolveComponentImg — valid component with img returns component.img TC5:
+ * resolveComponentImg — missing component returns fallback icon TC6: Ingredient states return
+ * resolved component names (not "managed item") TC7: Tool states return resolved names (not
+ * undefined) TC8: Result description resolution via resolveComponentName TC9: Recipe icon fallback
+ * — custom img passes through unchanged TC10: Recipe icon fallback — default bag icon falls back to
+ * linked item img TC11: Recipe icon fallback — no linked item falls back to document icon TC12:
+ * Graceful degradation for broken registeredItemUuid references TC13: resolveComponentName —
+ * component with no registeredItemUuid falls back to name match
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -45,18 +38,14 @@ globalThis.game = { user: { isGM: true, name: 'Test' }, fabricate: null };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 
-// ---------------------------------------------------------------------------
 // Imports — must come after globals
-// ---------------------------------------------------------------------------
 
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe, DEFAULT_RECIPE_IMAGE } = await import('../src/models/Recipe.js');
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { Ingredient } = await import('../src/models/Ingredient.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeSystem(components = [], tools = []) {
   return {
@@ -101,9 +90,7 @@ function teardownGame() {
   globalThis.game = { user: { isGM: true, name: 'Test' }, fabricate: null };
 }
 
-// ---------------------------------------------------------------------------
 // TC1: resolveComponentName — known component returns its name
-// ---------------------------------------------------------------------------
 
 test('TC1: resolveComponentName returns component name for known component', () => {
   const component = makeComponent('comp-1', 'Iron Ore');
@@ -119,9 +106,7 @@ test('TC1: resolveComponentName returns component name for known component', () 
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC2: resolveComponentName — missing component returns localized fallback
-// ---------------------------------------------------------------------------
 
 test('TC2: resolveComponentName returns fallback for unknown component', () => {
   const system = makeSystem([]);
@@ -137,9 +122,7 @@ test('TC2: resolveComponentName returns fallback for unknown component', () => {
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC3: resolveComponentName — component with registeredItemUuid resolves via fromUuid
-// ---------------------------------------------------------------------------
 
 test('TC3: resolveComponentName uses fromUuid when component has registeredItemUuid', async () => {
   const component = makeComponent('comp-uuid-1', 'Fallback Name', null, 'World.Item.abc123');
@@ -162,9 +145,7 @@ test('TC3: resolveComponentName uses fromUuid when component has registeredItemU
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC4: resolveComponentImg — valid component with img returns component.img
-// ---------------------------------------------------------------------------
 
 test('TC4: resolveComponentImg returns component.img when available', () => {
   const component = makeComponent('comp-2', 'Iron Ore', 'icons/ore.png');
@@ -180,9 +161,7 @@ test('TC4: resolveComponentImg returns component.img when available', () => {
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC5: resolveComponentImg — missing component returns fallback icon
-// ---------------------------------------------------------------------------
 
 test('TC5: resolveComponentImg returns fallback for unknown component', () => {
   const system = makeSystem([]);
@@ -198,9 +177,7 @@ test('TC5: resolveComponentImg returns fallback for unknown component', () => {
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC6: Ingredient states return resolved component names (not "managed item")
-// ---------------------------------------------------------------------------
 
 test('TC6: _buildIngredientStates resolves component names instead of "managed item"', () => {
   const component = makeComponent('comp-3', 'Dragon Scale');
@@ -229,9 +206,7 @@ test('TC6: _buildIngredientStates resolves component names instead of "managed i
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC7: Tool states return resolved names (not undefined)
-// ---------------------------------------------------------------------------
 
 test('TC7: evaluateCraftability resolves tool names (not undefined)', () => {
   const component = makeComponent('cat-comp-1', 'Mortar and Pestle');
@@ -258,9 +233,7 @@ test('TC7: evaluateCraftability resolves tool names (not undefined)', () => {
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC8: Result description resolution uses component name
-// ---------------------------------------------------------------------------
 
 test('TC8: resolveResultDescription returns component name instead of "Nx item"', () => {
   const component = makeComponent('res-comp-1', 'Health Potion');
@@ -280,9 +253,7 @@ test('TC8: resolveResultDescription returns component name instead of "Nx item"'
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC9: Recipe icon fallback — custom img passes through unchanged
-// ---------------------------------------------------------------------------
 
 test('TC9: _resolveRecipeIcon returns custom recipe img unchanged', () => {
   const manager = new RecipeManager();
@@ -292,9 +263,7 @@ test('TC9: _resolveRecipeIcon returns custom recipe img unchanged', () => {
   assert.equal(icon, 'icons/custom/potion.png');
 });
 
-// ---------------------------------------------------------------------------
 // TC10: Recipe icon fallback — default bag icon falls back to linked item img
-// ---------------------------------------------------------------------------
 
 test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag', async () => {
   // Recipe uses the default (blueprint) icon but has a linked item
@@ -315,9 +284,7 @@ test('TC10: _resolveRecipeIcon falls back to linked item when img is default bag
   delete globalThis.fromUuid;
 });
 
-// ---------------------------------------------------------------------------
 // TC11: Recipe icon fallback — no linked item falls back to document icon
-// ---------------------------------------------------------------------------
 
 test('TC11: _resolveRecipeIconAsync falls back to document icon when no linked item', async () => {
   const manager = new RecipeManager();
@@ -331,9 +298,7 @@ test('TC11: _resolveRecipeIconAsync falls back to document icon when no linked i
   assert.ok(icon !== DEFAULT_RECIPE_IMAGE, 'Should not return the default recipe image as final result');
 });
 
-// ---------------------------------------------------------------------------
 // TC12: Graceful degradation for broken registeredItemUuid references
-// ---------------------------------------------------------------------------
 
 test('TC12: resolveComponentNameAsync handles broken fromUuid gracefully', async () => {
   const component = makeComponent('broken-comp', 'Fallback Name', null, 'World.Item.broken');
@@ -355,9 +320,7 @@ test('TC12: resolveComponentNameAsync handles broken fromUuid gracefully', async
   teardownGame();
 });
 
-// ---------------------------------------------------------------------------
 // TC13: resolveComponentName — component with no registeredItemUuid returns component.name
-// ---------------------------------------------------------------------------
 
 test('TC13: resolveComponentName returns component.name when no registeredItemUuid', () => {
   const component = makeComponent('comp-nosrc', 'Silver Ingot', null, null);

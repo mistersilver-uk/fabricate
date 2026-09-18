@@ -1,15 +1,4 @@
-/**
- * Issue 714 — 1.19.0 default-on backfill for the recipe time requirement.
- *
- * The pre-toggle normalizer coerced `enabled: time.enabled === true` and `save()` persists
- * the normalized systems, so every system saved while the requirements block was live carries
- * `requirements.time.enabled: false` in STORAGE. The 714 reader flips to default-on, under
- * which that persisted literal `false` reads as a deliberate disable — the opposite of the
- * decision. This migration deletes the persisted `false` once so it re-defaults on.
- *
- * Covers the targeted delete, the conservative scope (only literal false), idempotency,
- * malformed-payload tolerance, the deliberate no-seed, and the runner registration + gate.
- */
+/** Issue 714 — 1.19.0 default-on backfill for the recipe time requirement. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -18,9 +7,7 @@ const { migrateDefaultOnTimeRequirements } = await import(
 );
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 
-// ---------------------------------------------------------------------------
 // The delete — a persisted `false` re-defaults on
-// ---------------------------------------------------------------------------
 
 test('1.19.0 deletes a persisted requirements.time.enabled === false', () => {
   const { systems } = migrateDefaultOnTimeRequirements([
@@ -62,9 +49,7 @@ test('1.19.0 is idempotent — a second run is a no-op', () => {
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // Never throws — every level is guarded
-// ---------------------------------------------------------------------------
 
 test('1.19.0 tolerates malformed payloads without throwing', () => {
   assert.deepEqual(migrateDefaultOnTimeRequirements(undefined), { systems: [] });
@@ -84,9 +69,7 @@ test('1.19.0 tolerates malformed payloads without throwing', () => {
   assert.equal(systems[4].requirements.time, 'nope');
 });
 
-// ---------------------------------------------------------------------------
 // Runner registration + version gate
-// ---------------------------------------------------------------------------
 
 test('the runner applies 1.19.0 and bumps the migration version', async () => {
   const store = new Map([
@@ -107,11 +90,8 @@ test('the runner applies 1.19.0 and bumps the migration version', async () => {
 });
 
 test('1.19.0 is version-gated — a later deliberate opt-out is NOT flipped back on', async () => {
-  // The gate is the whole point: once the world is at or past 1.19.0, a GM who turns the
-  // new toggle OFF (persisting a deliberate `false` under 714) must keep it off across
-  // reloads. The seed tracks the CURRENT highest version — seeding an older one would
-  // leave a later migration unapplied, so `result.ran` would be 1 and the assertion below
-  // would be measuring "the later migration ran", not "the 1.19.0 gate held".
+  // The gate is the whole point: once the world is at or past 1.19.0, a GM who turns the new toggle
+  // OFF (persisting a deliberate `false` under 714) must keep it off across reloads.
   const store = new Map([
     ['migrationVersion', '1.34.0'],
     ['craftingSystems', [{ id: 'sys', requirements: { time: { enabled: false } } }]],

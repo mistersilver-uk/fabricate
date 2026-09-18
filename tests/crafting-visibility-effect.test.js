@@ -1,10 +1,8 @@
 /**
  * Tests for the crafting visibility matrix contract
- * (src/ui/svelte/apps/manager/crafting/craftingVisibility.js): the flat
- * `visibilityMode` enum → conditional-surface flags + summary i18n key, plus the
- * unknown→knowledge fallback and freshness (no shared reference) guarantees.
- *
- * node:test + node:assert/strict. Pure, dependency-free module.
+ * (src/ui/svelte/apps/manager/crafting/craftingVisibility.js): the flat `visibilityMode` enum →
+ * conditional-surface flags + summary i18n key, plus the unknown→knowledge fallback and freshness
+ * (no shared reference) guarantees.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

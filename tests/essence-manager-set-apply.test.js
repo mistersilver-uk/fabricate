@@ -1,25 +1,7 @@
 /**
- * Issue 1036 — the essence set-apply write primitives and the activation blocker.
- *
- * `CraftingSystemManager.applyBulkEditToEssences` and `deleteEssences` are the manager-side
- * primitives behind the Essence Studio's bulk edit and bulk delete. Both managers are REAL
- * here, with only the world-setting write instrumented, so `updateRecipe`'s persistence
- * validation and activation gate run for real and the write counts are the counts a world
- * would actually see.
- *
- * The three facts with teeth:
- *
- *  - **Criterion 3.** A disabled essence BLOCKS ENABLING a recipe that requires it, does not
- *    retro-disable an already-enabled one, and the block is reported as a coded issue.
- *  - **Criterion 15.** Because that blocker is ACTIVATION-only and never persistence-level,
- *    deleting one of two disabled essences a recipe requires completes and persists. The
- *    control for it is the ESSENCE-ONLY SET below — a real, unmocked instance of a
- *    persistence-level abort in this exact cascade, which is what a simulated one was
- *    standing in for.
- *  - **Criterion 16.** A bulk delete of 3 essences across 2 shared recipes issues a counted,
- *    bounded number of world writes, and the un-batched per-essence shape exceeds it.
- *    Pinned for a non-alchemy AND an alchemy system, because the alchemy reconciliation
- *    issues further `recipes` writes after the non-alchemy bound is measured.
+ * Issue 1036 — the essence set-apply write primitives and the activation blocker. Criterion 3.** A
+ * disabled essence BLOCKS ENABLING a recipe that requires it, does not retro-disable an
+ * already-enabled one, and the block is reported as a coded issue.
  */
 
 import assert from 'node:assert/strict';
@@ -89,12 +71,8 @@ function recipeRequiring(id, essences, overrides = {}) {
 }
 
 /**
- * A recipe whose ONLY requirement is a first-class essence OPTION — the shape that
- * exposed the stale `set.ingredients` mirror (issue 1036). `IngredientSet` derives that
- * flat mirror from the first option of each group, so this set persists as
- * `ingredients: [<the essence option>]`, and a strip that rewrote only `ingredientGroups`
- * left the mirror naming an essence the delete had already removed from
- * `essenceDefinitions`.
+ * A recipe whose ONLY requirement is a first-class essence OPTION — the shape that exposed the
+ * stale `set.ingredients` mirror (issue 1036).
  */
 function recipeRequiringOnlyEssence(id, essenceId, overrides = {}) {
   return {
@@ -153,9 +131,7 @@ function countWrites(key) {
   return settingWrites.filter((written) => written === key).length;
 }
 
-// ---------------------------------------------------------------------------
 // Criterion 3 — the activation blocker
-// ---------------------------------------------------------------------------
 
 test('1036/3: a DISABLED essence blocks enabling a recipe that requires it', async () => {
   const { manager, recipeManager } = makeFixture({
@@ -246,9 +222,7 @@ test('1036/3: disabling an essence does NOT retro-disable an already-enabled rec
   assert.equal(saved.name, 'Renamed', 'a recipe may still be SAVED while requiring a disabled essence');
 });
 
-// ---------------------------------------------------------------------------
 // applyBulkEditToEssences
-// ---------------------------------------------------------------------------
 
 test('1036: applyBulkEditToEssences applies icon, colour and status in ONE craftingSystems write', async () => {
   const { manager } = makeFixture({
@@ -305,9 +279,7 @@ test('1036: a staged `enabled: false` and `colorToken: null` are FALSY BUT REAL'
   assert.equal(manager.getSystem(SYSTEM_ID).essenceDefinitions[0].enabled, false, 'Disable landed');
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 15 — the delete cascade completes past a second disabled essence
-// ---------------------------------------------------------------------------
 
 test('1036/15: deleting one of TWO disabled essences a recipe requires completes and persists', async () => {
   const { manager, recipeManager } = makeFixture({
@@ -330,22 +302,8 @@ test('1036/15: deleting one of TWO disabled essences a recipe requires completes
   assert.ok(countWrites('craftingSystems') >= 1, 'the system was persisted');
 });
 
-// ---------------------------------------------------------------------------
-// The essence-only ingredient set — the REAL persistence-level abort
-//
-// This is what the criterion-15 negative control used to SIMULATE by monkey-patching
-// `_validateRecipeForPersistence`. It needs no simulation: a set whose only requirement
-// is the deleted essence keeps a stale flat `ingredients` mirror (which `IngredientSet`
-// derives from the first option of each group and `toJSON` emits alongside the groups),
-// the retention filter reads that mirror and RETAINS the set, and the retained set names
-// an essence `deleteEssence` has already removed from `essenceDefinitions` in memory.
-// `_validateEssenceReferences` then raises at PERSISTENCE level and `updateRecipe` throws
-// — with the definitions and the component essence maps already destroyed in memory and
-// NOTHING written, so the next unrelated `save()` from any other GM action commits the
-// destruction.
-//
-// Both tests below FAIL before the `set.ingredients` rewrite and pass after it.
-// ---------------------------------------------------------------------------
+// The essence-only ingredient set — the REAL persistence-level abort. This is what the criterion-15
+// negative control used to SIMULATE by monkey-patching `_validateRecipeForPersistence`.
 
 test('1036/15: a set whose ONLY requirement is the deleted essence is DROPPED, not retained', async () => {
   const { manager, recipeManager } = makeFixture({
@@ -418,12 +376,8 @@ test('1036/15: the same input through the SET form completes and persists too', 
 });
 
 test('1036: a SURVIVING set does not RESURRECT the deleted essence through the stale mirror', async () => {
-  // The second live instance of the same defect, and it survives the retention filter
-  // for a different reason. This set keeps a legacy per-set map for `water`, so it is
-  // retained however `ingredients` reads — and `IngredientSet`'s constructor rebuilds its
-  // groups from `data.ingredients` whenever `ingredientGroups` is EMPTY
-  // (`IngredientSet.js:33-36`). A stale mirror therefore re-materialises the stripped
-  // `fire` option as a fresh group, and persistence validation raises on it.
+  // The second live instance of the same defect, and it survives the retention filter for a
+  // different reason.
   const { manager, recipeManager } = makeFixture({
     essenceDefinitions: [makeEssence({ id: 'fire' }), makeEssence({ id: 'water' })],
     recipes: [
@@ -451,9 +405,8 @@ test('1036: a SURVIVING set does not RESURRECT the deleted essence through the s
 
   const set = recipeManager.recipes.get('r1').toJSON().ingredientSets[0];
   assert.deepEqual(set.ingredientGroups, [], 'the essence-only group is gone and stays gone');
-  // Since issue 1135 the mirror is not written at all, which is a STRONGER guarantee than
-  // the `[]` this used to assert: there is nothing left for the constructor to rebuild a
-  // group from. The hydrated set proves the mirror is empty where it still exists.
+  // Since issue 1135 the mirror is not written at all, which is a STRONGER guarantee than the `[]`
+  // this used to assert: there is nothing left for the constructor to rebuild a group from.
   assert.ok(!('ingredients' in set), 'the flat mirror went with it');
   assert.deepEqual(
     recipeManager.recipes.get('r1').ingredientSets[0].ingredients,
@@ -464,18 +417,8 @@ test('1036: a SURVIVING set does not RESURRECT the deleted essence through the s
 });
 
 test('1036/1135: the stale flat mirror is DROPPED for a grouped set, never filtered in place', async () => {
-  // A group whose essence option is stripped but which still carries a component option
-  // must never leave `ingredients` naming the deleted essence. This used to be settled by
-  // RECOMPUTING the mirror from the surviving groups; since issue 1135 `toJSON` does not
-  // emit the alias at all. Recomputing it here would not reach disk — `updateRecipe` rebuilds
-  // via `Recipe.fromJSON` and persists `toJSON()` — but it would leave the intermediate patch
-  // carrying a second ingredient authority per set, the issue-1036 hazard. Dropping it is the
-  // stronger answer, because `IngredientSet` derives the mirror from the stripped groups on
-  // read — which the second assertion proves, and which is the property the original test
-  // was really after.
-  //
-  // Asserted on `_stripEssenceFromSets` directly because the `Recipe` round-trip re-derives
-  // the mirror whenever the groups are non-empty, and would therefore hide a wrong answer.
+  // A group whose essence option is stripped but which still carries a component option must never
+  // leave `ingredients` naming the deleted essence (issue 1135).
   const { manager } = makeFixture({ essenceDefinitions: [makeEssence({ id: 'fire' })] });
 
   const [stripped] = manager._stripEssenceFromSets(
@@ -534,9 +477,7 @@ test('1036: a LEGACY flat set with no groups at all is filtered in place, not em
   );
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 16 — the batched bulk delete
-// ---------------------------------------------------------------------------
 
 /** Three essences, two recipes, each recipe naming two of the three. */
 function bulkDeleteFixture() {
@@ -608,10 +549,7 @@ test('1036/16 negative control: the un-batched per-essence shape exceeds that bo
 });
 
 // Issue 1144 — `deleteEssences` mirrors `deleteComponents`'s `recipesDisabled` count: an
-// enabled->disabled TRANSITION, not the resulting disabled state. A recipe that was already
-// disabled before the delete is clamped along with the rest but must NOT inflate the count,
-// or a GM re-running a delete against an already-shaky library would be warned about recipes
-// it cannot possibly still be disabling.
+// enabled->disabled TRANSITION, not the resulting disabled state.
 test('1036/1144: deleteEssences counts the enabled->disabled TRANSITION, not already-disabled recipes', async () => {
   const { manager, recipeManager } = makeFixture({
     essenceDefinitions: [makeEssence({ id: 'fire' })],
@@ -678,14 +616,10 @@ test('1036: deleteEssences ignores unknown ids and is a no-op for an empty selec
   assert.equal(settingWrites.length, 0, 'neither issued a world write');
 });
 
-// ---------------------------------------------------------------------------
-// ALCHEMY MODE — the reason `deleteEssences` reconciles, and the reason
-// `applyBulkEditToEssences` routes through `updateSystem` rather than `save()`
-//
-// Without an alchemy-mode fixture the whole alchemy half of both primitives is inert:
-// `_reconcileAlchemySignaturesAfterDeletion` self-guards on `resolutionMode`, and
-// `updateSystem`'s `_assertNoAlchemySignatureCollisions` does too.
-// ---------------------------------------------------------------------------
+// ALCHEMY MODE — the reason `deleteEssences` reconciles, and the reason `applyBulkEditToEssences`
+// routes through `updateSystem` rather than `save()`. Without an alchemy-mode fixture the whole
+// alchemy half of both primitives is inert: `_reconcileAlchemySignaturesAfterDeletion` self-guards
+// on `resolutionMode`, and `updateSystem`'s `_assertNoAlchemySignatureCollisions` does too.
 
 /** A recipe whose groups are supplied verbatim, for signature-shaped fixtures. */
 function recipeWithGroups(id, groups, overrides = {}) {
@@ -710,10 +644,9 @@ const IRON_GROUP = (id) => ({
 });
 
 /**
- * Two enabled alchemy recipes that DO NOT collide while `fire` exists — `r2` additionally
- * requires a fire essence, so its signature strictly dominates `r1`'s — and that collapse
- * onto one identical signature the moment `fire` is deleted and its now-optionless group
- * is dropped. This is exactly the hazard clause 10 exists for.
+ * Two enabled alchemy recipes that DO NOT collide while `fire` exists — `r2` additionally requires
+ * a fire essence, so its signature strictly dominates `r1`'s — and that collapse onto one identical
+ * signature the moment `fire` is deleted and its now-optionless group is dropped.
  */
 function alchemyCollapseFixture() {
   return makeFixture({
@@ -815,13 +748,9 @@ test('1036: deleteEssences NOTIFIES the systems-changed subscribers', async () =
   assert.equal(notifications, 1, 'exactly one hook for the whole batch — and never zero');
 });
 
-// ---------------------------------------------------------------------------
-// The GM gate on both new primitives
-//
-// "Test seams are omnipotent": no fake in this suite refuses a write, so a missing
-// `_assertGM` on a world-setting writer is invisible to `npm test` unless it is
-// enumerated. Both of these write `craftingSystems` (and `recipes`).
-// ---------------------------------------------------------------------------
+// The GM gate on both new primitives. "Test seams are omnipotent": no fake in this suite refuses a
+// write, so a missing `_assertGM` on a world-setting writer is invisible to `npm test` unless it is
+// enumerated.
 
 test('1036: both set-apply primitives are GM-gated, and a refused call writes NOTHING', async () => {
   const { manager } = makeFixture({
@@ -865,16 +794,12 @@ test('1036 negative control: the SAME two calls succeed for a GM', async () => {
   assert.deepEqual((await manager.deleteEssences(SYSTEM_ID, ['fire'])).essenceIds, ['fire']);
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 5 (delta rule 5) — the `updateSystem` ROUTING is the alchemy guard
-// ---------------------------------------------------------------------------
 
 test('1036: a bulk essence edit is BLOCKED while the alchemy system carries a signature collision', async () => {
-  // Spec 007 §Alchemy Uniqueness Revalidation: "Any detected collision blocks saves
-  // globally until resolved, including saves from unrelated recipe edits." That block
-  // lives in `updateSystem`, so it applies to this primitive ONLY because the primitive
-  // routes through it. `system.essenceDefinitions = next; await this.save()` would issue
-  // the identical single `craftingSystems` write and commit the edit regardless.
+  // Spec 007 §Alchemy Uniqueness Revalidation: "Any detected collision blocks saves globally until
+  // resolved, including saves from unrelated recipe edits." That block lives in `updateSystem`, so
+  // it applies to this primitive ONLY because the primitive routes through it.
   const { manager } = makeFixture({
     resolutionMode: 'alchemy',
     essenceDefinitions: [makeEssence({ id: 'fire', colorToken: 'rose' })],

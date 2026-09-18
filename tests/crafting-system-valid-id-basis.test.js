@@ -1,20 +1,6 @@
-// The VALID ID BASIS guard for the world character libraries (issue 1308).
-//
-// WHY THIS SUITE EXISTS. `CraftingSystemManager` PRUNES reference ids — a tool's
-// `prerequisites.ids` and each activity check's `defaultModifierIds` — against the libraries
-// those ids name. While the libraries lived on the crafting system that basis was always at hand.
-// Now they are world scope, and a pass that derives the basis from an absent or unwritten library
-// sees an EMPTY set and deletes every reference in the world.
-//
-// `DOMAIN.md`'s Valid Id Basis rule is that a destructive pass runs only when its basis is
-// known-complete, and it names this exact shape: a pass handed an empty set for an entity class
-// prunes every key scoped to that class on every run, reached by an omitted ARGUMENT rather than
-// by an incomplete corpus.
-//
-// The dangerous states are not exotic. Migrations run on the ACTIVE GM only, so every player and
-// every assistant GM boots against an unmigrated setting; a migration pass can defer or abort
-// while startup continues; and an assistant GM holds SETTINGS_MODIFY, so their next system save
-// writes the whole corpus back. Each case below is one of those.
+// The VALID ID BASIS guard for the world character libraries (issue 1308). WHY THIS SUITE EXISTS.
+// `CraftingSystemManager` PRUNES reference ids — a tool's `prerequisites.ids` and each activity
+// check's `defaultModifierIds` — against the libraries those ids name.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -100,10 +86,7 @@ test('a store whose read THROWS prunes nothing, and does not take the normalizer
   );
 });
 
-// THE CASE THAT DESTROYS WORLDS. Foundry returns the REGISTERED DEFAULT for a world setting that
-// was never written, so an unmigrated world reads `{}` and normalizes to two empty arrays —
-// identical, after normalizing, to a GM who deliberately emptied both libraries. This is the
-// state of every player, every assistant GM, and any GM whose migration pass deferred or aborted.
+// THE CASE THAT DESTROYS WORLDS.
 test('an UNWRITTEN world setting prunes nothing, even though it reads as two empty libraries', () => {
   const store = new CharacterLibrariesStore({
     getSetting: () => ({}),
@@ -193,10 +176,8 @@ for (const method of [
   });
 }
 
-// `upsertTool` derives its OWN basis and never goes through `_normalizeSystem`, so it needs its
-// own guard. Before this was fixed it read the world-scoped library off the system, found
-// nothing, and handed a real-but-empty Set to the tool normalizer — which the unknown-basis
-// sentinel cannot refuse — so every Tool save stripped that tool's gate in a healthy world.
+// `upsertTool` derives its OWN basis and never goes through `_normalizeSystem`, so it needs its own
+// guard.
 test('upsertTool preserves prerequisite ids that exist in the WORLD library', async () => {
   const store = new CharacterLibrariesStore({
     getSetting: () => ({ characterPrerequisites: [PREREQ], modifiers: [] }),

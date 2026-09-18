@@ -1,33 +1,14 @@
 /**
  * DRIVING A LISTBOX FROM THE KEYBOARD, once, for every picker that has one (issue 1503).
- *
  * `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element and
- * drive selection with `aria-activedescendant`. Three components implement that model —
- * `SearchablePopover` and, until the epic folds them into it, `IconPicker` and
- * `EssenceSourceSelector` — and a mounted suite per component would otherwise carry a third copy
- * of the same six-function driver. The copies are what the duplication gate counts, and worse,
- * they are where the three suites would quietly stop asking the same question.
- *
- * ── WHY THE KEY IS DISPATCHED AT `document.activeElement` ────────────────────────────────────
- * The one thing these suites exist to prove is that focus does NOT move onto a row. A driver that
- * kept dispatching at the node it captured on open would report an unchanged `activeElement` even
- * from a model that had roved focus away from it, because it would never have asked the document
- * where focus actually is. Addressing `document.activeElement` makes the test follow the focus,
- * so a model that moves it is caught by the very next press.
+ * drive selection with `aria-activedescendant`.
  */
 
 import assert from 'node:assert/strict';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
-/**
- * Let Svelte's flush AND the pickers' own microtask-scheduled focus moves run.
- *
- * Both directions of the focus contract are deferred: a panel focuses its query field from a
- * `queueMicrotask` inside an effect, and a close returns focus to the trigger from a
- * `tick().then(...)`. Neither is visible to a bare `flushSync`, so a settle that skipped the turn
- * of the loop would read the focus state from before the move.
- */
+/** Let Svelte's flush AND the pickers' own microtask-scheduled focus moves run. */
 export async function settle() {
   await tick();
   await new Promise((done) => setTimeout(done, 0));
@@ -53,12 +34,7 @@ export function optionRows(root) {
   return [...root.querySelectorAll('[role="option"]')];
 }
 
-/**
- * The row the model marks as the keyboard cursor's, of which there must never be more than one.
- *
- * Returned as a list rather than a node precisely so "two rows are marked" is a visible failure
- * rather than a first-match read that hides it.
- */
+/** The row the model marks as the keyboard cursor's, of which there must never be more than one. */
 export function markedRows(root) {
   return [...root.querySelectorAll('[data-active-option="true"]')];
 }
@@ -68,12 +44,7 @@ export function activeDescendant(holder) {
   return holder.getAttribute('aria-activedescendant');
 }
 
-/**
- * Type into a picker's query field, the way a GM narrowing a long list does.
- *
- * An explicit `value` plus a dispatched `input` is the repo's idiom for a deterministic mounted
- * update; a synthesized `keydown` of a printable character would not change the field's value.
- */
+/** Type into a picker's query field, the way a GM narrowing a long list does. */
 export function typeQuery(field, term) {
   field.value = term;
   field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
@@ -83,15 +54,9 @@ export function typeQuery(field, term) {
 /**
  * Put the caret somewhere in a query field, which is what decides who owns Home/End/Left/Right.
  *
- * Four keys are the caret's before they are the list cursor's, and `SearchablePopover` hands each
- * of them to the cursor ONLY from the edge at which the caret would not move. happy-dom follows
- * the HTML spec and collapses the selection to the end of the value when `value` is assigned, so
- * `typeQuery` alone always leaves the caret at one particular edge — a suite that never called
- * this would measure that edge and never the other, and would read as though there were no rule.
- *
  * @param {HTMLInputElement} field The query field.
  * @param {number|[number, number]} caret An offset, or a two-element RANGE — the third state the
- *   boundary distinguishes, because a selection belongs to the field whichever edge it touches.
+ * boundary distinguishes, because a selection belongs to the field whichever edge it touches.
  */
 export function placeCaret(field, caret) {
   const [start, end] = Array.isArray(caret) ? caret : [caret, caret];
@@ -101,13 +66,9 @@ export function placeCaret(field, caret) {
 }
 
 /**
- * Press one key `presses` times, asserting after EVERY press that focus is still on the holder,
- * and return what the holder announced each time.
+ * Press one key `presses` times, asserting after EVERY press that focus is still on the holder, and
+ * return what the holder announced each time.
  *
- * The run is long on purpose. A single press cannot distinguish a model that keeps focus from one
- * that moves it back, and a wrap needs more presses than there are rows.
- *
- * @param {object} options
  * @param {Element} options.holder The element that must hold DOM focus for the panel's whole life.
  * @param {string} options.key The key to repeat.
  * @param {number} options.presses How many times to press it.
@@ -138,11 +99,6 @@ export function announceAcross({ holder, key, presses, consumed = true }) {
 /**
  * Assert the whole list is unmarked, every row is out of the tab order, and every row declares
  * itself focused to Foundry.
- *
- * The three go together because they are one decision seen from three sides: rows carry
- * `tabindex="-1"` so Tab cannot walk into the list, a `tabindex` element that is not a form field
- * must carry `data-keyboard-focus` or Foundry leaves every keybinding live, and the -1 sentinel
- * means an opened panel has no cursor until the GM asks for one.
  */
 export function assertRestingList(root, holder) {
   assert.deepEqual(
@@ -177,13 +133,7 @@ export function assertRestingList(root, holder) {
   );
 }
 
-/**
- * Assert a `mousedown` on a row is suppressed, then that clicking it still chooses.
- *
- * happy-dom never moves focus on `mousedown`, so an assertion that `activeElement` is unchanged
- * would pass whether or not the component suppressed anything. The suppression itself is the
- * mechanism a real browser acts on, so `defaultPrevented` is what is asserted.
- */
+/** Assert a `mousedown` on a row is suppressed, then that clicking it still chooses. */
 export function assertPointerSuppressed(row, holder) {
   const mousedown = new globalThis.MouseEvent('mousedown', { bubbles: true, cancelable: true });
   row.dispatchEvent(mousedown);

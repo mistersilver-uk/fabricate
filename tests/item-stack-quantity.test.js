@@ -1,19 +1,4 @@
-/**
- * The canonical item stack-quantity accessor (issue 1024, #853 proposal 1).
- *
- * ## Test discipline for the ambient path
- *
- * The configured path is MODULE STATE. `node --test` isolates per file, so the blast
- * radius of a leak is one file — but within a file it is total. So: no test configures
- * the path at module scope, and every test that configures it registers
- * `t.after(resetItemStackQuantityPath)` as the FIRST statement of its body, BEFORE the
- * configure call, so a mid-test throw still resets.
- *
- * `resetItemStackQuantityPath` exists precisely so that restore does not have to
- * hand-write the default literal — which would be a second, unpoliced spelling of what
- * `tests/quantity-literal-gate.test.js` exists to eliminate, in a file the gate does not
- * scan.
- */
+/** The canonical item stack-quantity accessor (issue 1024, #853 proposal 1). */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -71,38 +56,9 @@ function itemAt(path, value) {
   return item;
 }
 
-// ---------------------------------------------------------------------------
-// Criterion 8 — the three read semantics, table-driven over the awkward inputs.
-//
-// The absent-field default is a SECOND, INDEPENDENT axis from the stored-0 axis.
-// Both are exercised here so that folding them together (which silently inflates or
-// deflates every stack in the world by one) reds this file.
-//
-// ## The SIX declared behaviour deltas
-//
-// Consolidating four hand-rolled readers onto three shared ones changed behaviour at six
-// classes of stored value, all of them inputs no healthy system produces. They are listed
-// here — in the tree, not only in a commit message — and every one is pinned by a row
-// below, so a later "simplification" that quietly reverts one reds this file:
-//
-//   1. NEGATIVE. The `Number(x) || 1` sites passed a negative through; `readStackQuantity`
-//      now returns 1. `readStoredStackQuantity` still reports it as stored, because at a
-//      delete site "-3" must not read as "3 available".
-//   2. `Infinity`. Same sites, same shape: `Number(Infinity) || 1` is `Infinity`, so
-//      `CraftingEngine.selectedQuantityItems` did `remaining -= Infinity` and stopped
-//      selecting after ONE item. `readStackQuantity` now returns 1.
-//   3. NUMERIC STRING. The `?? 1` sites returned the string `'3'`; the accessors coerce.
-//   4. `NaN`. The `?? 1` sites returned `NaN` (it is neither `undefined` nor `null`), which
-//      propagates through every sum it touches. The accessors fall back instead.
-//   5. EXPLICIT `null`. The two `!== undefined` presence probes treated a stored `null` as
-//      present; `hasStackQuantity` treats it as absent, so an item whose count field is
-//      explicitly null no longer counts as stackable.
-//   6. A FRACTION BELOW ONE. `essenceResolver.js`'s multiplier was
-//      `Math.max(1, Number(...) || 1)`, which clamped `0.5` up to `1`; `readStackQuantity`
-//      keeps it fractional, because its floor is at zero and not at one. This is the only
-//      delta that CHANGES A RESULT for a value a system could plausibly store, so it is
-//      called out rather than filed under "inputs nobody produces".
-// ---------------------------------------------------------------------------
+// Criterion 8 — the three read semantics, table-driven over the awkward inputs. Consolidating four
+// hand-rolled readers onto three shared ones changed behaviour at six classes of stored value, all
+// of them inputs no healthy system produces.
 
 const ABSENT = Symbol('absent');
 
@@ -167,56 +123,9 @@ describe('the three read semantics, over every awkward stored value', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 8, second half — the per-site mapping table, checked against LIVE SOURCE.
-//
-// Each routed call site declares its file, which accessor it uses, how many occurrences
-// it accounts for, and — for the stored reader — which absent default preserves what it
-// did before the routing change.
-//
-// The earlier revision of this table was CIRCULAR: every assertion read `SITE_MAPPING`
-// and asserted a fact about `SITE_MAPPING`, so nothing read `src/**` and the table
-// discovered nothing. A reviewer proved it by flipping `gatheringResultCreation`'s
-// `absentDefault: 0` to `1` — the exact "silently inflates every stack by one" failure
-// the table exists to prevent — and the whole file still passed.
-//
-// So the table is now MECHANICAL. Every declared `(file, accessor, sites)` triple is
-// reconciled against a comment-stripped scan of `src/**`, in BOTH directions: a declared
-// site that no longer exists reds, and a call site in a file the table does not name reds
-// too. That closes un-routing, a new site, a site moved between files, and absent-default
-// drift.
-//
-// ## What the per-file counts CANNOT see, and what the anchors add
-//
-// Per-file counts are blind to two accessors being SWAPPED BETWEEN SITES IN ONE FILE:
-// every reconciled count survives such a swap intact. A reviewer proved that too, by
-// exchanging the accessors at `CraftingEngine.selectedQuantityItems` and
-// `CraftingEngine._consumeIngredients` — `readStackQuantity` stayed at 3,
-// `readStoredStackQuantity` stayed at 3, `absentDefault: 1` stayed at 3, and every suite in
-// the repo passed.
-//
-// Including `tests/item-stack-quantity-routing.test.js`, which retires a claim this comment
-// used to make. That file does NOT cover this boundary: its fixtures all carry a PRESENT,
-// POSITIVE stack count, and the two readers only diverge at a stored `0`, a negative, and a
-// non-numeric — the axes `READ_CASES` above isolates and no routed-path fixture exercises.
-// The swap is not cosmetic: under it an item stored at `0` stops decrementing `remaining`
-// in `selectedQuantityItems`, so every candidate enters the consumption plan and the delete
-// branch walks them one by one.
-//
-// So every row belonging to a file that contributes MORE THAN ONE row also declares
-// `anchors`: short source snippets pinning each accessor to the site it serves, whose match
-// counts must add up to that row's declared `sites`. Deliberately NOT line numbers — a
-// per-line pin rots on every edit above it.
-//
-// A file contributing exactly ONE row needs none, and that is a boundary rather than a
-// concession: one row means one accessor, so there is no second accessor in that file to
-// swap it with. `anchorsRequired` below enforces the rule instead of hand-listing files, so
-// a file that GAINS a second row has to anchor both.
-// ---------------------------------------------------------------------------
 
-/** Every accessor the table polices. `stackQuantityUpdate` had no `src` call site until the
- *  pooled holdings consume needed a BATCHED decrement (issue 1342); it was listed here before
- *  it had one, so that acquiring a site without a row was a red test rather than a silent gap. */
+/** Every accessor the table polices (issue 1342). */
 const ACCESSORS = Object.freeze([
   'hasStackQuantity',
   'readStackQuantity',
@@ -271,14 +180,9 @@ const SITE_MAPPING = [
     file: 'src/systems/CraftingEngine.js',
     accessor: 'readStackQuantity',
     sites: 2,
-    // Neither is a delete-on-underrun site any more: the salvage consume's capacity read
-    // moved to `pooledAllocation.planFirstFitDrain` (issue 1342) and took its delete site
-    // with it, one row below. These two are the selection helper and the salvage
-    // availability gate.
-    // The first anchor is the one that matters most. `selectedQuantityItems` is the
-    // hazard-COMPOUNDING site: read it with the stored reader and an item stored at 0
-    // stops decrementing `remaining`, so every candidate enters the plan the delete
-    // branch then walks.
+    // Neither is a delete-on-underrun site any more: the salvage consume's capacity read moved to
+    // `pooledAllocation.planFirstFitDrain` (issue 1342) and took its delete site with it, one row
+    // below.
     anchors: [/remaining -= readStackQuantity\(item\);/, /sum \+ readStackQuantity\(item\)/],
   },
   {
@@ -305,11 +209,10 @@ const SITE_MAPPING = [
     ],
   },
   {
-    // The DELETE half of the boundary below, and the reason it reads the present-item
-    // accessor rather than the stored one: the consumption plan counted this document
-    // with `readStackQuantity`, so a stack stored at `0` was planned as one unit and
-    // must settle as one unit. Reading it as stored answers zero and refuses the whole
-    // consumption as uncertain (#1648).
+    // The DELETE half of the boundary below, and the reason it reads the present-item accessor
+    // rather than the stored one: the consumption plan counted this document with
+    // `readStackQuantity`, so a stack stored at `0` was planned as one unit and must settle as one
+    // unit.
     site: 'CraftingEngine._consumeItemQuantity whole-document delete delta (#1648)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'readStackQuantity',
@@ -351,21 +254,15 @@ const SITE_MAPPING = [
     sites: 1,
   },
   {
-    // The snapshot's per-system tallies (issue 1077). It counts held UNITS, not stacks, for
-    // both the per-component quantity and the per-tag quantity the optimistic availability
-    // projection compares against, so it must read through the configured accessor exactly
-    // as the listing builders do — a snapshot counting raw documents would report a
-    // different "have" than the listing shows for every stackable system.
+    // The snapshot's per-system tallies (issue 1077).
     site: 'inventorySnapshot component/tag tallies',
     file: 'src/systems/inventorySnapshot.js',
     accessor: 'readStackQuantity',
     sites: 1,
   },
   {
-    // Bulk destroy removes WHOLE STACKS, so the pre-delete capture has to read the
-    // stack count through the configured accessor — `unitsDeleted` is derived from it.
-    // `updateStackQuantity` is deliberately absent: a delete is not a schema-filtered
-    // update, so this file contributes exactly one row and needs no anchors.
+    // Bulk destroy removes WHOLE STACKS, so the pre-delete capture has to read the stack count
+    // through the configured accessor — `unitsDeleted` is derived from it.
     site: 'BulkDestroyService pre-delete capture',
     file: 'src/systems/BulkDestroyService.js',
     accessor: 'readStackQuantity',
@@ -473,12 +370,9 @@ const SITE_MAPPING = [
     anchors: [/updateStackQuantity\(target, before \+ quantity, quantityPath\)/],
   },
   {
-    // The pooled holdings READ counts what a party is carrying (issue 1342), and it must count
-    // it with the reader the pooled CONSUME's first-fit drain spends: `pooledAllocation.js` uses
-    // `readStackQuantity` and states that the choice is not a parameter. A read on
-    // `readStoredStackQuantity` would honour a stored `0` the drain reads as `1`, so a pool the
-    // read called short would pay in full — a gate that lies in the direction that matters.
-    // One row, so no anchors: there is no second accessor in that file to be swapped with.
+    // The pooled holdings READ counts what a party is carrying (issue 1342), and it must count it
+    // with the reader the pooled CONSUME's first-fit drain spends: `pooledAllocation.js` uses
+    // `readStackQuantity` and states that the choice is not a parameter.
     site: 'companionPooledHoldings pooled component count',
     file: 'src/systems/companionPooledHoldings.js',
     accessor: 'readStackQuantity',
@@ -486,18 +380,7 @@ const SITE_MAPPING = [
   },
   {
     // The pooled holdings consume batches its writes per actor, so it needs the update PAYLOAD
-    // rather than the live-document writer every other decrement site uses (issue 1342). Two
-    // sites, and they are each other's inverse: one writes the post-take remainder, the other
-    // writes back the `available` the drain plan read.
-    //
-    // These anchors PROVE BOTH NUMBERS ARE PRESENT and nothing more. They cannot see the swap
-    // they were written for: exchange the two numbers between `reduceStacks` and `restoreStacks`
-    // and each regex still matches once, so the total is still 2 and this row stays green. The
-    // claim that the anchors close that hole was simply false. Two things do close it — the
-    // behavioural case in `tests/companion-pooled-consumption.test.js` that restores a reduced
-    // stack to the value the plan read, and the FUNCTION-SCOPED pin at the bottom of this file,
-    // which slices each function's body out and asserts it carries its own number and not the
-    // other's.
+    // rather than the live-document writer every other decrement site uses (issue 1342).
     site: 'companionPooledConsumption batched reduction and its rollback',
     file: 'src/systems/companionPooledConsumption.js',
     accessor: 'stackQuantityUpdate',
@@ -514,11 +397,6 @@ const ACCESSOR_MODULE = 'src/systems/itemStackQuantity.js';
 
 /**
  * Count comment-stripped `accessor(` occurrences per file across the whole `src` tree.
- *
- * Comments are stripped for the same reason the two literal gates strip them: the routed
- * modules DESCRIBE their accessor choice in prose (`componentStacking.js` names
- * `readStackQuantity` in a comment explaining why it does NOT use it), and counting prose
- * would make the table unmaintainable and then vacuous.
  *
  * @returns {Map<string, number>} `${file}::${accessor}` -> occurrences.
  */
@@ -585,9 +463,7 @@ describe('the per-site accessor mapping', () => {
   });
 
   it('pins every row of a multi-row file to the source snippet it serves', () => {
-    // The assertion the per-file counts cannot make. Exchanging two accessors between
-    // sites in one file leaves every declared count intact; it moves an anchor's match
-    // count to zero, which reds here.
+    // The assertion the per-file counts cannot make.
     const sources = collectSources(join(repoRoot, 'src'));
     for (const entry of SITE_MAPPING) {
       if (!entry.anchors) continue;
@@ -669,9 +545,7 @@ describe('the per-site accessor mapping', () => {
       nullDefault.map((entry) => entry.site),
       ['runHistoryEvidence.sourceItemQuantity stored source read', 'companionComponentAward stack-target base read']
     );
-    // Sorted, like its sibling below. A Map's entries follow the order `collectSources` walked
-    // the tree, so a raw comparison pins the FILESYSTEM's enumeration: this passed on Windows
-    // and failed on Linux CI the moment a third file joined the list (issue 1648).
+    // Sorted, like its sibling below (issue 1648).
     assert.deepEqual(
       asSortedPairs(countAbsentDefaults('null')),
       asSortedPairs(
@@ -712,8 +586,7 @@ describe('the per-site accessor mapping', () => {
       );
     }
     // Each delete site has an `await (underrun ? item.delete() : updateStackQuantity(...))`
-    // partner, so the engine's write count must equal its delete-site count. A routed read
-    // whose write half was missed reads 20 and writes 19 to another field forever.
+    // partner, so the engine's write count must equal its delete-site count.
     const engineWrites = SITE_MAPPING.filter(
       (entry) =>
         entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
@@ -722,9 +595,7 @@ describe('the per-site accessor mapping', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 9 — configure and normalize never throw and never store a falsy path.
-// ---------------------------------------------------------------------------
 
 describe('normalizeStackQuantityPath', () => {
   it('rejects every unusable value without throwing', () => {
@@ -797,10 +668,8 @@ describe('the per-system preset table', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Criterion 7 — a >= 3-segment path round-trips; a `.value` leaf preserves siblings;
-// an object-valued parent write is refused.
-// ---------------------------------------------------------------------------
+// Criterion 7 — a >= 3-segment path round-trips; a `.value` leaf preserves siblings; an
+// object-valued parent write is refused.
 
 describe('a >= 3-segment configured path', () => {
   it('round-trips through creation, read, write and the stackability probe', (t) => {
@@ -884,15 +753,7 @@ describe('the write helpers on a healthy path', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Criterion 10 — the probe, including the `_source` verdict.
-//
-// The `_source` verdict is vacuity-prone: the obvious fixture shortcut makes
-// `item._source` an alias of `item`, under which prepared and source can never
-// disagree, the verdict is unreachable, and the test still passes on the other three.
-// Every fixture below models the divergence EXPLICITLY, and the healthy case is carried
-// in the same describe so a probe that ALWAYS returns 'schema-discard' also fails.
-// ---------------------------------------------------------------------------
 
 /** An item whose PREPARED data and `_source` are genuinely distinct objects. */
 function itemWithSource({ prepared, source }) {
@@ -928,9 +789,8 @@ describe('probeStackQuantityPath', () => {
   });
 
   it("returns 'schema-discard' when it reads prepared but is ABSENT from _source", () => {
-    // The load-bearing fixture: `_source.system` has NO `qtd` key at all, while the
-    // prepared document does. This is what a module or an active effect produces, and
-    // what `SchemaField._cleanType` silently discards on every write.
+    // The load-bearing fixture: `_source.system` has NO `qtd` key at all, while the prepared
+    // document does.
     const items = [
       itemWithSource({ prepared: { qtd: 20, quantity: 20 }, source: { quantity: 20 } }),
       itemWithSource({ prepared: { qtd: 3, quantity: 3 }, source: { quantity: 3 } }),
@@ -979,9 +839,8 @@ describe('probeStackQuantityPath', () => {
   });
 
   it('measures the SUGGESTED default it was given, not the built-in one', () => {
-    // On tormenta20 the suggested correction is `system.qtd`, and the counts printed
-    // beside it in the advisory have to be counts FOR IT. Measuring `system.quantity`
-    // while naming `system.qtd` is worse than printing no counts at all.
+    // On tormenta20 the suggested correction is `system.qtd`, and the counts printed beside it in
+    // the advisory have to be counts FOR IT.
     const items = [
       itemWithSource({ prepared: { qtd: 20 }, source: { qtd: 20 } }),
       itemWithSource({ prepared: { qtd: 3 }, source: { qtd: 3 } }),
@@ -997,11 +856,9 @@ describe('probeStackQuantityPath', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// The advisory selector. `src/main.js` cannot be imported under `node --test`, which is
-// exactly why this decision lives in the accessor module: a three-way branch pinned only
-// by grepping `main.js` is not evidence that the right string reaches the right world.
-// ---------------------------------------------------------------------------
+// The advisory selector. `src/main.js` cannot be imported under `node --test`, which is exactly why
+// this decision lives in the accessor module: a three-way branch pinned only by grepping `main.js`
+// is not evidence that the right string reaches the right world.
 
 describe('stackQuantityAdvisory', () => {
   const reportFor = (overrides) => ({
@@ -1048,10 +905,7 @@ describe('stackQuantityAdvisory', () => {
   });
 
   it('states the CONDITIONAL when the configured path already IS the suggested default', () => {
-    // A dnd5e world whose Item directory holds only spells, feats, classes and
-    // backgrounds. Nothing is wrong, nothing has been typed, and the previous copy told
-    // this GM — permanently, on every login — to change the setting to the value it
-    // already had, while asserting imminent inventory destruction that is not happening.
+    // A dnd5e world whose Item directory holds only spells, feats, classes and backgrounds.
     const advisory = stackQuantityAdvisory(
       reportFor({ path: 'system.quantity', defaultPath: 'system.quantity', defaultResolved: 0 })
     );
@@ -1075,9 +929,7 @@ describe('stackQuantityAdvisory', () => {
   });
 
   it('puts the report defaultPath — and nothing else — into {default}', () => {
-    // `{default}` is what the GM is told to type. It has to be the ACTIVE SYSTEM's preset,
-    // which `main.js` supplies as the probe's `defaultPath`; the built-in
-    // `system.quantity` is wrong on tormenta20 and contradicts the setting's own hint.
+    // `{default}` is what the GM is told to type.
     for (const defaultPath of ['system.qtd', 'system.quantity', 'system.stack.count']) {
       const advisory = stackQuantityAdvisory(reportFor({ path: 'system.nope', defaultPath }));
       assert.equal(advisory.data.default, defaultPath);
@@ -1091,11 +943,9 @@ describe('stackQuantityAdvisory', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // The accessor is Foundry-free. `src/models/IngredientSet.js` is a call site and
-// `openspec/specs/data-models/spec.md:1328` commits the ingredient model to being
-// Foundry-free, so this is a contract, not a preference.
-// ---------------------------------------------------------------------------
+// `openspec/specs/data-models/spec.md:1328` commits the ingredient model to being Foundry-free, so
+// this is a contract, not a preference.
 
 describe('the accessor never reaches for a Foundry global', () => {
   it('names none of game, ui, Hooks or CONFIG', async () => {
@@ -1112,9 +962,7 @@ describe('the accessor never reaches for a Foundry global', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Registration: the per-system default overlay, and the player-write guardrail.
-// ---------------------------------------------------------------------------
 
 const { registerFabricateSettings, SETTING_KEYS, WORLD_SCOPED_SETTING_KEYS } = await import(
   '../src/config/settings.js'
@@ -1170,9 +1018,8 @@ describe('the item stack-quantity path setting', () => {
   });
 
   it('never yields an undefined default, even with no game.system at all', () => {
-    // Load-bearing: `ClientSettings#register` applies `data.default ??= null`, which
-    // would make every read return `null` rather than a usable path. Existing tests call
-    // `registerFabricateSettings()` against a stub with no `system` key.
+    // Load-bearing: `ClientSettings#register` applies `data.default ??= null`, which would make
+    // every read return `null` rather than a usable path.
     const entry = captureRegistrations({}).find(
       (registration) => registration.key === SETTING_KEYS.ITEM_STACK_QUANTITY_PATH
     );
@@ -1258,11 +1105,9 @@ describe('the item stack-quantity path setting', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Criterion 10's wiring half. `src/main.js` is the module entry point and cannot be
-// imported under `node --test`, so its wiring is pinned against its SOURCE — the same
-// shape the actor-type lane's criterion-14 pins use.
-// ---------------------------------------------------------------------------
+// Criterion 10's wiring half. `src/main.js` is the module entry point and cannot be imported under
+// `node --test`, so its wiring is pinned against its SOURCE — the same shape the actor-type lane's
+// criterion-14 pins use.
 
 describe('main.js wiring', () => {
   const mainSource = (async () => {
@@ -1285,11 +1130,8 @@ describe('main.js wiring', () => {
   });
 
   it('suggests the ACTIVE SYSTEM preset, not the built-in default', async () => {
-    // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever
-    // `main.js` passes here is literally the field the GM is told to type. Passing no
-    // `defaultPath` falls back to `system.quantity`, which on tormenta20 — the one system
-    // this whole feature exists for — resolves on 0 items and contradicts the setting's
-    // own hint, formatted from the same preset by `withActiveSystemDefaults`.
+    // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever `main.js`
+    // passes here is literally the field the GM is told to type.
     const source = await mainSource;
     assert.match(
       source,
@@ -1336,11 +1178,9 @@ describe('main.js wiring', () => {
     assert.ok(listener.length > 0, 'the shared listener exists');
     assert.match(listener, /SETTING_KEYS\.ITEM_STACK_QUANTITY_PATH/);
     assert.match(listener, /applyItemStackQuantityPathSetting\(\{ notify: true }\)/);
-    // The listener body is wrapped so a failure in ONE branch is logged as Fabricate's
-    // own line naming the setting, rather than as a core `Hooks.onError` entry against an
-    // anonymous listener. `Hooks.#call` already try/catches each listener, so this is not
-    // what stops a throw escaping into the broadcast — that hazard belongs to
-    // `SettingConfig.onChange`, and is why `settings.js` registers none.
+    // The listener body is wrapped so a failure in ONE branch is logged as Fabricate's own line
+    // naming the setting, rather than as a core `Hooks.onError` entry against an anonymous
+    // listener.
     assert.match(listener, /try \{/, 'the listener body is wrapped in try/catch');
     assert.match(listener, /} catch \(error\) \{/);
   });
@@ -1384,26 +1224,11 @@ describe('player-write guardrail for the stack-quantity key', () => {
 });
 
 describe('the pooled reduction and its inverse, pinned FUNCTION BY FUNCTION', () => {
-  /**
-   * The hole the two `stackQuantityUpdate` anchors in `SITE_MAPPING` cannot close.
-   *
-   * Those anchors are counted, not placed: exchange `take.remainingQuantity` and
-   * `take.available` between `reduceStacks` and `restoreStacks` and each regex still matches
-   * once, the total is still 2, and the row stays green. The swap is the failure that costs a
-   * player their inventory — a rollback writing the post-take remainder puts the stack back at
-   * the size the take left it, and a reduction writing `available` takes nothing at all.
-   *
-   * So the claim is made per FUNCTION BODY: each carries its own number and NOT the other's.
-   */
+  /** The hole the two `stackQuantityUpdate` anchors in `SITE_MAPPING` cannot close. */
   const CONSUMPTION_MODULE = 'src/systems/companionPooledConsumption.js';
 
   /**
    * One top-level function's body, sliced at its own closing brace.
-   *
-   * Prettier formats this file, so a top-level function's closing brace is the first `\n}` at
-   * column zero after its declaration. Slicing rather than lazily matching across the file is
-   * the whole point: a lazy `[^]*?` from one declaration to the other function's number would
-   * MATCH after the swap, which is the failure being closed.
    *
    * @param {string} source The module text.
    * @param {string} name The function to slice.
@@ -1441,21 +1266,13 @@ describe('the pooled reduction and its inverse, pinned FUNCTION BY FUNCTION', ()
   });
 });
 
-// ---------------------------------------------------------------------------
 // A GUARD REFUSAL IS NOT A LOST ACKNOWLEDGEMENT (#1648 A4).
-//
-// The object-valued-path guard answers `null` WITHOUT calling `update`, and the two
-// acknowledgement sites read that exactly as they read a document that did not acknowledge —
-// so a write that never reached the database demanded GM reconciliation. `throwOnRefusal`
-// separates them; the two directions are asserted together so neither can drift into the other.
-// ---------------------------------------------------------------------------
 
 describe('a refused write is distinguishable from an unacknowledged one', () => {
   // The divergence is modelled EXPLICITLY, and it is what makes the guard reachable from an
   // acknowledgement site at all: the quantity is read from `_source` (a number, so the site
-  // proceeds) while the guard reads the PREPARED document, where derived data or an Active
-  // Effect has put an object. A fixture aliasing the two could never reach the refusal, and the
-  // test would pass while asserting nothing.
+  // proceeds) while the guard reads the PREPARED document, where derived data or an Active Effect
+  // has put an object.
   function divergentItem() {
     return {
       name: 'Iron Ingot',
@@ -1532,14 +1349,7 @@ describe('a refused write is distinguishable from an unacknowledged one', () => 
   });
 });
 
-// ---------------------------------------------------------------------------
 // AN ACKNOWLEDGED SHORT WRITE IS NOT A COMPLETE ONE (#1648 Q-M1).
-//
-// Both short-write guards in `writeItemAward` were deletable with the whole corpus green: the
-// corpus covers UNACKNOWLEDGED writes well and never an acknowledged one that moved the stack
-// by less than it was asked to. That is the case whose receipt is real but partial, so the run
-// owes `historySettlement: uncertain` and would otherwise record `complete` — a persisted shape.
-// ---------------------------------------------------------------------------
 
 describe('an acknowledged write that landed short still demands reconciliation', () => {
   /** A document that acknowledges its own update but only moves the stack by `moved`. */

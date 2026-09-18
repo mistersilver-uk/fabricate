@@ -1,23 +1,4 @@
-/**
- * Issue 1364 — THE CRITERION NO KEY-SET COMPARISON CAN ANSWER.
- *
- * "Every field a production reader consumes is identical in the destination and the source, for the
- * imported system."
- *
- * An envelope diff cannot answer that, and neither can a craft-and-salvage smoke: the authoritative
- * copy of a component is still `system.components`, while the thing this change ADDS is a slice no
- * production reader consults until the consumer sweep. So an export that dropped every membership
- * record would pass both — the system would build, craft and salvage identically, and the world
- * corpus would simply be empty.
- *
- * The answer is a CORPUS DIFFERENTIAL over `export -> prepareForImport -> importFromPackData`,
- * built on the migration suite's own two projections plus a third over the three world-scope
- * slices, with every id canonicalised through the ACTUAL map the import produced rather than a
- * re-derived one — a re-derived map would agree with a WRONG import by construction.
- *
- * It runs three ways: keep mode into a SEEDED destination, copy mode into a seeded-but-empty one,
- * and copy mode into an ALREADY-CONFIGURED one.
- */
+/** Issue 1364 — THE CRITERION NO KEY-SET COMPARISON CAN ANSWER. */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -38,11 +19,7 @@ const { buildExportPayload, prepareForImport } = await import(
 
 const SOURCE_SYSTEM_ID = 'sys-source';
 
-/**
- * The authored system every leg of the differential starts from. It exercises a reference at every
- * class the shared walk visits — recipe ingredients and results, salvage, an essence source, a tool
- * component link and a repair recipe — so a projection can see a dropped one.
- */
+/** The authored system every leg of the differential starts from. */
 function authoredSystem() {
   return {
     id: SOURCE_SYSTEM_ID,
@@ -91,9 +68,7 @@ function authoredSystem() {
 
 /**
  * A SOURCE world: a migrated world holding the authored system and the world corpus a `1.30.0`
- * migration would have derived for it. It is built by importing the system into a seeded world,
- * which is the same machinery the migration uses and therefore cannot disagree with it about the
- * shape of a derived record.
+ * migration would have derived for it.
  */
 async function sourceWorld() {
   const world = await destinationWorld({
@@ -205,9 +180,6 @@ test('differential: keep mode into a seeded destination reproduces every project
 test('differential: copy mode into a seeded-but-empty destination reproduces every projection', async () => {
   // Every id moves here — the system id, both component ids — so this leg is what proves the
   // canonicaliser is doing real work and that the copy-mode map reaches INSIDE the three slices.
-  //
-  // REDDENS WHEN: the copy-mode map is not driven over the slices, so a membership record's
-  // `entityId` or a world default's component reference keeps a pre-import id.
   const leg = await runLeg({ mode: 'copy', destination: seededEmpty });
   assert.notEqual(leg.summary.system.id, SOURCE_SYSTEM_ID, 'copy mode minted a fresh system id');
   assert.deepEqual(leg.actual.entities, leg.expected.entities);
@@ -216,13 +188,7 @@ test('differential: copy mode into a seeded-but-empty destination reproduces eve
 });
 
 test('differential: copy mode into an ALREADY-CONFIGURED destination binds rather than duplicating', async () => {
-  // The destination already holds the SAME two items under different world ids. The imported system
-  // must still project identically — every field a reader consumes is unchanged — while the world
-  // roster must NOT grow, because binding to what the destination has is the whole point.
-  //
-  // REDDENS WHEN: match-or-mint is reverted to mint-everything: the two projections still match
-  // (a duplicate world entity carries the same fields) but the roster grows by two, which is the
-  // duplication this epic exists to end.
+  // The destination already holds the SAME two items under different world ids.
   const configured = () =>
     destinationWorld({
       componentScope: {

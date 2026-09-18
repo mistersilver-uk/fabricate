@@ -1,24 +1,6 @@
 /**
- * Gathering's FAILURE-RESULT path (issue 1098, AF4/CF6/CF10) — the mirrored award gate,
- * and the four dispositions that must never participate in it.
- *
- * ## Why both halves are asserted, not just the one that creates items
- *
- * The `outcome.status === 'succeeded'` gate is MIRRORED. `_terminalSideEffectPlan` carries
- * one around result PLANNING and `_commitTerminalSideEffects` carries the identical one
- * around result CREATION, and both run in sequence on both flows. The PLAN's
- * `createdResults` is what feeds the run record, `response.createdResults` and the posted
- * chat card, so changing only the commit gate creates items on the actor that all three
- * report as ZERO — a state an item-count-only assertion cannot detect. Every test here
- * therefore reads the PLAN as well as the creation.
- *
- * ## THE WHOLE PATH SHIPS DORMANT (decision 8)
- *
- * `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` and `GatheringEconomyView`
- * renders both formula-rolled modes disabled, both pending issue 683, so no configuration
- * a GM can select reaches this code today. These tests drive the seams directly, which is
- * the only way to pin a capability that is complete and unreachable — and the reason the
- * pin matters is that 683 will turn it on without revisiting any of it.
+ * Gathering's FAILURE-RESULT path (issue 1098, AF4/CF6/CF10) — the mirrored award gate, and the
+ * four dispositions that must never participate in it.
  */
 
 import test from 'node:test';
@@ -133,9 +115,7 @@ test('a succeeded outcome is unaffected by the policy, including under `never`',
 });
 
 test('a `failureOnBreak`-voided attempt does NOT award, even under `always`', async () => {
-  // A VOIDED SUCCESS, not an authored failure. The tool-breakage policy flips the status
-  // and clears the groups, and under `always` the naive reading would convert "the attempt
-  // is void" into "award the failure loot".
+  // A VOIDED SUCCESS, not an authored failure.
   const { engine, calls } = makeEngine();
   engine._planTerminalTools = async () => [{ id: 't1', broken: true }];
   const outcome = {
@@ -160,11 +140,8 @@ test('a `failureOnBreak`-voided attempt does NOT award, even under `always`', as
 });
 
 test('a failed outcome carrying no `failureAward` marker does NOT award — the d100 case', async () => {
-  // The d100 resolver's `failureWithEvent` policy returns a FAILED outcome that still
-  // carries the matched drop rows (they are what the "nothing found" card reports). A
-  // groups-only gate would start awarding them, changing a branch this issue must leave
-  // untouched — and d100 outcomes do not pass through `normalizeTerminalOutcome` at all,
-  // so they never carry the marker the routed failure seam sets.
+  // The d100 resolver's `failureWithEvent` policy returns a FAILED outcome that still carries the
+  // matched drop rows (they are what the "nothing found" card reports).
   const { plan, calls } = await runBothHalves(
     systemWith('always'),
     failedOutcome({ failureAward: false })
@@ -188,9 +165,7 @@ test('a failed outcome carrying NO group does not award — the null outcome-nam
 });
 
 test('a MISCONFIGURED outcome never participates — ROUTED_TIER_UNROUTED (CF10)', async () => {
-  // Its status is `misconfigured`, not `failed`. The stale spec reading — "a succeeding
-  // tier matching no group resolves to a terminal failure" — would, under `always`, have
-  // turned authoring drift into failure loot.
+  // Its status is `misconfigured`, not `failed`.
   const { plan, calls } = await runBothHalves(systemWith('always'), {
     status: 'misconfigured',
     resultGroups: [{ id: 'rg', results: [{ componentId: 'scrap', quantity: 1 }] }],
@@ -202,14 +177,8 @@ test('a MISCONFIGURED outcome never participates — ROUTED_TIER_UNROUTED (CF10)
 });
 
 /**
- * ## The zero-award evidence half (issue 1648, TP14-B acceptance 5)
- *
- * The gate above decides whether anything is awarded; this decides how a run that awarded
- * NOTHING says so. An omitted results effect is indistinguishable from evidence that was
- * never captured, so a deliberate zero records an APPLIED EMPTY RECEIPT, and the two
- * shapes that establish neither zero nor awards — an opaque record, and an effect still
- * applying — must stay distinguishable from it. These drive the real engine, run manager
- * and result creator; only Foundry documents and the check/roll inputs are doubled.
+ * The zero-award evidence half (issue 1648, TP14-B acceptance 5). The gate above decides whether
+ * anything is awarded; this decides how a run that awarded NOTHING says so.
  */
 
 const SOURCE_UUID = 'Compendium.fixture.materials.Item.scrap';
