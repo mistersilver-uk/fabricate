@@ -51,7 +51,7 @@ export function numberOrNull(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-/** A finite number, or `null`; `null`, `undefined` and `''` become `0`, because `Number('')` is `0`. */
+/** A finite number, or `null`; `null` and `''` become `0`, because `Number(null)` and `Number('')` are `0`. */
 export function laxNumberOrNull(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;

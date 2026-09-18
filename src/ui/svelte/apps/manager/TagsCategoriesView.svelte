@@ -20,7 +20,6 @@
 <script>
   import { normalizeTag } from '../../../../utils/scalars.js';
   import { localize } from '../../util/foundryBridge.js';
-
   import VocabularyPanel from './VocabularyPanel.svelte';
   import VocabularyTabs from './VocabularyTabs.svelte';
 

@@ -5,10 +5,14 @@ import test from 'node:test';
 import {
   arrayOrEmpty,
   arrayOrWrapped,
+  cloneJson,
+  isPlainObject,
   iterableToArray,
   laxNumberOrNull,
+  normalizeConditionId,
   normalizeIdList,
   normalizeTag,
+  normalizeTagList,
   numberOrNull,
   stringOnlyIdList,
   stringOrEmpty,
@@ -263,4 +267,16 @@ test('stringOnlyIdList takes only an array, and drops its non-string entries', (
     [],
     [],
   ]);
+});
+test('isPlainObject accepts only a non-null, non-array object', () => {
+  pin(isPlainObject, [false, false, false, false, false, false, false, false, false, false, true, true, false, false, false]);
+});
+test('normalizeTagList wraps a bare tag and lower-cases, de-duplicates and drops blanks', () => {
+  pin(normalizeTagList, [[], [], [], [], [], [], ['a'], [], ['42'], ['abc'], ['[object map]'], ['[object set]'], ['a', 'b'], ['a'], ['42']]);
+});
+test('normalizeConditionId slugs any scalar and reads id, value or label off an object', () => {
+  pin(normalizeConditionId, ['', '', '', '0', 'false', 'nan', 'a', '', '42', 'abc', '', '', '', 'a', '']);
+});
+test('cloneJson round-trips through JSON and keeps undefined', () => {
+  pin(cloneJson, ['', null, undefined, 0, false, null, ' a ', '  ', 42, 'abc', {}, {}, LIST, 'a', [42]]);
 });

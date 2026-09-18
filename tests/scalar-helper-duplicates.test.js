@@ -67,11 +67,12 @@ function declarationsOf(names) {
 
 test('the scan sees a real corpus', () => {
   // A throwing parse or a `collectSources` that stopped recursing passes every assertion over nothing.
-  const modules = Object.keys(collectSources(`${repoRoot}/src`, { extensions: ['.js'] }));
+  const scanned = Object.keys(collectSources(`${repoRoot}/src`));
+  const modules = scanned.filter((file) => file.endsWith('.js'));
   assert.ok(modules.length > 350, `expected the whole src/ tree, found ${modules.length} modules`);
   assert.ok(modules.includes(CANONICAL), `${CANONICAL} must be in the scanned corpus`);
 
-  const components = Object.keys(collectSources(`${repoRoot}/src`, { extensions: ['.svelte'] }));
+  const components = scanned.filter((file) => file.endsWith('.svelte'));
   assert.ok(components.length > 300, `expected the component tree, found ${components.length} files`);
 
   const probe = parseComponent('<script>\nfunction trimmed(value) { return value; }\n</script>\n');
