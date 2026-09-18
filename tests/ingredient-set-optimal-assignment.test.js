@@ -291,8 +291,8 @@ test('stress: a large mostly-uncontended recipe costs about one node per group',
   const matcher = matcherFor({ component: componentRules, tags: tagRules });
   const set = new IngredientSet({ id: 's', ingredientGroups: groups });
 
-  // Asserted through the PUBLIC result's `searchStats` (issue 1072's seam), not by calling
-  // `_searchAssignment` directly.
+  // Asserted through the PUBLIC result's `searchStats` (issue 1072's seam), not by calling the
+  // assignment module's search directly.
   const selection = set.resolveIngredientSelection(items, matcher, {
     resolveItemEssences: essenceProbe(probeTable),
   });

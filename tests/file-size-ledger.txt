@@ -12,7 +12,6 @@ src/migration/MigrationRunner.js::run	321
 src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	123
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	117
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	247
-src/models/IngredientSet.js	815
 src/models/Recipe.js::_validate	120
 src/systems/BulkSalvageService.js	819
 src/systems/CompendiumImporter.js	1542
