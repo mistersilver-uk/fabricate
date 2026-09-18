@@ -82,50 +82,6 @@ describe('dragDrop action DOM and behaviour', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
-  // Test 1: renders a div with class drop-zone containing an icon and label
-  it('renders a div with class drop-zone containing an icon and label', () => {
-    const div = document.createElement('div');
-    div.className = 'drop-zone';
-
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-download';
-    div.appendChild(icon);
-
-    div.appendChild(document.createTextNode('Drop item here'));
-
-    assert.ok(div.classList.contains('drop-zone'), 'root div has drop-zone class');
-    assert.ok(div.querySelector('i.fas.fa-download'), 'default icon element exists');
-    assert.ok(div.textContent.includes('Drop item here'), 'default label text is present');
-  });
-
-  // Test 2: renders custom icon class when icon prop is provided
-  it('renders custom icon class when icon prop is provided', () => {
-    const div = document.createElement('div');
-    div.className = 'drop-zone';
-
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-plus-circle';
-    div.appendChild(icon);
-
-    assert.ok(div.querySelector('i.fas.fa-plus-circle'), 'custom icon class is applied to i element');
-    assert.equal(div.querySelector('i').className, 'fas fa-plus-circle');
-  });
-
-  // Test 3: renders custom label text
-  it('renders custom label text', () => {
-    const div = document.createElement('div');
-    div.className = 'drop-zone';
-
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-download';
-    div.appendChild(icon);
-
-    const customLabel = 'Drop ingredients here';
-    div.appendChild(document.createTextNode(customLabel));
-
-    assert.ok(div.textContent.includes(customLabel), 'custom label text is rendered');
-  });
-
   // Test 4: adds drop-active class on dragover
   it('adds drop-active class on dragover', () => {
     const { div } = buildDropTarget({ onDrop: () => {} });

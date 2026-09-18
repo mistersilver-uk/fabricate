@@ -55,7 +55,7 @@ tests	19505
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
-tests/components	14951
+tests/components	14949
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	20
