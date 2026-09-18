@@ -36,9 +36,8 @@ describe('portal action', () => {
 
   it('refuses a selector string, leaving the node where it is (issue 1500)', () => {
     // The string branch was the document-wide `querySelector` form in a second spelling: the one
-    // target shape that is not guaranteed to be an ancestor of the node being moved, and so the
-    // one that could portal a panel into a DIFFERENT window. Removing it has to be visible here,
-    // or a caller could reintroduce it and be silently served.
+    // target shape that is not guaranteed to be an ancestor of the node being moved, and so the one
+    // that could portal a panel into a DIFFERENT window.
     const source = document.createElement('div');
     const target = document.createElement('div');
     target.className = 'portal-target';

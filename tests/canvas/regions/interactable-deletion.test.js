@@ -1,16 +1,4 @@
-/**
- * Provenance-aware interactable deletion (issue 533).
- *
- * P0 data-loss regression: deleting a PROMOTED interactable used to call
- * `region.delete()` on the user's whole Region, destroying their geometry and every
- * foreign (non-Fabricate) behaviour on it. These tests pin the pure ownership
- * decision + the executor edge so that:
- *   - a Fabricate-CREATED region (no foreign behaviours) still deletes the Region;
- *   - a PROMOTED region — or any region carrying foreign behaviours — deletes ONLY
- *     Fabricate's behaviour(s), preserving the Region and foreign behaviours;
- *   - a LEGACY region with no ownership flag defaults to the safe (do-not-destroy)
- *     promoted path.
- */
+/** Provenance-aware interactable deletion (issue 533). */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

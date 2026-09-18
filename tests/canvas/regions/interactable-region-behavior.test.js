@@ -203,12 +203,8 @@ test('static events delegate to the manager seam when present', async () => {
 });
 
 test('static events pass the RegionBehavior DOCUMENT (this.behavior), not the data model', async () => {
-  // In V13 a `RegionBehaviorType` `static events` handler runs with `this` bound
-  // to the DATA MODEL (the `system`), whose `type`/`system`/`parent` are NOT the
-  // document's. The manager needs the DOCUMENT, so the handler must forward
-  // `this.behavior`. Here `this` is a fake data model whose `behavior` getter
-  // returns a fake RegionBehavior document; the manager must receive THAT, never
-  // the data model itself.
+  // In V13 a `RegionBehaviorType` `static events` handler runs with `this` bound to the DATA MODEL
+  // (the `system`), whose `type`/`system`/`parent` are NOT the document's.
   const previousGame = globalThis.game;
   const captured = [];
   const fakeDocument = { type: 'fabricate.interactable', system: { interactableType: 'tool' } };

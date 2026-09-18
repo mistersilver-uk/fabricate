@@ -1,13 +1,4 @@
-/**
- * Unit coverage for the region-behaviour identity helper.
- *
- * A region-first gathering-task interactable is a pure (environment, task)
- * shortcut: it carries NO per-interactable node pool (the environment's
- * `nodeRuntime[taskId]` is the single source of truth), so there is no
- * behaviour-backed node-state adapter or node snapshot to test. What remains is
- * the pure `identifyRegionBehaviorRef` resolver used by the config panel / socket
- * edges.
- */
+/** Unit coverage for the region-behaviour identity helper. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

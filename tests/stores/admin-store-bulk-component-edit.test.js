@@ -1,11 +1,6 @@
 /**
- * `adminStore.applyComponentBulkEdit(componentIds, edit)` (issue 772) — the store-public
- * surface over `CraftingSystemManager.applyBulkEditToComponents`.
- *
- * It resolves the selected system itself, forwards the staged edit VERBATIM (an empty
- * `essences` map and a zero `difficulty` are real "clear" instructions, so the store must
- * not prune "empty" keys), refreshes so the browser rows re-render off the republished
- * `itemCards`, and routes a failure through `notify.error` while returning `false`.
+ * `adminStore.applyComponentBulkEdit(componentIds, edit)` (issue 772) — the store-public surface
+ * over `CraftingSystemManager.applyBulkEditToComponents`.
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';

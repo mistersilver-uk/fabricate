@@ -1,21 +1,6 @@
 /**
- * The composed component membership verbs, over the REAL published write path (issue 1371).
- *
- * ## Why this is a store unit and not a mounted assertion
- *
- * The composed verb keeps the GENERIC KEY. `worldScope.component.addToSystem` is the same name
- * the membership-only verb published before this lane, so no call site and no mounted test can
- * distinguish the two — a mounted test supplies the `actions` bag itself, and every screen just
- * calls the key. The composition is pinned as SOURCE beside the essence twin; this asserts what
- * the verb actually WRITES.
- *
- * ## And why the in-system half is the load-bearing one
- *
- * `## Scoped Entity Definitions` requirement 15 clause 3 makes the read union's ROW SET the
- * in-system array's for as long as the lifted fields are unshed. So a membership record written
- * alone names a component NOTHING can read: the rules list keeps drawing the row as a ghost, the
- * button looks inert, and no recipe can name the component. Dropping the in-system half passes
- * every membership assertion and ships that.
+ * The composed component membership verbs, over the REAL published write path (issue 1371). The
+ * composed verb keeps the GENERIC KEY.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -34,12 +19,7 @@ import { recipeReferencesComponent } from '../../src/utils/recipeComponentRefere
 import { getItemMatchUuids } from '../../src/utils/sourceReferenceUnion.js';
 import { makeWorldScopeStoreFake } from '../helpers/worldScopeStoreFixture.js';
 
-/**
- * THE STORE FAKE IS SHARED (issue 1371, round 3). Its body was byte-identical to the essence
- * suite's, which Sonar's copy-paste detector counts against the gate — and rightly, because the
- * scope store is generic over the entity family and the two copies were one contract twice.
- * Aliased locally so every call site below reads as the component store it is driving.
- */
+/** THE STORE FAKE IS SHARED (issue 1371, round 3). */
 const makeComponentScopeStore = makeWorldScopeStoreFake;
 
 /** The world component the seed is taken from: linked, with an alias, and fully identified. */
@@ -66,47 +46,18 @@ function componentsOf(harness) {
 }
 
 /**
- * Give the harness's crafting-system manager the SANCTIONED component delete — the shipped one.
- *
- * ## It runs `CraftingSystemManager`'s own method body, not a description of it
- *
- * `deleteComponents` and everything under it (`_deleteComponentSet`, `_stripComponentsFromRecipes`)
- * touch `this` only through named collaborators, so the real prototype methods are invoked against
- * a bag holding a recipe manager, a `getSystem` and a `save`. The reference repair under test is
- * therefore the SHIPPED cascade — every referencing recipe rewritten once, the ones left without a
- * usable shape clamped to disabled, essence source links cleared — rather than a second
- * implementation of it in a fixture, which is the way a test double quietly stops matching the
- * thing it stands for.
- *
- * `makeEssenceStoreHarness` ships no `deleteComponents` (it was written for the essence suites), and
- * `tests/helpers/**` belongs to no one lane, so the seam is installed here.
- *
- * ## And the two failure windows are injected HERE, into the shipped cascade
- *
- * `failAt` reddens one of the two seams the cascade actually has, and their ORDER is the whole
- * point (issue 1371, round 11). `_deleteComponentSet` persists ONCE, at its end:
- *
- *   `persist`   — `this.save()` throws. Nothing durable landed; the saved `craftingSystems` value
- *                 still holds the row.
- *   `reconcile` — `_reconcileAlchemySignaturesAfterDeletion` throws, which `deleteComponents` runs
- *                 only AFTER `_deleteComponentSet` has returned. The row is durably gone.
- *
- * They are injected as collaborators of the REAL method bodies rather than as a thrown-from stub
- * standing in for the cascade, so what the store sees on the way out — including what
- * `getSystem` reads afterwards — is what the shipped manager leaves behind, not what a fixture
- * decided to leave behind. That distinction is load-bearing for the two window tests below.
+ * Give the harness's crafting-system manager the SANCTIONED component delete — the shipped one
+ * (issue 1371).
  *
  * @param {object} harness the essence store harness.
  * @param {{failAt?: 'persist'|'reconcile'}} [options] which seam of the cascade should throw.
  * @returns {{calls: Array<{systemId: string, componentIds: string[]}>, infos: string[]}} what the
- *   store asked for, and what the GM was told.
+ * store asked for, and what the GM was told.
  */
 function installSanctionedComponentDelete(harness, { failAt } = {}) {
   const proto = CraftingSystemManager.prototype;
   const infos = [];
-  // `deleteComponents` announces the cascade through the Foundry global. Undeclared, `ui?.` is a
-  // ReferenceError rather than `undefined`, so the notification sink is installed too — and it is
-  // what the recipe-cascade disclosure is read from below.
+  // `deleteComponents` announces the cascade through the Foundry global.
   globalThis.ui = {
     notifications: {
       info: (message) => {
@@ -151,9 +102,7 @@ test('1371: adopting a world component writes BOTH halves, membership first', as
   const { store, scope } = await openStore(harness, [LINKED]);
   harness.writes.length = 0;
 
-  // A PROBE ON THE SYSTEM WRITE, so the ORDER is observable rather than inferred. The two halves
-  // land in different places — the membership record in the scope payload, the seeded row through
-  // `updateSystem` — so neither one's presence at the end says which happened first.
+  // A PROBE ON THE SYSTEM WRITE, so the ORDER is observable rather than inferred.
   const membershipAtSystemWrite = [];
   const shippedUpdateSystem = harness.services.getCraftingSystemManager().updateSystem;
   harness.services.getCraftingSystemManager().updateSystem = async (id, updates) => {
@@ -175,14 +124,8 @@ test('1371: adopting a world component writes BOTH halves, membership first', as
       'button writes a record nothing can read'
   );
 
-  // AND THE ORDER THE TITLE CLAIMS. The membership write goes FIRST because it owns the
-  // already-a-member rule, so the in-system seed does not restate it — and if the seed is then
-  // refused, the membership record is the one that has to be removed again. Round 1 asserted only
-  // that both landed, so swapping the two lines passed.
-  //
-  // The system write is the only one that reaches the harness; the membership write lands in the
-  // scope payload. So the order is read as "the membership record was already there when the
-  // system write happened", which is what the sequence actually has to guarantee.
+  // AND THE ORDER THE TITLE CLAIMS. The system write is the only one that reaches the harness; the
+  // membership write lands in the scope payload.
   const systemWrites = harness.writes.filter((write) => write.kind === 'updateSystem');
   assert.equal(systemWrites.length, 1, 'exactly one system write');
   assert.ok(
@@ -197,9 +140,7 @@ test('1371: adopting a world component writes BOTH halves, membership first', as
 });
 
 test('1371: the seed carries identity AND all three source-link fields', async () => {
-  // A component that cannot be matched to an Item exists in no inventory. Matching is durable-flag
-  // identity first and the raw source-reference union THIRD, so a seed carrying no source refs
-  // and stamping no role flag matches at NO tier.
+  // A component that cannot be matched to an Item exists in no inventory.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store } = await openStore(harness, [LINKED]);
 
@@ -303,9 +244,7 @@ test('1371: a component the world roster does not hold writes nothing', async ()
 });
 
 test('1371: the component family publishes setWorldTags and setMutedTags, and its siblings do not', async () => {
-  // THE POSITIVE HALF IS MANDATORY. An absence-only check passes on a family that returns an empty
-  // object, which is what a broken descriptor lookup produces — so the presence assertion is what
-  // makes the two absences below measurements.
+  // THE POSITIVE HALF IS MANDATORY.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store } = await openStore(harness, [LINKED]);
 
@@ -318,17 +257,9 @@ test('1371: the component family publishes setWorldTags and setMutedTags, and it
   assert.equal(typeof store.worldScope.tool.addToSystem, 'function');
 });
 
-// ── THE WORLD-SCOPE USAGE LEG (issue 1371, round 2) ────────────────────────────────────────
-//
-// Round 1 shipped this leg with NO store unit at all, and its gathering-production half read
-// `task.resultGroups` — a key a STORED gathering task never carries. `_normalizeGatheringTask` is
-// an allowlist rebuild emitting `dropRows` (from `dropRows ?? itemDrops`) and no `resultGroups` at
-// all; `resultGroups` is minted at COMPOSITION time with `results: []` and stays empty until issue
-// 683. So the loop compiled, ran, iterated nothing, and reported no gathering production on any
-// world — invisibly, because the projection did not publish `producedBy` either.
-//
-// Both halves are closed here: the leg reads `dropRows`, and the projection publishes the answer,
-// which is what makes this assertion an observation rather than a restatement of the source.
+// THE WORLD-SCOPE USAGE LEG (issue 1371, round 2). Round 1 shipped this leg with NO store unit at
+// all, and its gathering-production half read `task.resultGroups` — a key a STORED gathering task
+// never carries.
 test('1371: a gathering task contributes its DROPS to producedBy, off dropRows', async () => {
   const harness = makeEssenceStoreHarness({ components: [] });
   const shippedGetSetting = harness.services.getSetting;
@@ -348,9 +279,7 @@ test('1371: a gathering task contributes its DROPS to producedBy, off dropRows',
                     { id: 'drop-1', componentId: 'ingot', quantity: 1 },
                     { id: 'drop-2', systemItemId: 'coal', quantity: 2 },
                   ],
-                  // AND THE KEY THE DEAD LEG READ, populated. It is the NEGATIVE control: a
-                  // `resultGroups` implementation would answer `never-read` here and answer
-                  // NOTHING for the two rows above, so the assertions below tell the two apart.
+                  // AND THE KEY THE DEAD LEG READ, populated.
                   resultGroups: [{ id: 'rg', results: [{ componentId: 'never-read' }] }],
                 },
               ],
@@ -389,12 +318,7 @@ test('1371: a gathering task contributes its DROPS to producedBy, off dropRows',
   assert.equal(entries.find((entry) => entry.id === 'ingot')?.recipeCount, 0);
 });
 
-/**
- * A recipe that names the component, in the system it is being removed from. Its ingredient set
- * holds exactly one option, so stripping the component empties the group, empties the set, and
- * leaves the recipe with no ingredient sets at all — the shape `recipeLostItsShape` clamps to
- * disabled. Both consequences of the cascade are therefore observable on one fixture.
- */
+/** A recipe that names the component, in the system it is being removed from. */
 const NAILS_RECIPE = Object.freeze({
   id: 'r-nails',
   name: 'Iron Nails',
@@ -407,13 +331,7 @@ const NAILS_RECIPE = Object.freeze({
 });
 
 test('1371: removing a component from a system REPAIRS the recipes that name it', async () => {
-  // REVIEWER 2, ROUND 5 (blocking, data integrity). The in-system half used to filter the
-  // `components` array and call `updateSystem`, which normalizes, asserts uniqueness and saves —
-  // and repairs NOTHING. So `Remove from this system`, reachable from the entry's per-system rows,
-  // the system rules roster and the catalogue's bulk `Remove from` group, left every recipe in that
-  // system referencing a component id the system no longer held: no rewrite, no disable, no
-  // statement. Deleting the same component from the component list has always cascaded; the two
-  // now leave the same system behind.
+  // REVIEWER 2, ROUND 5 (blocking, data integrity).
   const harness = makeEssenceStoreHarness({
     components: [],
     recipes: [structuredClone(NAILS_RECIPE)],
@@ -465,10 +383,6 @@ test('1371: the sanctioned delete seam is the one the store feature-detects', as
 
 test('1371: a manager that cannot delete refuses the WHOLE removal, not half of it', async () => {
   // The harness ships no `deleteComponents`, which is exactly the state the guard is written for.
-  // Removing the membership record and then failing to remove the in-system row is the worse of
-  // the two outcomes: the read union's "no world half for this row" branch pushes such a record
-  // through UNCHANGED, so the component goes on resolving in a system the GM has removed it from
-  // with the world layer silently no longer consulted.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
   installSanctionedComponentDelete(harness);
@@ -493,13 +407,7 @@ test('1371: a manager that cannot delete refuses the WHOLE removal, not half of 
  * Refuse the in-system seed the way the shipped manager refuses it: through
  * `_assertUniqueComponentSourcesForSystem` itself.
  *
- * That method reads only its `system` argument, so the REAL assertion is invoked against the
- * system the write would produce. The refusal under test is therefore the shipped one — two
- * in-system components claiming one source uuid, which is exactly the duplicate-source state the
- * world entry's own `Review & merge` band exists to surface — rather than a stand-in error.
- *
  * @param {object} harness the essence store harness.
- * @returns {void}
  */
 function refuseDuplicateSourceWrites(harness) {
   const shipped = harness.systemManager.updateSystem;
@@ -549,10 +457,7 @@ test('1371: a REFUSED seed rolls the membership record back and reports it', asy
       'to go and merge'
   );
 
-  // THE MESSAGE IS LOCALIZED, AND CANNOT DEGRADE TO THE KEY. `localize` answers a MISSING key
-  // with the key itself — which this harness reproduces exactly, by returning every key verbatim
-  // — so the notification here is coming from the English floor rather than from a translation,
-  // and that is the branch worth pinning: it is what a world with an incomplete `lang` file gets.
+  // THE MESSAGE IS LOCALIZED, AND CANNOT DEGRADE TO THE KEY.
   const request = harness.localizations.find(
     (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.AddToSystemFailed'
   );
@@ -569,10 +474,7 @@ test('1371: a REFUSED seed rolls the membership record back and reports it', asy
 
 test('1371: but a membership record it did NOT write is left alone', async () => {
   // THE ROLLBACK IS GUARDED ON THIS CALL'S OWN WRITE, and the state is reachable: a record written
-  // before this composition shipped, or one left by an earlier refusal, has no in-system row. On
-  // such a record `addToSystem` answers `false` (already a member) and the seed still runs — and
-  // an unguarded rollback would then DELETE membership the GM authored earlier because an
-  // unrelated duplicate refused the seed.
+  // before this composition shipped, or one left by an earlier refusal, has no in-system row.
   const harness = makeEssenceStoreHarness({ components: [{ ...CLAIMANT }] });
   const { store, scope } = await openStore(harness, [LINKED]);
   scope.payload.membership[membershipKey('ingot', 'sys1')] = {
@@ -592,26 +494,15 @@ test('1371: but a membership record it did NOT write is left alone', async () =>
   assert.equal(harness.notifications.error.length, 1, 'and the GM is still told the seed failed');
 });
 
-// ── THE REMOVAL'S FAILURE WINDOWS (issue 1371, round 11) ───────────────────────────────────
-//
-// Round 8 closed the MISSING-seam case (a manager with no `deleteComponents` refuses the whole
-// removal) and left the THROWING-seam case open: the membership half was written first and
-// awaited, so a rejection out of the delete cascade escaped with the membership record already
-// gone and the in-system row still standing — the ghost this verb is composed to prevent, reached
-// by failure instead of by design — and escaped the catalogue's bulk loop as an unhandled
-// rejection on the way.
-//
-// The fix is the ORDER rather than a rollback, so these tests are about ORDER and about the two
-// windows the shipped cascade actually has. `_deleteComponentSet` persists once at its end, so a
-// throw before that persist leaves the row durably in place and a throw after it (from
-// `_reconcileAlchemySignaturesAfterDeletion`) leaves it really gone. Both are driven below, and
-// both are driven through the REAL method bodies — a stub that just threw would prove nothing
-// about what the manager leaves behind, which is the whole question.
+// THE REMOVAL'S FAILURE WINDOWS (issue 1371, round 11). Round 8 closed the MISSING-seam case (a
+// manager with no `deleteComponents` refuses the whole removal) and left the THROWING-seam case
+// open: the membership half was written first and awaited, so a rejection out of the delete cascade
+// escaped with the membership record already gone and the in-system row still standing — the ghost
+// this verb is composed to prevent, reached by failure instead of by design — and escaped the
+// catalogue's bulk loop as an unhandled rejection on the way.
 
 test('1371: the removal deletes the IN-SYSTEM row first, while the membership record still stands', async () => {
-  // THE ORDER IS THE COMPENSATION, so the order is what is pinned. Swapping the two lines back
-  // passes every end-state assertion in this file — both halves are gone either way — and reddens
-  // only here.
+  // THE ORDER IS THE COMPENSATION, so the order is what is pinned.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
   installSanctionedComponentDelete(harness);
@@ -642,19 +533,10 @@ test('1371: the removal deletes the IN-SYSTEM row first, while the membership re
 /**
  * Drive a removal whose in-system half throws at one of the cascade's two seams.
  *
- * Shared by the two window tests because they are ONE contract asked twice — the store's answer
- * must not depend on which side of the persist the manager fell over, since it cannot tell.
- * Written once so the two cannot drift, and so the pair adds no duplicated block to the gate.
- *
- * `translations` installs a WORLD THAT HAS THE KEY. The harness's own localizer answers every key
- * with the key itself, which reproduces Foundry's missing-key behaviour exactly — so by default
- * this drives the English-floor branch, and passing a table drives the translated branch. Both are
- * real states of a shipped world and the store has to be right in both.
- *
  * @param {'persist'|'reconcile'} failAt which seam of the shipped cascade throws.
  * @param {{translations?: Record<string, string>}} [options] the lang table this world has.
  * @returns {Promise<{answer: boolean, membership: string[], rows: string[], errors: string[],
- *   localizations: Array<{key: string, data: object}>}>}
+ * localizations: Array<{key: string, data: object}>}>}
  */
 async function driveRemovalFailure(failAt, { translations } = {}) {
   const harness = makeEssenceStoreHarness({ components: [] });
@@ -711,15 +593,7 @@ test('1371: a delete that throws BEFORE its persist leaves the membership record
 });
 
 test('1371: and so does one that throws AFTER it — the store cannot tell the two windows apart', async () => {
-  // WINDOW TWO, and THE MEASUREMENT THAT SETTLES THE DESIGN. `deleteComponents` runs
-  // `_reconcileAlchemySignaturesAfterDeletion` only once `_deleteComponentSet` has returned, so
-  // here the row is DURABLY gone where in window one it was not.
-  //
-  // The obvious alternative fix — keep the membership-first order and restore the record "only if
-  // the in-system row still stands" — needs those two windows to be told apart from the store.
-  // They cannot be: `_deleteComponentSet` mutates `system.components` IN PLACE before it persists,
-  // and `getSystem` hands back that same live object, so the row reads GONE in both. The
-  // assertion below is that reading, and it is why the shipped fix is the order instead.
+  // WINDOW TWO, and THE MEASUREMENT THAT SETTLES THE DESIGN.
   const before = await driveRemovalFailure('persist');
   const after = await driveRemovalFailure('reconcile');
 
@@ -755,15 +629,9 @@ test('1371: and so does one that throws AFTER it — the store cannot tell the t
 test('1371: a membership write that throws leaves only the INERT half, and still moves the screen', async () => {
   // THE SECOND HALF'S OWN WINDOW. The row is gone and the recipe cascade has already run, so there
   // is nothing to give back — re-seeding the row could not restore the rewritten recipes, and the
-  // membership record standing over a missing row is the RECOVERABLE partial state: the read
-  // union iterates the IN-SYSTEM array, finds nothing, and draws nothing through this system.
-  //
-  // "INERT" IS ABOUT THE READ UNION, NOT THE WORLD SCREENS (issue 1371 r17). The rules list
-  // draws the record as a ghost row; the world entry's systems card, the catalogue's system
-  // count and its `Has rules in` filter all still COUNT the membership, and the picker's
-  // `heldHere` withholds the record from this system's offer while the ghost row offers to add
-  // it — the two add surfaces disagree until the removal is re-issued or the ghost row's Add
-  // recovers the row. The docblock on `partComponentFromSystem` states the same.
+  // membership record standing over a missing row is the RECOVERABLE partial state: the read union
+  // iterates the IN-SYSTEM array, finds nothing, and draws nothing through this system (issue
+  // 1371).
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
   installSanctionedComponentDelete(harness);
@@ -794,8 +662,7 @@ test('1371: a membership write that throws leaves only the INERT half, and still
 test('1371: a removal that writes nothing at all answers false, and spends no re-projection', async () => {
   // THE NEGATIVE CONTROL FOR THE CATCH'S ANSWER. Every assertion above reads `true` out of a
   // failure, so an implementation that simply answered `true` from the catch would pass all of
-  // them. Here the system holds no row at all and the scope write is refused: nothing moved, and
-  // the honest answer is `false` — `_republishingFamily` must not spend a publish on it.
+  // them.
   const harness = makeEssenceStoreHarness({ components: [] });
   const { store, scope } = await openStore(harness, [LINKED]);
   installSanctionedComponentDelete(harness);
@@ -817,14 +684,10 @@ test('1371: a removal that writes nothing at all answers false, and spends no re
   assert.equal(harness.notifications.error.length, 1, 'and the GM is still told it did not happen');
 });
 
-// ── AND THE SENTENCE THE GM READS IS LOCALIZED (issue 1371, round 11 follow-up) ────────────
-//
-// The removal shipped its message as plain English because no component `RemoveFromSystemFailed`
-// key existed and `localize` answers a MISSING key with the key itself — so naming one before it
-// was in `lang/en.json` would have put `FABRICATE.…` on a GM's screen. The key is added beside
-// `AddToSystemFailed` and the sentence now reads through the same key-echo-guarded localizer the
-// join uses. BOTH branches are pinned, because a world with an incomplete lang file takes the
-// second one and it is the branch the guard exists for.
+// AND THE SENTENCE THE GM READS IS LOCALIZED (issue 1371, round 11 follow-up). The removal shipped
+// its message as plain English because no component `RemoveFromSystemFailed` key existed and
+// `localize` answers a MISSING key with the key itself — so naming one before it was in
+// `lang/en.json` would have put `FABRICATE.…` on a GM's screen.
 
 /** The key the removal's failure sentence is asked for under. */
 const REMOVE_FAILED_KEY = 'FABRICATE.Admin.Manager.Component.RemoveFromSystemFailed';
@@ -851,8 +714,6 @@ test('1371: a world that HAS the key reads the translation, reason and all', asy
 
 test('1371: and a world that does NOT reads the English floor, never the key', async () => {
   // THE HARNESS ANSWERS EVERY KEY WITH THE KEY, which is Foundry's missing-key behaviour exactly.
-  // `localize(k) || fallback` would return the key here and print `FABRICATE.…`; the guard is what
-  // makes this branch a sentence.
   const outcome = await driveRemovalFailure('persist');
 
   assert.equal(
@@ -869,18 +730,8 @@ test('1371: and a world that does NOT reads the English floor, never the key', a
   );
 });
 
-// ── issue 1371 r17 ──────────────────────────────────────────────────────────────────────────
-//
-// THE M25 WRITE'S FAILURE SENTENCE IS LOCALIZED, NOT FOUNDRY'S TOAST TWICE (Foundry 4, r13).
-// `SocketInterface.#handleError` already posts `ui.notifications.error(error.message)` before it
-// rejects a refused world-setting write, and `bulkEditComponentRules`' catch posted the SAME
-// `error.message` verbatim — so a server-refused essence write toasted one sentence twice. The
-// join and removal verbs add a localized sentence with the reason in it, through the shared
-// key-echo guard, and read as a second, different toast; this verb now does the same under its
-// own key, with the SYSTEM named because the write is per system and a GM staging essences
-// across several needs to know which one did not land. BOTH branches are pinned, as the removal
-// twin's are: a world with the key reads the translation, one without reads the English floor,
-// and neither ever reads the raw key.
+// issue 1371 r17. THE M25 WRITE'S FAILURE SENTENCE IS LOCALIZED, NOT FOUNDRY'S TOAST TWICE (Foundry
+// 4, r13).
 
 /** The key the M25 write's failure sentence is asked for under. */
 const BULK_EDIT_FAILED_KEY = 'FABRICATE.Admin.Manager.Component.BulkEditRulesFailed';
@@ -888,11 +739,8 @@ const BULK_EDIT_FAILED_KEY = 'FABRICATE.Admin.Manager.Component.BulkEditRulesFai
 /**
  * Drive one `bulkEditRules` whose set-apply primitive throws.
  *
- * `translations` installs a world that HAS the key, on `driveRemovalFailure`'s pattern; the
- * table here substitutes `{system}` as well as `{error}`, because this sentence carries both.
- *
- * @param {{translations?: Record<string, string>}} [options]
- * @returns {Promise<{answer: unknown, errors: string[], localizations: Array<{key: string, data: object}>}>}
+ * @returns {Promise<{answer: unknown, errors: string[], localizations: Array<{key: string, data:
+ * object}>}>}
  */
 async function driveBulkEditFailure({ translations } = {}) {
   const harness = makeEssenceStoreHarness({ components: [] });
@@ -971,13 +819,9 @@ test('1371 r17: and a world that HAS the key reads the translation, system and r
   );
 });
 
-// ── THE WORLD `essences` SECTION REACHES THE STORE AND THE PROJECTION (r18-store, M31) ────────
-//
-// The maintainer's world essence edit "did not persist or show anywhere" because the world panel
-// wrote per-system rules that no world screen reads. The world record now carries an `essences`
-// SECTION, so the generic section verbs take the name, and the projection publishes what the
-// world entry and the catalogue read: the world map on `defaults`, and per system the switch and
-// the map that system resolves.
+// THE WORLD `essences` SECTION REACHES THE STORE AND THE PROJECTION (r18-store, M31). The
+// maintainer's world essence edit "did not persist or show anywhere" because the world panel wrote
+// per-system rules that no world screen reads.
 
 test('1371 r18: `updateWorldDefaultSection("essences")` lands on the world record and is published', async () => {
   const harness = makeEssenceStoreHarness({
@@ -1042,26 +886,12 @@ test('1371 r18: flipping the essences switch OFF makes the system resolve its OW
   assert.deepEqual(entry.inheritCounts, { category: 1, essences: 0 });
 });
 
-// ── THE SYSTEM RULES LIST READS WHAT THE SYSTEM RESOLVES (r19-store2) ─────────────────────────
-//
-// `getItems` is the AUTHORING accessor and answers the persisted row by design, so the row
-// projection was drawing each component's OWN essence map while the rules editor and every engine
-// reader answered the world map the pair inherits. After the `1.32.0` election that is every
-// component in a one-system world, so the first world essence edit left the list stale and
-// contradicting its own editor.
+// THE SYSTEM RULES LIST READS WHAT THE SYSTEM RESOLVES (r19-store2). `getItems` is the AUTHORING
+// accessor and answers the persisted row by design, so the row projection was drawing each
+// component's OWN essence map while the rules editor and every engine reader answered the world map
+// the pair inherits.
 
-/**
- * Give the harness's manager the read union, through the seam the shipped manager delegates to.
- *
- * `CraftingSystemManager#getComponentsForSystem` is `resolveScopedComponents`, which is
- * `resolveScopedEntityRead(system, corpus, 'components')`. The corpus is passed explicitly rather
- * than probed off `game.fabricate`, which is the same call the manager makes with its injected
- * store resolved.
- *
- * @param {object} harness
- * @param {object} scope
- * @returns {void}
- */
+/** Give the harness's manager the read union, through the seam the shipped manager delegates to. */
 function installReadUnion(harness, scope) {
   harness.services.getCraftingSystemManager().getComponentsForSystem = (systemId) =>
     resolveScopedEntityRead(
@@ -1136,23 +966,15 @@ test('1371 r19: a manager with no read union at all still draws the persisted ro
   assert.deepEqual(card.essences.map((essence) => [essence.id, essence.quantity]), [['iron', 2]]);
 });
 
-// ── A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (r19-store2) ──────────────────────────────────
-//
-// The driver's ruling on reviewer round 5 finding 3, under the M31 model: the world record owns
-// the map and every system inherits it unless it overrides, so a write made on a SYSTEM screen —
-// the Component Studio's bulk `Essence values` axis, or the component editor's own card — is an
-// OVERRIDE. It flips `inherit.essences → false` for the pair FIRST and then writes the values, on
-// the rules editor's own flag-before-values order (`ComponentEditView.setEssenceInheritance`),
-// because the other order persists a map the union shadows and reports `N updated` for a write no
-// system resolves. A refused flag write stops that pair.
+// A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE (r19-store2). The driver's ruling on reviewer round 5
+// finding 3, under the M31 model: the world record owns the map and every system inherits it unless
+// it overrides, so a write made on a SYSTEM screen — the Component Studio's bulk `Essence values`
+// axis, or the component editor's own card — is an OVERRIDE.
 
 /**
- * A component-set write primitive over the harness's live system, recording the pair's switch
- * state AS IT WAS WHEN THE VALUES ARRIVED — which is what "flag before values" is an assertion
- * about.
+ * A component-set write primitive over the harness's live system, recording the pair's switch state
+ * AS IT WAS WHEN THE VALUES ARRIVED — which is what "flag before values" is an assertion about.
  *
- * @param {object} harness
- * @param {object} scope
  * @returns {Array<object>} the recorded calls.
  */
 function installBulkComponentWrite(harness, scope) {
@@ -1199,13 +1021,7 @@ function makeInheritingPair() {
   });
 }
 
-/**
- * Seed the inheriting pair onto a store fake and republish.
- *
- * @param {object} store
- * @param {object} scope
- * @returns {Promise<void>}
- */
+/** Seed the inheriting pair onto a store fake and republish. */
 async function seedInheritingPair(store, scope) {
   scope.payload.defaults.ingot = { id: 'ingot', essences: { fire: 3 } };
   scope.payload.membership[membershipKey('ingot', 'sys1')] = {
@@ -1216,13 +1032,7 @@ async function seedInheritingPair(store, scope) {
   await store.refresh();
 }
 
-/**
- * What the system RESOLVES for `ingot` right now, through the shipped union.
- *
- * @param {object} harness
- * @param {object} scope
- * @returns {object|undefined}
- */
+/** What the system RESOLVES for `ingot` right now, through the shipped union. */
 function resolvedIngotEssences(harness, scope) {
   const rows = resolveScopedEntityRead(harness.system, scope.store.corpus(), 'components');
   return rows.find((row) => row.id === 'ingot')?.essences;
@@ -1325,7 +1135,6 @@ test('1371 r19: a component the world corpus does not hold is written unchanged'
 /**
  * A single-component write primitive over the harness's live system.
  *
- * @param {object} harness
  * @returns {Array<object>} the recorded calls.
  */
 function installSingleComponentWrite(harness) {
@@ -1342,8 +1151,6 @@ function installSingleComponentWrite(harness) {
 test('1371 r19: an untouched save on an inheriting pair writes NO essence map, so the dormant row survives', async () => {
   // The rules editor seeds its steppers from the item card, which now draws the RESOLVED map, and
   // `buildUpdates` sends `essences` on every save whether or not the GM touched the locked card.
-  // Restating what the system already resolves is not an authored override, so the key is dropped
-  // — otherwise an unrelated save would overwrite the row an override later comes back to.
   const harness = makeInheritingPair();
   const { store, scope } = await openStore(harness, [LINKED]);
   installReadUnion(harness, scope);
@@ -1399,10 +1206,8 @@ test('1371 r19: and a refused flag write refuses the whole component save', asyn
   assert.deepEqual(calls, [], 'and no value write was made');
 });
 
-// ---------------------------------------------------------------------------
-// One accessor for "what does this system resolve", and the rest of round 6
-// (issue 1371 r20-store3, reviewer round 6 findings 4, 5 and 6; quality R5)
-// ---------------------------------------------------------------------------
+// One accessor for "what does this system resolve", and the rest of round 6 (issue 1371 r20-store3,
+// reviewer round 6 findings 4, 5 and 6; quality R5)
 
 test('1371 r20: the essence card and the delete dialog COUNT what the system resolves', async () => {
   // Finding 4. `_itemUsesEssence` walked `item.essences` — the PERSISTED row — so an essence a
@@ -1519,8 +1324,7 @@ test('1371 r20: a single value write that THROWS puts its switch back too', asyn
 
 test('1371 r20: the rules-bulk verb applies the SAME override rule as the Studio’s own', async () => {
   // Quality R5. `bulkEditRules` has no production caller — M31 superseded M25's route — so its
-  // override arm is defence for a route no screen currently drives. It is driven directly here
-  // rather than left as the one of the four sites a reader cannot tell is live.
+  // override arm is defence for a route no screen currently drives.
   const harness = makeInheritingPair();
   const { store, scope } = await openStore(harness, [LINKED]);
   installReadUnion(harness, scope);
@@ -1584,29 +1388,16 @@ test('1371 r20: an UNAUTHORED world essence section shadows nothing, so no switc
   );
 });
 
-// ── ROUND 7: THE WRITE HALF CATCHES UP WITH THE READ HALF (r21-store4) ───────────────────────
-//
-// Round 6 made every GM READ of a component's essences go through the resolved accessor. Three
-// WRITES were still acting on the persisted row while the surface around them spoke for the
-// resolved one: the essence delete's cascade, a rollback that restored a field rather than a
-// record, and a compensated region wide enough to contain the republish.
+// ROUND 7: THE WRITE HALF CATCHES UP WITH THE READ HALF (r21-store4). Round 6 made every GM READ of
+// a component's essences go through the resolved accessor.
 
-/**
- * The membership record for `(ingot, sys1)` as the fake store holds it right now.
- *
- * @param {object} scope
- * @param {string} [componentId]
- * @returns {object|undefined}
- */
+/** The membership record for `(ingot, sys1)` as the fake store holds it right now. */
 function membershipRecord(scope, componentId = 'ingot') {
   return scope.payload.membership[membershipKey(componentId, 'sys1')];
 }
 
 test('1371 r21: an essence delete is handed a seam that flips an inheriting pair to override', async () => {
-  // Reviewer finding 1, at the store. `CraftingSystemManager.deleteEssence` decides the cascade's
-  // reach and calls back for the flag write, because the flag is a world-scope setting and the
-  // manager holds no path to one. This pins the store's half: the seam it supplies really moves
-  // the switch, over the shipped rule, on the shipped family.
+  // Reviewer finding 1, at the store.
   const harness = makeInheritingPair();
   const { store, scope } = await openStore(harness, [LINKED]);
   installReadUnion(harness, scope);
@@ -1711,8 +1502,7 @@ test('1371 r21: a bulk edit whose REPUBLISH throws keeps its flips too', async (
 test('1371 r21: the SECOND cohort pass cannot roll back a first pass that already landed', async () => {
   // Reviewer finding 2. `flipped` is a subset of `writable`, so with the writable pass first a
   // throw on the refused pass un-flipped pairs whose essence values were already persisted —
-  // silently putting them back under the world map while the GM was told the write failed. The
-  // refused pass now runs FIRST, so a throw always precedes the flipped pairs' values.
+  // silently putting them back under the world map while the GM was told the write failed.
   const harness = makeEssenceStoreHarness({
     essences: [
       { id: 'fire', name: 'Fire' },
@@ -1808,9 +1598,7 @@ test('1371 r21: the rules-bulk verb rolls its flips back when the value write th
 
 test('1371 r21: the store forwards a STATED baseline to the rule, and it decides the save', async () => {
   // Quality gap N1, the store's half. Every earlier fixture's baseline EQUALLED the resolved map,
-  // so unwiring this argument changed nothing anywhere. A world map the editor's steppers cannot
-  // restate — a fractional quantity, reachable through an import or a hand-edited setting — makes
-  // the two answers differ, so the forwarding is falsifiable.
+  // so unwiring this argument changed nothing anywhere.
   const harness = makeInheritingPair();
   const { store, scope } = await openStore(harness, [LINKED]);
   installReadUnion(harness, scope);
@@ -1849,9 +1637,7 @@ test('1371 r21: the store forwards a STATED baseline to the rule, and it decides
 test('1371 r21: a row’s essence chips are the WORLD catalogue’s order, not the map’s', async () => {
   // UX designer round 7. The row projection hand-built its chip model by walking the map's own
   // keys, while the rail beside it read the shared `componentEssenceChips` — so one component
-  // printed its essences in two different orders on two surfaces of the same screen. It also drew
-  // a chip for an id the roster does not list: a count under a fallback glyph with no name, which
-  // is exactly what a deleted essence leaves behind.
+  // printed its essences in two different orders on two surfaces of the same screen.
   const harness = makeEssenceStoreHarness({
     essences: [
       { id: 'earth', name: 'Earth' },
@@ -1881,33 +1667,19 @@ test('1371 r21: a row’s essence chips are the WORLD catalogue’s order, not t
     card.essenceChips.every((essence) => essence.id !== 'ghost'),
     'and no chip for an id the roster does not list'
   );
-  // AND THE DRAWN RUN IS NOT THE SEED (issue 1371 r22-store4). `card.essences` is what the
-  // component editor is seeded from, so it stays whole — narrowing it made the editor's carried
-  // set empty and its next save dropped every off-roster id.
+  // AND THE DRAWN RUN IS NOT THE SEED (issue 1371 r22-store4).
   assert.ok(
     card.essences.some((essence) => essence.id === 'ghost'),
     'the seed run keeps the id the roster cannot name'
   );
 });
 
-// ── ROUND 8: THE CARD ANSWERS TWO QUESTIONS AND MUST NOT CONFLATE THEM (r22-store4) ─────────
-//
-// Revision 21 narrowed `card.essences` to the system roster for the row's chips. That same array
-// is what the MANAGER's component editor is seeded from — `componentForEdit` IS the card — so the
-// narrowing made `carriedComponentEssences` empty by construction and an untouched save started
-// dropping every essence the world map carries and this system does not define. The card now
-// publishes both: `essences`, the whole resolved map, for the editor; `essenceChips`, the drawn
-// run, for the row, the inspector and the browser's filter.
+// ROUND 8: THE CARD ANSWERS TWO QUESTIONS AND MUST NOT CONFLATE THEM (r22-store4). Revision 21
+// narrowed `card.essences` to the system roster for the row's chips.
 
 /**
  * The world after `1.32.0` with an OFF-ROSTER world essence: `ingot` resolves `{fire: 3, water: 4}`
  * while this system's roster defines `fire` alone.
- *
- * That state is ordinary rather than adversarial — a world map is NOT narrowed to the ids a given
- * system holds (`data-models` §Component scope 2a) — and it is the one the editor's round trip has
- * to survive, because `water` has no row here, no name, no glyph and no control.
- *
- * @returns {Promise<{store: object, scope: object, harness: object}>}
  */
 async function openOffRosterPair() {
   const harness = makeEssenceStoreHarness({
@@ -2006,8 +1778,7 @@ test('1371 r22: the manager’s editor saves a tag change without dropping an of
 test('1371 r22: and the render-time baseline the editor now states says the same thing', async () => {
   // Fix (b). `saveComponentEdit` used to state no baseline, so the rule fell back to "this caller
   // was seeded from the read union" — true of this editor only while the card's essence run WAS
-  // that union. The editor now computes the baseline from the rows it drew and hands it over, so
-  // the rule no longer depends on a premise a projection change can falsify.
+  // that union.
   const { store, scope, harness } = await openOffRosterPair();
   const calls = installSingleComponentWrite(harness);
   const [card] = get(store.viewState).itemCards;

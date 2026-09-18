@@ -1,26 +1,4 @@
-/**
- * The GM browser projection modules extracted from `adminStore.js` in issue 1090.
- *
- * Two things are proved here, and only these two — the extraction is behaviour-preserving,
- * so every behavioural claim about what the projections MEAN is already made by the
- * `tests/stores/` suites driving the real store, which pass unmodified.
- *
- * 1. DIRECT INVOCABILITY. Each module is called here with plain fixtures and no
- *    `createAdminStore`, no `svelte/store`, and no reactive wiring, which is what issues
- *    1071 and 1072 need in order to benchmark and count projection work at all.
- *
- * 2. THE ALLOWLISTS. `buildSelectedSystemViewData` and `buildRecipeList` are hand-built
- *    ALLOWLIST projections: a field omitted from either is invisible to the UI however
- *    correctly the model, the normalizer and the write path behave, and it fails NO test
- *    that asserts on behaviour — it just stops appearing on screen. This repo has shipped
- *    that defect more than once (`componentCategories`, `categoryIcons`, `toolBreakage`,
- *    the progressive check config, `timeRequirement`, `craftingModifier`,
- *    `allowPlayerResultReorder`). The field lists below are therefore pinned as EXACT
- *    sets, not subsets: removing a key fails, and so does adding one silently.
- *
- * Adding a field to a projection is expected to fail this suite. Add it to the list here
- * in the same commit, deliberately — that is the point of the pin.
- */
+/** The GM browser projection modules extracted from `adminStore.js` in issue 1090. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -61,10 +39,9 @@ const SELECTED_SYSTEM_FIELDS = [
   'id',
   'itemTags',
   'managedItemOptions',
-  // NO `modifiers` and NO `characterPrerequisites` (issue 1308): both libraries are world scope,
-  // so projecting either here would be a second and always-empty source of truth, exactly as the
-  // realm and currency notes above describe. Their readers take them from the top-level world
-  // slices instead.
+  // NO `modifiers` and NO `characterPrerequisites` (issue 1308): both libraries are world scope, so
+  // projecting either here would be a second and always-empty source of truth, exactly as the realm
+  // and currency notes above describe.
   'name',
   'recipeItemDefinitions',
   'recipeVisibility',
@@ -387,16 +364,8 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     });
   });
 
-  // --- The two recipe cohorts (issue 1462) ---------------------------------
-  //
-  // `recipes` is the search-filtered COHORT the GM library lists. `rosterRecipes` is the
-  // whole projected roster, and it exists so the Books & Scrolls enrichment has a
-  // RESOLUTION TABLE to map a book's stored `recipeIds` through: filtering that table does
-  // not report a different number, it reports a false one.
-  //
-  // These pin the properties the restructure has to preserve. Acceptance criterion 3 asked
-  // for "byte-identical to before", which cannot be asserted once the change has landed;
-  // these are the named invariants that replace it.
+  // The two recipe cohorts (issue 1462). `recipes` is the search-filtered COHORT the GM library
+  // lists.
 
   it('returns the unfiltered projected cohort alongside the filtered rows', () => {
     const recipes = [makeRecipe({ id: 'r-1' }), makeRecipe({ id: 'r-2', name: 'Steel Bar' })];
@@ -423,9 +392,8 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   });
 
   it('selects the filtered rows positionally, so two recipes sharing an id both survive', () => {
-    // An id-keyed selection would collapse these into one row referenced twice, changing
-    // the length and the identities the browser renders. Recipe ids are not guaranteed
-    // unique across a hand-authored or copy-imported system.
+    // An id-keyed selection would collapse these into one row referenced twice, changing the length
+    // and the identities the browser renders.
     const recipes = [
       makeRecipe({ id: 'r-dup', name: 'Iron Ingot' }),
       makeRecipe({ id: 'r-dup', name: 'Iron Rivet' }),
@@ -441,10 +409,8 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   });
 
   it('keeps the search predicate over the recipe MODELS, not the trimmed projected rows', () => {
-    // `makeRecipe`'s description is `'  padded  '` and `_createRecipeRow` TRIMS it, so a term
-    // carrying significant surrounding whitespace matches the model and not the row. Filtering
-    // the rows instead of the models is the natural mistake after the restructure, and this is
-    // the only assertion in the suite that can see it.
+    // `makeRecipe`'s description is `' padded '` and `_createRecipeRow` TRIMS it, so a term
+    // carrying significant surrounding whitespace matches the model and not the row.
     const result = buildRecipeList(null, makeRecipeManager([makeRecipe()]), makeSystem(), ' padded ');
 
     assert.equal(result.recipes[0]?.description, 'padded', 'control: the ROW description is trimmed');
@@ -456,9 +422,7 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   });
 
   it('keeps recipeTagPlaceholderCounts over the FILTERED cohort', () => {
-    // The deliberately-filtered half, pinned against an over-correction. This number is
-    // rendered on the Tags & Categories screen; issue 1191 owns whether it should be
-    // roster-wide, and this change does not decide it.
+    // The deliberately-filtered half, pinned against an over-correction (issue 1191).
     const tagged = makeRecipe({
       id: 'r-tag',
       name: 'Herbal Brew',
@@ -495,14 +459,9 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
 });
 
 /**
- * The two-tier row (issue 1081).
- *
- * The claim is narrow and mechanical: the fields `recipeBrowserModel` reads to filter, sort,
- * count and paginate are computed for EVERY row in the cohort, and everything else is
- * computed only for the rows something actually reads. Every negative assertion below is
- * paired with a positive control in the same fixture — a counter that reads zero because the
- * work was skipped is indistinguishable from one that reads zero because the seam was never
- * wired, and this repository has shipped that mistake before.
+ * The two-tier row (issue 1081). The claim is narrow and mechanical: the fields
+ * `recipeBrowserModel` reads to filter, sort, count and paginate are computed for EVERY row in the
+ * cohort, and everything else is computed only for the rows something actually reads.
  */
 describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
   /** A recipe manager whose expensive seams count their calls. */
@@ -511,12 +470,6 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     const instrumented = recipes.map((recipe) => ({
       ...recipe,
       // The ALLOCATION-heavy half of the detail tier, counted where it actually happens.
-      // `toJSON` and `canActivateRecipe` are the two CHEAP seams — one clone, one verdict —
-      // and neither observes `_buildRecipeBrowserDisplay` / `_buildRequirementPreviewStep`,
-      // the per-set/per-step object graph the module header calls the expensive half. Those
-      // build by `map`ping the step's ingredient sets, while the summary tier's arithmetic
-      // fold iterates the same array with `for...of` — so a counting `map` separates them
-      // exactly, and an eagerly-built preview is visible here and nowhere else.
       ingredientSets: countingCandidates(
         recipe.ingredientSets,
         {
@@ -703,9 +656,7 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     const { manager } = makeCountingRecipeManager(makeCohort(1));
     const [row] = buildRecipeList(null, manager, system, '').recipes;
 
-    // A DEFINITION contributes at most one entry; two DIFFERENT books contribute two. Both
-    // halves in one assertion, because a dedup that collapsed the second book as well would
-    // pass a test that only pinned the first.
+    // A DEFINITION contributes at most one entry; two DIFFERENT books contribute two.
     assert.deepEqual(row.recipeItemIds, ['book-dup', 'book-other']);
     assert.deepEqual(
       row.recipeItemIds,
@@ -769,35 +720,14 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
     await hydrateItemCards(warm);
     assert.equal(cache.size, 2, 'no new memo entries: both hydrations hit');
 
-    // THE NEW CONTRACT, stated rather than left implicit (issue 1081). A refresh no longer
-    // reuses the card OBJECT — the cheap card is rebuilt every time and only its resolved
-    // half is memoized — so "an unchanged component reuses the same card object" is simply
-    // no longer true and its removal is honest. What replaces it is this pair: fresh objects,
-    // and a re-hydration that comes back out of the memo with the same reading. The identity
-    // loss is why the selected and edited cards must be re-asked to hydrate after a refresh,
-    // so a silent return to object reuse would hide that requirement rather than satisfy it.
+    // THE NEW CONTRACT, stated rather than left implicit (issue 1081).
     assert.ok(warm[0] !== cold[0], 'a refresh projects a FRESH card object');
     assert.deepEqual(warm[0].sourceOrigin, cold[0].sourceOrigin);
     assert.equal(warm[0].description, cold[0].description);
     assert.equal(warm[0].sourceMissing, cold[0].sourceMissing);
   });
 
-  /**
-   * A REJECTED hydration must not be memoized (issue 1081).
-   *
-   * `hydrate()` memoizes its in-flight promise so a render effect calling it on every
-   * re-render costs nothing — but `_documentDescriptionCandidate` awaits Foundry's enricher,
-   * which does not catch its own throws the way the document lookup does. Caching the
-   * rejected promise turns one transient failure into a permanent one for that card, plus an
-   * unhandled rejection on every subsequent render, where the previous behaviour was a loud
-   * failure of the whole refresh that the next refresh cleared.
-   *
-   * It must also be AUDIBLE. All three view-side callers swallow the rejection deliberately —
-   * a card that cannot resolve keeps its un-hydrated reading, which renders correctly rather
-   * than blankly — so without a log here a persistently failing enricher leaves the GM on a
-   * stale description with nothing at all in the console. Pre-1081 the same throw aborted the
-   * refresh loudly and tripped the smoke run's console-error gate.
-   */
+  /** A REJECTED hydration must not be memoized (issue 1081). */
   it('does not memoize a REJECTED hydration, so a later render retries — and says so', async () => {
     const component = {
       id: 'c-throw',

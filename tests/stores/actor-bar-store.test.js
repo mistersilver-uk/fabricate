@@ -139,16 +139,12 @@ describe('actorBarStore', () => {
     assert.deepEqual(calls.setSelectedActorId, [], 'no re-persist on the guarded second load');
   });
 
-  // --- refreshSelectableActors (issue 1024) ---------------------------------
-  //
-  // The GM ticks a second player-character actor type mid-session. Every open bar must
-  // re-project WITHOUT resetting the one-shot `loaded` latch, which exists to stop a
-  // later `$effect` run clobbering a deliberate pick.
+  // refreshSelectableActors (issue 1024). The GM ticks a second player-character actor type
+  // mid-session.
 
   it('refresh seeds and persists the first entry when the selection is empty', () => {
-    // THE reported scenario: the player owns only a `robot`, so the bar loaded empty
-    // and nothing was selected. A naive "re-seed only when the current pick is GONE"
-    // guard short-circuits on the falsy id and leaves a populated but unselected bar.
+    // THE reported scenario: the player owns only a `robot`, so the bar loaded empty and nothing
+    // was selected.
     const overrides = { actors: [], seededId: '' };
     const { services, calls } = makeServices(overrides);
     const store = createActorBarStore({ services });

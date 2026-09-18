@@ -1,16 +1,4 @@
-/**
- * The pure half of the world Component screens (issue 1371, epic 1357).
- *
- * Three things are settled here rather than on a mounted tree, because each of them is a
- * PROPERTY OF A FUNCTION and a mounted assertion could only ever observe it through a rendered
- * consequence that a hand-built fixture can also produce:
- *
- *  - that an INHERITING `category` really does resolve from the world default, which is the
- *    premise every screen in this lane rests on;
- *  - that the category picker's offered set refuses the reserved bucket CASE-INSENSITIVELY;
- *  - that each validation check renders at its declared SEVERITY, so a legitimately blank entry
- *    warns rather than blocking.
- */
+/** The pure half of the world Component screens (issue 1371, epic 1357). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -53,14 +41,7 @@ const phrase = (_key, fallback, data) =>
     fallback
   );
 
-/**
- * A one-component world corpus, with the inherit switch and the world category as parameters.
- *
- * @param {object} options
- * @param {boolean} options.inheriting
- * @param {string|undefined} options.worldCategory
- * @returns {object}
- */
+/** A one-component world corpus, with the inherit switch and the world category as parameters. */
 function corpus({ inheriting, worldCategory }) {
   return {
     entities: [{ id: 'ingot', name: 'Iron Ingot' }],
@@ -73,10 +54,7 @@ function corpus({ inheriting, worldCategory }) {
 const IN_SYSTEM = [{ id: 'ingot', name: 'Iron Ingot', category: 'ingot', tags: [] }];
 
 describe('the component read union answers an inheriting category from the world default', () => {
-  // AC-5. THIS IS THE PREMISE THE WHOLE LANE RESTS ON. Under the retired blanket form of
-  // `## Scoped Entity Definitions` requirement 15 clause 1 the in-system record answered every
-  // key it carried, which made the inherit switch decide nothing at read time — and every
-  // `Inherits world category` line on these screens a false statement.
+  // AC-5. THIS IS THE PREMISE THE WHOLE LANE RESTS ON.
   it('resolves the WORLD value when the section is marked inheriting', () => {
     const [row] = resolveComponentScope(
       corpus({ inheriting: true, worldCategory: 'reagent' }),
@@ -210,15 +188,6 @@ describe('the attribution sentence is clamped at zero', () => {
 
   it('and the ENTRY surface counts members rather than OTHERS, in all three branches', () => {
     // THE THIRD SURFACE WAS UNTESTED, and it is the one that cannot reuse either sentence above.
-    // The list and the editor are read FROM a system, so they say how many OTHER systems share
-    // the record — member count minus one, clamped. The world entry belongs to no system, so
-    // "other" has no referent there: subtracting one would tell a GM looking at a component two
-    // systems hold that it is shared by one, and would say "shared with -1" on the zero case that
-    // is the whole reason this describe exists.
-    //
-    // All three branches, because they are three different sentences rather than one with a
-    // number in it: zero is a statement about being unused, one is singular, and the plural is
-    // the only branch a naive implementation gets right.
     const entryNote = (memberCount) =>
       componentAttributionNote({ surface: 'entry', memberCount }, phrase);
 
@@ -240,8 +209,7 @@ describe('the attribution sentence is clamped at zero', () => {
 describe('the world category note pluralises BOTH of its counts', () => {
   // The counts pluralise on DIFFERENT numbers — the left clause on the member total, the right on
   // the override count — so a single composed sentence with one plural rule cannot be right for
-  // both. On the commonest state of all, a component exactly one system has and overrides, the
-  // composed version read `0 of 1 systems inherit it · 1 override locally.`: wrong twice.
+  // both.
   const noteFor = (members, inheriting) =>
     componentWorldCategoryNote(
       { membershipCount: members, inheritCounts: { category: inheriting } },
@@ -288,10 +256,8 @@ describe('the delete note refuses while any system holds rules', () => {
 
 describe('the catalogue row states its two reach counts as a value over a label', () => {
   // AC-6's pure half. The `Unused` FLAG this block used to assert is gone with r8's row rebuild
-  // (gap-list rows 14 and 16): the reference's row has one flag slot and puts `Broken link` in
-  // it, and `Unused` restated the `0/3` the systems column now prints two centimetres away. The
-  // membership arithmetic it was the only cover for is asserted here instead, in the column that
-  // carries it — an inverted implementation still reds.
+  // (gap-list rows 14 and 16): the reference's row has one flag slot and puts `Broken link` in it,
+  // and `Unused` restated the `0/3` the systems column now prints two centimetres away.
   it('states the membership fraction for a component no system holds', () => {
     const row = componentRowStats({ membershipCount: 0, recipeCount: 0 }, 3, phrase);
     const systems = row.stats.find((stat) => stat.id === 'systems');
@@ -341,10 +307,8 @@ describe('the world entry notes count MEMBERS only', () => {
   });
 
   it('and CLAIMS NO REACH when nothing is muted, because the tags reach nothing yet', () => {
-    // It used to close ` in every system that has rules`, and that was false: world tags are
-    // merged by the resolver only and the read union discards them, so no system sees this list.
-    // `setMutedTags` has no caller under `src/` either, so a note asserting reach was telling the
-    // GM to tag here instead of in the system that actually reads a tag.
+    // It used to close ` in every system that has rules`, and that was false: world tags are merged
+    // by the resolver only and the read union discards them, so no system sees this list.
     const note = componentWorldTagNote(
       { defaults: { tags: ['ore'] }, systems: [{ member: true, mutedTags: [] }] },
       phrase
@@ -413,10 +377,9 @@ describe('the entry validation check set renders at its declared severity', () =
   });
 
   it('and the gate itself WARNS rather than blocking (maintainer, 2026-09-06)', () => {
-    // A world component with no rules in the system in view is a normal state — the catalogue
-    // holds every component, and a system adopts the ones it wants — so the check is guidance,
-    // not a hazard: it must not block a save of the world record. It still renders, still
-    // counts, and still gates the checks that need a membership record.
+    // A world component with no rules in the system in view is a normal state — the catalogue holds
+    // every component, and a system adopts the ones it wants — so the check is guidance, not a
+    // hazard: it must not block a save of the world record.
     const { groups, counts } = componentScopeValidationPresentation(
       { ...blank, member: false },
       phrase
@@ -441,13 +404,7 @@ describe('the entry validation check set renders at its declared severity', () =
     // `name` is a blocking check and every fixture here named the record `Iron Ingot`, so
     // collapsing the evaluator's `trimmed(context.name) ? 'authored' : 'missing'` to a bare
     // `'authored'` left this whole file green at 32/32 and the entry's mounted suite green at
-    // 64/64. Three claims, because the defect can hide in any one of them: the SEVERITY the row
-    // renders at, the TITLE it renders, and whether it reaches the Blocking tally the hero and
-    // the tab badge are both painted from.
-    //
-    // WHITESPACE, NOT THE EMPTY STRING. `''` is refused by `Boolean` as well as by `trim()`, so a
-    // check that dropped the trim would still pass on it; `'   '` is a name a GM can really type
-    // and is the one input that discriminates between the two.
+    // 64/64.
     const { groups, counts } = componentScopeValidationPresentation(
       { ...blank, name: '   ', hasSourceLink: true, resolvedCategory: 'Refined' },
       phrase
@@ -477,8 +434,7 @@ describe('the entry validation check set renders at its declared severity', () =
 
   it('and the world-tag row counts ONE tag in the singular', () => {
     // Reviewer finding 9: `WorldTagsSet` shipped as `{count} world tags set` with no `…One` twin,
-    // so a record with exactly one world tag rendered `1 world tags set`. Both arms, because a
-    // key wired to the singular unconditionally reads just as wrong at two.
+    // so a record with exactly one world tag rendered `1 world tags set`.
     const titleFor = (worldTags) =>
       componentScopeValidationPresentation(
         { ...blank, worldTags, hasSourceLink: true, resolvedCategory: 'Refined' },
@@ -509,10 +465,8 @@ describe('the entry validation check set renders at its declared severity', () =
 
 // ── issue 1371 r12-list ──────────────────────────────────────────────────────────────────────
 describe('the inspector’s `Salvage in` heading names the system as its own node', () => {
-  // `proto:1263` draws `Salvage in {{ d.sysName }}` — the caption and the name as two text nodes
-  // of one line — where the subject folded both into one localized string. The helper splits the
-  // localized template at its token so the view can wrap the name, and the JOIN of the three
-  // parts is byte-identical to the single string a screen reader used to hear.
+  // `proto:1263` draws `Salvage in {{ d.sysName }}` — the caption and the name as two text nodes of
+  // one line — where the subject folded both into one localized string.
   const text = (_key, fallback) => fallback;
 
   it('splits the shipped template into a lead, the name and an empty trail', () => {
@@ -544,10 +498,8 @@ describe('the inspector’s `Salvage in` heading names the system as its own nod
 
 // ── issue 1371 r18-entry — M31: THE WORLD BULK `Essence values` GROUP WRITES THE WORLD SECTION ──
 describe('the world bulk essence instruction is ONE world write per changed record (M31)', () => {
-  // Three world records, each carrying a different world map: `coal` has an elected map, `ingot`
-  // an authored EMPTY one, and `orphan` none at all. `resin` is not selected and must never be
-  // planned. The raw roster is present only so the union fallback has something to read for a
-  // record with no world section; it must not be written to.
+  // Three world records, each carrying a different world map: `coal` has an elected map, `ingot` an
+  // authored EMPTY one, and `orphan` none at all.
   const ENTRIES = [
     { id: 'coal', defaults: { category: 'Raw', essences: { flame: 2, tide: 1 } } },
     { id: 'ingot', defaults: { category: 'Refined', essences: {} } },
@@ -805,14 +757,9 @@ describe('the catalogue’s essence filter is the rules list’s, over the world
   });
 });
 
-// ── THE WORLD `essences` SECTION (issue 1371 r18-store, maintainer ruling M31) ────────────────
-//
-// The world component record carries an `essences` SECTION beside `category`, on the category
-// model exactly: a world map every system with rules for the component inherits unless it
-// overrides with its own. These pin the read union's answer, because that is the premise the
-// world entry's editor, the catalogue's rows and filter, and the rules editor's inherit choice
-// all rest on — and a mounted assertion could only observe it through a rendered consequence a
-// hand-built fixture can also produce.
+// THE WORLD `essences` SECTION (issue 1371 r18-store, maintainer ruling M31). The world component
+// record carries an `essences` SECTION beside `category`, on the category model exactly: a world
+// map every system with rules for the component inherits unless it overrides with its own.
 
 /** A one-component corpus with the essences switch and the world map as parameters. */
 function essenceCorpus({ inheriting, worldEssences }) {

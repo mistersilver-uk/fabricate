@@ -1,12 +1,4 @@
-/**
- * Unit coverage for the PURE `buildRegionSpawnRequest` (region-first model).
- *
- * It shapes the data the manager needs to create (a) a Scene Region (a small
- * rectangle centered on the drop point), (b) the nested `fabricate.interactable`
- * behaviour `system` (via the injected builder — the real
- * `buildInteractableBehaviorSystem`), and (c) the linked Tile data. No Foundry
- * globals: the behaviour-system builder + texture + grid size are injected.
- */
+/** Unit coverage for the PURE `buildRegionSpawnRequest` (region-first model). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,10 +52,8 @@ test('buildRegionSpawnRequest (tool) shapes region geometry + behaviour system +
   assert.equal(request.name, 'Forge Anvil');
   assert.equal(request.environmentId, null, 'tools carry no environment');
 
-  // Region shape: a 1-grid-square rectangle whose TOP-LEFT is anchored at
-  // `center - size/2`, so the rectangle is CENTERED on the drop point. (A Region
-  // rectangle renders top-left at its stored x/y; a Tile renders centered on its
-  // x/y — so the two store different x/y but their CENTERS both land on the drop.)
+  // Region shape: a 1-grid-square rectangle whose TOP-LEFT is anchored at `center - size/2`, so the
+  // rectangle is CENTERED on the drop point.
   assert.equal(request.region.shape.type, 'rectangle');
   assert.equal(request.region.shape.width, 100);
   assert.equal(request.region.shape.height, 100);

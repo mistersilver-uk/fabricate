@@ -1,20 +1,7 @@
 /**
- * `adminStore.applyRecipeBulkEdit(recipeIds, edit)` (issue 1010) — the store-public
- * surface over `CraftingSystemManager.applyBulkEditToRecipes`.
- *
- * It resolves the selected system itself, forwards the staged edit VERBATIM, refreshes so
- * the browser rows re-render off the republished projection, and routes a failure through
- * `notify.error` while returning `null`.
- *
- * The core contract under test is the UNPRUNED forward. Three of the six edit keys are
- * falsy but real — `enabled: false`, `locked: false` and `checkTierId: null` — and a
- * present `checkTierId: null` ("clear to the system default") means something different
- * from an absent one ("leave the tier alone"), so a store that pruned "empty" keys would
- * silently turn one instruction into the other.
- *
- * The manager is stubbed here: this suite covers the SEAM. `applyBulkEditToRecipes`'s own
- * behaviour (save counting, the blocked-enable retry, the book reconcile) is covered by
- * `tests/apply-bulk-edit-to-recipes.test.js`.
+ * `adminStore.applyRecipeBulkEdit(recipeIds, edit)` (issue 1010) — the store-public surface over
+ * `CraftingSystemManager.applyBulkEditToRecipes`. The core contract under test is the UNPRUNED
+ * forward.
  */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -123,8 +110,6 @@ describe('adminStore.applyRecipeBulkEdit (issue 1010)', () => {
     });
 
     // All three are real instructions — disable, unlock, clear to the system default.
-    // A store that dropped them as empty would turn a destructive apply into a no-op,
-    // and would make "clear the tier" indistinguishable from "leave the tier alone".
     assert.deepEqual(calls[0].edit, { enabled: false, locked: false, checkTierId: null });
     assert.ok(
       Object.hasOwn(calls[0].edit, 'checkTierId'),
@@ -138,9 +123,8 @@ describe('adminStore.applyRecipeBulkEdit (issue 1010)', () => {
 
     await store.applyRecipeBulkEdit(['r1'], { category: 'Alchemy' });
 
-    // The inverse of the case above: an unstaged tier axis must reach the primitive as
-    // an ABSENT key. Defaulting it to null here would clear every selected recipe's
-    // check tier on an edit that never touched the axis.
+    // The inverse of the case above: an unstaged tier axis must reach the primitive as an ABSENT
+    // key.
     assert.equal(
       Object.hasOwn(calls[0].edit, 'checkTierId'),
       false,

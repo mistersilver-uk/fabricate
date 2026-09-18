@@ -8,11 +8,6 @@ import {
 } from '../../src/ui/svelte/util/listboxNavigation.js';
 
 // The arithmetic of a keyboard cursor over a listbox, unit-tested WITHOUT MOUNTING (issue 1503).
-// That is the whole reason the module exists: `SearchablePopover` holds the cursor as component
-// state, and proving that ArrowDown wraps from the last row to the first through a mounted DOM
-// costs a compile, a happy-dom document and ten synthesized events per case. The mounted suite
-// proves the WIRING — which element listens, what `aria-activedescendant` says, that focus never
-// moves — and this proves the numbers.
 
 describe('listbox navigation: the cursor arithmetic', () => {
   describe('nextActiveIndex', () => {
@@ -46,9 +41,7 @@ describe('listbox navigation: the cursor arithmetic', () => {
 
     it('leaves a printable character and every non-navigation key alone', () => {
       // `null` is the signal the caller needs: the holder is a QUERY FIELD, so a key this module
-      // does not own must fall through to the input rather than being consumed. A module that
-      // returned `current` instead would be indistinguishable from "the cursor did not move", and
-      // the component would `preventDefault()` every letter the GM types.
+      // does not own must fall through to the input rather than being consumed.
       for (const key of ['a', 'Z', '1', ' ', 'Enter', 'Escape', 'Tab', 'PageDown', 'Backspace']) {
         assert.equal(nextActiveIndex(1, 4, key), null, `${key} is not a cursor key`);
       }
@@ -68,9 +61,8 @@ describe('listbox navigation: the cursor arithmetic', () => {
     });
 
     it('treats an out-of-range cursor as nothing active rather than clamping it', () => {
-      // A query change resets the cursor, but a caller that swaps `options` under an open panel
-      // can leave the index past the end of the new list. Re-entering from the end is the only
-      // reading that cannot select a row the GM never saw.
+      // A query change resets the cursor, but a caller that swaps `options` under an open panel can
+      // leave the index past the end of the new list.
       assert.equal(nextActiveIndex(9, 3, 'ArrowDown'), 0);
       assert.equal(nextActiveIndex(9, 3, 'ArrowUp'), 2);
       assert.equal(nextActiveIndex(NaN, 3, 'ArrowDown'), 0);
@@ -130,12 +122,9 @@ describe('listbox navigation: the cursor arithmetic', () => {
     });
   });
 
-  // ── THE DISABLED AXIS (issue 1504) ────────────────────────────────────────────────────────
-  //
-  // A converted `<select>` can gate an option — a premium tier, a mode this world cannot reach —
-  // and a cursor that lands on one announces a row whose Enter does nothing. The predicate is an
-  // INDEX predicate rather than the option array so the arithmetic stays off the option shape;
-  // these cases are the arithmetic, and the mounted suite proves the wiring that supplies it.
+  // THE DISABLED AXIS (issue 1504). A converted `<select>` can gate an option — a premium tier, a
+  // mode this world cannot reach — and a cursor that lands on one announces a row whose Enter does
+  // nothing.
   describe('nextActiveIndex with an `isDisabled` predicate', () => {
     /** Rows 1 and 2 of a four-row list are gated, so a skip has to cross more than one. */
     const gated = (...indexes) => {
@@ -195,17 +184,14 @@ describe('listbox navigation: the cursor arithmetic', () => {
     });
 
     it('walks the FLAT order when it skips in a grid, so a gated column strands nothing', () => {
-      // The press is `columns` wide; the skip scan is one cell. A scan that kept stepping by
-      // `columns` would only ever visit one column of the ring, so a grid whose first column was
-      // gated would leave every enabled tile beside it unreachable.
+      // The press is `columns` wide; the skip scan is one cell.
       assert.equal(nextActiveIndex(0, 6, 'ArrowDown', { columns: 3, isDisabled: gated(3) }), 4);
       assert.equal(nextActiveIndex(4, 6, 'ArrowUp', { columns: 3, isDisabled: gated(1) }), 0);
     });
 
     it('is TODAY`S ARITHMETIC for every caller that passes no predicate', () => {
-      // The compatibility contract in one case: absent `disabled` means absent predicate means
-      // the pre-1504 numbers, with no skip scan run at all. A predicate that gates nothing must
-      // agree with it, or the axis is not free after all.
+      // The compatibility contract in one case: absent `disabled` means absent predicate means the
+      // pre-1504 numbers, with no skip scan run at all.
       const never = () => false;
       for (const [current, key] of [
         [-1, 'ArrowDown'],
@@ -239,11 +225,7 @@ describe('listbox navigation: the cursor arithmetic', () => {
     });
   });
 
-  // ── THE TYPE-AHEAD (issue 1504) ───────────────────────────────────────────────────────────
-  //
-  // A native `<select>` jumps to the option a typed character names. Issue 1503 routes printable
-  // keys to the query field and a select-only combobox has no query field, so every converted
-  // control would lose the behaviour unless it is built back here, once, for all of them.
+  // THE TYPE-AHEAD (issue 1504). A native `<select>` jumps to the option a typed character names.
   describe('typeAheadCursor', () => {
     const LABELS = ['Anvil', 'Beaker', 'Ash', 'Coin', 'Amber'];
 

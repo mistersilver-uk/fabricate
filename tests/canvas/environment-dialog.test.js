@@ -1,13 +1,4 @@
-/**
- * Unit coverage for the on-drop GM environment-pick dialog (`environmentDialog.js`).
- *
- * The pure resolution precedence decides WHEN a dialog is needed; this module is
- * the thin Foundry `DialogV2` edge that presents it. These tests drive
- * `promptDropEnvironment` against a faked
- * `globalThis.foundry.applications.api.DialogV2`, asserting the empty-list and
- * DialogV2-unavailable guards return null, the default-preselect logic, the
- * HTML-escaping of option labels, and that a cancel/close resolves to null.
- */
+/** Unit coverage for the on-drop GM environment-pick dialog (`environmentDialog.js`). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,15 +16,13 @@ function restoreFoundry(saved) {
 }
 
 /**
- * Install a fake `DialogV2.prompt` that captures the config it is called with and
- * resolves with `resolveWith` (or rejects when `reject` is true, mimicking a
- * cancel/close with `rejectClose:false` turned off).
+ * Install a fake `DialogV2.prompt` that captures the config it is called with and resolves with
+ * `resolveWith` (or rejects when `reject` is true, mimicking a cancel/close with
+ * `rejectClose:false` turned off).
  *
- * @param {object} opts
- * @param {string|null} [opts.resolveWith]  The value `DialogV2.prompt` resolves to.
- * @param {boolean} [opts.reject=false]      Reject instead (cancel/close).
- * @param {boolean} [opts.available=true]    Whether DialogV2.prompt exists at all.
- * @returns {{ calls: object[] }}
+ * @param {string|null} [opts.resolveWith] The value `DialogV2.prompt` resolves to.
+ * @param {boolean} [opts.reject=false] Reject instead (cancel/close).
+ * @param {boolean} [opts.available=true] Whether DialogV2.prompt exists at all.
  */
 function installFakeDialog({ resolveWith = null, reject = false, available = true } = {}) {
   const calls = [];

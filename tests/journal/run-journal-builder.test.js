@@ -1,9 +1,6 @@
 /**
- * Coverage for the unified RunJournalBuilder projection (crafting fully; a
- * gathering passthrough smoke). Verifies the crafting RunModel shape — stepLabel,
- * per-step timeGate, derivedStatus (ready vs waiting from `availableAt`, never
- * `run.status`), stepName/tool/check/time resolution, createdResults aggregation,
- * viewer redaction parity, and the gathering `*WorldTime` re-map.
+ * Coverage for the unified RunJournalBuilder projection (crafting fully; a gathering passthrough
+ * smoke).
  */
 
 import test from 'node:test';
@@ -112,9 +109,7 @@ const SYSTEM = {
   id: 'sys-1',
   name: 'Blacksmithing',
   resolutionMode: 'simple',
-  // Multi-step feature ON: a multi-step recipe projects as a multi-step run. When
-  // the feature is off the run collapses to a single-step projection (issue 710) —
-  // see the dedicated collapse test below.
+  // Multi-step feature ON: a multi-step recipe projects as a multi-step run (issue 710).
   features: { multiStepRecipes: true },
   craftingCheck: { simple: { rollFormula: '1d20', dc: 15, tiers: [] } },
   tools: [{ id: 't1', label: 'Hammer', componentId: 'c1' }],
@@ -169,9 +164,7 @@ function activeCraftingRun(overrides = {}) {
     startedAt: 100,
     updatedAt: 150,
     currentStepIndex: 1,
-    // The crafting actor's OWN uuid. A run that records a source the world cannot resolve is a
-    // different state — the projection reports `sourcesUnavailable` for it (issue 1648, F5) —
-    // and naming a stranger here made every case in this file depict that state by accident.
+    // The crafting actor's OWN uuid (issue 1648).
     componentSourceActorUuids: [ACTOR.uuid],
     steps: [
       {
@@ -453,10 +446,9 @@ test('isFinalStep is false on a non-final step of a multi-step recipe', () => {
 });
 
 test('collapses a multi-step run to a single-step projection when the feature is off (issue 710)', () => {
-  // The run record still carries per-step detail, but with the system's multi-step
-  // feature OFF the recipe ran as one atomic chain, so the Journal presents it as a
-  // single-step run: multiStep false, a Single-Step structure label, and a blank
-  // "Step X of Y" label. Re-enabling the feature restores the multi-step projection.
+  // The run record still carries per-step detail, but with the system's multi-step feature OFF the
+  // recipe ran as one atomic chain, so the Journal presents it as a single-step run: multiStep
+  // false, a Single-Step structure label, and a blank "Step X of Y" label.
   const collapsedSystem = { ...SYSTEM, features: { multiStepRecipes: false } };
   const run = makeBuilder({
     active: [activeCraftingRun()],
@@ -953,10 +945,7 @@ test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () =
   // The step label is blanked so a hidden multi-step recipe never leaks its
   // step count / active step name through the run journal.
   assert.equal(redacted.stepLabel, '');
-  // Redaction hides IDENTITY ONLY (issue 966). A crafting run always advances on a
-  // click — nothing resolves one automatically — so suppressing the affordance here
-  // stranded every timed craft of a recipe the crafter cannot see. The run card is
-  // already listed, so the affordance leaks nothing its redacted title does not.
+  // Redaction hides IDENTITY ONLY (issue 966).
   assert.equal(redacted.manualAdvance, true);
   // ...and an owner may still abandon it (issue 848 + 966).
   const redactedOwned = makeBuilder({ active: [activeCraftingRun()], recipeVisibility })
@@ -1339,11 +1328,7 @@ test('gathering run with a blind/null taskId does not consult the task resolver'
   }).activeRuns[0];
 
   assert.equal(consulted, false, 'resolver not called for a blind task');
-  // Issue 901: the title is now the generic localization KEY, not the raw marker. The
-  // builder emits keys and the view localizes them, so a player used to be shown the
-  // literal string "blind" as a task title; they now get the same "Gather" label every
-  // other blind surface uses. The resolver assertion above is what this test is for and
-  // is unchanged.
+  // Issue 901: the title is now the generic localization KEY, not the raw marker.
   assert.equal(run.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
   assert.equal(run.img, 'icons/containers/bags/pouch-leather-brown-green.webp');
 });
@@ -1607,9 +1592,8 @@ test('salvage runs pass through with crafting-named time fields, runType salvage
   assert.equal(run.createdResults[0].itemUuid, 'Item.scrap');
 });
 
-// A realistic salvage run carries neither a `label` nor a `taskId` — only the source
-// `componentId` + `craftingSystemId`. getComponent resolves the source component to
-// its authored name/img for the run title + image (bug 1).
+// A realistic salvage run carries neither a `label` nor a `taskId` — only the source `componentId`
+// + `craftingSystemId`.
 const SALVAGE_COMPONENT = { name: 'Balehound Teeth', img: 'icons/teeth.webp' };
 const getSalvageComponent = (systemId, componentId) =>
   systemId === 'sys-1' && componentId === 'bhBalehoundTeth1' ? SALVAGE_COMPONENT : null;
@@ -1656,9 +1640,7 @@ test('salvage run title falls back to the raw componentId when it cannot be reso
 });
 
 test('salvage created result with only a componentId resolves name/img via getComponent', () => {
-  // Records persisted before name/img capture carry only { itemUuid, componentId,
-  // quantity }. This is the maintainer's already-persisted history — the componentId
-  // resolver must repair it without any captured name/img and without a resolvable uuid.
+  // Records persisted before name/img capture carry only { itemUuid, componentId, quantity }.
   const salvageRun = {
     id: 'salvage-persisted',
     craftingSystemId: 'sys-1',
@@ -1839,17 +1821,12 @@ test('a dynamic-DC check surfaces the formula without a DC number', () => {
 const BLUEPRINT_IMG = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 const ITEM_BAG = 'icons/svg/item-bag.svg';
 
-// Inverted with issue 887. This case previously asserted the BORROW — that a linked
-// recipe-item definition's image outranked the recipe's own. A recipe's icon is its own
-// `img` and nothing else (`data-models/spec.md` `## Recipe` requirement 16), so the
-// legacy `recipeItemId` scalar is no longer an input and the injected port that resolved
-// it is gone.
+// Inverted with issue 887. This case previously asserted the BORROW — that a linked recipe-item
+// definition's image outranked the recipe's own.
 test('a crafting run resolves the recipe OWN image, never a containing book/scroll', () => {
   const AUTHORED = 'icons/consumables/potions/bottle-round-corked-red.webp';
 
-  // A recipe carrying the legacy scalar still renders its authored image. The scalar is
-  // retained on the fixture deliberately: deleting it would make this pass vacuously,
-  // whereas keeping it fails the moment anyone re-adds the borrow.
+  // A recipe carrying the legacy scalar still renders its authored image.
   let run = makeBuilder({
     active: [activeCraftingRun()],
     recipe: { ...RECIPE, img: AUTHORED, recipeItemId: 'ri-1' },
@@ -1878,9 +1855,7 @@ test('a crafting run with no recipe image falls back to the blueprint default, n
 });
 
 test('duplicate run ids in history are de-duplicated (first kept) so the keyed Journal each cannot crash', () => {
-  // Corrupt/legacy data can archive the same run to history twice. The keyed
-  // {#each ... (run.id)} would throw each_key_duplicate; the builder must drop
-  // the repeat, keep the first, warn, and report the corrected count.
+  // Corrupt/legacy data can archive the same run to history twice.
   const original = console.warn;
   const warnings = [];
   console.warn = (msg) => warnings.push(String(msg));
@@ -2258,9 +2233,8 @@ test('absent or uncertain resolver evidence never proves a physical shortfall', 
   }
 
   // Every one of these is uncertain only about WHETHER anything is short — have/need absent,
-  // non-finite, or already satisfied — never a PROVEN shortfall, so it reads as waiting on a
-  // choice rather than as materials. Issue 1648, M15 now refuses the manual attempt for
-  // exactly that reason, rather than let it reach the engine's own refusal.
+  // non-finite, or already satisfied — never a PROVEN shortfall, so it reads as waiting on a choice
+  // rather than as materials (issue 1648).
   const uncertainAsChoice = [
     null, undefined, {}, { success: false },
     ...[
@@ -2300,11 +2274,9 @@ test('absent or uncertain resolver evidence never proves a physical shortfall', 
   assert.equal(stale.project().awaitingChoice, true, 'a route decision is still a decision');
 });
 
-// ── Waiting on the PLAYER's choice (issue 1648, M10) ─────────────────────────────────────────
-//
-// Post-D-026/D-028 a stage locks its choice and spends its materials when it STARTS, so the only
-// state that can wait on a choice is an UNSTARTED stage whose plan does not resolve. Every
-// fixture below is a real run body projected by the real builder; the flag is derived, never set.
+// Waiting on the PLAYER's choice (issue 1648, M10). Post-D-026/D-028 a stage locks its choice and
+// spends its materials when it STARTS, so the only state that can wait on a choice is an UNSTARTED
+// stage whose plan does not resolve.
 const CHOICE_ITEMS = [
   { id: 'iron', uuid: 'Actor.actor-1.Item.iron', name: 'Iron', system: { quantity: 5 } },
   { id: 'silver', uuid: 'Actor.actor-1.Item.silver', name: 'Silver', system: { quantity: 5 } },
@@ -2371,9 +2343,7 @@ test('an unbegun stage with no route chosen waits on the player rather than on t
   assert.equal(run.actions.atStageStart, true, 'the begin control still renders instead of the primary');
   assert.equal(run.actions.beginStep, false, 'pressing it would refuse: "requirements are unavailable"');
   assert.equal(run.actions.execute, false);
-  // Issue 1648, F5: the ROUTE decision in its own words. The attention chip stays `choice`,
-  // because what the PLAYER owes is one act either way — the code is what stops the sentence
-  // telling a single-route stage to pick a route.
+  // Issue 1648, F5: the ROUTE decision in its own words.
   assert.equal(run.actions.disabledReason, 'routeRequired');
   assert.equal(runAttentionPresentation(run).kind, 'choice');
   assert.equal(runAttentionPresentation(run).labelKey, 'FABRICATE.App.Journal.Status.awaitingChoice');
@@ -2400,10 +2370,7 @@ test('an unbegun stage owes the player nothing only once its own pick is persist
   assert.equal(only.actions.atStageStart, true);
   assert.equal(only.actions.beginStep, true);
   assert.equal(only.actions.disabledReason, 'stageNotStarted');
-  // A multi-OPTION group IS an open choice. The resolver invents a greedy pick and reports
-  // success, but `beginVersionedStage` demands the pick be PERSISTED and refuses without it
-  // ("Choose the crafting requirements before executing this step."), so the projection reads
-  // readiness from the same predicate the command does (issue 1648).
+  // A multi-OPTION group IS an open choice (issue 1648).
   const multiOption = unbegunSecondStage([new IngredientSet({ id: 'only',
     ingredientGroups: [{ id: 'metal', name: 'Metal',
       options: [componentOption('iron'), componentOption('silver')] }] })]);
@@ -2542,11 +2509,9 @@ test('a started stage and a paused run hold the choices they already made', () =
   assert.equal(notice(paused).dataAttr, 'data-journal-paused');
 });
 
-// Issue 1648, M21. A started stage's materials are gone, so the held/needed probe that
-// describes an open stage describes nothing about a started one — the maintainer read
-// `0/0 Drop essence` against an essence the stage had already spent. The projection carries
-// the START RECEIPT instead, and every assertion below is chosen so it can only pass by
-// reading that receipt: the recorded rows deliberately CONTRADICT the authored requirement.
+// Issue 1648, M21. A started stage's materials are gone, so the held/needed probe that describes an
+// open stage describes nothing about a started one — the maintainer read `0/0 Drop essence` against
+// an essence the stage had already spent.
 test('a started stage projects what it consumed, never the requirement it was measured against', () => {
   const recorded = {
     selectedIngredientSetId: 'route-iron',
@@ -2597,13 +2562,6 @@ test('a started stage projects what it consumed, never the requirement it was me
  * D-031: a currency-only ingredient set is authorable, so the live receipt's THIRD field is the
  * payment — projected beside the materials and the essence recap, and read by the same helper the
  * terminal screen reads.
- *
- * The second half disposes of QE2-7, which read `_stageConsumptionRecord`'s missing
- * `!historyEntitled` argument as a redaction its neighbours apply. That argument is
- * `resolveMetadata`, and it is passed INVERTED to entitlement on purpose: an entitled viewer's
- * `consumedIngredients` rows are enriched separately from earlier terminal evidence, so the
- * catalogue fallback is switched OFF for them and ON for everyone else. Copying it here would
- * take an entitled viewer's own receipt names away, which is the opposite of a redaction.
  */
 test('the live receipt carries currency, and its catalogue fallback is not a disclosure', () => {
   const recorded = {
@@ -2684,9 +2642,8 @@ test('a started stage whose locked route is deleted reports the edit, not an imp
 
 test('the projection reads a stage duration exactly as the run manager arms it', () => {
   // `RunJournalBuilder`'s `durationToSeconds` is a hand-maintained copy of
-  // `CraftingRunManager._durationToSeconds`, and since issue 1648 that copy also decides
-  // whether the begin control renders at all. Drift reproduces the whole "offered, then
-  // refused" class silently, so the two are compared through their public surfaces here.
+  // `CraftingRunManager._durationToSeconds`, and since issue 1648 that copy also decides whether
+  // the begin control renders at all.
   const manager = new CraftingRunManager();
   const durations = [
     null, {}, { minutes: 1 }, { hours: 2 }, { days: 3 }, { months: 1 }, { years: 1 },
@@ -2923,9 +2880,8 @@ test('authority availability gates current actions with its safe reason', () => 
   assert.equal(reads, 1, 'authority is read once for the listing pass');
 });
 
-// Issue 1648: the retained claim's token is what `reconcileJournalRunAuthority` needs, and it
-// was reachable only from a console macro that read the ledger's flags by hand. It reaches the
-// run it blocks, and only for a GM — nobody else may reconcile one.
+// Issue 1648: the retained claim's token is what `reconcileJournalRunAuthority` needs, and it was
+// reachable only from a console macro that read the ledger's flags by hand.
 test('a retained authority claim reaches the blocked run, for a GM viewer only', () => {
   const availability = {
     available: false,
@@ -2962,10 +2918,7 @@ test('a retained authority claim reaches the blocked run, for a GM viewer only',
 });
 
 test('a LIVE claim offers no release, because there is nothing a GM could clear', () => {
-  // The control for the test above, in the shape the authority actually produces. `claimStanding`
-  // carries a `retained` identity ONLY for a claim nobody is coming back for; a `live` one is a
-  // command still running, and its answer is to wait. So a `claim-held` availability has no
-  // retained identity, and the affordance must not appear (issue 1648, M27).
+  // The control for the test above, in the shape the authority actually produces (issue 1648).
   const run = makeBuilder({
     active: [activeCraftingRun({ lifecycleVersion: 1, runRevision: 2 })],
     getJournalActionAvailability: () => ({ available: false, reason: 'claim-held' }),
@@ -2976,9 +2929,7 @@ test('a LIVE claim offers no release, because there is nothing a GM could clear'
 
 test('a retained claim reaches the run whose OWN evidence is uncertain, which a GM opens first', () => {
   // M27: the maintainer was told to use `Release claim…` and answered "there is no release claim
-  // button in the UI". Keying on `blockedReason === 'recovery-required'` withheld it from every
-  // run that reports something else — including the run holding the uncertain effect, whose own
-  // evidence makes it report `recoveryRequired` instead. That is the one run a GM opens.
+  // button in the UI".
   const retained = {
     claimId: 'claim-9',
     requestKind: 'command',
@@ -3177,9 +3128,8 @@ test('current-step availability delegates material choices and shared essence al
   assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
   const expectedAvailability = {
     success: false,
-    // The fake resolver reports a group short of stock, so the plan waits on acquiring rather
-    // than on a pick. A proven `have < need` is stock to acquire whatever ingredient kind the
-    // miss carries, because the stage command refuses it either way (issue 1648).
+    // The fake resolver reports a group short of stock, so the plan waits on acquiring rather than
+    // on a pick (issue 1648).
     blocker: 'selectionRequired',
     awaitingChoice: false,
     knownMaterialShortfall: true,

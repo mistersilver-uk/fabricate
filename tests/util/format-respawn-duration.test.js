@@ -1,8 +1,6 @@
 /**
  * Coverage for the calendar-aware respawn-ETA duration formatter
- * (`src/ui/svelte/util/formatDuration.js`). Day/week thresholds come from the
- * injected calendar (via `secondsPerUnitFromCalendar`), not a hard-coded Earth
- * table, so a custom calendar's day length drives the rendered unit.
+ * (`src/ui/svelte/util/formatDuration.js`).
  */
 
 import test from 'node:test';
@@ -108,9 +106,7 @@ test('formatAuthoredDuration renders nothing for a non-requirement so callers ow
   assert.equal(formatAuthoredDuration(null), '');
 });
 
-// A POSITIVE requirement is never rendered as no requirement. Truncation used to floor a
-// sub-second authored duration to zero, which took the same `''` branch as "no wait at all" and
-// so told a player a stage needed nothing. Only zero and below mean nothing.
+// A POSITIVE requirement is never rendered as no requirement.
 test('formatAuthoredDuration floors a positive sub-second requirement up rather than away', () => {
   assert.equal(formatAuthoredDuration(0.5), '1 second');
   assert.equal(formatAuthoredDuration(0.01), '1 second');

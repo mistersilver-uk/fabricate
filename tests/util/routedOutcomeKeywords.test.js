@@ -14,9 +14,7 @@ import {
   routedOutcomeTierCount,
 } from '../../src/utils/routedOutcomeKeywords.js';
 
-// ---------------------------------------------------------------------------
 // normalizeRoutedName
-// ---------------------------------------------------------------------------
 
 test('normalizeRoutedName trims and lowercases', () => {
   assert.equal(normalizeRoutedName('  Iron Ore  '), 'iron ore');
@@ -30,9 +28,7 @@ test('normalizeRoutedName coerces nullish and falsy to an empty string', () => {
   assert.equal(normalizeRoutedName(false), '');
 });
 
-// ---------------------------------------------------------------------------
 // keyword families
-// ---------------------------------------------------------------------------
 
 test('isFailKeyword matches the fail and hazard families', () => {
   for (const word of [...FAIL_KEYWORDS, ...HAZARD_KEYWORDS]) {
@@ -57,9 +53,7 @@ test('isReservedRoutedName covers fail, miss, and hazard families', () => {
   assert.equal(isReservedRoutedName('Iron'), false);
 });
 
-// ---------------------------------------------------------------------------
 // matchResultGroupsByName — the shared routed name-match sub-step
-// ---------------------------------------------------------------------------
 
 const GROUPS = Object.freeze([
   { id: 'g-1', name: 'Iron' },
@@ -115,9 +109,7 @@ test('matchResultGroupsByName tolerates groups with a nullish name', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // routedOutcomeTierCount
-// ---------------------------------------------------------------------------
 
 test('routedOutcomeTierCount counts the active list by id, success and failure alike', () => {
   const routed = {

@@ -1,22 +1,13 @@
 /**
- * Unit tests for src/ui/svelte/actions/dragDrop.js
- *
- * The dragDrop export is a plain Svelte action (a function that operates on a
- * DOM element). It can be tested in Node by supplying a mock element and mock
- * drag events — no browser or Svelte compiler is needed.
- *
- * getDragEventData delegates to globalThis.foundry.applications.ux.TextEditor
- * .implementation.getDragEventData, so we install that on globalThis before
- * importing the module.
+ * Unit tests for src/ui/svelte/actions/dragDrop.js. The dragDrop export is a plain Svelte action (a
+ * function that operates on a DOM element).
  */
 
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
-// Install the Foundry global that getDragEventData requires.
-// Must be done before the module is imported so the cached import sees it.
-// ---------------------------------------------------------------------------
+// Install the Foundry global that getDragEventData requires. Must be done before the module is
+// imported so the cached import sees it.
 globalThis.foundry = {
   applications: {
     ux: {
@@ -38,9 +29,7 @@ globalThis.foundry = {
 
 const { dragDrop } = await import('../../src/ui/svelte/actions/dragDrop.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Creates a minimal mock DOM node.
@@ -76,11 +65,9 @@ function makeNode(children = []) {
 /**
  * Builds a minimal drag event object.
  *
- * @param {string} type            Event type string (e.g. 'dragover').
- * @param {object} [opts]
- * @param {*}      [opts.relatedTarget=null]  The relatedTarget on the event.
- * @param {*}      [opts.data=null]           JSON-serialisable drag payload,
- *                                            or null to simulate no data.
+ * @param {string} type Event type string (e.g. 'dragover').
+ * @param {*} [opts.relatedTarget=null] The relatedTarget on the event.
+ * @param {*} [opts.data=null] JSON-serialisable drag payload, or null to simulate no data.
  */
 function makeEvent(type, { relatedTarget = null, data = null } = {}) {
   const raw = data !== null ? JSON.stringify(data) : null;
@@ -100,9 +87,7 @@ function fire(node, type, event) {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Test suites
-// ---------------------------------------------------------------------------
 
 describe('dragDrop action — attach / detach', () => {
   it('attaches dragover, dragleave and drop listeners on creation', () => {

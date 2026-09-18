@@ -1,15 +1,10 @@
-/**
- * Tests for adminStore graph integration (T-057)
- * Uses node:test + node:assert/strict
- */
+/** Tests for adminStore graph integration (T-057) Uses node:test + node:assert/strict */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 
-// ---------------------------------------------------------------------------
 // Mock helpers
-// ---------------------------------------------------------------------------
 
 function makeSystem(overrides = {}) {
   const id = overrides.id || 'sys1';
@@ -61,9 +56,8 @@ function createMockServices(recipes = [], system = null) {
     getItems: (systemId) => defaultSystem.items || []
   };
 
-  // A revision-token-minting recipe manager (issue 1076's contract), plus a call counter so a
-  // test can assert that the graph index was NOT rebuilt. `getRecipes` is the only corpus
-  // read the graph makes, so counting it counts index rebuilds.
+  // A revision-token-minting recipe manager (issue 1076's contract), plus a call counter so a test
+  // can assert that the graph index was NOT rebuilt.
   let recipeRevision = 1;
   const mockRecipeManager = {
     corpusReads: 0,
@@ -93,9 +87,7 @@ function createMockServices(recipes = [], system = null) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe('adminStore — graph integration', () => {
   it('1. Graph tab triggers graph computation in viewState', async () => {
@@ -164,9 +156,7 @@ describe('adminStore — graph integration', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Bounding and index retention — issue 1082
-// ---------------------------------------------------------------------------
 
 describe('adminStore — bounded graph and retained index (issue 1082)', () => {
   function makeCorpus(count) {

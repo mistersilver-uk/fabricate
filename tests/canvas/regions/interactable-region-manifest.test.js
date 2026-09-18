@@ -5,13 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { INTERACTABLE_BEHAVIOR_SUBTYPE } from '../../../src/canvas/regions/interactableRegionFlags.js';
 
 /**
- * The custom `fabricate.interactable` RegionBehavior subtype is only a VALID
- * document type if the module manifest declares it under
- * `documentTypes.RegionBehavior`. Registering `CONFIG.RegionBehavior.dataModels`
- * at runtime is necessary but NOT sufficient — without the manifest declaration
- * Foundry rejects the type ("…is not a valid type for the RegionBehavior Document
- * class") and region-interactable placement fails. This guards that the manifest
- * and the code constant never drift apart.
+ * The custom `fabricate.interactable` RegionBehavior subtype is only a VALID document type if the
+ * module manifest declares it under `documentTypes.RegionBehavior`.
  */
 const manifest = JSON.parse(
   readFileSync(fileURLToPath(new URL('../../../module.json', import.meta.url)), 'utf8')
@@ -37,8 +32,7 @@ test('module.json declares the interactable RegionBehavior subtype matching the 
 });
 
 test('module.json declares socket:true so cross-client emits are relayed', () => {
-  // Foundry only relays a module's `game.socket.emit("module.fabricate", …)` to
-  // other clients when the manifest opts in with `"socket": true`. Without it the
-  // player→active-GM activation round-trip (and node/event routing) silently dies.
+  // Foundry only relays a module's `game.socket.emit("module.fabricate", …)` to other clients when
+  // the manifest opts in with `"socket": true`.
   assert.equal(manifest.socket, true, 'manifest must set "socket": true for module socket relay');
 });

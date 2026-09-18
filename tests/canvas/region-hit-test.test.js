@@ -1,11 +1,4 @@
-/**
- * Coverage for the V13 Scene Region point-in-region seam (Phase 6).
- *
- * `regionEnvironmentIdsAtPoint` collects the `flags.fabricate.environmentId` of
- * every flagged region whose document-level `testPoint({ x, y, elevation })`
- * returns true. The V13 RegionDocument API is faked; this asserts the collection
- * + flag-read + containment glue, including the deprecated placeable fallback.
- */
+/** Coverage for the V13 Scene Region point-in-region seam (Phase 6). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -190,12 +183,8 @@ test('tokenDocumentCenter falls back to getCenterPoint, then the placeable centr
   assert.equal(tokenDocumentCenter({}), null);
 });
 
-// --- regionContainsTokenDocument: the canvas-free signal rule (issue 999) ----
-//
-// A 100x100 rect anchored at (100,100) covers 100..200 on both axes. On a 100px
-// grid a 1x1 token document at (60,60) has its TOP-LEFT outside that rect and its
-// CENTRE (110,110) inside — the exact shape that made a GM who is not viewing the
-// scene deny a player who is standing in the region.
+// regionContainsTokenDocument: the canvas-free signal rule (issue 999). A 100x100 rect anchored at
+// (100,100) covers 100..200 on both axes.
 const RECT = { x: 100, y: 100, w: 100, h: 100 };
 const CENTRE_INSIDE = { x: 60, y: 60 };
 const FAR_OUTSIDE = { x: 600, y: 600 };
@@ -329,10 +318,9 @@ test('a THROWING testPoint is indeterminate, not a denial', () => {
 });
 
 test('signal 2 is DEFINITIVE: an outside verdict denies and signal 3 never overrides it', () => {
-  // Foundry's own predicate knows about the token footprint, the elevation band
-  // and (on V14) scene levels; the centre-point test is a strictly worse
-  // approximation of it, so it must never overturn it. Here the centre IS inside
-  // the rect and the answer is still a denial.
+  // Foundry's own predicate knows about the token footprint, the elevation band and (on V14) scene
+  // levels; the centre-point test is a strictly worse approximation of it, so it must never
+  // overturn it.
   const region = rectRegion(RECT);
   const token = containmentToken(CENTRE_INSIDE, { regions: [], insideRegion: false });
   assert.equal(regionContainsTokenDocument(region, token), false);

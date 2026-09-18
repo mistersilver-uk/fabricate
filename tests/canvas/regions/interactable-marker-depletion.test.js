@@ -199,10 +199,8 @@ describe('syncInteractableMarkers (edge)', () => {
   });
 
   it('foreign tile (no isInteractableVisual reverse flag) → no write (ownership guard)', async () => {
-    // The behaviour's linkedVisual.uuid resolves to a tile that is NOT a Fabricate
-    // interactable visual (ref drift / relinked to a foreign tile). Marker sync must
-    // never flip its hidden/texture or stamp markerAvailableImg. Depleted env would
-    // otherwise force a swap + stash — assert nothing is written.
+    // The behaviour's linkedVisual.uuid resolves to a tile that is NOT a Fabricate interactable
+    // visual (ref drift / relinked to a foreign tile).
     tileDoc = makeTile();
     tileDoc.flags = {}; // strip the reverse flag → a foreign tile
     scenes = makeScenes(gatheringSystem());
