@@ -44,6 +44,7 @@ globalThis.game = { user: { isGM: true, name: 'Original GM' } };
 const { Recipe, RECIPE_OMITTED_WHEN_DEFAULT } = await import('../src/models/Recipe.js');
 const { INGREDIENT_SET_OMITTED_WHEN_DEFAULT } = await import('../src/models/IngredientSet.js');
 const { INGREDIENT_OMITTED_WHEN_DEFAULT } = await import('../src/models/Ingredient.js');
+const { RESULT_OMITTED_WHEN_DEFAULT } = await import('../src/models/Result.js');
 
 // Authored identity. Every one of these is a `foundry.utils.randomID()`-shaped 16-character
 // alphanumeric, which is the whole difficulty: the load path mints ids of this same shape.
@@ -671,6 +672,7 @@ describe('the non-deterministic hydrate defaults the canonical form is written a
       RECIPE_OMITTED_WHEN_DEFAULT,
       INGREDIENT_SET_OMITTED_WHEN_DEFAULT,
       INGREDIENT_OMITTED_WHEN_DEFAULT,
+      RESULT_OMITTED_WHEN_DEFAULT,
     };
     assert.deepEqual(
       new Set(

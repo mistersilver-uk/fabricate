@@ -33,6 +33,7 @@ import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
+import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
@@ -73,9 +74,11 @@ import {
 } from './itemStackQuantity.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
+  attachRolledAwards,
   awardReceipts,
   createItemReceiptCollector,
   itemReceipt,
@@ -155,6 +158,26 @@ export function rollTotalForCard(checkResult) {
 function tierStepForCard(checkResult) {
   return checkResult?.data?.tierStepApplied ?? null;
 }
+
+/** What a card states about the rolled amounts an awarded array carries (issue 1645): the live
+ * rolls the message rides on, and the empty awards that created no item and so are their own row. */
+function rolledAwardChatParts(awarded) {
+  const awards = awarded?.rolledAwards ?? [];
+  return {
+    rolls: awards.map((award) => award.roll).filter(Boolean),
+    emptyAwards: awards.filter((award) => award.quantity === 0),
+  };
+}
+
+/** One award's rolled-amount evidence (issue 1645): the persistable record, plus the live `Roll` and
+ * display fields only the chat card reads — an empty award has no item, so this row states its roll. */
+const rolledAwardEvidence = (result, rolled, amount, roll, { name, img }) => ({
+  ...rolledAwardRecord(result, rolled, amount),
+  rolled,
+  roll,
+  name,
+  img,
+});
 
 /** Map one `_consumeIngredients` entry to the persisted run-record shape, capturing the item's
  * `name`/`img` at consume time (issue 738) — a consumed item is DELETED immediately. */
@@ -756,7 +779,7 @@ export class CraftingEngine {
           : null;
       if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
     }
-    const validation = recipe.validate?.() ?? { valid: true, errors: [] };
+    const validation = recipe.validate?.({ Roll: diceEngine() }) ?? { valid: true, errors: [] };
     if (validation.valid) return null;
     return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
   }
@@ -2787,8 +2810,7 @@ export class CraftingEngine {
       };
     }
 
-    // Validate the recipe
-    const validation = recipe.validate();
+    const validation = recipe.validate({ Roll: diceEngine() });
     if (!validation.valid) {
       return {
         success: false,
@@ -4735,7 +4757,6 @@ export class CraftingEngine {
    * in place with `{ item, quantity, ingredient: null }` entries. Shared by the success path AND
    * the Simple failure path so a matched fail consumes the same submitted multiset as a pass.
    * No-op unless this is an alchemy attempt carrying `alchemySubmittedItems`.
-   * @private
    */
   async _consumeAlchemyExtraItems(consumedItems, componentSourceActors, options) {
     if (!options?.isAlchemyAttempt || !Array.isArray(options?.alchemySubmittedItems)) return;
@@ -4768,7 +4789,6 @@ export class CraftingEngine {
   /**
    * Consume submitted alchemy items (no-match failure path).
    * Best-effort: removes items by UUID from component source actors.
-   * @private
    */
   async _consumeSubmittedAlchemyItems(componentSourceActors, submittedItems) {
     const consumeCounts = new Map();
@@ -4793,7 +4813,6 @@ export class CraftingEngine {
    * `componentId` each was bucketed to at the collector (issue 572), so the dead-end key can
    * never drift from the signature {@link _matchAlchemySignature} matched against. Each record
    * contributes at most one unit; a record with no component id is skipped.
-   * @private
    */
   _submittedComponentMultiset(submittedItems) {
     const multiset = {};
@@ -4810,7 +4829,6 @@ export class CraftingEngine {
    * per-system append-only, deduped array (`alchemyDeadEnds[craftingSystemId] = [signatureKey]`).
    * Written ONLY when the system's `showAttemptHistoryToPlayers` is true. No-ops on an empty or
    * duplicate key, or an actor without flag support.
-   * @private
    */
   async _recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg) {
     if (alchemyCfg?.showAttemptHistoryToPlayers !== true) return;
@@ -4833,7 +4851,6 @@ export class CraftingEngine {
    * and does not abort the craft. It RETURNS the settlement (issue 902), which only the
    * time-gated START path consumes, because only it persists a record a later cancel reversal
    * would hand back. Never throws: a thrown deduction reports total non-settlement.
-   * @private
    */
   async _spendCraftCurrency(craftingActor, recipe, currencySpends) {
     if (!currencySpends?.length) return { valid: true, groups: [], settledSpends: [] };
@@ -4864,7 +4881,6 @@ export class CraftingEngine {
    * failure is logged, never thrown, so a cancel that cannot refund still removes the run. FAILS
    * CLOSED (issue 902): a refund that throws reports total failure with NO group detail, and
    * absent detail is read as unknown-and-failed.
-   * @private
    */
   async _refundCraftCurrency(craftingActor, recipe, currencySpends) {
     if (!currencySpends?.length) return { valid: true, groups: [] };
@@ -4895,7 +4911,6 @@ export class CraftingEngine {
    * quantity is set, and the durable per-system component identity is stamped so the restored
    * item resolves to its OWN component. With no component/source, a lightweight item is built
    * from the consume-time name/img snapshot so the player gets a stand-in rather than nothing.
-   * @private
    */
   async _restoreComponentItem({ actor, system, componentId, quantity, name, img }) {
     if (!actor || typeof actor.createEmbeddedDocuments !== 'function') return null;
@@ -4943,7 +4958,6 @@ export class CraftingEngine {
    * Restore every consumed ingredient captured in a step's START-phase snapshot back onto its
    * source actor (issue 848), falling back to the crafting actor when the recorded source actor
    * no longer resolves.
-   * @private
    */
   async _restoreConsumedIngredients(craftingActor, systemId, consumedSummary = []) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -4981,7 +4995,6 @@ export class CraftingEngine {
   /**
    * Resolve the actor a consumed ingredient should be restored to: the recorded
    * source actor uuid, or the crafting actor when it no longer resolves.
-   * @private
    */
   _resolveRestoreActor(craftingActor, actorUuid) {
     if (actorUuid && typeof globalThis.fromUuidSync === 'function') {
@@ -5059,7 +5072,6 @@ export class CraftingEngine {
   /**
    * Classify a reversal's currency refund (issue 902). `none` means it was never attempted, and
    * is neither a success nor a failure; `partial` requires at least one group demonstrably back.
-   * @private
    */
   _currencyRefundOutcome({ attempted, failed, refundedGroups }) {
     let status = 'full';
@@ -5145,7 +5157,6 @@ export class CraftingEngine {
   /**
    * Whether a player cancel should refund the consumed inputs. An explicit `options.refund` wins;
    * otherwise the owning system's `features.refundOnPlayerCancel` decides, defaulting ON.
-   * @private
    */
   _shouldRefundOnCancel(run, options = {}) {
     if (typeof options.refund === 'boolean') return options.refund;
@@ -5160,7 +5171,6 @@ export class CraftingEngine {
    * diverge. `resolveComponent` is the alchemy-path resolver (issue 578); `essenceAllocation` is
    * the player's step-scoped funding (issue 917), so the consumed plan is exactly what the
    * requirement rail displayed.
-   * @private
    */
   _resolveCraftSelection(
     componentSourceActors,
@@ -5209,7 +5219,6 @@ export class CraftingEngine {
    * stale by construction. On a mismatch the allocation is DROPPED, never clamped into the
    * resolved step — item uuids carry no step identity, so a step-1 map applied to step 2 would
    * look plausible while steering the wrong consumption.
-   * @private
    */
   _scopedEssenceAllocation(payload, step, ingredientSet) {
     return scopedEssenceAllocation(payload, step?.id, ingredientSet?.id);
@@ -5221,7 +5230,6 @@ export class CraftingEngine {
    * the resolved selection comes back `success: false` with a partial plan; `RecipeManager.canCraft`
    * ran BEFORE the allocation was applied, so without this the engine would consume the partial
    * plan and still award the result. Scoped to the supplied-allocation case.
-   * @private
    */
   _allocationShortfallMessage(essenceAllocation, craftSelection, executionRecipe) {
     if (!essenceAllocation || craftSelection?.success !== false) return null;
@@ -5246,7 +5254,6 @@ export class CraftingEngine {
    * Consume the item plan from the single craft selection, computed once in {@link craft} and
    * passed in, so this never recomputes the match against possibly-mutated items. Every
    * consumption requires document acknowledgement; there is no unconfirmed mode.
-   * @private
    * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
    */
   async _consumeIngredients(consumptionPlan = []) {
@@ -5322,7 +5329,6 @@ export class CraftingEngine {
    * whose system matches is satisfied WITHOUT an owned item and returned `virtual: true`; an
    * owned, non-broken item still takes precedence, and {@link resolvePresentComponentIds}
    * enforces the system scope.
-   * @private
    */
   async _validateTools(
     actors,
@@ -5463,7 +5469,6 @@ export class CraftingEngine {
    * attaches its `authority`/`reason`/`triggerId`. Under `toolSpecific` each tool's own mode
    * decides. Durable-identity gate (issue 557): an item is used OR broken only when it matches
    * the tool by durable identity, re-checked here so a presence-only item never reaches `delete()`.
-   * @private
    */
   async _applyToolBreakage(
     recipe,
@@ -5581,7 +5586,6 @@ export class CraftingEngine {
    * Build a `replaceWith` creator that resolves component targets through the
    * recipe's crafting system and direct-Item targets by UUID, then creates the
    * replacement item on the actor.
-   * @private
    */
   _makeToolReplacementCreator(recipe) {
     const system = this.getCraftingSystem(recipe?.craftingSystemId);
@@ -5598,10 +5602,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Create the result items based on recipe configuration. The three essence-resolution inputs
-   * travel together in one trailing options bag, matching {@link CraftingEngine#_createSingleResult}:
-   * only the time-gated FINISH path supplies the snapshot pair at all.
-   * @private
+   * The three essence-resolution inputs travel in one trailing options bag, matching
+   * {@link CraftingEngine#_createSingleResult}; only the time-gated FINISH path supplies them.
    */
   async _createResultItems(
     craftingActor,
@@ -5638,6 +5640,7 @@ export class CraftingEngine {
     const groupsToCreate = Array.isArray(resolved?.groups) ? resolved.groups : [];
 
     const createdItems = [];
+    const rolledAwards = [];
     const receiptCollector = createItemReceiptCollector();
     try {
       for (const group of groupsToCreate) {
@@ -5652,7 +5655,14 @@ export class CraftingEngine {
               ...checkResult,
               resolutionMeta: resolved?.meta || {},
             },
-            { step, precomputedEssences, essenceEnabled, resolveComponent, receiptCollector }
+            {
+              step,
+              precomputedEssences,
+              essenceEnabled,
+              resolveComponent,
+              receiptCollector,
+              rolledAwards,
+            }
           );
 
           // Return each physical Item once; the collector retains every row's delta.
@@ -5666,15 +5676,15 @@ export class CraftingEngine {
     }
 
     return {
-      items: attachAwardReceipts(createdItems, receiptCollector.snapshot()),
+      items: attachRolledAwards(
+        attachAwardReceipts(createdItems, receiptCollector.snapshot()),
+        rolledAwards
+      ),
       resolutionMeta: resolved?.meta || null,
     };
   }
 
-  /**
-   * Create a single result item
-   * @private
-   */
+  /** Create one result item: resolve its amount, build its data, and award or stack it. */
   async _createSingleResult(
     craftingActor,
     result,
@@ -5688,15 +5698,13 @@ export class CraftingEngine {
       essenceEnabled = null,
       resolveComponent,
       receiptCollector = null,
+      rolledAwards = null,
     } = {}
   ) {
-    // Get the source item
     let sourceItem;
     let managedItem = null;
-    // Resolve the crafting system once for the whole method: the stacking gate
-    // (issue 858) and the effect-transfer gate below both read it, and a bare
-    // `itemUuid` output (no managed component) still transfers effects, so this
-    // must not be scoped to the managed-component branch.
+    // Resolved once for the whole method: a bare `itemUuid` output with no managed component
+    // still transfers effects, so this must not be scoped to the managed-component branch.
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = recipe.craftingSystemId
       ? (systemManager?.getSystem(recipe.craftingSystemId) ?? null)
@@ -5735,14 +5743,19 @@ export class CraftingEngine {
       throw unconfirmedHistoryError('Crafting result source is unavailable');
     }
 
-    // Set quantity
+    // Resolved ONCE, before `setStackQuantity` and `receiptQuantity` read it. Zero is an EMPTY
+    // AWARD: no item is created, and the record is what states the roll (issue 1645).
+    const { amount, rolled, roll } = await resolveRolledAmount(result, craftingActor, {
+      Roll: diceEngine(),
+    });
+    if (rolled) rolledAwards?.push(rolledAwardEvidence(result, rolled, amount, roll, itemData));
+    if (amount === 0) return null;
     if (hasStackQuantity(itemData) || !sourceItem) {
-      setStackQuantity(itemData, result.quantity);
+      setStackQuantity(itemData, amount);
     }
 
-    // Apply macro-based property updates. Every CONTRIBUTING essence's own property
-    // macro runs FIRST (issue 1036), in `essenceDefinitions` library order, so the
-    // result's own macro is the LAST writer at any path the two share.
+    // Every CONTRIBUTING essence's property macro runs FIRST (issue 1036), in `essenceDefinitions`
+    // order, so the result's own macro is the LAST writer at any path the two share.
     const essenceMacrosApplied = await this._runEssencePropertyMacros(itemData, {
       system,
       recipe,
@@ -5777,33 +5790,21 @@ export class CraftingEngine {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
-    // The stacking veto is the OR across EVERY macro that applied a path — essence or
-    // result (issue 1036). `createOrStackComponentItem` DISCARDS `itemData` wholesale
-    // when it stacks, so an essence-mutated output that failed to set this would merge
-    // into a plain stack and lose every mutation with no error at all.
+    // The veto is the OR across every macro that applied a path (issue 1036), because
+    // `createOrStackComponentItem` discards `itemData` when it stacks, losing every mutation.
     const hasPropertyUpdates = Boolean(essenceMacrosApplied || resultMacroApplied);
 
-    // Stamp the durable component identity on the crafted output so the inventory
-    // matcher attributes it to its OWN component and not a sibling reached through a
-    // transitive `_stats.duplicateSource` (issue 539). Keyed on the result's managed
-    // component id + the recipe's crafting system id; a result with no managed component
-    // (a bare `itemUuid` output) or an unsafe system id is left unstamped and resolves
-    // via the raw-reference fall-through.
+    // The durable component identity, so the inventory matcher attributes this output to its OWN
+    // component and not a sibling reached through `_stats.duplicateSource` (issue 539).
     stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
-    // Whether this output transfers per-craft active effects (both the recipe- and
-    // system-level flags must be set). A transferring output is materially distinct
-    // per craft, so it must never merge into an existing stack.
+    // Both flags must be set, and a transferring output never merges into an existing stack.
     const transfersEffects =
       recipe.transferEffects === true && system?.features?.effectTransfer === true;
 
-    // Stack onto a matching inventory item instead of spawning a duplicate (issue 858).
-    // Only a PLAIN component output stacks: it must resolve to a managed component,
-    // carry no per-craft property-macro customization, and transfer no per-craft
-    // effects — any of which makes the produced item materially distinct from an
-    // existing stack. Matches are resolved through the same system-scoped resolver
-    // salvage/craft already use to find component items on the actor.
-    const awardedQuantity = receiptQuantity(result.quantity ?? 1);
+    // Only a PLAIN component output stacks onto an existing item (issue 858): a managed component
+    // with no property-macro customization and no transferred effects.
+    const awardedQuantity = receiptQuantity(amount ?? 1);
     const itemsIterable =
       craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
     let matchingItems = [];
@@ -5822,15 +5823,15 @@ export class CraftingEngine {
         componentId: managedItem?.id ?? null,
         resultRowId: result.resultRowId ?? null,
         sourceItemUuid: sourceItem?.uuid ?? null,
+        ...(rolled && { rolled }),
       },
     });
     if (!resultItem) return null;
 
     const stacked = matchingItems.includes(resultItem);
 
-    // Transfer active effects if configured (requires both recipe- and system-level
-    // flags). Only ever applies to a freshly created item — a stacked item keeps its
-    // own effects and, by construction, `transfersEffects` is false when stacking.
+    // Only ever a freshly created item: a stacked one keeps its own effects and, by construction,
+    // `transfersEffects` is false when stacking.
     if (!stacked && transfersEffects) {
       await this._transferEffects(
         resultItem,
@@ -5853,7 +5854,6 @@ export class CraftingEngine {
    * behaviour (issue 1036) but its quantities still match, accumulate and are consumed —
    * `enabled` gates essence-carried BEHAVIOUR, never essence ARITHMETIC. This walk stays SEPARATE
    * from the property-macro loop, whose GM-authorable order would change the `effectsData` order.
-   * @private
    */
   async _transferEffects(
     resultItem,
@@ -5913,7 +5913,6 @@ export class CraftingEngine {
    * definition, so a mid-run GM toggle cannot change a craft whose inputs are already consumed;
    * the snapshot is COMPLETE over the START keys, and an ABSENT key falls through to the live
    * definition and reads as enabled.
-   * @private
    */
   _essenceCarriesBehaviour(definition, essenceId, essenceEnabled = null) {
     if (
@@ -5935,7 +5934,6 @@ export class CraftingEngine {
    * COLLAPSED-chain carve-out. An EMPTY stored map is deliberately not distinguished from an
    * absent one: `_snapshotEssenceEnabled` emits one entry per START key, so the two readings
    * coincide, and `tests/essence-timed-craft-gate.test.js` fails on a dropped key at either site.
-   * @private
    */
   _resumedEssenceEnabled(prepared) {
     const stored = prepared?.essenceEnabled;
@@ -5951,7 +5949,6 @@ export class CraftingEngine {
    * `actor.setFlag` merge cannot delete a key inside a SURVIVING run, so an omitted key
    * resurrects with its old value, and a disabled-ids-only map would be indistinguishable from
    * the absent map that has to keep meaning "evaluate live".
-   * @private
    */
   _snapshotEssenceEnabled(resolvedEssences, system) {
     const definitions = resolvedEssencesFor(system);
@@ -5977,7 +5974,6 @@ export class CraftingEngine {
    *
    * @returns {Promise<boolean>} whether ANY essence macro applied at least one path — the essence
    *   half of `_createSingleResult`'s `hasPropertyUpdates` stacking veto.
-   * @private
    */
   async _runEssencePropertyMacros(
     itemData,
@@ -6072,7 +6068,6 @@ export class CraftingEngine {
    * otherwise raise one notification per essence per result on the PLAYER's screen. A partial
    * application still counts as applied, so the stacking veto fires and the landed mutations are
    * not silently merged away; later essences still run.
-   * @private
    */
   _applyEssencePropertyUpdates(itemData, updates, definition) {
     let applied = false;
@@ -6101,7 +6096,6 @@ export class CraftingEngine {
    * again inside `MacroExecutor.run` DELIBERATELY — `run` THROWS for an unresolvable uuid, and
    * settling "is the GM's link broken" before entering the try is what keeps that case silent.
    * Return handling matches the result macro: a non-object or Array return is warned and ignored.
-   * @private
    */
   async _runOneEssencePropertyMacro(definition, context) {
     const macroUuid = definition.propertyMacroUuid;
@@ -6176,7 +6170,6 @@ export class CraftingEngine {
 
   /**
    * Check Item Piles currency cost on a recipe, if the integration is enabled.
-   * @private
    */
   async _checkItemPilesCurrencyCost(craftingActor, recipe) {
     const cost = recipe?.currencyCost;
@@ -6207,7 +6200,6 @@ export class CraftingEngine {
   /**
    * Deduct Item Piles currency cost from actor after a successful craft.
    * Errors are logged but do not throw, to avoid losing crafting results.
-   * @private
    */
   async _deductItemPilesCurrencyCost(craftingActor, recipe) {
     const cost = recipe?.currencyCost;
@@ -6234,7 +6226,6 @@ export class CraftingEngine {
    * chosen ingredient set, so its check is the same optional pass/fail check as `simple`/`alchemy`
    * on the shared `craftingCheck.simple` slot. `simple` honours the crafting-checks toggle;
    * alchemy and `routedByIngredients` run on an authored roll formula alone.
-   * @private
    */
   async _runCraftingCheck(
     recipe,
@@ -6432,7 +6423,6 @@ export class CraftingEngine {
    * resolves via {@link _resolveSimpleCheckDc} parameterized over `config`, so a recipe
    * `checkTierId` or dynamic-DC macro still applies, and the roll goes through the shared
    * {@link runFormulaPassFail}, which honours forced outcomes and interactive cancel.
-   * @private
    */
   async _runPassFailCheck(
     system,
@@ -6485,7 +6475,6 @@ export class CraftingEngine {
    * the SAME recipe-tier / dynamic-macro path as {@link _runSimpleCheck}, because routed crafting
    * carries `recipe.checkTierId` and relative tiers shift each threshold by `dc + outcome.dc`.
    * Not reached when no routed formula is configured: the caller's required-check guard fails.
-   * @private
    */
   async _runRoutedCheck(
     system,
@@ -6682,7 +6671,6 @@ export class CraftingEngine {
 
   /**
    * Resolve the system for a recipe (or salvage synthetic recipe) from the manager.
-   * @private
    */
   _getRecipeSystem(recipe) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -6852,15 +6840,15 @@ export class CraftingEngine {
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
     const toolEntries = this._resolveToolChatEntries(tools, system);
+    const { rolls, emptyAwards } = rolledAwardChatParts(createdResults);
 
-    // Resolve to a plain, Foundry-free model, then render via the shared pure
-    // builder (mirrors the gathering card: resolve names/images here, format there).
+    // A plain, Foundry-free model: names and images resolve here, formatting happens there.
     const content = buildCraftingChatContent(
       {
         status: success ? 'succeeded' : 'failed',
         actorName: craftingActor?.name || '',
         recipeName: recipe?.name || '',
-        results: awardReceipts(createdResults),
+        results: [...awardReceipts(createdResults), ...emptyAwards],
         consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
           name: item?.name || '',
           img: item?.img || '',
@@ -6875,10 +6863,13 @@ export class CraftingEngine {
       localize
     );
 
+    // The rolls sound the dice and animate Dice So Nice. The custom `content` survives them because
+    // the card has child elements, and a result card is never whispered, so they hide it from nobody.
     try {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
         content,
+        ...(rolls.length > 0 && { rolls }),
       });
     } catch (error) {
       console.error('Fabricate | Failed to post crafting chat message:', error);
@@ -6902,10 +6893,8 @@ export class CraftingEngine {
       const key = componentId || pair.item?.uuid || pair.item?.name || null;
       if (key && seen.has(key)) continue;
       if (key) seen.add(key);
-      // `data-models` requirement 13: the authored label and the registration snapshot
-      // both outrank the linked component, and the matched item is the last resort. The
-      // previous component-then-item ordering skipped an authored `label` entirely and
-      // printed the raw item name for every item-sourced Tool (issue 1119).
+      // `data-models` requirement 13: the authored label and the registration snapshot both
+      // outrank the linked component, and the matched item is the last resort (issue 1119).
       entries.push({
         name: resolveToolDisplayName(pair.tool, component, '') || pair.item?.name || '',
         img: this._toolChatImage(pair.tool, component) || pair.item?.img || '',
@@ -6928,9 +6917,8 @@ export class CraftingEngine {
     const componentById = new Map(
       resolvedComponentsFor(system).map((component) => [component?.id, component])
     );
-    // The evidence carries `toolId` (issue 1119) precisely so this card can reach the Tool.
-    // Resolving `componentId` alone produced BLANK entries — not even a fallback — for an
-    // item-sourced Tool, which has no component to name.
+    // The evidence carries `toolId` (issue 1119) precisely so this card can reach a Tool an
+    // item sourced, which has no component to name and so resolves to nothing by `componentId`.
     const toolById = new Map(resolvedToolsFor(system).map((tool) => [tool?.id, tool]));
     const entries = [];
     const seen = new Set();
@@ -6951,10 +6939,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Post a salvage result chat card, the salvage analogue of {@link _postCraftChatMessage} (issue
-   * 675). Gated on the SAME `features.chatOutput` toggle, and posted only for a resolved success
-   * or a rolled failure — never for a cancelled prompt, a misconfigured abort, or a time-gated
-   * run that awarded nothing.
+   * The salvage analogue of {@link _postCraftChatMessage} (issue 675), on the SAME
+   * `features.chatOutput` toggle and posted only for a resolved success or a rolled failure.
    *
    * @param {boolean} [params.suppressed] Post nothing (issue 859) because a bulk salvage posts
    *   ONE aggregated card; gated with `features.chatOutput` so there is one early return.
@@ -6977,6 +6963,7 @@ export class CraftingEngine {
     if (suppressed || !system || system.features?.chatOutput !== true) return;
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
+    const { rolls, emptyAwards } = rolledAwardChatParts(results);
     const consumed =
       Number(consumedQuantity) > 0
         ? [
@@ -6993,7 +6980,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: actor?.name || '',
         componentName: component?.name || '',
-        results: awardReceipts(results),
+        results: [...awardReceipts(results), ...emptyAwards],
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
@@ -7008,6 +6995,7 @@ export class CraftingEngine {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content,
+        ...(rolls.length > 0 && { rolls }),
       });
     } catch (error) {
       console.error('Fabricate | Failed to post salvage chat message:', error);
@@ -7847,10 +7835,8 @@ export class CraftingEngine {
     return consumed;
   }
 
-  /** Create every result in the resolved salvage groups and return both the created documents and
-   * the award records the run container needs, keyed to the component each item was awarded FOR.
-   * ONE implementation, TWO callers (issue 1098): a second copy would be a second place for the
-   * stacked-twice de-dup and the `componentId` fallback chain to drift. */
+  /** Every result in the resolved salvage groups: the created documents, plus the award records the
+   * run container needs. ONE implementation, TWO callers (issue 1098). */
   async _awardSalvageResultGroups({
     actor,
     resultGroups,
@@ -7860,10 +7846,9 @@ export class CraftingEngine {
     checkResult,
   }) {
     const resultItems = [];
-    // Track the awarding component id alongside each created item without reshaping `resultItems`,
-    // which both callers return as `results`. Each `result` carries its id as `result.componentId`
-    // (legacy `result.systemItemId`), the same accessor `_createSingleResult` uses.
+    // The awarding component id travels beside each item, leaving `resultItems` unreshaped.
     const createdRecords = [];
+    const rolledAwards = [];
     const receiptCollector = createItemReceiptCollector();
     try {
       for (const group of resultGroups) {
@@ -7875,7 +7860,7 @@ export class CraftingEngine {
             tools,
             salvageRecipeView,
             checkResult,
-            { receiptCollector }
+            { receiptCollector, rolledAwards }
           );
           // Return each physical Item once while preserving all receipt rows.
           if (created && !resultItems.includes(created)) {
@@ -7887,7 +7872,13 @@ export class CraftingEngine {
       throw receiptCollector.failure(error);
     }
     createdRecords.push(...receiptCollector.snapshot());
-    return { resultItems: attachAwardReceipts(resultItems, createdRecords), createdRecords };
+    return {
+      resultItems: attachRolledAwards(
+        attachAwardReceipts(resultItems, createdRecords),
+        rolledAwards
+      ),
+      createdRecords,
+    };
   }
 
   /** The salvage failure consumption policy, defaulting to `consumeComponentOnFail: true` and
@@ -7963,14 +7954,17 @@ export class CraftingEngine {
       );
       if (!resolved) return [];
 
-      // Progressive results are a quantity-less ordered list: the loop charges and awards each
-      // entry ONCE, so the GM expresses "more of X" by listing X again. Force `quantity: 1` so the
-      // grant path produces one item per awarded entry, as `_resolveProgressive` always has for
-      // recipes (issue 676). The force stays on the award path, not in the award resolver.
+      // Progressive results are a quantity-less ordered list: the loop awards each entry ONCE, so
+      // the GM expresses "more of X" by listing X again. `quantity: 1` and the dropped formula are
+      // forced on the award path, never in the award resolver (issues 676, 1645).
       return [
         {
           ...resolved.group,
-          results: resolved.award.awarded.map((result) => ({ ...result, quantity: 1 })),
+          results: resolved.award.awarded.map((result) => ({
+            ...result,
+            quantity: 1,
+            quantityFormula: null,
+          })),
         },
       ];
     }

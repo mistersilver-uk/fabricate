@@ -47,6 +47,18 @@ function recordedNumber(value) {
   return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
 }
 
+/** What a surface states about a ROLLED amount, or null for a fixed one (issue 1645): an award's
+ *  recorded roll BESIDE the real quantity it produced, an authored expression INSTEAD of a number no
+ *  actor-free surface can know. The roll is read, never re-rolled. */
+function rolledAmountLabel(source, localize) {
+  const rolled = plainObjectOrNull(source?.rolled);
+  const total = numberOrNull(rolled?.total);
+  if (stringOrNull(rolled?.formula) && total !== null) {
+    return localize('FABRICATE.App.Journal.RolledAmount', { formula: rolled.formula, total });
+  }
+  return stringOrNull(source?.quantityFormula);
+}
+
 // Versioned terminal history is persisted BEFORE effects. Its createdResults is
 // a plan, even after commit; the applied results receipt is the award authority.
 function gatheringActualAwards(run) {
@@ -219,24 +231,19 @@ export class RunJournalBuilder {
    * @param {Function} [deps.getSystem] `(systemId) => system|null`.
    * @param {Function} [deps.getTool] `(systemId, toolId) => { name, img }|null`.
    * @param {Function} [deps.getGatheringBlindSecret] `(runId) => { taskId, snapshot }|null`
-   *   — reads the GM-owned blind-run store (issue 901). Present only so a GM's
-   *   journal can preview the task an in-flight blind run will yield; the
-   *   projection ignores it for every non-GM viewer.
+   *   — the GM-owned blind-run store (issue 901), read for a GM viewer's preview and
+   *   ignored for every other viewer.
    * @param {Function} [deps.isGatheringIdentityHidden] `({actor, viewer, environmentId, taskId})
    *   => boolean` — D-027: whether run history must still name a blind gathering task
    *   generically. Answered from the environment's reveal policy and the PERSISTED reveal
    *   state, never from actor ownership; unwired it discloses, because a builder with no
    *   reveal source cannot tell a blind environment from a plain one.
    * @param {Function} [deps.getGatheringTask] `(environmentId, taskId) => { name, img }|null`
-   *   — resolves a gathering run's task to its authored name/image (from the COMPOSED
-   *   environment), mirroring how `getRecipe` resolves a crafting run's name/image.
-   * @param {Function} [deps.getResultItem] `(itemUuid) => { name, img }|null` — resolves
-   *   an awarded/created result item by its recorded uuid, so the journal can label a
-   *   run's produced items even for records that predate name/img capture.
+   *   — the task's authored name/image, from the COMPOSED environment.
+   * @param {Function} [deps.getResultItem] `(itemUuid) => { name, img }|null` — labels a
+   *   produced item from a record that predates name/img capture.
    * @param {Function} [deps.getComponent] `(systemId, componentId) => { name, img }|null` —
-   *   resolves a system component to its authored name/image. Powers a salvage run's
-   *   title (from the source `componentId`) and the name/img fallback for a salvage
-   *   created-result whose record captured neither (records that predate name/img capture).
+   *   powers a salvage run's title and the name/img fallback for a capture-less record.
    * @param {Function} [deps.getViewer] `() => viewer` (current Foundry user) for redaction.
    * @param {Function} [deps.localize] `(key, data?) => string`.
    * @param {Function} [deps.nowWorldTime] `() => number` current world time.
@@ -522,11 +529,6 @@ export class RunJournalBuilder {
   /**
    * Resolve a crafting run's icon: the recipe's OWN `img`, per `data-models/spec.md`
    * `## Recipe` requirement 16.
-   *
-   * This previously preferred the linked recipe-item definition's image, keyed on the
-   * legacy `recipe.recipeItemId` scalar, which outranked an authored `recipe.img` and
-   * tracked definition order rather than anything the GM authored (issue 887). The
-   * injected `getRecipeItemImg` port existed solely for that lookup and is gone with it.
    *
    * `resolveRecipeImage` keeps the item-bag sentinel treated as "no image", so a run
    * still falls back to the blueprint and never to the bag.
@@ -992,13 +994,10 @@ export class RunJournalBuilder {
    * quantity was never captured keeps a null quantity, which the view reports as unrecorded
    * rather than filling in from the requirement it was matched against.
    *
-   * Scoped to the CURRENT stage of a live run, which is the only surface that reads it:
-   * `selectionAvailability` is scoped the same way, and a terminal run's record is already
-   * projected as `consumedIngredients` under the history entitlement rule. Widening it here
-   * would put recorded evidence on terminal steps by a second route that does not consult
-   * that rule.
+   * Scoped to the CURRENT stage of a live run, which is the only surface that reads it: a
+   * terminal run's record is already projected as `consumedIngredients` under the history
+   * entitlement rule, and widening it here would route recorded evidence around that rule.
    *
-   * @private
    * `currencySpends` rides with them: a stage whose only requirement was a price recorded its
    * settlement here and nowhere the live view read, so the whole started branch rendered blank
    * (issue 1648, QE2-3).
@@ -1871,6 +1870,7 @@ export class RunJournalBuilder {
       name ||= stringOrNull(component?.name);
       img ||= stringOrNull(component?.img);
     }
+    const amountLabel = rolledAmountLabel(result, this.localize);
     return {
       actorUuid: stringOrNull(result?.actorUuid),
       componentId,
@@ -1878,6 +1878,8 @@ export class RunJournalBuilder {
       quantity: quantity !== null && quantity >= 0 ? quantity : null,
       name,
       img,
+      // Omitted for a fixed amount, so every fixed projection is unchanged (issue 1645).
+      ...(amountLabel && { amountLabel }),
     };
   }
 
@@ -2134,9 +2136,7 @@ export class RunJournalBuilder {
    * - A plain run names its task and resolves to that task's authored name/image,
    *   exactly as before.
    * - A BLIND run persists only the `blind:<environmentId>` marker, so for a
-   *   player it resolves to the generic blind label. It previously resolved to the
-   *   real task's NAME, because the marker did not exist and the run carried the
-   *   drawn task id in clear text — the leak this issue is about, in rendered text.
+   *   player it resolves to the generic blind label, never the real task's name.
    * - For a GM, a blind run resolves to the real task from the GM-owned blind-run
    *   store and is flagged as a secret preview, because the GM needs to know what
    *   the player will get.
@@ -2319,7 +2319,9 @@ export class RunJournalBuilder {
       art: stringOrNull(mapped.img),
       icon: stringOrNull(result?.icon),
       tint: stringOrNull(result?.tint ?? result?.colorToken),
+      // The expression rides BESIDE the number: an absent `qty` reads as "not recorded" instead.
       qty: numberOrNull(result?.quantity) ?? 1,
+      amountLabel: mapped.amountLabel ?? null,
       chance,
     });
   }
@@ -2361,7 +2363,7 @@ export class RunJournalBuilder {
 
   _tierYield(result, systemId, index) {
     const mapped = this._mapResult(result, systemId);
-    const quantity = numberOrNull(result?.quantity) ?? 1;
+    const quantity = mapped.amountLabel ?? numberOrNull(result?.quantity) ?? 1;
     return compactPresentation({
       id:
         stringOrNull(result?.id) ||
@@ -2575,10 +2577,8 @@ export class RunJournalBuilder {
    * alone, so the affordance appears exactly where there is something a person can clear and
    * never to a player.
    *
-   * It used to be keyed on `blockedReason === 'recovery-required'`, the reason string of only
-   * ONE presentation of that state. A run carrying uncertain evidence of its own reports
-   * `recoveryRequired` instead, and that is the run a GM opens first — so the single claim a
-   * world was stuck on offered no way out but a console call (issue 1648, M27).
+   * A run carrying uncertain evidence of its own reports `recoveryRequired` rather than that
+   * reason string, and that is the run a GM opens first (issue 1648, M27).
    * @private
    * @returns {object|null}
    */

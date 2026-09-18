@@ -914,29 +914,12 @@ export class ResolutionModeService {
    * Order is applied HERE, not in `resolveProgressiveAward` — that helper orders nothing
    * by contract; the caller owns order (issue 651 D0).
    *
-   * ## THIS IS NOT A FIRING SITE, AND MUST NOT BECOME ONE (issue 1286)
-   *
-   * Component complications fire from the ENGINE, after the award is committed and
-   * before the chat card is posted. Moving the firing in here would look like a
-   * simplification — the buckets are decided here, so why not act on them — and it
-   * breaks two ways at once:
-   *
-   *  - **It would fire more than once.** `resolveResultGroups` is called UP TO THREE
-   *    TIMES for one craft: `CraftingEngine.js:1082` (the pre-consumption
-   *    misconfiguration gate), `:1910` (the failure-award preflight), and again inside
-   *    `_createResultItems` at `:3489` when the results are actually created.
-   *  - **It would fire on a craft that then aborts.** The first of those calls runs
-   *    BEFORE any consumption precisely so a misconfigured recipe can abort having
-   *    consumed nothing. A complication fired there would be a consequence of a craft
-   *    that never happened.
-   *
-   * The reason the engine may ask three times at all is that this method is PURE: asking
-   * it twice agrees with itself. Firing is an effect, and an effect here would destroy
-   * that property — which is also what every one of those three call sites relies on.
-   *
-   * It PUBLISHES the facts instead. The `meta` below is deliberately FLAT and
-   * id-list-shaped rather than carrying a nested `progressive` sub-object, so no consumer
-   * has to learn a second shape to read one more field.
+   * This is NOT a complication firing site and must not become one (issue 1286). It is PURE, and
+   * the engine relies on that: `resolveResultGroups` is asked up to three times per craft — the
+   * pre-consumption misconfiguration gate, the failure-award preflight, and the award itself — and
+   * the first of those runs before anything is consumed. Complications fire from the ENGINE, after
+   * the award commits. This publishes the facts instead, in a FLAT id-list-shaped `meta` so no
+   * consumer has to learn a second shape to read one more field.
    *
    * @returns {{groups: Array, meta: {awardedResultIds: Array<string>, remaining: number,
    *   partialResultId: string|null, haltedResultId: string|null,
@@ -966,13 +949,17 @@ export class ResolutionModeService {
         zeroRemainingOnPartial: true,
       });
 
-    // Progressive results are a quantity-less ordered list: each entry is awarded
-    // once and the GM expresses "more of X" by listing X again. Force `quantity: 1`
-    // so the grant path (CraftingEngine._createResultItem reads `result.quantity`)
-    // produces one item per awarded entry, even for legacy recipes still carrying a
-    // `quantity > 1` authored before the editor dropped the field.
+    // Progressive results are a quantity-less ordered list: each entry is awarded once and the GM
+    // expresses "more of X" by listing X again. `quantity: 1` and a dropped `quantityFormula` force
+    // one item per awarded entry, so a rolled amount never reaches the resolver here (issue 1645),
+    // even for a legacy recipe still carrying a `quantity > 1` authored before the field went.
     return {
-      groups: [{ ...group, results: awarded.map((result) => ({ ...result, quantity: 1 })) }],
+      groups: [
+        {
+          ...group,
+          results: awarded.map((result) => ({ ...result, quantity: 1, quantityFormula: null })),
+        },
+      ],
       // The three additive ids are taken from the award loop's own report and are NEVER
       // re-derived from `awarded` + `remaining`: the break index is not recoverable once
       // a skipped stage sits between the last award and the halt (issue 1286).

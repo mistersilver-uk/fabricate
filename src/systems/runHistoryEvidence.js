@@ -16,6 +16,14 @@ export function receiptQuantity(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/** The roll a rolled amount awarded (issue 1645): `{formula, total}` and nothing more, because
+ *  this persists. `total` is the roll as it fell, so it may be negative where `quantity` is 0. */
+function rolledRecord(value) {
+  const formula = text(value?.formula);
+  const total = Number(value?.total);
+  return formula && Number.isFinite(total) ? { formula, total } : null;
+}
+
 export function itemReceipt(entry = {}) {
   const source = entry && typeof entry === 'object' ? entry : {};
   const receipt = Object.fromEntries(
@@ -29,6 +37,9 @@ export function itemReceipt(entry = {}) {
   for (const key of ['componentId', 'resultRowId', 'sourceItemUuid']) {
     if (Object.hasOwn(source, key)) receipt[key] = text(source[key]);
   }
+  // Omitted rather than nulled for a fixed amount: presence is the mode, as it is on the result.
+  const rolled = rolledRecord(source.rolled);
+  if (rolled) receipt.rolled = rolled;
   return receipt;
 }
 
@@ -169,6 +180,13 @@ export function attachAwardReceipts(items, receipts) {
   Object.defineProperty(items, 'historyReceipts', {
     value: Object.freeze(list(receipts).map((entry) => Object.freeze(itemReceipt(entry)))),
   });
+  return items;
+}
+
+/** The same carrier for a rolled amount's evidence (issue 1645): the chat poster reads it off the
+ *  awarded array rather than a call site relaying it. Holds a live `Roll` and is never persisted. */
+export function attachRolledAwards(items, awards) {
+  Object.defineProperty(items, 'rolledAwards', { value: Object.freeze(list(awards)) });
   return items;
 }
 

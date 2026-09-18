@@ -1164,6 +1164,93 @@ test('gathering yield projects straight and d100 authored previews without repla
   ]);
 });
 
+test('1645: a rolled amount is stated beside the number every yield projection carries', () => {
+  const rolled = { id: 'ore-result', componentId: 'ore', quantity: 3, quantityFormula: '1d4+1' };
+  const fixed = { id: 'clay-result', componentId: 'clay', quantity: 2 };
+  const getComponent = (_systemId, componentId) => ({ id: componentId, name: componentId });
+  const task = {
+    id: 'straight-task',
+    name: 'Quarry',
+    resolutionMode: 'straight',
+    resultGroups: [{ id: 'stone-group', name: 'Stone', results: [rolled, fixed] }],
+  };
+  const listing = makeBuilder({
+    gatheringActive: [
+      {
+        id: 'straight-active',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'straight-task',
+        status: 'inProgress',
+      },
+    ],
+    gatheringHistory: [
+      {
+        id: 'straight-history',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'straight-task',
+        status: 'succeeded',
+        createdResults: [
+          { componentId: 'ore', quantity: 3, rolled: { formula: '1d4+1', total: 3 } },
+          { componentId: 'clay', quantity: 2 },
+        ],
+      },
+    ],
+    getGatheringTask: () => task,
+    getComponent,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  const [rolledEntry, fixedEntry] = listing.activeRuns[0].gatheringYield.entries;
+  assert.equal(rolledEntry.qty, 3, 'a null qty renders as "not recorded", so the number stays');
+  assert.equal(rolledEntry.amountLabel, '1d4+1', 'and the expression rides beside it');
+  assert.equal(fixedEntry.qty, 2);
+  assert.ok(!('amountLabel' in fixedEntry), 'a fixed row states no expression at all');
+
+  const [rolledAward, fixedAward] = listing.history[0].createdResults;
+  assert.equal(rolledAward.quantity, 3, 'a recorded award states the integer it awarded');
+  assert.equal(
+    rolledAward.amountLabel,
+    `FABRICATE.App.Journal.RolledAmount|${JSON.stringify({ formula: '1d4+1', total: 3 })}`
+  );
+  assert.equal(fixedAward.quantity, 2);
+  assert.ok(!('amountLabel' in fixedAward), 'and a fixed award carries no label key');
+
+  const system = {
+    ...SYSTEM,
+    gatheringCraftingCheck: {
+      routed: {
+        type: 'fixed',
+        fixedOutcomes: [{ id: 'pass', name: 'Bounty', success: true, min: 10 }],
+      },
+    },
+  };
+  const tiers = makeBuilder({
+    system,
+    gatheringActive: [
+      {
+        id: 'routed-active',
+        craftingSystemId: system.id,
+        environmentId: 'env-1',
+        taskId: 'routed-task',
+        status: 'inProgress',
+      },
+    ],
+    getGatheringTask: () => ({
+      id: 'routed-task',
+      name: 'Hunt',
+      resolutionMode: 'routed',
+      resultGroups: [{ id: 'bounty-group', name: 'Bounty', results: [rolled, fixed] }],
+    }),
+    getComponent,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].gatheringYield.tiers;
+  assert.deepEqual(
+    tiers[0].yields.map((entry) => entry.quantity),
+    ['×1d4+1', '×2'],
+    'a tier yield renders one amount string, so the expression occupies it directly'
+  );
+});
+
 test('gathering routed yield uses authored tier bands, normalized group names, and failure policy', () => {
   const system = {
     ...SYSTEM,

@@ -12,6 +12,7 @@ import {
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
+import { normalizeQuantityFormula } from '../models/Result.js';
 import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
@@ -1860,10 +1861,8 @@ export class CraftingSystemManager {
     const rawQty = Number(salvage.ingredientQuantity);
     const ingredientQuantity = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
 
-    // Optional per-component salvage DC override: when set it replaces the
-    // system-level salvage check default DC at salvage time. null = use the default.
-    // Guard null/''/undefined explicitly so re-normalizing a null stays null
-    // (Number(null) is 0, which would otherwise become a spurious 0 override).
+    // A set override replaces the system-level salvage default DC; null uses it. null/''/undefined
+    // are guarded explicitly so re-normalizing a null stays null (`Number(null)` is a spurious 0).
     const dcOverride = (() => {
       const raw = salvage.dcOverride;
       if ([null, undefined, ''].includes(raw)) return null;
@@ -1878,9 +1877,8 @@ export class CraftingSystemManager {
       ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
       : [];
 
-    // Simple-mode SUCCESS-FIRST retain-one clamp (issue 764). Only runs with a Simple
-    // salvage-mode context; routed/progressive and the no-context default keep every
-    // group and the pre-#764 lower-bound-only `enabled` rule.
+    // Simple-mode SUCCESS-FIRST retain-one clamp (issue 764). Routed, progressive and the
+    // no-context default keep every group and the lower-bound-only `enabled` rule.
     const { salvageResolutionMode, salvageSimpleCheckHasFormula } = options;
     let resultGroups = normalizedGroups;
     let enabled = salvage.enabled === true && normalizedGroups.length > 0;
@@ -1895,10 +1893,8 @@ export class CraftingSystemManager {
       // Reserved failure group tolerated ONLY with an authored Simple check formula.
       if (failureGroup && salvageSimpleCheckHasFormula === true) clamped.push(failureGroup);
       resultGroups = clamped;
-      // A Simple config with no success group (e.g. a lone `role: 'failure'` group)
-      // cannot be enabled — the success branch's `slice(0, 1)` would otherwise award the
-      // failure group on a PASSED check. Unchanged by issue 1098, which gives the failure
-      // branch its own role-keyed selection rather than relaxing this clamp.
+      // A Simple config with no success group cannot be enabled: the success branch's
+      // `slice(0, 1)` would otherwise award a lone `role: 'failure'` group on a PASSED check.
       enabled = salvage.enabled === true && successGroup != null;
     }
 
@@ -1955,6 +1951,7 @@ export class CraftingSystemManager {
   _normalizeSalvageResult(result) {
     if (!result || typeof result !== 'object') return null;
     const compId = result.componentId || result.systemItemId;
+    const quantityFormula = normalizeQuantityFormula(result.quantityFormula);
     return {
       id: result.id || foundry.utils.randomID(),
       componentId: compId || null,
@@ -1963,6 +1960,8 @@ export class CraftingSystemManager {
         Number.isFinite(Number(result.quantity)) && Number(result.quantity) >= 1
           ? Number(result.quantity)
           : 1,
+      // Absence is the fixed-amount state, so `''` and whitespace collapse to it (issue 1645).
+      ...(quantityFormula && { quantityFormula }),
       propertyMacroUuid: result.propertyMacroUuid || null,
     };
   }

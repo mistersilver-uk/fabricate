@@ -1,61 +1,22 @@
 /**
  * Pure presentation helper for the crafting result chat card.
  *
- * `buildCraftingChatContent` takes an already-resolved, plain data model (no
- * Foundry documents, no globals) and returns the HTML string posted via
- * `ChatMessage.create`. Keeping it pure makes the card markup trivially
- * unit-testable without stubbing `game`/`ChatMessage`, mirroring
- * {@link module:src/systems/GatheringChatCard} so the crafting and gathering
- * result cards render as one consistent, Fabricate-namespaced card. All
- * image/name resolution happens in the caller (CraftingEngine); this module
- * only formats.
+ * `buildCraftingChatContent` takes an already-resolved, plain data model — no Foundry documents and
+ * no globals, so every name and image is resolved by the caller — and returns the HTML posted as a
+ * `ChatMessage` content. {@link buildResultCard} is the rendering core, parameterised by a
+ * label-key map, and salvage renders through it verbatim so a salvage card IS this card.
  *
- * The rendering core is factored into {@link buildResultCard}, a generic result
- * card parameterised by a label-key map. Salvage reuses it verbatim (via
- * {@link module:src/systems/SalvageChatCard}) so a salvage card is the SAME card
- * — same markup, same `fabricate-craft-chat` styles — reading only as a salvage
- * analogue rather than a second, unrelated format (issue 675). Sharing the core
- * this way also keeps the two callers from duplicating the renderer.
+ * The markup ATOMS — {@link esc}, {@link renderItem}, {@link renderSection},
+ * {@link renderRollTotal}, {@link tierStepText} and {@link renderComplications} — are exported
+ * because the bulk salvage and gathering cards compose rows this core cannot express, and a second
+ * spelling of one `<li>` would drift from the stylesheet the moment either side is edited.
+ * {@link renderComplications} is parameterised by the BEM block token its caller's card uses.
  *
- * ## The markup ATOMS are exported, not just the card (issue 859)
- *
- * `buildResultCard` has ONE `subjectName`, ONE `rollValue` and ONE `status`, so it
- * cannot express the N subjects a bulk salvage run produces. Rather than let
- * {@link module:src/systems/BulkSalvageChatCard} re-spell the same `<li>`/`<section>`
- * shapes — which would drift from the stylesheet the moment either side is edited —
- * {@link esc}, {@link renderItem}, {@link renderSection}, {@link renderRollTotal} and
- * {@link tierStepText} are exported so the aggregate card composes the SAME atoms
- * against the SAME `fabricate-craft-chat` rules. The promotion is purely additive:
- * every function keeps its body, so the crafting and salvage cards are byte-identical
- * to what `tests/salvage-chat-card.test.js` already pins.
- *
- * {@link tierStepText} is an EXTRACTION rather than a promotion: the bulk card needs
- * the tier-step SENTENCE inline in a subject row, not the block-level notice
- * `renderTierStep` wraps it in, and two derivations of one sentence is exactly the
- * pattern this module exists to avoid. `renderTierStep` now renders what
- * `tierStepText` returns, and the `null` return preserves its "no note at all" branch
- * exactly (see that function's contract).
- *
- * ## The complications block lives here and serves all FOUR builders (issue 1286)
- *
- * A fired component complication has to reach the crafting card, the salvage card, the
- * gathering card and the aggregated bulk-salvage card. Four copies of one `<li>` shape
- * is the duplication this module already exists to prevent, so {@link renderComplications}
- * is a single renderer parameterised by the BEM block token its caller's card uses —
- * `craft` for the three that emit `fabricate-craft-chat`, `gather` for the gathering
- * card. The gathering card imports it rather than growing a second copy, which is the
- * first thing that module has ever taken from this one.
- *
- * Two properties of that renderer are load-bearing rather than incidental:
- *
- *  - **It is the escaping boundary.** A complication contributes a GM-authored `name`
- *    and a free-prose `description`, and Fabricate imports third-party crafting systems,
- *    so a hostile definition carrying markup is the threat model — not a typo. EVERY
- *    authored string routes through {@link esc}, and every attribute the block writes is
- *    DOUBLE-quoted, because `esc` deliberately does not escape `'`.
- *  - **It returns `''` for an empty list**, exactly as {@link renderSection} does, so a
- *    component with no complications produces a card byte-identical to the pre-change
- *    build in all four builders. That identity is asserted, not assumed.
+ * Two contracts hold across every builder. This module is the escaping boundary: a complication
+ * contributes GM-authored prose and Fabricate imports third-party systems, so every authored string
+ * routes through {@link esc} and every attribute it writes is double-quoted, because `esc`
+ * deliberately does not escape `'`. And an absent optional block renders '' rather than an empty
+ * wrapper, so a card that has none is byte-identical — asserted, not assumed.
  */
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
@@ -89,6 +50,17 @@ const COMPLICATIONS_HEADING_KEY = 'FABRICATE.Chat.Complications';
  * A FLAT leaf in the `Chat` namespace, on the same rule as the heading key above.
  */
 const COMPLICATION_POSITION_KEY = 'FABRICATE.Chat.ComplicationResult';
+
+/**
+ * The two keys a ROLLED result amount reads (issue 1645), on the `FABRICATE.Chat.Roll` precedent
+ * the heading key above records: one sentence for an amount that produced something, one for an
+ * EMPTY AWARD, whose total was zero or less and so created no item at all. Both carry `{formula}`
+ * and `{total}`, following the journal's own `{formula} = {total}` rolled-total wording.
+ */
+const ROLLED_AMOUNT_KEYS = Object.freeze({
+  produced: 'FABRICATE.Chat.RolledAmount',
+  empty: 'FABRICATE.Chat.RolledAmountEmpty',
+});
 
 /**
  * The card BEM blocks a complications block can be rendered into, by token.
@@ -136,15 +108,45 @@ export function esc(value) {
 }
 
 /**
+ * The localized sentence for an entry whose amount was ROLLED, or '' when it was fixed.
+ *
+ * Substituted here for the reason {@link tierStepText} gives: every card module takes `localize`
+ * as a key-only `(key) => string`. A zero or negative award reads the empty-award key, because the
+ * player is owed the roll that produced nothing rather than a silently missing row.
+ *
+ * @param {{formula?: string, total?: number}|null|undefined} rolled The award's recorded roll.
+ * @param {number} quantity The integer actually awarded; 0 is the empty award.
+ * @param {(key: string) => string} localize Key-only lookup.
+ * @returns {string}
+ */
+export function rolledAmountText(rolled, quantity, localize = (key) => key) {
+  const formula = typeof rolled?.formula === 'string' ? rolled.formula.trim() : '';
+  const total = Number(rolled?.total);
+  if (formula === '' || !Number.isFinite(total)) return '';
+  const key = Number(quantity) > 0 ? ROLLED_AMOUNT_KEYS.produced : ROLLED_AMOUNT_KEYS.empty;
+  return String(localize(key)).replace('{formula}', formula).replace('{total}', String(total));
+}
+
+/**
  * Render one image-backed entry (created result, consumed ingredient, or tool)
  * as a list item. `quantity` is rendered as a `N×` prefix when present and > 1.
+ *
+ * A `rolled` amount adds a second run to the row in the card's own `__roll` treatment, which is
+ * what {@link renderRollTotal} states a check total in and is the one run here that must not be
+ * ellipsed away at chat width; `__item-roll` names the per-row instance so a rule may reach it
+ * without reaching the card-level total row. An entry without one renders byte-identically.
  */
-export function renderItem({ name, img, quantity }) {
+export function renderItem({ name, img, quantity, rolled }, localize = (key) => key) {
   const label = Number(quantity) > 1 ? `${Number(quantity)}× ${esc(name)}` : esc(name);
+  const note = rolledAmountText(rolled, quantity, localize);
   return [
     '<li class="fabricate-craft-chat__item">',
     `<img class="fabricate-craft-chat__icon" src="${esc(img || ITEM_FALLBACK_IMG)}" alt="" />`,
     `<span class="fabricate-craft-chat__label">${label}</span>`,
+    note
+      ? '<span class="fabricate-craft-chat__roll fabricate-craft-chat__item-roll">' +
+        `${esc(note)}</span>`
+      : '',
     '</li>',
   ].join('');
 }
@@ -210,7 +212,7 @@ function renderTierStep(tierStep, keys, localize) {
 }
 
 /** Render a titled section with an icon grid; returns '' when there are no entries. */
-export function renderSection({ heading, entries, modifier }) {
+export function renderSection({ heading, entries, modifier, localize = (key) => key }) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const sectionClass = modifier
     ? `fabricate-craft-chat__section fabricate-craft-chat__section--${modifier}`
@@ -219,7 +221,7 @@ export function renderSection({ heading, entries, modifier }) {
     `<section class="${sectionClass}">`,
     `<div class="fabricate-craft-chat__heading">${esc(heading)}</div>`,
     '<ul class="fabricate-craft-chat__grid">',
-    ...entries.map((entry) => renderItem(entry)),
+    ...entries.map((entry) => renderItem(entry, localize)),
     '</ul>',
     '</section>',
   ].join('');
@@ -414,7 +416,8 @@ export function renderComplications({
  * @param {'succeeded'|'failed'} model.status
  * @param {string}  model.actorName
  * @param {string}  [model.subjectName] - The recipe (crafting) or source component (salvage).
- * @param {Array<{name:string,img:string,quantity:number}>} [model.results]
+ * @param {Array<{name:string,img:string,quantity:number,rolled?:{formula:string,total:number}}>}
+ *   [model.results] - A `rolled` entry states its roll; `quantity` 0 is an empty award (issue 1645).
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when
@@ -456,6 +459,8 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
         heading: loc(keys.results),
         entries: model.results,
         modifier: 'results',
+        // Only a RESULT amount can be rolled, so only the two result sections localize a row.
+        localize: loc,
       }),
       renderSection({
         heading: loc(keys.consumed),
@@ -479,6 +484,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
         heading: loc(keys.producedOnFailure),
         entries: model.results,
         modifier: 'results',
+        localize: loc,
       }),
       renderSection({
         heading: loc(keys.consumedOnFailure),

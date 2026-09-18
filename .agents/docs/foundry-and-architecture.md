@@ -97,6 +97,12 @@ For BOTH compendium cases, read folder membership from `pack.index[].folder` —
 Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
 A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
+- **A hand-rolled `@path` reference pattern narrower than core's own silently misses references core recognises, and a maximised-total helper does not need to neutralise paths itself before rolling.**
+`Roll.parse` already substitutes every roll-data reference it recognises with `0` (`missing: "0"`) before evaluating, and V14 recognises a braced `@{…}` form that a bare `@[-.\w]+` pattern misses.
+`ROLL_DATA_PATH` in `src/utils/rollFormulaRollability.js` matches core's own wider pattern (`/@\{[-.\w]+\}|@[-.\w]+/g`) for exactly this reason, and `maximisedTotal` rolls the formula verbatim rather than hand-neutralising it first (issue 1645).
+- **`evaluateSync({ maximize: true })` is deterministic for every dice term but SKIPS dice modifiers entirely, so its maximised total is not a formula's true ceiling.**
+A keep-highest or keep-lowest modifier is never applied under maximise, so `4d6kh3` maximises to 24 (every die counted) rather than 18 (the kept three).
+A rollability floor built on this call is a `total > 0` proof only, never a stated maximum, and must not be read as one: see `maximisedTotal` in `src/utils/rollFormulaRollability.js` (issue 1645).
 - `game.documentTypes.Item` is a plain **array**, not a `Set` — `Game#setupPackages` builds it with `Object.keys(types)` (verified against V13.351 `client/game.mjs`).
   A defensive `Array.from()` is harmless and still appears in the harness, but code may index and `.includes()` it directly.
   This note previously claimed `Set`; a `.has()` written against it would have failed at runtime while passing every fake that copied the note.
@@ -244,6 +250,9 @@ The document is broadcast in full to every connected client: `ChatMessage.metada
 A player can therefore read a GM whisper's `content` straight out of `game.messages` in the console.
 This is core behaviour and is identical for core's own Private GM Roll, so it is not a Fabricate defect — but it is the honest limit on any claim that a whispered card is a safe home for secret text, and it belongs beside the world-setting disclosure note in `data-models/spec.md` § Component rather than being rediscovered.
 Fabricate's `visibility: 'gmOnly'` is therefore a **disclosure** guarantee (no Fabricate surface shows it) and never a **confidentiality** guarantee.
+- **`ChatMessage#rolls` accepts live `Roll` instances directly, and a non-empty array is what plays the dice sound and animates a dice-animation module like Dice So Nice for that message.**
+A message's own custom `content` survives alongside a non-empty `rolls` array, because the card renders its own child elements rather than relying on core's rolled-message template.
+`CHAT_MESSAGE_STYLES.ROLL` is retired by V14.367, so do not gate a "this message is a roll" check on it: a non-empty `rolls` array is the live signal (reported by Foundry review; core source for the style removal is not in this tree, so confirm against your pinned build before relying on the specific version).
 - **A test double for a Foundry util must match the REAL helper's edge semantics, not just its happy path.** A stub LOOSER than core produces false passes, which is the direction nobody notices under `npm test`: the essence-macro test fixtures' hand-rolled `setProperty` stub vivified on `== null` (replacing a `null` intermediate with `{}`, where real Foundry throws) and omitted core's `__proto__`/`constructor`/`prototype` refusal, so no test built on that stub could ever fail on the `setProperty` defect above while the real code aborted crafts in production.
 See `tests/helpers/essenceFixtures.js`.
 - **Foundry's LIGHT application theme changes almost nothing about a Fabricate window, so a light-theme screenshot that looks dark is correct rather than broken.**

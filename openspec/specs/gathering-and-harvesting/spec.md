@@ -647,6 +647,7 @@ A task no longer carries a `region`/`regions` match tag (the inert legacy tag na
 A task whose required `weather` or `timeOfDay` values are not satisfied by the current enabled condition dimensions remains composed by biome, but is not attemptable until the condition gate passes.
 6. Persisted, imported, or seeded drop rows require a `dropRate` integer from 0 to 100, a positive quantity, and a reward target that resolves at the data boundary. `componentId` targets must match a component in the owning crafting system. `itemUuid` targets must resolve through Foundry UUID lookup to an Item document.
 Unresolved editor rows may omit component references while a GM is still authoring the row, but they must not be saved or imported until assigned a valid component or item reference.
+A drop row's quantity is always FIXED: the rolled form is a result amount only, so a drop row carries no amount expression.
 7. Drop row condition modifier values are signed integer percentage-point adjustments.
 Every condition modifier (time-of-day, weather, biome) applies under the single global `rules.dropModifierMode`; the mode is NOT selectable per entry.
 In additive mode matching modifiers are summed into the final drop chance; in multiplicative mode matching modifiers scale it.
@@ -659,6 +660,10 @@ New Manager authoring and d100 runtime behavior use system Gathering Rules once 
 Character modifiers adjust the threshold side of d100 resolution and do not replace task visibility, pass/fail gates, stamina gates, node gates, or tool gates.
 11. A Gathering Task may declare stamina cost, node availability, risk overrides, encounter hooks, and condition or roll modifier providers where the selected gathering economy uses them.
 12. Per-environment overrides remain associated with the environment and must not rewrite the Gathering Task.
+13. A result-group result's rolled amount resolves through the shared result-amount resolver ONCE per attempt, in `plan()`, against the gathering character.
+`create()` awards the planned integer and never resolves again, so the journalled plan and the awarded stack are one roll rather than two.
+An award that reaches `create()` with no parked plan to read resolves there instead, still once.
+A planned amount of zero awards nothing, and the plan still records the roll that produced it.
 
 ## Gathering Tools Library
 

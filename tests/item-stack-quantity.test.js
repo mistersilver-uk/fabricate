@@ -239,7 +239,7 @@ const SITE_MAPPING = [
     file: 'src/systems/CraftingEngine.js',
     accessor: 'setStackQuantity',
     sites: 2,
-    anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, result\.quantity\);/],
+    anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, amount\);/],
   },
   {
     site: 'RecipeManager have counts',

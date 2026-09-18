@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
+import { attachAwardReceipts, attachRolledAwards } from '../src/systems/runHistoryEvidence.js';
 
 /**
  * The published card renders ACKNOWLEDGED awards only: production hands `_postCraftChatMessage` the
@@ -22,8 +22,24 @@ function awardedResults(entries) {
       name: entry.name,
       img: entry.img,
       quantity: entry.system?.quantity ?? 1,
+      ...(entry.rolled && { rolled: entry.rolled }),
     }))
   );
+}
+
+/** One award's evidence in the shape `rolledAwardEvidence` builds. */
+function rolledAward({ formula, total, quantity, name = 'Iron Ore', roll = { total } }) {
+  return {
+    resultId: 'r1',
+    componentId: 'ore',
+    formula,
+    total,
+    quantity,
+    rolled: { formula, total },
+    roll,
+    name,
+    img: '',
+  };
 }
 
 // Minimal globals
@@ -599,4 +615,86 @@ test('_postCraftChatMessage: failure does not post when chatOutput toggle is off
     0,
     'No failure chat message should be posted when chatOutput toggle is off'
   );
+});
+
+// Rolled result amounts (issue 1645)
+
+test('_postCraftChatMessage: a rolled award states its roll and carries the evaluated Roll', async () => {
+  setupGame(true);
+  resetChat();
+
+  const roll = { total: 3, formula: '1d4+1' };
+  const createdResults = attachRolledAwards(
+    awardedResults([
+      {
+        name: 'Iron Sword',
+        uuid: 'Item.sword',
+        img: 'icons/sword.png',
+        system: { quantity: 3 },
+        rolled: { formula: '1d4+1', total: 3 },
+      },
+    ]),
+    [rolledAward({ formula: '1d4+1', total: 3, quantity: 3, name: 'Iron Sword', roll })]
+  );
+
+  await new CraftingEngine({})._postCraftChatMessage({
+    success: true,
+    craftingActor: buildActor('Gandalf'),
+    recipe: buildRecipe(),
+    consumedIngredients: [],
+    tools: [],
+    createdResults,
+  });
+
+  assert.equal(chatCreated.length, 1);
+  assert.deepEqual(chatCreated[0].rolls, [roll], 'the evaluated roll rides along on the message');
+  assert.ok(chatCreated[0].content.includes('3× Iron Sword'), 'the awarded integer');
+  assert.ok(
+    chatCreated[0].content.includes('FABRICATE.Chat.RolledAmount'),
+    'and the rolled-amount key (identity localize)'
+  );
+});
+
+test('_postCraftChatMessage: an empty award is a row of its own and still sounds its dice', async () => {
+  setupGame(true);
+  resetChat();
+
+  const roll = { total: -3, formula: '1d4-8' };
+  const createdResults = attachRolledAwards(awardedResults([]), [
+    rolledAward({ formula: '1d4-8', total: -3, quantity: 0, roll }),
+  ]);
+
+  await new CraftingEngine({})._postCraftChatMessage({
+    success: true,
+    craftingActor: buildActor('Gandalf'),
+    recipe: buildRecipe(),
+    consumedIngredients: [],
+    tools: [],
+    createdResults,
+  });
+
+  const { content, rolls } = chatCreated[0];
+  assert.deepEqual(rolls, [roll], 'a roll that produced nothing was still rolled');
+  assert.ok(content.includes('Iron Ore'), 'the row names what produced nothing');
+  assert.ok(content.includes('FABRICATE.Chat.RolledAmountEmpty'), 'stated as an empty award');
+  assert.ok(!content.includes('FABRICATE.Chat.RolledAmount<'), 'never the produced sentence');
+});
+
+test('_postCraftChatMessage: a fixed award carries no rolls key at all', async () => {
+  setupGame(true);
+  resetChat();
+
+  await new CraftingEngine({})._postCraftChatMessage({
+    success: true,
+    craftingActor: buildActor('Gandalf'),
+    recipe: buildRecipe(),
+    consumedIngredients: [],
+    tools: [],
+    createdResults: awardedResults([
+      { name: 'Iron Sword', uuid: 'Item.sword', img: '', system: { quantity: 1 } },
+    ]),
+  });
+
+  assert.ok(!('rolls' in chatCreated[0]), 'no dice were rolled, so the message carries none');
+  assert.ok(!chatCreated[0].content.includes('RolledAmount'), 'and the card states no roll');
 });

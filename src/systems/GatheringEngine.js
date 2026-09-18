@@ -48,6 +48,7 @@ import {
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
 import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
+import { gatheringResultAmountErrors } from './gatheringResultGroups.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
@@ -5621,6 +5622,7 @@ function validateTaskConfiguration(task, system = null) {
     if (hasInvalidFixedResultQuantity(resultGroups)) {
       errors.push('Gathering results require finite positive numeric quantities');
     }
+    errors.push(...gatheringResultAmountErrors(resultGroups));
   }
 
   if (resolutionMode === 'd100') {
@@ -5654,9 +5656,7 @@ function validateTaskConfiguration(task, system = null) {
     }
   }
 
-  // Routed gathering resolves through the system-level gathering check formula,
-  // not a per-task result-selection provider: require the configured routed roll
-  // formula. The result-group / group-name checks above still apply.
+  // Routed gathering resolves through the system-level check formula, not a per-task provider.
   if (
     resolutionMode === 'routed' &&
     !stringOrNull(system?.gatheringCraftingCheck?.routed?.rollFormula)

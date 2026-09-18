@@ -698,6 +698,26 @@ describe('recipeBrowserModel — the inspector Produces list', () => {
     assert.equal(success.failure, false);
   });
 
+  it('1645: states a rolled amount as its expression and a fixed one as its number', () => {
+    const [fixedRow, rolledRow] = buildRecipeProduceRows(
+      {
+        resultGroups: [
+          {
+            id: 'g',
+            results: [
+              { id: 'fixed', componentId: 'cmp-potion', quantity: 2 },
+              { id: 'rolled', componentId: 'cmp-potion', quantity: 1, quantityFormula: ' 1d4+1 ' }
+            ]
+          }
+        ]
+      },
+      { componentOptions: COMPONENTS }
+    );
+    assert.equal(fixedRow.amountLabel, '2', 'a fixed amount labels its number');
+    assert.equal(rolledRow.amountLabel, '1d4+1', 'a rolled one labels its expression, trimmed');
+    assert.equal(rolledRow.quantity, 1, 'the authored fallback is still carried beside it');
+  });
+
   it("marks the reserved role: 'failure' group so it is never shown as an output", () => {
     const failure = rows.find((row) => row.groupId === 'g-failure');
     assert.equal(

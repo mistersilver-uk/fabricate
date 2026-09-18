@@ -11,6 +11,7 @@ import {
   resolveItemEssences,
 } from '../utils/essenceResolver.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
+import { diceEngine } from '../utils/rollFormulaRollability.js';
 import {
   itemResolvesToComponent,
   itemResolvesToTool,
@@ -2064,10 +2065,10 @@ export class RecipeManager {
     return component.img || FALLBACK_COMPONENT_IMG;
   }
 
-  /** Resolve a result description using the component name. */
-  resolveResultDescription(recipe, componentId, quantity = 1) {
+  /** Resolve a result description. `quantityFormula` wins: a rolled amount states its expression. */
+  resolveResultDescription(recipe, componentId, quantity = 1, quantityFormula = null) {
     const name = this.resolveComponentName(recipe, componentId);
-    return `${quantity}x ${name}`;
+    return `${quantityFormula ?? quantity}x ${name}`;
   }
 
   /** Resolve the icon for a recipe (synchronous): the recipe's own img, which may be the default
@@ -2230,18 +2231,20 @@ export class RecipeManager {
   }
 
   /** Validation required to *persist* a recipe: structural and completeness integrity plus
-   * essence, tag-placeholder and resolution-mode reference checks. Signature uniqueness is
-   * excluded — a conflict never blocks persistence, only activation. */
+   * essence, tag-placeholder and resolution-mode checks. Signature uniqueness is excluded — a
+   * conflict never blocks persistence, only activation. `Roll` reaches `Result.validate` from
+   * here, so a rolled amount that can never award anything is refused at the write. */
   _validateRecipeForPersistence(recipe, { requireComplete = true } = {}) {
-    const baseValidation = requireComplete ? recipe.validate() : recipe.validateStructure();
-    // Collect structured issues in the same order as the raw error strings. Resolution-mode
-    // failures carry a stable `code` plus id-free params so the UI can localize them (issue 595).
+    const injected = { Roll: diceEngine() };
+    const baseValidation = requireComplete
+      ? recipe.validate(injected)
+      : recipe.validateStructure(injected);
+    // Structured issues in the same order as the raw error strings, carrying a stable `code` plus
+    // id-free params so the UI can localize them; a string-only validator rides UNCODED (issue 595).
     const issues = [];
     const pushPlain = (list) => {
       for (const message of list || []) issues.push({ code: null, params: {}, message });
     };
-    // A sub-validator supplying structured `issues` (coded and id-free, issue 595) contributes
-    // them directly; a legacy string-only validator rides as UNCODED issues.
     const pushValidation = (validation) => {
       if (Array.isArray(validation?.issues)) issues.push(...validation.issues);
       else pushPlain(validation?.errors);
@@ -2259,20 +2262,17 @@ export class RecipeManager {
     };
   }
 
-  /** Full validity required to *activate* a recipe: completeness plus all persistence checks plus
-   * signature uniqueness. `issues` mirrors `errors` with a stable `code` plus params so the UI
-   * can localize the enable failure (issue 550). */
+  /** Full validity required to *activate* a recipe: completeness, every persistence check and
+   * signature uniqueness. `issues` mirrors `errors` with a stable `code` (issue 550). */
   _validateRecipeForActivation(recipe) {
     const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
     const errors = [...persistence.errors];
-    // Structured, coded issues run in parallel with the raw `errors` strings so a UI caller can
-    // localize them (issue 550); the remaining base/essence/tag strings ride uncoded.
+    // Coded issues run in parallel with the raw strings so a UI caller can localize them (550).
     const issues = [...persistence.issues];
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
     issues.push(...(signatureValidation.issues || []));
-    // A DISABLED essence blocks activation only (issue 1036) — never persistence. See
-    // `_validateEnabledEssenceReferences` for why that placement is load-bearing.
+    // A DISABLED essence blocks activation only (issue 1036) — never persistence.
     const disabledEssenceValidation = this._validateEnabledEssenceReferences(recipe);
     errors.push(...disabledEssenceValidation.errors);
     issues.push(...disabledEssenceValidation.issues);
