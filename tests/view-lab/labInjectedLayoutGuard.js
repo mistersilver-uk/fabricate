@@ -1,14 +1,7 @@
 /**
  * Finds content-width reductions caused specifically by the View Lab stylesheet.
  *
- * Production layout can intentionally reserve scrollbar space. The caller supplies
- * measurements from the same rendered nodes with the View Lab stylesheet enabled
- * and disabled, so unchanged production reservations are not reported as lab drift.
- *
- * @param {Array<{element: Element, boxWidth: number, clientWidth: number}>} withLab
- * @param {Array<{element: Element, boxWidth: number, clientWidth: number}>} withoutLab
  * @param {number} [tolerance=1] Sub-pixel rounding allowance in CSS pixels.
- * @returns {Array<{element: Element, boxWidth: number, clientWidth: number, lost: number}>}
  */
 export function findLabInjectedContentWidthLosses(withLab, withoutLab, tolerance = 1) {
   const withoutLabByElement = new Map(

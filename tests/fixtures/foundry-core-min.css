@@ -1,32 +1,12 @@
 /*
- * Minimal stand-in for FoundryVTT V13's core stylesheet (`/css/foundry2.css`),
- * capturing ONLY the load-bearing cascade behaviour that affects font-size in the
- * Fabricate manager. It is deliberately tiny and stable rather than a 466 KB vendored
- * copy that drifts across Foundry releases.
- *
- * Reproduced faithfully (verified against a live Foundry V13 instance):
- *   1. Core CSS lives entirely inside @layer, so any UNLAYERED module rule
- *      (fabricate.css) wins regardless of specificity.
- *   2. @layer reset sets `input, button, textarea, select { font: inherit }`, so a
- *      control with no fabricate font-size inherits the app base — this is the "Foundry
- *      default bleed" the audit hunts for.
- *   3. The application base font-size is --font-size-14 = 0.875rem (14px), applied to
- *      the app root; the html root stays at the 16px default (the rem anchor).
- *   4. The core LIST rules, which give every `<li>` a 4px bottom margin and exempt the
- *      last child. Verified byte-for-byte against a harvested Foundry 14.365
- *      `css/foundry2.css`. They are here because they are load-bearing for GEOMETRY, not
- *      only for font-size: a Fabricate browser row that is an `<li>` inherits the margin,
- *      and in a CSS grid `align-items: stretch` sizes an item's MARGIN box to its row, so
- *      the last card in a grid takes the exempted 4px as extra border-box height and comes
- *      out taller than its row siblings with no content difference to explain it. Every
- *      geometry gate that renders an `<li>` against this fixture must see that, or it
- *      measures a page the product never draws — which is how the defect reached a
- *      published frame unmeasured. Foundry neutralises the margin only for AppV1
- *      (`body.game .app ul li { margin: unset }`), and the Fabricate manager is an
- *      ApplicationV2, so the neutraliser is deliberately NOT reproduced.
- *
- * A recipe-studio element whose computed font-size equals 14px is therefore Foundry
- * bleed; anything else is fabricate-controlled.
+ * Minimal stand-in for FoundryVTT's core stylesheet (`/css/foundry2.css`), carrying only the
+ * cascade behaviour Fabricate's geometry and font-size gates depend on, verified against a live
+ * V13 instance and a harvested 14.365 sheet. Core lives entirely inside `@layer`, so an unlayered
+ * module rule wins on layer membership alone; `@layer reset` gives controls `font: inherit`, so a
+ * control with no fabricate font-size inherits the 14px app base — that 14px IS the Foundry
+ * bleed the audit hunts. The core LIST rules are load-bearing for GEOMETRY, not only font-size:
+ * under `align-items: stretch` the exempted last-child margin makes the last card taller than its
+ * row siblings. Foundry's AppV1-only neutraliser is deliberately not reproduced.
  */
 @layer reset, variables, elements, blocks, applications;
 

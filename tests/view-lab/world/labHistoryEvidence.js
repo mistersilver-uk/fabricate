@@ -1,19 +1,11 @@
-/**
- * Persisted history-data witnesses: recovered identity, legacy row rolls and settled receipts.
- *
- * Records are assembled through the writers' own normalizers, so a field the Journal reads is a
- * field a manager persists. The mining witness keeps the saved world's independent per-row rolls
- * 12 and 94 with receipts 2 and 1, which no evaluated row quantity can supply.
- */
+/** Persisted history-data witnesses: recovered identity, legacy row rolls and settled receipts. */
 import { historyEvidenceFields, itemReceipt } from '../../../src/systems/runHistoryEvidence.js';
 
 import { ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 
 const MINING_TASK_ID = 'sm-task-prospect';
 const MINE_ENVIRONMENT_ID = 'sm-env-mine';
-// The retained registration spelling from the saved world: a pack address with no `Item`
-// qualifier. Its hauls use the equivalent `Item`-qualified spelling, and only that equivalence
-// recovers the mining quantities.
+// The retained registration spelling from the saved world: a pack address with no `Item` qualifier.
 const ORE_PACK = 'Compendium.fabricate-lab.ore';
 const ART = Object.freeze({
   'sm-iron-ore': 'commodities/stone/ore-chunk-brown.webp',
@@ -213,11 +205,6 @@ function craftingStep(recipe, { status, completedAt, consumed = [], created = []
 }
 
 // Evaluated rows as `[id, componentId, quantity, finalDropRate, roll, modifier]`.
-//
-// The legacy pair is the saved world's: two genuinely independent rolls, no root roll at all, and
-// authored quantities that deliberately differ from the receipts so nothing can read one for the
-// other. The shared trio carries one root roll and a modifier, so its raw roll differs from the
-// effective roll every row was read against.
 const MINING_LEGACY_ROWS = [
   ['legacy-iron-ore-roll-12', 'sm-iron-ore', 3, 90, 12],
   ['legacy-copper-ore-roll-94', 'sm-copper-ore', 5, 35, 94],

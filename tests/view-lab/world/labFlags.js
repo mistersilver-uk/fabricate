@@ -1,19 +1,4 @@
-/**
- * Foundry V13 flag semantics, in one place.
- *
- * The lab previously carried THREE different `getFlag` implementations — two literal-key lookups
- * returning `null`, and one literal-first-then-walk that was patched onto a single actor. None of
- * them was Foundry's, and the difference is not cosmetic: every Fabricate read goes through
- * `getFabricateFlag`, which normalises a bare key to the dotted `fabricate.<key>`. A literal-only
- * lookup answers `null` to all of it, so a frame renders cleanly and completely — showing nothing
- * learned, no tool wear, nothing broken, no realm discovered — whatever the fixture author seeded.
- * That is the worst failure this harness has: a confident, wrong screenshot.
- *
- * V13's implementation (`common/abstract/document.mjs:906-919`) delegates to `getProperty`
- * (`common/utils/helpers.mjs:701-713`), which tries the LITERAL key first and only then splits on
- * `.` and walks. Both halves matter — Foundry stores a dotted key literally when it was written as
- * one, so a walk-only implementation misses exactly the keys a literal-only one finds.
- */
+/** Foundry V13 flag semantics, in one place. */
 
 /**
  * Foundry's `getProperty`: literal key first, then a dotted walk.
@@ -33,9 +18,6 @@ export function getProperty(object, key) {
 /**
  * A V13-accurate `getFlag` bound to a document's own `flags`.
  *
- * Returns `undefined` for a missing flag, as Foundry does — not `null`. Callers distinguish the two:
- * `getFabricateFlag` applies its `defaultValue` on `undefined`.
- *
  * @param {object} document The document whose `flags` to read.
  * @returns {(scope: string, key: string) => unknown} The bound accessor.
  */
@@ -50,23 +32,6 @@ export function makeGetFlag(document) {
 /**
  * A `setFlag` that stores where Foundry stores, and MERGES the way Foundry merges.
  *
- * `setFlag(ns, key, v)` becomes `update({flags: {[ns]: {[key]: v}}})`, and V13's `updateSource`
- * expands dotted keys only when a TOP-LEVEL key contains a dot
- * (`common/abstract/data.mjs:442-451`). The top-level key here is `flags`, so the inner
- * `ns`/`key` pair never expands and a dotted `key` lands LITERALLY, one level deep — which is why
- * the three run containers do not agree with each other. See {@link RUN_CONTAINER_PATHS}.
- *
- * The write itself then goes through {@link applyUpdate}, exactly as the `update` seam does,
- * because a `setFlag` is an `update` — Foundry deep-merges the value and honours `-=key`
- * deletions at every depth of it. A shallow spread that stored the value verbatim got both
- * halves wrong, and the second one was fatal rather than cosmetic:
- * `writeAcknowledgedRunContainer` (`src/systems/runHistoryEvidence.js`) retires a finished run by
- * setting `active['-=<runId>'] = null` INSIDE the container it writes, so the lab kept a property
- * literally named `-=<runId>` whose value was `null`. `CraftingRunManager.getActiveRuns` is
- * `Object.values(container.active)`, so every subsequent read handed the UI a null run and
- * `findActiveRunForRecipe` threw on `run.recipeId` — a craft could be performed but its summary
- * could never be rendered.
- *
  * @param {object} document The document to write to.
  * @returns {(scope: string, key: string, value: unknown) => Promise<object>} The bound mutator.
  */
@@ -79,19 +44,8 @@ export function makeSetFlag(document) {
 }
 
 /**
- * Where each run container actually lives, mirroring `src/systems/runFlagInvalidation.js`.
- *
- * These are NOT uniform, and the asymmetry is real production behaviour rather than an oversight:
- *
- * - crafting and salvage go through `setFabricateFlag`, which issues
- *   `update({'flags.fabricate.fabricate.<key>': v})`. That is a top-level dotted key, so V13
- *   expands it — landing the container DOUBLY nested at `flags.fabricate.fabricate.<key>`.
- * - gathering uses a bare `actor.setFlag('fabricate', 'gatheringRuns', v)`, whose inner key has no
- *   dot, so nothing expands and it lands at `flags.fabricate.gatheringRuns`.
- *
- * The lab must seed ONE shape — production's — per container. Writing both spellings, as it did
- * before, makes it impossible for the lab to reproduce the depth bug this branch already shipped
- * once, because every reader finds something no matter which depth it looks at.
+ * Where each run container actually lives, mirroring `src/systems/runFlagInvalidation.js`. The lab
+ * must seed ONE shape — production's — per container.
  */
 export const RUN_CONTAINER_PATHS = Object.freeze({
   craftingRuns: ['fabricate', 'craftingRuns'],
@@ -101,9 +55,6 @@ export const RUN_CONTAINER_PATHS = Object.freeze({
 
 /**
  * Foundry's `expandObject`: a dotted TOP-LEVEL key becomes nested objects.
- *
- * `updateSource` applies this only when a top-level key contains a dot — which is the whole reason
- * the three run containers sit at two different depths. See {@link RUN_CONTAINER_PATHS}.
  *
  * @param {object} changes Flat or partly-dotted change set.
  * @returns {object} The expanded set.
@@ -129,17 +80,6 @@ export function expandObject(changes) {
 /**
  * Apply an expanded change set the way V13's `_updateDiff` does: deep merge, and `-=key` DELETES.
  *
- * The lab's documents previously updated with `Object.assign`, which is not an update in any sense
- * Foundry would recognise. Two consequences, both silent:
- *
- *   - a nested change replaced the whole branch instead of merging into it;
- *   - a deletion key produced a own-property literally NAMED
- *     `flags.fabricate.fabricate.craftingRuns.active.-=lab-run-x` and deleted nothing.
- *
- * `deleteRemovedActiveRunFlags`, `GatheringRunManager` and `RecipeVisibilityService.forgetLearnedRecipes`
- * all issue `-=` keys. Under `Object.assign` each appeared to succeed while changing nothing, so the
- * UI would render unchanged and the frame would read as a UI bug rather than a harness bug.
- *
  * @param {object} target Object to mutate.
  * @param {object} changes Expanded change set.
  * @returns {object} The mutated target.
@@ -164,11 +104,6 @@ export function applyUpdate(target, changes) {
 
 /**
  * Install V13-shaped `update` and `updateSource` on a lab document.
- *
- * `updateSource` matters beyond correctness of the write: `setFabricateFlag` forks on
- * `typeof document.updateSource === 'function'`, so without it EVERY lab write took the legacy
- * `setFlag` fallback while every production write took the `update` branch. The lab could not
- * exercise the path production runs.
  *
  * @param {object} document Document to equip.
  * @returns {object} The same document.

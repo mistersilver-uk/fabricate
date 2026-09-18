@@ -1,14 +1,4 @@
-/**
- * Localization for the View Lab, backed by the shipped strings.
- *
- * The lab resolves keys against the real `lang/en.json` rather than a per-case string map, so a
- * window title, a button label, and a status chip are the strings players actually see — which
- * matters for a screenshot, where text width is layout.
- *
- * Foundry's own `APPLICATION.TOOLS.*` labels come from the harvested core `lang/en.json`. They
- * only ever reach `data-tooltip`/`aria-label`, so a miss is cosmetically irrelevant, but the
- * lookup is wired anyway to keep the DOM faithful.
- */
+/** Localization for the View Lab, backed by the shipped strings. */
 
 function flatten(source, prefix, sink) {
   for (const [key, value] of Object.entries(source)) {
@@ -50,7 +40,6 @@ export async function createLocalizer() {
  * Build the `{localize, format}` pair Fabricate components read off `game.i18n`.
  *
  * @param {(key: string) => string} localize A resolver from {@link createLocalizer}.
- * @returns {{localize: Function, format: Function}}
  */
 export function toI18nStub(localize) {
   return {

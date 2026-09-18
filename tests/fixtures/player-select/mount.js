@@ -1,29 +1,4 @@
-/**
- * Mount the REAL converted player controls, and the three caption SHAPES, for issue 1511.
- *
- * Everything except the window frame around it is production code, reached through the real
- * Svelte plugin: each component is imported from `src/`, its own `<style>` is compiled and
- * injected exactly as the shipped bundle injects it, and `styles/fabricate.css` is served raw.
- * That matters more than usual here, because both questions the suite asks are about things a
- * hand-written copy of the markup could not reproduce — the listeners a caption click meets, and
- * a `min-width` that only exists in a compiled scoped block.
- *
- * `?subject=` picks one of seven:
- *
- *   filters   `InventoryFilters`, whose sort trigger carries a floor
- *   journal   `JournalListShell`, whose sort trigger carries a floor and renders twice in the app
- *   book      `InventoryBookDetail`, whose page-size trigger carries a floor
- *   system    `InventorySystemSelector`, the one converted row that REFUSES a floor
- *   label     a bare `Select` re-wrapped in the `<label>` the conversion demotes
- *   span      the same control in the `<span>` the conversion demotes it to
- *   field     the primitive's OWN labelled form (`Select label=`), carried here as a third
- *             subject. It rendered `<Field as="label">` around the trigger when this fixture
- *             landed — a surviving `<label>` wrapper with twelve live callers — and issue 1510
- *             repaired it onto `Field as="div"` on the report this subject produced
- *
- * `?value=` picks which option starts selected, so the same subject can be measured with its
- * shortest and its longest label without remounting into a different tree.
- */
+/** Mount the REAL converted player controls, and the three caption SHAPES, for issue 1511. */
 import { mount } from 'svelte';
 
 import en from '../../../lang/en.json';
@@ -87,8 +62,6 @@ const JOURNAL_SORTS = [
 /**
  * The three caption shapes around one bare `Select`, hosted the way the journal's sort row hosts
  * its control (the wrapper and caption classes are the difference under test).
- *
- * @returns {void}
  */
 function mountShape() {
   mountCaptionShape({
