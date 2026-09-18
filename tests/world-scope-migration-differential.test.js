@@ -10,7 +10,7 @@ import {
   buildWorldScopeGrouping,
   ENTITY_TYPE_FIELDS,
   WORLD_IDENTITY_FIELDS,
-} from '../src/migration/worldScopeEntityGrouping.js';
+} from '../src/systems/worldScopeEntityGrouping.js';
 import { COMPONENT_SCOPE } from '../src/systems/componentScope.js';
 import { ESSENCE_SCOPE } from '../src/systems/essenceScope.js';
 import { resolveScopedDefinition } from '../src/systems/scopedDefinitions.js';
@@ -590,7 +590,7 @@ test('the drift detector is EMPTY on the migration own output, for every corpus 
 test('the FOURTH-target walk over the three scope payloads is INERT, and that is COUNTED', async () => {
   // `#### D6` requires the belt-and-braces arm to find nothing on a correctly ordered pass.
   const { keyedRemapper, rewriteMembershipReferences } =
-    await import('../src/migration/worldScopeReferenceRewrite.js');
+    await import('../src/systems/worldScopeReferenceRewrite.js');
   for (const scenario of scenarioSpecs()) {
     const before = normalizeCorpus(CraftingSystemManager, scenario.raw);
     const { report, migrated } = migrateAndSave(before);
@@ -810,7 +810,7 @@ test('idempotence (b) the map image: applying the UNGUARDED rewrite half twice i
     rewriteRecipeReferences,
     rewriteSystemReferences,
     rewriteGatheringSliceReferences,
-  } = await import('../src/migration/worldScopeReferenceRewrite.js');
+  } = await import('../src/systems/worldScopeReferenceRewrite.js');
   const before = normalizeCorpus(CraftingSystemManager, scenarioSpecs()[0].raw);
   const result = migrateWorldScopeEntities({
     recipes: before.recipes,

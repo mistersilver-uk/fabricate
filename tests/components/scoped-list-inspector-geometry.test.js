@@ -110,7 +110,7 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
     'src/utils/scalars.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/utils/definitionIndex.js',
     'src/utils/sourceReferenceUnion.js',
     'src/ui/model/browserPagination.js',

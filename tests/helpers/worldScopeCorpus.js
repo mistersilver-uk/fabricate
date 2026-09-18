@@ -4,7 +4,7 @@
  * and which FAILS the quality gate.
  */
 
-import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../../src/migration/worldScopeEntityGrouping.js';
+import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../../src/systems/worldScopeEntityGrouping.js';
 import { membershipKey } from '../../src/systems/scopedDefinitions.js';
 import { createScopedDefinitionStore } from '../../src/systems/scopedDefinitionStore.js';
 import {

@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
-import { buildWorldScopeEntityNotice } from '../src/migration/worldScopeEntityNotice.js';
+import { buildWorldScopeEntityNotice } from '../src/systems/worldScopeEntityNotice.js';
 import {
   policyDefersSelection,
   resolveMaxModifierPicks,

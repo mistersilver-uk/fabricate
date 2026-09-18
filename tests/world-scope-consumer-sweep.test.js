@@ -8,7 +8,7 @@ import { getMatchHandler } from '../src/models/match/matchTypes.js';
 import {
   buildWorldIdentityDriftNotice,
   describeWorldIdentityDrift,
-} from '../src/migration/worldScopeEntityNotice.js';
+} from '../src/systems/worldScopeEntityNotice.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
 import {
   resolvedComponentsFor,

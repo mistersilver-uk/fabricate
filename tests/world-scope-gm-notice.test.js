@@ -10,13 +10,13 @@ import {
   getHighestRegisteredMigrationVersion,
   MigrationRunner,
 } from '../src/migration/MigrationRunner.js';
-import { buildWorldEssenceMergeRemapNotice } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import { buildWorldEssenceMergeRemapNotice } from '../src/systems/remapWorldScopeIdentityFlags.js';
 import {
   buildWorldEssenceMergeNotice,
   buildWorldScopeEntityNotice,
   buildWorldScopeIdentityRemapNotice,
   describeWorldEssenceMerge,
-} from '../src/migration/worldScopeEntityNotice.js';
+} from '../src/systems/worldScopeEntityNotice.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
@@ -348,7 +348,7 @@ test('src/main.js dispatches BOTH notices, each on the right channel', () => {
 
 test('every localization key the two notices reference exists in lang/en.json', () => {
   const source = readFileSync(
-    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    resolve(HERE, '..', 'src', 'systems', 'worldScopeEntityNotice.js'),
     'utf8'
   );
   const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldScopeEntities\.[A-Za-z]+)'/g)].map(
@@ -648,7 +648,7 @@ test('the 1.34.0 and 1.30.0 remap fallbacks and their lang/en.json strings compo
 
 test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.json', () => {
   const source = readFileSync(
-    resolve(HERE, '..', 'src', 'migration', 'remapWorldScopeIdentityFlags.js'),
+    resolve(HERE, '..', 'src', 'systems', 'remapWorldScopeIdentityFlags.js'),
     'utf8'
   );
   const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(
@@ -666,7 +666,7 @@ test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.
 
 test('every WorldEssenceMerge localization key the notice references exists in lang/en.json', () => {
   const source = readFileSync(
-    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    resolve(HERE, '..', 'src', 'systems', 'worldScopeEntityNotice.js'),
     'utf8'
   );
   const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(

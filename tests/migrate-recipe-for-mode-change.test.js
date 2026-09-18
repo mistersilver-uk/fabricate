@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   migrateRecipeForModeChange,
   classifyModeChange,
-} from '../src/migration/migrateRecipeForModeChange.js';
+} from '../src/systems/migrateRecipeForModeChange.js';
 
 const MODES = ['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'];
 const ROUTED_MODES = ['routedByIngredients', 'routedByCheck'];

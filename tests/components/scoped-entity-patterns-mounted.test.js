@@ -32,7 +32,7 @@ const SCOPED_RAW_MODULES = [
   'src/utils/scalars.js',
   // Issue 1370: the store now derives the DELETE half of the read union's key rule from the
   // one lifted-identity field list in the tree, which lives beside the migration that wrote it.
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
 ];
 
 /**

@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
+import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 // BY PATH, and the path matters.
 import {
   emptyWorldScopeEntityState,
