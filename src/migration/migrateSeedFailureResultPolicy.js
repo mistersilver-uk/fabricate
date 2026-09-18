@@ -6,7 +6,7 @@
 
 import { SEEDED_FAILURE_RESULT_POLICY } from '../utils/failureResultPolicy.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /** The three activity check blocks that carry a failure-result policy. */
 const CHECK_KEYS = Object.freeze([
@@ -43,7 +43,7 @@ export function migrateSeedFailureResultPolicy(data = {}) {
     return { systems: data.systems, recipes: data.recipes };
   }
 
-  for (const system of systems) applySeededFailureResultPolicy(system);
+  forEachSystem(systems, (system) => applySeededFailureResultPolicy(system));
 
   return { systems, recipes: Array.isArray(recipes) ? recipes : data.recipes };
 }

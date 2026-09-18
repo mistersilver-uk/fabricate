@@ -6,6 +6,8 @@
  * DIFFERENT field families and are deliberately not touched.
  */
 
+import { forEachSystem } from './migrationHelpers.js';
+
 const FIELD_RENAMES = [
   ['sourceUuid', 'registeredItemUuid'],
   ['sourceItemUuid', 'originItemUuid'],
@@ -28,13 +30,12 @@ function _renameEntryFields(entry) {
 
 export function migrateRenameSourceUuidFields(systems) {
   const safeSystems = Array.isArray(systems) ? systems : [];
-  for (const system of safeSystems) {
-    if (!system || typeof system !== 'object') continue;
+  forEachSystem(safeSystems, (system) => {
     for (const key of ENTRY_ARRAY_KEYS) {
       const list = system[key];
       if (!Array.isArray(list)) continue;
       for (const entry of list) _renameEntryFields(entry);
     }
-  }
+  });
   return { systems: safeSystems };
 }

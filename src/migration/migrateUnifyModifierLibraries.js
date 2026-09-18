@@ -5,7 +5,7 @@
  * whose references this pass can rewrite EXHAUSTIVELY.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /** Where the check-modifier catalogue lived between `1.22.0` and `1.23.0`. */
 const LEGACY_CHECK_LIBRARY_KEY = 'checkModifiers';
@@ -157,15 +157,14 @@ export function migrateUnifyModifierLibraries(data = {}) {
   const configSystems = isPlainObject(gatheringConfig?.systems) ? gatheringConfig.systems : null;
 
   const collisions = [];
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const systemId = String(system.id ?? '');
     const systemConfig = systemId && configSystems ? configSystems[systemId] : null;
     const collided = applyUnifiedModifierLibrary(system, systemConfig);
     if (collided > 0) {
       collisions.push({ system: String(system.name ?? systemId), collisions: collided });
     }
-  }
+  });
 
   const result = {
     systems,

@@ -5,6 +5,9 @@
  * wins — the gathering copy is dropped, not merged, so a re-author is never clobbered by a stale
  * config copy. A tool without an id is skipped.
  */
+
+import { forEachSystem } from './migrationHelpers.js';
+
 export function migrateToolsToSystem(systems, gatheringConfig) {
   const safeSystems = Array.isArray(systems) ? systems : [];
   const config = gatheringConfig && typeof gatheringConfig === 'object' ? gatheringConfig : {};
@@ -16,11 +19,9 @@ export function migrateToolsToSystem(systems, gatheringConfig) {
   }
 
   const systemById = new Map();
-  for (const system of safeSystems) {
-    if (system && typeof system === 'object' && system.id) {
-      systemById.set(String(system.id), system);
-    }
-  }
+  forEachSystem(safeSystems, (system) => {
+    if (system.id) systemById.set(String(system.id), system);
+  });
 
   let movedCount = 0;
 

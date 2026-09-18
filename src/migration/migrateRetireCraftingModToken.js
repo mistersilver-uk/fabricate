@@ -14,7 +14,7 @@ import {
   planRetiredPlaceholderStrip,
 } from '../utils/craftingCheckExpression.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 import { finishMigrationNotice, localizeNoticeClause } from './migrationNoticeDetail.js';
 
 /** Every check block and slot swept. Gathering has no `simple` slot — its `d100` authors nothing. */
@@ -217,12 +217,12 @@ export function migrateRetireCraftingModToken(data = {}) {
   }
 
   const reported = [];
-  for (const system of systems) {
+  forEachSystem(systems, (system) => {
     const counts = applyRetireCraftingModToken(system);
     if (hasRetiredCraftingModFindings(counts)) {
       reported.push({ system: systemLabel(system), ...counts });
     }
-  }
+  });
 
   return { systems, _retiredCraftingModCounts: reported };
 }

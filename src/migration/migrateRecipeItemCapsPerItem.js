@@ -6,7 +6,7 @@
  * at all. `destroyWhenSpent` (learn) is distinct from `destroyWhenExhausted` (item).
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateRecipeItemCapsPerItem(data = {}) {
   const systems = _clone(data.systems);
@@ -15,8 +15,7 @@ export function migrateRecipeItemCapsPerItem(data = {}) {
     return { systems: data.systems };
   }
 
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const definitions = system.recipeItemDefinitions;
     const knowledge = system.recipeVisibility?.knowledge;
     const seededCaps = _capsFromKnowledge(knowledge);
@@ -29,7 +28,7 @@ export function migrateRecipeItemCapsPerItem(data = {}) {
     }
 
     _stripRelocatedCapFields(knowledge);
-  }
+  });
 
   return { systems };
 }

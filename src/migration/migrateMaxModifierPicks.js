@@ -10,7 +10,7 @@ import {
   resolveMaxModifierPicks,
 } from '../systems/checkModifierResolver.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /** The one combination rule whose historical behaviour was a bound of exactly one pick. */
 const HISTORICALLY_SINGLE_PICK_POLICY = 'playerPicks';
@@ -47,7 +47,7 @@ export function migrateMaxModifierPicks(data = {}) {
     return { systems: data.systems, recipes: data.recipes };
   }
 
-  for (const system of systems) applyMaxModifierPicks(system);
+  forEachSystem(systems, (system) => applyMaxModifierPicks(system));
 
   return { systems, recipes: Array.isArray(recipes) ? recipes : data.recipes };
 }

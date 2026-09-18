@@ -9,7 +9,7 @@ import {
   normalizeComponentEssenceMap,
 } from '../systems/componentScope.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /**
  * The in-system component rows of every system, keyed `systemId` then component id, with each
@@ -17,10 +17,9 @@ import { isPlainObject } from './migrationHelpers.js';
  */
 function componentsBySystem(systems) {
   const bySystem = new Map();
-  for (const [index, system] of (Array.isArray(systems) ? systems : []).entries()) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system, index) => {
     const systemId = typeof system.id === 'string' ? system.id.trim() : '';
-    if (!systemId || bySystem.has(systemId)) continue;
+    if (!systemId || bySystem.has(systemId)) return;
     const rows = new Map();
     for (const component of Array.isArray(system.components) ? system.components : []) {
       if (!isPlainObject(component)) continue;
@@ -28,7 +27,7 @@ function componentsBySystem(systems) {
       if (componentId && !rows.has(componentId)) rows.set(componentId, component);
     }
     bySystem.set(systemId, { index, rows });
-  }
+  });
   return bySystem;
 }
 

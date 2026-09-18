@@ -5,7 +5,7 @@
  * Pure, deep-cloning, idempotent, and strictly after `1.0.0`, which still reads the old key.
  */
 
-import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
+import { isPlainObject, clone, renameKey, forEachSystem } from './migrationHelpers.js';
 
 /** Run the region-to-realm rename over the runner's bundle. */
 export function migrateRenameGatheringRegionsToRealms(data = {}) {
@@ -16,11 +16,10 @@ export function migrateRenameGatheringRegionsToRealms(data = {}) {
     : [];
 
   // The Foundry-bridge fields and the modifier values inside each realm ride along untouched.
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     renameKey(system, 'gatheringRegions', 'gatheringRealms');
     renameKey(system, 'gatheringRegionSettings', 'gatheringRealmSettings');
-  }
+  });
 
   // 2. Environments: location-availability id lists.
   for (const environment of environments) {

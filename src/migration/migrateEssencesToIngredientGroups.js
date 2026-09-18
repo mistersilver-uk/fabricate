@@ -7,7 +7,7 @@
  */
 import { SignatureValidator } from '../systems/SignatureValidator.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateEssencesToIngredientGroups(data = {}) {
   const recipes = _clone(data.recipes);
@@ -73,8 +73,8 @@ function _reconcileAlchemyCollisions(recipes, systems) {
   }
 
   const disabledIds = new Set();
-  for (const system of systems) {
-    if (!_isAlchemySystem(system)) continue;
+  forEachSystem(systems, (system) => {
+    if (!_isAlchemySystem(system)) return;
     const systemId = system.id;
     const systemRecipes = recipes.filter(
       (recipe) => isPlainObject(recipe) && recipe.craftingSystemId === systemId
@@ -97,7 +97,7 @@ function _reconcileAlchemyCollisions(recipes, systems) {
         }
       }
     }
-  }
+  });
 
   return [...disabledIds]
     .map((id) => recipeById.get(id)?.name)
@@ -106,10 +106,7 @@ function _reconcileAlchemyCollisions(recipes, systems) {
 
 /** Whether a system is in alchemy mode (accepting the legacy `cauldron` alias). */
 function _isAlchemySystem(system) {
-  return (
-    isPlainObject(system) &&
-    (system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron')
-  );
+  return system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron';
 }
 
 function _clone(value) {

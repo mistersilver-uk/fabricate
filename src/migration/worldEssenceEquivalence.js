@@ -14,7 +14,7 @@ import {
   identityOf,
 } from '../systems/worldScopeEntityGrouping.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /** The `craftingSystem` array essences are stored under, read from the one list that names it. */
 const ESSENCE_DEFINITIONS_FIELD = ENTITY_TYPE_FIELDS.essences;
@@ -140,10 +140,9 @@ function readSystemsCorpus(systems) {
   const rowsBySystem = new Map();
   const positionById = new Map();
   const systemsByRowId = new Map();
-  for (const [systemIndex, system] of arrayOf(systems).entries()) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system, systemIndex) => {
     const systemId = trimmedString(system.id);
-    if (!systemId) continue;
+    if (!systemId) return;
     if (!order.has(systemId)) order.set(systemId, systemIndex);
     if (!rowsBySystem.has(systemId)) rowsBySystem.set(systemId, []);
     const rows = rowsBySystem.get(systemId);
@@ -156,7 +155,7 @@ function readSystemsCorpus(systems) {
       if (!systemsByRowId.has(id)) systemsByRowId.set(id, new Set());
       systemsByRowId.get(id).add(systemId);
     }
-  }
+  });
   return { order, rowsBySystem, positionById, systemsByRowId };
 }
 

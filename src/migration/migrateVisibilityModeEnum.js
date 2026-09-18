@@ -6,7 +6,7 @@
  * `knowledge.learn.dragDropEnabled` is still normalized on read.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateVisibilityModeEnum(data = {}) {
   const systems = _clone(data.systems);
@@ -15,11 +15,10 @@ export function migrateVisibilityModeEnum(data = {}) {
     return { systems: data.systems };
   }
 
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
-    if (typeof system.visibilityMode === 'string' && system.visibilityMode) continue;
+  forEachSystem(systems, (system) => {
+    if (typeof system.visibilityMode === 'string' && system.visibilityMode) return;
     system.visibilityMode = _deriveVisibilityMode(system.recipeVisibility);
-  }
+  });
 
   return { systems };
 }

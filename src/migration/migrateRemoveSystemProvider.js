@@ -6,18 +6,14 @@
  * entry is deleted with its references scrubbed. Result selection and currency are untouched.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateRemoveSystemProvider(data = {}) {
   const systems = _clone(data.systems);
   const gatheringConfig = _clone(data.gatheringConfig);
   const environments = _clone(data.environments);
 
-  if (Array.isArray(systems)) {
-    for (const system of systems) {
-      _stripSystemToolRequirements(system);
-    }
-  }
+  forEachSystem(systems, (system) => _stripSystemToolRequirements(system));
 
   if (isPlainObject(gatheringConfig) && isPlainObject(gatheringConfig.systems)) {
     for (const systemConfig of Object.values(gatheringConfig.systems)) {

@@ -6,7 +6,7 @@
  * Pure and idempotent: after a run the recipes carry neither field, and existing `recipeIds` survive.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateInvertRecipeItemLink(data = {}) {
   const systems = _clone(data.systems);
@@ -19,8 +19,7 @@ export function migrateInvertRecipeItemLink(data = {}) {
   // Per-system definition lookups (by id and by source uuid); ensure every
   // definition carries a `recipeIds` array to receive membership.
   const systemIndex = new Map();
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const definitions = Array.isArray(system.recipeItemDefinitions)
       ? system.recipeItemDefinitions
       : [];
@@ -37,7 +36,7 @@ export function migrateInvertRecipeItemLink(data = {}) {
       if (source) bySource.set(source, def);
     }
     systemIndex.set(String(system.id || ''), { byId, bySource });
-  }
+  });
 
   for (const recipe of recipes) {
     if (!isPlainObject(recipe)) continue;

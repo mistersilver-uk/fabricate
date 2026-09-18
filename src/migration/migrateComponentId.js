@@ -3,6 +3,8 @@
  * `systemItem` match type to `component`. Pure functions over raw JSON, idempotent, no I/O.
  */
 
+import { mapSystems } from './migrationHelpers.js';
+
 // --- Internal helpers ------------------------------------------------------
 
 /**
@@ -170,9 +172,7 @@ export function migrateRecipes(recipes) {
 export function migrateCraftingSystems(systems) {
   if (!Array.isArray(systems)) return systems;
 
-  return JSON.parse(JSON.stringify(systems)).map((system) => {
-    if (system == null || typeof system !== 'object') return system;
-
+  return mapSystems(JSON.parse(JSON.stringify(systems)), (system) => {
     // Rename managedItems -> components
     if ('managedItems' in system) {
       if (!('components' in system) || system.components == null) {

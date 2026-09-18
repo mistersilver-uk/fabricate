@@ -22,7 +22,7 @@ import {
 } from '../systems/worldScopeReferenceRewrite.js';
 
 import { readScopePayload } from './migrateWorldScopeEntities.js';
-import { clone, isPlainObject } from './migrationHelpers.js';
+import { clone, isPlainObject, forEachSystem } from './migrationHelpers.js';
 import { buildWorldEssenceEquivalence } from './worldEssenceEquivalence.js';
 
 /** The `craftingSystem` array essences are stored under, read from the one list that names it. */
@@ -150,9 +150,9 @@ function freezeInheritedSections(record, loserDefault, inSystemRows) {
  */
 function indexInSystemEssences(systems) {
   const bySystem = new Map();
-  for (const system of systems) {
+  forEachSystem(systems, (system) => {
     const systemId = trimmedString(system?.id);
-    if (!systemId) continue;
+    if (!systemId) return;
     const byId = new Map();
     for (const record of arrayOf(system[ESSENCE_DEFINITIONS_FIELD])) {
       if (!isPlainObject(record)) continue;
@@ -162,7 +162,7 @@ function indexInSystemEssences(systems) {
       byId.get(id).push(record);
     }
     bySystem.set(systemId, byId);
-  }
+  });
   return bySystem;
 }
 
@@ -252,11 +252,11 @@ export function mergeEquivalentWorldEssences(data) {
     recipesBySystem.get(systemId).push(recipe);
   }
 
-  for (const system of systems) {
+  forEachSystem(systems, (system) => {
     const systemId = trimmedString(system?.id);
-    if (!systemId) continue;
+    if (!systemId) return;
     const legs = perSystemLegs[systemId];
-    if (!legs) continue;
+    if (!legs) return;
     const remapEssence = keyedRemapper(legs[ESSENCES]);
     const remappers = { remapEssence };
     // The definition ids and the derived roster first, then every reference to them.
@@ -279,7 +279,7 @@ export function mergeEquivalentWorldEssences(data) {
       if (!isPlainObject(record) || trimmedString(record.systemId) !== systemId) continue;
       rewriteMembershipReferences(record, 'tools', remappers);
     }
-  }
+  });
 
   // The world-scope key positions, which belong to no system and take the unioned lookup.
   for (const record of Object.values(componentScope.defaults)) {

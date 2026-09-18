@@ -6,7 +6,7 @@
  * SLOT, reading the RAW persisted shape and copying only present fields.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateMoveRoutedByIngredientsCheck(data = {}) {
   const systems = _clone(data.systems);
@@ -15,10 +15,10 @@ export function migrateMoveRoutedByIngredientsCheck(data = {}) {
     return { systems: data.systems };
   }
 
-  for (const system of systems) {
-    if (!isPlainObject(system) || system.resolutionMode !== 'routedByIngredients') continue;
+  forEachSystem(systems, (system) => {
+    if (system.resolutionMode !== 'routedByIngredients') return;
     _moveCheckSlot(system);
-  }
+  });
 
   return { systems };
 }

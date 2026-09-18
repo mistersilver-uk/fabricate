@@ -6,7 +6,7 @@
  * routing surfaces as a validation issue. The salvage and gathering `routed` tokens are unrelated.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 export function migrateSplitRoutedResolutionModes(data = {}) {
   const systems = _clone(data.systems);
@@ -21,13 +21,13 @@ export function migrateSplitRoutedResolutionModes(data = {}) {
   // Decide each routed system's new mode (majority provider; ties → ingredients)
   // BEFORE any provider field is dropped, then rewrite the system token.
   const modeBySystemId = new Map();
-  for (const system of systems) {
-    if (!isPlainObject(system) || system.resolutionMode !== 'routed') continue;
+  forEachSystem(systems, (system) => {
+    if (system.resolutionMode !== 'routed') return;
     const systemId = String(system.id);
     const target = _chooseSystemMode(recipeList, systemId);
     modeBySystemId.set(systemId, target);
     system.resolutionMode = target;
-  }
+  });
 
   if (modeBySystemId.size === 0) {
     return { systems, recipes: Array.isArray(recipes) ? recipes : data.recipes };

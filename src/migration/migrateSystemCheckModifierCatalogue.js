@@ -6,7 +6,7 @@
 
 import { normalizeModifierPolicy } from '../systems/checkModifierResolver.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /** The same spelling at two scopes: inside `craftingCheck` before, on the system after. */
 const LEGACY_CATALOGUE_KEY = 'checkModifiers';
@@ -40,6 +40,6 @@ export function applySystemCheckModifierCatalogue(system) {
 export function migrateSystemCheckModifierCatalogue(data = {}) {
   const systems = structuredClone(data.systems ?? null);
   if (!Array.isArray(systems)) return { systems: data.systems };
-  for (const system of systems) applySystemCheckModifierCatalogue(system);
+  forEachSystem(systems, (system) => applySystemCheckModifierCatalogue(system));
   return { systems };
 }

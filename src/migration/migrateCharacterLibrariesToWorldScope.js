@@ -7,7 +7,7 @@
 import { normalizeCharacterPrerequisiteList } from '../systems/characterPrerequisites.js';
 import { normalizeModifierLibrary } from '../systems/modifierLibrary.js';
 
-import { isPlainObject, clone } from './migrationHelpers.js';
+import { isPlainObject, clone, forEachSystem, mapSystems } from './migrationHelpers.js';
 
 /** The two library keys, and the normalizer that decides what "the same entry" means for each. */
 const LIBRARIES = Object.freeze([
@@ -34,10 +34,9 @@ function buildLibrary(systems, library) {
   const seen = new Map();
   const collisions = [];
 
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const raw = system[library.key];
-    if (!Array.isArray(raw)) continue;
+    if (!Array.isArray(raw)) return;
     const systemId = String(system.id || '');
 
     for (const entry of raw) {
@@ -63,7 +62,7 @@ function buildLibrary(systems, library) {
       seen.set(id, { systemId, normalized: normalizedEntry(entry, library.normalize) });
       entries.push(clone(entry));
     }
-  }
+  });
 
   return { entries, collisions };
 }
@@ -91,8 +90,7 @@ export function stripSystemCharacterLibraries(systems, keys = LIBRARIES.map((l) 
   const list = Array.isArray(systems) ? systems : [];
   const strip = Array.isArray(keys) ? keys : [];
   if (strip.length === 0) return list;
-  return list.map((system) => {
-    if (!isPlainObject(system)) return system;
+  return mapSystems(list, (system) => {
     const carries = strip.some((key) => Object.prototype.hasOwnProperty.call(system, key));
     // Returning the ORIGINAL reference matters: the runner detects change by JSON comparison over
     // the whole corpus, so rebuilding every system would rewrite the entire corpus for nothing.

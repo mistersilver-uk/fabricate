@@ -6,7 +6,7 @@
  */
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 const LEGACY_MODE_TARGETS = { mapped: 'routedByIngredients', tiered: 'routedByCheck' };
 
@@ -37,8 +37,7 @@ export function migrateLegacyResolutionModes(data = {}) {
  */
 function _migrateSystems(systems) {
   const modeBySystemId = new Map();
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const target = LEGACY_MODE_TARGETS[system.resolutionMode];
     if (target) {
       modeBySystemId.set(String(system.id), target);
@@ -47,7 +46,7 @@ function _migrateSystems(systems) {
     if (system.salvageResolutionMode === 'tiered') {
       system.salvageResolutionMode = 'routed';
     }
-  }
+  });
   return modeBySystemId;
 }
 

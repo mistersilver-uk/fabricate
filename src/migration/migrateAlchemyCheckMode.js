@@ -6,7 +6,7 @@
  * recipe COLLAPSES to its first set — distinct from a multi-STEP one, which stays unsupported.
  */
 
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 const VALID_CHECK_MODES = new Set(['none', 'simple', 'tiered']);
 
@@ -23,8 +23,8 @@ export function migrateAlchemyCheckMode(data = {}) {
 
   let collapsedMultiSetCount = 0;
 
-  for (const system of systems) {
-    if (!_isAlchemySystem(system)) continue;
+  forEachSystem(systems, (system) => {
+    if (!_isAlchemySystem(system)) return;
     const systemRecipes = recipes.filter(
       (recipe) => isPlainObject(recipe) && recipe.craftingSystemId === system.id
     );
@@ -56,7 +56,7 @@ export function migrateAlchemyCheckMode(data = {}) {
         collapsedMultiSetCount += 1;
       }
     }
-  }
+  });
 
   if (collapsedMultiSetCount > 0) {
     console.warn(
@@ -69,10 +69,7 @@ export function migrateAlchemyCheckMode(data = {}) {
 
 /** Whether a system is in alchemy mode (accepting the legacy `cauldron` alias). */
 function _isAlchemySystem(system) {
-  return (
-    isPlainObject(system) &&
-    (system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron')
-  );
+  return system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron';
 }
 
 /** Count of a recipe's result groups carrying a non-empty `checkOutcomeIds`. */
