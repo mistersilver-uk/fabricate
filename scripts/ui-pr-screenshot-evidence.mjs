@@ -282,7 +282,7 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/utils\/plainTextDescription\.js$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/ui\/svelte\/util\/(?:foundryBridge|foundryEnrich|foundryDocuments)\.js$/,
     ],
   },
   {
@@ -292,7 +292,7 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/utils\/plainTextDescription\.js$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/ui\/svelte\/util\/(?:foundryBridge|foundryEnrich|foundryDocuments)\.js$/,
       /^src\/systems\/CraftingSystemManager\.js$/,
       /^src\/config\/repairItemData\.js$/,
     ],
@@ -304,7 +304,7 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/utils\/plainTextDescription\.js$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      /^src\/ui\/svelte\/util\/foundryBridge\.js$/,
+      /^src\/ui\/svelte\/util\/(?:foundryBridge|foundryEnrich|foundryDocuments)\.js$/,
       /^src\/systems\/CraftingSystemManager\.js$/,
     ],
   },
