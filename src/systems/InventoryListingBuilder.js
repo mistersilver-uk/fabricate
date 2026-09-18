@@ -75,6 +75,10 @@ import { attachStageComplications } from '../utils/progressiveStageComplications
 // The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
 // A deliberately import-free leaf.
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
+import {
+  untrimmedStringOrEmpty as stringOrEmpty,
+  untrimmedStringOrNull as stringOrNull,
+} from '../utils/scalars.js';
 import { matchRecipeItemDefinition, resolveToolForItem } from '../utils/sourceUuid.js';
 
 import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
@@ -106,15 +110,6 @@ const LEARN_CAPABLE_MODES = new Set(['learned', 'itemOrLearned']);
 // Knowledge modes in which the book grants crafting access by being held — the
 // only modes where its craft-use ("Crafting uses") limit is meaningful.
 const ITEM_ACCESS_MODES = new Set(['item', 'itemOrLearned']);
-
-function stringOrEmpty(value) {
-  return typeof value === 'string' ? value : value == null ? '' : String(value);
-}
-
-function stringOrNull(value) {
-  const out = stringOrEmpty(value);
-  return out.length > 0 ? out : null;
-}
 
 function actorKey(actor) {
   return actor?.id ?? actor?.uuid ?? null;

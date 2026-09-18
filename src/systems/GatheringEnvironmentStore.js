@@ -3,7 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, stringOrEmpty } from '../utils/scalars.js';
 
 import {
   environmentComposesRecord,
@@ -628,11 +628,6 @@ function normalizeOptionalString(value) {
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim();
   return normalized || null;
-}
-
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
 }
 
 function normalizeStringList(value) {

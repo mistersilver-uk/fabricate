@@ -46,14 +46,10 @@
  * `nodeRuntime` count ever having moved.
  */
 
+import { stringOrNull } from '../utils/scalars.js';
+
 /** Units one blind run reserves from a node pool. One attempt, one node. */
 export const BLIND_RESERVATION_UNITS = 1;
-
-function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
-}
 
 function plainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;

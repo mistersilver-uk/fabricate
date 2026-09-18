@@ -38,20 +38,15 @@ import { getFabricateFlag } from '../config/flags.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
+import {
+  untrimmedStringOrEmpty as stringOrEmpty,
+  untrimmedStringOrNull as stringOrNull,
+} from '../utils/scalars.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
 import { SignatureValidator } from './SignatureValidator.js';
-
-function stringOrEmpty(value) {
-  return typeof value === 'string' ? value : value == null ? '' : String(value);
-}
-
-function stringOrNull(value) {
-  const out = stringOrEmpty(value);
-  return out.length > 0 ? out : null;
-}
 
 function actorKey(actor) {
   return actor?.id ?? actor?.uuid ?? null;

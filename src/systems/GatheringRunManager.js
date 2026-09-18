@@ -1,4 +1,4 @@
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, stringOrNull } from '../utils/scalars.js';
 
 import { reconcileAgainstDocument, runContainerBaseline } from './runContainerCoherence.js';
 import {
@@ -841,12 +841,6 @@ function normalizeActorList(raw) {
 
 function actorKey(actor) {
   return stringOrNull(actor?.uuid) || stringOrNull(actor?.id);
-}
-
-function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
 }
 
 function numberOrDefault(...values) {

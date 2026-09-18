@@ -17,6 +17,8 @@
  * @typedef {'visible' | 'gmOnly'} GatheringRealmModifierVisibility
  */
 
+import { stringOrEmpty } from '../utils/scalars.js';
+
 export const GATHERING_REALM_REVEAL_MODES = Object.freeze([
   'manual',
   'onPartyTokenEntry',
@@ -50,11 +52,6 @@ const DEFAULT_REALM_SETTINGS = Object.freeze({
   revealMode: 'manual',
   modifierVisibility: 'visible',
 });
-
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
 
 function optionalString(value) {
   if (value === null || value === undefined) return null;

@@ -3,7 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, stringOrEmpty } from '../utils/scalars.js';
 
 const OVERRIDE_MODES = new Set(['none', 'manual']);
 
@@ -362,11 +362,6 @@ function replaceAt(array, index, value) {
   const next = [...array];
   next[index] = value;
   return next;
-}
-
-function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
 }
 
 function optionalString(value) {

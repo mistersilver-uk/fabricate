@@ -1,4 +1,5 @@
 import { GATHERING_HOOKS } from '../config/hooks.js';
+import { stringOrNull } from '../utils/scalars.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -190,12 +191,6 @@ function normalizeUsedTool(entry) {
 
 function idOf(document) {
   return stringOrNull(document?.id) || stringOrNull(document?.uuid);
-}
-
-function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
 }
 
 function numberOr(value, fallback) {

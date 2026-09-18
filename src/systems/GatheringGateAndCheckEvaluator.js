@@ -7,6 +7,9 @@
  * `threshold`) and there is no provider discriminator. The gathering check
  * itself is now resolved at the system level by the engine, not here.
  */
+
+import { untrimmedStringOrEmpty as stringOrEmpty } from '../utils/scalars.js';
+
 export class GatheringGateAndCheckEvaluator {
   constructor({ evaluateExpression = null } = {}) {
     this.evaluateExpression = evaluateExpression;
@@ -195,10 +198,6 @@ function numericValueOf(value) {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
-}
-
-function stringOrEmpty(value) {
-  return value === undefined || value === null ? '' : String(value);
 }
 
 function errorMessage(error, fallback) {

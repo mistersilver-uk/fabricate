@@ -6,6 +6,7 @@
  */
 
 import { normalizeNodeConfig } from '../../systems/gatheringNodeConfig.js';
+import { trimStringOrNull as stringOrNull } from '../../utils/scalars.js';
 
 import { numberOrNull } from './coercion.js';
 
@@ -26,11 +27,6 @@ export const TASK_NODE_LINKS = Object.freeze(['linked', 'unlinked']);
 
 export function coerceString(value) {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function stringOrNull(value) {
-  const trimmed = coerceString(value);
-  return trimmed || null;
 }
 
 /** PURE. The behaviour's `DataSchema`, built off an injected `foundry.data.fields` namespace. */

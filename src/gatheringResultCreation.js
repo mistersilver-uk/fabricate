@@ -17,6 +17,7 @@ import { resolveRolledAmount } from './systems/rolledAmountResolver.js';
 import { createItemReceiptCollector, receiptQuantity, writeItemAward, unconfirmedHistoryError } from './systems/runHistoryEvidence.js';
 import { resolvedComponentsFor } from './systems/scopedEntityReads.js';
 import { diceEngine } from './utils/rollFormulaRollability.js';
+import { stringOrNull } from './utils/scalars.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 
 export function flattenGatheringResults(resultGroups = []) {
@@ -72,11 +73,6 @@ export function describeUnresolvedResult(result) {
     stringOrNull(result?.id) ||
     'an unnamed result row'
   );
-}
-
-function stringOrNull(value) {
-  const text = String(value ?? '').trim();
-  return text.length > 0 ? text : null;
 }
 
 /** Every row resolved up front, so an unresolvable one is caught BEFORE anything is created. */

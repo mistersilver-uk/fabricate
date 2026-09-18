@@ -51,6 +51,10 @@ import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { attachStageComplications } from '../utils/progressiveStageComplications.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
+import {
+  untrimmedStringOrEmpty as stringOrEmpty,
+  untrimmedStringOrNull as stringOrNull,
+} from '../utils/scalars.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
@@ -111,15 +115,6 @@ const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
  * none has no check), handled separately in `_buildCheck`.
  */
 const MANDATORY_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
-
-function stringOrEmpty(value) {
-  return typeof value === 'string' ? value : value == null ? '' : String(value);
-}
-
-function stringOrNull(value) {
-  const out = stringOrEmpty(value);
-  return out.length > 0 ? out : null;
-}
 
 function actorKey(actor) {
   return actor?.id ?? actor?.uuid ?? null;
