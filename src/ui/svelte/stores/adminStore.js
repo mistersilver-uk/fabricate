@@ -81,7 +81,7 @@ import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gath
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
-import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
+import { classifyModeChange } from '../../../systems/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';

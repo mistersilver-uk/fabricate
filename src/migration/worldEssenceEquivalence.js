@@ -7,14 +7,14 @@
 import { resolveEssence } from '../systems/essenceScope.js';
 import { membershipKey } from '../systems/scopedDefinitions.js';
 import { subKeyEntries } from '../systems/scopedDefinitionStore.js';
-
-import { isPlainObject } from './migrationHelpers.js';
-import { isWorldAddressable } from './worldScopeDefaults.js';
+import { isWorldAddressable } from '../systems/worldScopeDefaults.js';
 import {
   ENTITY_TYPE_FIELDS,
   ESSENCE_EFFECT_SOURCE_FIELDS,
   identityOf,
-} from './worldScopeEntityGrouping.js';
+} from '../systems/worldScopeEntityGrouping.js';
+
+import { isPlainObject } from './migrationHelpers.js';
 
 /** The `craftingSystem` array essences are stored under, read from the one list that names it. */
 const ESSENCE_DEFINITIONS_FIELD = ENTITY_TYPE_FIELDS.essences;
