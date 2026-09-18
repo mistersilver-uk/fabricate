@@ -14,12 +14,22 @@ const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 const RAW_FIELD_ALLOWLIST = Object.freeze([
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    sites: 7,
+    sites: 3,
     why:
-      'The manager root, 14k lines and the file every manager lane touches. Its seven fields ' +
-      'are the drop-rate editor, the drop-count editor, two condition-modifier pickers, the ' +
-      'condition shortcut and two bare fields. Deferred as a whole so the sweep and the root ' +
-      'are separately reviewable, not because the sites differ from the 81 that converted.',
+      'The manager root, 13k lines and the file every manager lane touches. Its three remaining ' +
+      'fields are the drop-rate editor, the drop-count editor and the condition shortcut. It was ' +
+      'seven until issue 1707 wrote the twice-authored modifier panel once: FOUR left this file ' +
+      'and TWO landed in the row below, so the other two were DE-DUPLICATED rather than ' +
+      'converted. Deferred as a whole so the sweep and the root are separately reviewable, not ' +
+      'because the sites differ from the 81 that converted.',
+  }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    sites: 2,
+    why:
+      'The condition-modifier picker and the expression-override field of the panel issue 1707 ' +
+      'wrote once. RELOCATED without converting either, so the deferral is unchanged in ' +
+      'substance; the file is now one screen\'s form, which a conversion lane can take on its own.',
   }),
 ]);
 

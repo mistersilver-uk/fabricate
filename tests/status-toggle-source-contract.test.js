@@ -32,18 +32,18 @@ const TREE_EXCEPTIONS = Object.freeze([
       'it; its docblock names all three classes in prose, which the comment stripping removes',
   }),
   Object.freeze({
-    file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
     counts: Object.freeze({
-      'manager-status-toggle-track': 2,
-      'manager-status-toggle-knob': 2,
-      'manager-status-toggle-label': 2,
+      'manager-status-toggle-track': 1,
+      'manager-status-toggle-knob': 1,
+      'manager-status-toggle-label': 1,
     }),
     why:
-      'deferred: root convergence pending. The drop-scope and event-scope character-modifier ' +
-      'override switches are the last hand-rolled pair, held out of the sweep because the ' +
-      'converging 12k-line root is the wrong place to land its tail. Pinned by count so a ' +
-      'later root pass that removes one of the two fails here instead of leaving half a ' +
-      'deferral nobody is tracking.',
+      'deferred with a named reason. The root held the drop-scope and event-scope ' +
+      'character-modifier override switches as a hand-rolled PAIR; issue 1707 wrote that panel ' +
+      'once, so one of the two was DE-DUPLICATED rather than converted and the survivor moved ' +
+      'here with the rest of the panel. Pinned by count so a later pass that removes it without ' +
+      'converting it fails here instead of leaving a deferral nobody is tracking.',
   }),
 ]);
 

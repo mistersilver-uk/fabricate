@@ -83,8 +83,12 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
 /** A native `<select>` rendered by a Svelte template, keyed `file`. */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
-/** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 71;
+/**
+ * @see KNOWN_NATIVE_SELECT_ELEMENTS
+ */
+// #1707: the root's 16 became 12 and `GatheringModifierEditor.svelte` took 2 (71 - 2). The other
+// two were DE-DUPLICATED by writing that panel once, not converted.
+export const KNOWN_NATIVE_SELECT_TOTAL = 69;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
@@ -201,7 +205,9 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * @see KNOWN_FORMLESS_BUTTONS
  */
 // #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 225;
+// #1707: the root's 70 became 60 and `GatheringModifierEditor.svelte` took 5 (225 - 5). The other
+// five were DE-DUPLICATED by writing that panel once, not converted.
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 220;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */
