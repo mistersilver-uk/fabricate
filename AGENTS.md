@@ -536,6 +536,9 @@ The immutability, completeness, and one-build-per-publish contracts are specifie
 Do not add or reintroduce Handlebars templates.
 - UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
 - `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
+- `src/ui/presenters/` holds the modules that render a chat card or build a read-side row model for a UI surface.
+Unlike `src/ui/model/`, these have importers outside `src/ui/` — the crafting, gathering and bulk-salvage engines, and `src/main.js`, which drives four of them behind the `game.fabricate` facade.
+Several own a canonical disclosure rule (teaser redaction, blind-run secrecy, summary audience), so a change here can be a requirement change rather than a cosmetic one.
 - Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
 - Svelte stores live in `src/ui/svelte/stores/`.
 - Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.

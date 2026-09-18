@@ -624,7 +624,8 @@ function journalHistoryDataCases() {
         // there rather than here, where `selectRenderFileCases` would never reach it.
         sourceMatches: [
           JOURNAL_SOURCES,
-          /^src\/systems\/(?:RunJournalBuilder|gatheringHistoryEvidence|historyItemEvidence|runHistoryEvidence)\.js$/,
+          /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+          /^src\/systems\/(?:gatheringHistoryEvidence|historyItemEvidence|runHistoryEvidence)\.js$/,
         ],
       })
     )
@@ -1338,7 +1339,7 @@ function journalLifecycleCases() {
       sourceMatches: [
         JOURNAL_SOURCES,
         /^src\/ui\/svelte\/stores\/journalStore/,
-        /^src\/systems\/RunJournalBuilder\.js$/,
+        /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
       ],
     })
   );
@@ -1365,7 +1366,7 @@ function journalBlindRunCases() {
       JOURNAL_SOURCES,
       /^src\/ui\/svelte\/stores\/journalStore/,
       // The projection that decides what each viewer is told.
-      /^src\/systems\/RunJournalBuilder\.js$/,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
     ],
   };
   return [
