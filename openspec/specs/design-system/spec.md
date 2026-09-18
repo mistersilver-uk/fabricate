@@ -1341,10 +1341,17 @@ It is only meaningful where a selection repeats, and a setting with no behaviour
 It defaults to WITHOUT replacement, and it states its own current value rather than being read as a checked or unchecked box.
 A draw of N above the alternative count exhausts the bundle rather than erroring.
 
-A draw is ROLLED by definition, so `draw N` pins the chooser and hides it rather than leaving a player-chooses draw authorable, and pins N to its rolled form.
+A draw is ROLLED by definition, so `draw N` PINS the chooser to rolled rather than leaving a player-chooses draw authorable.
+It renders that control LOCKED, stating the pinned value and refusing the other, and MUST NOT hide it.
+A control that disappears under one setting is read as a control that never existed, and the header would change shape as the strategy changes.
+N is not pinned by the strategy: a draw's count is as authorable fixed as it is rolled, and it carries the same control under every strategy that takes an N.
 
 The group header reads LEFT TO RIGHT as one sentence — award strategy, N, replacement, chooser — with a help line beneath it restating the resolved behaviour in prose.
 Four controls in a row are read faster as a sentence than as a form.
+Every strategy renders the SAME header: a setting its strategy does not take is absent, and a setting it pins is locked rather than removed, so the controls a reader has learned stay where they were.
+The header states each setting ONCE, in the control that owns it.
+A badge or pill restating a value the control beside it already carries is FORBIDDEN: it says the same thing twice, and because its width tracks the value, editing N or the strategy moves every control after it.
+A caption that reads back the state is a help line beneath the header, where nothing is aligned to it.
 
 The SELECTION EXPRESSION is the group's OWN roll and not the craft's check.
 A routed craft has already rolled once to reach this set, and reading that same total here would leave the group's authored expression with nothing to do.
