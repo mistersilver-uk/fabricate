@@ -482,10 +482,9 @@ export default [
     rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
   },
 
-  // 5d. The Foundry-free view models under `src/ui/model/` (issue 1664). They left `src/utils/`
-  //     with the same guarantee and carry it here as their own block rather than as a fifth
-  //     `DOMAIN_LAYER_ROOTS` entry: `tests/foundry-global-reads-ratchet.test.js` derives each root
-  //     from its first two path segments, so a three-segment root fails its comparison.
+  // 5d. The Foundry-free view models under `src/ui/model/` (issue 1664). A separate block, not a
+  //     fifth `DOMAIN_LAYER_ROOTS` entry: `tests/foundry-global-reads-ratchet.test.js` derives each
+  //     root from its first two path segments, so a three-segment root fails it.
   {
     files: ['src/ui/model/**/*.js'],
     rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
