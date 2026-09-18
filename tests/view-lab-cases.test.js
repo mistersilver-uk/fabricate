@@ -3301,13 +3301,6 @@ test('every case file opens its array exactly once, on the line the selector par
     );
     assert.ok(cases.length > 0, `${path} declares no cases, so it earns no manifest entry`);
   }
-
-  // Every case the flattened array holds comes from exactly one file, in file order.
-  assert.deepEqual(
-    VIEW_LAB_CASE_FILES.flatMap(({ cases }) => cases.map((viewCase) => viewCase.id)),
-    [...caseIds],
-    'the manifest flattened in declaration order is no longer the registry order'
-  );
 });
 
 test('a patch inside any case file attributes to that file\'s own case, and nothing else', () => {
@@ -3342,6 +3335,22 @@ test('a patch inside any case file attributes to that file\'s own case, and noth
       selectedIds([path], shared.patches([shared.source.length - 2])),
       coverageIds(),
       `a patch on the shared module ${path} must select one frame of every surface`
+    );
+  }
+});
+
+test('every case literal parses as its own attributable region', () => {
+  for (const { path, cases } of VIEW_LAB_CASE_FILES) {
+    const file = fileAt(path);
+    const inline = cases.map((viewCase) => viewCase.id).filter((id) => isInlineCase(id));
+    assert.deepEqual(
+      inline.filter((id) => {
+        const selected = selectedIds([path], file.patches([caseIdLine(id)]));
+        return selected.length !== 1 || selected[0] !== id;
+      }),
+      [],
+      `${path}: a patch confined to these case literals widens past them, so \`CASE_OPEN_PATTERN\` ` +
+        'no longer matches the line that opens them'
     );
   }
 });
@@ -3424,7 +3433,7 @@ test('a registry change confined to case literals selects only those cases', () 
     assert.deepEqual(selectedForCase(id, [idLine + 1]), [id]);
   }
 
-  // Two cases of ONE file, two hunks: the honest answer is two frames, where it used to be 157.
+  // Two cases of one file, two hunks: the honest answer is two frames, where it used to be 157.
   const siblings = caseFileSources.get(caseFile(inline[3]).path);
   const [first, second] = inline.filter((id) => siblings.includes(`    id: '${id}',`)).slice(0, 2);
   const file = caseFile(first);

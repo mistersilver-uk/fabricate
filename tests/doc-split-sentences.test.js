@@ -123,17 +123,10 @@ const RENAMED = [
       'A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
     identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
   },
-  {
-    before:
-      "Every entry in `scripts/lib/viewLabCases.js` declares `reaches`, which is the registry's honesty field — an approximate case that does not say it is approximate is worse than no case at all.",
-    after:
-      "Every entry in `scripts/lib/view-lab-cases/` declares `reaches`, which is the registry's honesty field — an approximate case that does not say it is approximate is worse than no case at all.",
-    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
-  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 6;
+const RENAMED_COUNT = 5;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {

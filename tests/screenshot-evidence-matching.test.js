@@ -68,6 +68,7 @@ const EXPECTED_CASE_IDS = mapChangedFilesToCases(CHANGED_FILES).map((viewCase) =
 const REGISTRY_PATH = VIEW_LAB_CASE_FILES.map(({ path }) => path).find((path) =>
   readFileSync(path, 'utf8').includes(`    id: '${FALLBACK_CASE_ID}',`)
 );
+assert.ok(REGISTRY_PATH, `no case file declares ${FALLBACK_CASE_ID} inline`);
 
 /**
  * The 1-based line on which that file declares the fallback case's id, asserted present so a
@@ -76,7 +77,6 @@ const REGISTRY_PATH = VIEW_LAB_CASE_FILES.map(({ path }) => path).find((path) =>
  * @returns {number} The line number.
  */
 function fallbackCaseIdLine() {
-  assert.ok(REGISTRY_PATH, `no case file declares ${FALLBACK_CASE_ID} inline`);
   const source = readFileSync(REGISTRY_PATH, 'utf8').split('\n');
   const index = source.indexOf(`    id: '${FALLBACK_CASE_ID}',`);
   assert.notEqual(index, -1, `${REGISTRY_PATH} no longer declares ${FALLBACK_CASE_ID} inline`);

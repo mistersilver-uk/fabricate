@@ -26,7 +26,7 @@ export const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect|StagingInset)\.svelte$/;
 
 /**
- * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and armed
+ * The shared bulk-delete card (issue 1132): the heading, impact statement, standing hint and armed
  * control every studio's set delete renders.
  */
 export const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
@@ -84,7 +84,7 @@ const CRAFTING_MODE_FILES = Object.freeze({
 /** The one not-yet-ready chrome all five player views draw (issue 1514). */
 export const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
 
-/** Everything under `crafting/` that is NOT one mode's own body. Applies to every crafting case. */
+/** Everything under `crafting/` that is not one mode's own body. Applies to every crafting case. */
 export const CRAFTING_SHARED = new RegExp(
   '^src/ui/svelte/apps/crafting/(?!detail/(' +
     Object.values(CRAFTING_MODE_FILES).flat().join('|') +

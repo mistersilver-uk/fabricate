@@ -8,14 +8,17 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { VIEW_LAB_CASE_FILES } from '../scripts/lib/viewLabCases.js';
-
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
-/** Every View Lab case file as one text (issue 1671 moved the cases out of the index). */
+/** Every module under the View Lab case directory as one text (issue 1671 split the index). */
+const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
 const caseRegistrySource = () =>
-  VIEW_LAB_CASE_FILES.map(({ path }) => read(path)).join('\n');
+  readdirSync(resolve(repoRoot, CASE_FILE_DIRECTORY))
+    .filter((name) => name.endsWith('.js'))
+    .sort()
+    .map((name) => read(`${CASE_FILE_DIRECTORY}/${name}`))
+    .join('\n');
 
 const MANAGER = 'src/ui/svelte/apps/manager';
 const SCOPED = `${MANAGER}/scoped`;

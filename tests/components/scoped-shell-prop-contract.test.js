@@ -5,7 +5,6 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 import { listSvelteComponents } from '../../scripts/lib/svelteComponentFiles.js';
-import { VIEW_LAB_CASE_FILES } from '../../scripts/lib/viewLabCases.js';
 import {
   attributeValueOn,
   detectShellSpreads,
@@ -1257,8 +1256,13 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
 });
 
 describe('the entry’s pointer proofs survive in the capture registry', () => {
+  const caseFileDirectory = 'scripts/lib/view-lab-cases';
   const registry = () =>
-    VIEW_LAB_CASE_FILES.map(({ path }) => sourceOf(path)).join('\n');
+    readdirSync(resolve(repoRoot, caseFileDirectory))
+      .filter((name) => name.endsWith('.js'))
+      .sort()
+      .map((name) => sourceOf(`${caseFileDirectory}/${name}`))
+      .join('\n');
 
   it('carries a centre-hit on the world tag chip, which the page still emits', () => {
     // `moss`, not `fuel` (issue 1371 r15-entry): the run offers the vocabulary's tags alone.

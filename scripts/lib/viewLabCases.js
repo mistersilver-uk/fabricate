@@ -72,12 +72,6 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 /** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
-/**
- * It carries a `{keys, unattributable}` pair at every level of the attribution walk — from one
- * candidate anchor, up through a hunk's candidates, a patch's hunks, an input's patch, and a
- * change's inputs — and each level merges both halves of its children's pairs.
- */
-
 export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 
 /** The Foundry application theme every case renders under unless it says otherwise. */

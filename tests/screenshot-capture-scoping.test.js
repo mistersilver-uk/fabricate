@@ -25,16 +25,19 @@ import {
   isD0SectionNeededForTargets,
 } from '../scripts/lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from '../scripts/lib/smokeSectionFixture.js';
-import { VIEW_LAB_CASE_FILES } from '../scripts/lib/viewLabCases.js';
 
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
-// Every case file the manifest names, so an offender is reported against the file it is authored in.
-const CASE_FILES = VIEW_LAB_CASE_FILES.map(({ path }) => ({
-  path,
-  source: readFileSync(path, 'utf8'),
-}));
+// Every `.js` under the case directory, so an offender is reported against its authoring file.
+const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
+const CASE_FILES = readdirSync(CASE_FILE_DIRECTORY)
+  .filter((name) => name.endsWith('.js'))
+  .sort()
+  .map((name) => ({
+    path: `${CASE_FILE_DIRECTORY}/${name}`,
+    source: readFileSync(`${CASE_FILE_DIRECTORY}/${name}`, 'utf8'),
+  }));
 
 /** The one case file whose source holds `text`. */
 function caseFileHolding(text) {
