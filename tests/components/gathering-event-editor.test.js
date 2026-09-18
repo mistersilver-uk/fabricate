@@ -127,9 +127,10 @@ describe('GatheringEventEditView source contract', () => {
     assert.equal(/function\s+enableEventModifier\s*\(/.test(editorSource), false, 'enableEventModifier helper should be removed');
   });
 
+  // The two hook pins this block opened with are asserted in the DOM now — at the event route by
+  // `manager-gathering-mounted.js`, at both subjects by `manager-environments-mounted.js` — because
+  // issue 1707 computes every hook name from `subject` and no root literal spells them.
   it('renders the event modifier inspector (time, weather, character) from the manager root', () => {
-    assert.ok(rootSource.includes('data-gathering-event-condition-modifiers={kind}'), 'root should render event condition modifier cards');
-    assert.ok(rootSource.includes('data-gathering-event-character-modifiers'), 'root should render event character modifier card');
     assert.ok(rootSource.includes('addGatheringEventConditionModifier'), 'root should expose add condition modifier handler');
     assert.ok(rootSource.includes('updateGatheringEventConditionModifier'), 'root should expose update condition modifier handler');
     assert.ok(rootSource.includes('deleteGatheringEventConditionModifier'), 'root should expose delete condition modifier handler');
@@ -147,27 +148,32 @@ describe('GatheringEventEditView source contract', () => {
     // The operator Positive/Negative <select> is gone; value is typed signed.
     assert.ok(rootSource.includes('function gatheringModifierValueClass'), 'root should expose a signed value-class helper');
     assert.ok(rootSource.includes('function signedToOperatorValue'), 'root should split a signed input back into { operator, value }');
-    assert.ok(
-      rootSource.includes('manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}'),
-      'condition modifier box should be colored by its signed value'
-    );
-    assert.ok(rootSource.includes('class="manager-condition-modifier-value"'), 'condition modifier should use the single signed-input wrapper');
+    // The coloured box and the signed-input wrapper are asserted in the DOM by
+    // `manager-environments-mounted.js`; the root no longer writes either.
     assert.equal(rootSource.includes('manager-condition-modifier-row-body'), false, 'the old two-line value body should be removed');
     assert.equal(rootSource.includes('gatheringDropModifierOperatorClass'), false, 'the operator-only class helper should be removed');
   });
 
   it('formats condition modifier values as signed percentages', () => {
+    // The formatter stays in the root; the input that renders its return, its `inputmode` and its
+    // `%` adornment moved into the shared panel and are asserted in the DOM by
+    // `manager-environments-mounted.js`.
     assert.ok(rootSource.includes('function gatheringModifierDisplayValue'), 'root should expose a signed display formatter');
-    assert.ok(rootSource.includes('value={gatheringModifierDisplayValue(modifier)}'), 'condition modifier input should render the formatted signed value');
-    assert.ok(/<input\s+type="text"\s+inputmode="numeric"/.test(rootSource), 'condition modifier value should be a numeric text input so a leading + can render');
-    assert.ok(rootSource.includes('<span aria-hidden="true">%</span>'), 'condition modifier value should show a % adornment');
   });
 
   it('supports Arrow Up/Down stepping on condition modifier values', () => {
     assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
     assert.ok(rootSource.includes('function onGatheringEventModifierKeydown'), 'root should expose an event modifier keydown stepper');
-    assert.ok(/onkeydown=\{\(event\) =>\s*onGatheringDropModifierKeydown/.test(rootSource), 'drop modifier input should wire the keydown stepper');
-    assert.ok(/onkeydown=\{\(event\) =>\s*onGatheringEventModifierKeydown/.test(rootSource), 'event modifier input should wire the keydown stepper');
+    // The `onkeydown` attribute is the shared panel's now; what the ROOT still owns is handing each
+    // scope's stepper to its own panel call site, the drop one arity-normalised on the way.
+    assert.ok(
+      /onConditionModifierKeydown=\{\(kind, modifier, event\) =>\s*onGatheringDropModifierKeydown/.test(rootSource),
+      'the drop panel call site should wire the drop keydown stepper'
+    );
+    assert.ok(
+      /onConditionModifierKeydown=\{onGatheringEventModifierKeydown\}/.test(rootSource),
+      'the event panel call site should wire the event keydown stepper'
+    );
     assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');
   });
 

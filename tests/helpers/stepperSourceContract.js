@@ -207,7 +207,11 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
 export const CHARACTER_MODIFIER_BOUNDS_PATH =
   'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
 
-/** The two update functions the shared bounds row is wired to, one per scope. */
+/** The shared panel that renders the bounds row, once, for BOTH scopes (issue 1707). */
+export const CHARACTER_MODIFIER_PANEL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
+
+/** The two update functions the shared panel is wired to at the root, one per scope. */
 export const CHARACTER_MODIFIER_BOUNDS_SCOPES = Object.freeze([
   'onUpdateDropCharacterModifier',
   'onUpdateEventCharacterModifier',
