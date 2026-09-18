@@ -1874,6 +1874,114 @@ export function registerGatheringCases() {
     );
   });
 
+  // The drop half acted on through the root (issue 1707): its writers arrive pre-bound to
+  // `selectedGatheringDrop.id`, so only a click proves the row they reach is the selected one.
+  it('adds and steps a drop condition modifier on the selected drop row', async () => {
+    const calls = [];
+    await openDirtyGatheringTaskEditor(calls, {});
+    target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]').click();
+    await settleSaveAttempt();
+
+    const biomeCard = target.querySelector('[data-gathering-drop-condition-modifiers="biome"]');
+    assert.ok(Boolean(biomeCard), 'the drop inspector renders the biome condition-modifier card');
+    assert.equal(
+      biomeCard.querySelectorAll('[data-gathering-drop-modifier-id]').length,
+      1,
+      'the fixture drop starts with its one seeded biome modifier'
+    );
+
+    biomeCard
+      .querySelector('[data-gathering-drop-condition-modifier-picker="biome"] button')
+      .click();
+    await settleSaveAttempt();
+
+    const attached = [...biomeCard.querySelectorAll('[data-gathering-drop-modifier-id]')];
+    assert.equal(attached.length, 2, 'the add control attaches a second modifier to this drop');
+    const added = attached.find(
+      (row) => row.getAttribute('data-gathering-drop-modifier-id') !== 'forest-penalty'
+    );
+    assert.ok(
+      added.textContent.includes('Crystal Cavern'),
+      'the added row names the condition the picker had selected'
+    );
+    assert.ok(added.classList.contains('is-zero'), 'a freshly attached modifier reads zero');
+
+    added
+      .querySelector('.manager-condition-modifier-value input')
+      .dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', {
+          key: 'ArrowUp',
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    await settleSaveAttempt();
+    const addedId = added.getAttribute('data-gathering-drop-modifier-id');
+    assert.ok(
+      biomeCard
+        .querySelector(`[data-gathering-drop-modifier-id="${addedId}"]`)
+        .classList.contains('is-positive'),
+      'Arrow stepping rewrites the stored value, not only the input the key landed in'
+    );
+
+    await clickHeaderSave();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryTask');
+    assert.equal(saved[2], 'task-herbs', 'the save carries the task being edited');
+    const savedRow = saved[3].dropRows.find((row) => row.id === 'drop-nightshade');
+    assert.ok(Boolean(savedRow), 'the drop row the panel was bound to survives the save');
+    const savedBiomes = savedRow.conditionModifiers.biome;
+    assert.equal(savedBiomes.length, 2, 'both writes landed on this drop row, by its real id');
+    assert.deepEqual(
+      savedBiomes
+        .filter((modifier) => modifier.conditionId === 'cavern')
+        .map((modifier) => [modifier.operator, modifier.value]),
+      [['+', 1]],
+      'the added modifier persists on the selected drop with its stepped value'
+    );
+  });
+
+  // The event half's glue: its pick writer is bound to `editingGatheringEvent` at that call site.
+  it('persists a character modifier picked from the event editor suggestions', async () => {
+    const calls = [];
+    await openDirtyGatheringEventEditor(calls, {
+      modifiers: [
+        { id: 'mod-herbalism', label: 'Herbalism Training', expression: '@skills.nat.total' },
+      ],
+    });
+
+    const search = target.querySelector('[data-gathering-event-character-modifier-search]');
+    assert.ok(Boolean(search), 'the event editor renders the character-modifier search');
+    assert.ok(
+      !target.querySelector('[data-gathering-event-character-modifier-ref]'),
+      'the fixture event starts with no character modifiers attached'
+    );
+
+    setInputValue(search.querySelector('input'), 'herbal');
+    await settleSaveAttempt();
+    const suggestion = target.querySelector(
+      '[data-gathering-event-character-modifier-suggestion="mod-herbalism"]'
+    );
+    assert.ok(Boolean(suggestion), 'the typed term suggests the one library modifier');
+    suggestion.click();
+    await settleSaveAttempt();
+
+    const ref = target.querySelector('[data-gathering-event-character-modifier-ref]');
+    assert.ok(Boolean(ref), 'picking a suggestion attaches a reference row to the event');
+    assert.ok(
+      ref.textContent.includes('Herbalism Training'),
+      'the reference row names the library modifier it points at'
+    );
+
+    await clickHeaderSave();
+    const saved = calls.findLast((call) => call[0] === 'updateGatheringLibraryEvent');
+    assert.equal(saved[2], 'event-thorns', 'the save carries the event being edited');
+    assert.deepEqual(
+      saved[3].characterModifiers.map((entry) => entry.modifierId),
+      ['mod-herbalism'],
+      'the picked reference persists on this event, so the pick reached its own record'
+    );
+  });
+
   it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventReject: true };

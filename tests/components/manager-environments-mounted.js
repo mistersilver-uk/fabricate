@@ -102,7 +102,6 @@ export function registerEnvironmentsCases() {
     await settleBetweenTests();
   });
 
-
   it('routes to the environments browser and opens the forced v2 editor route', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -2874,9 +2873,13 @@ export function registerEnvironmentsCases() {
   // component now, so only rendering both subjects can prove their hooks stayed distinct.
   for (const subject of ['drop', 'event']) {
     it(`renders the shared modifier panel under its own ${subject} hook prefix`, async () => {
-      const shell = modifierEditorShell(subject);
+      const shell = modifierEditorShell(subject, [
+        { id: 'cm-1', kind: 'biome', conditionId: 'forest', sign: 'positive', display: '+15' },
+      ]);
       const other = subject === 'drop' ? 'event' : 'drop';
-      const root = mountModifierEditor(shell.props);
+      // Nothing else pins the open direction now that it crosses the prop boundary.
+      const props = { ...shell.props, characterModifierSearchOpenUp: true };
+      const root = mountModifierEditor(props);
 
       assert.ok(
         Boolean(root.querySelector(`[data-gathering-${subject}-condition-modifiers="biome"]`)),
@@ -2885,6 +2888,14 @@ export function registerEnvironmentsCases() {
       assert.ok(
         Boolean(root.querySelector(`[data-gathering-${subject}-condition-modifier-picker="biome"]`)),
         `the biome picker must carry the ${subject} prefix`
+      );
+      assert.ok(
+        Boolean(root.querySelector(`[data-gathering-${subject}-modifier-id="cm-1"]`)),
+        `the attached modifier row must carry the ${subject} prefix`
+      );
+      assert.ok(
+        !root.querySelector(`[data-gathering-${other}-modifier-id="cm-1"]`),
+        `the attached modifier row must not carry the ${other} prefix`
       );
       assert.ok(
         Boolean(root.querySelector(`[data-gathering-${subject}-character-modifiers]`)),
@@ -2897,6 +2908,10 @@ export function registerEnvironmentsCases() {
       assert.ok(
         Boolean(root.querySelector(`[data-gathering-${subject}-character-modifier-suggestions]`)),
         `the suggestion list must carry the ${subject} prefix`
+      );
+      assert.ok(
+        Boolean(root.querySelector('.manager-character-modifier-add-suggestions.is-above')),
+        'the suggestion list opens upwards when the shell says it must'
       );
       assert.ok(
         !root.querySelector(`[data-gathering-${other}-condition-modifiers="biome"]`),
@@ -2926,7 +2941,7 @@ export function registerEnvironmentsCases() {
       flushSync();
       assert.deepEqual(shell.picked, ['mod-training'], 'the pick must reach the shell');
 
-      const rendered = mountModifierEditor(shell.props);
+      const rendered = mountModifierEditor(props);
       const ref = rendered.querySelector(
         `[data-gathering-${subject}-character-modifier-ref="ref-mod-training"]`
       );
@@ -2971,9 +2986,12 @@ export function registerEnvironmentsCases() {
     assert.equal(input.getAttribute('type'), 'text', 'a text input so a leading + can render');
     assert.equal(input.getAttribute('inputmode'), 'numeric', 'with a numeric keypad');
     assert.equal(input.value, '+15', 'and the formatted signed value the shell returned');
-    assert.ok(
-      [...box.querySelectorAll('span')].some((span) => span.textContent === '%'),
-      'the value carries its % adornment'
+    const adornment = [...box.querySelectorAll('span')].find((span) => span.textContent === '%');
+    assert.ok(Boolean(adornment), 'the value carries its % adornment');
+    assert.equal(
+      adornment.getAttribute('aria-hidden'),
+      'true',
+      'the adornment stays hidden from assistive technology'
     );
 
     input.dispatchEvent(
