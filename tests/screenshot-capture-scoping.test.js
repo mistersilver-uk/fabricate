@@ -30,14 +30,13 @@ import { VIEW_LAB_CASE_FILES } from '../scripts/lib/viewLabCases.js';
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
-// Every case file the registry manifest names, so a scan reads the whole corpus and every offender
-// it reports names the file the step is actually authored in.
+// Every case file the manifest names, so an offender is reported against the file it is authored in.
 const CASE_FILES = VIEW_LAB_CASE_FILES.map(({ path }) => ({
   path,
   source: readFileSync(path, 'utf8'),
 }));
 
-/** @returns {{path: string, source: string}} The one case file whose source holds `text`. */
+/** The one case file whose source holds `text`. */
 function caseFileHolding(text) {
   const holders = CASE_FILES.filter(({ source }) => source.includes(text));
   assert.equal(holders.length, 1, `exactly one case file must contain: ${text}`);

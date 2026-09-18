@@ -532,7 +532,7 @@ Smoke labels are deliberately not shown, because this page is the lab's evidence
 
 ## What a case claims
 
-Every entry in `scripts/lib/viewLabCases.js` declares `reaches`, which is the registry's honesty field — an approximate case that does not say it is approximate is worse than no case at all.
+Every entry in `scripts/lib/view-lab-cases/` declares `reaches`, which is the registry's honesty field — an approximate case that does not say it is approximate is worse than no case at all.
 
 | `reaches` | Meaning | `smokeLabels` |
 |---|---|---|

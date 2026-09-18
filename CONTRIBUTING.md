@@ -599,7 +599,7 @@ Pass `--clean` to force a full reset.
 The same directory also carries a self-contained `index.html`, grouped by application and area with a multi-tag filter, written automatically at the end of every capture.
 It shows the lab's own frames only, never a smoke label, because it is not a comparison.
 
-Cases live in `scripts/lib/viewLabCases.js`.
+Cases live in `scripts/lib/view-lab-cases/`.
 A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from a changed-file set.
 Every manager case declares `expectView`, which the capture asserts against the app's actual route before taking the frame — without it a mis-click silently screenshots the wrong screen.
 
@@ -616,7 +616,7 @@ A route's own internal tabs — the Recipe editor's Results tab, the Tool editor
 Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
 Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
 Five inputs narrow below coverage.
-A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
+A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.
 A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.

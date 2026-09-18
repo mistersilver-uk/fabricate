@@ -14,8 +14,7 @@ export function journalBlindRunCases() {
     smokeLabels: [],
     steps: [
       { selector: card },
-      // Assert the SELECTION landed on the gathering run as well as scrolling its detail in: a
-      // mis-click would otherwise photograph the crafting detail under a gathering case's name.
+      // Assert the selection landed on the gathering run: a mis-click photographs the crafting detail instead.
       {
         selector: '[data-journal-detail][data-run-key*="lab-gathering-blind-waiting"]',
         scroll: true,

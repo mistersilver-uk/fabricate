@@ -151,8 +151,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-world-travel-long-label-focus',
     label: 'Manager — World Travel long child label keyboard focus',
-    // The live smoke uses shipped localization, so its ordinary focused Map row is not long-label
-    // evidence. The View Lab supplies the localized stress string and guards it against duplicates.
+    // The smoke uses shipped localization, so the View Lab supplies the long-label stress string and guards it.
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', longTravelLabels: '1' },
@@ -174,16 +173,13 @@ export const CASES = Object.freeze([
     id: 'manager-gathering-settings-normal',
     label: 'Manager — Gathering settings as authored',
     smokeLabels: ['manager-gathering-settings'],
-    // `exact`: the smoke reaches this tab by the same two gestures and photographs it without
-    // touching a control, which is the whole point of the frame — the settings a GM finds, not a
-    // state a walk drove them into.
+    // `exact`: the smoke reaches this tab by the same two gestures and photographs it without touching a control.
     reaches: 'exact',
     // Deliberately not `manager-gathering-economy-actors`, which reaches the same tab.
     query: { system: 'lab-herbalism' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-settings' }],
     expectView: 'environments',
-    // Resolution belongs to each task; this page starts with its economy limitation controls.
-    // The route key alone cannot distinguish these settings from the environments browser.
+    // This page starts with its economy limitation controls; the route key alone cannot tell it from the browser.
     expectSelector: '.fabricate-manager [data-economy-mode-card] [data-economy-mode-option]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
@@ -194,8 +190,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-gathering-economy-actors',
     label: 'Manager — Gathering economy actor stamina pools',
-    // `beyond`: the live smoke never walks the Gathering Settings tab, so there is no counterpart
-    // frame for this to fall short of.
+    // `beyond`: the smoke never walks the Gathering Settings tab, so there is no counterpart to fall short of.
     reaches: 'beyond',
     smokeLabels: [],
     // The actor stamina table is the only surface no case reached (issue 1050).
@@ -212,9 +207,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'environments',
     kinds: ['manager', 'environments'],
-    // Deliberately no pattern for `components/Stepper.svelte`: `BROAD_SIGNAL_PATTERN` matches
-    // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
-    // before it consults any case's `sourceMatches`, so such an entry would be unreachable code.
+    // No pattern for `components/Stepper.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
@@ -248,9 +241,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Environment edit blind task weights',
     reaches: 'beyond',
     smokeLabels: [],
-    // `CompositionList`'s weight field renders in one state — `showBlindWeights`, which is `kind
-    // === 'task' && selectionMode === 'blind'` — and no case reached it: the list's single existing
-    // claim (`manager-environments-browse-normal`) stops at the environments browser.
+    // `CompositionList`'s weight field renders only under `showBlindWeights`, and no other case reached it.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -272,9 +263,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Environment edit automatic Force add',
     reaches: 'beyond',
     smokeLabels: [],
-    // Issue 1315 moved Force add to automatic mode, where a filter exists for it to override, and
-    // nothing in the lab photographed the result: the automatic Non-matching section is the section
-    // this control lives in, and no case reached it.
+    // Issue 1315 moved Force add to automatic mode's Non-matching section, which no case reached.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -302,12 +291,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-environment-validation',
     label: 'Manager — Environment edit Validation tab',
-    // Beyond, with an empty label array to match: `screenshotCaptureMap.js` carries no routine for
-    // this tab, so the smoke has no counterpart to fall short of.
+    // Beyond, with an empty label array: `screenshotCaptureMap.js` carries no routine for this tab.
     reaches: 'beyond',
     smokeLabels: [],
-    // The first frame of this tab, and it is registered before the change that re-skins it (issue
-    // 1517), so the conversion has a before to be compared against.
+    // The first frame of this tab, registered before the re-skin (issue 1517) so the conversion has a before.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -318,19 +305,15 @@ export const CASES = Object.freeze([
       { selector: '#environment-tab-validation' },
     ],
     expectView: 'environment-edit',
-    // The route survives a tab click that did nothing, and every other environment editor case
-    // proves that by opening a different tab of this same route.
+    // The route survives a tab click that did nothing; every other environment editor case opens a different tab.
     expectSelector: '[data-environment-tab="validation"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       // The tab itself, which no other case can now claim.
       /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentValidationTab\.svelte$/,
-      // Its producer. The same evaluator feeds the tab strip's badge counts, so the four
-      // directory claims keep it too; this is the frame that draws its verdict and its rows.
+      // Its producer: the same evaluator feeds the tab strip's badge counts, and this frame draws its verdict and rows.
       /^src\/ui\/svelte\/apps\/manager\/environment\/environmentReadiness\.js$/,
-      // The host. It owns the tab panel wrapper and the one layout rule only this tab reaches —
-      // `is-inspector-hidden`, which releases the inspector column on the validation tab and on
-      // no other.
+      // The host: it owns the tab panel wrapper and `is-inspector-hidden`, which only this tab reaches.
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
   }),

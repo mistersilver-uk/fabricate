@@ -10,9 +10,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Currency actor property',
     smokeLabels: ['currency-actor-property'],
     reaches: 'exact',
-    // World > Currency (issue 1278). The ladder is world scope, so this route needs no selected
-    // system and is ungated — the card renders whether or not any crafting system has switched
-    // currency on.
+    // World > Currency (issue 1278): the ladder is world scope, so this route needs no selected system and is ungated.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
@@ -28,9 +26,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Currency macro',
     smokeLabels: ['currency-macro'],
     reaches: 'exact',
-    // The macro branch is chosen on the app's own option list (issue 1510): the strategy control
-    // is a `<Select>` now, so the native `select:` verb — which `view-lab-screenshots.mjs` turns
-    // into Playwright's `<select>`-only `selectOption` — would throw on its `<button>` trigger.
+    // The macro branch is chosen on the app's own option list (issue 1510): a native `select:` would throw on its `<button>`.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
@@ -47,9 +43,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Currency actor inventory',
     smokeLabels: ['currency-actor-inventory'],
     reaches: 'exact',
-    // dnd5e registers no inventory currency provider, so this strategy resolves to the
-    // no-provider callout steering the GM to macro mode — which is the state the smoke's
-    // counterpart photographs too, for the same reason.
+    // dnd5e registers no inventory currency provider, so this resolves to the no-provider callout, as the smoke's does.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
@@ -90,8 +84,7 @@ export const CASES = Object.freeze([
     // No counterpart, and the empty array is a correction rather than an omission (issue 1520).
     smokeLabels: [],
     reaches: 'beyond',
-    // World > Rules & Resources > Character prerequisites (issue 1311). The library is world scope
-    // since issue 1308, so this route needs no selected system and is ungated.
+    // World > Rules & Resources > Character prerequisites (issue 1311): world scope since issue 1308, so ungated.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
@@ -102,16 +95,12 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/],
   }),
-  // Every converted control's open state became photographable for the first time with the
-  // conversion — a native `<select>`'s popup is drawn by the operating system and does not appear
-  // in a screenshot at all — and an open-panel case cannot double as its view's closed-state frame,
-  // because the portal occludes the screen behind it.
+  // A converted control's open state is photographable for the first time, and cannot double as its closed-state frame.
   managerCase({
     id: 'world-currency-strategy-list',
     label: 'Manager — World Currency spend strategy list',
     smokeLabels: [],
-    // `beyond`: the smoke walks THROUGH this control to the macro and inventory states and never
-    // rests on it open, so there is no counterpart frame to fall short of.
+    // `beyond`: the smoke walks through this control and never rests on it open, so there is no counterpart.
     reaches: 'beyond',
     // The closed-state case's own route, stopped at the trigger with no row click.
     steps: [
@@ -120,9 +109,7 @@ export const CASES = Object.freeze([
       { selector: '[data-world-currency-strategy-select]' },
     ],
     expectView: 'world-currency',
-    // Three claims, and a trigger-only frame satisfies none of them: the panel exists, it is a
-    // direct child of the manager root (the portal, not the fallback that draws it in place), and
-    // it is the unticked configuration.
+    // Three claims a trigger-only frame fails: the panel exists, it is a direct child of the manager root, and it is unticked.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover' +
       ':not(.fabricate-select-popover-ticked) [data-popover-option="macro"]',
@@ -159,8 +146,7 @@ export const CASES = Object.freeze([
     id: 'world-prerequisites-condition-row',
     label: 'Manager — World Character prerequisite condition row, operator closed',
     smokeLabels: [],
-    // `beyond`: the smoke never expands a prerequisite item, so there is no counterpart frame
-    // this one could fall short of and no label it could claim.
+    // `beyond`: the smoke never expands a prerequisite item, so there is no counterpart frame and no label to claim.
     reaches: 'beyond',
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
@@ -193,8 +179,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],
   }),
-  // Frames from this PR prove the shell only. Every one of these routes is a placeholder: no
-  // catalogue, no editor, no `InheritRow`.
+  // Every one of these routes is a placeholder: no catalogue, no editor, no `InheritRow`.
   managerCase({
     id: 'world-component-catalogue',
     label: 'Manager — World Component catalogue',
@@ -209,11 +194,9 @@ export const CASES = Object.freeze([
       { selector: '[data-scoped-list-search]', fill: '' },
     ],
     expectView: 'world-components',
-    // The page's own hook, so a route that silently fell back to the systems library fails the
-    // capture rather than publishing a frame of the wrong screen.
+    // The page's own hook, so a route that fell back to the systems library fails rather than publishing the wrong screen.
     expectSelector: '[data-scoped-page="world-components"]',
-    // The four leaves, in the prototype's authored order, each proved to hold its own icon rather
-    // than merely to exist.
+    // The four leaves in the prototype's authored order, each proved to hold its own icon rather than merely to exist.
     expectContained: [
       {
         container: '#manager-world-nav-component-catalogue',
@@ -236,10 +219,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // The placeholder claim is gone (issue 1371), and dropping it is not optional bookkeeping:
-    // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
-    // body" with "that route's page still imports it", so a real body left claiming the placeholder
-    // publishes this route's screen as evidence of a placeholder change.
+    // The placeholder claim is gone (issue 1371): `manager-scoped-prop-contract` pairs the claim with the page's own import.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
@@ -254,7 +234,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Component catalogue, bulk selection',
     reaches: 'beyond',
     smokeLabels: [],
-    // One search over both subjects, AND A staged instruction (issue 1371, round 3).
+    // One search over both subjects, and A staged instruction (issue 1371, round 3).
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-scoped-list-search]', fill: 'salt' },
@@ -264,7 +244,7 @@ export const CASES = Object.freeze([
       {
         selector: '[data-bulk-inset="tags"] [data-world-component-bulk-option="moss"]',
       },
-      // AND the direction is staged last, which is also what scrolls the panel back to its HEAD.
+      // And the direction is staged last, which is also what scrolls the panel back to its head.
       { selector: '[data-world-component-bulk-mode-option="remove"]' },
     ],
     expectView: 'world-components',
@@ -278,8 +258,7 @@ export const CASES = Object.freeze([
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-apply]',
       },
-      // The two staged axes, so the frame is asserted to hold the changed panel rather than the
-      // resting one.
+      // The two staged axes, so the frame is asserted to hold the changed panel rather than the resting one.
       {
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-mode-state]',
@@ -288,7 +267,7 @@ export const CASES = Object.freeze([
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-tag-chip="moss"]',
       },
-      // AND the three insets themselves (issue 1371 r8-cat, gap-list rows 43-45).
+      // And the three insets themselves (issue 1371 r8-cat, gap-list rows 43-45).
       {
         container: '[data-world-component-bulk-panel]',
         target: '[data-bulk-inset="systems"]',
@@ -297,8 +276,7 @@ export const CASES = Object.freeze([
         container: '[data-world-component-bulk-panel]',
         target: '[data-bulk-inset="tags"]',
       },
-      // AND THE DANGER LEG (gap-list row 47), which is the one control on this panel that had no
-      // counterpart at all before this revision.
+      // And the danger leg, the one control on this panel that had no counterpart at all before this revision.
       {
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-danger]',
@@ -311,8 +289,7 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // The entry editor's definition tab (issue 1371), reached the way a GM reaches it: through the
-    // catalogue row's pen.
+    // The entry editor's definition tab (issue 1371), reached the way a GM reaches it: through the catalogue row's pen.
     id: 'world-component-entry-definition',
     label: 'Manager — World Component entry',
     reaches: 'beyond',
@@ -334,15 +311,12 @@ export const CASES = Object.freeze([
         container: '[data-scoped-page="world-component-entry"]',
         target: '[data-scoped-entry-source="sm-coal"]',
       },
-      // THE PREVIEW RAIL IS THE GRID'S SECOND COLUMN (issue 1371, parity round 4), so it is in
-      // the FIRST frame rather than below a fold: it no longer scrolls with the card stack, and
-      // this claim is what would red if it were nested back inside the tab panel.
+      // The preview rail is the grid's second column (issue 1371), so it is in the first frame rather than below a fold.
       {
         container: '[data-scoped-page="world-component-entry"]',
         target: '[data-scoped-entry-preview-tile]',
       },
-      // The category card's claims moved to the tags case (issue 1371, round 2), because that is
-      // the frame the card is fully drawn in.
+      // The category card's claims moved to the tags case (issue 1371), the frame the card is fully drawn in.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -369,9 +343,7 @@ export const CASES = Object.freeze([
       { selector: '[data-scoped-entry-tags="sm-coal"]', scroll: true },
     ],
     expectView: 'world-component-entry',
-    // One CARD, two columns (issue 1371, parity round 4): `proto:881-910` draws category and tags
-    // in a single `World classification` card, and the two-card split this case used to photograph
-    // is gone.
+    // One card, two columns (issue 1371): the reference draws category and tags in a single `World classification` card.
     expectSelector: '[data-scoped-entry-category="sm-coal"]',
     expectContained: [
       {
@@ -394,13 +366,12 @@ export const CASES = Object.freeze([
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag-note]',
       },
-      // One lit chip, AND it is the frame's point (issue 1371 r17, ux F-N2).
+      // One lit chip, and it is the frame's point (issue 1371 r17, ux F-N2).
       {
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag="moss"][aria-pressed="true"]',
       },
-      // The applied-but-unauthored chip (issue 1371 r18-entry, maintainer ruling M33, closing
-      // D-CJ).
+      // The applied-but-unauthored chip (issue 1371, maintainer ruling M33).
       {
         container: '[data-scoped-entry-tags="sm-coal"]',
         target:
@@ -414,11 +385,7 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
   }),
   managerCase({
-    // The entry's `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31),
-    // reached by scrolling for the reason the tags case gives: the card follows `World
-    // classification`, so at 1280x900 the definition frame shows its head and the tops of its tiles
-    // and puts the steppers under the panel's fold, where every assertion passes on a frame that
-    // shows no control.
+    // The entry's `Essence contribution` card (issue 1371), scrolled because it follows `World classification`.
     id: 'world-component-entry-essences',
     label: 'Manager — World Component entry, essence contribution',
     reaches: 'beyond',
@@ -433,9 +400,7 @@ export const CASES = Object.freeze([
     expectView: 'world-component-entry',
     expectSelector: '[data-scoped-entry-essences="sm-coal"]',
     expectContained: [
-      // The grid of shared quantity cards, one per WORLD essence, with the elected `fire` value
-      // drawn as a CONTRIBUTING tile; the note that counts the section's inheritors; and the
-      // rail's essence run, which follows the same map and is the frame's other half.
+      // The grid of shared quantity cards, the note counting the section's inheritors, and the rail's essence run.
       {
         container: '[data-scoped-entry-essences="sm-coal"]',
         target: '[data-scoped-entry-essence-grid]',
@@ -453,9 +418,7 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-essences] [data-essence-chip="fire"]',
       },
     ],
-    // THE STEPPER IS THE NEW CONTROL (issue 1371 r18-entry): a real pointer hit on its `+`, because
-    // a grid that overflowed its card or a head that overlapped it would leave a control present
-    // in the DOM, correct in every mounted assertion and unclickable on screen.
+    // The stepper is the new control (issue 1371), so a real pointer hit on its `+`: a mounted assertion cannot see overlap.
     expectCenterHit:
       '[data-scoped-entry-essences="sm-coal"] [data-component-edit-essence="fire"] [data-stepper-increment]',
     position: { width: 1280, height: 900 },
@@ -467,8 +430,7 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // The maintainer's second exhibit (issue 1371, parity round 4): `Systems using this component`,
-    // and the `Delete from the world` card under it.
+    // The maintainer's second exhibit (issue 1371): `Systems using this component`, and the delete card under it.
     id: 'world-component-entry-systems',
     label: 'Manager — World Component entry, systems and deletion',
     reaches: 'beyond',
@@ -483,8 +445,7 @@ export const CASES = Object.freeze([
     expectView: 'world-component-entry',
     expectSelector: '[data-scoped-entry-systems="sm-coal"]',
     expectContained: [
-      // THE HEAD, ITS ACTION AND THE SEGMENTED FILTER, which round 3 drew as a bare kicker
-      // reading the data and a `<select>`.
+      // The head, its action and the segmented filter, which round 3 drew as a bare kicker and a `<select>`.
       {
         container: '[data-scoped-entry-systems="sm-coal"]',
         target: '[data-scoped-entry-add-to-systems]',
@@ -497,15 +458,13 @@ export const CASES = Object.freeze([
         container: '[data-scoped-entry-systems="sm-coal"]',
         target: '[data-scoped-entry-system-count]',
       },
-      // AND THE DANGER CARD, with its reach note beside the armed control.
+      // And the danger card, with its reach note beside the armed control.
       {
         container: '[data-scoped-page="world-component-entry"]',
         target: '[data-scoped-entry-delete-note]',
       },
     ],
-    // Two pointer proofs on one frame (issue 1371, revision 8 — ux F13), because these are the two
-    // controls on this screen a compressed row can swallow and no mounted test can see: happy-dom
-    // lays nothing out, so every mounted assertion about either passes on a zero-sized target.
+    // Two pointer proofs on one frame: happy-dom lays nothing out, so mounted assertions pass on a zero-sized target.
     expectCenterHit:
       '[data-scoped-entry-system="lab-smithing"] [data-arm-token="scoped-membership-remove:sm-coal|lab-smithing"]',
     expectClick: '[data-arm-token="world-component-delete:sm-coal"]',
@@ -516,9 +475,7 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // The validation tab, on the one lab component that fails a blocking check: `lab-unbound-salt`
-    // is seeded with no source uuid at all, so `No source item linked` blocks and the two world
-    // classification rows warn.
+    // The validation tab on `lab-unbound-salt`, seeded with no source uuid, so its unlinked source blocks.
     id: 'world-component-entry-validation',
     label: 'Manager — World Component entry, validation',
     reaches: 'beyond',
@@ -547,11 +504,7 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/model\/componentScopeValidation\.js$/],
   }),
   managerCase({
-    // The frame the world Component entry and the system component rules editor share stacks its
-    // rail under its content column below `@container fabricate-manager (max-width: 1000px)`, and
-    // until this revision nothing in the registry reached that state on either consumer — while
-    // their three neighbours (`manager-components-stacked`, `manager-essences-stacked`,
-    // `manager-tags-categories-stacked`) all have one.
+    // The shared entry frame stacks its rail below `max-width: 1000px`, and nothing in the registry reached that state.
     id: 'world-component-entry-stacked',
     label: 'Manager — World Component entry stacked',
     reaches: 'beyond',
@@ -561,7 +514,7 @@ export const CASES = Object.freeze([
       { selector: '[data-scoped-list-search]', fill: 'Coal' },
       { selector: '[data-scoped-list-inspect="sm-coal"]' },
       { selector: '[data-scoped-component-open-entry]' },
-      // The strip into view before the pointer TEST.
+      // The strip into view before the pointer test.
       { selector: '[data-scoped-entry-tab="definition"]', scroll: true },
     ],
     expectView: 'world-component-entry',
@@ -578,13 +531,10 @@ export const CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    // 980 rather than the registry's usual 1024, and the twenty-two pixels are measured rather than
-    // chosen: the lab's manager container resolves to the window width minus two (measured at five
-    // widths), and the frame's own query is `max-width: 1000px` on that container.
+    // 980 rather than 1024, measured: the lab's manager container resolves to the window width minus two.
     position: { width: 980, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
-    // The frame is the SHEET's and the two pages that wear it, so a change to either page or to
-    // the shared rail selects this frame alongside its wide twin.
+    // The frame is the sheet's and the two pages that wear it, so a change to either selects this frame and its wide twin.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
@@ -595,8 +545,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tags & Categories',
     reaches: 'beyond',
     smokeLabels: [],
-    // The leaf whose label is character-for-character identical to the system-scope entry further
-    // up the same rail.
+    // The leaf whose label is character-for-character identical to the system-scope entry further up the same rail.
     steps: [{ selector: '#manager-world-nav-vocabulary' }],
     expectView: 'world-vocabulary',
     expectSelector: '[data-scoped-page="world-vocabulary"]',
@@ -615,33 +564,30 @@ export const CASES = Object.freeze([
         target: '[data-component-tag-id] .manager-icon-button',
       },
     ],
-    // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band
-    // (issue 1392).
+    // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band (issue 1392).
     position: { width: 1280, height: 1000 },
     kinds: ['manager', 'world', 'scoped'],
-    // The `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns
-    // (issue 1392).
+    // The `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns (issue 1392).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldVocabularyStudio\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
     ],
   }),
-  // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new
-  // patterns.
+  // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.
   managerCase({
     id: 'world-essence-catalogue',
     label: 'Manager — World Essence Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    // The second step selects A row, AND without it this case photographs the wrong screen.
+    // The second step selects A row, and without it this case photographs the wrong screen.
     steps: [
       { selector: '#manager-world-nav-essence-catalogue' },
       { selector: '[data-scoped-list-inspect]' },
     ],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-page="world-essences"]',
-    // The rows AND the filled inspector, proved present rather than assumed.
+    // The rows and the filled inspector, proved present rather than assumed.
     expectContained: [
       {
         container: '[data-scoped-list]',
@@ -682,8 +628,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',
-    // Both world-default cards, with their inherit lines. A frame that showed the identity fields
-    // alone would show nothing this screen exists for.
+    // Both world-default cards with their inherit lines: the identity fields alone show nothing this screen exists for.
     expectContained: [
       {
         container: '[data-scoped-page="world-essence-entry"]',
@@ -703,8 +648,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
-      // The buffered-save seam (issue 1372): the header's `← Back` / `Save essence` pair and the
-      // draft leaf behind it.
+      // The buffered-save seam (issue 1372): the header's Back and Save pair, and the draft leaf behind it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
@@ -736,9 +680,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // The same three files the resting case claims, deliberately: this is the `-narrow` / `-normal`
-    // relationship, where one screen is photographed in two states and a change to it publishes
-    // both.
+    // The same three files the resting case claims: this is the narrow/normal relationship, and a change publishes both.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,

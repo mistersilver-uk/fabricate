@@ -16,14 +16,12 @@ export const CASES = Object.freeze([
     expectView: 'world-tools',
     expectSelector: '[data-item-drop-zone="tool-create"]',
     expectContained: [
-      // THE ZONE, INSIDE THE LIST. Rendered anywhere on the screen it would satisfy
-      // `expectSelector`; this is what proves it is in the list rather than beside the card.
+      // The zone, inside the list: rendered anywhere it satisfies `expectSelector`, so the scope is the claim.
       {
         container: '[data-scoped-list="world-tools"]',
         target: '[data-item-drop-zone="tool-create"]',
       },
-      // AND THE BREAKAGE CARD STILL SPANNING THE COLUMN ABOVE IT, which is the other half of the
-      // same move: the card only reaches the pane's edge because the zone left its row.
+      // And the breakage card still spanning the column above it, which the zone's move is what allows.
       {
         container: '[data-world-tool-break-mode]',
         target: '[data-world-tool-break-segment="checkDriven"]',
@@ -42,9 +40,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    // `Tools Catalogue` is plural where its siblings are singular, and `Tools` is a live substring
-    // of it — which is why the shipped `Tools` rail entry could no longer be reached by text
-    // either.
+    // `Tools Catalogue` is plural where its siblings are singular, and `Tools` is a live substring of it.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-scoped-list-inspect="sm-tool-hammer"]' },
@@ -57,14 +53,12 @@ export const CASES = Object.freeze([
         container: '[data-world-tool-break-mode]',
         target: '[data-world-tool-break-segment="toolSpecific"]',
       },
-      // THE FACT RUN, which is where a Tool row's badges live since issue 1373: the design puts
-      // the chips under the NAME and the frame renders them inside the identity column, so a
-      // trailing-column assertion would be measuring a container the row no longer uses.
+      // The fact run, where a Tool row's badges live since issue 1373: the chips render inside the identity column.
       {
         container: '[data-scoped-list="world-tools"]',
         target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-row-facts]',
       },
-      // AND the foot pager, which eleven rows now have (issue 1373, maintainer feedback round 2).
+      // And the foot pager, which eleven rows now have (issue 1373, maintainer feedback round 2).
       {
         container: '.manager-scoped-list-column',
         target: '[data-pagination-page]',
@@ -73,7 +67,7 @@ export const CASES = Object.freeze([
         container: '[data-scoped-list-inspector]',
         target: '[data-scoped-list-inherit-count="breakage"]',
       },
-      // The fifth inspector CARD is gone, and nothing replaces it here.
+      // The fifth inspector card is gone, and nothing replaces it here.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -82,7 +76,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // `MembershipActions` is no longer claimed here, AND no case replaces it (issue 1373).
+      // `MembershipActions` is no longer claimed here, and no case replaces it (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
     ],
@@ -100,14 +94,12 @@ export const CASES = Object.freeze([
     expectView: 'world-tools',
     expectSelector: '[data-scoped-page="world-tools"]',
     expectContained: [
-      // THE ROW THAT ONLY PAGE TWO HAS. Present anywhere it would satisfy a bare selector; this
-      // says the walk actually landed on the page that holds it.
+      // The row only page two has: present anywhere it satisfies a bare selector, so this says the walk landed.
       {
         container: '[data-scoped-list="world-tools"]',
         target: '[data-scoped-list-row="lab-tool-unlinked"] [data-scoped-list-source]',
       },
-      // AND THE BAR ITSELF, inside the LIST column rather than the inspector's - the roster panel
-      // beside it carries a pager of its own, so an unscoped assertion is answered by that one.
+      // And the bar itself, inside the list column: the roster panel beside it carries a pager of its own.
       {
         container: '.manager-scoped-list-column',
         target: '[data-pagination-prev]',
@@ -119,8 +111,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // The page window itself. It is restated on the lifted view-state, and a change there with
-      // no claim would publish a frame of some other screen as evidence that the pager moved.
+      // The page window itself, restated on the lifted view-state so a change there cannot publish another screen.
       /^src\/ui\/model\/managerBrowserViewState\.js$/,
     ],
   }),
@@ -129,8 +120,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, bulk edit',
     reaches: 'beyond',
     smokeLabels: [],
-    // The state that shipped broken AND that no case could see (issue 1373, maintainer feedback
-    // round 2).
+    // The state that shipped broken and that no case could see (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: 'label:has(input[data-scoped-list-select="sm-tool-anvil"])' },
@@ -146,8 +136,7 @@ export const CASES = Object.freeze([
         container: '[data-scoped-list-inspector]',
         target: '[data-world-tool-bulk-panel]',
       },
-      // The staged axis and the Apply that names the blast radius, both inside the panel: an
-      // Apply outside its own dock would be a panel that had lost its primary action.
+      // The staged axis and the Apply that names the blast radius, both inside the panel's own dock.
       {
         container: '[data-world-tool-bulk-panel]',
         target: '[data-world-tool-bulk-status]',
@@ -156,7 +145,7 @@ export const CASES = Object.freeze([
         container: '[data-world-tool-bulk-panel]',
         target: '[data-world-tool-bulk-apply]',
       },
-      // AND the toolbar's own count, in the same frame.
+      // And the toolbar's own count, in the same frame.
       {
         container: '.manager-scoped-list-column',
         target: '[data-scoped-list-selection-count]',
@@ -180,14 +169,13 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, empty world',
     reaches: 'beyond',
     smokeLabels: [],
-    // The empty catalogue, which the fixture could not produce (issue 1373, maintainer feedback
-    // round 2).
+    // The empty catalogue, which the fixture could not produce (issue 1373).
     query: { noTools: '1' },
     steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-state="empty"]',
     expectContained: [
-      // The hero, under the zone AND inside the list.
+      // The hero, under the zone and inside the list.
       {
         container: '[data-scoped-list="world-tools"]',
         target: '[data-item-drop-zone="tool-create"]',
@@ -196,13 +184,12 @@ export const CASES = Object.freeze([
         container: '[data-scoped-list="world-tools"]',
         target: '[data-scoped-list-state="empty"]',
       },
-      // AND the inspector's own no-state, inside the column that owns it.
+      // And the inspector's own no-state, inside the column that owns it.
       {
         container: '[data-scoped-list-inspector]',
         target: '[data-scoped-list-inspector-state="resting"]',
       },
-      // The scope band survives an empty corpus and is still confined to the LIST column - the
-      // half of the finding that says the band must not span the inspector's track.
+      // The scope band survives an empty corpus and stays confined to the list column, not the inspector's track.
       {
         container: '.manager-scoped-list-column',
         target: '[data-world-tool-break-mode]',
@@ -214,12 +201,10 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // `EmptyState.svelte` AND `ItemDropZone.svelte` were claimed here AND are not anymore.
+      // `EmptyState.svelte` and `ItemDropZone.svelte` were claimed here and are not anymore.
     ],
   }),
-  // Until these four cases existed the registry contained zero steps naming
-  // `data-scoped-list-search`, `data-scoped-list-sort`, `data-scoped-list-clear-filters` or
-  // `data-scoped-list-state="filtered"` — across all of its cases, not just this screen's.
+  // Until these four cases existed the registry contained no step naming any `data-scoped-list-*` control.
   managerCase({
     id: 'world-tool-catalogue-search',
     label: 'Manager — World Tools Catalogue, filtered by search',
@@ -257,9 +242,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, filtered to nothing',
     reaches: 'beyond',
     smokeLabels: [],
-    // Filtered to nothing is not an absence, and the frame draws a different panel to say so:
-    // `EmptyState` at `filtered`, with a `Clear filters` action rather than the corpus-empty hero's
-    // creation prompt.
+    // Filtered to nothing is not an absence: `EmptyState` at `filtered` offers `Clear filters`, not a creation prompt.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-scoped-list-search]', fill: WORLD_TOOL_SEARCH_MISS_TERM },
@@ -297,9 +280,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-direction="desc"]',
-    // The toggle is live here, which is the half that separates this frame from its sibling below:
-    // `systems` is one of the frame's own sort keys, so the direction composes with it and the
-    // control is enabled.
+    // `systems` is one of this frame's own sort keys, so the direction composes with it and the toggle is live.
     expectAttributes: [
       { selector: '[data-scoped-list-direction]', name: 'aria-pressed', value: 'false' },
     ],
@@ -328,8 +309,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-direction][disabled]',
-    // `aria-pressed` still follows `asc`, which is the second half of "inert, not hidden": the
-    // control keeps saying which way the order runs even though pressing it would do nothing.
+    // `aria-pressed` still follows `asc`: inert, not hidden — the control keeps saying which way the order runs.
     expectAttributes: [
       { selector: '[data-scoped-list-direction]', name: 'aria-pressed', value: 'true' },
     ],
@@ -348,8 +328,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
-      // The lane descriptor itself: `worldToolSorts` is the only `sorts` array on this screen and
-      // it is what makes the toggle inert at all.
+      // The lane descriptor itself: `worldToolSorts` is the only `sorts` array here, and it is what makes the toggle inert.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
     ],
   }),

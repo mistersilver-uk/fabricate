@@ -10,9 +10,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipes-editor-roundtrip',
     label: 'Manager — Recipes editor roundtrip',
     smokeLabels: ['manager-recipes-editor-roundtrip'],
-    // The state is what survived a round trip, so every step is load-bearing: filter to a category,
-    // select a row into the shared inspector (the collapse below leaves no row to click), collapse
-    // the group, open the editor from the inspector, and come back.
+    // Every step is load-bearing: the state is what survived a full round trip.
     reaches: 'exact',
     query: {},
     steps: [
@@ -69,9 +67,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-systems-empty',
     label: 'Manager — System library empty',
-    // `beyond`: the live smoke seeds a crafting system before it opens the manager at all, so no
-    // smoke frame shows the library with nothing in it and there is no counterpart to fall short
-    // of.
+    // `beyond`: the smoke seeds a system before it opens the manager, so it never shows an empty library.
     reaches: 'beyond',
     smokeLabels: [],
     // No new lab input, and that is the finding rather than a shortcut.
@@ -83,11 +79,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
       ' .manager-setup-card',
     kinds: ['manager', 'systems'],
-    // Deliberately no pattern for `manager/EmptyState.svelte`, for the reason
-    // `manager-gathering-economy-actors` records about `Stepper`: `EmptyState` is in
-    // `MANAGER_PRIMITIVES`, so `BROAD_SIGNAL_PATTERN` matches it and `selectRenderFileCases`
-    // `continue`s on a broad-signal file before consulting any case's `sourceMatches` — such an
-    // entry would be unreachable.
+    // No pattern for `manager/EmptyState.svelte`: it is a broad signal, so no case's `sourceMatches` ever sees it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
@@ -97,9 +89,7 @@ export const CASES = Object.freeze([
     id: 'manager-selected-normal',
     label: 'Manager — Selected normal',
     smokeLabels: ['manager-selected-normal'],
-    // Reached the way the smoke reaches it: by CLICKING the system row's identity, which is what
-    // `selectSmokeSystemInManager` does. This exact line is pinned by `tests/view-lab-cases.test.js`
-    // as the comment-only registry change that must select one frame.
+    // Reached the way the smoke reaches it, by clicking the system row's identity.
     reaches: 'exact',
     query: {},
     steps: [
@@ -116,8 +106,7 @@ export const CASES = Object.freeze([
     id: 'manager-rail-expanded',
     label: 'Manager — Rail expanded',
     smokeLabels: ['manager-rail-expanded'],
-    // The smoke's counterpart is the expanded baseline it establishes before collapsing: it enters
-    // the system scope, collapses the rail if it is not already expanded, and photographs that.
+    // The smoke's counterpart is the expanded baseline it establishes before collapsing.
     reaches: 'exact',
     query: {},
     steps: [
@@ -175,8 +164,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
-      // `ResolutionModeCard` left this alternation at issue 1509, which deleted the file: the
-      // shim's four call sites render `RadioCardGroup` directly now.
+      // `ResolutionModeCard` went at issue 1509; the shim's four call sites render `RadioCardGroup` directly.
       /^src\/ui\/svelte\/apps\/manager\/(CraftingEffectPanel|ItemPageInspector)\.svelte$/,
     ],
   }),
@@ -186,10 +174,7 @@ export const CASES = Object.freeze([
     // The validation tab, which had no frame at all (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
-    // `lab-smithing` stated rather than inherited from the seeded default, because the frame's
-    // whole content is that system's validation report: `sm-r-runeplate-draft` contributes a
-    // critical `noResultGroup` and a `disabledIncomplete` warning, and `sm-r-deepbind` a
-    // `requirementOverlap` warning.
+    // `lab-smithing` stated rather than inherited: the frame's whole content is that system's validation report.
     query: { system: 'lab-smithing' },
     steps: ['System Overview', { selector: '#system-tab-validation' }],
     expectView: 'system-edit',
@@ -221,8 +206,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-system-edit-dirty'],
     reaches: 'exact',
     query: {},
-    // `data-system-details-dirty` appears on an `input` event, so no amount of clicking or
-    // seeding reaches it — a typed value is the only route to the lit "Unsaved" chip.
+    // `data-system-details-dirty` appears on an `input` event, so only a typed value lights the Unsaved chip.
     steps: [
       'System Overview',
       { selector: '#system-tab-settings' },
@@ -247,10 +231,7 @@ export const CASES = Object.freeze([
       { selector: '[data-world-modifiers] .manager-card-title', scroll: true },
     ],
     expectView: 'world-modifiers',
-    // The one authoring surface (issue 1117), asserted on the fields it absorbed from the retired
-    // Checks-tab editor rather than only on the section it already had: the open row's `min`
-    // Stepper is what proves the check-only bounds pair reached this card, and it is the only frame
-    // in the registry that can show it now that no Checks route authors an entry.
+    // The one authoring surface (issue 1117): the open row's `min` Stepper proves the check-only bounds pair reached this card.
     expectSelector:
       '.fabricate-manager [data-world-modifiers]' +
       ':has([data-world-modifier-bounds] [data-world-modifier-field="min"])',
@@ -269,8 +250,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-system-edit-modifier-rolls',
     label: 'Manager — World Modifiers rolling entry',
-    // BEYOND the smoke: the walk opens no modifier entry at all, and `manager-system-edit-lists`
-    // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
+    // Beyond the smoke: the walk opens no modifier entry, and `manager-system-edit-lists` opens a flat one.
     reaches: 'beyond',
     smokeLabels: [],
     // The state issue 1118 creates.
@@ -281,8 +261,7 @@ export const CASES = Object.freeze([
       { selector: '[data-world-modifier="hb-mod-luck"]', scroll: true },
     ],
     expectView: 'world-modifiers',
-    // The roll NOTE keyed to this entry is the assertion, because it is the element the retired
-    // rule's copy occupied and the only one that cannot render if the note is dropped.
+    // The roll note keyed to this entry is the assertion: it is the element the retired rule's copy occupied.
     expectSelector:
       '.fabricate-manager [data-world-modifiers]' +
       ':has([data-world-modifier-roll-note="hb-mod-luck"])',

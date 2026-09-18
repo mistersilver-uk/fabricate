@@ -24,8 +24,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-knowledge-empty-tab'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // Idrin carries knowledge and no copies at all, which is the only route to the Recipe-items
-    // tab's dashed empty state — an empty ROSTER renders the same words for the opposite reason.
+    // Idrin carries knowledge and no copies, the only route to the Recipe-items tab's dashed empty state.
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
@@ -65,8 +64,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-knowledge-party-pool-warning'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // Vosk holds the `total`-scope codex that is STILL the source of a learned entry, which is
-    // the one arrangement that raises the ordering-hazard band.
+    // Vosk's `total`-scope codex is still the source of a learned entry, the one arrangement raising the ordering-hazard band.
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
@@ -132,9 +130,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-components-bulk-edit-progressive'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // The fourth bulk-edit section — Progressive DC — renders only for a system whose component
-    // difficulty axis is progressive, which is why this case sits on herbalism rather than on the
-    // simple-mode default system the other two bulk frames use.
+    // Progressive DC renders only for a progressive difficulty axis, which is why this case sits on herbalism.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="hb-moonleaf"])' },
@@ -170,8 +166,7 @@ export const CASES = Object.freeze([
     id: 'manager-import-report',
     label: 'Manager — Import report',
     smokeLabels: ['manager-import-report'],
-    // The uploaded payload is a real export envelope, because `validateImportData` rejects anything
-    // else.
+    // The uploaded payload is a real export envelope, because `validateImportData` rejects anything else.
     reaches: 'exact',
     query: { dialog: 'open' },
     steps: [
@@ -217,8 +212,7 @@ export const CASES = Object.freeze([
       { selector: '.application.dialog button[data-action="ok"]' },
     ],
     expectView: 'systems',
-    // The systems browser is what sits underneath the report, so `expectView` alone cannot tell the
-    // two apart.
+    // The systems browser sits underneath the report, so `expectView` alone cannot tell the two apart.
     expectSelector: '[data-import-report-group]',
     kinds: ['manager', 'systems'],
     sourceMatches: [

@@ -13,9 +13,7 @@ export const CASES = Object.freeze([
     id: 'player-alchemy-chooser',
     label: 'Player app — Alchemy chooser',
     smokeLabels: ['player-alchemy-chooser'],
-    // The discipline chooser, reached exactly as the counterpart reaches it: the world remembers a
-    // chosen discipline, so the tab opens on the workbench and "Switch discipline"
-    // (`[data-alchemy-switch]`) is what returns to the chooser.
+    // The world remembers a discipline, so the tab opens on the workbench and `[data-alchemy-switch]` returns.
     reaches: 'exact',
     query: { tab: 'alchemy' },
     steps: [{ selector: '[data-alchemy-switch]' }],
@@ -30,9 +28,7 @@ export const CASES = Object.freeze([
     query: { tab: 'alchemy' },
     steps: [],
     kinds: ['player', 'alchemy'],
-    // The ALCHEMY end of the same repair `player-inventory` above carries (issue 1513): this tab
-    // is the third `showSourcesBar` renders in, and it is the alchemy frame that draws the bar at
-    // the app's own default geometry with no step to reach it.
+    // The alchemy end of the repair `player-inventory` carries (issue 1513): `showSourcesBar`'s third tab.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/alchemy\//,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
@@ -96,9 +92,7 @@ export const CASES = Object.freeze([
     id: 'fabricate-journal-craft-detail',
     label: 'Player app — Journal craft detail',
     smokeLabels: ['fabricate-journal-craft-detail'],
-    // The counterpart's condition is a history crafting run selected, so the run-detail recorded
-    // stage facts (`[data-stage-fact]`) are on screen — a different article from the one
-    // `fabricate-journal` shows, which is the default active run.
+    // The counterpart selects a history crafting run, so its recorded stage facts are on screen.
     reaches: 'exact',
     query: { tab: 'journal' },
     steps: [

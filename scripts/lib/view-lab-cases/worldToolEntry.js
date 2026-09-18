@@ -6,15 +6,13 @@ import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
-  // An enumeration of ~200 reachable states over the four Tool surfaces turned up four that look
-  // like coverage gaps and are not.
+  // An enumeration of about 200 reachable states over the four Tool surfaces found four that look like gaps and are not.
   managerCase({
     id: 'world-tool-entry',
     label: 'Manager — World Tool entry',
     reaches: 'beyond',
     smokeLabels: [],
-    // Reached by clicking A catalogue row, which is the only way in: the entry route takes an
-    // entity id the rail cannot supply.
+    // Reached by clicking a catalogue row, the only way in: the entry route takes an id the rail cannot supply.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -24,8 +22,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-scoped-page="world-tool-entry"]',
-    // A section tab open with its inherit count, the read-only world break mode, and at least one
-    // per-system row.
+    // A section tab open with its inherit count, the read-only world break mode, and at least one per-system row.
     expectContained: [
       {
         container: '[data-scoped-page="world-tool-entry"]',
@@ -51,8 +48,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, unsaved',
     reaches: 'beyond',
     smokeLabels: [],
-    // The state the explicit save exists for (issue 1373), and the twin of
-    // `world-essence-entry-dirty` beside it.
+    // The state the explicit save exists for (issue 1373), and the twin of `world-essence-entry-dirty` beside it.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -75,8 +71,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // The same files the resting case claims, deliberately: one screen photographed in two states,
-    // where the resting frame shows the screen and this one shows that its Save is a live control.
+    // The same files the resting case claims: the resting frame shows the screen and this one shows Save is live.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
@@ -88,8 +83,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, Overview',
     reaches: 'beyond',
     smokeLabels: [],
-    // A second frame on one screen, because the entry's two tabs make different decisions and its
-    // sibling case opens Breakage.
+    // A second frame on one screen, because the entry's two tabs make different decisions and its sibling opens Breakage.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -98,19 +92,18 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-card="enabled"]',
-    // The switch AND the consequence count beside it.
+    // The switch and the consequence count beside it.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="enabled"]',
         target: '[data-world-tool-entry-enabled]',
       },
-      // AND the optional display label's helper (issue 1373).
+      // And the optional display label's helper (issue 1373).
       {
         container: '[data-world-tool-entry-card="display-label"]',
         target: '[data-world-tool-entry-name-hint]',
       },
-      // The header `Delete`, which the design draws between Back and Save and which this screen did
-      // not have.
+      // The header `Delete`, which the design draws between Back and Save and which this screen did not have.
       {
         container: '.manager-header-actions',
         target: '[data-arm-token^="world-tool-delete:"]',
@@ -139,8 +132,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-card="linked-item"]',
-    // Both halves of the unlinked face, inside the card that owns them: the drop prompt itself and
-    // the sentence that says what the record has without an Item.
+    // Both halves of the unlinked face inside their card: the drop prompt, and what the record has without an Item.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="linked-item"]',
@@ -150,7 +142,7 @@ export const CASES = Object.freeze([
         container: '[data-world-tool-entry-card="linked-item"]',
         target: '[data-world-tool-entry-unlinked]',
       },
-      // AND the world master switch, off (issue 1373).
+      // And the world master switch, off (issue 1373).
       {
         container: '[data-world-tool-entry-card="enabled"]',
         target: '[data-world-tool-entry-enabled="off"]',
@@ -215,7 +207,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-card="display-label"]',
-    // The field AND its helper, inside the card.
+    // The field and its helper, inside the card.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="display-label"]',
@@ -248,8 +240,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-requirements-tab]',
-    // THE TWO CONTROLS AND THE REACH LINE. A frame proving the tab exists but not that each
-    // section states how many systems inherit it would be evidence for the strip alone.
+    // The two controls and the reach line: a frame proving only the tab exists is evidence for the strip alone.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="requirements"]',
@@ -260,7 +251,7 @@ export const CASES = Object.freeze([
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-section-note="prerequisites"]',
       },
-      // AND the bonus is A pick from the world modifier library (issue 1373, maintainer round 3).
+      // And the bonus is A pick from the world modifier library (issue 1373, maintainer round 3).
       {
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-bonus-modifier]',
@@ -275,8 +266,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
-      // BOTH of this tab's lists' row (issue 1373, rounds 4 and 5) — the bonus list, shared
-      // with the Checks Studio catalogue, and the prerequisite list above it.
+      // Both of this tab's lists' rows (issue 1373): the bonus list shared with the Checks Studio, and the prerequisite list.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
       // The card the tab draws each of its two sections as (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
@@ -287,8 +277,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, bonus with no world modifiers',
     reaches: 'beyond',
     smokeLabels: [],
-    // The state the maintainer's own world is in (issue 1373, maintainer round 3): the bonus
-    // section selects over the world modifier library, and most worlds have authored none.
+    // The state the maintainer's own world is in (issue 1373): the bonus section selects over an unauthored library.
     query: { clearSystem: '1' },
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
@@ -299,8 +288,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-bonus-empty]',
-    // BOTH SENTENCES, because the claim is that the two absences read the same way. Asserting
-    // the bonus one alone would pass just as well against a second voice invented for it.
+    // Both sentences, because the claim is that the two absences read the same way.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="requirements"]',
@@ -315,7 +303,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
-      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      // The bonus list's row, shared with the Checks Studio catalogue (issue 1373, round 4).
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
     ],
@@ -334,15 +322,12 @@ export const CASES = Object.freeze([
       { selector: '[data-world-tool-entry-tab="breakage"]' },
     ],
     expectView: 'world-tool-entry',
-    // The chosen CARD AND the absent inset, in one selector, and the absence is the load-bearing
-    // half.
+    // The chosen card and the absent inset in one selector, and the absence is the load-bearing half.
     expectSelector:
       '[data-world-tool-entry-card="breakage"]' +
       ':has([data-world-tool-entry-breakage-mode="unlimited"] input:checked)' +
       ':not(:has([data-world-tool-entry-breakage-value]))',
-    // THE SUMMARY LINE, which is the reading the stepper used to contradict. With the fourth mode
-    // in the list the card and the line agree, and this is the frame in which they can be read
-    // against each other.
+    // The summary line the stepper used to contradict: with the fourth mode the card and the line agree.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="breakage"]',
@@ -377,7 +362,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-validation]',
-    // The summary, the counts rail AND A named check.
+    // The summary, the counts rail and A named check.
     expectContained: [
       {
         container: '[data-world-tool-entry-validation]',
@@ -396,8 +381,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
-      // The shared shell BOTH validation tabs are callers of, claimed on the frame that draws its
-      // world face. Its only other claim is `manager-essence-edit-validation`.
+      // The shared shell both validation tabs call, claimed on the frame that draws its world face.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedValidationTab\.svelte$/,
     ],
   }),
@@ -406,8 +390,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, an empty repair set',
     reaches: 'beyond',
     smokeLabels: [],
-    // The state A GM is in the instant they pick `Mark as broken`, and it was drawn by nothing
-    // (issue 1373).
+    // The state a GM is in the instant they pick `Mark as broken`, and it was drawn by nothing (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -417,8 +400,7 @@ export const CASES = Object.freeze([
       { selector: '[data-world-tool-entry-onbreak-mode="flagBroken"]' },
     ],
     expectView: 'world-tool-entry',
-    // THE COUNT AT ZERO, which is the one selector that separates this frame from its populated
-    // twin. `[data-tool-repair-requirements]` alone is satisfied by either.
+    // The count at zero is the one selector separating this frame from its populated twin.
     expectSelector: '[data-tool-repair-count="0"]',
     expectContained: [
       {
@@ -435,8 +417,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The sentence generator, which is the whole of what this frame's last line shows and
-      // which had no claim of its own once the list cases stopped swallowing `tools/`.
+      // The sentence generator, which is this frame's last line and had no claim once the list cases stopped swallowing `tools/`.
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientSetCard\.svelte$/,
     ],
@@ -446,8 +427,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, a replacement with no target chosen',
     reaches: 'beyond',
     smokeLabels: [],
-    // `ToolReplacementTarget`'s empty face, which has sixty lines of CSS written for it and no
-    // frame at either scope (issue 1373).
+    // `ToolReplacementTarget`'s empty face, which has sixty lines of CSS and no frame at either scope (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -481,21 +461,19 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route',
     reaches: 'beyond',
     smokeLabels: [],
-    // A state no case could reach, which is why the screen shipped without the control (issue 1373,
-    // maintainer round 2).
+    // A state no case could reach, which is why the screen shipped without the control (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
         selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
       },
       { selector: '[data-world-tool-entry-tab="breakage"]' },
-      // Scrolled, because the repair editor is the last thing in the second card of a panel that
-      // also holds the read-only mode band and the whole breakage card.
+      // Scrolled, because the repair editor is the last thing in the second card of the breakage panel.
       { selector: '[data-tool-repair-requirements]', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements]',
-    // The rows AND the adders.
+    // The rows and the adders.
     expectContained: [
       {
         container: '[data-scoped-page="world-tool-entry"]',
@@ -515,8 +493,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The row itself, because this is the only frame in the registry that photographs a tag
-      // requirement inside a Tool inspector.
+      // The row itself, because this is the only frame photographing a tag requirement inside a Tool inspector.
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
     ],
   }),
@@ -561,8 +538,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route with an empty tag row',
     reaches: 'beyond',
     smokeLabels: [],
-    // The row the maintainer authored, which no fixture could seed (issue 1373, maintainer round
-    // 7).
+    // The row the maintainer authored, which no fixture could seed (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -608,8 +584,7 @@ export const CASES = Object.freeze([
       { selector: '[data-tool-repair-requirements] [data-recipe-add-tag]' },
     ],
     expectView: 'world-tool-entry',
-    // THE NOTE, BY ITS VARIANT CLASS. `.manager-empty` alone would pass over the dashed hero this
-    // frame exists to prove is gone, and the popover alone would pass over a list of rows.
+    // The note by its variant class: `.manager-empty` alone passes over the dashed hero this frame proves is gone.
     expectSelector:
       '.fabricate-manager .fabricate-picker-popover .manager-travel-popover-empty ' +
       '.manager-empty.is-note',
@@ -633,8 +608,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route with a suggestion list open',
     reaches: 'beyond',
     smokeLabels: [],
-    // No case in the registry opened A suggestion list (issue 1373, maintainer round 7), which is
-    // why the row that completes a typed name shipped centred and unphotographed.
+    // No case opened a suggestion list (issue 1373), which is why the completion row shipped centred and unphotographed.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {

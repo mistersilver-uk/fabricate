@@ -21,8 +21,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-tool-adopted-world-tool-1280x720',
     label: 'Manager — Tool rules, world Tool adopted 1280x720',
-    // BEYOND, and the empty smoke labels go with it: the live smoke walks no world-Tool
-    // adoption, so there is no counterpart frame to fall short of.
+    // Beyond, with empty smoke labels: the smoke walks no world-Tool adoption, so there is no counterpart.
     reaches: 'beyond',
     smokeLabels: [],
     query: {},
@@ -94,11 +93,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-tool-zero-state-browse-world-1280x720',
     label: 'Manager — Tool zero state, world Tools browsed 1280x720',
-    // BEYOND: the live smoke walks no widened Tool rules list on a system holding none.
+    // Beyond: the live smoke walks no widened Tool rules list on a system holding none.
     reaches: 'beyond',
     smokeLabels: [],
-    // What pressing the zero state's primary route actually draws (issue 1373), and until this case
-    // it was unproducible.
+    // What pressing the zero state's primary route draws (issue 1373), and until this case it was unproducible.
     query: { system: 'lab-jewelry' },
     steps: [
       { selector: '#manager-nav-tool-rules' },
@@ -122,7 +120,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Tool zero state, membership widened to all 1280x720',
     reaches: 'beyond',
     smokeLabels: [],
-    // The second route to the same state, AND it is not inferable from the first (issue 1373).
+    // The second route to the same state, and it is not inferable from the first (issue 1373).
     query: { system: 'lab-jewelry' },
     steps: [
       { selector: '#manager-nav-tool-rules' },
@@ -210,10 +208,7 @@ export const CASES = Object.freeze([
       { selector: '[data-tool-membership-option="over"]' },
     ],
     expectView: 'tools',
-    // The track's `data-tool-membership-filter` stamps `true` rather than the live value since
-    // issue 1515 put this control on the shared segmented primitive, so readiness is the third
-    // segment being lit - the class the primitive derives from its `value` prop, which is the one
-    // reading the component has to re-render to satisfy.
+    // `data-tool-membership-filter` stamps `true` since issue 1515, so readiness is the third segment being lit.
     expectSelector: '[data-tool-membership-option="over"].is-active',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
@@ -239,8 +234,7 @@ export const CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // A selected row under the pointer (issue 1373), which is how a live cascade defect stayed
-    // invisible through three parity passes.
+    // A selected row under the pointer (issue 1373), which is how a live cascade defect survived three parity passes.
     id: 'manager-tool-rules-row-hovered-1280x720',
     label: 'Manager — Tool rules selected row under the pointer 1280x720',
     reaches: 'beyond',
@@ -344,11 +338,9 @@ export const CASES = Object.freeze([
     label: 'Manager — Tool stress long name',
     smokeLabels: ['manager-tool-stress-long-name'],
     reaches: 'exact',
-    // The Tool Studio stress states live on the Runework fixture system — see the tool library
-    // note in labContent.js for why not the default system.
+    // The Tool Studio stress states live on the Runework fixture system (see labContent.js's tool library note).
     query: { system: 'lab-runework' },
-    // A long display label, authored on the fixture rather than typed: the field is the one the
-    // smoke fills, and an authored value reaches the same overflow without a keystroke.
+    // A long display label authored on the fixture: it reaches the same overflow the smoke types without a keystroke.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
@@ -390,8 +382,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Tool stress repair',
     smokeLabels: ['manager-tool-stress-repair'],
     reaches: 'exact',
-    // The Tool Studio stress states live on the Runework fixture system — see the tool library
-    // note in labContent.js for why not the default system.
+    // The Tool Studio stress states live on the Runework fixture system (see labContent.js's tool library note).
     query: { system: 'lab-runework' },
     // The flag-broken tool, whose two populated repair-requirement groups are the frame.
     steps: [
@@ -401,8 +392,7 @@ export const CASES = Object.freeze([
           '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-breakage' },
-      // The repair editor sits below the breakage tab's own fold; without this the frame shows
-      // the mode cards and none of the two populated requirement groups the case exists for.
+      // The repair editor sits below the breakage tab's fold, and the two populated requirement groups are the case.
       { selector: '[data-tool-repair-requirements]', scroll: true },
     ],
     expectView: 'tool-edit',
@@ -411,11 +401,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // The repair set IS a list of `RecipeIngredientOption` rows at system scope too, and this
-      // frame is the only one that photographs them there (issue 1373, round 6).
+      // The repair set is `RecipeIngredientOption` rows at system scope, and only this frame photographs them there.
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
-      // The summary sentence's own module, claimed by name since the list cases stopped swallowing
-      // the whole `tools/` directory (issue 1373).
+      // The summary sentence's own module, claimed by name since the list cases stopped swallowing `tools/`.
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,
     ],
   }),
@@ -424,8 +412,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Tool stress replacement',
     smokeLabels: ['manager-tool-stress-replacement'],
     reaches: 'exact',
-    // The Tool Studio stress states live on the Runework fixture system — see the tool library
-    // note in labContent.js for why not the default system.
+    // The Tool Studio stress states live on the Runework fixture system (see labContent.js's tool library note).
     query: { system: 'lab-runework' },
     // The replace-with tool, with its replacement component already chosen.
     steps: [
@@ -438,7 +425,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    // The CARD itself is claimed here (issue 1373, maintainer round 2).
+    // The card itself is claimed here (issue 1373, maintainer round 2).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
@@ -450,12 +437,9 @@ export const CASES = Object.freeze([
     label: 'Manager — Tool stress immune',
     smokeLabels: ['manager-tool-stress-immune'],
     reaches: 'exact',
-    // The Tool Studio stress states live on the Runework fixture system — see the tool library
-    // note in labContent.js for why not the default system.
+    // The Tool Studio stress states live on the Runework fixture system (see labContent.js's tool library note).
     query: { system: 'lab-runework' },
-    // Immune is a CHECK-DRIVEN state, and the authority is a per-system radio pair on the tools
-    // browser — so the segment is clicked before the tool is opened, exactly as the smoke does
-    // it, rather than pinning the whole fixture system to check-driven breakage.
+    // Immune is check-driven, so the segment is clicked before the tool opens, exactly as the smoke does it.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-authority-segment="checkDriven"]' },
@@ -486,9 +470,7 @@ export const CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    // No `ToolInheritCard` claim here, and that is a choice rather than an omission: this case
-    // opens the Anvil, whose two sections are the canonical empty, so both cards draw their
-    // off-state sentence and neither shows the inherit row the card's head is spent on.
+    // No `ToolInheritCard` claim: this case opens the Anvil, whose two sections are the canonical empty.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
@@ -511,8 +493,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     expectSelector: '[data-tool-prerequisite-list]',
-    // THE CHECKED ROW AND AN UNCHECKED ONE. A frame proving the list renders but not that a
-    // selection reads differently from a non-selection would be evidence for half the control.
+    // The checked row and an unchecked one: a list that renders without reading a selection differently is half the control.
     expectContained: [
       {
         container: '[data-tool-rule-card="prerequisites"]',
@@ -532,15 +513,11 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'tools'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
-      // The row both of this tab's lists draw (issue 1373, round 5), and the checkbox the
-      // prerequisite list trails on it.
+      // The row both of this tab's lists draw (issue 1373), and the checkbox the prerequisite list trails on it.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
-      // Deliberately no pattern for `components/SelectionCheckbox.svelte`, for the reason
-      // `manager-setup-first-run` records: it is a broad signal, `selectRenderFileCases`
-      // `continue`s on one before consulting any case's `sourceMatches`, and such an entry would be
-      // unreachable.
+      // No pattern for `components/SelectionCheckbox.svelte`: it is a broad signal, so `sourceMatches` never sees it.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
-      // AND the tab strip, on the one system frame that draws its requirements badge (issue 1373).
+      // And the tab strip, on the one system frame that draws its requirements badge (issue 1373).
       ...TOOL_EDITOR_SHELL_MATCHES,
     ],
   }),
@@ -572,7 +549,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'tools'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
-      // The bonus list's ROW, shared with the Checks Studio catalogue (issue 1373, round 4).
+      // The bonus list's row, shared with the Checks Studio catalogue (issue 1373, round 4).
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
@@ -588,10 +565,9 @@ export const CASES = Object.freeze([
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
-    // The tab had A case AND no assertion (issue 1373).
+    // The tab had A case and no assertion (issue 1373).
     expectSelector: '[data-tool-validation-tab]',
-    // The surface's three parts, each inside the region that owns it: the summary medallion, the
-    // counts rail beside it, and a real check row in the group below.
+    // The surface's three parts, each inside the region that owns it: medallion, counts rail, and a real check row.
     expectContained: [
       {
         container: '[data-tool-validation-tab]',
@@ -608,8 +584,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    // THE STRIP'S PASSING BADGE. This is the frame that draws the NEUTRAL tick — the treatment
-    // issue 1373 took the filled success disc down to — and its danger twin is the frame below.
+    // The strip's passing badge: the neutral tick issue 1373 took the filled success disc down to.
     sourceMatches: [
       ...TOOL_EDITOR_SHELL_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
@@ -620,8 +595,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Tool stress invalid validation',
     smokeLabels: ['manager-tool-stress-invalid-validation'],
     reaches: 'exact',
-    // The Tool Studio stress states live on the Runework fixture system — see the tool library
-    // note in labContent.js for why not the default system.
+    // The Tool Studio stress states live on the Runework fixture system (see labContent.js's tool library note).
     query: { system: 'lab-runework' },
     // The blocking Validation state.
     steps: [
@@ -631,9 +605,7 @@ export const CASES = Object.freeze([
           '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] [data-tool-edit-rules]',
       },
       { selector: '#tool-tab-requirements' },
-      // ADDRESSED BY THE ROW'S OWN HOOK since issue 1373's round 5: the prerequisite list is
-      // `ModifierLibraryRow` now, and `data-tool-prerequisite-row` carries the entry id, so this
-      // step no longer reaches through a class the list does not write.
+      // Addressed by the row's own hook since issue 1373: `data-tool-prerequisite-row` carries the entry id.
       { selector: '[data-tool-prerequisite-row="rw-prereq-arcana"]' },
       { selector: '#tool-tab-validation' },
     ],
@@ -651,9 +623,7 @@ export const CASES = Object.freeze([
       },
     ],
     kinds: ['manager', 'tools'],
-    // THE STRIP'S DANGER BADGE, which is the count `manager-tool-parity-05-validation-1280x720`'s
-    // neutral tick replaces. One frame each, because a change to either treatment is invisible in
-    // the other.
+    // The strip's danger badge, which the neutral tick replaces: a change to either treatment is invisible in the other.
     sourceMatches: [
       ...TOOL_EDITOR_SHELL_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolValidationTab\.svelte$/,
@@ -688,7 +658,7 @@ export const CASES = Object.freeze([
     expectView: 'tools',
     position: { width: 680, height: 700 },
     kinds: ['manager', 'tools', 'responsive'],
-    // Two claims removed here, AND neither was routing (issue 1373).
+    // Two claims removed here, and neither was routing (issue 1373).
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
 ]);

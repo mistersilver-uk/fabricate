@@ -52,9 +52,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
   ]),
-  // `HistoricalRunDetail.svelte:168` renders this card too, so a change to its inset or its region
-  // rhythm moves the multi-stage history cards as well as the active ones — and the three active
-  // frames alone would publish evidence that does not show it.
+  // `HistoricalRunDetail` renders this card too, so a change moves the multi-stage history cards as well.
   'src/ui/svelte/components/StageCard.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-past-stage',
@@ -68,9 +66,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-lifecycle-gathering-check',
   ]),
-  // The preview scale, plus the two historical branches no other frame draws: recorded per-row
-  // rolls with no global cut, and a recorded shared roll that cannot cut because one row's
-  // outcome was never recorded.
+  // The preview scale, plus the two historical branches no other frame draws.
   'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-d100',
     'fabricate-journal-history-data-legacy-row-rolls-1240',
@@ -83,16 +79,13 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
-  // The manager's one selection box, whose `sm` size has exactly one caller and is absent from both
-  // representative frames: `manager-components-normal` and `fabricate-app-shell` draw the browse
-  // row's `lg` box and nothing else.
+  // The manager's one selection box, whose `sm` size has one caller and is absent from both representative frames.
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
     'manager-tool-prerequisites-selected-1280x720',
   ]),
   // The app's one art tile (issue 1506), which is the change that earned it an entry.
   'src/ui/svelte/components/Medallion.svelte': Object.freeze(['world-component-entry-essences']),
-  // The manager's on/off switch (issue 1040), and the one entry here whose three frames are chosen
-  // per host rather than per state.
+  // The manager's on/off switch (issue 1040), whose three frames are chosen per host rather than per state.
   'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
     'manager-system-edit-normal',
     'coverage-mode-routed-check-checks',
@@ -103,20 +96,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-simple-two-band-strip',
     'coverage-mode-routed-check-checks',
   ]),
-  // The manager's labelled form field (issue 1428), on 81 call sites across 23 components — and in
-  // neither representative frame.
+  // The manager's labelled form field (issue 1428), on 81 call sites and in neither representative frame.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
   ]),
-  // The manager's icon-only button (issue 1422). 36 callers, and the representative pair does reach
-  // it — but only ever in its neutral state.
+  // The manager's icon-only button (issue 1422): 36 callers, and the representative pair reaches only its neutral state.
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',
   ]),
-  // The manager's filter bar (issue 1039), extracted from 11 hand-written `class="manager-toolbar"`
-  // sections.
+  // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections.
   'src/ui/svelte/components/ManagerToolbar.svelte': Object.freeze([
     'world-component-catalogue',
     'manager-environments-browse-normal',
@@ -126,22 +116,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
   ]),
-  // The manager's card shell (issue 1427), extracted from 80 hand-written
-  // `class="manager-inspector-card"` sections.
+  // The manager's card shell (issue 1427), extracted from 80 hand-written inspector-card sections.
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
-  // The percentage slider (issue 1508), and the entry closes a gap that the source-match route
-  // could not: this component is under `components/`, so the directory leg of
-  // `BROAD_SIGNAL_PATTERN` claims it and `selectRenderFileCases` never consults any case's
-  // `sourceMatches` for it at all.
+  // The percentage slider (issue 1508): it is under `components/`, so no case's `sourceMatches` is ever consulted for it.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
-  // An actor's portrait (issue 1506), and the first entry in this table gained by a primitive
-  // arriving rather than by an extraction leaving one state unphotographed.
+  // An actor's portrait (issue 1506), the first entry gained by a primitive arriving rather than an extraction leaving.
   'src/ui/svelte/components/Avatar.svelte': Object.freeze(['manager-knowledge-owned-copies']),
-  // The editor tab strip (issue 1509), and the first key this table gains because a component moved
-  // rather than because one acquired a state its frames could not reach.
+  // The editor tab strip (issue 1509), the first key gained because a component moved rather than acquired a state.
   'src/ui/svelte/components/EditorTabs.svelte': Object.freeze([
     'manager-system-edit-normal',
     'manager-recipe-item-overview',
@@ -167,8 +151,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
   ]),
-  // Both parties pickers, because between them they are the primitive's two modes and neither
-  // renders the other's chrome.
+  // Both parties pickers: between them they are the primitive's two modes, and neither renders the other's chrome.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
     'world-tool-entry-overview',
@@ -193,33 +176,26 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-ingredients-or-menu',
     // An eighth, and it is the primitive's grid list form (issue 1503).
     'manager-essences-source-picker',
-    // A ninth AND A tenth, and they are the primitive's multi-select mode and the one caller that
-    // stays open without it (issue 1513).
+    // A ninth and a tenth: the primitive's multi-select mode and the caller that stays open without it (issue 1513).
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
-  // The app's own select (issue 1504), whose panel is drawn by the primitive above and whose whole
-  // subject — the option list — exists only while it is open.
+  // The app's own select (issue 1504), whose whole subject — the option list — exists only while it is open.
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'player-inventory-page-size',
     'interactables-manager-region-open',
   ]),
-  // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above —
-  // a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list, and
-  // the shared two-column template in place of a caller rule.
+  // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above.
   'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([
     'manager-essences-source-picker',
   ]),
-  // The overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
-  // the environment editor and one `SearchablePopover` in the component editor that was announcing
-  // two commands as selectable options.
+  // The overflow action menu (issue 1477), extracted from four hand-rolled menus and one `SearchablePopover`.
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
     'manager-systems-row-menu-open',
   ]),
-  // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
-  // change.
+  // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same change.
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
     'manager-recipe-edit-crafting-modifier-cap-reached',
   ]),
@@ -235,8 +211,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
   // The surface that reports something that just happened (issue 1505), on two callers.
   'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
-  // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing
-  // files.
+  // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing files.
   'src/ui/svelte/apps/manager/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',

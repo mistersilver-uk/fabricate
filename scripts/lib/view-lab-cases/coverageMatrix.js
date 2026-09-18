@@ -66,14 +66,10 @@ export const CASES = Object.freeze([
       { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // Anchored on the strip's own `<span>` band, so a case that stopped drawing the strip
-    // fails here rather than publishing a frame of the table alone.
+    // Anchored on the strip's own band, so a case that stopped drawing the strip fails rather than publishing the table.
     expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
-    // Deliberately no pattern for `components/ThresholdBandStrip.svelte`, for the reason
-    // `manager-gathering-economy-actors` records about `Stepper`: `BROAD_SIGNAL_PATTERN` matches
-    // `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a broad-signal file
-    // before consulting any case's `sourceMatches`, so such an entry would be unreachable.
+    // No pattern for `components/ThresholdBandStrip.svelte`: it is a broad signal, so `sourceMatches` never sees it.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   managerCase({
@@ -104,12 +100,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-dynamic-dc',
     label: 'Manager — Checks crafting dynamic DC macro',
-    // BEYOND the smoke. The walk never switches the DC source, so there is no counterpart frame of
-    // the dynamic branch to fall short of.
+    // Beyond the smoke: the walk never switches the DC source, so the dynamic branch has no counterpart.
     reaches: 'beyond',
     smokeLabels: [],
-    // Criterion 14's subject: the dynamic-DC macro card, which is the one shipped consumer this
-    // change converted from a hand-rolled `use:dragDrop` div onto the shared `ItemDropZone`.
+    // Criterion 14's subject: the dynamic-DC macro card, the one shipped consumer moved onto `ItemDropZone`.
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
@@ -120,10 +114,7 @@ export const CASES = Object.freeze([
     expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
-      // `ItemDropZone` is deliberately not claimed here (issue 1509), and the deletion changes no
-      // routing: the pattern that used to sit on this line was on the removal-only
-      // `BROAD_SHADOWED_SOURCE_MATCHES` register precisely because the file was already a broad
-      // signal, so `selectRenderFileCases` never read it.
+      // `ItemDropZone` is deliberately not claimed here (issue 1509): it is a broad signal, so it was never read.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/ui\/model\/macroReference\.js$/,
     ],
@@ -131,14 +122,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-recipe-tiers',
     label: 'Manager — Checks crafting recipe tiers',
-    // BEYOND the smoke. The walk never adds a recipe tier, and every simple check in the
-    // fixture world authors none — so the populated list has never been photographed at all.
+    // Beyond the smoke: every simple check in the fixture world authors no recipe tier, so the list is unphotographed.
     reaches: 'beyond',
     smokeLabels: [],
-    // The row treatment, which is what issue 1096 changed here: the recipe-tier list was the last
-    // consumer of `.manager-checks-outcome-table` on The roll, drawing boxed inputs in a grid with
-    // a column-header row, while the prototype draws the same list as the Outcomes screen draws its
-    // tiers.
+    // The row treatment issue 1096 changed: the recipe-tier list was the last consumer of the boxed outcome table.
     query: {},
     steps: [
       'Checks',
@@ -150,8 +137,7 @@ export const CASES = Object.freeze([
       { selector: '[data-tier-row]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The ROW, not the card: a card that kept its old table would still satisfy a selector
-    // aimed at the section, and the row class is the thing this frame is evidence for.
+    // The row, not the card: a card keeping its old table still satisfies a selector aimed at the section.
     expectSelector: '.fabricate-manager .manager-checks-tier-list [data-tier-row]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -165,25 +151,19 @@ export const CASES = Object.freeze([
     // Beyond the smoke.
     reaches: 'beyond',
     smokeLabels: [],
-    // Runework is the only fixture check carrying authored triggers, and the only crafting check
-    // with named outcome tiers — which is what makes the `target` mode's tier select renderable at
-    // all.
+    // Runework is the only crafting check with named outcome tiers, which is what makes `target`'s tier select render.
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
-      // The list collapses (issue 1096), so the subject of this case — the tier-step row — is not
-      // in the document until its trigger is opened.
+      // The list collapses (issue 1096), so the tier-step row is not in the document until its trigger is opened.
       { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
-      // Anchored on a named trigger's own tier-step row, never on "the row's last control": which
-      // control that is depends on the mode, so a mode change would silently move the anchor.
+      // Anchored on a named trigger's tier-step row: which control is last depends on the mode.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The route alone is not enough here: the case is named for a control that only exists
-    // once the disclosure above has actually opened, and a click that no-oped would leave the
-    // right screen showing the wrong state.
+    // The route alone is not enough: a click that no-oped leaves the right screen showing the wrong state.
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
@@ -191,16 +171,12 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-trigger-break-tools',
     label: 'Manager — Checks crafting trigger break-tools card',
-    // Beyond the smoke, and a state no other frame reaches: breaking tools is authored on a trigger
-    // only while the system's tool-breakage authority is check-driven, and every fixture system
-    // rests on `toolSpecific`.
+    // Beyond the smoke: breaking tools is authored only while the authority is check-driven, and fixtures rest on `toolSpecific`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
     steps: [
-      // The authority is a per-system radio pair on the tools browser, so it is CLICKED rather
-      // than pinned on the fixture — the same route `manager-tool-stress-immune` takes for the
-      // same reason, and the same one the smoke takes.
+      // The authority is a per-system radio pair, so it is clicked rather than pinned on the fixture, as the smoke does.
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-authority-segment="checkDriven"]' },
       'Checks',
@@ -210,9 +186,7 @@ export const CASES = Object.freeze([
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The subject itself, not the route: the authority click and the disclosure click both have
-    // to have landed, and a frame of the right screen with either one missing would show the
-    // state this case is named for being ABSENT.
+    // The subject itself, not the route: both the authority click and the disclosure click have to have landed.
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
@@ -221,12 +195,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-simulator-rolled',
     label: 'Manager — Checks crafting outcome preview, rolled',
-    // BEYOND the smoke. The walk never opens the Checks rail's simulator, so there is no
-    // counterpart frame of a rolled readout to fall short of.
+    // Beyond the smoke: the walk never opens the Checks rail's simulator, so a rolled readout has no counterpart.
     reaches: 'beyond',
     smokeLabels: [],
-    // Runework is the only routed-by-check fixture with NAMED outcome tiers, which is what
-    // makes the matched band card render something a GM can read.
+    // Runework is the only routed-by-check fixture with named tiers, so its matched band card reads as a GM would.
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
@@ -237,8 +209,7 @@ export const CASES = Object.freeze([
       { selector: '[data-checks-simulator-readout]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // Anchored on the readout itself: a case that stopped rolling would fail here rather
-    // than publishing a frame of the pre-roll hint under a "rolled" name.
+    // Anchored on the readout: a case that stopped rolling would publish the pre-roll hint under a rolled name.
     expectSelector: '.fabricate-manager [data-checks-simulator-band]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -273,9 +244,7 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
-    // The formula is typed rather than authored, for the reason
-    // `manager-checks-crafting-dynamic-dc` records: the fixture check is shared, so authoring
-    // `2d20` there would move every already-captured Runework frame to photograph one panel.
+    // The formula is typed rather than authored: the fixture check is shared, so authoring it would move every Runework frame.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -284,8 +253,7 @@ export const CASES = Object.freeze([
       { selector: '[data-checks-odds-state="not-enumerable"]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The REASON, not merely the note: an abstention with no stated reason is the defect
-    // the discriminated codes exist to prevent.
+    // The reason, not merely the note: an abstention with no stated reason is what the discriminated codes prevent.
     expectSelector: '.fabricate-manager [data-checks-odds-reason="non-unit-count"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -298,8 +266,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks crafting odds histogram (progressive award count)',
     reaches: 'beyond',
     smokeLabels: [],
-    // Herbalism is the world's only progressive system, so it is the only route where a histogram
-    // bucketed by award count exists at all.
+    // Herbalism is the world's only progressive system, so only there does an award-count histogram exist.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -311,10 +278,7 @@ export const CASES = Object.freeze([
     // A bucket that must exist, not merely a bar.
     expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
     kinds: ['manager', 'checks'],
-    // NO entry for `src/systems/progressiveCheckSandbox.js`, deliberately: `isUiFile` admits
-    // only `src/ui/`, `styles/`, `.svelte` and `.css`, so a change confined to that module
-    // selects no case at all and a pattern for it here would be unreachable code — the same
-    // trap the `Stepper` note two thousand lines up records for a different reason.
+    // No entry for `src/systems/progressiveCheckSandbox.js`: `isUiFile` admits no such path, so a pattern would be dead.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
@@ -325,8 +289,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks simple two-band DC strip',
     reaches: 'beyond',
     smokeLabels: [],
-    // Smithing is the fixture's `simple` system, so its Outcomes section is the two-outcome
-    // card the third `ThresholdBandStrip` binding renders in.
+    // Smithing is the fixture's `simple` system, so its Outcomes section is the two-outcome card.
     query: { system: 'lab-smithing' },
     steps: [
       'Checks',
@@ -338,16 +301,13 @@ export const CASES = Object.freeze([
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
     kinds: ['manager', 'checks'],
-    // The strip's simple mode, and one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for
-    // `components/ThresholdBandStrip.svelte` (issue 1378).
+    // The strip's simple mode, one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for it (issue 1378).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
   }),
   managerCase({
     id: 'manager-checks-crafting-outcomes-empty',
     label: 'Manager — Checks crafting Outcomes with zero tiers',
-    // BEYOND the smoke. The walk never empties an outcome table, and every routed check in the
-    // fixture world authors three tiers, so the state a routed check STARTS in was in no frame
-    // at all.
+    // Beyond the smoke: every routed check in the fixture world authors three tiers, so the starting state was unframed.
     reaches: 'beyond',
     smokeLabels: [],
     // The dead end that was fixed (issue 1097 follow-up, maintainer report).
@@ -361,8 +321,7 @@ export const CASES = Object.freeze([
       { selector: '[data-add-outcome-tier]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The fix itself, as a selector: the add control has to be a sibling of the empty sentence,
-    // which is what taking it out of the list's `{#if}` made it.
+    // The fix as a selector: the add control has to be a sibling of the empty sentence, outside the list's `{#if}`.
     expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
@@ -370,16 +329,14 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-alchemy-off',
     label: 'Manager — Checks crafting alchemy check switched off',
-    // BEYOND the smoke. The walk never opens a switched-off crafting check, so the state has no
-    // counterpart frame.
+    // Beyond the smoke: the walk never opens a switched-off crafting check.
     reaches: 'beyond',
     smokeLabels: [],
     // The state the off switch exists for.
     query: { system: 'lab-tidewrack' },
     steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
     expectView: 'checks-crafting',
-    // The turn-on action INSIDE the off panel, as one selector: the panel alone would pass on a
-    // dead end with no way back, which is precisely the failure this state used to be.
+    // The turn-on action inside the off panel: the panel alone passes on the dead end this state used to be.
     expectSelector:
       '.fabricate-manager [data-checks-panel="crafting"][data-checks-off] [data-checks-turn-on]',
     kinds: ['manager', 'checks'],
@@ -388,11 +345,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-alchemy-behaviour',
     label: 'Manager — Checks crafting alchemy behaviour card',
-    // BEYOND the smoke. The walk never opens an alchemy system's On failure section, so there is
-    // no counterpart frame to fall short of.
+    // Beyond the smoke: the walk never opens an alchemy system's On failure section.
     reaches: 'beyond',
     smokeLabels: [],
-    // A CARD no frame reached.
+    // A card no frame reached.
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
@@ -424,8 +380,7 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting' },
-    // Brenna holds the silver billet and not the gold one, so this frame shows one route satisfied
-    // and one short — which is the only way a routed body's routing is visible at all.
+    // Brenna holds the silver billet and not the gold, so one route is satisfied and one short.
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="jw-r-cast"]' }],
     kinds: ['player', 'crafting', 'resolution-mode'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_INGREDIENTS],
@@ -440,9 +395,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting', 'resolution-mode'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_CHECK],
   }),
-  // Visibility mode changes which rails EXIST, not merely what they contain — a restricted system
-  // has an Access rail, a knowledge-gated one has Books & Scrolls and Knowledge, a global one has
-  // neither. The smoke walks a single system, so two of the three were never photographed.
+  // Visibility mode changes which rails exist, and the smoke walks a single system, so two of the three were unframed.
   managerCase({
     id: 'coverage-visibility-global',
     label: 'Coverage — global visibility system',
@@ -507,8 +460,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems', 'theme'],
     sourceMatches: [/^styles\/fabricate\.css$/, /^src\/ui\/theme\.js$/],
   }),
-  // Feature toggles that remove UI. `multiStepRecipes: false` (the jewellers) drops the step rail
-  // and the Multi-step chip from the recipe editor; `experimental: '0'` drops the Graph rail entry.
+  // Feature toggles that remove UI: `multiStepRecipes: false` drops the step rail, `experimental: '0'` the Graph entry.
   managerCase({
     id: 'coverage-multistep-off-recipe-editor',
     label: 'Coverage — multi-step disabled recipe editor',
@@ -545,15 +497,12 @@ export const CASES = Object.freeze([
     // The mounted stamp, not the panel element.
     expectSelector: '[data-player-extension-mounted="downtime"]',
     expectAttributes: [
-      // A provider tab's `accessibleName` REPLACES the visible label as the control's accessible
-      // name, so the value is the stand-in's own composed string, verbatim and unlocalized.
+      // A provider tab's `accessibleName` replaces the visible label, so the value is the stand-in's own composed string.
       { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-label', value: 'Open Projects' },
-      // The IDREF wiring the rail gained with this seam: every rail button points at the one
-      // content panel, and the panel is labelled back by the active button.
+      // The IDREF wiring this seam gained: every rail button points at the one panel, which is labelled back by it.
       { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-controls', value: 'player-nav-panel' },
     ],
-    // The seam adds a control to an existing fixed grid, so the pointer contract is photographed
-    // rather than assumed.
+    // The seam adds a control to an existing fixed grid, so the pointer contract is photographed rather than assumed.
     expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
     expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
     expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
@@ -565,9 +514,7 @@ export const CASES = Object.freeze([
     label: 'Player app — TEST companion navigation surface, narrow with long labels',
     smokeLabels: [],
     reaches: 'beyond',
-    // Both gaps in one frame: the enforced minimum window size, rendered directly rather than
-    // asserted about a larger frame, and the rail label's worst case against the truncation rule
-    // that admits a third-party label at all.
+    // Both gaps in one frame: the enforced minimum window size, and the rail label's worst case against truncation.
     query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', longPlayerLabels: '1' },
     steps: [],
     expectSelector: '[data-player-extension-mounted="downtime"]',
@@ -580,9 +527,7 @@ export const CASES = Object.freeze([
     ],
     expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
     expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
-    // The rail is the point of this frame: `.fabricate-app-nav` is `overflow-y: auto`, so its
-    // `overflow-x` computes to `auto` and an untruncated label would put a horizontal scrollbar
-    // in the 84px column. The shell is included so a spill cannot hide one level up.
+    // `.fabricate-app-nav` computes `overflow-x: auto`, so an untruncated label scrollbars the 84px column.
     expectNoHorizontalOverflow: [
       '.fabricate-app-content',
       '.fabricate-app-nav',
@@ -599,11 +544,9 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', playerProviderFault: '1' },
     steps: [],
-    // The whole decision in one selector: the faulted surface's rail entry survives, the active tab
-    // does not move, and Core renders its own error state in the panel.
+    // The whole decision in one selector: the entry survives, the active tab holds, and Core renders its error state.
     expectSelector: `.fabricate-app-shell:has(${PLAYER_EXTENSION_RAIL_BUTTON}[aria-selected="true"]) [data-player-extension-fault="downtime"]`,
-    // Core's own diagnostic copy, rendered rather than merely present in the DOM. It names the
-    // provider that failed and nothing else: no product name, no offer, no call to action.
+    // Core's own diagnostic copy, rendered: it names the provider that failed and nothing else.
     expectVisible:
       '[data-player-extension-fault="downtime"]:has-text("This section could not be displayed")',
     expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],

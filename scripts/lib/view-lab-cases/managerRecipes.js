@@ -30,9 +30,7 @@ export const CASES = Object.freeze([
     // The flash, which no case reached (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
-    // `sm-r-runeplate-draft` is the lab's one OFF-and-un-enableable recipe — an incomplete shell
-    // with no result groups, which also requires the disabled `aether` essence — so its row's
-    // switch is the one gesture in the corpus that produces a refusal rather than a write.
+    // `sm-r-runeplate-draft` is the lab's one off-and-un-enableable recipe, so its switch refuses rather than writes.
     query: { system: 'lab-smithing' },
     steps: [
       'Crafting',
@@ -43,14 +41,12 @@ export const CASES = Object.freeze([
       },
     ],
     expectView: 'recipes',
-    // The alert AND its dismiss control, because the flash is specified as dismissible and
-    // non-auto-hiding: an alert drawn without its control is a different contract from the one this
-    // frame is evidence for.
+    // The alert and its dismiss control, because the flash is specified as dismissible and non-auto-hiding.
     expectSelector:
       '.fabricate-manager .fab-notice[data-recipe-flash][role="alert"]' +
       ':has(.fab-notice-title)' +
       ' [data-notice-dismiss]',
-    // The refusal is logged, AND the log is the state working (issue 1515, driver capture).
+    // The refusal is logged, and the log is the state working (issue 1515, driver capture).
     allowedConsoleErrors: [/Fabricate \| Failed to toggle recipe enabled state/],
     // The flash has to be in the picture, not merely in the DOM.
     expectContained: [{ container: '.manager-main', target: '[data-recipe-flash]' }],
@@ -79,17 +75,14 @@ export const CASES = Object.freeze([
     id: 'manager-recipes-no-check',
     label: 'Manager — Recipes no check',
     smokeLabels: ['manager-recipes-no-check'],
-    // The row's "No check" warning pill is a SYSTEM-level fact, not a recipe one:
-    // `_buildRecipeCheckSummary` reports `kind: 'none'` for any non-`routedByIngredients` system
-    // whose check slot carries no authored roll formula — "check enabled" is not the same thing.
+    // The row's `No check` pill is a system-level fact: any non-`routedByIngredients` system with no roll formula reports it.
     reaches: 'exact',
     query: {},
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-check-roll-formula]', fill: '' },
-      // The Checks view is a staged editor: typing only marks the draft dirty, and the browser's
-      // check pills read the persisted system.
+      // The Checks view is a staged editor: typing only marks the draft dirty, and the check pills read the persisted system.
       { selector: '[data-checks-save]' },
       'Crafting',
     ],
@@ -104,9 +97,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipes-grouped-continuation',
     label: 'Manager — Recipes grouped continuation',
     smokeLabels: ['manager-recipes-grouped-continuation'],
-    // Page two of a grouped list: with "Group by category" on, ordering is category-major before
-    // pagination, so a category larger than the page continues across the boundary instead of being
-    // re-sliced alphabetically per page.
+    // Page two of a grouped list: ordering is category-major before pagination, so a large category continues across it.
     reaches: 'exact',
     query: {},
     steps: [
@@ -136,8 +127,7 @@ export const CASES = Object.freeze([
       ...chooseSelectOption('[data-recipe-bulk-category]', 'Armoursmithing'),
       { selector: '[data-recipe-bulk-status-option="enable"]' },
       { selector: '[data-recipe-bulk-lock-option="lock"]' },
-      // Karrun Forgecraft is the only lab system that authors check tiers, so this select is the
-      // only populated one in the world; every other system renders the info Callout instead.
+      // Karrun Forgecraft is the only lab system authoring check tiers, so this is the world's only populated select.
       ...chooseSelectOption('[data-recipe-bulk-check-tier]', 'sm-tier-masterwork'),
       { selector: '.fab-bulk-book-trigger' },
       { selector: '[data-popover-option="sm-book"]' },
@@ -147,8 +137,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-bulk-book-remove]' },
     ],
     expectView: 'recipes',
-    // Both staged states must be on screen at once, or a control that shows one book at a time
-    // reads as a control that stages one book at a time.
+    // Both staged states must be on screen at once, or staging one book at a time reads the same as showing one.
     expectSelector:
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
@@ -176,13 +165,10 @@ export const CASES = Object.freeze([
     id: 'manager-recipes-bulk-edit-blocked',
     label: 'Manager — Recipes bulk edit blocked',
     smokeLabels: ['manager-recipes-bulk-edit-blocked'],
-    // The blocked face, and the frame acceptance criterion 6 is settled by: the panel's warning
-    // Callout counting the same rows the browser has pilled, in one photograph, so the two cannot
-    // be shown to disagree.
+    // The blocked face: the panel's warning Callout counting the same rows the browser has pilled, in one photograph.
     reaches: 'exact',
     query: {},
-    // Order is load-bearing, and `expectSelector` cannot enforce it: a click auto-scrolls its
-    // target into view, so whichever row is ticked last is the one the frame is scrolled to.
+    // Order is load-bearing and `expectSelector` cannot enforce it: the row ticked last is the one scrolled to.
     steps: [
       'Crafting',
       { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
@@ -190,17 +176,14 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-bulk-status-option="enable"]' },
     ],
     expectView: 'recipes',
-    // Both halves of the claim, in one selector, because either alone would publish a lie: a
-    // Callout with no pilled row says the panel invented a count, and a pilled row with no Callout
-    // is the plain browser frame under a case named for the warning.
+    // Both halves in one selector: a Callout with no pilled row, or a pilled row with no Callout, each publishes a lie.
     expectSelector:
       '.fabricate-manager:has([data-recipe-bulk-blocked-warning]) ' +
       '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]:has(.manager-chip.is-danger)',
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
-  // The staged case opens the picker, picks, presses the action and repeats; the pick clears on
-  // staging by design, so that frame lands on the trigger plus the staged list.
+  // The staged case picks, presses and repeats; the pick clears on staging, so that frame shows the staged list.
   managerCase({
     id: 'manager-recipes-bulk-edit-picker',
     label: 'Manager — Recipes bulk edit picker',
@@ -214,10 +197,7 @@ export const CASES = Object.freeze([
       { selector: '.fab-bulk-book-trigger' },
     ],
     expectView: 'recipes',
-    // Three claims in one selector, and the trigger-only frame satisfies none of them: the popover
-    // exists at all, it is portaled into the manager (the whole reason it escapes the inspector's
-    // `overflow: hidden`), and its rows carry the second meta line — which is the fact the GM
-    // chooses on and which only renders when the option was given one.
+    // Three claims the trigger-only frame fails: the popover exists, it is portaled, and its rows carry the second meta line.
     expectSelector:
       '.fabricate-manager .manager-travel-popover ' +
       '[data-popover-option="sm-book"] .manager-travel-option-meta',
@@ -239,8 +219,7 @@ export const CASES = Object.freeze([
       { selector: '[data-popover-option="sm-book"]' },
     ],
     expectView: 'recipes',
-    // The card for the Folio, which holds neither selected recipe — so `Add 2` is live and `Remove`
-    // is dead with its count dropped rather than rendered as `Remove 0`.
+    // The Folio card holds neither selected recipe, so `Add 2` is live and `Remove` is dead with its count dropped.
     expectSelector:
       '.fabricate-manager [data-recipe-bulk-book-pick="sm-book"]' +
       ':has([data-recipe-bulk-book-add]:not([disabled]))' +
@@ -248,17 +227,14 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
-  // The third surface this panel cannot hold, and the first frame in the registry that draws a
-  // `<Select>`'s option list at all.
+  // The third surface this panel cannot hold, and the first frame in the registry drawing a `<Select>`'s option list.
   managerCase({
     id: 'manager-recipes-bulk-edit-check-tier',
     label: 'Manager — Recipes bulk edit check tier list',
     smokeLabels: [],
     reaches: 'beyond',
     query: {},
-    // The staged case's own walk, stopped one step into its fourth axis: the same two ordinary
-    // Weaponsmithing recipes, then the check-tier trigger and no row click — so the frame is the
-    // open list rather than what choosing from it stages.
+    // The staged case's walk stopped one step in: the check-tier trigger and no row click, so the list is still open.
     steps: [
       'Crafting',
       { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
@@ -266,36 +242,27 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-bulk-check-tier]' },
     ],
     expectView: 'recipes',
-    // Four claims, and the trigger-only frame satisfies none of them: the panel exists, it is
-    // portaled onto the manager root (the whole reason it escapes the rail's `overflow: hidden`),
-    // it is the ticked configuration, and the row this frame is named for carries a tick element of
-    // its own.
+    // Four claims the trigger-only frame fails: the panel exists, it is portaled, it is ticked, and the row carries a tick.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
       '[data-popover-option="sm-tier-masterwork"]:has(.fabricate-select-tick)',
-    // The two affordances the frame is for, asserted geometrically because both are things a
-    // reviewer reads off the picture: a group heading and a per-option hint, each inside the
-    // panel's own box rather than clipped by it.
+    // A group heading and a per-option hint, each asserted inside the panel's own box rather than clipped by it.
     expectContained: [
       { container: '.fabricate-manager', target: '.fabricate-select-popover' },
       { container: '.fabricate-select-popover', target: '.manager-travel-popover-group-label' },
       { container: '.fabricate-select-popover', target: '.fabricate-select-hint' },
     ],
     kinds: ['manager', 'recipes'],
-    // SPREAD, not the shared array, for the reason `manager-recipes-bulk-edit-picker` records:
-    // this and that frame are the two bulk-edit frames that rest on an OPEN panel, so they are the
-    // two that must answer for the positioning seam.
+    // Spread rather than the shared array: this and the picker frame are the two bulk-edit frames resting on an open panel.
     sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
-  // Both frames run on herbalism, not on the flagship smithing library every other recipe case
-  // photographs, and the choice is the whole reason these frames say anything.
+  // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.
   managerCase({
     id: 'manager-recipes-bulk-delete-idle',
     label: 'Manager — Recipes bulk delete idle',
     smokeLabels: [],
     reaches: 'beyond',
-    // The unarmed face: the impact statement and the standing permanence hint, rendered before the
-    // control is armed.
+    // The unarmed face: the impact statement and the standing permanence hint, before the control is armed.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -305,8 +272,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-bulk-delete-card]', scroll: true },
     ],
     expectView: 'recipes',
-    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
-    // from its armed twin below — a selector naming only the card would pass on either.
+    // Unarmed is the state under test, and `data-armed="false"` is what separates this frame from its armed twin.
     expectSelector: '.fabricate-manager [data-arm-token="delete-recipes"][data-armed="false"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -327,13 +293,11 @@ export const CASES = Object.freeze([
       { selector: 'label:has(input[data-recipe-select="hb-r-healing"])' },
       { selector: 'label:has(input[data-recipe-select="hb-r-salve"])' },
       { selector: 'label:has(input[data-recipe-select="hb-r-oil"])' },
-      // The button, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
-      // arms, so this cannot drift onto a wrapper the way a class selector could.
+      // The button, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it arms.
       { selector: '[data-arm-token="delete-recipes"]' },
     ],
     expectView: 'recipes',
-    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
-    // indistinguishable from the idle case above.
+    // Armed is a state; a frame re-photographing the idle button would be indistinguishable from the case above.
     expectSelector: '.fabricate-manager [data-arm-token="delete-recipes"][data-armed="true"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -346,8 +310,7 @@ export const CASES = Object.freeze([
     id: 'manager-crafting-group-expanded',
     label: 'Manager — Crafting group expanded',
     smokeLabels: ['manager-crafting-group-expanded'],
-    // The rail's Crafting group expanded to all four subitems — Recipes, Books & Scrolls,
-    // Knowledge, Settings — over a multi-category recipe library.
+    // The rail's Crafting group expanded to all four subitems over a multi-category recipe library.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: ['Crafting'],
@@ -390,9 +353,7 @@ export const CASES = Object.freeze([
       { selector: '[data-books-scrolls-select="hb-book"]' },
     ],
     expectView: 'books-scrolls',
-    // The GRID with its accented tile inside it, not the aside root: an inspector that kept its
-    // chrome while the tiles stopped rendering would leave every other claim here true, and
-    // `tone="info"` on the middle tile is the one reach of that tone anywhere in the tree.
+    // The grid with its accented tile, not the aside root, and `tone="info"` is that tone's one reach in the tree.
     expectSelector: '[data-item-page-stats] [data-stat-tone="info"]',
     kinds: ['manager', 'books-scrolls'],
     // The inspector only.
@@ -422,8 +383,7 @@ export const CASES = Object.freeze([
       { selector: '[data-books-scrolls-edit="hb-book"]' },
     ],
     expectView: 'recipe-item-edit',
-    // The panel, not the tab BUTTON: a strip that kept its buttons while the panel stopped
-    // rendering would leave every other claim here true.
+    // The panel, not the tab button: a strip keeping its buttons while the panel stopped rendering passes otherwise.
     expectSelector: '[data-recipe-item-tab="overview"]',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
@@ -445,9 +405,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-tab-button="contents"]' },
     ],
     expectView: 'recipe-item-edit',
-    // The PANEL and the populated list inside it, not the tab BUTTON: a strip that kept its
-    // buttons while the panel stopped rendering would leave every other claim here true, and the
-    // list is what says the fixture's membership reached the screen rather than the empty line.
+    // The panel and the populated list inside it: the list is what says the fixture's membership reached the screen.
     expectSelector: '[data-recipe-item-tab="contents"] [data-recipe-item-contents-list]',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
@@ -470,15 +428,13 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-link-recipe-toggle]' },
     ],
     expectView: 'recipe-item-edit',
-    // The panel, its search row AND A row in it. The panel alone would pass over an empty list, and
-    // the option row is what makes this frame evidence for the populated presentation.
+    // The panel, its search row and a row in it: the panel alone would pass over an empty list.
     expectSelector:
       '.fabricate-manager .fabricate-picker-popover.manager-travel-popover' +
       ':has(.manager-travel-popover-search)' +
       ' .manager-travel-popover-options .manager-travel-option',
     kinds: ['manager', 'books-scrolls'],
-    // `...ANCHORED_POPOVER_SOURCES` because this frame rests on an open panel the shared
-    // positioning seam measured, clamped and portaled, which is that array's own membership test.
+    // `...ANCHORED_POPOVER_SOURCES` because this frame rests on an open panel the shared seam clamped and portaled.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
@@ -509,8 +465,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-item-validation-blocked',
     label: 'Manager — Recipe item validation blocked',
     smokeLabels: ['manager-recipe-item-validation-blocked'],
-    // The same tab in its blocking state, which is a different summary card, a different count
-    // split and a Block pill on the offending row.
+    // The same tab blocking: a different summary card, a different count split and a Block pill on the offending row.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -529,8 +484,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-item-preview-recipe-pager',
     label: 'Manager — Recipe item preview, the book detail recipe pager',
-    // The sixth converted select's only frame (issue 1511), and the reason it is a MANAGER case is
-    // measured rather than chosen.
+    // The sixth converted select's only frame (issue 1511), and it is a manager case by measurement rather than choice.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -555,10 +509,7 @@ export const CASES = Object.freeze([
       { container: '[data-recipe-item-preview]', target: '[data-inventory-page-size]' },
     ],
     kinds: ['manager', 'books-scrolls'],
-    // `apps/inventory/detail/` is named here for the reason the frame exists: this is the only
-    // case in the registry that renders a player inventory DETAIL body inside the manager window,
-    // so without the pattern a change to `InventoryBookDetail.svelte` published nothing that could
-    // contain its GM-facing render.
+    // `apps/inventory/detail/` is named here because this is the only case rendering an inventory detail body in the manager.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,

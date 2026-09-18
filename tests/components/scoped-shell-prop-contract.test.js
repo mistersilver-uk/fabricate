@@ -1256,10 +1256,7 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
   });
 });
 
-/** THIS SCREEN'S POINTER HIT-TESTS ARE IN THE CAPTURE REGISTRY. */
 describe('the entry’s pointer proofs survive in the capture registry', () => {
-  // Every case file the manifest names, as one text: this screen's cases moved out of the index
-  // with the split (issue 1671), and which file holds them is not this suite's concern.
   const registry = () =>
     VIEW_LAB_CASE_FILES.map(({ path }) => sourceOf(path)).join('\n');
 

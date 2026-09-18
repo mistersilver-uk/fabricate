@@ -2622,15 +2622,7 @@ const labMountSource = sourceOf(LAB_MOUNT_PATH);
 const selectedIds = (files, options) =>
   mapChangedFilesToCases(files, options).map((viewCase) => viewCase.id);
 
-/**
- * The 1-based line of a file holding an exact piece of text, asserted present so that a rename
- * fails the test loudly rather than quietly turning it into an assertion about line 0.
- *
- * @param {string[]} source The file, by line.
- * @param {string} text The whole line.
- * @param {string} where The file's path, for the failure message.
- * @returns {number} Its 1-based line number.
- */
+/** The 1-based line holding an exact piece of text, asserted so a rename fails loudly, not as line 0. */
 function lineOf(source, text, where) {
   const index = source.indexOf(text);
   assert.notEqual(index, -1, `${where} no longer contains the line: ${text}`);
@@ -2714,12 +2706,7 @@ function patchEditing(source, { line, removed = 1, replaced = true }) {
 /** @returns {object} The `patches` option carrying one patch for one path. */
 const patchesFor = (path, patch) => ({ patches: { [path]: patch } });
 
-/**
- * The case file a path names, with the helpers that name lines and patches in it.
- *
- * @param {string} path A manifest entry's path, or any other file this test patches.
- * @returns {{path: string, source: string[], lineOf: Function, patches: Function}} The file.
- */
+/** One file, with the helpers that name a line of it and build a patch adding those lines. */
 function fileAt(path) {
   const source = caseFileSources.get(path) ?? sourceOf(path);
   return {
@@ -2730,29 +2717,23 @@ function fileAt(path) {
   };
 }
 
-/**
- * The case file declaring a case's literal, asserted present so a generated case — which no file
- * declares a literal for — fails here rather than silently patching the wrong file.
- *
- * @param {string} id A case id declared inline in some file's array.
- * @returns {{path: string, source: string[], lineOf: Function, patches: Function}} Its file.
- */
+/** The case file declaring a case's literal, asserted so a generated case fails rather than drifts. */
 function caseFile(id) {
   const found = [...caseFileSources].find(([, source]) => source.includes(`    id: '${id}',`));
   assert.ok(found, `no case file declares a literal for "${id}"`);
   return fileAt(found[0]);
 }
 
-/** @returns {number} The 1-based line of a case's own `id:` line, in its own file. */
+/** The 1-based line of a case's own `id:` line, in its own file. */
 const caseIdLine = (id) => caseFile(id).lineOf(`    id: '${id}',`);
 
-/** @returns {string[]} The ids a patch at those lines of a case's own file selects. */
+/** The ids a patch at those lines of a case's own file selects. */
 function selectedForCase(id, lineNumbers) {
   const file = caseFile(id);
   return selectedIds([file.path], file.patches(lineNumbers));
 }
 
-/** @returns {boolean} True when some case file declares this case as a literal. */
+/** True when some case file declares this case as a literal. */
 const isInlineCase = (id) =>
   [...caseFileSources.values()].some((source) => source.includes(`    id: '${id}',`));
 
@@ -2760,13 +2741,7 @@ const isInlineCase = (id) =>
 const labActorsPatches = (lineNumbers) =>
   patchesFor(LAB_ACTORS_PATH, patchAdding(labActorsSource, lineNumbers));
 
-/**
- * The 1-based span of the case literal containing an id line, found the way a reader would: up to
- * the factory call that opens it, down to the line that closes it.
- *
- * @param {string} id A case id declared inline in the array.
- * @returns {number[]} Every line number of the literal.
- */
+/** Every line of a case's literal, from the factory call that opens it to the line that closes it. */
 function caseLiteralLines(id) {
   const { source } = caseFile(id);
   const idLine = caseIdLine(id);
@@ -3019,7 +2994,6 @@ test('widening unions with what was already attributed, at every level it can ha
 
   const file = caseFile(INSIDE_A_CASE_LITERAL);
   const inside = caseIdLine(INSIDE_A_CASE_LITERAL);
-  // Inside the same file, outside every case literal: the line its `CASES` array opens on.
   const outside = file.lineOf(ARRAY_OPEN_LINE);
   const expected = [...new Set([...LAB_SURFACE_CASE_IDS, INSIDE_A_CASE_LITERAL])];
   const inRegistryOrder = (ids) => caseIds.filter((id) => ids.includes(id));
@@ -3266,10 +3240,7 @@ test('no single changed file selects more than one window, and every lab input r
   );
 });
 
-/**
- * The modules under `scripts/lib/view-lab-cases/` that declare no cases of their own: the shared
- * seams and case generators the data files import. Everything else there is a manifest entry.
- */
+/** The modules under the case directory that declare no cases: everything else is a manifest entry. */
 const SHARED_CASE_MODULES = Object.freeze([
   'broadSignals.js',
   'caseConstants.js',
@@ -3304,8 +3275,7 @@ test('the manifest names every case file under the directory, and only case file
       unaccounted.join('\n  ')
   );
 
-  // And in the other direction: the allowlist cannot carry a name that has gone, or one the
-  // manifest also claims.
+  // And the allowlist cannot carry a name that has gone, or one the manifest also claims.
   for (const name of SHARED_CASE_MODULES) {
     assert.ok(onDisk.includes(name), `${name} is allowlisted but no longer exists`);
     assert.ok(
@@ -3347,7 +3317,6 @@ test('a patch inside any case file attributes to that file\'s own case, and noth
     const inline = cases.map((viewCase) => viewCase.id).filter((id) => isInlineCase(id));
     assert.ok(inline.length > 0, `${path} declares no case literal, so no patch can be attributed`);
 
-    // First, middle and last: a file whose array open or close moved attributes one end wrongly.
     for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
       assert.deepEqual(
         selectedIds([path], file.patches([caseIdLine(id)])),
@@ -3357,7 +3326,6 @@ test('a patch inside any case file attributes to that file\'s own case, and noth
       attributed.add(id);
     }
 
-    // And the same file's array-open line, which is inside no literal.
     assert.deepEqual(
       selectedIds([path], file.patches([file.lineOf(ARRAY_OPEN_LINE)])),
       coverageIds(),
@@ -3367,7 +3335,6 @@ test('a patch inside any case file attributes to that file\'s own case, and noth
 
   assert.ok(attributed.size >= VIEW_LAB_CASE_FILES.length, 'every case file must be exercised');
 
-  // A shared module holds no literal at all, so every patch on one widens.
   for (const name of SHARED_CASE_MODULES) {
     const path = `${CASE_FILE_DIRECTORY}/${name}`;
     const shared = fileAt(path);
@@ -3380,8 +3347,7 @@ test('a patch inside any case file attributes to that file\'s own case, and noth
 });
 
 test('the registry order and its surface coverage match the committed golden files', () => {
-  // Generated on the base commit and committed unchanged: the split moved 485 case literals
-  // between files, and nothing else in this suite would notice a run landing out of order.
+  // Generated on the base commit: nothing else here would notice a run landing out of order.
   const golden = (name) =>
     readFileSync(resolve(ROOT, `tests/fixtures/view-lab/${name}.golden.txt`), 'utf8')
       .split('\n')
@@ -3477,8 +3443,7 @@ test('ADDING a case to the registry selects that one case', () => {
 test('a registry change OUTSIDE a case literal selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
-  // A shared factory, a pattern constant, a case file's own spread of a generator, and the mapping
-  // function itself — each in the file that now declares it.
+  // A shared factory, a pattern constant, a generator spread, and the mapping function itself.
   for (const [path, line] of [
     ['scripts/lib/view-lab-cases/caseFactories.js', 'export function managerCase(entry) {'],
     // Was ` 'RadioCardGroup',`, one element of the hand-written `MANAGER_PRIMITIVES` array (issue
@@ -3502,8 +3467,7 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
 test('a comment-only registry change selects one frame — not 157, and not none', () => {
   // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
   // cost this narrowing exists to remove.
-  const COMMENT =
-    "    // Reached the way the smoke reaches it: by CLICKING the system row's identity, which is what";
+  const COMMENT = "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
   const file = fileAt(fileDeclaring(COMMENT));
   assert.deepEqual(selectedIds([file.path], file.patches([file.lineOf(COMMENT)])), [
     FALLBACK_CASE_ID,
@@ -3590,13 +3554,7 @@ function survivableShifts(patch) {
   return [3, 17, 400, 4000, 1 - Math.min(...starts)].filter((delta) => delta !== 0);
 }
 
-/**
- * The case literal each line of one case file sits in, derived the way a reader would — from the
- * factory call that opens an element to the line that closes it.
- *
- * @param {string} path A manifest entry's path.
- * @returns {Map<number, string>} Line number -> case id, for lines inside a case literal.
- */
+/** Line number -> case id for one case file, read from the factory call down to the closing line. */
 function caseIdByLineIn(path) {
   const source = caseFileSources.get(path);
   const byLine = new Map();
@@ -3607,16 +3565,10 @@ function caseIdByLineIn(path) {
   return byLine;
 }
 
-/** The `CASES` array-open line every case file carries, and the registry parses each file by. */
+/** The array-open line every case file carries, and the registry parses each file by. */
 const ARRAY_OPEN_LINE = 'export const CASES = Object.freeze([';
 
-/**
- * The one case file holding an exact line, asserted unique so a fixture line that spread to a
- * second file fails here rather than patching whichever file happens to be first.
- *
- * @param {string} text The whole line.
- * @returns {string} That file's path.
- */
+/** The one case file holding an exact line, asserted unique so a spread fixture line fails here. */
 function fileDeclaring(text) {
   const holders = [...caseFileSources]
     .filter(([, source]) => source.includes(text))
@@ -3883,13 +3835,7 @@ function windowOccurrences(source, line) {
   return (windowIndex(source, 7).get(source.slice(from - 1, from + 6).join('\n')) ?? []).length;
 }
 
-/**
- * Cases whose id line, and whose LAST content line, both anchor uniquely — so a fixture built at
- * either lands on exactly one place in the file.
- *
- * @param {number} howMany How many to return.
- * @returns {{id: string, idLine: number, lastContentLine: number}[]} Qualifying cases.
- */
+/** Cases whose id line and last content line both anchor uniquely, so a fixture at either is exact. */
 function uniquelyAnchoredCases(howMany) {
   const qualifying = caseIds
     .filter((id) => id !== FALLBACK_CASE_ID && isInlineCase(id))

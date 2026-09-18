@@ -143,20 +143,16 @@ export function journalLifecycleCases() {
     ];
   };
   const steps = {
-    // A paused run holds the choices it already made (D-028), so its rail is inert: the walk
-    // pauses the run and stops there rather than reaching for a tile it can no longer open.
+    // A paused run holds the choices it made (D-028), so its rail is inert and the walk stops at the pause.
     paused: [{ selector: '[data-run-action="pause"]' }],
     'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
-    // Started and matured, which is what an enabled roll requires — and therefore locked, so
-    // there is no open tile or choice option left to walk (issue 1648, D-028).
+    // Started and matured, which an enabled roll requires, and therefore locked: no open tile is left to walk.
     'check-route': [],
     'material-shortage': [
       { selector: '[data-journal-route] input[value="boss-stage-1-verdant"]' },
       { selector: '[data-journal-route] input[value="boss-stage-1-sunward"]' },
     ],
-    // Issue 1648, M15: the primary is refused while the essence pick is unmade, so there is
-    // no further control left to walk into a command refusal — the frame is the blocked
-    // state itself, reached by `selectCaseRun` alone.
+    // Issue 1648, M15: the primary is refused while the essence pick is unmade, so `selectCaseRun` alone reaches it.
     'automatic-blocker': [],
     'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
     'past-stage': [{ selector: '[data-stage-nav-index="0"]' }],
@@ -290,9 +286,7 @@ export function journalLifecycleCases() {
         '[data-journal-summary-card="time"]',
         `${primary}:disabled`
       ),
-    // An open requirement rail belongs to a stage that has NOT begun (D-028), and an unbegun
-    // stage offers the begin decision in place of the resolve action — refused, because the
-    // option pick this case exists to show is exactly what it is still waiting for.
+    // An open requirement rail belongs to an unbegun stage (D-028), which offers the begin decision instead.
     'waiting-open-choice':
       detail +
       has(
@@ -301,8 +295,7 @@ export function journalLifecycleCases() {
         '[data-run-action="begin"]:disabled'
       ) +
       lacks(primary),
-    // The stage the player has not begun: its own control, stating what beginning commits,
-    // and NO roll offered at all until it has started (issue 1648, M13/M15).
+    // The stage the player has not begun: its own control, and no roll offered until it starts (issue 1648).
     'stage-not-started':
       detail + has('[data-run-action="begin"]:not(:disabled)', '[data-run-begin]') + lacks(primary),
     // Issue 1648, M10.
@@ -315,9 +308,7 @@ export function journalLifecycleCases() {
         '[data-journal-route] input:not(:disabled)'
       ) +
       lacks('[data-journal-action-blocker]', '[data-run-attention="materials"]'),
-    // The same stage once it started: it shows the RECEIPT of what it consumed rather than
-    // the requirement rail, which probes an inventory the stage already emptied (M21), and
-    // nothing about the choice is editable any more.
+    // The same stage once started: the receipt of what it consumed, and nothing about the choice editable (M21).
     'stage-consumed':
       detail +
       has('[data-journal-stage-details]', '[data-journal-stage-consumed] [data-list-row]') +
@@ -326,21 +317,18 @@ export function journalLifecycleCases() {
         '[data-run-action="begin"]',
         '[data-slot-row]'
       ),
-    // A currency-only ingredient set is valid and authorable (D-031), so a started stage whose
-    // whole requirement was a price is a reachable state.
+    // A currency-only ingredient set is authorable (D-031), so a started stage priced that way is reachable.
     'stage-paid':
       detail +
       has('[data-journal-stage-consumed] [data-journal-fact]') +
       lacks(
-        // The item-row GRID, as one compound selector: a DESCENDANT inside a negated `:has()`
-        // is evaluated unfaithfully by happy-dom, so the mounted walk would pass it open.
+        // The item-row grid as one compound selector: happy-dom evaluates a descendant inside a negated `:has()` unfaithfully.
         '.journal-stage-consumed-items',
         '[data-essence-history]',
         '[data-slot-row]',
         '[data-run-action="begin"]'
       ),
-    // A stage short of its materials has NOT begun — starting is what spends them (D-026) —
-    // so the control it offers is the begin decision, refused and reasoned (issue 1648).
+    // A stage short of its materials has not begun — starting spends them (D-026) — so it offers the begin decision.
     'material-shortage':
       detail +
       has(
@@ -466,9 +454,7 @@ export function journalLifecycleCases() {
       'succeeded',
       '[data-history-stages] [data-stage-io="produced"]'
     ),
-    // Issue 1648, M15: the same unmade-choice shape as `awaiting-choice`, on a run armed before the
-    // D-028 lock existed (started, but never locked, so its essence pick is still live-resolved and
-    // still open).
+    // Issue 1648, M15: `awaiting-choice`'s shape on a run armed before the D-028 lock, so its pick is still open.
     'automatic-blocker':
       detail +
       has(
@@ -488,8 +474,7 @@ export function journalLifecycleCases() {
         `${detail} [data-run-action="cancel-arm"]:not(:disabled)`
       ) +
       lacks('[data-journal-stages]', '[data-yield-entry]', '[data-run-secret-preview]'),
-    // Its stage has STARTED, so its materials surface is the consumption receipt rather than
-    // the held/needed rail the slot id named (M21).
+    // Its stage has started, so its materials surface is the consumption receipt rather than the held/needed rail (M21).
     alchemy:
       detail +
       has(
@@ -554,8 +539,7 @@ export function journalLifecycleCases() {
       lacks('[data-journal-recovery]', '[data-journal-paused]:not([data-journal-action-blocker])'),
     wide: roomy,
     narrow: roomy,
-    // A choice slot exists only before the stage starts now (M21), so this state's stage is
-    // unbegun.
+    // A choice slot exists only before the stage starts now (M21), so this state's stage is unbegun.
     'current-choice-closed':
       detail +
       has('[data-stage-state="current"] [data-slot-row] button.fab-slot-tile') +

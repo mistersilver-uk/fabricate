@@ -24,8 +24,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // Every frame below reaches its state by clicking the rule group (and, for the capped pair, by
-  // typing into the pick-cap Stepper) rather than by authoring a second catalogued system.
+  // Every frame below reaches its state by clicking the rule group rather than by authoring a second catalogued system.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-inherit',
     label: 'Manager — Recipe edit crafting modifier inherit',
@@ -45,7 +44,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The picker cell AND the inherited-names paragraph.
+    // The picker cell and the inherited-names paragraph.
     expectSelector:
       '.fabricate-manager [data-recipe-editor] ' +
       '[data-recipe-crafting-modifier-picker] [data-recipe-crafting-modifier-inherited]',
@@ -58,12 +57,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-custom-set',
     label: 'Manager — Recipe edit crafting modifier custom set',
-    // BEYOND the smoke: the walk never presses a rule card, so its seeded system is `highest` and
-    // no counterpart frame of the picker in its custom-set state exists.
+    // Beyond the smoke: the walk never presses a rule card, so the picker's custom-set state has no counterpart.
     reaches: 'beyond',
     smokeLabels: [],
-    // `hb-r-stillroom` authors `{ modifierIds: [...three] }`, so the tri-state reads `Custom set`
-    // above a three-pill row.
+    // `hb-r-stillroom` authors three modifier ids, so the tri-state reads `Custom set` above a three-pill row.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -77,8 +74,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The pill row is what a `Custom set` adds over `Inherit`; the absent cap sentence is what
-    // separates this frame from both of its capped neighbours.
+    // The pill row is what `Custom set` adds over `Inherit`, and the absent cap sentence separates it from both capped neighbours.
     expectSelector:
       '.fabricate-manager [data-recipe-editor] ' +
       '[data-recipe-crafting-modifier-picker]:has([data-modifier-pill-select])' +
@@ -89,13 +85,11 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // The suppressed-pick state (issue 1608): the same seeded custom set as the case above, after one
-  // of its three stored picks is un-marked on the Checks tab rather than removed on the recipe.
+  // The suppressed-pick state (issue 1608): the same custom set, after one pick is un-marked on the Checks tab.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-suppressed',
     label: 'Manager — Recipe edit crafting modifier suppressed pick',
-    // BEYOND the smoke, same as its neighbours: the smoke's system authors no modifier picks at
-    // all under this rule, let alone an un-marked one.
+    // Beyond the smoke: the smoke's system authors no modifier picks under this rule, let alone an un-marked one.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -112,10 +106,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The count, not merely the note's presence: a click that landed on the wrong row, or one that
-    // toggled nothing, would still leave all three picks eligible and render no note at all, and a
-    // selector asserting only `[data-recipe-crafting-modifier-suppressed]` would be satisfied by
-    // any nonzero count.
+    // The count, not merely the note: a click that toggled nothing leaves all three picks eligible and no note at all.
     expectSelector: '.fabricate-manager [data-recipe-crafting-modifier-suppressed="1"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -123,9 +114,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // Two frames, because the cap has two readings and they are different pictures: below the bound
-  // the sentence states it and the Add menu is live, at the bound the sentence gains its at-cap
-  // clause and the Add menu goes dead.
+  // Two frames, because below the bound the Add menu is live and at the bound it goes dead.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-cap-available',
     label: 'Manager — Recipe edit crafting modifier below the pick cap',
@@ -144,8 +133,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The READING, not merely the presence of a sentence: both frames render the same element with
-    // the same chrome, so a fill that silently did not land would publish the at-cap picture here.
+    // The reading, not merely a sentence: both frames render the same element, so a fill that did not land publishes the wrong one.
     expectSelector: '.fabricate-manager [data-recipe-crafting-modifier-cap="available"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -181,13 +169,10 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-absent',
     label: 'Manager — Recipe edit crafting modifier absent',
-    // BEYOND the smoke. The walk photographs a system whose recipes DO author picks, so there is
-    // no counterpart frame of the surface being gone.
+    // Beyond the smoke: the walk photographs a system whose recipes do author picks, so absence has no counterpart.
     reaches: 'beyond',
     smokeLabels: [],
-    // The negative frame, and the one the redesign turns on. Under any rule but `bySubject` this
-    // tab renders nothing about check modifiers — no picker, and no standing "the system decides"
-    // banner either.
+    // The negative frame the redesign turns on: under any rule but `bySubject` this tab renders nothing about check modifiers.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -196,8 +181,7 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-section="identity"]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // Absence in THREE directions, because each retired hook is a different way the surface could
-    // come back: the picker cell, the retired rule select, and the retired delegation banner.
+    // Absence in three directions, because each retired hook is a different way the surface could come back.
     expectSelector:
       '.fabricate-manager [data-recipe-editor]' +
       ':not(:has([data-recipe-crafting-modifier-picker]))' +
@@ -209,14 +193,11 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // Both cases used to photograph the `noPlaceholder` inert cause — a formula authored but never
-  // spending the check-modifier roll-formula placeholder — and that cause retires with the
-  // placeholder: the scalar is appended to whatever the GM authored, so the state is unreachable.
+  // Both cases used to photograph the `noPlaceholder` inert cause, which retires with the placeholder.
   managerCase({
     id: 'manager-checks-crafting-modifier-inert',
     label: 'Manager — Checks crafting modifiers inert',
-    // BEYOND the smoke. The walk never empties a check formula, so no counterpart frame of
-    // the notice exists.
+    // Beyond the smoke: the walk never empties a check formula, so no counterpart frame of the notice exists.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -230,8 +211,7 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-modifier-inert]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The CAUSE, not just the notice. Both causes render through the same element with the
-    // same chrome, so a presence-only assertion would photograph the wrong sentence.
+    // The cause, not just the notice: both causes render through the same element with the same chrome.
     expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noFormula"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -242,7 +222,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-inert',
     label: 'Manager — Recipe edit crafting modifier inert',
-    // BEYOND the smoke, for the same reason as the sibling above.
+    // Beyond the smoke, for the same reason as the sibling above.
     reaches: 'beyond',
     smokeLabels: [],
     // The recipe end of the same fact, and the only check-modifier banner this tab has left.
@@ -252,9 +232,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
-      // Back to The roll to clear the formula: the field and the catalogue it makes inert
-      // are two SECTIONS apart now (issue 1096), and a step that stayed on Modifiers would
-      // find no formula field and abort the case.
+      // Back to The roll to clear the formula: the field and the catalogue it makes inert are two sections apart (issue 1096).
       { selector: '#checks-section-roll' },
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
@@ -330,8 +308,7 @@ export const CASES = Object.freeze([
         container: '[data-recipe-option]',
         target: '[data-recipe-option-kind]',
       },
-      // AND THE ADDERS, which are three controls in one row rather than three buttons stacked
-      // under a heading. The set card is what draws them.
+      // And the adders, which are three controls in one row rather than three stacked buttons: the set card draws them.
       {
         container: '[data-recipe-set]',
         target: '[data-recipe-add="tag-requirement"]',
@@ -347,10 +324,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-ingredients-cost',
     label: 'Manager — Recipe edit ingredients cost',
     smokeLabels: ['manager-recipe-edit-ingredients-cost'],
-    // The essence + currency-cost requirement rows, which sit below the fold of the plain
-    // ingredients frame — the smoke splits them into their own capture for exactly that reason and
-    // scrolls the currency row (the last requirement) into view so both rows and their end-of-row
-    // Steppers are on screen.
+    // The essence and currency-cost rows sit below the plain ingredients fold, so the currency row is scrolled into view.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -370,9 +344,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-tag-picker',
     label: 'Manager — Recipe edit, the tag picker open over a system vocabulary',
     smokeLabels: [],
-    // No case in the registry opened this popover (issue 1373, maintainer round 8), which is the
-    // third such gap in as many rounds and is why it went on drawing a panel that is not the
-    // design's.
+    // No case in the registry opened this popover (issue 1373), which is why it went on drawing a panel that is not the design's.
     reaches: 'beyond',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -383,13 +355,11 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
     ],
     expectView: 'recipe-edit',
-    // The panel AND A row in it.
+    // The panel and A row in it.
     expectSelector:
       '.fabricate-manager .fabricate-picker-popover.manager-travel-popover ' +
       '.manager-travel-popover-options .manager-travel-option',
-    // Portaled, so containment is asserted against the application root rather than against the row
-    // that owns the trigger: the panel escapes the editor's clipping on purpose, so a container
-    // assertion on that row could only ever fail.
+    // Portaled, so containment is asserted against the application root: the panel escapes the editor's clipping on purpose.
     expectContained: [
       {
         container: '.fabricate-manager',
@@ -408,9 +378,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Recipe edit ingredients, the "or…" menu open',
     reaches: 'beyond',
     smokeLabels: [],
-    // No case in the registry had ever opened this menu (issue 1373, maintainer round 8), and that
-    // is the whole reason it shipped as a wide list of four full sentences with no header and no
-    // colour while three surfaces around it were being brought onto the design.
+    // No case had opened this menu (issue 1373), which is why it shipped as four full sentences with no header and no colour.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -421,12 +389,9 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     // Named on the last kind, not on the panel.
     expectSelector: '.manager-recipe-or-popover [data-recipe-add="alternative-currency"]',
-    // The panel is PORTALED to the manager root (`util/overlayHost.js`), so the container is that
-    // root and not the recipe view: it is deliberately outside the scrolling editor pane, and
-    // containment against the pane would be a claim about a box it does not sit in.
+    // The panel is portaled to the manager root, so containment against the scrolling editor pane would be a false claim.
     expectContained: [{ container: '.fabricate-manager', target: '.manager-recipe-or-popover' }],
-    // …and it is actually on top. A menu drawn under the row it hangs from is contained, visible
-    // and useless, which is a failure no bounding box can see.
+    // …and it is actually on top: a menu drawn under its row is contained, visible and useless.
     expectCenterHit: '.manager-recipe-or-popover [data-recipe-add="alternative-component"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -441,16 +406,14 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-validation'],
     reaches: 'exact',
     query: {},
-    // The recipe is named, and that is the whole difference between this frame and the one it
-    // replaces.
+    // The recipe is named, and that is the whole difference between this frame and the one it replaces.
     steps: [
       'Crafting',
       { selector: '[data-recipe-edit="sm-r-runeplate-draft"]' },
       { selector: '#recipe-tab-validation' },
     ],
     expectView: 'recipe-edit',
-    // A representative frame for `EditorValidationSurface` since issue 1517, and it had no
-    // assertion at all until then.
+    // A representative frame for `EditorValidationSurface` since issue 1517, which had no assertion at all until then.
     expectSelector: '[data-recipe-tab="validation"] [data-recipe-issue-view]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -500,9 +463,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-results-multistep',
     label: 'Manager — Recipe edit results multistep',
     smokeLabels: ['manager-recipe-edit-results-multistep'],
-    // The Results tab's per-step result sections — the frame that proves a multi-step recipe's
-    // Results renders something rather than an empty tab (the structural bug that shipped unseen
-    // for want of exactly this coverage).
+    // The Results tab's per-step sections: the frame that proves a multi-step recipe's Results is not an empty tab.
     reaches: 'exact',
     query: {},
     steps: [
@@ -522,8 +483,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Multistep disable confirm',
     smokeLabels: ['manager-multistep-disable-confirm'],
     reaches: 'exact',
-    // `dialog: 'open'` leaves Foundry's own DialogV2 standing and unresolved, which is the whole
-    // point of this frame: the confirmation itself is the state, not what follows it.
+    // `dialog: 'open'` leaves DialogV2 standing and unresolved: the confirmation is the state, not what follows it.
     query: { dialog: 'open' },
     steps: [
       'System Overview',
@@ -531,9 +491,7 @@ export const CASES = Object.freeze([
       { selector: '.manager-feature-tile[data-feature-key="multiStepRecipes"] button' },
     ],
     expectView: 'system-edit',
-    // The dialog IS the state, so the frame has to be held to it: `expectView: 'system-edit'` is
-    // satisfied by the settings tab with no dialog standing, which is precisely the screen a
-    // silently no-oping toggle would have published.
+    // The dialog is the state, so `expectView` alone would be satisfied by a silently no-oping toggle's screen.
     expectSelector: '.application.dialog',
     kinds: ['manager', 'recipes'],
     // Matches the screen it renders.
@@ -546,8 +504,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-collapsed',
     label: 'Manager — Recipe edit collapsed',
     smokeLabels: ['manager-recipe-edit-collapsed'],
-    // The collapsed editor: `RecipeEditView` draws a read-only steps card plus its explanatory
-    // note, instead of the editable accordion, whenever `!multiStepEnabled && steps.length > 1`.
+    // The collapsed editor: a read-only steps card and its note whenever `!multiStepEnabled && steps.length > 1`.
     reaches: 'exact',
     query: { system: 'lab-jewelry' },
     steps: [
@@ -567,9 +524,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-results-progressive',
     label: 'Manager — Recipe edit results progressive',
     smokeLabels: ['manager-recipe-edit-results-progressive'],
-    // Progressive Results: an ORDERED stage list with a roll-budget strip, a read-only difficulty
-    // badge and keyboard move chevrons — a wholly different tab body from the routed and simple
-    // shapes. It is a SYSTEM-mode fact, so it can only be photographed on the progressive system.
+    // Progressive Results is a system-mode fact, so its ordered stage list can only be photographed on that system.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -588,8 +543,7 @@ export const CASES = Object.freeze([
     id: 'manager-recipe-edit-results-alchemy',
     label: 'Manager — Recipe edit results alchemy',
     smokeLabels: ['manager-recipe-edit-results-alchemy'],
-    // Alchemy Results: the two-slot shape — an authored success set plus a reserved, undeletable
-    // "On a failed check" set the editor draws itself.
+    // Alchemy Results: an authored success set plus the reserved, undeletable failed-check set the editor draws itself.
     reaches: 'exact',
     query: { system: 'lab-alchemy' },
     steps: [
@@ -616,8 +570,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
-      // The manager router and the Crafting entry model (issue 1151), for the reason recorded on
-      // `manager-books-scrolls-normal`.
+      // The manager router and the Crafting entry model (issue 1151), as `manager-books-scrolls-normal` records.
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
@@ -635,8 +588,7 @@ export const CASES = Object.freeze([
       { selector: '[data-access-row="al-r-elixir"]' },
     ],
     expectView: 'access',
-    // The inspector's CHARACTERS roster, not the inspector root: the root renders in BOTH
-    // branches, so naming it alone would pass over the empty state this case exists to leave.
+    // The inspector's characters roster, not its root: the root renders in both branches and would pass over the empty state.
     expectSelector: '[data-access-inspector] [data-access-roster="characters"]',
     kinds: ['manager', 'access'],
     sourceMatches: [
@@ -650,9 +602,7 @@ export const CASES = Object.freeze([
     // The populated half of the access inspector (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
-    // `lab-alchemy` is a `restricted` system, which is what makes the Access rail entry render
-    // at all; `al-r-elixir` is one of its five recipes, well inside the list's resting page size
-    // of ten, so the row is on screen without a filter or a pager step.
+    // `lab-alchemy` is `restricted`, which is what renders the Access rail entry, and `al-r-elixir` is on the resting page.
     query: { system: 'lab-alchemy' },
     steps: [
       'Crafting',
@@ -660,9 +610,7 @@ export const CASES = Object.freeze([
       { selector: '[data-access-row="al-r-elixir"]' },
     ],
     expectView: 'access',
-    // The inspector's populated branch, proved by an element that exists only in it: the empty
-    // branch draws an `EmptyState` and nothing else, so `[data-access-inspector]` alone is
-    // satisfied by the frame this case exists to distinguish itself from.
+    // The populated branch, proved by an element only it has: the empty branch draws an `EmptyState` and nothing else.
     expectSelector:
       '.fabricate-manager [data-access-inspector]:has([data-access-summary])' +
       ' [data-access-roster="characters"] [data-access-character-row]',
@@ -701,9 +649,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-access-recipe-roster-no-match',
     label: 'Manager — Recipe access players roster no match',
-    // The per-roster no-match line (issue 1515), the second state the one-user roster made
-    // unreachable: the field that produces it renders only over a roster with something in it, and
-    // a roster of one has nothing a query can miss that the screen does not already show.
+    // The per-roster no-match line (issue 1515): a roster of one has nothing a query can miss that the screen does not show.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-alchemy', manyPlayers: '1' },
@@ -723,8 +669,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
-      // No `EmptyState.svelte` pattern, for the reason the paged case above records about
-      // `Pagination`: it is a broad signal, so the pattern could never be consulted.
+      // No `EmptyState.svelte` pattern: it is a broad signal, so the pattern could never be consulted.
     ],
   }),
 ]);

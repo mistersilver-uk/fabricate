@@ -19,8 +19,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-events'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // The counterpart's own sequence — select an environment, open the Events tab, wait on
-    // `[data-gathering-event-section]` — on the world's only environment that has an Events tab.
+    // The counterpart's own sequence, on the world's only environment that has an Events tab.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '[data-gathering-detail-tab="events"]' },
@@ -34,8 +33,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-task-ready'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // The counterpart's condition is a selected task whose attempt is not blocked
-    // (`[data-gathering-attempt-blocked="false"]`).
+    // The counterpart's condition is a selected task whose attempt is not blocked.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
@@ -47,8 +45,7 @@ export const CASES = Object.freeze([
     id: 'player-gathering-after-success',
     label: 'Player app — Gathering after success',
     smokeLabels: ['player-gathering-after-success'],
-    // The gather runs end to end and the frame says so: "Nodes available: 2/3" against the ready
-    // state's 3/3, from a run the manager recorded as `succeeded`. Verified live.
+    // The gather runs end to end and the frame says so: `Nodes available: 2/3` against the ready state's 3/3.
     reaches: 'exact',
     query: { tab: 'gathering' },
     steps: [
@@ -65,9 +62,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-tool-blocked'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A selected task whose attempt is blocked, on the tool reason specifically: Cut Icecap Fronds
-    // requires the herbalist's glass alembic, and the gathering actor is the smith who carries none
-    // of Idrin's glassware.
+    // Blocked on the tool reason: the task wants the herbalist's alembic and the gathering actor is the smith.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-icecap"] .gathering-task-summary' },
@@ -81,8 +76,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-timed-ready'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A timed task before it has been started: attempt unblocked, and the requirements panel names
-    // the six hours the attempt will wait rather than resolving on the spot.
+    // A timed task before it starts: unblocked, with the requirements panel naming the six hours it will wait.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
@@ -111,8 +105,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-blind'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // `[data-gathering-blind-card]`: a blind-selection environment redacts its task list entirely
-    // — one opaque attempt card instead of rows, with the mask chip on the environment card.
+    // A blind-selection environment redacts its task list: one opaque attempt card, with the mask chip above it.
     steps: [{ selector: '.gathering-env-card[data-environment-id="hb-env-thicket"]' }],
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
@@ -123,8 +116,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-realm-locked'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // The one environment-card state selection cannot reach: a locked teaser, greyed, with the lock
-    // overlay and the "not in current realm" header alert.
+    // The one environment-card state selection cannot reach: a locked teaser with the not-in-current-realm alert.
     steps: [{ selector: '.gathering-env-card.is-locked', scroll: true }],
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
@@ -152,8 +144,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
-  // The Crafting header withholds "Ready to craft" and leads the blocking callout with the
-  // authority's own reason.
+  // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
     id: 'player-crafting-authority-blocked',
     label: 'Player app — Crafting blocked by the run authority',
@@ -193,7 +184,7 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-sources-picker',
     label: 'Player app — Crafting component sources picker',
-    // The panel twenty-seven frames claim AND none opens (issue 1513).
+    // The panel twenty-seven frames claim and none opens (issue 1513).
     reaches: 'beyond',
     smokeLabels: [],
     query: { tab: 'crafting' },
@@ -203,8 +194,7 @@ export const CASES = Object.freeze([
       '.fabricate-picker-popover.crafting-sources-popover ' +
       '.manager-travel-popover-options .crafting-source-option',
     kinds: ['player', 'crafting'],
-    // `apps/crafting/ComponentSourcesBar.svelte` named explicitly rather than left to
-    // `CRAFTING_SHARED`.
+    // `apps/crafting/ComponentSourcesBar.svelte` named explicitly rather than left to `CRAFTING_SHARED`.
     sourceMatches: [
       CRAFTING_SHARED,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
@@ -243,9 +233,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-run-summary',
     label: 'Player app — Crafting run summary',
     smokeLabels: ['player-crafting-run-summary'],
-    // The counterpart's condition is the right column having swapped to the run summary —
-    // `[data-crafting-run-summary]`, which `CraftingView` renders only once `lastRollResult`
-    // carries an entry for the selected recipe.
+    // The counterpart waits on the right column swapping to the run summary, which needs a `lastRollResult` entry.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -260,8 +248,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-roll-result',
     label: 'Player app — Crafting roll result',
     smokeLabels: ['player-crafting-roll-result'],
-    // The counterpart's condition is the RollResultBox inside the run summary, scrolled into frame:
-    // `[data-crafting-run-summary] [data-recipe-section="roll-result"]`.
+    // The counterpart's condition is the `RollResultBox` inside the run summary, scrolled into frame.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -279,8 +266,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-roll-prompt',
     label: 'Player app — Crafting roll prompt with modifier choice',
     smokeLabels: ['player-crafting-roll-prompt'],
-    // The interactive check roll prompt, standing and unanswered, with the `playerPicks` modifier
-    // fieldset issue 855 adds.
+    // The interactive check roll prompt, standing and unanswered, with the `playerPicks` fieldset issue 855 adds.
     reaches: 'exact',
     query: { tab: 'crafting', dialog: 'open' },
     steps: [
@@ -288,15 +274,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    // The dialog is a sibling of the application window, so the app's own route is satisfied by the
-    // crafting tab with nothing over it — precisely the screen a prompt that never opened would
-    // publish.
+    // The dialog is a sibling of the window, so the app route alone is satisfied by a prompt that never opened.
     expectSelector: '.application.dialog .fabricate-roll-prompt__modifiers',
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and
-      // nothing else under that folder contributes a pixel of it, so a change elsewhere in
-      // `crafting/` should not conscript a frame of a modal that would not show it.
+      // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -308,10 +290,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-essence-alternative',
     label: 'Player app — Crafting essence alternative',
     smokeLabels: ['player-crafting-essence-alternative'],
-    // The counterpart's condition is an open alternatives radiogroup — `.crafting-alt-option` rows
-    // under `[data-recipe-section="alternatives"]` — one of whose options is an essence, so the
-    // option card draws the shared art tile in its glyph face, `[data-medallion="glyph"]`, rather
-    // than an item image.
+    // The counterpart wants an open alternatives radiogroup whose essence option draws the glyph face.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -335,9 +314,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-essence-legacy',
     label: 'Player app — Crafting essence legacy',
     smokeLabels: ['player-crafting-essence-legacy'],
-    // Window, and unreachable from fixture data. The legacy surface is the IoTable's own
-    // `[data-io-group="essences"]` group, which renders only from a set-level
-    // `ingredientSet.essences` map.
+    // Window, and unreachable from fixture data: the legacy surface renders only from a set-level essences map.
     reaches: 'window',
     query: { tab: 'crafting' },
     steps: [],
@@ -358,9 +335,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-essence-shopping',
     label: 'Player app — Crafting essence shopping',
     smokeLabels: ['player-crafting-essence-shopping'],
-    // The counterpart's condition is an essence tile inside the shopping list's acquire card:
-    // `[data-shopping-acquire-components] [data-medallion="glyph"]`, reached by pressing a recipe
-    // row's cart button.
+    // The counterpart's condition is an essence tile inside the shopping list's acquire card.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -377,8 +352,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-slot-rail',
     label: 'Player app — Crafting slot rail',
     smokeLabels: ['player-crafting-slot-rail'],
-    // The counterpart's three programmatic assertions, all reproduced: the rail's slot states are
-    // exactly `['choice:partial', 'essence:short', 'fixed:met']` and exactly one chooser is open.
+    // The counterpart's three assertions reproduced: the rail's exact slot states, and exactly one chooser open.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -394,9 +368,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-crafting-tag-unmatched'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    // The counterpart's three assertions, all reproduced: a rail whose tag tile has no item image
-    // to borrow renders its own glyph and never Foundry's `item-bag.svg`; every group is fixed, so
-    // it is the world's only rail with no chooser open.
+    // The counterpart's three assertions reproduced: a tag tile draws its own glyph, and no chooser is open.
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Refine Silver' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-silver-ingot"]' },
@@ -420,8 +392,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-crafting-pick-for-me'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    // "Pick for me" restoring the resolver's suggestion after the player has trimmed it — the
-    // counterpart's own sequence.
+    // `Pick for me` restoring the resolver's suggestion after the player trimmed it, as the counterpart does.
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Rivet Chainmail' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"]' },
@@ -484,8 +455,7 @@ export const CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
-      // Scroll to the second step ("Fold the pattern") to show its corrected requirements,
-      // which is painted with its own coal-only cost, not step 1's Steel Ingot + Coal.
+      // Scroll to the second step to show its own coal-only cost rather than step 1's Steel Ingot and Coal.
       { selector: '[data-recipe-step]:nth-of-type(2)', scroll: true },
     ],
     kinds: ['player', 'crafting'],
@@ -495,9 +465,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-progressive',
     label: 'Player app — Crafting progressive',
     smokeLabels: ['player-crafting-progressive'],
-    // The reorderable stage list at rest — `[data-recipe-section="progressive-stages"]` with its
-    // grips, ordinals, per-stage difficulty and "Reached at ≥N" thresholds, and the chevron box
-    // rendered whether or not anything has moved.
+    // The reorderable stage list at rest, with grips, ordinals, per-stage difficulty and its thresholds.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -512,11 +480,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
-    // The crafting half of the per-stage complication band (issue 1286), asserted on the frame that
-    // already draws it for the same reason `player-salvage` is: `ProgressiveBody` passes
-    // `complications="forecast"` unconditionally, so all four `player-crafting-progressive*` frames
-    // render the band, and a fifth case sharing this case's query and steps would publish a
-    // byte-identical PNG under a second name.
+    // The crafting half of the complication band (issue 1286): `ProgressiveBody` passes `complications` unconditionally.
     expectSelector:
       '[data-recipe-mode="progressive"]' +
       ':has([data-recipe-section="progressive-stages"] ' +
@@ -528,9 +492,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-progressive-reordered',
     label: 'Player app — Crafting progressive reordered',
     smokeLabels: ['player-crafting-progressive-reordered'],
-    // The same list after one downward move, which is the counterpart's own sequence and the only
-    // state in which two of its invariants stop being vacuous: the live region is empty until a
-    // move announces, and the authored thresholds ascend by construction until one is re-derived.
+    // The same list after one downward move, the only state in which two of its invariants stop being vacuous.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -551,9 +513,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-progressive-fixed',
     label: 'Player app — Crafting progressive fixed',
     smokeLabels: ['player-crafting-progressive-fixed'],
-    // The GM-ordered variant, on its own recipe because the state is a recipe flag:
-    // `allowPlayerResultReorder` defaults true, so an explicit false has to be authored to reach it
-    // at all.
+    // The GM-ordered variant, on its own recipe: `allowPlayerResultReorder` defaults true, so false must be authored.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -573,8 +533,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-progressive-stacked',
     label: 'Player app — Crafting progressive stacked',
     smokeLabels: ['player-crafting-progressive-stacked'],
-    // The shared 960px boundary makes the smoke counterpart's stacked condition reachable at
-    // production's 1024px player-window floor: the named container is roughly 938px wide there.
+    // The shared 960px boundary makes the stacked condition reachable at the 1024px player-window floor.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [

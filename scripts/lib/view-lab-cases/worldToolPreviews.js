@@ -18,13 +18,12 @@ export const CASES = Object.freeze([
       },
       { selector: '[data-world-tool-entry-tab="breakage"]' },
       { selector: '[data-tool-player-broken]' },
-      // SCROLLED for the reason the repair frame is: the card is the last thing in the second
-      // card of the panel, and its unlink control sits at the foot of it.
+      // Scrolled for the reason the repair frame is: the unlink control sits at the foot of the second card.
       { selector: '[data-tool-replacement-target]', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-replacement-target]',
-    // The filled face of the drop zone AND the tile it explains.
+    // The filled face of the drop zone and the tile it explains.
     expectContained: [
       {
         container: '[data-tool-replacement-target]',
@@ -40,8 +39,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolReplacementTarget\.svelte$/,
-      // The rail's player tile is what this frame's second assertion is about, so a change to
-      // the shared preview publishes it rather than a frame of the working copy alone.
+      // The rail's player tile is this frame's second assertion, so a shared-preview change publishes it.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
     ],
   }),
@@ -50,8 +48,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, destroyed copy',
     reaches: 'beyond',
     smokeLabels: [],
-    // The third face of `Show as broken`, and the one no case could reach (issue 1373, maintainer
-    // round 2).
+    // The third face of `Show as broken`, and the one no other case reaches (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -66,9 +63,7 @@ export const CASES = Object.freeze([
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-player-image="none"]',
       },
-      // AND THE SENTENCE THAT EXPLAINS THE EMPTY BOX. With the chip gone, this note is the only
-      // thing that says WHY the slot is empty, so a frame without it would show an absence with
-      // no account of itself.
+      // With the chip gone, this note is the only thing that says why the slot is empty.
       {
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-player-note]',
@@ -86,8 +81,7 @@ export const CASES = Object.freeze([
     label: 'Manager — World Tool entry, player preview',
     reaches: 'beyond',
     smokeLabels: [],
-    // The third frame on this screen, and it is the only one that can show its preview column
-    // (issue 1373).
+    // The third frame on this screen, and the only one that can show its preview column (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -98,11 +92,9 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-preview]',
-    // One assertion per region, against the preview column itself. A frame proving only the
-    // inventory tile would be evidence for a third of the change.
+    // One assertion per region: a frame proving only the inventory tile is evidence for a third of it.
     expectContained: [
-      // The PLAYER tile, its name caption, the usability CARD AND the paged `Required for` list —
-      // one per region.
+      // The player tile, its name caption, the usability card and the paged `Required for` list.
       {
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-player-preview]',
@@ -115,8 +107,7 @@ export const CASES = Object.freeze([
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-preview-usability]',
       },
-      // The `Required for` region is asserted through its two parts rather than its wrapper, and
-      // that is a real constraint rather than a weaker claim.
+      // `Required for` is asserted through its two parts rather than its wrapper, which is the stronger claim.
       {
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-required-row]',
@@ -128,10 +119,7 @@ export const CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE SHARED RAIL AND THE SHELL UNDER IT ARE BOTH CLAIMED, unlike this screen's other two
-    // cases: every region in this frame is drawn by `ToolBehaviorPreview` through
-    // `ScopedEntityPreview`'s trailing slot, so a change to either that only published a system
-    // scope frame would leave the world rail unphotographed.
+    // Every region here is drawn through `ScopedEntityPreview`'s trailing slot, so the world rail is claimed too.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
@@ -143,20 +131,16 @@ export const CASES = Object.freeze([
     label: 'Manager — World scoped rail collapsed',
     reaches: 'beyond',
     smokeLabels: [],
-    // Kept AND load-bearing. The prototype has no collapsed rail state, so the parity oracle
-    // structurally cannot reach this; this frame and the full-width set-equality gate are its only
-    // evidence.
+    // The prototype has no collapsed-rail state, so the parity oracle cannot reach this; only this frame can.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-manager-rail-toggle]' },
     ],
     expectView: 'world-components',
-    // The ACTIVE leaf inside the collapsed rail. Asserting the leaf alone would pass on a rail
-    // that never collapsed, so the state and the element are asserted together.
+    // The active leaf and the collapsed state are asserted together: the leaf alone passes on an open rail.
     expectSelector:
       '.manager-body.is-rail-collapsed #manager-world-nav-component-catalogue.is-active',
-    // And every one of the four leaves keeps its glyph INSIDE its 56px button, which is what
-    // makes the strip navigable at all once the labels are gone.
+    // And every leaf keeps its glyph inside its 56px button, which is what makes the strip navigable.
     expectContained: [
       {
         container: '#manager-world-nav-component-catalogue',
@@ -186,8 +170,7 @@ export const CASES = Object.freeze([
     steps: [{ selector: '#manager-world-nav-component-catalogue' }],
     expectView: 'world-components',
     expectSelector: '[data-scoped-page="world-components"]',
-    // The absence of the dead strip, measured in the browser rather than inferred from the
-    // stylesheet. `expectedTracks: 2` is the released column; `absentSelector` is the aside.
+    // The dead strip's absence measured in the browser: `expectedTracks: 2` is the released column.
     expectLayout: {
       containerSelector: '.fabricate-manager',
       gridSelector: '.manager-body',

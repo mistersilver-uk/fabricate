@@ -43,15 +43,13 @@ export const CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
-      // A placement the shim REFUSES, so the whole formula is discarded: critical, not the
-      // ignorable warning an additive placement raises.
+      // A placement the shim refuses, so the whole formula is discarded: critical, not an ignorable warning.
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
       { selector: '#manager-checks-nav-validation' },
       { selector: '[data-issue="retiredPlaceholderBreaksFormula"]', scroll: true },
     ],
     expectView: 'checks-validation',
-    // The CRITICAL id specifically. A presence-only assertion would be satisfied by the
-    // warning, which is the other half of the split and says the opposite thing.
+    // The critical id specifically: a presence-only assertion is satisfied by the warning, which says the opposite.
     expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -59,18 +57,13 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
-  // Six states the old four-tab surface had no shape for, and every one of them is a claim this
-  // change makes that only a photograph settles.
+  // Six states the old four-tab surface had no shape for, each a claim only a photograph settles.
   managerCase({
     id: 'manager-checks-rail-group',
     label: 'Manager — Checks rail group expanded',
     reaches: 'beyond',
     smokeLabels: [],
-    // Jewelry is the system whose SALVAGE is routed with no authored check, so salvage
-    // carries a real readiness issue: the parent badge, the salvage child badge and the
-    // Validation child badge are all visible together, which is the whole rule the frame
-    // has to settle (the parent sums the ACTIVITY children only, and Validation restates
-    // that total rather than adding to it).
+    // Jewelry's salvage is routed with no authored check, so parent, salvage and Validation badges show together.
     query: { system: 'lab-jewelry' },
     steps: ['Checks'],
     expectView: 'checks-crafting',
@@ -107,8 +100,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks section with a count AND a warning dot',
     reaches: 'beyond',
     smokeLabels: [],
-    // No frame in the prototype shows a section carrying both markers, and they occupy the same
-    // slot, so this is the one that proves they do not collide.
+    // No prototype frame shows a section carrying both markers, and they share a slot, so this proves they do not collide.
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
@@ -129,9 +121,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks crafting switched off',
     reaches: 'beyond',
     smokeLabels: [],
-    // Reached by turning the check off rather than by a fixture whose check is already off: every
-    // lab system authors an enabled check, and a seventh system carrying a disabled one would
-    // change the system count every other manager frame is composed against.
+    // Reached by turning the check off: a seventh system carrying a disabled one would move the system count.
     query: { system: 'lab-jewelry' },
     steps: [
       'Checks',
@@ -151,9 +141,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Checks stacked at the declared floor',
     reaches: 'beyond',
     smokeLabels: [],
-    // The 1024x640 declared floor, and it is stacked there rather than a side rail: the shipped
-    // `fabricate-manager` container ladder restacks `.manager-body` to one column at 1120, so at
-    // the floor every panel is reached by scrolling the body.
+    // The 1024x640 declared floor, stacked: the container ladder restacks `.manager-body` to one column at 1120.
     query: { system: 'lab-runework' },
     steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
     expectView: 'checks-crafting',
@@ -208,9 +196,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering-on-failure',
     label: 'Manager — Checks gathering on failure',
-    // The activity that renders the policy and no consumption toggles, because it has no
-    // consumption block — plus the dormancy notice naming issue 683 and the read-only
-    // `task.failureOutcome` cross-reference in its no-record state.
+    // The activity with no consumption block, plus the dormancy notice and the read-only `task.failureOutcome` reference.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -236,9 +222,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-results-failure-tier',
     label: 'Manager — Recipe edit results failure tier',
-    // Decision 7, and the only frame of it: a routed-by-check recipe's result-group card offering a
-    // failure-marked outcome tier, which is reachable only because `lab-runework`'s crafting check
-    // authors `failureResultPolicy: 'always'`.
+    // Decision 7's only frame: reachable because `lab-runework`'s crafting check authors `failureResultPolicy: 'always'`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
@@ -260,9 +244,7 @@ export const CASES = Object.freeze([
     id: 'manager-checks-crafting-modifiers',
     label: 'Manager — Checks crafting modifiers',
     smokeLabels: ['manager-checks-crafting-modifiers'],
-    // The check-modifier catalogue card, which sits last in the crafting panel and is therefore
-    // below the fold of `manager-checks-crafting-consumption`'s frame — hence a dedicated capture
-    // that scrolls to it.
+    // The catalogue card sits last in the crafting panel, below the consumption frame's fold, so this capture scrolls to it.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -274,8 +256,7 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // Two things at once, on the one card — and that card is `How they combine`, which issue 1096's
-    // parity round split out of the catalogue card.
+    // Two things at once on the `How they combine` card, which issue 1096's parity round split out of the catalogue card.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-policy-card]' +
       ':has([data-crafting-modifier-policy-option="bySubject"])' +
@@ -289,8 +270,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-modifier-max-picks',
     label: 'Manager — Checks crafting modifiers, pick cap set',
-    // BEYOND the smoke: the walk never presses a rule card and never types in this field, so no
-    // counterpart frame of a BOUNDED cap exists.
+    // Beyond the smoke: the walk never presses a rule card or types here, so no bounded-cap counterpart exists.
     reaches: 'beyond',
     smokeLabels: [],
     // The other half of the cap's two readings.
@@ -301,13 +281,11 @@ export const CASES = Object.freeze([
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
-      // The cap field, which is this case's whole subject and the card's last element, so the frame
-      // carries the rule grid above it.
+      // The cap field, this case's whole subject and the card's last element, so the rule grid sits above it.
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The VALUE, not the presence of a field: a fill that silently did not land leaves the field
-    // rendered and blank, which is the sibling frame published under this name.
+    // The value, not the presence of a field: a fill that did not land leaves it rendered and blank.
     expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -318,8 +296,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-modifier-entries',
     label: 'Manager — Checks crafting modifier entries',
-    // BEYOND the smoke: the walk never opens a system carrying a catalogue on this tab, and the
-    // two sibling cases above frame the rule grid and the cap rather than the entries.
+    // Beyond the smoke: the walk never opens a system carrying a catalogue on this tab.
     reaches: 'beyond',
     smokeLabels: [],
     // The crafting rows, and since issue 1117 what they show is the absence of an editor.
@@ -334,10 +311,7 @@ export const CASES = Object.freeze([
       },
     ],
     expectView: 'checks-crafting',
-    // The whole of the rebuilt CARD, clause by clause, because each clause is a thing that shipped
-    // wrong and could come back: the rule's sentence in the head's description slot, the read-only
-    // expression, the bounds chip on the row, the deep link (which was a full-width button at the
-    // foot), and the library note that now closes the card instead of opening it.
+    // The rebuilt card clause by clause, because each clause is a thing that shipped wrong and could come back.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
       ':has(.manager-checks-card-head [data-crafting-modifier-defaults])' +
@@ -349,18 +323,15 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The entry row itself, which sits outside `checks/` since issue 1373's round 4 moved it into
-      // a shared component the Tool Studio's check-bonus picker also calls.
+      // The entry row sits outside `checks/` since issue 1373 moved it into a component the Tool Studio also calls.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
-  // Every activity renders the library read-only now, with a bounds chip and a link to the system
-  // editor, while the per-entry eligibility control and the rule grid stay fully editable.
+  // Every activity renders the library read-only now, while eligibility and the rule grid stay editable.
   managerCase({
     id: 'manager-checks-salvage-modifiers',
     label: 'Manager — Checks salvage modifiers',
-    // BEYOND the smoke: the walk never opens the salvage sub-tab of a system carrying a
-    // library, so no counterpart frame of these rows exists.
+    // Beyond the smoke: the walk never opens the salvage sub-tab of a system carrying a library.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -371,8 +342,7 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
     expectView: 'checks-salvage',
-    // The read-only row, asserted through the one element the retired editable branch could not
-    // draw.
+    // The read-only row, asserted through the one element the retired editable branch could not draw.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="salvage"]' +
       ':has([data-crafting-modifier-readonly="expression"])' +
@@ -382,17 +352,14 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The entry row itself, which sits outside `checks/` since issue 1373's round 4 moved it into
-      // a shared component the Tool Studio's check-bonus picker also calls.
+      // The entry row sits outside `checks/` since issue 1373 moved it into a component the Tool Studio also calls.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
   managerCase({
     id: 'manager-checks-gathering-modifiers',
     label: 'Manager — Checks gathering modifiers',
-    // BEYOND the smoke, and the only frame of the DORMANCY notice against a populated catalogue:
-    // `manager-checks-gathering` runs on the default system, whose catalogue is empty, so its card
-    // draws the empty state and none of the rows the notice is about.
+    // Beyond the smoke, and the only frame of the dormancy notice against a populated catalogue.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -403,9 +370,7 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
     expectView: 'checks-gathering',
-    // The gathering card carries TWO notices no other activity's does — the check-vs-character
-    // modifier disambiguation and the issue-683 dormancy note — and both are stated against real
-    // rows here rather than against an empty catalogue.
+    // The gathering card's two unique notices are stated against real rows here rather than an empty catalogue.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="gathering"]' +
       ':has([data-gathering-modifier-disambiguation])' +
@@ -415,17 +380,15 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The entry row itself, which sits outside `checks/` since issue 1373's round 4 moved it into
-      // a shared component the Tool Studio's check-bonus picker also calls.
+      // The entry row sits outside `checks/` since issue 1373 moved it into a component the Tool Studio also calls.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
-  // `SubjectModifierPicker` is one component with two hosts, and both gate it on the activity's
-  // rule being `bySubject`.
+  // `SubjectModifierPicker` is one component with two hosts, and both gate it on the rule being `bySubject`.
   managerCase({
     id: 'manager-component-edit-salvage-modifier-pick',
     label: 'Manager — Component edit salvage modifier pick',
-    // BEYOND the smoke: the walk never presses a rule card, so the picker is on no smoke frame.
+    // Beyond the smoke: the walk never presses a rule card, so the picker is on no smoke frame.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -443,7 +406,7 @@ export const CASES = Object.freeze([
       { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
     ],
     expectView: 'component-edit',
-    // The picker AND its inherit note.
+    // The picker and its inherit note.
     expectSelector:
       '.fabricate-manager [data-subject-modifier-picker="salvage-check-modifier"] ' +
       '[data-subject-modifier-inherited]',
@@ -459,8 +422,7 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    // The rail's gathering group is a SUBMENU, so reaching the task library is two clicks —
-    // the same route `manager-gathering-task-editor-normal` takes, after the rule click.
+    // The rail's gathering group is a submenu, so reaching the task library is two clicks, then the rule click.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-gathering' },
@@ -475,9 +437,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-task-check-modifiers]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
-    // The task card, the picker inside it AND the picker's inherit note: the card carries the
-    // check-vs-character modifier hint, which is the disambiguation this screen is the second half
-    // of, and the note is where the inherited entries are named.
+    // The task card, the picker inside it and the picker's inherit note, where the inherited entries are named.
     expectSelector:
       '.fabricate-manager [data-gathering-task-check-modifiers] ' +
       '[data-subject-modifier-picker="gathering-check-modifier"] ' +
@@ -491,7 +451,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-modifiers-narrow',
     label: 'Manager — Checks crafting modifiers narrow',
-    // BEYOND the smoke: the walk runs one geometry, and the whole subject here is the other one.
+    // Beyond the smoke: the walk runs one geometry, and the whole subject here is the other one.
     reaches: 'beyond',
     smokeLabels: [],
     // The 1x4 reflow, which is only judgeable from a photograph.
@@ -532,8 +492,7 @@ export const CASES = Object.freeze([
     id: 'manager-components-grouped-continuation',
     label: 'Manager — Components grouped continuation',
     smokeLabels: ['manager-components-grouped-continuation'],
-    // The component library's half of the grouped-continuation pair: page two of a category-major
-    // list, where a category larger than the page continues across the boundary.
+    // The component library's grouped-continuation half: page two of a category-major list crossing the boundary.
     reaches: 'exact',
     query: {},
     steps: [
@@ -559,8 +518,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'tags'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
-      // `VocabularyTabs` is the strip issue 1429 extracted out of `TagsCategoriesView`, so the
-      // `TagsCategories` prefix above stops reaching it.
+      // `VocabularyTabs` is the strip issue 1429 extracted from `TagsCategoriesView`, so the prefix above misses it.
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyTabs|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
     ],
   }),

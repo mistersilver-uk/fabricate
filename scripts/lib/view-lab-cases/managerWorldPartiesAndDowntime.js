@@ -61,8 +61,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-world-parties-stacked',
     label: 'Manager — World Parties stacked',
-    // Same populated state as the normal frame, pinned inside the manager's 1120px responsive
-    // breakpoint so the full-width Parties route is photographed after the shell restacks.
+    // The normal frame's state pinned inside the manager's 1120px breakpoint, so the route is shot after the restack.
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing' },
@@ -82,8 +81,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-world-parties-card-stacked-680',
     label: 'Manager — World Parties card stacked at 680px',
-    // The browser viewport stays 1920x1080; only the Foundry window is narrow. This case therefore
-    // proves the card responds to the named manager container rather than to a viewport media rule.
+    // The viewport stays 1920x1080 and only the window is narrow, so the card responds to the container, not a media rule.
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing' },
@@ -104,8 +102,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-world-parties-no-selection',
     label: 'Manager — World Parties with no crafting system selected',
-    // The live smoke always has systems and normalizes an empty selection to the first one. This
-    // honest no-systems state is therefore View-Lab-only, not a Foundry smoke counterpart.
+    // The smoke always has systems and normalizes an empty selection, so this honest no-systems state is lab-only.
     smokeLabels: [],
     reaches: 'beyond',
     query: { clearSystem: '1' },
@@ -116,8 +113,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
-      // The gate lock this case is named for is drawn by `PartyExpandedBody`, in the card's right
-      // column.
+      // The gate lock this case is named for is drawn by `PartyExpandedBody`, in the card's right column.
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
@@ -130,9 +126,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-smithing', noParties: '1' },
     steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
     expectView: 'world',
-    // The primitive's own hook, so the frame proves the pane rendered `EmptyState` rather than
-    // a bespoke panel — `ui-integration/spec.md:174` requires every manager "nothing here"
-    // message to go through the one primitive and `:182` forbids a per-screen size override.
+    // The primitive's own hook: `ui-integration` requires every manager nothing-here message to go through `EmptyState`.
     expectSelector: '[data-travel-panel="parties"] [data-travel-parties-none]',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
@@ -151,9 +145,7 @@ export const CASES = Object.freeze([
       { selector: '[data-manager-party-search]', fill: WORLD_PARTIES_SEARCH_TERM },
     ],
     expectView: 'world',
-    // Both survivors on one page is the claim, and it is unreachable unfiltered: the five parties
-    // page at three, and these two are the second and the fifth, so they are never siblings in the
-    // same list without the filter.
+    // Both survivors on one page is unreachable unfiltered: five parties page at three, and these are the second and fifth.
     expectSelector:
       '[data-travel-panel="parties"] .manager-travel-parties-list' +
       ':has([data-manager-travel-party-id="lab-party-long-haul"])' +
@@ -175,8 +167,7 @@ export const CASES = Object.freeze([
       { selector: '.manager-travel-parties [data-pagination-next]' },
     ],
     expectView: 'world',
-    // Five records at the default page size of three: page two holds the trailing two, so the
-    // absence of the first card is as load-bearing as the presence of the last.
+    // Five records at a page size of three, so the absence of the first card is as load-bearing as the last one's presence.
     expectSelector:
       '[data-travel-panel="parties"] .manager-travel-parties-list' +
       ':has([data-manager-travel-party-id="lab-party-wagonwright"])' +
@@ -195,20 +186,15 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-smithing' },
-    // `lab-party-emberwatch` is disabled and holds two of the three characters that the enabled
-    // `lab-party` already holds, so enabling it violates `GatheringPartyStore`'s composite
-    // uniqueness invariant and the write is refused.
+    // `lab-party-emberwatch` duplicates two of `lab-party`'s characters, so enabling it violates composite uniqueness.
     steps: [
       { selector: '#manager-world-nav-parties', press: 'Enter' },
       { selector: '[data-manager-party-enable="lab-party-emberwatch"]' },
-      // AND scroll back to the alert, which is the whole subject of the frame (issue 1515, driver
-      // capture).
+      // And scroll back to the alert, which is the whole subject of the frame (issue 1515).
       { selector: '[data-manager-party-summary-error]', scroll: true },
     ],
     expectView: 'world',
-    // The alert inside the parties pane, not merely somewhere in the window: the same refusal
-    // reaches a card's own field error on a different operation, and that element is a different
-    // contract with a different owner.
+    // The alert inside the parties pane: the same refusal reaches a card's field error, which is a different contract.
     expectSelector:
       '[data-travel-panel="parties"]' +
       ' .fab-notice[data-manager-party-summary-error][role="alert"]',
@@ -279,9 +265,7 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
-  // The tooltip column is the shipped `Tabs.<Tab>.Tooltip` string verbatim (issue 1185
-  // aligned it to the design's own wording), so a lang edit that forgets these frames
-  // fails the case rather than publishing a frame whose caption no longer exists.
+  // The tooltip column is the shipped `Tabs.<Tab>.Tooltip` string verbatim, so a lang edit fails the case (issue 1185).
   ...[
     [
       'tracking',
@@ -353,8 +337,7 @@ export const CASES = Object.freeze([
           name: 'aria-controls',
           value: `world-downtime-panel-${id}`,
         })),
-        // The rail child and the studio-card button are two triggers for ONE navigation,
-        // so the frame proves the rail followed the card that drove it (issue 1185).
+        // The rail child and the studio-card button are two triggers for one navigation, so the rail followed the card (issue 1185).
         {
           selector: `[data-world-downtime-item="${tabId}"]`,
           name: 'aria-current',
@@ -479,8 +462,7 @@ export const CASES = Object.freeze([
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
     ],
     expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
-    // Collapsing the rail WIDENS the pane, so this frame overflows even less than the tab
-    // frames above — same reasoning, same owner for the scrolling proof.
+    // Collapsing the rail widens the pane, so this frame overflows even less than the tab frames above.
     expectOverflowY: '.downtime-preview-scroll',
     expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
     expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
@@ -504,9 +486,7 @@ export const CASES = Object.freeze([
       { selector: '#manager-world-nav-downtime', press: 'Enter' },
     ],
     expectView: 'world-downtime',
-    // One selector for the whole lock: the body is NOT collapsed although the GM's stored
-    // preference says it is, and the control that would collapse it is genuinely disabled and
-    // reports the displayed state rather than the stored one.
+    // One selector for the whole lock: the body is not collapsed, and the control reports the displayed state.
     expectSelector:
       '.manager-body:not(.is-rail-collapsed) [data-manager-rail-toggle][disabled][aria-pressed="false"]',
     expectAttributes: [
@@ -525,23 +505,19 @@ export const CASES = Object.freeze([
         name: 'data-world-nav-premium-state',
         value: 'installed',
       },
-      // The lock explains itself in sidebar wording, not the section-scoped string the rail
-      // GROUPS use.
+      // The lock explains itself in sidebar wording, not the section-scoped string the rail groups use.
       {
         selector: '[data-manager-rail-toggle]',
         name: 'title',
         value: 'The sidebar stays open on this page.',
       },
-      // No tab strip over a companion's screens: its tabs are the rail sub-items, and the
-      // panel is a region named by the one that is current.
+      // No tab strip over a companion's screens: its tabs are the rail sub-items, and the panel is named by the current one.
       {
         selector: '[data-downtime-extension-panel]',
         name: 'data-downtime-extension-panel',
         value: 'ledger',
       },
-      // Named by the sub-item's LABEL, not by the sub-item: the button carries the tab's
-      // `accessibleName` as its own name, which is an instruction, and a landmark takes the
-      // name of the screen.
+      // Named by the sub-item's label: the button's own name is an instruction, and a landmark takes the screen's name.
       {
         selector: '#world-downtime-panel-ledger',
         name: 'aria-labelledby',
@@ -554,16 +530,12 @@ export const CASES = Object.freeze([
         value: 'Open the downtime ledger',
       },
     ],
-    // The title bar carries the loud signal and the rail chip is muted beside it; the
-    // provider's own three tabs are rendered rather than Core's four.
+    // The title bar carries the loud signal and the rail chip is muted, with the provider's three tabs rather than Core's four.
     expectVisible: '[data-manager-titlebar-premium]:has-text("PREMIUM")',
     expectContained: [
       { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
-      // Issue 1302 — geometrically inside its OWN sub-item, keyed on the tab id on both sides:
-      // `expectContained` resolves each side with `document.querySelector` and is first-match,
-      // not strict, so an unkeyed pair would compare the first sub-item's box against the first
-      // badge's box, which need not be the same row.
+      // Issue 1302 — keyed on the tab id on both sides, because `expectContained` is first-match rather than strict.
       {
         container: '[data-world-downtime-item="ledger"]',
         target: '[data-world-downtime-badge="ledger"]',
@@ -601,13 +573,10 @@ export const CASES = Object.freeze([
       { selector: '[data-lab-companion-drilldown]' },
     ],
     expectView: 'world-downtime',
-    // The identity block Core's recipe and component editors render, now over a companion's
-    // screen — and its medallion carrying a real image rather than the glyph fallback.
+    // The identity block Core's editors render, now over a companion's screen, with a real image rather than the glyph.
     expectSelector: '[data-downtime-chrome-heading] [data-medallion="image"] img',
     expectAttributes: [
-      // THE TRAIL GROWS BY ONE CRUMB rather than changing its last word (issue 1322): the tab
-      // crumb keeps its own name and the drill-down's hangs beneath it, so a GM inside a
-      // companion's detail can still see -- and press -- the tab they reached it through.
+      // The trail grows by one crumb rather than changing its last word (issue 1322), so the tab crumb stays pressable.
       {
         selector: '[data-breadcrumb-downtime-tab]',
         name: 'data-breadcrumb-downtime-tab',
@@ -657,9 +626,7 @@ export const CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
-  // Issue 1302 — the Downtime parent rollup, the state Core reaches on a fresh Manager open: the
-  // disclosure closed and never yet visited (`railGroupUserExpanded.worldDowntime` seeds `false`,
-  // and `isWorldDowntimeRoute` is false off the Downtime route, so nothing locks it open).
+  // Issue 1302 — the Downtime parent rollup as Core reaches it on a fresh Manager open: closed and never visited.
   managerCase({
     id: 'manager-world-downtime-test-companion-rollup',
     label: 'Manager — Downtime rollup on a closed disclosure, with a TEST companion',
@@ -668,18 +635,14 @@ export const CASES = Object.freeze([
     query: { system: 'lab-smithing', downtimeProvider: '1' },
     steps: [],
     expectView: 'systems',
-    // One selector proves both halves of the swap: the rollup is present inside the parent button,
-    // and — because `:not(:has(...))` is scoped to that same button — the muted `PREMIUM` chip is
-    // not a descendant of it.
+    // One selector proves both halves: the rollup is inside the parent button, and the muted chip is not a descendant of it.
     expectSelector:
       '#manager-world-nav-downtime:not(:has([data-world-nav-premium])) [data-world-downtime-badge-total]',
     expectAttributes: [
       {
         selector: '[data-world-downtime-badge-total]',
         name: 'aria-label',
-        // The lab provider's only badge is the four-digit one on `ledger` (1284), so the rollup
-        // total is that same value — Core sums the resolved badge once per tab it renders, never
-        // registered-plus-runtime.
+        // The lab provider's only badge is the four-digit one on `ledger`, so the rollup total is that same value.
         value: '1284 updates',
       },
     ],
@@ -689,8 +652,7 @@ export const CASES = Object.freeze([
         target: '[data-world-downtime-badge-total]',
       },
     ],
-    // The Downtime parent row is the last rail entry, below Parties, Travel and Currency, and
-    // nothing scrolls it into view without a step this state deliberately takes none of.
+    // The Downtime parent row is the last rail entry, and this state deliberately takes no step that scrolls it into view.
     position: { width: 1330, height: 1000 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
@@ -700,8 +662,7 @@ export const CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
-  // Issue 1332 — the companion navigating. Every other Downtime frame is reached by pressing
-  // something of core's: a rail entry, a rail sub-item, a preview tab.
+  // Issue 1332 — the companion navigating, where every other Downtime frame is reached by pressing core's own control.
   managerCase({
     id: 'manager-world-downtime-test-companion-tab-navigation',
     label: 'Manager — a TEST companion sending the GM to another of its own tabs',
@@ -713,7 +674,7 @@ export const CASES = Object.freeze([
       { selector: '[data-lab-companion-tab-link]' },
     ],
     expectView: 'world-downtime',
-    // The DESTINATION tab's panel, reached without the rail ever being touched.
+    // The destination tab's panel, reached without the rail ever being touched.
     expectSelector: '[data-downtime-extension-panel="crew"]',
     expectAttributes: [
       {
@@ -721,8 +682,7 @@ export const CASES = Object.freeze([
         name: 'data-downtime-extension-panel',
         value: 'crew',
       },
-      // The RAIL FOLLOWED, which is what makes this a navigation rather than a panel swap: the
-      // sub-item nobody pressed is now the current one, and the tab that asked is not.
+      // The rail followed, which makes this a navigation rather than a panel swap: the sub-item nobody pressed is current.
       { selector: '#manager-downtime-nav-crew', name: 'aria-current', value: 'true' },
       { selector: '#manager-downtime-nav-ledger', name: 'aria-current', value: null },
       {
@@ -731,8 +691,7 @@ export const CASES = Object.freeze([
         value: 'manager-downtime-nav-label-crew',
       },
     ],
-    // The destination screen carries its own cross-navigation control, pointing on to the third tab
-    // — so the frame shows a capability every screen has rather than one button that worked once.
+    // The destination carries its own cross-navigation control, so the frame shows a capability rather than one button.
     expectVisible: '[data-lab-companion-tab-link]:has-text("Go to Test Companion")',
     expectNoHorizontalOverflow: [
       '[data-world-downtime-host]',

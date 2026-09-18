@@ -13,7 +13,7 @@ import { VIEW_LAB_CASE_FILES } from '../scripts/lib/viewLabCases.js';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
-/** Every View Lab case file as one text — the split (issue 1671) moved the cases out of the index. */
+/** Every View Lab case file as one text (issue 1671 moved the cases out of the index). */
 const caseRegistrySource = () =>
   VIEW_LAB_CASE_FILES.map(({ path }) => read(path)).join('\n');
 

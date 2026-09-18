@@ -40,9 +40,7 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-essence-filter]', select: '__any' },
-      // OPEN A CARRYING ROW, through its identity button rather than through the chip: the list
-      // opens on its first drawn row before the filter narrows it (M14), and that row may carry
-      // nothing, so the inspector's run below is only drawn once a tinted row is the selection.
+      // Open a carrying row through its identity button: the list opens on its first drawn row, which may carry nothing.
       { selector: '.manager-component-row:has([data-chip-tint]) .manager-component-identity' },
     ],
     expectView: 'components',
@@ -65,9 +63,7 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // The inheriting rules editor (issue 1371, round 2), and it is the only state that renders the
-    // category note in its info tone — the pixel behind E-4's `tone: 'info'`, which round 1 shipped
-    // as a unit-tested constant no frame could contain.
+    // The inheriting rules editor (issue 1371): the only state that renders the category note in its info tone.
     id: 'manager-component-edit-inheriting',
     label: 'Manager — Component edit inheriting',
     reaches: 'beyond',
@@ -78,20 +74,15 @@ export const CASES = Object.freeze([
       { selector: '[data-component-edit]' },
     ],
     expectView: 'component-edit',
-    // The category control is one select now, not an `InheritRow` (issue 1371, parity round 4,
-    // rebuild-spec D4.1 / gap-list rows 132-133): the reference draws a single full-width select
-    // whose first option is `Inherit from world · {category}`, with the state note directly under
-    // it — no separate toggle, no second `Category` label, no floated head control.
+    // The category control is one select, not an `InheritRow` (issue 1371): its first option inherits, with the note under it.
     expectSelector: '[data-component-edit-category]',
     expectContained: [
-      // THE INFO-TONE BRANCH, which is this case's whole subject: `inherited` is the state
-      // `sm-iron-ingot` is in, and `manager-component-edit-normal` opens a row that overrides, so
-      // it photographs the warning branch and can never show this one.
+      // The info-tone branch: `sm-iron-ingot` inherits, while `manager-component-edit-normal` opens a row that overrides.
       {
         container: 'main.manager-component-edit-main',
         target: '[data-component-edit-category-note="inherited"]',
       },
-      // And the ONE identity callout the two stacked cards collapsed into (D3).
+      // And the one identity callout the two stacked cards collapsed into (D3).
       {
         container: 'main.manager-component-edit-main',
         target: '[data-component-edit-section="identity"]',
@@ -106,16 +97,13 @@ export const CASES = Object.freeze([
         target: '[data-component-edit-essence-note="inherited"]',
       },
     ],
-    // THE SWITCH IS A NEW CONTROL ON THIS CARD (issue 1371 r18-entry), so it owns a real pointer
-    // hit: an inherit row overlapped by the card head or the grid would be present in the DOM,
-    // correct in every mounted assertion and unclickable on screen, and only `elementFromPoint`
-    // at its centre can tell those apart.
+    // The switch is a new control on this card (issue 1371), so it owns a real pointer hit rather than a DOM assertion.
     expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
-    // The rules editor's read-only world tag CARD (issue 1371, round 3), which no frame reached.
+    // The rules editor's read-only world tag card (issue 1371, round 3), which no frame reached.
     id: 'manager-component-edit-world-tags',
     label: 'Manager — Component edit world tags',
     reaches: 'beyond',
@@ -129,14 +117,12 @@ export const CASES = Object.freeze([
     expectView: 'component-edit',
     expectSelector: '[data-component-edit-section="world-tags"]',
     expectContained: [
-      // The count note is contained by the CARD, not by the world-tag group, and the difference is
-      // what this pair was getting wrong.
+      // The count note is contained by the card, not by the world-tag group, which is what this pair was getting wrong.
       {
         container: '[data-component-edit-section="tags"]',
         target: '[data-component-edit-world-tags-note]',
       },
-      // The chip states ARE the group's own subject, and stay scoped to it: `bulk` is muted in
-      // this system and `fuel` is not, so a card painting one treatment for both fails here.
+      // The chip states stay scoped to the group: `bulk` is muted in this system and `fuel` is not.
       {
         container: '[data-component-edit-section="world-tags"]',
         target: '[data-component-edit-world-tag="bulk"]',
@@ -150,23 +136,16 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
-    // The widened membership cohort (issue 1371, round 2): the ghost rows, their Add, and the
-    // toolbar counting the widened set.
+    // The widened membership cohort (issue 1371): the ghost rows, their Add, and the toolbar counting the widened set.
     id: 'manager-components-world-cohort',
     label: 'Manager — Components world cohort',
     reaches: 'beyond',
     smokeLabels: [],
     steps: [
       { selector: '#manager-nav-component-rules' },
-      // The cohort switch is A `SegmentedControl`, not A `<select>` (issue 1371, parity round 4,
-      // rebuild-spec C6): the reference draws two inline segments and the shipped control now
-      // renders one `<label>` per option carrying `data-component-membership-option="<value>"`
-      // (`data-component-membership-filter` is on the track, and stamps `true`, not a value).
+      // The cohort switch is a `SegmentedControl` (issue 1371): one `<label>` per option, and the track stamps `true`.
       { selector: '[data-component-membership-option="all"]' },
-      // Scroll to the cohort, because it sits below every member row: the lab world's smithing
-      // system holds a handful of components and the world corpus holds sixty-five, so the ghost
-      // list starts well past the fold and an unscrolled frame photographs the member rows this
-      // case is not about.
+      // Scroll to the cohort: it sits below every member row, so an unscrolled frame photographs the wrong rows.
       { selector: '.manager-component-row[data-component-member="false"]', scroll: true },
     ],
     expectView: 'components',
@@ -182,7 +161,7 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
   }),
   managerCase({
-    // The `Add from catalogue` picker, open AND multi-selected (issue 1371, M9).
+    // The `Add from catalogue` picker, open and multi-selected (issue 1371, M9).
     id: 'manager-components-add-from-catalogue',
     label: 'Manager — Components add from catalogue',
     reaches: 'beyond',
@@ -190,14 +169,14 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-add-from-catalogue]' },
-      // Two rows ticked, by state rather than by ID.
+      // Two rows ticked, by state rather than by id.
       { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
       { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
     ],
     expectView: 'components',
     expectSelector: '[data-component-add-from-catalogue-dialog]',
     kinds: ['manager', 'components'],
-    // The picker's own file, AND not `ManagerModal.svelte`.
+    // The picker's own file, and not `ManagerModal.svelte`.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentAddFromCatalogueDialog\.svelte$/,
     ],
@@ -208,17 +187,13 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-components-bulk-edit'],
     reaches: 'exact',
     query: {},
-    // The staged face. `data-component-select` sits on a visually hidden input, so the click target
-    // is its wrapping `<label>`; two rows, because a one-row selection reads as an accident.
+    // The staged face. `data-component-select` sits on a hidden input, so the click target is its `<label>`; two rows, because one reads as an accident.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
       { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
-      // The tag inset is a PAGED window over the system's tags (issue 1371 r16-cat converged both
-      // panels on one `BulkStagingInset`), so `ore` and `ingot` sit past page one: reach each
-      // through the inset's own search well, as the world bulk case reaches its rows, then clear
-      // the well so the frame shows the resting inset under the staged chip run.
+      // The tag inset pages over the system's tags (issue 1371), so each tag is reached through its search well and the well then cleared.
       { selector: '[data-bulk-inset-search="tags"]', fill: 'ore' },
       { selector: '[data-bulk-tag="ore"]' },
       { selector: '[data-bulk-inset-search="tags"]', fill: 'ingot' },
@@ -229,8 +204,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'components',
     expectSelector: '[data-component-bulk-panel]',
-    // The three staged axes, asserted (issue 1371 r17-b, quality N4): a category radio or tag
-    // tri-state that stopped staging on this panel would otherwise still publish a green frame.
+    // The three staged axes asserted: a radio or tri-state that stopped staging would otherwise publish a green frame.
     expectContained: [
       {
         container: '[data-component-bulk-panel]',
@@ -263,9 +237,7 @@ export const CASES = Object.freeze([
     label: 'Manager — Components bulk delete idle',
     reaches: 'beyond',
     smokeLabels: [],
-    // The unarmed face of the set remove (issue 1129; the reference's `Remove N components from
-    // {system}…` leg in the shell's dock since issue 1371 r16-list, M23), and the frame that
-    // photographs its consequence note.
+    // The unarmed face of the set remove (issue 1129), and the frame that photographs its consequence note.
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
@@ -273,8 +245,7 @@ export const CASES = Object.freeze([
       { selector: '[data-component-bulk-remove]', scroll: true },
     ],
     expectView: 'components',
-    // Unarmed is the state under test, and `data-armed="false"` is what separates this frame from
-    // its armed twin below — an `expectSelector` naming only the card would pass on either.
+    // Unarmed is the state under test, and `data-armed="false"` is what separates this frame from its armed twin.
     expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="false"]',
     kinds: ['manager', 'components'],
     sourceMatches: [
@@ -290,20 +261,17 @@ export const CASES = Object.freeze([
     label: 'Manager — Components bulk delete armed',
     reaches: 'beyond',
     smokeLabels: [],
-    // The armed half of the set remove (issue 1129; in the dock since issue 1371 r16-list), the
-    // twin of `manager-essences-bulk-delete-armed`.
+    // The armed half of the set remove (issue 1129), the twin of `manager-essences-bulk-delete-armed`.
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
-      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control
-      // it arms, so this cannot drift onto a wrapper the way a class selector could.
+      // The button, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it arms.
       { selector: '[data-arm-token="delete-components"]' },
     ],
     expectView: 'components',
-    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
-    // indistinguishable from the bulk-edit case above.
+    // Armed is a state; a frame re-photographing the idle button would be indistinguishable from the case above.
     expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="true"]',
     kinds: ['manager', 'components'],
     sourceMatches: [
@@ -320,8 +288,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-components-bulk-edit-unstaged'],
     reaches: 'exact',
     query: {},
-    // The pristine face of the same panel: a selection and nothing staged, which is the only
-    // evidence of the "leave unchanged" chips and the inert Apply.
+    // The pristine face: a selection and nothing staged, the only evidence of the leave-unchanged chips and inert Apply.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
@@ -409,10 +376,7 @@ export const CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }, { selector: '[data-component-edit]' }],
     expectView: 'component-edit',
-    // THE SHARED RAIL, IN THIS FRAME (issue 1371 r18-list, maintainer ruling M27): the editor
-    // renders the world entry's `How players see it` rail at the system scope, so the frame must
-    // show the rail's scope sentence and its inventory tile beside the form — the two regions a
-    // rail of the editor's own would draw differently, and the reason the ruling was made.
+    // The shared rail in this frame (issue 1371): the editor renders the world entry's rail at system scope.
     expectContained: [
       {
         container: 'main.manager-component-edit-main',
@@ -424,8 +388,7 @@ export const CASES = Object.freeze([
       },
     ],
     kinds: ['manager', 'components'],
-    // The three complication components are claimed by the four `*-complications-*` and
-    // `*-salvage-stage-strip` cases below, not here (issue 1286).
+    // The three complication components are claimed by the four complication and stage-strip cases below (issue 1286).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -461,8 +424,7 @@ export const CASES = Object.freeze([
     id: 'manager-component-edit-salvage',
     label: 'Manager — Component edit salvage',
     smokeLabels: ['manager-component-edit-salvage'],
-    // The routed salvage authoring body: per-component result groups plus a populated
-    // outcome-routing table (`[data-salvage-routing]`) and the DC override.
+    // The routed salvage authoring body: per-component result groups, a populated routing table and the DC override.
     reaches: 'exact',
     query: { system: 'lab-runework' },
     steps: [
@@ -474,8 +436,7 @@ export const CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    // The shared subject check-modifier picker does not render here, and this list used to claim it
-    // did (issue 1095).
+    // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -511,15 +472,11 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
 
-  // Five frames, and every one of them is on `lab-herbalism` because no other lab system can draw
-  // any of them: `ComponentComplicationsSection` gates itself on "some activity in this system
-  // resolves progressively", and herbalism is the world's only progressive system on any axis.
+  // Five frames, all on `lab-herbalism`: the section gates on progressive resolution, which only herbalism has.
   managerCase({
     id: 'manager-component-complications-empty',
     label: 'Manager — Component complications empty',
-    // The section's empty state, which is `EmptyState`'s new `inline` variant (issue 1286) and
-    // exists on no other screen: the stack flips to a row and the 46px icon tile is released into a
-    // bare glyph, neither of which `is-compact` does.
+    // The section's empty state is `EmptyState`'s `inline` variant (issue 1286), which exists on no other screen.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -531,9 +488,7 @@ export const CASES = Object.freeze([
       { selector: '[data-complications-section]', scroll: true },
     ],
     expectView: 'component-edit',
-    // The empty state ITSELF, not merely the section: a component that silently acquired a
-    // complication would still render the section and would publish the populated list under a
-    // case whose whole subject is that there is nothing to list.
+    // The empty state itself: a component that acquired a complication would publish the populated list under this name.
     expectSelector: '.fabricate-manager [data-complications-section] [data-complications-empty]',
     kinds: ['manager', 'components', 'complications'],
     sourceMatches: [
@@ -569,9 +524,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-component-complications-expanded',
     label: 'Manager — Component complications expanded',
-    // The open row, which is where the section's whole authoring surface lives: the identity strip,
-    // the Applies-to chips, and the When and Then cards with six `ComplicationEffectRow` instances
-    // between them.
+    // The open row, where the section's whole authoring surface lives: identity strip, Applies-to chips, When and Then cards.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -582,13 +535,11 @@ export const CASES = Object.freeze([
           '.manager-component-row[data-component-id="hb-mortar-dust"] [data-component-edit]',
       },
       { selector: '[data-complication="hb-comp-dust-cloud"] [data-complication-disclosure]' },
-      // The LAST row of the When card, so `scrollIntoViewIfNeeded` — which lands its anchor near
-      // the bottom edge — puts the whole card and the identity strip above it in one frame.
+      // The last row of the When card, so the scroll puts the whole card and the identity strip in one frame.
       { selector: '[data-complication-roll-condition]', scroll: true },
     ],
     expectView: 'component-edit',
-    // `aria-expanded`, not merely the presence of the detail: a disclosure that silently stopped
-    // toggling would leave the row closed and publish the collapsed frame under this name.
+    // `aria-expanded`, not merely the detail: a disclosure that stopped toggling would publish the collapsed frame.
     expectSelector:
       '.fabricate-manager [data-complication="hb-comp-dust-cloud"] ' +
       '[data-complication-disclosure][aria-expanded="true"]',
@@ -625,8 +576,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-complications-stage-strip',
     label: 'Manager — Recipe complications stage strip',
-    // The Recipe Studio's counterpart, and the reason it is a separate frame rather than the same
-    // one photographed twice: the two strips are deliberately asymmetric.
+    // The Recipe Studio's counterpart, kept as a separate frame because the two strips are deliberately asymmetric.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },

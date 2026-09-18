@@ -7,7 +7,6 @@ export const PLAYER = 'fabricate-app';
 export const MANAGER = 'fabricate-crafting-system-manager';
 
 // Only the recomposed Journal's reachable render surfaces claim its frames.
-// Retained legacy components outside the window's import closure cannot supply evidence.
 export const JOURNAL_SOURCES =
   /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
 
@@ -125,9 +124,7 @@ export const BULK_DEFAULTS = Object.freeze({
 export const DEFAULT_POSITION = Object.freeze({
   [MANAGER]: Object.freeze({ width: 1280, height: 820 }),
   [PLAYER]: Object.freeze({ width: 1280, height: 860 }),
-  // The three canvas windows are captured at their declared size, unlike the two above — the
-  // Manager's smoke counterpart is photographed at 1280x820 rather than its declared 1280x940, and
-  // the player app's frames are 860 rather than its own default.
+  // The three canvas windows are captured at their declared size, unlike the Manager and the player app.
   [CANVAS_BROWSER]: Object.freeze({ width: 420, height: 620 }),
   [CANVAS_CONFIG]: Object.freeze({ width: 480, height: 680 }),
   [CANVAS_MANAGER]: Object.freeze({ width: 560, height: 680 }),

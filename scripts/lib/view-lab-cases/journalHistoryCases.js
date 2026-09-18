@@ -52,7 +52,6 @@ export function journalHistoryBatchCases() {
 /** TP14 history-data witnesses. */
 const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
   // Two independent recorded rolls and no global cut: the approved row-only legacy exception.
-  // Their quantities (2 and 1) come from the hauls, so no evaluated row quantity can supply them.
   'legacy-row-rolls':
     ':has([data-yield-entry="legacy-iron-ore-roll-12"].is-cleared)' +
     ':has([data-yield-entry="legacy-copper-ore-roll-94"].is-cleared)' +
@@ -65,15 +64,13 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':has([data-yield-entry="shared-iron-ore:0"].is-cleared)' +
     ':has([data-yield-entry="shared-coal:1"].is-cleared)' +
     ':has([data-yield-entry="shared-ruby:2"].is-missed)',
-  // Two recovered identities, the captured name winning over the live component name beside it,
-  // and a third row that stays unknown and therefore draws the fallback glyph instead of art.
+  // Two recovered identities, the captured name winning, and a third row that stays unknown and draws the fallback.
   'recovered-materials':
     ':has([data-history-items="consumed"] [title="Steel Billet"])' +
     ':has([data-history-items="consumed"] [title="Coal"])' +
     ':has([data-history-items="consumed"] i.fa-box)' +
     ':has([data-history-items="produced"] [title="Steel Ingot"])',
-  // A recorded roll that cannot cut, because one row's outcome was never recorded; and a haul
-  // whose quantity is real while its row is not known.
+  // A recorded roll that cannot cut, and a haul whose quantity is real while its row is not known.
   'unknown-material-resolution':
     ':has([data-yield-shared-roll])' +
     ':has([data-yield-entry="unknown-silver-ore"].is-cleared)' +
@@ -82,8 +79,7 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':not(:has([data-yield-cut]))' +
     ':not(:has([data-yield-entry="unknown-ruby"].is-cleared))' +
     ':not(:has([data-yield-entry="unknown-ruby"].is-missed))',
-  // A confirmed complete-empty award: every row explicitly missed, nothing produced, nothing
-  // unknown — the applied empty receipt is what separates this from a missing record.
+  // A confirmed complete-empty award: the applied empty receipt is what separates this from a missing record.
   'settled-zero':
     ':has([data-journal-verdict="failed"])' +
     ':has([data-yield-cut])' +
@@ -98,8 +94,7 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':has([data-journal-effect="2"][data-effect-phase="planned"])' +
     ':has([data-journal-recovery-evidence] ~ [data-journal-history-detail] [data-journal-guidance])' +
     ':not(:has([data-history-items]))',
-  // Native fizzle: the permitted consumption with its captured names and images, and the
-  // resolution that actually applied — with no recipe row to disclose.
+  // Native fizzle: the permitted consumption with its captured names, and the resolution that actually applied.
   fizzle:
     ':has([data-journal-verdict="failed"])' +
     ':has([data-history-summary="none"])' +
@@ -107,8 +102,7 @@ const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
     ':has([data-history-items="consumed"] [title="Yellow Sulphur"])' +
     ':has([data-history-items="consumed"] img.fab-medallion-img)' +
     ':not(:has([data-history-items="produced"]))',
-  // Native salvage: two receipts from one source row, and a consumption that does not apply
-  // rather than one that is unknown.
+  // Native salvage: two receipts from one source row, and a consumption that does not apply rather than one unknown.
   salvage:
     ':has([data-journal-verdict="failed"])' +
     ':has([data-history-items="produced"] [data-list-row] ~ [data-list-row])' +
@@ -137,8 +131,7 @@ export function journalHistoryDataCases() {
         expectTab: 'journal',
         expectSelector: `[data-journal-detail]${evidence}`,
         kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],
-        // YieldScale is a broad signal routed by `BROAD_SIGNAL_CASE_OVERRIDES`, so it is named
-        // there rather than here, where `selectRenderFileCases` would never reach it.
+        // `YieldScale` is a broad signal routed by `BROAD_SIGNAL_CASE_OVERRIDES`, which is where it is named.
         sourceMatches: [
           JOURNAL_SOURCES,
           /^src\/ui\/presenters\/RunJournalBuilder\.js$/,

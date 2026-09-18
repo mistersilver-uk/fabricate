@@ -9,10 +9,7 @@ import {
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
-  // The state it would show — one section inherited with its value card locked and one overridden
-  // beside it — is reached by flipping an inherit switch, and in the View Lab that write does not
-  // reach the screen: the toggle renders and clicks, and neither its own state chip nor the value
-  // card beneath it changes.
+  // The state it would show is reached by flipping an inherit switch, and in the View Lab that write never reaches the screen.
   managerCase({
     id: 'manager-environments-browse-normal',
     label: 'Manager — Environments browse normal',
@@ -46,19 +43,14 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-gathering-tasks-browse-normal',
     label: 'Manager — Gathering tasks browse normal',
-    // Beyond the smoke: `screenshotCaptureMap.js` carries the two task-EDITOR labels and nothing
-    // for the library that lists them, so there is no smoke routine to name.
+    // Beyond the smoke: `screenshotCaptureMap.js` carries the two task-editor labels and nothing for the library.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    // The tasks library is a SECTION of the environments route, exactly as the events library is
-    // (`EnvironmentsBrowserView.svelte:1111` renders `GatheringTasksBrowserView`), so the route
-    // key stays `environments` and the second step moves the section rather than the route.
+    // The tasks library is a section of the environments route, so the route key stays `environments`.
     steps: ['Gathering', { selector: '#manager-gathering-nav-tasks' }],
     expectView: 'environments',
-    // The inspector fact, which needs no click to populate: `selectedGatheringTaskId` falls back to
-    // `gatheringTaskDefinitions[0]?.id` over the declaration-ordered library, so the browse opens
-    // on `hb-task-forage`.
+    // `selectedGatheringTaskId` falls back to the declaration-ordered library, so the browse opens on `hb-task-forage`.
     expectSelector: '.fabricate-manager [data-gathering-task-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
@@ -71,8 +63,7 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-gathering-task-editor-normal'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // The rail's gathering group is a submenu, so reaching the task library is two clicks:
-    // `Gathering` opens the group on Environments, then the `tasks` subitem switches the section.
+    // The rail's gathering group is a submenu, so reaching the task library takes two clicks.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -302,13 +293,11 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-gathering-task-availability-menu',
     label: 'Manager — Gathering task availability menu open',
-    // Beyond the smoke: no smoke routine opens an availability menu, so there is no counterpart
-    // frame of this state and no label to name.
+    // Beyond the smoke: no smoke routine opens an availability menu, so there is no counterpart frame.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    // `hb-task-slowbloom` authors `biomes: ['mountain']` against a four-entry biome vocabulary, so
-    // the menu opens on the three still-unselected biomes rather than on the empty state.
+    // `hb-task-slowbloom` authors one of four biomes, so the menu opens on the three unselected ones.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -320,8 +309,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-task-field="biomes"] .manager-condition-menu-button' },
     ],
     expectView: 'gathering-task-edit',
-    // The portaled panel, and an option inside it. Asserting the option alone would be satisfied by
-    // the old in-place menu; asserting the popover alone would be satisfied by an empty one.
+    // The portaled panel and an option inside it: either alone is satisfied by a state this case is not about.
     expectSelector:
       '.fabricate-manager .manager-travel-popover [data-gathering-task-availability-option="biomes"]',
     kinds: ['manager', 'environments'],
@@ -343,14 +331,11 @@ export const CASES = Object.freeze([
         selector:
           '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
       },
-      // At 1000px the task library stacks, so Playwright has to scroll the panel to reach the row's
-      // Edit control — and the editor then mounts into a container that kept that scroll offset,
-      // framing "Required Tools" instead of the identity card.
+      // At 1000px the library stacks, so the scroll to reach Edit carries into the editor's own container.
       { selector: '[data-gathering-task-core-editor]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
-    // 1000x720, the width its smoke counterpart stacks at — the previous 1280x820 was the
-    // NORMAL geometry, so the two cases differed in nothing at all.
+    // 1000x720, the width its smoke counterpart stacks at; 1280x820 was the normal geometry.
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
@@ -362,8 +347,7 @@ export const CASES = Object.freeze([
     id: 'manager-environment-edit-placeholder',
     label: 'Manager — Environment edit placeholder',
     smokeLabels: ['manager-environment-edit-placeholder'],
-    // The environment editor's Overview tab — identity, context, player-facing behaviour and
-    // composition mode, with the summary/linked-scene/validation/runtime inspector beside it.
+    // The environment editor's Overview tab, with the summary, linked-scene, validation and runtime inspector beside it.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -434,8 +418,7 @@ export const CASES = Object.freeze([
     id: 'manager-environment-edit-events',
     label: 'Manager — Environment edit Events tab',
     smokeLabels: ['manager-environment-edit-events'],
-    // `exact`: the smoke's own walk clicks this tab and photographs it without selecting anything,
-    // and so does this.
+    // `exact`: the smoke's own walk clicks this tab and photographs it without selecting anything.
     reaches: 'exact',
     // No fixture change.
     query: { system: 'lab-herbalism' },
@@ -448,8 +431,7 @@ export const CASES = Object.freeze([
       { selector: '#environment-tab-events' },
     ],
     expectView: 'environment-edit',
-    // The route survives a tab click that did nothing, so the assertion names the tab panel AND the
-    // inspector the auto-selection populates.
+    // The route survives a tab click that did nothing, so the assertion names the tab panel and the inspector.
     expectSelector:
       '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-row.is-selected)' +
       ' [data-record-inspector="event"]',
@@ -465,15 +447,11 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-gathering-events-normal'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // `encounters`, not `events`: the nav item's id is the route key, and the label is the only
-    // place the word "Events" appears.
+    // `encounters`, not `events`: the nav item's id is the route key, and only the label says Events.
     steps: ['Gathering', { selector: '#manager-gathering-nav-encounters' }],
-    // The events library is a SECTION of the environments route, so the route key is unchanged;
-    // the section is what the second step moves.
+    // The events library is a section of the environments route, so the second step moves the section.
     expectView: 'environments',
-    // The inspector fact, pinned because it is the only evidence that the event browser calls
-    // `activeEnvironmentsForRecord` correctly (issue 1321): the seam's own suite proves the return
-    // value, and the caller is an unexported component local no unit test can reach.
+    // The inspector fact is the only evidence that the event browser calls `activeEnvironmentsForRecord` correctly (issue 1321).
     expectSelector: '.fabricate-manager [data-gathering-event-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
