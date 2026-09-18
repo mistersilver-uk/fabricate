@@ -344,7 +344,7 @@ describe('journalStore', () => {
     assert.equal(store.activeStatusFilter, 'inProgress', 'the retired value is refused');
   });
 
-  it('keeps active/history pages independent, accepts 4/6/12/25 sizes, and clamps after filtering or reload deletion', async () => {
+  it('keeps active/history pages independent, accepts only 4/6/12/25 sizes, and clamps after filtering or reload deletion', async () => {
     const activeRuns = Array.from({ length: 10 }, (_unused, index) => run({ id: `a${index}`, startedAt: index }));
     const setup = makeServices({ listing: baseListing({ activeRuns, history: history(10) }) });
     const store = await loadedStore(setup);
@@ -352,6 +352,9 @@ describe('journalStore', () => {
     assert.deepEqual(store.pageSizes, [4, 6, 12, 25]);
     assert.equal(store.activePageSize, 4);
     assert.equal(store.historyPageSize, 4);
+    store.setActivePageSize(7);
+    flushSync();
+    assert.equal(store.activePageSize, 4, 'a size outside the allowlist is ignored');
     store.setActivePage(2);
     store.setHistoryPage(2);
     flushSync();
@@ -731,7 +734,7 @@ describe('journalStore', () => {
     }
   });
 
-  // A failed CHECK is an outcome the run's own history records, not a command error.
+  // A failed check is an outcome the run's own history records, not a command error.
   it('reports a resolved failed check as an outcome, not as a command error', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
     const setup = makeServices({

@@ -179,7 +179,7 @@ describe('craftingStore', () => {
     const listing = { summaries: [recipe('r1', 'Anvil')] };
     const { services } = makeServices({ listing, favourites: ['r1'] });
     const store = createCraftingStore({ services });
-    // Reading `loadedOnce` inside the seams is the only way to see the ORDER: seeding after the
+    // Reading `loadedOnce` inside the seams is the only way to see the order: seeding after the
     // flag pairs the new listing with the old seeds, and every assertion below still passes.
     const seenAtSeed = [];
     const favouriteIds = services.getFavouriteRecipeIds;
@@ -262,6 +262,15 @@ describe('craftingStore', () => {
     assert.deepEqual(
       store.pageItems.map((entry) => entry.name),
       ['Charlie', 'Delta']
+    );
+
+    store.setPage(99);
+    flushSync();
+    assert.equal(store.page, 99, 'the recipe pager stores the requested index unclamped');
+    assert.deepEqual(
+      store.pageItems.map((entry) => entry.name),
+      ['Echo'],
+      'the clamp happens on read, so an out-of-range page shows the last one'
     );
   });
 

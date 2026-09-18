@@ -274,6 +274,15 @@ describe('inventoryStore', () => {
       store.pageItems.map((r) => r.name),
       ['Charlie', 'Delta']
     );
+
+    store.setPage(99);
+    flushSync();
+    assert.equal(store.page, 99, 'the item pager stores the requested index unclamped');
+    assert.deepEqual(
+      store.pageItems.map((r) => r.name),
+      ['Echo'],
+      'the clamp happens on read, so an out-of-range page shows the last one'
+    );
   });
 
   it('selects by key and falls back to the first visible item', async () => {
