@@ -80,7 +80,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../components/ChanceSlider.svelte',
   // MOVED BY ISSUE 1506, not added.
   '../../components/Chip.svelte',
-  // MOVED BY ISSUE 1710, not added.
+  // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
   // ADDED BY ISSUE 1515 (decision D12), under the message below and not as drift.
   '../../components/Kicker.svelte',

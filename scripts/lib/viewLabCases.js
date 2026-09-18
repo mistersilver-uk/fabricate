@@ -1490,10 +1490,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
       ' .manager-setup-card',
     kinds: ['manager', 'systems'],
-    // Deliberately no pattern for `components/EmptyState.svelte`, for the reason
-    // `manager-gathering-economy-actors` records about `Stepper`: `BROAD_SIGNAL_PATTERN` matches
+    // Deliberately no pattern for `components/EmptyState.svelte`: `BROAD_SIGNAL_PATTERN` matches
     // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
-    // before consulting any case's `sourceMatches` — such an entry would be unreachable.
+    // before reading any case's `sourceMatches`, so such an entry is unreachable.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
@@ -5442,10 +5441,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     // case whose whole subject is that there is nothing to list.
     expectSelector: '.fabricate-manager [data-complications-section] [data-complications-empty]',
     kinds: ['manager', 'components', 'complications'],
-    // Deliberately no pattern for `components/EmptyState.svelte`, for the reason
-    // `manager-systems-empty` records: `BROAD_SIGNAL_PATTERN` matches
+    // Deliberately no pattern for `components/EmptyState.svelte`: `BROAD_SIGNAL_PATTERN` matches
     // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
-    // before consulting any case's `sourceMatches`, so such an entry would be unreachable.
+    // before reading any case's `sourceMatches`, so such an entry is unreachable.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
     ],

@@ -55,6 +55,8 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         '../../components/ChanceSlider.svelte',
         // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new dependency.
         '../../components/Chip.svelte',
+        // Moved by issue 1710's file move, and it is neither a screen nor a new dependency.
+        '../../components/EmptyState.svelte',
         // DRAGGED IN BY ISSUE 1515's HEADER CONVERSION (D12), and it is a LABEL PRIMITIVE rather
         // than a screen — the same reading as the two file-move rows above, reached from what the
         // import DOES rather than from where it moved.
