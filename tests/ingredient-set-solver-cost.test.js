@@ -77,11 +77,16 @@ function countingLedgerSeam(counters, key) {
   };
   return {
     seedRemaining,
-    assertUsed(expectedStacks) {
+    assertUsed(expectedStacks, expectedMints = 1) {
       assert.ok(
         ledgers.length > 0,
         'the counting ledger was never minted, so this counter could never go up — the ' +
           '`seedRemaining` seam has moved and the probe needs fixing, not the assertion'
+      );
+      assert.equal(
+        ledgers.length,
+        expectedMints,
+        'the seam must be bound at every site that seeds a ledger for this resolution'
       );
       assert.equal(
         ledgers[0].size,
@@ -119,7 +124,7 @@ function instrumentedSolver(set, ledger, phase) {
 
 /**
  * Wrap a caller-supplied probe (the ingredient matcher, or the essence resolver) so its invocations
- * are counted on either side of the {@link armAfterPassIndex} boundary.
+ * are counted on either side of the {@link passIndexPhase} boundary.
  *
  * @returns {{probe: Function, tally: {beforeIndex: number, afterIndex: number}}}
  */
@@ -220,7 +225,7 @@ function resolveAndCount(fillerStacks, { groups = contendedGroups(), essences = 
     resolveItemEssences: essenceProbe?.probe,
   });
 
-  ledger.assertUsed(items.length);
+  ledger.assertUsed(items.length, essences ? 2 : 1);
   assert.equal(selection.success, true, 'the contended fixture must be satisfiable');
   return {
     ledgerOps: counters.get('ledgerOps'),
@@ -397,9 +402,23 @@ test('an adversarial cap-hitting search is measured against its stated wall-cloc
   const items = adversarialInventory(994);
   assert.equal(items.length, 1000);
 
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
   const started = performance.now();
-  const selection = adversarialSet().resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
+  let selection;
+  try {
+    selection = adversarialSet().resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
+  } finally {
+    console.warn = realWarn;
+  }
   const elapsed = performance.now() - started;
+
+  assert.deepEqual(
+    warnings.map((line) => line.split(':')[0]),
+    ['Fabricate | IngredientSet adversarial'],
+    'the cap-hit fallback must announce itself and name the set it gave up on'
+  );
 
   assert.equal(selection.success, false, 'the fixture must be genuinely unsatisfiable');
   assert.equal(
@@ -426,7 +445,7 @@ test('the adversarial search costs the same ledger operations at 20 and 1,000 st
       ingredientSetId: set.id,
       seedRemaining: probe.seedRemaining,
     }).resolve(items, ADVERSARIAL_MATCHER);
-    probe.assertUsed(items.length);
+    probe.assertUsed(items.length, 2);
     return { ledgerOps: counters.get('ledgerOps'), stats: selection.searchStats };
   };
 
