@@ -136,13 +136,10 @@ test('the library has the exact structure the parser assumes', () => {
   // `<EssencePool>`, `<RunProgress> <StageNav> <StageCard>` and `<YieldScale> <OutcomeLadder>` —
   // carrying eleven names, every one of them target. RE-MEASURED by importing this parser: the
   // same revision added six routing rows and three migration rows, and moved no other count.
-  // 62 as of the result-side revision: three section-PROSE blocks under the picker-row entry, for
-  // the chooser, the award modes and the reward row. Prose, so only the block counts and the prose
-  // register move; the names they cite are already declared by the entry they sit beneath.
-  assert.equal(library.blockCount, 62, 'spec-head block count');
+  assert.equal(library.blockCount, 59, 'spec-head block count');
   assert.equal(
     library.headingCount,
-    62,
+    59,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
@@ -154,7 +151,7 @@ test('the library has the exact structure the parser assumes', () => {
       'and the set has a duplicate'
   );
   assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 39, 'naming blocks');
-  assert.equal(library.nonPrimitiveHeadings.length, 23, 'section-prose blocks');
+  assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan. If the parser were ever
   // widened to the whole file these two would collapse to 69 and 0, and every set comparison below
@@ -164,11 +161,11 @@ test('the library has the exact structure the parser assumes', () => {
 });
 
 /**
- * The 23 `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
+ * The 20 `div.spec-head > h4` headings that name no primitive: section prose, pinned by exact
  * decoded text.
  *
  * Encoding: DECODED, which is what `tests/helpers/designLibrary.js` yields and why. The corpus
- * mixes three spellings — four of these carry entities (`&amp;`, `&mdash;`) and four carry a raw
+ * mixes three spellings — three of these carry entities (`&amp;`, `&mdash;`) and four carry a raw
  * U+00B7 — so pinning raw markup would pin an inconsistency and would red on a pure re-escaping
  * that changes nothing a reader sees.
  */
@@ -184,9 +181,6 @@ const NON_PRIMITIVE_HEADINGS = [
   'The state set',
   'Hit targets, naming, announcement',
   'The mark vocabulary',
-  'Who chooses a result-side alternative',
-  'How many alternatives a result set awards',
-  'A reward row — kind, value, amount, naming',
   'The two sets',
   'Routed by ingredients',
   'Routed by check',
@@ -224,7 +218,7 @@ test('every recorded section-prose heading is still in the library', () => {
 test('the section-prose register is pinned at its measured size and holds no primitive name', () => {
   assert.equal(
     NON_PRIMITIVE_HEADINGS.length,
-    23,
+    20,
     'without this pin the cheapest way to green a new `<h4>Toggle</h4>` is to append `Toggle` ' +
       'here, which is the drift the census exists to catch'
   );
