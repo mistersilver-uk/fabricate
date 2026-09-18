@@ -24,7 +24,7 @@ export const COMPONENT_SORT_KEYS = Object.freeze([
   'salvage',
 ]);
 
-/** The essence filter's two predicate values, offered ahead of the per-essence entries (#1371). */
+/** The essence filter's two predicate values, offered ahead of the per-essence entries (issue 1371). */
 export const COMPONENT_ESSENCE_FILTER_ANY = '__any';
 export const COMPONENT_ESSENCE_FILTER_NONE = '__none';
 
@@ -57,7 +57,7 @@ export function componentCategoryOf(component) {
   return normalizeComponentCategory(component?.category);
 }
 
-/** The essence run a card draws: `essenceChips`, falling back to `essences` (#1371). */
+/** The essence run a card draws: `essenceChips`, falling back to `essences` (issue 1371). */
 export function componentEssenceRun(component) {
   if (Array.isArray(component?.essenceChips)) return component.essenceChips;
   return Array.isArray(component?.essences) ? component.essences : [];
@@ -100,7 +100,7 @@ const COMPONENT_ADAPTER = Object.freeze({
     },
     {
       id: 'essence',
-      // The neutral `all`, either predicate, or a named essence (#1371).
+      // The neutral `all`, either predicate, or a named essence (issue 1371).
       matches: (component, value) => {
         if (value === 'all') return true;
         const names = essenceNames(component);
