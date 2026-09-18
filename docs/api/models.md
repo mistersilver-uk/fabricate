@@ -245,7 +245,7 @@ Result data is validated as part of recipe validation and consumed by the crafti
 
 {: .note }
 
-> A non-empty `quantityFormula` makes the amount ROLLED, and `quantity` becomes the authored fallback rather than the number awarded.
+> A non-empty `quantityFormula` makes the amount ROLLED, and `quantity` stays the authored amount it falls back to, rather than the number awarded.
 > The formula is a roll expression, resolved once per result per award against the crafting character, and it can reference the character's own roll data.
 > `Result.validate({ Roll })` accepts `Roll` as an injected dependency and rejects a formula with no character reference whose maximum possible roll can never exceed zero.
 > With no `Roll` supplied, validation reports nothing about `quantityFormula`.

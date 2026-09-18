@@ -48,7 +48,7 @@ It is resolved once, at the moment the result is awarded, against the character 
 A rolled amount can come up as zero.
 When it does, nothing is created, and the crafting or salvage chat card names the roll and states that nothing was produced, rather than leaving the result off the card.
 Fabricate refuses to save a rolled amount that could never produce anything at all, such as an expression with no dice and no character reference that can only ever total zero or less.
-An expression that reads the crafting character's own data is always accepted, because its value cannot be known in advance.
+An expression that reads the crafting character's own data is accepted as long as it can be rolled at all, because no value can be known in advance without a character to roll it against.
 
 {: .note }
 > Choosing between a fixed and a rolled amount on the Results tab is planned and not yet available.
