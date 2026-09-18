@@ -33,6 +33,10 @@
  * silently executing twice.
  */
 
+import {
+  buildBulkSalvageChatContent,
+  sumChatEntriesByName,
+} from '../ui/presenters/BulkSalvageChatCard.js';
 // The PLAYER forecast projection, and the trigger-id read that keeps it honest. Both are
 // import-free leaves, so the "what could go wrong" preview costs this service no closure.
 import { forecastComplications } from '../utils/complicationPlan.js';
@@ -41,7 +45,6 @@ import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
-import { buildBulkSalvageChatContent, sumChatEntriesByName } from './BulkSalvageChatCard.js';
 import { awardReceipts } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';

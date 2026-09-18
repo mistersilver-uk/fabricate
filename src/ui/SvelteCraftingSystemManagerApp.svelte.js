@@ -26,7 +26,7 @@ import {
   hasRealFolderGroups,
 } from './svelte/util/importFolderGroups.js';
 import { CompendiumImporter } from '../systems/CompendiumImporter.js';
-import { buildImportReportContent } from '../systems/importReportContent.js';
+import { buildImportReportContent } from './presenters/importReportContent.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';

@@ -9,14 +9,14 @@
  * happens in the caller (GatheringEngine); this module only formats.
  *
  * The fired-complications block is the ONE thing this module takes from
- * {@link module:src/systems/CraftingChatCard} (issue 1286). A complication row is the
+ * {@link module:src/ui/presenters/CraftingChatCard} (issue 1286). A complication row is the
  * same row on all four cards, so a local copy here would be a fourth spelling of one
  * `<li>` — the duplication the crafting card's exported atoms exist to prevent. The
  * shared renderer is parameterised by BEM block, so it emits this card's own
  * `fabricate-gather-chat` classes and needs no new CSS.
  */
 
-import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
+import { DEFAULT_GATHERING_EVENT_IMG } from '../../gatheringImageDefaults.js';
 
 import { renderComplications } from './CraftingChatCard.js';
 

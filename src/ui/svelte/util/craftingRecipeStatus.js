@@ -2,7 +2,7 @@
 // `CRAFTING_BROWSE_STATUS` vocabulary `CraftingListingBuilder` emits, so the UI never branches on a
 // raw token, and `tone` is a semantic token CSS resolves — never a colour literal.
 
-import { CRAFTING_BROWSE_STATUS } from '../../../systems/CraftingListingBuilder.js';
+import { CRAFTING_BROWSE_STATUS } from '../../presenters/CraftingListingBuilder.js';
 
 const STATUS_PRESENTATION = Object.freeze({
   [CRAFTING_BROWSE_STATUS.AVAILABLE]: Object.freeze({

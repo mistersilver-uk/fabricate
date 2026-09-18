@@ -2,14 +2,14 @@
  * @module summaryProjection
  *
  * The CANONICAL recipe and component summary projections — the one cheap row shape the
- * player crafting listing (#1075) and the GM manager browsers (#1081) both consume
- * (issue 1091, under the performance programme #1070).
+ * player crafting listing (issue 1075) and the GM manager browsers (issue 1081) both consume
+ * (issue 1091, under the performance programme issue 1070).
  *
  * ## Why a shared contract needs an owner
  *
- * #1075 splits the player listing into summary and detail phases. #1081 splits the GM
- * browsers into cheap summary data, page rows and an inspector. #1076 built the indexes
- * both draw on and #1077 the snapshot and the cheap availability projection. Nothing
+ * issue 1075 splits the player listing into summary and detail phases. issue 1081 splits the GM
+ * browsers into cheap summary data, page rows and an inspector. issue 1076 built the indexes
+ * both draw on and issue 1077 the snapshot and the cheap availability projection. Nothing
  * defined the summary itself, and a contract with no owner does not get written once — it
  * gets written twice, differently, with overlapping-but-unequal fields and two separately
  * evolving availability rules. Reconciling those later costs more than agreeing them now.
@@ -101,28 +101,28 @@
  * wiring snapshot → tallies → projection themselves, so neither can drift into a second
  * interpretation of "does this actor plausibly have the materials?".
  *
- * "Cheap availability" here and #1077's "indexed availability projection" are the SAME
+ * "Cheap availability" here and issue 1077's "indexed availability projection" are the SAME
  * rule with the SAME implementation, `projectRecipeAvailability` in `inventorySnapshot.js`,
  * reached only through {@link projectSummaryAvailability} below and never re-derived. The
- * two phrasings exist because #1077 named the rule at the tallies and #1091 named it again
+ * two phrasings exist because issue 1077 named the rule at the tallies and issue 1091 named it again
  * at the summary that consumes it — a second name picked up along the way, not a second
  * rule authored twice. Treating them as two things is exactly the drift this module exists
  * to foreclose.
  *
- * It carries forward #1077's documented OPTIMISM verbatim: the answer is an upper bound.
+ * It carries forward issue 1077's documented OPTIMISM verbatim: the answer is an upper bound.
  * A `true` means "nothing rules this out" and must be presented as "looks makeable", never
  * as "you can make this"; a `false` is definitive. The `optimistic: true` key rides along
  * in the result so a consumer cannot read it as exact by accident. Exactness stays at
  * craft time, where it already is and must remain.
  */
 
-import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
-import { normalizeComponentCategory } from '../utils/componentCategories.js';
-import { getRecipeCategoryLabel, normalizeRecipeCategory } from '../utils/recipeCategories.js';
+import { projectRecipeAvailability } from '../../systems/inventorySnapshot.js';
+import { buildStepRecipeView } from '../../systems/stepRecipeView.js';
+import { normalizeComponentCategory } from '../../utils/componentCategories.js';
+import { getRecipeCategoryLabel, normalizeRecipeCategory } from '../../utils/recipeCategories.js';
+import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
 import { deriveBrowseStatus } from './craftingBrowseStatus.js';
-import { projectRecipeAvailability } from './inventorySnapshot.js';
-import { buildStepRecipeView } from './stepRecipeView.js';
 
 /**
  * Who a summary is being built for. The value rides on the summary itself so a consumer
@@ -266,7 +266,7 @@ function tagList(value) {
  * This is the ONLY sanctioned way for a summary to answer "does this actor plausibly have
  * the materials?". It resolves the snapshot's per-system tallies — memoised there, so
  * asking for N recipes of one system walks the inventory once, not N times — and hands
- * them to #1077's projection.
+ * them to issue 1077's projection.
  *
  * ## The answer is an UPPER BOUND, and consumers must say so
  *
@@ -398,12 +398,12 @@ function redactionOf(audience, access) {
  * @param {object} input.recipe The authored recipe. Source of `id`, `name`, `img`,
  *   `category`, `tags`, `enabled`, `locked` and `systemId`.
  * @param {object|null} [input.system] The owning crafting system, resolved through
- *   #1076's per-system read (source of `systemName`), and the tallies key for availability.
+ *   issue 1076's per-system read (source of `systemName`), and the tallies key for availability.
  * @param {string} [input.audience] A {@link SUMMARY_AUDIENCE} value; defaults to `player`,
  *   the redacting one, so an omitted audience fails safe rather than open.
  * @param {object|null} [input.access] The visibility service's access result for this
  *   (recipe, viewer) — source of `browseStatus`'s reason and of the teaser redaction.
- * @param {object|null} [input.snapshot] An inventory snapshot (#1077), or `null`.
+ * @param {object|null} [input.snapshot] An inventory snapshot (issue 1077), or `null`.
  * @param {boolean} [input.exhausted] Whether every owned copy of the recipe's book has
  *   reached its cap, as already established by the knowledge access evaluation. NOT
  *   recomputed here — recipe-visibility/spec.md forbids a second candidate collection.
@@ -510,7 +510,7 @@ function lookupDefinition(index, key) {
  * projected rows carry an ARRAY of `{ id, name }` and filter on the name. Both surfaces
  * therefore need both facets, and deriving them in two places is exactly the divergence
  * this module exists to prevent — so the list is built here, from the canonical map, with
- * the display name resolved through the system's essence-definition index (#1076).
+ * the display name resolved through the system's essence-definition index (issue 1076).
  *
  * Sorted by id so two summaries of the same component compare equal regardless of key
  * insertion order, which matters for any consumer memoising on a summary.
@@ -574,9 +574,9 @@ function heldOf(component, tallies) {
  *   than read off the component, which does not carry one: component ids are unique only
  *   WITHIN a system, so a summary that could not name its system would be ambiguous the
  *   moment two systems were browsed together.
- * @param {Map<string, object>|null} [input.essenceDefinitionsById] #1076's per-system
+ * @param {Map<string, object>|null} [input.essenceDefinitionsById] issue 1076's per-system
  *   essence-definition index, for essence display names.
- * @param {object|null} [input.tallies] A snapshot's `componentTallies(system)` (#1077), or
+ * @param {object|null} [input.tallies] A snapshot's `componentTallies(system)` (issue 1077), or
  *   `null` when the surface has no actor in view.
  * @returns {object} A summary carrying exactly {@link COMPONENT_SUMMARY_FIELDS.shared}.
  */

@@ -9,7 +9,7 @@
   one implementation of "manager modal dialog", not two technologies side by side.
 
   This component is a pure PRESENTER. Everything it renders comes pre-assembled and
-  pre-localized from `buildImportReportContent` (`src/systems/importReportContent.js`);
+  pre-localized from `buildImportReportContent` (`src/ui/presenters/importReportContent.js`);
   it holds no import knowledge and performs no lookups, which keeps report assembly
   unit-testable without a Foundry runtime and keeps the rendering testable without an
   importer.

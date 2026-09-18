@@ -5,6 +5,8 @@ import {
   resolvePresentToolIds,
 } from '../gatheringToolRuntime.js';
 import { resolveToolDisplayImage, resolveToolDisplayName } from '../models/toolDisplay.js';
+import { buildGatheringChatContent } from '../ui/presenters/GatheringChatCard.js';
+import { GatheringListingBuilder } from '../ui/presenters/GatheringListingBuilder.js';
 import {
   buildInteractiveRollOptions,
   promptCheckRoll,
@@ -18,7 +20,6 @@ import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { fireComplications } from './complicationRuntime.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
-import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
   actorMatchesId,
   blindWaitingTaskId,
@@ -38,7 +39,6 @@ import {
   stringOrNull,
   stripRuntimeSnapshotFromRun,
 } from './gatheringEngineInternals.js';
-import { GatheringListingBuilder } from './GatheringListingBuilder.js';
 import {
   buildRealmDisclosure,
   buildTravelGuidance,

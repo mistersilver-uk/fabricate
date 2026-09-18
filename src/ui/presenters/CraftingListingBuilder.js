@@ -24,8 +24,8 @@
  * genuinely different costs and genuinely different audiences of consumer.
  *
  * - {@link CraftingListingBuilder#buildListing} answers "what may this viewer browse?" for
- *   the whole visible corpus and returns #1091 summaries. It performs ZERO exact
- *   craftability evaluations, at any corpus size: material availability comes from #1077's
+ *   the whole visible corpus and returns issue 1091 summaries. It performs ZERO exact
+ *   craftability evaluations, at any corpus size: material availability comes from issue 1077's
  *   indexed projection over ONE per-pass inventory snapshot. Everything the browser list
  *   filters, sorts and paginates on — name, id, browse status, system, category — is on a
  *   summary, so the page window is chosen before any expensive work happens.
@@ -38,29 +38,29 @@
  * `1 + setCount + stepSetCount` exact evaluations PER RECIPE for rows nobody would see.
  *
  * The two phases disagree about material availability BY DESIGN, and that is stated here
- * rather than discovered: the summary's answer is #1077's documented upper bound (contended
+ * rather than discovered: the summary's answer is issue 1077's documented upper bound (contended
  * sets are counted for both, so it can say "looks makeable" where exact evaluation refuses),
  * while the detail — and the craft guard behind it — stay exact. A row is a promise about
  * what is worth opening, never a promise about what will craft.
  */
 
-import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
+import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
+import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
+import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
+import { activeRunStepState, buildStepRecipeView } from '../../systems/stepRecipeView.js';
 // The player-visible per-stage complication forecast (issue 1286), attached to the stage
 // rows this builder already publishes. An import-free leaf, on the same grounds as
 // `progressiveStageThresholds` beneath it.
-import { attachStageComplications } from '../utils/progressiveStageComplications.js';
-import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
-import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
+import { attachStageComplications } from '../../utils/progressiveStageComplications.js';
+import { progressiveStageThresholds } from '../../utils/progressiveStageThresholds.js';
+import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../../utils/recipeCategories.js';
 import {
   untrimmedStringOrEmpty as stringOrEmpty,
   untrimmedStringOrNull as stringOrNull,
-} from '../utils/scalars.js';
+} from '../../utils/scalars.js';
+import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
-import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
-import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
-import { resolvedComponentsFor } from './scopedEntityReads.js';
-import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
 /**
@@ -82,7 +82,7 @@ const RESOLUTION_MODE_LABEL_KEYS = {
  * The browse-status vocabulary the player Crafting list keys its callout on, re-exported
  * from the import-free leaf that now owns it (issue 1091).
  *
- * It moved because #1091's summary projection needs the SAME vocabulary and the same
+ * It moved because issue 1091's summary projection needs the SAME vocabulary and the same
  * precedence rule, and could not take them from here without dragging this whole builder
  * into every consumer's graph — which is exactly why `craftingStore.svelte.js` already
  * kept a private copy. One vocabulary, one owner, and this re-export so nothing that
@@ -180,7 +180,7 @@ export class CraftingListingBuilder {
   /**
    * SUMMARY PHASE — the paged browse query (issue 1075).
    *
-   * Every recipe the viewer may browse, projected into #1091's canonical summary. The cost
+   * Every recipe the viewer may browse, projected into issue 1091's canonical summary. The cost
    * is one corpus-wide visibility pass, one inventory snapshot, and one cheap projection per
    * visible recipe; `evaluateCraftability` and `resolveIngredientSelection` are invoked
    * ZERO times, which is asserted by counter rather than left as a review note.
@@ -351,7 +351,7 @@ export class CraftingListingBuilder {
    * A per-pass VALUE, never a field: `inventorySnapshot`'s invalidation rule is that no
    * snapshot outlives the synchronous pass that built it, because nothing mints a revision
    * token when a player's `actor.items` changes and a stale inventory read would feed the
-   * craftability and knowledge gates. #1078 owns the item-side generation that would ever
+   * craftability and knowledge gates. issue 1078 owns the item-side generation that would ever
    * permit retention.
    *
    * Built through the shared {@link buildPassInventorySnapshot} since issue 1228, so this
@@ -369,7 +369,7 @@ export class CraftingListingBuilder {
   }
 
   /**
-   * Project one visible recipe into its #1091 summary.
+   * Project one visible recipe into its issue 1091 summary.
    *
    * `exhausted` is skipped for a redacted teaser, matching the pre-split builder exactly:
    * the teaser branch short-circuited before the exhaustion read, and asking for it here
@@ -965,7 +965,7 @@ export class CraftingListingBuilder {
     const routedFixed =
       (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
       config.type === 'fixed';
-    // Resolve the displayed DC AFTER the #765 suppression guard above (never
+    // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
     // reorder it there): routed-fixed and dynamic-DC checks surface no chip
     // (`null`); otherwise the recipe's tier DC wins over the static fallback. See
     // the method JSDoc and `_resolveDisplayDc`.

@@ -2,7 +2,7 @@
  * @module craftingBrowseStatus
  *
  * The browse-status vocabulary a crafting row is labelled with, and the ONE precedence
- * rule that derives it (issue 1091, under the performance programme #1070).
+ * rule that derives it (issue 1091, under the performance programme issue 1070).
  *
  * ## Why this is a leaf module of its own
  *
@@ -10,7 +10,7 @@
  * transitive imports), so every consumer that wanted the token set but not the builder
  * kept a private copy instead — `craftingStore.svelte.js` says so in as many words:
  * "a local copy keeps the store free of the builder import". A vocabulary with copies is
- * a vocabulary that drifts, and #1091 exists precisely to stop the player and GM surfaces
+ * a vocabulary that drifts, and issue 1091 exists precisely to stop the player and GM surfaces
  * evolving separate answers to the same question.
  *
  * So the vocabulary and its precedence rule live here, in an import-free leaf any surface
