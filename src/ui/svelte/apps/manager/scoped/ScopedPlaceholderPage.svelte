@@ -6,7 +6,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
 
   let { pageId = '', titleKey = '', titleFallback = '', icon = 'fas fa-cubes-stacked' } = $props();
 

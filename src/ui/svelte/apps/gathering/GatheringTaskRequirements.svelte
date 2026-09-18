@@ -13,7 +13,7 @@
   the always-visible right-column section never renders empty.
 -->
 <script>
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';

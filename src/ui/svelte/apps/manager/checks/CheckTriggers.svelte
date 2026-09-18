@@ -20,7 +20,7 @@
   import { interpolate } from './checksCopy.js';
   import { buildPresetTrigger, checkTriggerPresets } from './checkTriggerPresets.js';
   import { summariseCondition, summariseEffect, summariseHeadline } from './checkTriggerSummary.js';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';

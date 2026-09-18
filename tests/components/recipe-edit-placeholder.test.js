@@ -244,7 +244,7 @@ describe('RecipeEditView empty-state regression guards', () => {
   // Issue 785: the surface is a shared COMPONENT now.
   it('reuses the shared EmptyState primitive for the null-recipe state', () => {
     assert.ok(
-      editSource.includes("import EmptyState from './EmptyState.svelte'"),
+      editSource.includes("import EmptyState from '../../components/EmptyState.svelte'"),
       'the view imports the shared no-state primitive'
     );
     assert.ok(editSource.includes('<EmptyState'), 'the null-recipe branch renders it');

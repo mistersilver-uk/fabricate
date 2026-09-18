@@ -24,10 +24,10 @@
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

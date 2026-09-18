@@ -32,7 +32,7 @@ const harness = createMountedComponentHarness({
     // The shared fill bar and no-state panel (issue 1514). The per-essence meter is a
     // `FillBar` and the no-carriers line is an `EmptyState note`, so omitting either fails
     // this suite by name.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   ],

@@ -16,7 +16,7 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { componentEntrySystemFilters, componentSystemModeLabel } from './componentScoped.js';
 
   let {

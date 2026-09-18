@@ -24,7 +24,7 @@ const runActionHarness = createHarness(
   [
     component('ManagerButton'),
     component('IconButton'),
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
   ],
   ['src/ui/svelte/util/foundryBridge.js']
 );

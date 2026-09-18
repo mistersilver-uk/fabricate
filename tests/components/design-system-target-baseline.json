@@ -66,7 +66,7 @@
     "src/ui/svelte/apps/manager/BulkEditSection.svelte | 1",
     "src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte | 1",
     "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte | 1",
-    "src/ui/svelte/apps/manager/EmptyState.svelte | 1",
+    "src/ui/svelte/components/EmptyState.svelte | 1",
     "src/ui/svelte/apps/manager/ExplainerCard.svelte | 1",
     "src/ui/svelte/apps/manager/IconFactRow.svelte | 1",
     "src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte | 1",

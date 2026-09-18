@@ -9,8 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
 const SHARED_PRIMITIVES = [
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   // The manager's ONE selection control and ONE essence quantity card (issue 772).
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/Stepper.svelte',

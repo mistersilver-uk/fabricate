@@ -19,7 +19,7 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import { evaluatePrerequisites } from '../../../../../systems/characterPrerequisites.js';
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';

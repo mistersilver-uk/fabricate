@@ -69,7 +69,7 @@
   import { localize, formatList } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../../manager/EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';

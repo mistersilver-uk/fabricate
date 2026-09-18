@@ -12,7 +12,7 @@
   empty copy (recipe / step / global).
 -->
 <script>
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
 

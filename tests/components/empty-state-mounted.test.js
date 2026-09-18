@@ -9,15 +9,15 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const emptyStateSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/EmptyState.svelte'),
+  resolve(repoRoot, 'src/ui/svelte/components/EmptyState.svelte'),
   'utf8'
 );
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-empty-state-',
-  compiledModules: ['src/ui/svelte/apps/manager/EmptyState.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte',
+  compiledModules: ['src/ui/svelte/components/EmptyState.svelte'],
+  componentPath: 'src/ui/svelte/components/EmptyState.svelte',
 });
 
 function panelOf(target) {

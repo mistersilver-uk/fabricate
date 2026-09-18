@@ -13,8 +13,8 @@
   exists. Prop-driven.
 -->
 <script>
-  import Callout from '../manager/Callout.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import Callout from '../../components/Callout.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
 

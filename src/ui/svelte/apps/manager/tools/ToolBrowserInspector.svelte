@@ -1,6 +1,6 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

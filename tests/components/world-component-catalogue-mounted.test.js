@@ -2682,8 +2682,8 @@ describe('world Component Catalogue (issue 1371)', () => {
         'src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte',
         'src/ui/svelte/components/ArmedDangerButton.svelte',
         'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-        'src/ui/svelte/apps/manager/Callout.svelte',
-        'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+        'src/ui/svelte/components/Callout.svelte',
+        'src/ui/svelte/components/SegmentedControl.svelte',
       ],
     });
 

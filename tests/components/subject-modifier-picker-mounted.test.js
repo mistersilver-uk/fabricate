@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     PICKER_PATH,
   ],
   componentPath: PICKER_PATH,

@@ -15,9 +15,9 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import LibraryShelf from './library/LibraryShelf.svelte';
-  import SegmentedControl from './SegmentedControl.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';

@@ -67,7 +67,7 @@ const harness = createMountedComponentHarness({
     'src/systems/scopedDefinitions.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.

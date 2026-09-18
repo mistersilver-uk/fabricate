@@ -35,7 +35,7 @@
   the only one on screen when a zero-member party's add is rejected.
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import PartyNameField from './PartyNameField.svelte';
   import PartyMemberRow from './PartyMemberRow.svelte';
   import PartyAddMemberPanel from './PartyAddMemberPanel.svelte';

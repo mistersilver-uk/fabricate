@@ -23,7 +23,7 @@
    - onLinkRecipe(recipeId) / onRemoveRecipe(recipeId): link / unlink a recipe.
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../systems/characterPrerequisites.js';

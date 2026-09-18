@@ -66,7 +66,7 @@ const harness = createMountedComponentHarness({
     // that tab. World scope passes no `intro`, so the strip never appears here — but a static
     // import is in the tree's graph whether or not its branch is taken, and a `.svelte` the
     // harness omits HANGS this suite and reports `# cancelled` rather than `# fail`.
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     // The world modifier library's row. Since issue 1373's round 5 the prerequisite list
     // and the bonus list are both this one component, so omitting it HANGS the suite.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
@@ -101,7 +101,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
     // The per-row match-type segmented control those three render.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,

@@ -14,7 +14,7 @@
   - `onChange(value)` — the chosen option's `value`.
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import { localize } from '../util/foundryBridge.js';
 
   let {
     options = [],

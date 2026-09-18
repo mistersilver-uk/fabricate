@@ -45,7 +45,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
@@ -62,7 +62,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
     // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`.
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.

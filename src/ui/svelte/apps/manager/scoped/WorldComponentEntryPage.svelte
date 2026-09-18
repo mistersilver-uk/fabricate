@@ -14,7 +14,7 @@
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EditorTabs from '../../../components/EditorTabs.svelte';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';

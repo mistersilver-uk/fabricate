@@ -70,21 +70,20 @@ const PUBLISHING_CASE_IDS = new Set(
 );
 
 /** The V8-escaped source of `BROAD_SIGNAL_PATTERN`, verbatim. */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(Callout|EmptyState|ExplainerCard|IconFactRow|ManagerModal|SegmentedControl)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow|ManagerModal)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
  */
 const EXPECTED_OVERRIDE_KEYS = [
-  // Issue 1505: the widened standing statement, and the FIRST entry here whose primitive earned its
-  // frames by being re-authored rather than by acquiring a new state.
-  'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
   'src/ui/svelte/components/Avatar.svelte',
+  // Issue 1505: the widened standing statement, the FIRST entry whose primitive earned its frames by
+  // re-authoring rather than by a new state, and — with `EmptyState` — moved here by issue 1710.
+  'src/ui/svelte/components/Callout.svelte',
   // Issue 1508: the percentage slider, and the second key gained by a family being RE-ROOTED rather
   // than by a component arriving or acquiring a state.
   'src/ui/svelte/components/ChanceSlider.svelte',
@@ -93,6 +92,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ChoiceOptionList.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
@@ -156,7 +156,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
   String.raw`coverage-theme-light-manager :: ^styles\/fabricate\.css$`,
   String.raw`coverage-theme-light-player :: ^src\/ui\/theme\.js$`,
   String.raw`coverage-theme-light-player :: ^styles\/fabricate\.css$`,
-  String.raw`manager-component-complications-empty :: ^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Chip\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Medallion\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^styles\/fabricate\.css$`,
@@ -164,7 +163,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
   String.raw`manager-world-downtime-test-companion-rollup :: ^styles\/fabricate\.css$`,
   String.raw`manager-world-downtime-test-companion-tab-navigation :: ^styles\/fabricate\.css$`,
   String.raw`manager-world-parties-card-stacked-680 :: ^styles\/fabricate\.css$`,
-  String.raw`manager-world-parties-empty :: ^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab|EmptyState)\.svelte$`,
   String.raw`manager-world-parties-last-page :: ^src\/ui\/svelte\/components\/Pagination\.svelte$`,
   String.raw`manager-world-parties-stacked :: ^styles\/fabricate\.css$`,
   String.raw`manager-world-travel-default-collapsed :: ^styles\/fabricate\.css$`,
@@ -176,13 +174,13 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
 
 /**
  * Broad-signal components that no frame in the registry renders. Each later primitive extraction in
- * this programme removes its own entry, and the only accepted edit is a REMOVAL (issue 1116).
+ * this programme removes its own entry; the only accepted edits are a REMOVAL (issue 1116) and a
+ * RE-KEY between the two primitive directories, which holds the length (issue 1710).
  */
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
@@ -194,6 +192,7 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ManagerColorPopover.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {
@@ -227,7 +226,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 180);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 144);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -303,7 +302,7 @@ test('(a) the two older overrides still name the frame that renders their state'
         'exists only in the open popover, and neither representative frame opens one',
     ],
     [
-      'src/ui/svelte/apps/manager/EmptyState.svelte',
+      'src/ui/svelte/components/EmptyState.svelte',
       'manager-systems-empty',
       'the frame that draws the dashed empty panel, and the one `docs/help/quickstart.md` Step 1 ' +
         'embeds — both representative frames are POPULATED states',
@@ -311,7 +310,7 @@ test('(a) the two older overrides still name the frame that renders their state'
     // The `note` variant (issue 1373) released the panel entirely for an empty inside an overlay
     // the product has already bounded — a picker popover.
     [
-      'src/ui/svelte/apps/manager/EmptyState.svelte',
+      'src/ui/svelte/components/EmptyState.svelte',
       'world-tool-entry-on-break-repair-tag-picker-empty',
       'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
         'bordered panel filling a region',
@@ -732,11 +731,10 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
 
   // Non-vacuity in the direction that matters.
   assert.ok(
-    domain.length >= 60,
+    domain.length >= 50,
     `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
-      `caller bar, against the 64 this tree holds — 71 until issue 1509 moved six primitives out ` +
-      `of apps/ and Phase 3's shim deletion took the seventh. With none, the register is empty and ` +
-      'this property is satisfied by a broken scan.'
+      'caller bar, against the 65 this tree holds. With none, the register is empty and this ' +
+      'property is satisfied by a broken scan.'
   );
   assert.ok(
     domain.some((file) => MANIFEST_ROWS.some((row) => row.path === file)),
@@ -791,5 +789,46 @@ test('(e) every registered path is a real, unadjudicated component', () => {
     `a register row names a file under ${PRIMITIVE_DIRECTORY}, which is outside this property's ` +
       'domain entirely — those are covered by the manifest clauses above, and a row here would be ' +
       'checked by nothing while looking checked'
+  );
+});
+
+test('(e) exactly one shared member row still lives outside the primitive directory', () => {
+  assert.deepEqual(
+    MANIFEST_ROWS.filter(
+      (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
+    ).map((row) => row.path),
+    ['src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte'],
+    'the design-system spec names this set; a promotion or a new shared row outside ' +
+      `${PRIMITIVE_DIRECTORY} must update that sentence with it`
+  );
+});
+
+const APP_DIRECTORY = 'src/ui/svelte/apps/';
+
+test('(f) no file under components/ imports from the application tree', () => {
+  // The dependency graph inverted rather than a source pin: `importersOf` is measured, so this adds
+  // no `tests/source-pin-ledger.txt` row and no specifier's spelling can satisfy it.
+  const appRenderFiles = RENDER_FILES.filter((file) => file.startsWith(APP_DIRECTORY));
+  assert.ok(
+    appRenderFiles.length >= 200,
+    `only ${appRenderFiles.length} files walked under ${APP_DIRECTORY}, against the 333 this tree ` +
+      'holds. With none, the property below is satisfied by a broken walk.'
+  );
+
+  const inversions = appRenderFiles
+    .flatMap((file) =>
+      IMPORTERS.importersOf(file)
+        .filter((importer) => importer.startsWith(PRIMITIVE_DIRECTORY))
+        .map((importer) => `${importer} imports ${file}`)
+    )
+    .sort();
+
+  assert.deepEqual(
+    inversions,
+    [],
+    'a shared primitive imports from the application tree. The set is the layer every application ' +
+      'depends on, so an edge in this direction makes one primitive unusable without the manager ' +
+      'and reverses the dependency the `design-system` capability specifies. Move the imported ' +
+      'file into the primitive directory, or take the dependency out of the primitive.'
   );
 });

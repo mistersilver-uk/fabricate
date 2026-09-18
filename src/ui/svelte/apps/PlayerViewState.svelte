@@ -80,7 +80,7 @@
      scoped rules keep reaching their markup.
 -->
 <script>
-  import EmptyState from './manager/EmptyState.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import Notice from '../components/Notice.svelte';
 
   let { branches = [], children = undefined } = $props();

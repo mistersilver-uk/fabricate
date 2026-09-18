@@ -25,7 +25,7 @@
 <script>
   import Medallion from '../../../components/Medallion.svelte';
   import Select from '../../../components/Select.svelte';
-  import EmptyState from '../../manager/EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../../util/recipeItemAccessBadge.js';

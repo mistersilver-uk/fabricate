@@ -16,7 +16,7 @@
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import SegmentedControl from '../SegmentedControl.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';

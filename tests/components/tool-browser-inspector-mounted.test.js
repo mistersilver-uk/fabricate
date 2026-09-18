@@ -17,7 +17,7 @@ const harness = createMountedComponentHarness({
   rawModules: [...TOOL_TREE_RAW_MODULES, 'src/utils/scalars.js'],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     // THE PANEL'S CARD IS THE SHARED PRIMITIVE (issue 1427).
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',

@@ -47,7 +47,7 @@ const harness = createMountedComponentHarness({
     'src/utils/bulkSelectionModel.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
     // The shared bulk-delete card (issue 1132). The panel renders its delete block through it,
     // so it is a STATIC import of the component under test; omitting it HANGS this suite as
@@ -59,7 +59,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',

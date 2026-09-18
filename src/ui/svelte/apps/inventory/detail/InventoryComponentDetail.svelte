@@ -21,7 +21,7 @@
   import Avatar from '../../../components/Avatar.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Notice from '../../../components/Notice.svelte';
-  import EmptyState from '../../manager/EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';

@@ -44,7 +44,7 @@
     ESSENCE_RULES_TABS,
     essenceOnCraftCount,
   } from './essences/essenceStudio.js';
-  import Callout from './Callout.svelte';
+  import Callout from '../../components/Callout.svelte';
   import ToggleCard from '../../components/ToggleCard.svelte';
   import CopyRulesCard from './scoped/CopyRulesCard.svelte';
   import MembershipActions from './scoped/MembershipActions.svelte';

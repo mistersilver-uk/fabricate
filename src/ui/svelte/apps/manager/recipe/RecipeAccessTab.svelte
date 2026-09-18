@@ -16,7 +16,7 @@
      sub-line says "Shared with all players", never "Played by <one name>".
 -->
 <script>
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 

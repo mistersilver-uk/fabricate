@@ -21,7 +21,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import InventoryBookDetail from './detail/InventoryBookDetail.svelte';
   import InventoryComponentDetail from './detail/InventoryComponentDetail.svelte';
 

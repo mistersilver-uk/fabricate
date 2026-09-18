@@ -45,7 +45,7 @@
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';

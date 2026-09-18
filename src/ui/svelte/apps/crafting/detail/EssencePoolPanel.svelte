@@ -27,7 +27,7 @@
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import FillBar from '../../../components/FillBar.svelte';
-  import EmptyState from '../../manager/EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
 
   let {
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.

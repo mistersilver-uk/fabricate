@@ -2,7 +2,7 @@
 <script>
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { anchoredPopover, hostRelativePopoverLayout } from '../../actions/anchoredPopover.js';

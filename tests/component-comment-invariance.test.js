@@ -1,6 +1,6 @@
 /**
  * A COMMENT-ONLY EDIT TO `src/ui/svelte/components/` CHANGES NO EXECUTABLE CONSTRUCT (issue 1678).
- * Epic 1656 rewrites the headers of 37 components at once.
+ * Epic 1656 rewrites the headers of 52 components at once.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,8 +16,8 @@ import { parse } from 'svelte/compiler';
 const COMPONENT_DIR = 'src/ui/svelte/components';
 const repoRoot = resolve(import.meta.dirname, '..');
 
-/** 37 components live here today; a walk that stopped recursing or filtering reads far below it. */
-const CORPUS_FLOOR = 30;
+/** 52 components live here today; a walk that stopped recursing or filtering reads far below it. */
+const CORPUS_FLOOR = 45;
 
 /** Keys that carry position, formatting or comments rather than meaning. */
 const DROPPED_KEYS = Object.freeze(

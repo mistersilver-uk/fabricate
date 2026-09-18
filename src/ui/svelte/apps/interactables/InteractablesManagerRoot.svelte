@@ -32,7 +32,7 @@
   import InspectorCard from '../../components/InspectorCard.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Select from '../../components/Select.svelte';
-  import SegmentedControl from '../manager/SegmentedControl.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
 
   let { services = null } = $props();
 

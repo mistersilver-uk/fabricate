@@ -12,7 +12,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
@@ -30,7 +30,7 @@
     readinessModeForSlot,
     sectionForIssue,
   } from './checksReadiness.js';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
   import { focusValidationTarget } from '../validationFocus.js';
   import { announceValidationOutcome } from '../validationAnnouncement.js';

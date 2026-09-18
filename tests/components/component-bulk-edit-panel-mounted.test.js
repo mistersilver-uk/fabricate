@@ -33,7 +33,7 @@ const panel = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25).
     'src/ui/svelte/components/Medallion.svelte',

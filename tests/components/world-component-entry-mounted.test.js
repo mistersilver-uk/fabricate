@@ -43,11 +43,11 @@ const harness = createComponentScopeHarness({
     // THE `Essence contribution` CARD'S TWO LEAVES (issue 1371 r18-entry, maintainer ruling M31):
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/components/ArmedDangerButton.svelte',
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -65,7 +65,7 @@ const sourceCardHarness = createComponentScopeHarness({
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldComponentEntrySourceCard.svelte',
   rawExtras: ['src/ui/svelte/actions/dragDrop.js', 'src/ui/svelte/util/dropUtils.js'],
   compiledExtras: [
-    'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/components/Callout.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],

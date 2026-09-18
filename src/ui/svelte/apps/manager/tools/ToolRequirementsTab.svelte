@@ -40,7 +40,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
-  import Callout from '../Callout.svelte';
+  import Callout from '../../../components/Callout.svelte';
   import Field from '../../../components/Field.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';

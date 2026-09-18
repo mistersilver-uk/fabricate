@@ -47,8 +47,8 @@ const emptyStateHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-scoped-empty-state-',
   rawModules: [],
-  compiledModules: ['src/ui/svelte/apps/manager/EmptyState.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/EmptyState.svelte',
+  compiledModules: ['src/ui/svelte/components/EmptyState.svelte'],
+  componentPath: 'src/ui/svelte/components/EmptyState.svelte',
 });
 
 const inheritHarness = createMountedComponentHarness({

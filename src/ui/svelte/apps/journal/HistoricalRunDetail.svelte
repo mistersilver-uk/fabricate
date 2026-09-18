@@ -1,7 +1,7 @@
 <!-- Renders the builder's entitled historical evidence, with unknowns local to each field. -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import Callout from '../manager/Callout.svelte';
+  import Callout from '../../components/Callout.svelte';
   import ListRow from '../../components/ListRow.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';

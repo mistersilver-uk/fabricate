@@ -15,7 +15,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -23,7 +23,7 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import SegmentedControl from './SegmentedControl.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { statusChipTone } from '../../util/statusChipTone.js';

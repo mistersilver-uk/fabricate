@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';

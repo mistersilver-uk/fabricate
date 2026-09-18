@@ -1,11 +1,11 @@
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
-  import SegmentedControl from './SegmentedControl.svelte';
+  import SegmentedControl from '../../components/SegmentedControl.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';

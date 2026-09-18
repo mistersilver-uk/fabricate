@@ -6,7 +6,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const segmentedSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/SegmentedControl.svelte'),
+  resolve(repoRoot, 'src/ui/svelte/components/SegmentedControl.svelte'),
   'utf8'
 );
 
@@ -16,8 +16,8 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-segmented-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: ['src/ui/svelte/apps/manager/SegmentedControl.svelte'],
-  componentPath: 'src/ui/svelte/apps/manager/SegmentedControl.svelte'
+  compiledModules: ['src/ui/svelte/components/SegmentedControl.svelte'],
+  componentPath: 'src/ui/svelte/components/SegmentedControl.svelte'
 });
 
 const OPTIONS = [

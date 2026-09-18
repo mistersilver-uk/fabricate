@@ -11,7 +11,7 @@
   expected. `idPrefix` namespaces the `data-recipe-section` marker per instance.
 -->
 <script>
-  import EmptyState from '../EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';

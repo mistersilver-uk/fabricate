@@ -16,7 +16,7 @@
   list, as does a field error whose card is no longer on the page.
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import Notice from '../../components/Notice.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';

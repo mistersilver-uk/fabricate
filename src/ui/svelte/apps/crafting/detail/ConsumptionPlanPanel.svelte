@@ -23,7 +23,7 @@
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
-  import EmptyState from '../../manager/EmptyState.svelte';
+  import EmptyState from '../../../components/EmptyState.svelte';
 
   let {
     // `{ rows, pending }` from buildConsumptionPlan.

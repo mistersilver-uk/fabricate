@@ -25,7 +25,7 @@
      already stands, which surfaces the composite-uniqueness collision before the pick fails.
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';

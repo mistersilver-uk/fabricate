@@ -29,7 +29,7 @@
    - onResetSystem(actorId) / onResetAll(actorId)
 -->
 <script>
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Avatar from '../../components/Avatar.svelte';

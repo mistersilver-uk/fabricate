@@ -193,7 +193,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 // test — the three primitives it renders, plus itself (issue 1371).
 export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte'
 ]);
@@ -204,7 +204,7 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte'
 ]);
@@ -221,14 +221,14 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/components/Notice.svelte',
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
 ]);
 
 // THE SHARED PRIMITIVES THE PLAYER WINDOW'S TREES RENDER, as ONE closure (issue 1514).
 export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
-  'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
-  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/Callout.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
@@ -388,13 +388,13 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
   // The ONE not-yet-ready chrome the five player views draw (issue 1514). `CraftingView` below
   // renders the composition, so this roster is where the crafting suites acquire it.
-  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/components/Callout.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
   // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for the
   // reason `SELECT_COMPILED_MODULES` records above — the static guard in
   // `mounted-harness-primitive-allowlist.test.js` reads this array's own source text for quoted
   // literals, and a nested `...NAME` is not one.
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Notice.svelte',

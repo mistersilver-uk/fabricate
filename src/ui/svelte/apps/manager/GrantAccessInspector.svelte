@@ -8,7 +8,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import EmptyState from './EmptyState.svelte';
+  import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
