@@ -2065,10 +2065,10 @@ export class RecipeManager {
     return component.img || FALLBACK_COMPONENT_IMG;
   }
 
-  /** Resolve a result description using the component name. */
-  resolveResultDescription(recipe, componentId, quantity = 1) {
+  /** Resolve a result description. `quantityFormula` wins: a rolled amount states its expression. */
+  resolveResultDescription(recipe, componentId, quantity = 1, quantityFormula = null) {
     const name = this.resolveComponentName(recipe, componentId);
-    return `${quantity}x ${name}`;
+    return `${quantityFormula ?? quantity}x ${name}`;
   }
 
   /** Resolve the icon for a recipe (synchronous): the recipe's own img, which may be the default

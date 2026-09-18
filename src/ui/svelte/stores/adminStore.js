@@ -98,6 +98,7 @@ import {
   permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
 import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
+import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 // The two authority tokens, imported rather than re-spelled (issue 1374): the write path reads
 // any third value as a CLEAR, so tokens, resolver and normalizer must share one set.
@@ -7431,13 +7432,10 @@ export function createAdminStore(services) {
         if (!quantityValid) {
           errors.push(`${resultLabel} quantity must be a positive finite number`);
         }
-        const candidate = Result.fromJSON({
-          ...result,
-          // `Result` owns the remaining field contract. Give its legacy quantity default a
-          // valid value after checking the authored raw value above so zero cannot become one.
-          quantity: quantityValid ? quantity : 1,
-        });
-        for (const error of candidate.validate().errors) {
+        // `Result` owns the remaining field contract, and its legacy quantity default is applied
+        // only after the raw check above so zero cannot become one; `Roll` is injected (issue 1645).
+        const candidate = Result.fromJSON({ ...result, quantity: quantityValid ? quantity : 1 });
+        for (const error of candidate.validate({ Roll: diceEngine() }).errors) {
           errors.push(`${resultLabel}: ${error}`);
         }
       }

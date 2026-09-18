@@ -341,6 +341,13 @@ function describeRequirementOption(option, components, essences) {
   };
 }
 
+/** What a reader prints for an amount: the expression when rolled, the number otherwise (1645). */
+function amountLabelOf(result) {
+  const formula = typeof result?.quantityFormula === 'string' ? result.quantityFormula.trim() : '';
+  if (formula.length > 0) return formula;
+  return String(Number(result?.quantity) > 0 ? Number(result.quantity) : 1);
+}
+
 /**
  * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to.
  */
@@ -361,6 +368,7 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
           name: component?.name || '',
           img: component?.img || '',
           quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
+          amountLabel: amountLabelOf(result),
           // The component's authored difficulty (its progressive "cost"/DC).
           difficulty: Number.isFinite(Number(component?.difficulty))
             ? Number(component.difficulty)
@@ -460,9 +468,8 @@ export function buildRecipeBrowserModel(recipes, options = {}) {
     filtered,
     page: paged.recipes,
     groups,
-    // The FILTERED-COHORT counts, exported so a caller that renders its own header (or a test that
-    // pins the scope) reads the same map the group headers do instead of recounting whatever array
-    // it happens to hold.
+    // The FILTERED-COHORT counts, exported so a caller rendering its own header reads the same map
+    // the group headers do instead of recounting whatever array it happens to hold.
     categoryTotals,
     pageIndex: paged.pageIndex,
     pageCount: paged.pageCount,

@@ -19,7 +19,6 @@ export class Result {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();
 
-    // Managed item reference inside a crafting system
     this.componentId = data.componentId || data.systemItemId || null;
 
     // Foundry Source UUID (core.sourceId flag) of item to create
@@ -66,8 +65,9 @@ export class Result {
     };
   }
 
+  /** The AUTHORED amount: a rolled result states its expression, never a number (issue 1645). */
   getDescription() {
-    return `${this.quantity}x item`;
+    return `${this.quantityFormula ?? this.quantity}x item`;
   }
 
   toJSON() {

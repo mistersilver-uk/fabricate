@@ -118,3 +118,8 @@ test('1645: an award record states the roll beside the integer awarded, zero inc
     quantity: 0,
   });
 });
+
+test('1645: a projection states the expression for a rolled amount and the number for a fixed one', () => {
+  assert.equal(fixed().getDescription(), '2x item');
+  assert.equal(fixed({ quantityFormula: ' 1d4+1 ' }).getDescription(), '1d4+1x item');
+});

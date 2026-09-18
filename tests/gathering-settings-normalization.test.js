@@ -340,6 +340,35 @@ test('admin gathering task validation rejects invalid active results before pers
   assert.equal(writeCount, 0, 'an invalid active result never reaches persistence');
 });
 
+test('1645: an imported rolled gathering amount is validated against the same rollability floor', async () => {
+  const { seededRollClass } = await import('./helpers/seededRoll.js');
+  const { Roll } = seededRollClass({ maxima: { '1d4+1': 5, '1d4 - 10': -6 }, unparsable: ['1d4]'] });
+  const previous = globalThis.Roll;
+  globalThis.Roll = Roll;
+  try {
+    const store = createAdminStore(createServices(makeSystem({ features: { gathering: true } })));
+    await store.selectSystem('sys1');
+    const task = quantityFormula => ({
+      id: 'rolled',
+      name: 'Mine ore',
+      resolutionMode: 'straight',
+      dropRows: [],
+      resultGroups: [
+        { id: 'results', name: 'Ore', results: [{ id: 'ore', componentId: 'ore', quantity: 1, quantityFormula }] }
+      ]
+    });
+
+    assert.equal(store.validateGatheringLibraryTask(task('1d4+1')).valid, true, 'a rollable amount');
+    const never = store.validateGatheringLibraryTask(task('1d4 - 10'));
+    assert.equal(never.valid, false, 'an amount that can never award anything');
+    assert.ok(never.resultErrors.some(error => error.includes('positive amount')));
+    assert.equal(store.validateGatheringLibraryTask(task('1d4]')).valid, false, 'an unrollable one');
+  } finally {
+    if (previous === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previous;
+  }
+});
+
 test('admin production reporting reads only the active gathering result source', async () => {
   const gatheringConfig = {
     systems: {

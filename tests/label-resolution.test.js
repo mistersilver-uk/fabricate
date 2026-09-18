@@ -250,6 +250,12 @@ test('TC8: resolveResultDescription returns component name instead of "Nx item"'
     `Expected "Health Potion" in description, got: "${description}"`);
   assert.ok(description.startsWith('2x'), `Expected "2x" prefix, got: "${description}"`);
 
+  // Issue 1645: a rolled amount has no previewed character, so the description states the
+  // expression instead of the authored fallback number.
+  const rolled = manager.resolveResultDescription(recipe, 'res-comp-1', 1, '1d4+1');
+  assert.ok(rolled.startsWith('1d4+1x'), `Expected the formula, got: "${rolled}"`);
+  assert.ok(rolled.includes('Health Potion'), 'and still the component name');
+
   teardownGame();
 });
 
