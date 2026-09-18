@@ -64,7 +64,7 @@ const BASE_SCAN = Object.freeze({
  * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor (issue 1371).
  */
 const SCAN_TOTALS = Object.freeze({
-  // #1648: eight unique tool/receipt reads in two engine files; #1666: four relocated files.
+  // #1648: eight unique tool/receipt reads in two engine files; #1666: five relocated files.
   matches: 183,
   lines: 165,
   files: 23,
