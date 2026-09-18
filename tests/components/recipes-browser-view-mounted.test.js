@@ -36,7 +36,9 @@ const RECIPE_RAW_MODULES = [
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
   'src/ui/model/recipeBrowserModel.js',
-  // recipeBrowserModel imports the shared category totals (issue 676).
+  // ... which since issue 1688 runs on the shared adapter-driven pipeline.
+  'src/ui/model/entityBrowserModel.js',
+  // entityBrowserModel imports the shared category totals (issue 676).
   'src/ui/model/browserGroupCounts.js',
   // ... and, since issue 1036, the shared page-window model too. Same consequence.
   'src/ui/model/browserPagination.js',
