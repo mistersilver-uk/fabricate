@@ -94,6 +94,7 @@ import {
   permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
 import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
+import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,
