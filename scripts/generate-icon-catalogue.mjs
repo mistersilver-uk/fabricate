@@ -236,16 +236,14 @@ function resolveBundle(argument) {
 }
 
 /** Everything the generator reports about the bundle it measured. */
-function measureBundle({ foundryVersion, rules, definitions, offered, brandCodepoints, classic }) {
+function measureBundle({ foundryVersion, rules, definitions, offered, brandCodepoints }) {
   return {
     foundryVersion,
     glyphRules: rules.length,
     declaredNames: rules.reduce((total, rule) => total + rule.names.length, 0),
-    multiNameRules: rules.filter((rule) => rule.names.length > 1).length,
     classicGlyphs: definitions.length,
     offeredGlyphs: offered.length,
     brandGlyphs: rules.filter((rule) => brandCodepoints.has(rule.codepoint)).length,
-    classicFaceCodepoints: classic.size,
   };
 }
 
@@ -294,7 +292,6 @@ function main() {
     definitions,
     offered,
     brandCodepoints,
-    classic: classicCodepoints,
   });
 
   const rendered = renderCatalogueJson({

@@ -1,6 +1,6 @@
-// GENERATED — do not hand-edit `foundryIconCatalogue.json`. Regenerate both with `node
-// scripts/generate-icon-catalogue.mjs <foundry>/…/fonts/fontawesome`. Why the offered set is the
-// Foundry × Free intersection: `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`.
+// Hand-maintained loader over the GENERATED `foundryIconCatalogue.json`; do not hand-edit that.
+// Regenerate it with `node scripts/generate-icon-catalogue.mjs <foundry>/…/fonts/fontawesome`.
+// Why the set is Foundry × Free: `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`.
 
 import catalogue from './foundryIconCatalogue.json' with { type: 'json' };
 
