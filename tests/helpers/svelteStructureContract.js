@@ -7,27 +7,25 @@
  * Do not add a string `includes` on component source to a test. That is the shape
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
  *
- * The residue they deliberately do not address: exact JS expression text, a receiver that is a
- * loop variable rather than a literal, i18n key strings, and `.js`/`.mjs` targets.
+ * The residue they deliberately do not address: exact JS expression text, and a receiver that is a
+ * loop variable rather than a literal. An i18n key is a literal `containsLiteral` answers, and a
+ * `.js`/`.mjs` target is answered by the sibling predicates in `moduleAst.js` (issue 1691).
  */
 import { parse } from 'svelte/compiler';
 import { parseForESLint } from 'svelte-eslint-parser';
 
-import { walkNodes } from './moduleAst.js';
+import {
+  declaredConstant as declaresConstant,
+  importedModules as importedModuleSpecifiers,
+  lazilyImportedModules,
+  literalStrings,
+  referencesIdentifier as namesIdentifier,
+  walkNodes,
+} from './moduleAst.js';
 import { attributeNamed, walkElements } from './svelteTemplateScan.js';
 
 /** Directives that genuinely bind a prop; `class:`, `style:`, `use:`, `on:` and friends do not. */
 const PROP_DIRECTIVES = Object.freeze(new Set(['BindDirective']));
-
-/** Declaration nodes that name a module the component depends on. */
-const SPECIFIER_TYPES = Object.freeze([
-  'ImportDeclaration',
-  'ExportNamedDeclaration',
-  'ExportAllDeclaration',
-]);
-
-/** Keys that make the tree cyclic or carry no child nodes. */
-const SKIPPED_KEYS = Object.freeze(['parent', 'loc', 'range']);
 
 /** Parse one component's source into the AST the predicates below read. */
 export function parseComponent(source) {
@@ -116,35 +114,87 @@ export function passesProp(ast, componentName, propName) {
   return occurrences.every((node) => declaresAttribute(node, propName));
 }
 
+/** Both script blocks, in source order; the two places a component may declare or import. */
+function scriptBodies(ast) {
+  return [ast.instance?.content?.body ?? [], ast.module?.content?.body ?? []];
+}
+
+/** The scripts and the template: everywhere a component spells code. */
+function codeParts(ast) {
+  return [...scriptBodies(ast), ast.fragment ?? {}];
+}
+
 /**
  * Every module specifier the component depends on: both script blocks, static and dynamic imports,
  * and re-exports.
  */
 export function importedModules(ast) {
-  const specifiers = [];
-  const visit = (node) => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) {
-      for (const child of node) visit(child);
-      return;
-    }
-    if (SPECIFIER_TYPES.includes(node.type) && node.source?.value) {
-      specifiers.push(node.source.value);
-    }
-    if (node.type === 'ImportExpression' && node.source?.type === 'Literal') {
-      specifiers.push(node.source.value);
-    }
-    for (const [key, value] of Object.entries(node)) {
-      if (SKIPPED_KEYS.includes(key)) continue;
-      if (value && typeof value === 'object') visit(value);
-    }
-  };
-  visit(ast.instance?.content?.body ?? []);
-  visit(ast.module?.content?.body ?? []);
-  return specifiers;
+  return scriptBodies(ast).flatMap((body) => [
+    ...importedModuleSpecifiers(body),
+    ...lazilyImportedModules(body),
+  ]);
 }
 
 /** Whether the component imports or re-exports the given module specifier. */
 export function importsModule(ast, specifier) {
   return importedModules(ast).includes(specifier);
+}
+
+/** Whether either script, or a `{@const}`, declares `const <name>`. */
+export function declaredConstant(ast, name) {
+  return codeParts(ast).some((part) => declaresConstant(part, name));
+}
+
+/** Whether the component names this identifier in a script or a template expression. */
+export function referencesIdentifier(ast, name) {
+  return codeParts(ast).some((part) => namesIdentifier(part, name));
+}
+
+/**
+ * Whether the component spells this text in any literal it carries — a JS string, a template
+ * chunk, a static attribute value or template text. Deliberately a substring match, because the
+ * claims it answers are mostly absences and a looser needle makes an absence harder to fake.
+ */
+export function containsLiteral(ast, text) {
+  const needle = String(text);
+  return codeParts(ast).some((part) => {
+    if (literalStrings(part).some((literal) => literal.includes(needle))) return true;
+    for (const node of walkNodes(part)) {
+      if (node.type === 'Text' && String(node.data ?? '').includes(needle)) return true;
+    }
+    return false;
+  });
+}
+
+/** The host objects through which a Foundry global is also legitimately reached. */
+const GLOBAL_HOSTS = Object.freeze(new Set(['globalThis', 'window', 'self']));
+
+/** The property a member expression reads, for a plain name or a string-literal index. */
+function memberName(node) {
+  if (!node.computed) return node.property?.type === 'Identifier' ? node.property.name : undefined;
+  return node.property?.type === 'Literal' && typeof node.property.value === 'string'
+    ? node.property.value
+    : undefined;
+}
+
+/**
+ * Whether a component reads the named global, on the scope-resolved parse `parseComponentScope`
+ * returns. Both legs are required: a free reference (`game.user` in the template) and a member read
+ * off a free host (`globalThis.game.user`, the prevailing form). Scope resolution is what makes a
+ * local `const game`, an `obj.game` property and an object key named `game` all answer false.
+ */
+export function readsGlobal({ ast, scopeManager }, name) {
+  const free = scopeManager?.globalScope?.through ?? [];
+  if (free.some((reference) => reference.identifier?.name === name)) return true;
+  const hosts = new Set(
+    free
+      .filter((reference) => GLOBAL_HOSTS.has(reference.identifier?.name))
+      .map((reference) => reference.identifier)
+  );
+  for (const node of walkNodes(ast)) {
+    if (node.type === 'MemberExpression' && hosts.has(node.object) && memberName(node) === name) {
+      return true;
+    }
+  }
+  return false;
 }

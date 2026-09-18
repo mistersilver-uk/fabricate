@@ -16,12 +16,24 @@ import {
   moduleAstsIn,
 } from './helpers/parsedSource.js';
 import {
+  declaredConstant as declaredConstantOf,
+  importsModule as importsModuleOf,
+  importsModuleLazily,
+  parseModule,
+  referencesIdentifier as referencesIdentifierOf,
+} from './helpers/moduleAst.js';
+import {
   carriesSpread,
+  containsLiteral,
+  declaredConstant,
   declaresAttribute,
   importedModules,
   importsModule,
   parseComponent,
+  parseComponentScope,
   passesProp,
+  readsGlobal,
+  referencesIdentifier,
   renderedComponents,
   renderedElements,
   rendersComponent,
@@ -198,4 +210,110 @@ test('the seam header still forbids the one text-shaped route an AST return leav
   );
   assert.match(header, /returns ASTs and never source\s+\* text/);
   assert.match(header, /JSON\.stringify\(ast\)\.includes/);
+});
+
+/** `game` read once per place a component can spell code, so each leg is proved alone. */
+const GLOBAL_READ_FIXTURES = Object.freeze({
+  'the instance script': "<script>const who = game.user.name;</script><div>{who}</div>",
+  'the module script': "<script module>export const who = game.user.name;</script><div />",
+  'a template expression': '<div>{game.user.name}</div>',
+  'a host member read': '<script>const who = globalThis.game.user.name;</script><div>{who}</div>',
+  'a computed host read': "<script>const who = globalThis['game'].user;</script><div>{who}</div>",
+});
+
+for (const [place, source] of Object.entries(GLOBAL_READ_FIXTURES)) {
+  test(`readsGlobal sees a Foundry global read in ${place}`, () => {
+    assert.equal(readsGlobal(parseComponentScope(source), 'game'), true);
+  });
+}
+
+/** The three shapes a `\bgame\b` regex called reads and a scope-resolved predicate must not. */
+const GLOBAL_NEGATIVE_FIXTURES = Object.freeze({
+  'a local binding of the same name': '<script>const game = { user: 1 };</script><div>{game.user}</div>',
+  'a member property of another object': '<script>const who = props.game.user;</script><div>{who}</div>',
+  'an object-literal key': '<script>const bag = { game: 1 };</script><div>{bag.game}</div>',
+});
+
+for (const [shape, source] of Object.entries(GLOBAL_NEGATIVE_FIXTURES)) {
+  test(`readsGlobal denies ${shape}`, () => {
+    assert.equal(readsGlobal(parseComponentScope(source), 'game'), false);
+  });
+}
+
+test('readsGlobal answers per name, and the manager root reads none of the four', () => {
+  const root = componentScopeOf(ROOT_COMPONENT);
+  for (const name of ['game', 'ui', 'Hooks', 'CONFIG']) {
+    assert.equal(readsGlobal(root, name), false, `the root must not read ${name}`);
+  }
+  // A host read the name set deliberately EXCLUDES, proving the predicate would have seen it.
+  assert.equal(readsGlobal(root, 'foundry'), true, 'the root does reach globalThis.foundry.utils');
+});
+
+/** One fixture for the three structural predicates the negatives converted onto. */
+const DECLARATION_FIXTURE = [
+  '<script module>',
+  "  const KIND = 'studio';",
+  '</script>',
+  '<script>',
+  '  const total = $derived(rows.length);',
+  '  let open = $state(false);',
+  '</script>',
+  '<div class="manager-shelf" data-shelf>',
+  '  {#each rows as row}',
+  '    {@const badge = badgeFor(row)}',
+  '    <span>{badge}</span>',
+  '  {/each}',
+  '  {KIND}{total}{open}',
+  '</div>',
+].join('\n');
+
+const declarations = parseComponent(DECLARATION_FIXTURE);
+
+test('declaredConstant reads both scripts and a template @const, and denies a let', () => {
+  assert.equal(declaredConstant(declarations, 'KIND'), true, 'the module script');
+  assert.equal(declaredConstant(declarations, 'total'), true, 'the instance script');
+  assert.equal(declaredConstant(declarations, 'badge'), true, 'a template @const');
+  assert.equal(declaredConstant(declarations, 'open'), false, 'a let is not a const');
+  assert.equal(declaredConstant(declarations, 'absent'), false);
+});
+
+test('referencesIdentifier reaches script and template alike, and denies one absent', () => {
+  assert.equal(referencesIdentifier(declarations, 'badgeFor'), true, 'a template call');
+  assert.equal(referencesIdentifier(declarations, 'rows'), true);
+  assert.equal(referencesIdentifier(declarations, 'openLegacySystemSettings'), false);
+});
+
+test('containsLiteral sees an attribute value, a class token and a script string', () => {
+  assert.equal(containsLiteral(declarations, 'manager-shelf'), true, 'an attribute value');
+  assert.equal(containsLiteral(declarations, 'studio'), true, 'a script string');
+  assert.equal(containsLiteral(declarations, 'manager-titlebar-icon'), false);
+});
+
+/** The module-AST half, on a fixture rather than on a production file that may move. */
+const MODULE_FIXTURE = [
+  "import { registerApp } from './registry.js';",
+  "export * from './surface.js';",
+  'const LOADER = async () => {',
+  "  const mod = await import('./lazy.js');",
+  '  return mod.default;',
+  '};',
+  'let counter = 0;',
+  'export { LOADER, counter, registerApp };',
+].join('\n');
+
+const moduleFixture = parseModule(MODULE_FIXTURE).ast;
+
+test('the module predicates separate a static import from a lazy one', () => {
+  assert.equal(importsModuleOf(moduleFixture, './registry.js'), true);
+  assert.equal(importsModuleOf(moduleFixture, './surface.js'), true, 'a re-export counts');
+  assert.equal(importsModuleOf(moduleFixture, './lazy.js'), false, 'a dynamic import is not static');
+  assert.equal(importsModuleLazily(moduleFixture, './lazy.js'), true);
+  assert.equal(importsModuleLazily(moduleFixture, './registry.js'), false);
+});
+
+test('the module predicates answer for a constant and a named reference', () => {
+  assert.equal(declaredConstantOf(moduleFixture, 'LOADER'), true);
+  assert.equal(declaredConstantOf(moduleFixture, 'counter'), false, 'a let is not a const');
+  assert.equal(referencesIdentifierOf(moduleFixture, 'registerApp'), true);
+  assert.equal(referencesIdentifierOf(moduleFixture, 'SvelteRecipeManagerApp'), false);
 });

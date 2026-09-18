@@ -71,3 +71,62 @@ export function identifierNames(node) {
   for (const inner of walkNodes(node)) if (inner.type === 'Identifier') names.add(inner.name);
   return names;
 }
+
+/** Declaration nodes that name a module this one depends on, statically. */
+const SPECIFIER_TYPES = Object.freeze([
+  'ImportDeclaration',
+  'ExportNamedDeclaration',
+  'ExportAllDeclaration',
+]);
+
+/** Every module specifier a subtree names in a static import or a re-export. */
+export function importedModules(node) {
+  const specifiers = [];
+  for (const inner of walkNodes(node)) {
+    if (SPECIFIER_TYPES.includes(inner.type) && inner.source?.value) {
+      specifiers.push(inner.source.value);
+    }
+  }
+  return specifiers;
+}
+
+/** Every module specifier a subtree names in an `import(…)` with a literal argument. */
+export function lazilyImportedModules(node) {
+  const specifiers = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type === 'ImportExpression' && inner.source?.type === 'Literal') {
+      specifiers.push(inner.source.value);
+    }
+  }
+  return specifiers;
+}
+
+/**
+ * Whether a module statically imports or re-exports this specifier. Static and lazy are separate
+ * questions: a module deferred to its own chunk is imported one way and forbidden the other.
+ */
+export function importsModule(node, specifier) {
+  return importedModules(node).includes(specifier);
+}
+
+/** Whether a module reaches this specifier through a dynamic `import(…)`. */
+export function importsModuleLazily(node, specifier) {
+  return lazilyImportedModules(node).includes(specifier);
+}
+
+/**
+ * Whether a subtree mentions this name anywhere — including as a property key or a member name,
+ * which is what makes it sound for the absence claims it mostly serves.
+ */
+export function referencesIdentifier(node, name) {
+  return identifierNames(node).has(name);
+}
+
+/** Whether a subtree declares `const <name>`, wherever the declaration sits. */
+export function declaredConstant(node, name) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'VariableDeclaration' || inner.kind !== 'const') continue;
+    if (inner.declarations.some((declarator) => declarator.id?.name === name)) return true;
+  }
+  return false;
+}
