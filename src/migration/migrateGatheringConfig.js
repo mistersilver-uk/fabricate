@@ -4,16 +4,14 @@
  * `normalizeSystemVocabularies` falls back to top-level vocab, it propagates into every system.
  */
 
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
+import { isPlainObject } from './migrationHelpers.js';
 
 /** A deep-cloned config with `regions` cleared; a non-object or absent `vocabularies` passes through. */
 export function migrateGatheringConfig(config) {
-  if (!_isPlainObject(config)) return config;
+  if (!isPlainObject(config)) return config;
 
   const cloned = JSON.parse(JSON.stringify(config));
-  if (_isPlainObject(cloned.vocabularies)) {
+  if (isPlainObject(cloned.vocabularies)) {
     cloned.vocabularies.regions = [];
   }
   return cloned;

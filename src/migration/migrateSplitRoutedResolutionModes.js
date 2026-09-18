@@ -6,6 +6,8 @@
  * routing surfaces as a validation issue. The salvage and gathering `routed` tokens are unrelated.
  */
 
+import { isPlainObject } from './migrationHelpers.js';
+
 export function migrateSplitRoutedResolutionModes(data = {}) {
   const systems = _clone(data.systems);
   const recipes = _clone(data.recipes);
@@ -20,7 +22,7 @@ export function migrateSplitRoutedResolutionModes(data = {}) {
   // BEFORE any provider field is dropped, then rewrite the system token.
   const modeBySystemId = new Map();
   for (const system of systems) {
-    if (!_isPlainObject(system) || system.resolutionMode !== 'routed') continue;
+    if (!isPlainObject(system) || system.resolutionMode !== 'routed') continue;
     const systemId = String(system.id);
     const target = _chooseSystemMode(recipeList, systemId);
     modeBySystemId.set(systemId, target);
@@ -32,7 +34,7 @@ export function migrateSplitRoutedResolutionModes(data = {}) {
   }
 
   for (const recipe of recipeList) {
-    if (!_isPlainObject(recipe)) continue;
+    if (!isPlainObject(recipe)) continue;
     const target = modeBySystemId.get(String(recipe.craftingSystemId));
     if (!target) continue;
     _reconcileRecipe(recipe, target);
@@ -49,7 +51,7 @@ function _chooseSystemMode(recipes, systemId) {
   let ingredientCount = 0;
   let checkCount = 0;
   for (const recipe of recipes) {
-    if (!_isPlainObject(recipe) || String(recipe.craftingSystemId) !== systemId) continue;
+    if (!isPlainObject(recipe) || String(recipe.craftingSystemId) !== systemId) continue;
     const provider = recipe.resultSelection?.provider;
     if (provider === 'check') checkCount += 1;
     else if (provider === 'ingredientSet') ingredientCount += 1;
@@ -78,10 +80,6 @@ function _logReconciledRecipe(recipe, target) {
       craftingSystemId: recipe.craftingSystemId,
     })} into ${target}; its routing must be re-authored for the new basis (surfaced as a validation issue).`
   );
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

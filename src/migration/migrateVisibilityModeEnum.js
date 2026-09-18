@@ -5,6 +5,9 @@
  * The legacy `recipeVisibility` block is intentionally NOT removed — its residual
  * `knowledge.learn.dragDropEnabled` is still normalized on read.
  */
+
+import { isPlainObject } from './migrationHelpers.js';
+
 export function migrateVisibilityModeEnum(data = {}) {
   const systems = _clone(data.systems);
 
@@ -13,7 +16,7 @@ export function migrateVisibilityModeEnum(data = {}) {
   }
 
   for (const system of systems) {
-    if (!_isPlainObject(system)) continue;
+    if (!isPlainObject(system)) continue;
     if (typeof system.visibilityMode === 'string' && system.visibilityMode) continue;
     system.visibilityMode = _deriveVisibilityMode(system.recipeVisibility);
   }
@@ -26,7 +29,7 @@ export function migrateVisibilityModeEnum(data = {}) {
  * `'knowledge'` default.
  */
 function _deriveVisibilityMode(recipeVisibility) {
-  const listMode = _isPlainObject(recipeVisibility) ? recipeVisibility.listMode : undefined;
+  const listMode = isPlainObject(recipeVisibility) ? recipeVisibility.listMode : undefined;
   switch (listMode) {
     case 'global': {
       return 'global';
@@ -44,10 +47,6 @@ function _deriveVisibilityMode(recipeVisibility) {
       return 'knowledge';
     }
   }
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

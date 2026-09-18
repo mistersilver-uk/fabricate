@@ -10,6 +10,8 @@ import {
   resolveMaxModifierPicks,
 } from '../systems/checkModifierResolver.js';
 
+import { isPlainObject } from './migrationHelpers.js';
+
 /** The one combination rule whose historical behaviour was a bound of exactly one pick. */
 const HISTORICALLY_SINGLE_PICK_POLICY = 'playerPicks';
 
@@ -18,18 +20,14 @@ const HISTORICAL_PICK_LIMIT = 1;
 
 const MAX_PICKS_KEY = 'maxModifierPicks';
 
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 /**
  * Apply the whole `1.20.0` transform to ONE system, mutated in place, shared with
  * `migrateExportPayload.js`. It DELIBERATELY DOES NOT SEED A MISSING CHECK BLOCK, the same call two
  * sibling migrations make, and both reads go through the resolver rather than re-deriving its rules.
  */
 export function applyMaxModifierPicks(system) {
-  if (!_isPlainObject(system)) return;
-  const check = _isPlainObject(system.craftingCheck) ? system.craftingCheck : null;
+  if (!isPlainObject(system)) return;
+  const check = isPlainObject(system.craftingCheck) ? system.craftingCheck : null;
   if (!check) return;
   if (normalizeModifierPolicy(check.defaultModifierPolicy) !== HISTORICALLY_SINGLE_PICK_POLICY) {
     return;

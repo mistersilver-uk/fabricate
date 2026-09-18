@@ -6,6 +6,8 @@
 
 import { normalizeModifierPolicy } from '../systems/checkModifierResolver.js';
 
+import { isPlainObject } from './migrationHelpers.js';
+
 /** The same spelling at two scopes: inside `craftingCheck` before, on the system after. */
 const LEGACY_CATALOGUE_KEY = 'checkModifiers';
 const SYSTEM_CATALOGUE_KEY = 'checkModifiers';
@@ -13,14 +15,10 @@ const SYSTEM_CATALOGUE_KEY = 'checkModifiers';
 /** The rule token this migration rewrites. */
 const LEGACY_POLICY = 'byRecipe';
 
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 /** Apply the `1.22.0` transform to ONE system in place, shared with `migrateExportPayload.js`. */
 export function applySystemCheckModifierCatalogue(system) {
-  if (!_isPlainObject(system)) return;
-  const check = _isPlainObject(system.craftingCheck) ? system.craftingCheck : null;
+  if (!isPlainObject(system)) return;
+  const check = isPlainObject(system.craftingCheck) ? system.craftingCheck : null;
 
   // A MALFORMED LEGACY VALUE IS SKIPPED, NOT DELETED: deleting it is a REPAIR, and this pass would
   // be destroying data it cannot read. GUARDED, so an authored system-level catalogue is never

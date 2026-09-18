@@ -34,8 +34,8 @@ const CONSOLIDATED = {
   untrimmedStringOrNull: [CANONICAL],
 };
 
-/** Names no longer declared anywhere under `src/`; hub modules re-publish them as aliases. */
-const RETIRED = ['normalizeList', 'numberOrNullStrict', 'trimmed'];
+/** Names no longer declared under `src/`: a hub re-publishes some as aliases, and a private copy like `_isPlainObject` is imported from its shared equivalent instead. */
+const RETIRED = ['_isPlainObject', 'normalizeList', 'numberOrNullStrict', 'trimmed'];
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 

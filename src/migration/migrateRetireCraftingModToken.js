@@ -14,6 +14,7 @@ import {
   planRetiredPlaceholderStrip,
 } from '../utils/craftingCheckExpression.js';
 
+import { isPlainObject } from './migrationHelpers.js';
 import { finishMigrationNotice, localizeNoticeClause } from './migrationNoticeDetail.js';
 
 /** Every check block and slot swept. Gathering has no `simple` slot — its `d100` authors nothing. */
@@ -29,10 +30,6 @@ const ROUTED_LEGACY_FORMULA_KEY = 'rollExpression';
 /** The formula keys swept on each slot; only `routed` carries the legacy alias. */
 function formulaKeysFor(slot) {
   return slot === 'routed' ? ['rollFormula', ROUTED_LEGACY_FORMULA_KEY] : ['rollFormula'];
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** A zeroed count bag. Named so the three producers below cannot drift on key spelling. */
@@ -76,7 +73,7 @@ function retireFormulaField(config, key, counts) {
  * SET rather than a non-empty catalogue (requirement 5). Must run BEFORE the strip.
  */
 function countInertActiveCraftingCheck(system) {
-  const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : null;
+  const check = isPlainObject(system?.craftingCheck) ? system.craftingCheck : null;
   if (!check) return 0;
   // The context is BUILT by the shared builder, never hand-mirrored, and `null` for the subject
   // because no migration can see a recipe's pick. THE `??` CHAIN MUST COVER ALL THREE LIBRARY
@@ -107,15 +104,15 @@ function countInertActiveCraftingCheck(system) {
  */
 export function applyRetireCraftingModToken(system) {
   const counts = emptyCounts();
-  if (!_isPlainObject(system)) return counts;
+  if (!isPlainObject(system)) return counts;
 
   counts.inert = countInertActiveCraftingCheck(system);
 
   for (const [blockKey, slots] of SWEPT_CHECK_SLOTS) {
-    const block = _isPlainObject(system[blockKey]) ? system[blockKey] : null;
+    const block = isPlainObject(system[blockKey]) ? system[blockKey] : null;
     if (!block) continue;
     for (const slot of slots) {
-      const config = _isPlainObject(block[slot]) ? block[slot] : null;
+      const config = isPlainObject(block[slot]) ? block[slot] : null;
       if (!config) continue;
       for (const key of formulaKeysFor(slot)) retireFormulaField(config, key, counts);
     }

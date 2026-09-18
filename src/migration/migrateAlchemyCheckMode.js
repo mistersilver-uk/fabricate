@@ -6,6 +6,8 @@
  * recipe COLLAPSES to its first set — distinct from a multi-STEP one, which stays unsupported.
  */
 
+import { isPlainObject } from './migrationHelpers.js';
+
 const VALID_CHECK_MODES = new Set(['none', 'simple', 'tiered']);
 
 export function migrateAlchemyCheckMode(data = {}) {
@@ -24,12 +26,12 @@ export function migrateAlchemyCheckMode(data = {}) {
   for (const system of systems) {
     if (!_isAlchemySystem(system)) continue;
     const systemRecipes = recipes.filter(
-      (recipe) => _isPlainObject(recipe) && recipe.craftingSystemId === system.id
+      (recipe) => isPlainObject(recipe) && recipe.craftingSystemId === system.id
     );
 
     // Seed the system-level checkMode from the recipe provider reduction, unless a
     // valid checkMode is already present (idempotency).
-    const alchemy = _isPlainObject(system.alchemy) ? system.alchemy : {};
+    const alchemy = isPlainObject(system.alchemy) ? system.alchemy : {};
     if (!VALID_CHECK_MODES.has(alchemy.checkMode)) {
       const hasCheckProvider = systemRecipes.some(
         (recipe) => recipe.resultSelection?.provider === 'check'
@@ -68,7 +70,7 @@ export function migrateAlchemyCheckMode(data = {}) {
 /** Whether a system is in alchemy mode (accepting the legacy `cauldron` alias). */
 function _isAlchemySystem(system) {
   return (
-    _isPlainObject(system) &&
+    isPlainObject(system) &&
     (system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron')
   );
 }
@@ -79,10 +81,6 @@ function _tieredGroupCount(recipe) {
   return groups.filter(
     (group) => Array.isArray(group?.checkOutcomeIds) && group.checkOutcomeIds.length > 0
   ).length;
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

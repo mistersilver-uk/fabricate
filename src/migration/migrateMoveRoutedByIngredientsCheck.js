@@ -6,6 +6,8 @@
  * SLOT, reading the RAW persisted shape and copying only present fields.
  */
 
+import { isPlainObject } from './migrationHelpers.js';
+
 export function migrateMoveRoutedByIngredientsCheck(data = {}) {
   const systems = _clone(data.systems);
 
@@ -14,7 +16,7 @@ export function migrateMoveRoutedByIngredientsCheck(data = {}) {
   }
 
   for (const system of systems) {
-    if (!_isPlainObject(system) || system.resolutionMode !== 'routedByIngredients') continue;
+    if (!isPlainObject(system) || system.resolutionMode !== 'routedByIngredients') continue;
     _moveCheckSlot(system);
   }
 
@@ -27,13 +29,13 @@ export function migrateMoveRoutedByIngredientsCheck(data = {}) {
  */
 function _moveCheckSlot(system) {
   const check = system.craftingCheck;
-  if (!_isPlainObject(check)) return;
+  if (!isPlainObject(check)) return;
 
-  const routed = _isPlainObject(check.routed) ? check.routed : null;
+  const routed = isPlainObject(check.routed) ? check.routed : null;
   const routedFormula = typeof routed?.rollFormula === 'string' ? routed.rollFormula.trim() : '';
   if (!routed || routedFormula.length === 0) return;
 
-  const existingSimple = _isPlainObject(check.simple) ? check.simple : null;
+  const existingSimple = isPlainObject(check.simple) ? check.simple : null;
   const simpleFormula =
     typeof existingSimple?.rollFormula === 'string' ? existingSimple.rollFormula.trim() : '';
   // Never clobber a GM-authored simple check; idempotent once simple is authored.
@@ -64,10 +66,6 @@ function _moveCheckSlot(system) {
     `Fabricate | migrateMoveRoutedByIngredientsCheck: moved routedByIngredients pass/fail check ` +
       `routed → simple for system ${JSON.stringify({ id: system.id, name: system.name })}`
   );
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {
