@@ -29,6 +29,7 @@ globalThis.foundry = {
 };
 
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
+const { seededRollClass } = await import('./helpers/seededRoll.js');
 
 const SYSTEM_ID = 'sys-780';
 
@@ -343,4 +344,61 @@ test('a planned component award carries componentId so it survives to the card a
   assert.equal(planned[0].itemUuid, null, 'no uuid yet — the document does not exist');
   assert.equal(planned[0].componentId, SOURCELESS_COMPONENT.id, 'componentId is the identity');
   assert.equal(planned[0].quantity, 3);
+});
+
+test('1645: a gathering attempt rolls each amount once across plan() and create()', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll, calls } = seededRollClass({ totals: { '1d4+2': 5, '1d6': 2 } });
+  const previous = globalThis.Roll;
+  globalThis.Roll = Roll;
+  try {
+    const actor = capturingActor();
+    const resultGroups = [
+      {
+        results: [
+          { componentId: SOURCELESS_COMPONENT.id, quantity: 1, quantityFormula: '1d4+2' },
+          { componentId: SOURCELESS_COMPONENT.id, quantity: 9, quantityFormula: '1d6' },
+        ],
+      },
+    ];
+    const creator = createGatheringResultCreator(managerWith(system));
+    const planned = await creator.plan({ actor, system, resultGroups });
+    const created = await creator.create({ actor, system, resultGroups });
+
+    assert.deepEqual(
+      calls.map((call) => call.formula),
+      ['1d4+2', '1d6'],
+      'ONE roll per result across both passes — create() consumes the plan'
+    );
+    assert.deepEqual(planned.map((ref) => ref.quantity), [5, 2], 'the plan states the roll');
+    assert.deepEqual(planned[0].rolled, { formula: '1d4+2', total: 5 });
+    assert.deepEqual(created.map((receipt) => receipt.quantity), [5, 2], 'and the award matches');
+  } finally {
+    if (previous === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previous;
+  }
+});
+
+test('1645: a gathered amount that rolls to zero creates no item', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll } = seededRollClass({ totals: { '1d4-8': -3 } });
+  const previous = globalThis.Roll;
+  globalThis.Roll = Roll;
+  try {
+    const actor = capturingActor();
+    const created = await createGatheringResultCreator(managerWith(system)).create({
+      actor,
+      system,
+      resultGroups: [
+        { results: [{ componentId: SOURCELESS_COMPONENT.id, quantity: 4, quantityFormula: '1d4-8' }] },
+      ],
+    });
+    assert.equal(actor.captured.length, 0, 'nothing is created for an empty award');
+    assert.equal(created.length, 0, 'and no receipt claims one was');
+  } finally {
+    if (previous === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previous;
+  }
 });

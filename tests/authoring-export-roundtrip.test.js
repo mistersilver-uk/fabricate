@@ -35,6 +35,8 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
           id: 'result-herb',
           componentId: 'comp-herb',
           quantity: 3,
+          // Issue 1645: a rolled amount must survive export → import → export verbatim.
+          quantityFormula: '1d4+1',
           propertyMacroUuid: 'Macro.herb-properties'
         }
       ]
@@ -156,6 +158,11 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const task = second.gatheringConfig.system.tasks.find((entry) => entry.name === 'Forage Herbs');
   assert.equal(task.resolutionMode, 'routed');
   assert.deepEqual(task.resultGroups, sourceTask.resultGroups);
+  assert.equal(
+    task.resultGroups[0].results[0].quantityFormula,
+    '1d4+1',
+    'a rolled amount survives export → import → export verbatim (issue 1645)'
+  );
   assert.deepEqual(
     task.checkModifierIds,
     ['mod-medicine', 'mod-alchemy'],

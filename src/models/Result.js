@@ -1,7 +1,20 @@
-/**
- * Represents an item produced by a recipe
- * Recipes can produce multiple different items
- */
+import { hasRollDataPath, maximisedTotal } from '../utils/rollFormulaRollability.js';
+
+import { isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
+
+/** Serialized result fields the constructor rebuilds to EXACTLY this value from absence, so
+ *  emitting them is pure payload weight (issue 1135). */
+export const RESULT_OMITTED_WHEN_DEFAULT = {
+  quantityFormula: isNull,
+};
+
+/** The persisted form of an amount formula: a trimmed non-empty string, or `null` for absent. */
+export function normalizeQuantityFormula(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text.length > 0 ? text : null;
+}
+
+/** An item a recipe produces; a recipe can produce several. */
 export class Result {
   constructor(data = {}) {
     this.id = data.id || foundry.utils.randomID();
@@ -12,15 +25,18 @@ export class Result {
     // Foundry Source UUID (core.sourceId flag) of item to create
     this.itemUuid = data.itemUuid || null;
 
-    // Number of items created
     this.quantity = data.quantity || 1;
 
-    // Macro-based property calculation
+    // Presence is the mode: a non-empty formula ROLLS the amount and `quantity` becomes the
+    // authored fallback. `''` and whitespace ARE absence, so the two on-disk states are one.
+    this.quantityFormula = normalizeQuantityFormula(data.quantityFormula);
+
     this.propertyMacroUuid = data.propertyMacroUuid || null;
   }
 
-  /** Validate that this result has all required data */
-  validate() {
+  /** `Roll` is INJECTED: with none, nothing is reported about `quantityFormula`, because a missing
+   *  dice engine can decide no formula and no actor-free reading can decide a path-bearing one. */
+  validate({ Roll } = {}) {
     const errors = [];
 
     if (!this.itemUuid && !this.componentId) {
@@ -29,6 +45,15 @@ export class Result {
 
     if (typeof this.quantity !== 'number' || this.quantity <= 0) {
       errors.push('Result quantity must be a positive number');
+    }
+
+    if (this.quantityFormula && typeof Roll === 'function') {
+      const maximum = maximisedTotal(this.quantityFormula, Roll);
+      if (maximum === null) {
+        errors.push('Result quantity formula cannot be rolled');
+      } else if (maximum <= 0 && !hasRollDataPath(this.quantityFormula)) {
+        errors.push('Result quantity formula can never award a positive amount');
+      }
     }
 
     if (this.propertyMacroUuid !== null && typeof this.propertyMacroUuid !== 'string') {
@@ -41,20 +66,23 @@ export class Result {
     };
   }
 
-  /** Get a simple description of this result */
   getDescription() {
     return `${this.quantity}x item`;
   }
 
   toJSON() {
-    return {
-      id: this.id,
-      componentId: this.componentId,
-      systemItemId: this.componentId,
-      itemUuid: this.itemUuid,
-      quantity: this.quantity,
-      propertyMacroUuid: this.propertyMacroUuid,
-    };
+    return omitReconstructibleDefaults(
+      {
+        id: this.id,
+        componentId: this.componentId,
+        systemItemId: this.componentId,
+        itemUuid: this.itemUuid,
+        quantity: this.quantity,
+        quantityFormula: this.quantityFormula,
+        propertyMacroUuid: this.propertyMacroUuid,
+      },
+      RESULT_OMITTED_WHEN_DEFAULT
+    );
   }
 
   static fromJSON(data) {

@@ -7,22 +7,24 @@
  */
 
 import { stampItemDataRoleIdentity } from './config/flags.js';
-// Routed onto the configured stack-quantity path (issue 1024) but deliberately NOT consolidated onto
-// `createOrStackComponentItem`: the absent-field default and the stack-match resolution both differ.
+// On the configured stack-quantity path (issue 1024), deliberately NOT consolidated onto
+// `createOrStackComponentItem`: the absent-field default and stack-match resolution both differ.
 import {
   hasStackQuantity,
   setStackQuantity,
 } from './systems/itemStackQuantity.js';
+import { resolveRolledAmount } from './systems/rolledAmountResolver.js';
 import { createItemReceiptCollector, receiptQuantity, writeItemAward, unconfirmedHistoryError } from './systems/runHistoryEvidence.js';
 import { resolvedComponentsFor } from './systems/scopedEntityReads.js';
+import { diceEngine } from './utils/rollFormulaRollability.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 
 export function flattenGatheringResults(resultGroups = []) {
   return resultGroups.flatMap((group) => (Array.isArray(group?.results) ? group.results : []));
 }
 
-// The awarding system's component set, exactly as `resolveGatheringResultSource` resolves it: the
-// stack guard must be handed this and `system.id`, or a fresh award can fold wrongly (issue 556).
+// The awarding system's component set: the stack guard must be handed this and `system.id`, or a
+// fresh award can fold wrongly (issue 556).
 export function resolveGatheringSystemComponents(system, craftingSystemManager) {
   const own = resolvedComponentsFor(system);
   if (own.length > 0) return own;
@@ -77,10 +79,7 @@ function stringOrNull(value) {
   return text.length > 0 ? text : null;
 }
 
-/**
- * Resolve every row up front so an unresolvable one is caught BEFORE anything is created, answering
- * `{ awards, unresolved }`.
- */
+/** Every row resolved up front, so an unresolvable one is caught BEFORE anything is created. */
 function resolveAllResults(resultGroups, system, craftingSystemManager) {
   const awards = [];
   const unresolved = [];
@@ -113,11 +112,9 @@ export function normalizeFoundryCollection(collection) {
   return [];
 }
 
-/**
- * `componentId` is carried so a ref built BEFORE creation still has an identity: a planned award
- * resolving to a bare component has no `uuid` yet, and a uuid-only identity emptied the chat card
- * and run journal for a gather that did award items.
- */
+/** `componentId` is carried so a ref built BEFORE creation still has an identity: a planned award
+ *  resolving to a bare component has no `uuid` yet, and a uuid-only identity emptied the chat card
+ *  and run journal for a gather that did award items. */
 export function gatheringRunItemRef(actor, item, quantity = null, componentId = null) {
   const ref = {
     actorUuid: actor?.uuid ?? null,
@@ -136,9 +133,15 @@ export function gatheringRunItemRef(actor, item, quantity = null, componentId = 
 }
 
 export function createGatheringResultCreator(craftingSystemManager) {
+  // `plan()` rolls each amount ONCE per attempt and parks the outcome against the live result row
+  // `create()` is handed, so the journalled plan and the awarded stack are the same number rather
+  // than two independent rolls (issue 1645). A plan-less award resolves in `create()` instead.
+  const planned = new WeakMap();
+  const resolveAmount = (result, actor) =>
+    resolveRolledAmount(result, actor, { Roll: diceEngine() });
   return {
-    // Unresolved rows are DIAGNOSTICS, never a quietly shortened list: the engine turns them into a
-    // blocked start BEFORE the node and stamina are committed, so a broken row costs nothing.
+    // Unresolved rows are DIAGNOSTICS, never a shortened list: the engine turns them into a blocked
+    // start BEFORE the node and stamina are committed, so a broken row costs nothing.
     async plan({ actor, system, resultGroups = [] } = {}) {
       const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
       if (unresolved.length > 0) {
@@ -150,10 +153,17 @@ export function createGatheringResultCreator(craftingSystemManager) {
           })),
         };
       }
-      return awards.map((award) => ({
-        ...gatheringRunItemRef(actor, award.source, award.result.quantity ?? 1, award.componentId),
-        resultRowId: award.result.resultRowId ?? null, sourceItemUuid: award.source.uuid ?? null,
-      }));
+      const refs = [];
+      for (const award of awards) {
+        const { amount, rolled } = await resolveAmount(award.result, actor);
+        planned.set(award.result, { amount, rolled });
+        refs.push({
+          ...gatheringRunItemRef(actor, award.source, amount ?? 1, award.componentId),
+          resultRowId: award.result.resultRowId ?? null, sourceItemUuid: award.source.uuid ?? null,
+          ...(rolled && { rolled }),
+        });
+      }
+      return refs;
     },
 
     async create({ actor, system, resultGroups = [] } = {}) {
@@ -172,7 +182,8 @@ export function createGatheringResultCreator(craftingSystemManager) {
       try {
       for (const award of awards) {
         const { result, source, componentId } = award;
-        const quantity = receiptQuantity(result.quantity ?? 1);
+        const { amount } = planned.get(result) ?? (await resolveAmount(result, actor));
+        const quantity = receiptQuantity(amount ?? 1);
         if (quantity === null) throw unconfirmedHistoryError('Invalid gathering award quantity');
         if (quantity === 0) continue;
         const identity = { actorUuid: actor.uuid, componentId, resultRowId: result.resultRowId ?? null,

@@ -33,6 +33,7 @@ import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
+import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
@@ -73,6 +74,7 @@ import {
 } from './itemStackQuantity.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
@@ -756,7 +758,7 @@ export class CraftingEngine {
           : null;
       if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
     }
-    const validation = recipe.validate?.() ?? { valid: true, errors: [] };
+    const validation = recipe.validate?.({ Roll: diceEngine() }) ?? { valid: true, errors: [] };
     if (validation.valid) return null;
     return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
   }
@@ -2787,8 +2789,7 @@ export class CraftingEngine {
       };
     }
 
-    // Validate the recipe
-    const validation = recipe.validate();
+    const validation = recipe.validate({ Roll: diceEngine() });
     if (!validation.valid) {
       return {
         success: false,
@@ -5598,10 +5599,8 @@ export class CraftingEngine {
   }
 
   /**
-   * Create the result items based on recipe configuration. The three essence-resolution inputs
-   * travel together in one trailing options bag, matching {@link CraftingEngine#_createSingleResult}:
-   * only the time-gated FINISH path supplies the snapshot pair at all.
-   * @private
+   * The three essence-resolution inputs travel in one trailing options bag, matching
+   * {@link CraftingEngine#_createSingleResult}; only the time-gated FINISH path supplies them.
    */
   async _createResultItems(
     craftingActor,
@@ -5638,6 +5637,7 @@ export class CraftingEngine {
     const groupsToCreate = Array.isArray(resolved?.groups) ? resolved.groups : [];
 
     const createdItems = [];
+    const rolledAmounts = [];
     const receiptCollector = createItemReceiptCollector();
     try {
       for (const group of groupsToCreate) {
@@ -5652,7 +5652,14 @@ export class CraftingEngine {
               ...checkResult,
               resolutionMeta: resolved?.meta || {},
             },
-            { step, precomputedEssences, essenceEnabled, resolveComponent, receiptCollector }
+            {
+              step,
+              precomputedEssences,
+              essenceEnabled,
+              resolveComponent,
+              receiptCollector,
+              rolledAmounts,
+            }
           );
 
           // Return each physical Item once; the collector retains every row's delta.
@@ -5668,13 +5675,11 @@ export class CraftingEngine {
     return {
       items: attachAwardReceipts(createdItems, receiptCollector.snapshot()),
       resolutionMeta: resolved?.meta || null,
+      rolledAmounts,
     };
   }
 
-  /**
-   * Create a single result item
-   * @private
-   */
+  /** Create one result item: resolve its amount, build its data, and award or stack it. */
   async _createSingleResult(
     craftingActor,
     result,
@@ -5688,15 +5693,13 @@ export class CraftingEngine {
       essenceEnabled = null,
       resolveComponent,
       receiptCollector = null,
+      rolledAmounts = null,
     } = {}
   ) {
-    // Get the source item
     let sourceItem;
     let managedItem = null;
-    // Resolve the crafting system once for the whole method: the stacking gate
-    // (issue 858) and the effect-transfer gate below both read it, and a bare
-    // `itemUuid` output (no managed component) still transfers effects, so this
-    // must not be scoped to the managed-component branch.
+    // Resolved once for the whole method: a bare `itemUuid` output with no managed component
+    // still transfers effects, so this must not be scoped to the managed-component branch.
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = recipe.craftingSystemId
       ? (systemManager?.getSystem(recipe.craftingSystemId) ?? null)
@@ -5735,14 +5738,19 @@ export class CraftingEngine {
       throw unconfirmedHistoryError('Crafting result source is unavailable');
     }
 
-    // Set quantity
+    // Resolved ONCE, before `setStackQuantity` and `receiptQuantity` read it, so one award cannot
+    // roll twice. Zero is an EMPTY AWARD: no item, and the record is what states it.
+    const { amount, rolled } = await resolveRolledAmount(result, craftingActor, {
+      Roll: diceEngine(),
+    });
+    if (rolled) rolledAmounts?.push(rolledAwardRecord(result, rolled, amount));
+    if (amount === 0) return null;
     if (hasStackQuantity(itemData) || !sourceItem) {
-      setStackQuantity(itemData, result.quantity);
+      setStackQuantity(itemData, amount);
     }
 
-    // Apply macro-based property updates. Every CONTRIBUTING essence's own property
-    // macro runs FIRST (issue 1036), in `essenceDefinitions` library order, so the
-    // result's own macro is the LAST writer at any path the two share.
+    // Every CONTRIBUTING essence's property macro runs FIRST (issue 1036), in `essenceDefinitions`
+    // order, so the result's own macro is the LAST writer at any path the two share.
     const essenceMacrosApplied = await this._runEssencePropertyMacros(itemData, {
       system,
       recipe,
@@ -5777,33 +5785,25 @@ export class CraftingEngine {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
-    // The stacking veto is the OR across EVERY macro that applied a path — essence or
-    // result (issue 1036). `createOrStackComponentItem` DISCARDS `itemData` wholesale
-    // when it stacks, so an essence-mutated output that failed to set this would merge
-    // into a plain stack and lose every mutation with no error at all.
+    // The stacking veto is the OR across EVERY macro that applied a path (issue 1036).
+    // `createOrStackComponentItem` DISCARDS `itemData` when it stacks, so an essence-mutated
+    // output that failed to set this would merge into a plain stack and lose every mutation.
     const hasPropertyUpdates = Boolean(essenceMacrosApplied || resultMacroApplied);
 
-    // Stamp the durable component identity on the crafted output so the inventory
-    // matcher attributes it to its OWN component and not a sibling reached through a
-    // transitive `_stats.duplicateSource` (issue 539). Keyed on the result's managed
-    // component id + the recipe's crafting system id; a result with no managed component
-    // (a bare `itemUuid` output) or an unsafe system id is left unstamped and resolves
-    // via the raw-reference fall-through.
+    // The durable component identity, so the inventory matcher attributes this output to its OWN
+    // component and not a sibling reached through a transitive `_stats.duplicateSource` (issue
+    // 539). No managed component or an unsafe system id is left unstamped, resolving by reference.
     stampCraftedComponentIdentity(itemData, recipe.craftingSystemId, managedItem?.id);
 
-    // Whether this output transfers per-craft active effects (both the recipe- and
-    // system-level flags must be set). A transferring output is materially distinct
-    // per craft, so it must never merge into an existing stack.
+    // Both the recipe- and system-level flags must be set. A transferring output is materially
+    // distinct per craft, so it must never merge into an existing stack.
     const transfersEffects =
       recipe.transferEffects === true && system?.features?.effectTransfer === true;
 
-    // Stack onto a matching inventory item instead of spawning a duplicate (issue 858).
-    // Only a PLAIN component output stacks: it must resolve to a managed component,
-    // carry no per-craft property-macro customization, and transfer no per-craft
-    // effects — any of which makes the produced item materially distinct from an
-    // existing stack. Matches are resolved through the same system-scoped resolver
-    // salvage/craft already use to find component items on the actor.
-    const awardedQuantity = receiptQuantity(result.quantity ?? 1);
+    // Only a PLAIN component output stacks onto an existing item (issue 858): it must resolve to a
+    // managed component, carry no property-macro customization and transfer no effects, any of
+    // which makes it materially distinct. Matches come from the shared system-scoped resolver.
+    const awardedQuantity = receiptQuantity(amount ?? 1);
     const itemsIterable =
       craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
     let matchingItems = [];
@@ -5828,9 +5828,8 @@ export class CraftingEngine {
 
     const stacked = matchingItems.includes(resultItem);
 
-    // Transfer active effects if configured (requires both recipe- and system-level
-    // flags). Only ever applies to a freshly created item — a stacked item keeps its
-    // own effects and, by construction, `transfersEffects` is false when stacking.
+    // Only ever a freshly created item: a stacked one keeps its own effects and, by construction,
+    // `transfersEffects` is false when stacking.
     if (!stacked && transfersEffects) {
       await this._transferEffects(
         resultItem,
@@ -7847,10 +7846,9 @@ export class CraftingEngine {
     return consumed;
   }
 
-  /** Create every result in the resolved salvage groups and return both the created documents and
-   * the award records the run container needs, keyed to the component each item was awarded FOR.
-   * ONE implementation, TWO callers (issue 1098): a second copy would be a second place for the
-   * stacked-twice de-dup and the `componentId` fallback chain to drift. */
+  /** Every result in the resolved salvage groups, as the created documents plus the award records
+   * the run container needs. ONE implementation, TWO callers (issue 1098): a second copy would be a
+   * second place for the stacked-twice de-dup and the `componentId` fallback chain to drift. */
   async _awardSalvageResultGroups({
     actor,
     resultGroups,
@@ -7860,9 +7858,8 @@ export class CraftingEngine {
     checkResult,
   }) {
     const resultItems = [];
-    // Track the awarding component id alongside each created item without reshaping `resultItems`,
-    // which both callers return as `results`. Each `result` carries its id as `result.componentId`
-    // (legacy `result.systemItemId`), the same accessor `_createSingleResult` uses.
+    // The awarding component id travels alongside each created item without reshaping
+    // `resultItems`, which both callers return as `results`.
     const createdRecords = [];
     const receiptCollector = createItemReceiptCollector();
     try {
@@ -7963,14 +7960,17 @@ export class CraftingEngine {
       );
       if (!resolved) return [];
 
-      // Progressive results are a quantity-less ordered list: the loop charges and awards each
-      // entry ONCE, so the GM expresses "more of X" by listing X again. Force `quantity: 1` so the
-      // grant path produces one item per awarded entry, as `_resolveProgressive` always has for
-      // recipes (issue 676). The force stays on the award path, not in the award resolver.
+      // Progressive results are a quantity-less ordered list: the loop awards each entry ONCE, so
+      // the GM expresses "more of X" by listing X again. `quantity: 1` and the dropped formula are
+      // forced on the award path, never in the award resolver (issues 676, 1645).
       return [
         {
           ...resolved.group,
-          results: resolved.award.awarded.map((result) => ({ ...result, quantity: 1 })),
+          results: resolved.award.awarded.map((result) => ({
+            ...result,
+            quantity: 1,
+            quantityFormula: null,
+          })),
         },
       ];
     }

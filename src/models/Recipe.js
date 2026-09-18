@@ -248,22 +248,23 @@ export class Recipe {
 
   /**
    * Validate that this recipe has all required data, including completeness (ingredient sets and
-   * result groups required to craft).
+   * result groups required to craft). `Roll` is threaded to `Result.validate`, which reports
+   * nothing about a rolled amount without it.
    */
-  validate() {
-    return this._validate({ requireComplete: true });
+  validate({ Roll } = {}) {
+    return this._validate({ requireComplete: true, Roll });
   }
 
   /**
    * Validate this recipe's structural integrity only, waiving completeness (missing ingredient sets
    * / result groups).
    */
-  validateStructure() {
-    return this._validate({ requireComplete: false });
+  validateStructure({ Roll } = {}) {
+    return this._validate({ requireComplete: false, Roll });
   }
 
   /** Internal validation implementation. */
-  _validate({ requireComplete = true } = {}) {
+  _validate({ requireComplete = true, Roll } = {}) {
     // Structured, coded issues (issue 595): each carries a stable `code` + id-free params
     // (step/set/result-group/result label as name-or-1-based-position, and a pre-composed
     // `location` context phrase — `Recipe` or `Step "<label>"`), so the UI can localize every
@@ -273,10 +274,8 @@ export class Recipe {
       issues.push({ code: null, params: {}, message });
     };
 
-    // Basic validation
     if (!this.name) plain('Recipe must have a name');
 
-    // Ingredient set validation
     const hasSteps = this.steps.length > 0;
     if (requireComplete && !hasSteps && this.ingredientSets.length === 0) {
       plain('Recipe must have at least one ingredient set (or use explicit steps)');
@@ -314,7 +313,6 @@ export class Recipe {
       }
     }
 
-    // Result validation.
     if (requireComplete && !hasSteps && this.resultGroups.length === 0) {
       plain('Recipe must have at least one result group');
     }
@@ -336,6 +334,7 @@ export class Recipe {
     for (const container of resultContainers) {
       this._validateResultGroups(container.resultGroups, container.location, issues, {
         requireComplete,
+        Roll,
       });
       this._validateRoutedResultSelection(
         container.resultSelection,
@@ -395,7 +394,7 @@ export class Recipe {
     return name || String(index + 1);
   }
 
-  _validateResultGroups(resultGroups, location, issues, { requireComplete = true } = {}) {
+  _validateResultGroups(resultGroups, location, issues, { requireComplete = true, Roll } = {}) {
     const resultGroupIds = new Set();
     const resultIds = new Set();
     for (const [groupIndex, group] of resultGroups.entries()) {
@@ -427,7 +426,7 @@ export class Recipe {
         }
         resultIds.add(result.id);
 
-        const resultValidation = result.validate();
+        const resultValidation = result.validate({ Roll });
         if (!resultValidation.valid) {
           issues.push(
             buildRecipeActivationIssue('resultInvalid', {

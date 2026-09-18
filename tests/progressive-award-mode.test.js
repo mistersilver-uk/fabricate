@@ -7,12 +7,7 @@ import assert from 'node:assert/strict';
 
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
-// Helper builders
-
-/**
- * Build a mock crafting system config with progressive mode defaults.
- * @param {object} overrides - properties to deep-merge on the top-level system object
- */
+/** A mock crafting system config with progressive-mode defaults. */
 function buildSystem(overrides = {}) {
   return {
     id: 'test-system',
@@ -29,12 +24,7 @@ function buildSystem(overrides = {}) {
   };
 }
 
-/**
- * Build a progressive system with the given components and awardMode.
- * @param {object[]} components - array of { id, difficulty } entries
- * @param {string} awardMode - 'equal' | 'exceed' | 'partial'
- * @param {object} overrides - additional top-level system overrides
- */
+/** A progressive system over `{ id, difficulty }` components under one `awardMode`. */
 function buildProgressiveSystem(components = [], awardMode = 'equal', overrides = {}) {
   return buildSystem({
     components,
@@ -48,7 +38,7 @@ function buildProgressiveSystem(components = [], awardMode = 'equal', overrides 
   });
 }
 
-/** Build a ResolutionModeService whose craftingSystemManager resolves the given system. */
+/** A ResolutionModeService whose craftingSystemManager resolves the given system. */
 function buildService(system) {
   const craftingSystemManager = {
     getSystem: (id) => (system && id === system.id ? system : null),
@@ -56,20 +46,12 @@ function buildService(system) {
   return new ResolutionModeService(craftingSystemManager);
 }
 
-/**
- * Build a minimal result object.
- * @param {string} id - the result id
- * @param {string} componentId - the componentId used to look up difficulty
- */
+/** A minimal result; `componentId` is what the difficulty lookup keys on. */
 function makeResult(id, componentId) {
   return { id, componentId };
 }
 
-/**
- * Build a step with a single result group containing the given results.
- * @param {object[]} results - results for the single result group
- * @param {object} overrides - additional step-level overrides
- */
+/** A step with a single result group holding the given results. */
 function buildStep(results = [], overrides = {}) {
   return {
     id: 'step-1',
@@ -80,10 +62,7 @@ function buildStep(results = [], overrides = {}) {
   };
 }
 
-/**
- * Build a minimal recipe referencing the default test system.
- * @param {object} overrides - additional recipe-level overrides
- */
+/** A minimal recipe referencing the default test system. */
 function buildRecipe(overrides = {}) {
   return {
     id: 'test-recipe',
@@ -92,15 +71,14 @@ function buildRecipe(overrides = {}) {
   };
 }
 
-/**
- * Build a checkResult with a numeric value.
- * @param {number} value - the check budget
- */
+/** A checkResult carrying the numeric budget. */
 function buildCheckResult(value) {
   return { value };
 }
 
+// ---------------------------------------------------------------------------
 // AC 1 — equal mode: awards when remaining >= cost, stops when remaining < cost
+// ---------------------------------------------------------------------------
 
 test('equal mode — budget exactly matches difficulty → result awarded, remaining = 0', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'equal');
@@ -212,7 +190,9 @@ test('equal mode — budget exactly covers multiple results sequentially → all
   assert.equal(result.meta.remaining, 0);
 });
 
+// ---------------------------------------------------------------------------
 // AC 2 — exceed mode: awards when remaining > cost (strict inequality)
+// ---------------------------------------------------------------------------
 
 test('exceed mode — budget greater than difficulty → result awarded', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'exceed');
@@ -318,7 +298,9 @@ test('exceed mode — budget strictly exceeds all results → all awarded', () =
   assert.equal(result.meta.remaining, 5);
 });
 
+// ---------------------------------------------------------------------------
 // AC 3 — partial mode: awards partial credit on last result, then stops
+// ---------------------------------------------------------------------------
 
 test('partial mode — budget >= difficulty → full result awarded', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'partial');
@@ -432,7 +414,9 @@ test('partial mode — remaining exactly matches difficulty → full award, no p
   assert.equal(result.meta.remaining, 0);
 });
 
+// ---------------------------------------------------------------------------
 // AC 4 — Edge cases
+// ---------------------------------------------------------------------------
 
 test('edge case — zero check value → no results awarded in equal mode', () => {
   const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 1 }], 'equal');
@@ -521,8 +505,9 @@ test('edge case — no result groups → returns empty groups and zero remaining
 });
 
 test('edge case — a MAX_SAFE_INTEGER value (a forced-success crit) awards every result', () => {
-  // A progressive check's success crit forces value = Number.MAX_SAFE_INTEGER to mean "award
-  // everything"; the budget loop awards every result regardless of difficulty.
+  // A progressive check's success crit forces value = Number.MAX_SAFE_INTEGER to
+  // mean "award everything"; the budget loop awards every result regardless of
+  // difficulty. Uses 'exceed' (the strictest mode) to prove the sentinel covers all.
   const system = buildProgressiveSystem(
     [{ id: 'item-A', difficulty: 100 }, { id: 'item-B', difficulty: 9999 }],
     'exceed'
@@ -573,7 +558,9 @@ test('edge case — result with missing componentId is skipped, valid results st
   assert.equal(result.meta.remaining, 0);
 });
 
+// ---------------------------------------------------------------------------
 // Quantity-less awards — progressive results grant one item per ordered entry
+// ---------------------------------------------------------------------------
 
 test('awarded results are forced to quantity 1, ignoring any legacy authored quantity', () => {
   // A recipe authored before the editor dropped the quantity field may still carry
@@ -628,4 +615,20 @@ test('duplicate components award in order as separate quantity-1 entries', () =>
     result.groups[0].results.every((r) => r.quantity === 1),
     'every awarded entry grants a single item'
   );
+});
+
+test('1645: a progressive stage drops its quantityFormula with its quantity', () => {
+  const system = buildProgressiveSystem([{ id: 'item-A', difficulty: 3 }], 'equal');
+  const step = buildStep([{ ...makeResult('result-A', 'item-A'), quantity: 9, quantityFormula: '1d4+1' }]);
+
+  const result = buildService(system).resolveResultGroups({
+    recipe: buildRecipe(),
+    step,
+    ingredientSet: null,
+    checkResult: buildCheckResult(3),
+  });
+
+  const [awarded] = result.groups[0].results;
+  assert.equal(awarded.quantity, 1, 'a stage awards exactly one');
+  assert.equal(awarded.quantityFormula, null, 'so the rolled amount never reaches the resolver');
 });
