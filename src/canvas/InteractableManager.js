@@ -14,6 +14,12 @@ import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFac
 import { promptDropEnvironment } from './environmentDialog.js';
 import { resolveDropEnvironment } from './environmentResolution.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
+import {
+  denialMessage,
+  openGrant as openGrantLocally,
+  requestActivation,
+  validateAndGrant as validateActivationAndGrant,
+} from './interactableGrant.js';
 import { resolveItemUuidToTool } from './interactableItemResolution.js';
 import {
   DEFAULT_INTERACTABLE_IMG,
@@ -34,27 +40,16 @@ import {
 import {
   classifyInteractableDrop,
   buildRegionSpawnRequest,
-  buildActiveCanvasTool,
   parseInteractableSourceUuid,
 } from './interactableResolution.js';
-import {
-  INTERACTABLE_SOCKET,
-  INTERACTABLE_ACTIVATION_GRANTED,
-  INTERACTABLE_ACTIVATION_DENIED,
-} from './interactableSocket.js';
+import { INTERACTABLE_SOCKET } from './interactableSocket.js';
 import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
   selectRepromptTokenDoc,
 } from './regionHitTest.js';
 import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
-import {
-  shouldPromptOnEnter,
-  buildActivationRequest,
-  validateActivationRequest,
-  describeGrant,
-  activationDenialMessageKey,
-} from './regions/interactableRegionActivation.js';
+import { shouldPromptOnEnter } from './regions/interactableRegionActivation.js';
 import {
   buildInteractableBehaviorSystem,
   readInteractableBehaviorSystem,
@@ -66,9 +61,35 @@ import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapt
 /** Client keybinding id for the "interact here" re-trigger. */
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
 
-/** Whether this client is the primary (active) GM. */
-function isActiveGM() {
-  return globalThis.game?.user === globalThis.game?.users?.activeGM;
+/**
+ * The activation collaborators, each a function invoked where the manager's own `globalThis` read
+ * used to happen. Nothing is resolved here: the singleton is built during page parse, before
+ * `game`, `canvas`, `ui.notifications` or `game.time` exist, so a captured value is permanently
+ * undefined in production and no test that installs its fakes first can see it.
+ */
+function grantCollaborators(manager) {
+  return {
+    getAppClass: () => manager._getAppClass?.(),
+    resolveBehavior: (request) => manager._resolveBehavior(request),
+    emit: (payload) => globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload),
+    isActiveGM: () => globalThis.game?.user === globalThis.game?.users?.activeGM,
+    hasActiveGM: () => !!globalThis.game?.users?.activeGM,
+    currentUserId: () => globalThis.game?.user?.id ?? null,
+    worldTime: () => Number(globalThis.game?.time?.worldTime || 0),
+    getUser: (userId) => globalThis.game?.users?.get?.(String(userId ?? '')),
+    canControlActor: (userId, actorId) => manager._userCanControlActor(userId, actorId),
+    sourceExists: (system) => manager._sourceExists(system),
+    environmentExists: (environmentId) => manager._environmentExists(environmentId),
+    tokenInside: (behavior, actorId, userId) =>
+      manager._tokenInsideRegion(behavior, actorId, userId),
+    resolutionDeps: () => manager._resolutionDeps(),
+    notifyWarn: (message) => globalThis.ui?.notifications?.warn?.(message),
+    localize: (key) => globalThis.game?.i18n?.localize?.(key),
+    now: () => Date.now(),
+    onGrantClose: (args) => manager._repromptAfterInteractableClose(args),
+    validateAndGrant: (request) => manager.validateAndGrant(request),
+    openGrant: (payload) => manager.openGrant(payload),
+  };
 }
 
 class InteractableManager {
@@ -82,6 +103,7 @@ class InteractableManager {
     this._getPromptAppClass = getPromptAppClass;
     this._regionEnvironmentIdsAtPoint = regionHitTest;
     this._promptDropEnvironment = promptEnvironment;
+    this._grantDeps = grantCollaborators(this);
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._onControlToken = this._onControlToken.bind(this);
@@ -452,188 +474,16 @@ class InteractableManager {
 
   // --- Activation: request / validate-grant / open ---------------------------
 
-  /** Grant locally (active GM) or emit for the active GM; with none connected, warn and abort. */
   _requestActivation(behavior, ctx = {}) {
-    const system = readInteractableBehaviorSystem(behavior);
-    const ref = identifyRegionBehaviorRef(behavior);
-    if (!system || !ref) return;
-
-    const request = buildActivationRequest(system, {
-      regionId: ref.regionId,
-      behaviorId: ref.behaviorId,
-      sceneId: ref.sceneId,
-      actorId: ctx.actorId ?? null,
-      userId: ctx.userId ?? globalThis.game?.user?.id ?? null,
-      activationSource: ctx.activationSource ?? 'regionEnter',
-      ts: Date.now(),
-    });
-
-    if (isActiveGM()) {
-      void this.validateAndGrant(request);
-      return;
-    }
-    if (!globalThis.game?.users?.activeGM) {
-      globalThis.ui?.notifications?.warn?.(
-        globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.NoActiveGM') ??
-          'A GM must be online to gather here.'
-      );
-      return;
-    }
-    globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, request);
+    requestActivation(behavior, ctx, this._grantDeps);
   }
 
-  /**
-   * Active-GM body for `interactableActivate`: resolve the target, compute the validation
-   * collaborators, run {@link validateActivationRequest}, and on a pass emit the grant. No-throw.
-   */
   async validateAndGrant(request) {
-    if (!request || typeof request !== 'object') return false;
-    const behavior = this._resolveBehavior(request);
-    const system = readInteractableBehaviorSystem(behavior);
-    if (!system) {
-      // No behaviour system resolved (a deleted region). Tell the requester why, generically.
-      this._routeActivationDenied(request.userId, null);
-      return false;
-    }
-
-    const now = Number(globalThis.game?.time?.worldTime || 0);
-    // `isGM` is the REQUESTING user's override status, not the validating GM's, so the
-    // actor-control gate cannot be bypassed by a non-owning, non-GM player.
-    const isGM = globalThis.game?.users?.get?.(String(request.userId ?? ''))?.isGM === true;
-    const canControlActor = this._userCanControlActor(request.userId, request.actorId);
-    const sourceExists = this._sourceExists(system);
-    const environmentExists =
-      system.interactableType === 'gatheringTask'
-        ? this._environmentExists(system.environmentId)
-        : true;
-    const tokenInside = this._tokenInsideRegion(behavior, request.actorId, request.userId);
-    const validation = validateActivationRequest(request, {
-      behaviorSystem: system,
-      now,
-      isGM,
-      canControlActor,
-      sourceExists,
-      environmentExists,
-      tokenInside,
-    });
-    if (!validation.ok) {
-      // Tell the requesting user WHY (localized) instead of failing silently.
-      this._routeActivationDenied(request.userId, validation.reason);
-      return false;
-    }
-
-    const grant = describeGrant(system);
-    if (!grant) return false;
-
-    // For a tool, resolve the live activeCanvasTool to thread into the grant.
-    if (system.interactableType === 'tool') {
-      const tool = this._resolutionDeps().getTool({
-        systemId: system.systemId,
-        toolId: system.toolId,
-      });
-      const activeCanvasTool = buildActiveCanvasTool({
-        systemId: system.systemId,
-        toolId: system.toolId,
-        tool,
-      });
-      if (!activeCanvasTool) {
-        // Say WHY. A bare `return false` here answered a station whose Tool no longer resolves
-        // with NOTHING AT ALL, which is what hid the issue-1119 defect: the station places and
-        // renders perfectly and only dies on activation.
-        this._routeActivationDenied(request.userId, 'SOURCE_MISSING');
-        return false;
-      }
-      grant.context = { ...grant.context, activeCanvasTool };
-    }
-
-    const payload = {
-      action: INTERACTABLE_ACTIVATION_GRANTED,
-      userId: request.userId,
-      behaviorId: request.behaviorId,
-      requestId: request.ts ? String(request.ts) : null,
-      grant: {
-        tab: grant.tab,
-        context: grant.context,
-        ref: {
-          sceneId: request.sceneId,
-          regionId: request.regionId,
-          behaviorId: request.behaviorId,
-        },
-        interactableType: system.interactableType,
-        environmentId: system.environmentId ?? null,
-        taskId: system.taskId ?? null,
-        // The interacting actor is the default selected actor in the granted session; already
-        // ownership-validated above.
-        actorId: request.actorId ?? null,
-      },
-    };
-    // The requester opens the session locally; when the GM IS the requester, open it here, since
-    // a socket emit never reaches its emitter.
-    if (globalThis.game?.user?.id === request.userId) {
-      this.openGrant(payload);
-    } else {
-      globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, payload);
-    }
-    return true;
+    return validateActivationAndGrant(request, this._grantDeps);
   }
 
-  /**
-   * Local-user body for `interactableActivationGranted`: Crafting for a tool, Gathering scoped to
-   * `{ environmentId, taskId }` for a task. `grant.ref` is threaded through as `interactableRef`
-   * so an UNLINKED task decrements its own pool rather than the environment's (issue 302).
-   */
   openGrant(payload) {
-    const grant = payload?.grant;
-    if (!grant || typeof grant !== 'object') {
-      return;
-    }
-    const AppClass = this._getAppClass?.();
-    if (!AppClass?.show) {
-      return;
-    }
-
-    // The interacting actor becomes the default-selected actor in the opened session's top bar.
-    const actorId = grant.actorId ?? null;
-
-    if (grant.interactableType === 'tool') {
-      const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
-      if (!activeCanvasTool) {
-        return;
-      }
-      // A Tool station belongs to crafting: inject the station tool as virtual-present so
-      // prerequisite checks pass without the actor owning the item.
-      void AppClass.show('crafting', { activeCanvasTool, actorId });
-      return;
-    }
-
-    if (grant.interactableType === 'gatheringTask') {
-      const environmentId = grant.environmentId ?? grant.context?.environmentId ?? null;
-      const taskId = grant.taskId ?? grant.context?.taskId ?? null;
-      if (!environmentId || !taskId) {
-        return;
-      }
-      // Always passed through: the engine falls back to the environment scope when the behaviour
-      // is environment-scoped or gone (issue 302).
-      const interactableRef =
-        grant.ref && typeof grant.ref === 'object'
-          ? {
-              sceneId: grant.ref.sceneId ?? null,
-              regionId: grant.ref.regionId ?? null,
-              behaviorId: grant.ref.behaviorId ?? null,
-            }
-          : null;
-      // On close, re-raise the prompt if the token is STILL inside, so a large region need not be
-      // re-entered and an accidental close is recoverable. `_promptForTokenInsideRegion` re-applies
-      // the hit-test, guard and ref-matching, so a token that has left is not re-prompted (332).
-      const gatheringOptions = {
-        environmentId,
-        taskId,
-        actorId,
-        interactableRef,
-        onClose: () => this._repromptAfterInteractableClose({ ref: grant.ref, actorId }),
-      };
-      Promise.resolve(AppClass.show('gathering', gatheringOptions)).catch(() => {});
-    }
+    openGrantLocally(payload, this._grantDeps);
   }
 
   /**
@@ -664,25 +514,9 @@ class InteractableManager {
     }
   }
 
-  /** Route a DENIAL as grants are routed: notify here when the GM is the requester, else emit. */
-  _routeActivationDenied(userId, reason) {
-    if (globalThis.game?.user?.id === userId) {
-      this.notifyActivationDenied(reason);
-      return;
-    }
-    globalThis.game?.socket?.emit?.(INTERACTABLE_SOCKET, {
-      action: INTERACTABLE_ACTIVATION_DENIED,
-      userId: userId ?? null,
-      reason: reason ?? null,
-    });
-  }
-
   /** Local-user body for `interactableActivationDenied`: warn WHY. No-throw. */
   notifyActivationDenied(reason) {
-    const key = activationDenialMessageKey(reason);
-    const localize = globalThis.game?.i18n?.localize;
-    const message = typeof localize === 'function' ? localize.call(globalThis.game.i18n, key) : key;
-    globalThis.ui?.notifications?.warn?.(message);
+    this._grantDeps.notifyWarn(denialMessage(reason, this._grantDeps));
   }
 
   // --- Foundry-edge helpers (activation) -------------------------------------
