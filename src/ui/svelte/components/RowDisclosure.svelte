@@ -8,11 +8,13 @@
   | --- | --- | --- | --- |
   | `expanded` | boolean | `false` | Whether the controlled region is open. |
   | `controls` | element id | `''` | The region this discloses. Required for `aria-controls` to mean anything. |
-  | `label` | pre-localized string | `''` | The accessible name. It names the ROW, not the action — "Trigger 1: on a natural 1" reads correctly under both states, because `aria-expanded` supplies the rest. |
+  | `label` | pre-localized string | `''` | The accessible name. It names the ROW, not the action — "Trigger 1: on a natural 1" reads correctly under both states, because `aria-expanded` supplies the rest. Emitted only when non-empty (issue 1512): an empty `aria-label` is a label of nothing, and it overrides the name the element would otherwise take from its content. |
   | `side` / `disabled` / `dataAttr` / `dataValue` | `'trailing'` \| `'leading'` / boolean / strings | `'trailing'` / `false` / `''` | Which way the collapsed chevron points, whether the `<button>` is disabled, and an optional test/screenshot hook. |
   | `onToggle()` | function | no-op | The caller owns `expanded`. |
 
   Invariants:
+  - It declares `data-keyboard-focus="true"` (issue 1512), or Foundry's `KeyboardManager#hasFocus`
+    stays false while this chevron holds focus and Space pauses the game behind the open window.
   - IT RENDERS A REAL `<button>` AND MUST NOT BE PLACED INSIDE ANOTHER ONE, because nested buttons
     are invalid DOM that `createElement` accepts and no mounted test notices. A caller nests this
     control BESIDE the row's own content rather than wrapping it.
@@ -42,7 +44,8 @@
   class:is-expanded={expanded}
   aria-expanded={expanded}
   aria-controls={controls || undefined}
-  aria-label={label}
+  aria-label={label || undefined}
+  data-keyboard-focus="true"
   {disabled}
   {...hookAttributes}
   onclick={() => onToggle(!expanded)}

@@ -41,8 +41,11 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/Select.svelte',
   // THE right-inspector action button (issue 1036, maintainer round 2).
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  // The product's ONE horizontal fill bar.
+  // The product's ONE horizontal fill bar, ONE row disclosure and ONE ordered list (issue 1512).
+  // The list reaches five manager surfaces at once, and it renders the disclosure and the icon
+  // button behind it, so a tree holding any converted list pulls three primitives in.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
