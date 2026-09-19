@@ -495,8 +495,8 @@ It also now awaits the `capture` job in `pr-screenshots.yml` for this PR's own h
 If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
 An explicit issue-specific maintainer instruction may replace automated screenshot production, but it leaves agent visual approval pending and does not itself satisfy or waive `check-screenshots`; qualifying maintainer-provided evidence or the maintainer label is still required.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
-- The smoke walk's Phase D0 (the `screenshot-manager` step, in `scripts/foundry-smoke/scenarios/d0-*.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text.
-When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep `scripts/foundry-smoke/` for the changed classes / text before declaring the change done.
+- The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-smoke/scenarios/`) pins many selectors by class, `.nth(N)` index, and visible button text.
+When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done.
 See the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
 
 ### Release Utilities
