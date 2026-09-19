@@ -196,7 +196,7 @@ src/ui/svelte/apps/manager/tools/toolStudio.js::projectToolPlayerPreview	108
 src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte	1155
 src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte	540
 src/ui/svelte/components/Chip.svelte	515
-src/ui/svelte/components/SearchablePopover.svelte	882
+src/ui/svelte/components/SearchablePopover.svelte	845
 src/ui/svelte/stores/actorBarStore.svelte.js::createActorBarStore	205
 src/ui/svelte/stores/adminComponentRowProjection.js::_createItemCard	131
 src/ui/svelte/stores/adminRecipeRowProjection.js	888

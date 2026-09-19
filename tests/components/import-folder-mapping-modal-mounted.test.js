@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878).
     'src/ui/svelte/util/essenceIcons.js',

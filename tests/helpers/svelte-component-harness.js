@@ -181,6 +181,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   // The listbox cursor's arithmetic (issue 1503).
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/overlayHost.js',

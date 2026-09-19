@@ -49,14 +49,14 @@ src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	327
 src/ui/svelte/components	1423
 src/ui/svelte/stores	4526
-src/ui/svelte/util	1218
+src/ui/svelte/util	1243
 src/utils	944
 styles	1042
 tests	19509
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
-tests/components	14924
+tests/components	14931
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	20
@@ -69,7 +69,7 @@ tests/helpers/scale	622
 tests/journal	157
 tests/stores	1529
 tests/systems	328
-tests/util	379
+tests/util	386
 tests/view-lab	413
 tests/view-lab/foundry	269
 tests/view-lab/world	930

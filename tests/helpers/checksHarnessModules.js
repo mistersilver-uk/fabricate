@@ -11,6 +11,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconCatalogue.json',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/essenceIcons.js',
   'src/ui/svelte/components/stepperLabels.js',
