@@ -587,7 +587,7 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(consumed.length, 1, 'run history records the consumed component');
   // Issue 738: the timed FINISH path must persist the consume-time name/img/componentId (captured
   // into the START snapshot before the source items were deleted), exactly like the immediate craft
-  // paths do via mapConsumedIngredientRef.
+  // paths do via `runHistoryEvidence`'s `mapConsumedIngredientRef`.
   assert.equal(consumed[0].name, 'Wood', 'the timed-step run persists the consume-time name');
   assert.equal(consumed[0].img, 'icons/wood.png', 'the timed-step run persists the consume-time img');
   assert.equal(consumed[0].componentId, 'wood', 'the timed-step run persists the componentId');

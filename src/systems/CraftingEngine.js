@@ -49,6 +49,11 @@ import {
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
+import {
+  rollTotalForCard,
+  tierStepForCard,
+  VERSIONED_EXECUTION_CONTEXT,
+} from './craftCardFields.js';
 import { CraftingFizzleExecutor } from './CraftingFizzleExecutor.js';
 import {
   CraftingLifecycleExecutionError,
@@ -83,6 +88,7 @@ import {
   awardReceipts,
   createItemReceiptCollector,
   itemReceipt,
+  mapConsumedIngredientRef,
   sourceItemQuantity,
   receiptQuantity,
   requireDocumentAcknowledgment,
@@ -112,8 +118,6 @@ import {
   composeToolBonusTerms,
   evaluateToolCheckContribution,
 } from './toolCheckBonus.js';
-
-const VERSIONED_EXECUTION_CONTEXT = Symbol('fabricate.versionedCraftingExecution');
 
 /** Resolve the winning alchemy match by picking the unique MOST-SPECIFIC set (issue 774) — the
  * unique maximum of the {@link signatureDominates} partial order. No unique maximum FAILS SAFE
@@ -147,18 +151,6 @@ function toolDisplayReference(tool, recipe = null, recipeManager = null) {
   return componentId || tool?.id || 'unknown';
 }
 
-/** The RAW rolled total for a result chat card, or null when no check ran. A progressive check
- * overwrites `value` with the AWARDING value on a forced crit, so the card reads `data.total`. */
-export function rollTotalForCard(checkResult) {
-  return checkResult?.data?.total ?? checkResult?.value ?? null;
-}
-
-/** Realized routed tier-step evidence for result chat, or null when the tier was never moved:
- * `runFormulaRouted` emits `data.tierStepApplied` only on an actual tier change (issue 975). */
-function tierStepForCard(checkResult) {
-  return checkResult?.data?.tierStepApplied ?? null;
-}
-
 /** What a card states about the rolled amounts an awarded array carries (issue 1645): the live
  * rolls the message rides on, and the empty awards that created no item and so are their own row. */
 function rolledAwardChatParts(awarded) {
@@ -178,19 +170,6 @@ const rolledAwardEvidence = (result, rolled, amount, roll, { name, img }) => ({
   name,
   img,
 });
-
-/** Map one `_consumeIngredients` entry to the persisted run-record shape, capturing the item's
- * `name`/`img` at consume time (issue 738) — a consumed item is DELETED immediately. */
-function mapConsumedIngredientRef({ item, quantity, receipt }) {
-  if (receipt) return itemReceipt(receipt);
-  return {
-    actorUuid: item.parent?.uuid || null,
-    itemUuid: item.uuid,
-    quantity,
-    name: item.name ?? null,
-    img: item.img ?? null,
-  };
-}
 
 function addHistoricalEssenceContribution(carriers, essenceId, source) {
   const carrier = carriers.get(JSON.stringify([source.actorUuid, source.itemUuid]));

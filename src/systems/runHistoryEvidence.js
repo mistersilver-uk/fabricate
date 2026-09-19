@@ -43,6 +43,19 @@ export function itemReceipt(entry = {}) {
   return receipt;
 }
 
+/** Map one `_consumeIngredients` entry to the persisted run-record shape, capturing the item's
+ * `name`/`img` at consume time (issue 738) — a consumed item is DELETED immediately. */
+export function mapConsumedIngredientRef({ item, quantity, receipt }) {
+  if (receipt) return itemReceipt(receipt);
+  return {
+    actorUuid: item.parent?.uuid || null,
+    itemUuid: item.uuid,
+    quantity,
+    name: item.name ?? null,
+    img: item.img ?? null,
+  };
+}
+
 export function historyEvidenceFields(source = {}) {
   const evidence = {};
   if (

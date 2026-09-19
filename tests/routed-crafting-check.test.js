@@ -322,8 +322,8 @@ test('no Roll engine does not block the craft and fabricates no route', async ()
 });
 
 
-// Tier-step evidence reaches the result chat card (issue 975) ────────────── The engine's
-// `tierStepForCard` mapping had NO coverage: the chat-card suites feed the presentation model
+// Tier-step evidence reaches the result chat card (issue 975) ────────────── the
+// `craftCardFields` `tierStepForCard` mapping had NO coverage: the chat-card suites feed the presentation model
 // directly and the suites above stop at the check result, so every `_postCraftChatMessage` call
 // site could silently drop the routed evidence and still ship green.
 

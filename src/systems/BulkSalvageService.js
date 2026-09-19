@@ -631,7 +631,7 @@ export class BulkSalvageService {
       item.message = result?.message ?? '';
       // A progressive check overwrites `value` with the AWARDING value on a forced
       // crit, so the raw `data.total` is preferred wherever a run record carries it —
-      // the same precedence `rollTotalForCard` applies inside the engine. The
+      // the same precedence `rollTotalForCard` applies in `craftCardFields`. The
       // top-level `value` is the last resort because `salvage()` threads it only on
       // the SUCCESS return; a rolled failure's total is reachable only through the run.
       item.rollValue = firstFinite(

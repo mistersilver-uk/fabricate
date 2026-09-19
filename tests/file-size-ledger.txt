@@ -16,7 +16,7 @@ src/systems/BulkSalvageService.js	819
 src/systems/CompendiumImporter.js	1542
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
 src/systems/CompendiumImporter.js::importFromPackData	291
-src/systems/CraftingEngine.js	8475
+src/systems/CraftingEngine.js	8454
 src/systems/CraftingEngine.js::_applyToolBreakage	111
 src/systems/CraftingEngine.js::_buildVersionedStageOperation	229
 src/systems/CraftingEngine.js::_createSingleResult	160
