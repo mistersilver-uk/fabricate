@@ -212,7 +212,9 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 // #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
 // #1707: the root's 70 became 60 and `GatheringModifierEditor.svelte` took 5 (225 - 5). The other
 // five were DE-DUPLICATED by writing that panel once, not converted.
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 220;
+// Issue 1512: five rows leave whole (220 - 14). The two recipe rows and `RowDisclosure` are paid
+// by the shared list rendering their reorder controls; the other two declare the attribute in place.
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 206;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */
