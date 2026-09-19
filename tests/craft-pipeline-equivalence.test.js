@@ -812,6 +812,37 @@ const SCENARIOS = [
     ],
   },
   {
+    name: 'the collapsed chain waits on its summed gate and keeps the run',
+    async run() {
+      const world = craftProbe({
+        steps: [
+          {
+            ingredients: [{ componentId: 'wood', quantity: 2 }],
+            results: [{ componentId: 'plank', quantity: 1 }],
+            timeRequirement: { hours: 1 },
+          },
+          {
+            ingredients: [{ componentId: 'nail', quantity: 1 }],
+            results: [{ componentId: 'chair', quantity: 1 }],
+            timeRequirement: { hours: 1 },
+          },
+        ],
+        stock: { wood: 5, nail: 3 },
+      });
+      await world.craft();
+      return world.journal.entries;
+    },
+    journal: [
+      ['run.findActiveRunForRecipe', 'Actor:Crafter', 'recipe-probe'],
+      ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
+      ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
+      ['run.durationToSeconds', { hours: 1 }],
+      ['run.durationToSeconds', { hours: 1 }],
+      ['run.armCollapsedChainGate', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r | pending 0c/0t/0r]', 7200],
+      ['returned', { success: false, results: null, message: 'Crafting Probe Recipe is in progress (7200s remaining)' }],
+    ],
+  },
+  {
     // The versioned-execution key is identity-typed: a second declaration of it re-arms the per-step
     // time gate and re-rolls a check the executor already resolved.
     name: 'versioned execution skips the time gate and reuses its resolved check',
