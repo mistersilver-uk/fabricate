@@ -42,10 +42,10 @@
     the trigger's root and one on the portaled panel, which escapes the first.
   - THE FOCUS MODEL, the key map, the caret-edge rules, the type-ahead and the flat-order option ids
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
-    arithmetic is `util/listboxNavigation.js`'s, and `searchable-popover-keyboard-mounted.test.js`
-    (40 cases) and `-capabilities-mounted` (27) pin what each key does. The option ids carry a
-    PER-INSTANCE prefix, because two pickers on one screen indexing from 0 would make
-    `aria-activedescendant` ambiguous.
+    arithmetic is `util/listboxNavigation.js`'s and `util/pickerOptionModel.js`'s, and
+    `searchable-popover-keyboard-mounted.test.js` (40 cases) and `-capabilities-mounted` (27) pin
+    what each key does. The option ids carry a per-instance prefix, because two pickers on one
+    screen indexing from 0 would make `aria-activedescendant` ambiguous.
   - THE PANEL'S OWN CHROME MUST NOT TAKE FOCUS EITHER: it is `role="dialog" tabindex="-1"`, so a
     click on its inset, header or empty note would move focus off the holder and take the key map
     with it, invisibly. The `mousedown` guard excepts every element with its OWN reason to take
@@ -82,23 +82,30 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, nextActiveIndex, typeAheadCursor } from '../util/listboxNavigation.js';
+  import {
+    activeOptionId,
+    caretOwnsKey,
+    nextActiveIndex,
+    openingKeyOwns,
+    typeAheadCursor,
+  } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
+  import {
+    activeCursorIndex,
+    filteredCountLabel,
+    groupedOptionBuckets,
+    labelSubstringFilter,
+    optionListGeneration as listGenerationOf,
+    pickerEmptiness,
+    renderedOptionOrder,
+    selectedOptionIds,
+  } from '../util/pickerOptionModel.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   function localizedText(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function labelSubstringFilter(list, query) {
-    if (!query) return list;
-    return list.filter((option) =>
-      String(option.label || '')
-        .toLowerCase()
-        .includes(query)
-    );
   }
 
   let {
@@ -184,39 +191,16 @@
   const isGrid = $derived(as === 'grid');
   const gridColumns = $derived(isGrid && Number.isInteger(columns) && columns > 1 ? columns : 1);
 
-  const groupedOptions = $derived.by(() => {
-    const groups = Array.isArray(optionGroups) ? optionGroups.filter((group) => group?.id) : [];
-    if (groups.length === 0) return [];
-    const known = new Set(groups.map((group) => group.id));
-    const buckets = groups.map((group) => ({
-      id: group.id,
-      label: group.label || '',
-      options: filteredOptions.filter((option) => option.group === group.id),
-    }));
-    const ungrouped = filteredOptions.filter((option) => !known.has(option.group));
-    if (ungrouped.length > 0) buckets.push({ id: '__ungrouped', label: '', options: ungrouped });
-    let offset = 0;
-    return buckets
-      .filter((bucket) => bucket.options.length > 0)
-      .map((bucket) => {
-        const positioned = { ...bucket, offset };
-        offset += bucket.options.length;
-        return positioned;
-      });
-  });
+  const groupedOptions = $derived(groupedOptionBuckets(filteredOptions, optionGroups));
   const isGrouped = $derived(groupedOptions.length > 0);
-  const renderedOptions = $derived(
-    isGrouped ? groupedOptions.flatMap((bucket) => bucket.options) : filteredOptions
-  );
+  const renderedOptions = $derived(renderedOptionOrder(groupedOptions, filteredOptions));
   const typeAheadLabels = $derived(renderedOptions.map((option) => String(option.label ?? '')));
 
   function optionIsDisabled(index) {
     return Boolean(renderedOptions[index]?.disabled);
   }
 
-  const selectedIdSet = $derived(
-    multiple ? new Set(Array.isArray(value) ? value : [value]) : new Set()
-  );
+  const selectedIdSet = $derived(selectedOptionIds(value, multiple));
 
   function optionIsSelected(option) {
     return multiple ? selectedIdSet.has(option.id) : option.id === value;
@@ -225,32 +209,30 @@
   const staysOpenOnChoose = $derived(multiple || stayOpen);
 
   const filteredCount = $derived(
-    String(filteredCountTemplate)
-      .replace('{matched}', String(filteredOptions.length))
-      .replace('{total}', String(options.length))
+    filteredCountLabel(filteredCountTemplate, filteredOptions.length, options.length)
   );
 
-  const filteredToNothing = $derived(options.length > 0 && filteredOptions.length === 0);
   const noMatchesText = $derived(
     noMatchesHint || localizedText('FABRICATE.Common.Picker.NoMatches', 'No matches')
   );
-  const emptyMessage = $derived(filteredToNothing ? noMatchesText : emptyHint);
-  const emptyBody = $derived(filteredToNothing ? '' : emptyDetail);
+  const emptiness = $derived(
+    pickerEmptiness({
+      total: options.length,
+      matched: filteredOptions.length,
+      noMatchesText,
+      emptyHint,
+      emptyDetail,
+    })
+  );
+  const emptyMessage = $derived(emptiness.message);
+  const emptyBody = $derived(emptiness.body);
 
   const optionListGeneration = $derived(
-    [
-      open ? 'open' : 'closed',
-      normalizedSearch,
-      options.length,
-      options[0]?.id ?? '',
-      options[options.length - 1]?.id ?? '',
-    ].join('/')
+    listGenerationOf({ open, query: normalizedSearch, options })
   );
 
   const activeIndex = $derived(
-    cursor.generation === optionListGeneration && cursor.index < renderedOptions.length
-      ? cursor.index
-      : -1
+    activeCursorIndex(cursor, optionListGeneration, renderedOptions.length)
   );
 
   const listRendered = $derived(open && filteredOptions.length > 0);
@@ -264,22 +246,6 @@
     const active = popoverRoot.querySelector?.('[data-active-option="true"]');
     active?.scrollIntoView?.({ block: 'nearest' });
   });
-
-  const CARET_EDGE = new Map([
-    ['ArrowLeft', 'start'],
-    ['Home', 'start'],
-    ['ArrowRight', 'end'],
-    ['End', 'end'],
-  ]);
-
-  function caretOwnsKey(event) {
-    const field = event.target;
-    if (typeof field?.selectionStart !== 'number') return false;
-    const edge = CARET_EDGE.get(event.key);
-    if (!edge) return false;
-    if (field.selectionStart !== field.selectionEnd) return true;
-    return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
-  }
 
   function typeAheadOwnsKey(event) {
     if (showSearch) return false;
@@ -298,17 +264,14 @@
     return true;
   }
 
-  const OPENING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End']);
-
-  function openingKeyOwns(event) {
+  function takeOpeningKey(event) {
     if (showSearch) return false;
     if (disabled || triggerAriaDisabled) return false;
-    if (event.ctrlKey || event.metaKey || event.shiftKey) return false;
-    const altOpen = event.altKey && event.key === 'ArrowDown';
-    if (!altOpen && (event.altKey || !OPENING_KEYS.has(event.key))) return false;
+    const opening = openingKeyOwns(event);
+    if (!opening) return false;
     event.preventDefault();
     open = true;
-    if (altOpen) return true;
+    if (opening.altOpen) return true;
     const landing = nextActiveIndex(-1, renderedOptions.length, event.key, {
       columns: gridColumns,
       isDisabled: optionIsDisabled,
@@ -319,7 +282,7 @@
 
   function onHolderKeydown(event) {
     if (!open) {
-      if (openingKeyOwns(event)) return;
+      if (takeOpeningKey(event)) return;
       typeAheadOwnsKey(event);
       return;
     }

@@ -43,6 +43,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   // `ActionMenu`'s own placement helper (issue 1477).
   'src/ui/svelte/util/actionMenuLayout.js',
   'src/ui/svelte/util/overlayHost.js',

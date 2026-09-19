@@ -39,6 +39,7 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/anchoredPopover.js',

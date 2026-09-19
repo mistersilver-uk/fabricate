@@ -412,3 +412,39 @@ test('every exported roster in the shared harness resolves whole through the gua
       truncated.join('\n- ')
   );
 });
+
+// The picker's two pure leaves, which every harness that mounts a picker names together. The
+// closure walk above quantifies over `.svelte` shared primitives, so it cannot see a roster that
+// names one `.js` module and not the other, and that omission cancels the suite silently. Each is
+// imported by `components/SearchablePopover.svelte` alone, which is what makes the two rosters'
+// requirement sets identical rather than merely similar.
+const CO_LOCATED_PICKER_MODULES = Object.freeze([
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
+]);
+
+test('a roster naming one of the picker’s two leaf modules names the other', () => {
+  // Anchored on the opening quote, so a relative import specifier — the unit tests' own
+  // `'../../src/ui/svelte/util/listboxNavigation.js'` — is not read as a roster entry.
+  const [navigation, optionModel] = CO_LOCATED_PICKER_MODULES.map((path) => `'${path}'`);
+  const gaps = [];
+  let rosters = 0;
+  for (const file of repoPathsUnder('tests', '.js')) {
+    const source = readRepoFile(file);
+    if (!source.includes(navigation)) continue;
+    rosters += 1;
+    if (!source.includes(optionModel)) gaps.push(file);
+  }
+
+  assert.ok(
+    rosters >= 30,
+    `only ${rosters} files name the picker's cursor module as a roster entry, so this clause has ` +
+      'lost most of its domain and would pass over an almost empty set'
+  );
+  assert.deepEqual(
+    gaps,
+    [],
+    'these rosters name one of the picker`s two leaf modules and not the other, so a suite that ' +
+      `opens a picker hangs (# cancelled) instead of failing:\n- ${gaps.join('\n- ')}`
+  );
+});
