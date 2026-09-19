@@ -22,6 +22,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+      /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
     ],
   }),
   managerCase({
@@ -110,6 +111,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+      /^src\/ui\/model\/(?:recipe|entity)BrowserModel\.js$/,
     ],
   }),
   // Three frames, because the panel's five axes cannot be photographed in one.

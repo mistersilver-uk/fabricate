@@ -1,7 +1,13 @@
 /** Pure list model for the GM essence library (issue 1036): filter → sort → paginate. */
 
 import { countByCategory } from './browserGroupCounts.js';
-import { paginateRows } from './browserPagination.js';
+import {
+  buildEntityBrowserModel,
+  describeActiveEntityFilters,
+  filterEntities,
+  paginateEntities,
+  sortEntities,
+} from './entityBrowserModel.js';
 
 /** Sort keys offered by the library toolbar, in menu order. */
 export const ESSENCE_SORT_KEYS = Object.freeze(['name', 'status', 'components', 'recipes']);
@@ -47,17 +53,46 @@ function matchesSourceFilter(essence, source) {
   return state === 'stale' || state === 'missing';
 }
 
-/** Filter the projected rows by status and source state. */
-export function filterEssences(essences, filters = {}) {
-  const status = ESSENCE_STATUS_FILTERS.includes(filters.status) ? filters.status : 'all';
-  const source = ESSENCE_SOURCE_FILTERS.includes(filters.source) ? filters.source : 'all';
-
-  return (Array.isArray(essences) ? essences : []).filter((essence) => {
-    if (status !== 'all' && essenceStatusOf(essence) !== status) return false;
-    if (source !== 'all' && !matchesSourceFilter(essence, source)) return false;
-    return true;
-  });
+function numeric(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
+
+/**
+ * How the essence library shapes the shared pipeline. It has no category, so it never groups, and
+ * both axes carry an allowed list: an uncoerced `source` would read as `needs-attention` and hide
+ * every healthy row. The lists coerce the filter and not the chips, which report the raw values.
+ */
+const ESSENCE_ADAPTER = Object.freeze({
+  rowsKey: 'essences',
+  sortKeys: ESSENCE_SORT_KEYS,
+  defaultPageSize: ESSENCE_DEFAULT_PAGE_SIZE,
+  sortValues: Object.freeze({
+    // Enabled first on an ascending sort: the GM's working set is the live essences, and a status
+    // sort that buried them under the disabled ones would invert the control's obvious reading.
+    status: (essence) => (essenceStatusOf(essence) === 'enabled' ? 0 : 1),
+    components: (essence) => numeric(essence?.componentUsageCount),
+    recipes: (essence) => numeric(essence?.recipeUsageCount),
+  }),
+  filters: Object.freeze([
+    {
+      id: 'status',
+      allowed: ESSENCE_STATUS_FILTERS,
+      matches: (essence, value) => value === 'all' || essenceStatusOf(essence) === value,
+    },
+    {
+      id: 'source',
+      allowed: ESSENCE_SOURCE_FILTERS,
+      matches: (essence, value) => value === 'all' || matchesSourceFilter(essence, value),
+    },
+  ]),
+});
+
+export const filterEssences = (rows, filters) => filterEntities(rows, filters, ESSENCE_ADAPTER);
+export const sortEssences = (rows, options) => sortEntities(rows, options, ESSENCE_ADAPTER);
+export const paginateEssences = (rows, options) => paginateEntities(rows, options, ESSENCE_ADAPTER);
+export const describeActiveEssenceFilters = (filters) =>
+  describeActiveEntityFilters(filters, ESSENCE_ADAPTER);
 
 /**
  * How many rows each status holds — the counts the segmented control's option labels read, so the
@@ -73,66 +108,22 @@ export function essenceStatusCounts(essences) {
   };
 }
 
-function numeric(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-const SORT_VALUES = Object.freeze({
-  // Enabled first on an ascending sort: the GM's working set is the live essences, and a status
-  // sort that buried them under the disabled ones would invert the control's obvious reading.
-  status: (essence) => (essenceStatusOf(essence) === 'enabled' ? 0 : 1),
-  components: (essence) => numeric(essence?.componentUsageCount),
-  recipes: (essence) => numeric(essence?.recipeUsageCount),
-});
-
-/** Sort the rows by key + direction with an EXPLICIT comparator. */
-export function sortEssences(essences, options = {}) {
-  const key = ESSENCE_SORT_KEYS.includes(options.key) ? options.key : 'name';
-  const direction = options.direction === 'desc' ? -1 : 1;
-  const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
-  const read = SORT_VALUES[key];
-
-  return [...(Array.isArray(essences) ? essences : [])].sort((a, b) => {
-    if (!read) return direction * byName(a, b);
-    const delta = read(a) - read(b);
-    return delta === 0 ? byName(a, b) : direction * delta;
-  });
-}
-
-/**
- * Slice one page out of the rows, clamping the page index into range so a filter change that
- * shrinks the list can never strand the pager on an empty page.
- */
-export function paginateEssences(essences, options = {}) {
-  const { rows, ...window } = paginateRows(essences, options, ESSENCE_DEFAULT_PAGE_SIZE);
-  return { essences: rows, ...window };
-}
-
-/** The active-filter chips, as data. */
-export function describeActiveEssenceFilters(filters = {}) {
-  const chips = [];
-  if (filters.status && filters.status !== 'all') {
-    chips.push({ id: 'status', value: filters.status });
-  }
-  if (filters.source && filters.source !== 'all') {
-    chips.push({ id: 'source', value: filters.source });
-  }
-  const search = String(filters.search || '').trim();
-  if (search) chips.push({ id: 'search', value: search });
-  return chips;
-}
+const idsOf = (rows) => rows.map((essence) => String(essence?.id ?? '')).filter(Boolean);
 
 /** Run the whole pipeline in one call: filter → sort → paginate. */
 export function buildEssenceBrowserModel(essences, options = {}) {
-  const filtered = filterEssences(essences, options);
-  const sorted = sortEssences(filtered, options);
-  const paged = paginateEssences(sorted, options);
+  const model = buildEntityBrowserModel(essences, options, ESSENCE_ADAPTER);
 
   return {
-    ...paged,
-    filteredIds: sorted.map((essence) => String(essence?.id ?? '')).filter(Boolean),
-    pageIds: paged.essences.map((essence) => String(essence?.id ?? '')).filter(Boolean),
+    essences: model.page,
+    pageIndex: model.pageIndex,
+    pageCount: model.pageCount,
+    totalCount: model.totalCount,
+    rangeStart: model.rangeStart,
+    rangeEnd: model.rangeEnd,
+    filteredIds: idsOf(model.sorted),
+    pageIds: idsOf(model.page),
+    // A second, status-neutral pass, so each option's count survives the status filter itself.
     statusCounts: essenceStatusCounts(filterEssences(essences, { ...options, status: 'all' })),
   };
 }

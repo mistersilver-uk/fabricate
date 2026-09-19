@@ -307,7 +307,9 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         'src/ui/svelte/actions/dragDrop.js',
         'src/utils/componentCategories.js',
         'src/ui/model/componentBrowserModel.js',
-        // componentBrowserModel imports the shared category totals; omitting it HANGS the suite
+        // ... which since issue 1688 runs on the shared adapter-driven pipeline.
+        'src/ui/model/entityBrowserModel.js',
+        // entityBrowserModel imports the shared category totals; omitting it hangs the suite
         // (`# cancelled`) rather than failing it.
         'src/ui/model/browserGroupCounts.js',
         // ... and, since issue 1036, the shared page-window model too. Same consequence.

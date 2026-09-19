@@ -3,8 +3,15 @@
  * per-row derivations the rich row renders.
  */
 
-import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
-import { paginateRows } from './browserPagination.js';
+import {
+  buildEntityBrowserModel,
+  canonicalBrowserOptions,
+  describeActiveEntityFilters,
+  filterEntities,
+  groupEntitiesByCategory,
+  paginateEntities,
+  sortEntities,
+} from './entityBrowserModel.js';
 
 /** Sort keys offered by the library toolbar, in menu order. */
 export const RECIPE_SORT_KEYS = Object.freeze([
@@ -24,10 +31,7 @@ export const RECIPE_LOCK_FILTERS = Object.freeze(['all', 'unlocked', 'locked']);
 /** Default page size. */
 export const RECIPE_DEFAULT_PAGE_SIZE = 25;
 
-/**
- * Build a fresh recipe-browser view-state object: the filter / sort / group / paginate controls
- * that live above the pure list model (issue 643).
- */
+/** The filter / sort / group / paginate controls that live above the pure list model. */
 export function createRecipeBrowserState() {
   return {
     statusFilter: 'all',
@@ -44,7 +48,6 @@ export function createRecipeBrowserState() {
   };
 }
 
-/** The reserved category key a recipe with no authored category falls back to. */
 const GENERAL_CATEGORY = 'general';
 
 function numeric(value, fallback = 0) {
@@ -52,32 +55,10 @@ function numeric(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-/**
- * The category bucket a row belongs to; an unauthored category falls back to the reserved `general`
- * catch-all.
- */
+/** The category bucket a row belongs to, falling back to the reserved `general` catch-all. */
 export function recipeCategoryOf(recipe) {
   const raw = typeof recipe?.category === 'string' ? recipe.category.trim() : '';
   return raw || GENERAL_CATEGORY;
-}
-
-/** Filter the projected rows by status, lock state and category. */
-export function filterRecipes(recipes, filters = {}) {
-  const status = filters.status || 'all';
-  const lock = filters.lock || 'all';
-  const category = filters.category || 'all';
-
-  return (Array.isArray(recipes) ? recipes : []).filter((recipe) => {
-    const enabled = recipe?.enabled !== false;
-    const locked = recipe?.locked === true;
-
-    if (status === 'on' && !enabled) return false;
-    if (status === 'off' && enabled) return false;
-    if (lock === 'locked' && !locked) return false;
-    if (lock === 'unlocked' && locked) return false;
-    if (category !== 'all' && recipeCategoryOf(recipe) !== category) return false;
-    return true;
-  });
 }
 
 /** The attention rank a row sorts on. */
@@ -86,92 +67,55 @@ export function attentionRank(recipe) {
   return recipe?.enabled === false ? 2 : 1;
 }
 
-// A recipe with no resolvable DC sorts below every recipe that has one, in both directions, rather
-// than colliding with DC 0.
-const SORT_VALUES = Object.freeze({
-  attention: (recipe) => attentionRank(recipe),
-  dc: (recipe) => numeric(recipe?.checkSummary?.dc, -Infinity),
-  ingredients: (recipe) => numeric(recipe?.ingredientCount),
-  results: (recipe) => numeric(recipe?.resultItemCount),
+/**
+ * How the recipe library shapes the shared pipeline. It supplies no category comparator, so
+ * `general` sorts alphabetically among the named buckets rather than last; grouping off still draws
+ * through one unnamed bucket, because the view renders groups rather than rows; and a non-string
+ * search term makes no chip, which is the affordance the GM clears a search with.
+ */
+const RECIPE_ADAPTER = Object.freeze({
+  rowsKey: 'recipes',
+  sortKeys: RECIPE_SORT_KEYS,
+  defaultPageSize: RECIPE_DEFAULT_PAGE_SIZE,
+  categoryOf: recipeCategoryOf,
+  ungroupedGroups: 'single',
+  searchOf: (options) => (typeof options.search === 'string' ? options.search.trim() : ''),
+  // A recipe with no resolvable DC sorts below every recipe that has one, in both directions,
+  // rather than colliding with DC 0.
+  sortValues: Object.freeze({
+    attention: (recipe) => attentionRank(recipe),
+    dc: (recipe) => numeric(recipe?.checkSummary?.dc, -Infinity),
+    ingredients: (recipe) => numeric(recipe?.ingredientCount),
+    results: (recipe) => numeric(recipe?.resultItemCount),
+  }),
+  // `all`, and any value the toolbar cannot produce, admits every row.
+  filters: Object.freeze([
+    {
+      id: 'status',
+      matches: (recipe, value) =>
+        value === 'on' ? recipe?.enabled !== false : value !== 'off' || recipe?.enabled === false,
+    },
+    {
+      id: 'lock',
+      matches: (recipe, value) =>
+        value === 'locked'
+          ? recipe?.locked === true
+          : value !== 'unlocked' || recipe?.locked !== true,
+    },
+    {
+      id: 'category',
+      matches: (recipe, value) => value === 'all' || recipeCategoryOf(recipe) === value,
+    },
+  ]),
 });
 
-function sortValue(recipe, key) {
-  const read = SORT_VALUES[key];
-  return read ? read(recipe) : 0;
-}
-
-/** Order two rows by their category. */
-function compareRecipeCategories(left, right) {
-  return recipeCategoryOf(left).localeCompare(recipeCategoryOf(right));
-}
-
-/**
- * The per-key row comparator, factored out so both the flat sort and the category-major sort
- * compose the SAME within-row ordering (a bug injected here flips both).
- */
-function rowComparator(key, direction) {
-  const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
-  return (a, b) => {
-    if (key === 'name') return direction * byName(a, b);
-    const delta = sortValue(a, key) - sortValue(b, key);
-    if (delta !== 0) return direction * delta;
-    return byName(a, b);
-  };
-}
-
-/** Sort the rows by key + direction with an EXPLICIT comparator. */
-export function sortRecipes(recipes, options = {}) {
-  const key = RECIPE_SORT_KEYS.includes(options.key) ? options.key : 'name';
-  const direction = options.direction === 'desc' ? -1 : 1;
-  const compareRows = rowComparator(key, direction);
-  const comparator = options.categoryMajor
-    ? (a, b) => compareRecipeCategories(a, b) || compareRows(a, b)
-    : compareRows;
-
-  return [...(Array.isArray(recipes) ? recipes : [])].sort(comparator);
-}
-
-/** Group the rows into category buckets, preserving the incoming row order inside each bucket. */
-export function groupRecipesByCategory(recipes, categoryTotals) {
-  const buckets = new Map();
-
-  for (const recipe of Array.isArray(recipes) ? recipes : []) {
-    const category = recipeCategoryOf(recipe);
-    if (!buckets.has(category)) buckets.set(category, []);
-    buckets.get(category).push(recipe);
-  }
-
-  return [...buckets]
-    .map(([category, rows]) => ({
-      category,
-      recipes: rows,
-      total: categoryTotalOf(categoryTotals, category, rows.length),
-    }))
-    .sort((a, b) => compareRecipeCategories(a, b));
-}
-
-/**
- * Slice one page out of the rows, clamping the page index into range so a filter change that
- * shrinks the list can never strand the pager on an empty page.
- */
-export function paginateRecipes(recipes, options = {}) {
-  const { rows, ...window } = paginateRows(recipes, options, RECIPE_DEFAULT_PAGE_SIZE);
-  return { recipes: rows, ...window };
-}
-
-/** The active-filter chips, as data. */
-export function describeActiveFilters(filters = {}) {
-  const chips = [];
-  if (filters.status && filters.status !== 'all')
-    chips.push({ id: 'status', value: filters.status });
-  if (filters.lock && filters.lock !== 'all') chips.push({ id: 'lock', value: filters.lock });
-  if (filters.category && filters.category !== 'all') {
-    chips.push({ id: 'category', value: filters.category });
-  }
-  const search = typeof filters.search === 'string' ? filters.search.trim() : '';
-  if (search) chips.push({ id: 'search', value: search });
-  return chips;
-}
+export const filterRecipes = (rows, filters) => filterEntities(rows, filters, RECIPE_ADAPTER);
+export const sortRecipes = (rows, options) => sortEntities(rows, options, RECIPE_ADAPTER);
+export const paginateRecipes = (rows, options) => paginateEntities(rows, options, RECIPE_ADAPTER);
+export const describeActiveFilters = (filters) =>
+  describeActiveEntityFilters(filters, RECIPE_ADAPTER);
+export const groupRecipesByCategory = (rows, totals) =>
+  groupEntitiesByCategory(rows, totals, RECIPE_ADAPTER);
 
 /** The row's I/O readout (issue 643 §9 — resolved there, do not re-derive). */
 export function deriveRecipeIo(recipe, resolutionMode) {
@@ -450,34 +394,11 @@ export function buildRecipeRoutingModel(recipe) {
 
 /** Run the whole pipeline in one call: filter → sort → paginate (→ group the page). */
 export function buildRecipeBrowserModel(recipes, options = {}) {
-  const filtered = sortRecipes(filterRecipes(recipes, options), {
-    key: options.sortKey,
-    direction: options.sortDirection,
-    // Grouping ON ⇒ order category-major BEFORE pagination, so each category is a contiguous run
-    // across page boundaries rather than an interleaved slice per page.
-    categoryMajor: !!options.groupByCategory,
-  });
-  // COUNTED BEFORE PAGINATION, unconditionally (issue 1081).
-  const categoryTotals = countByCategory(filtered, recipeCategoryOf);
-  const paged = paginateRecipes(filtered, options);
-  const groups = options.groupByCategory
-    ? groupRecipesByCategory(paged.recipes, categoryTotals)
-    : [{ category: '', recipes: paged.recipes, total: paged.recipes.length }];
-
-  return {
-    filtered,
-    page: paged.recipes,
-    groups,
-    // The FILTERED-COHORT counts, exported so a caller rendering its own header reads the same map
-    // the group headers do instead of recounting whatever array it happens to hold.
-    categoryTotals,
-    pageIndex: paged.pageIndex,
-    pageCount: paged.pageCount,
-    totalCount: paged.totalCount,
-    // The page WINDOW, so the count can read "1–5 of 12" rather than "5 of 12" — which never told
-    // the GM which page they were on.
-    rangeStart: paged.rangeStart,
-    rangeEnd: paged.rangeEnd,
-    chips: describeActiveFilters(options),
-  };
+  const { filtered, sorted, ...model } = buildEntityBrowserModel(
+    recipes,
+    canonicalBrowserOptions(options),
+    RECIPE_ADAPTER
+  );
+  // This library's `filtered` is the sorted cohort, which is how its views read it.
+  return { filtered: sorted, ...model };
 }

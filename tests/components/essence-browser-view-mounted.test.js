@@ -34,6 +34,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/model/essenceBrowserModel.js',
+    // ... which since issue 1688 runs on the shared adapter-driven pipeline.
+    'src/ui/model/entityBrowserModel.js',
     'src/ui/model/essenceBulkEditModel.js',
     'src/utils/bulkSelectionModel.js',
     'src/ui/model/browserGroupCounts.js',
