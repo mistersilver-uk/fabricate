@@ -15,9 +15,16 @@ import {
 } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 
-const refuse = (message, extras = {}) => ({
-  result: { success: false, results: null, message, salvageRun: null, ...extras },
+/** The five-key shape every salvage refusal returns, here and at `salvage()`'s own gates. */
+export const salvageRefusal = (message, extras = {}) => ({
+  success: false,
+  results: null,
+  message,
+  salvageRun: null,
+  ...extras,
 });
+
+const refuse = (message, extras = {}) => ({ result: salvageRefusal(message, extras) });
 
 /** Narrow a resolution's fired complications to the four keys the SALVAGE RUN RECORD stores
  * (issue 1286). Redaction happens HERE, at the write, through `publicComplications`, keyed on

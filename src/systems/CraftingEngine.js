@@ -122,6 +122,7 @@ import {
   resolveSalvageFailure,
   resolveSalvageRunRecord,
   runSalvageCheck,
+  salvageRefusal,
   validateSalvageTools,
 } from './salvagePipeline.js';
 import {
@@ -6661,19 +6662,14 @@ export class CraftingEngine {
       refusal: null,
     };
     if (!ctx.actor) {
-      ctx.refusal = { success: false, results: null, message: 'Actor not found', salvageRun: null };
+      ctx.refusal = salvageRefusal('Actor not found');
       return ctx;
     }
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     ctx.system = systemManager?.getSystem(craftingSystemId);
     if (!ctx.system) {
-      ctx.refusal = {
-        success: false,
-        results: null,
-        message: `Crafting system "${craftingSystemId}" not found`,
-        salvageRun: null,
-      };
+      ctx.refusal = salvageRefusal(`Crafting system "${craftingSystemId}" not found`);
       return ctx;
     }
 
@@ -6689,31 +6685,18 @@ export class CraftingEngine {
         }
       : null;
     if (!ctx.component) {
-      ctx.refusal = {
-        success: false,
-        results: null,
-        message: `Component "${componentId}" not found in system`,
-        salvageRun: null,
-      };
+      ctx.refusal = salvageRefusal(`Component "${componentId}" not found in system`);
       return ctx;
     }
 
     if (!ctx.system.features?.salvage) {
-      ctx.refusal = {
-        success: false,
-        results: null,
-        message: 'Salvage feature is not enabled on this crafting system',
-        salvageRun: null,
-      };
+      ctx.refusal = salvageRefusal('Salvage feature is not enabled on this crafting system');
       return ctx;
     }
     if (!ctx.component.salvage?.enabled) {
-      ctx.refusal = {
-        success: false,
-        results: null,
-        message: `Salvage is not enabled for component "${ctx.component.name || componentId}"`,
-        salvageRun: null,
-      };
+      ctx.refusal = salvageRefusal(
+        `Salvage is not enabled for component "${ctx.component.name || componentId}"`
+      );
       return ctx;
     }
 
@@ -6723,16 +6706,13 @@ export class CraftingEngine {
     if (resolutionService) {
       const validation = resolutionService.validateSalvage(ctx.component, ctx.system);
       if (!validation.valid) {
-        ctx.refusal = {
-          success: false,
-          // The SAME additive discriminator the misconfigured-check abort carries (issue 859).
-          // This gate runs BEFORE `_runSalvageCraftingCheck`, so without the flag a caller reads
-          // a GM-side config error as a rolled failure and tells the player "nothing recovered".
-          misconfigured: true,
-          results: null,
-          message: `Invalid salvage configuration: ${validation.errors.join(', ')}`,
-          salvageRun: null,
-        };
+        // The SAME additive discriminator the misconfigured-check abort carries (issue 859).
+        // This gate runs BEFORE `_runSalvageCraftingCheck`, so without the flag a caller reads
+        // a GM-side config error as a rolled failure and tells the player "nothing recovered".
+        ctx.refusal = salvageRefusal(
+          `Invalid salvage configuration: ${validation.errors.join(', ')}`,
+          { misconfigured: true }
+        );
       }
     }
     return ctx;
