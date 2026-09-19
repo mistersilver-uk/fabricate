@@ -66,7 +66,7 @@ function createServices({ modifiers = [], prerequisites = [], currencyUnits = []
     setSetting,
     randomID: () => `cur-seed-${++idSeq}`,
   });
-  // The systemManager stays local because its `updateSystem` DEEP-CLONES the requirements it
+  // The systemManager stays local because its `updateSystem` deep-clones the requirements it
   // persists, which is what keeps the currency ladder from aliasing the caller's draft.
   return createSharedServices(system, [], [], {
     getSetting,

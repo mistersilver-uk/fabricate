@@ -231,7 +231,7 @@ export function makeEssenceStoreHarness(options = {}) {
   };
 
   // The shared admin-services fixture, with the essence write primitives above composed over it:
-  // those four ARE the subject of these suites, the rest is the same boilerplate every suite uses.
+  // those four are the subject of these suites, the rest is the same boilerplate every suite uses.
   const services = createServices(system, recipes, [], {
     getCraftingSystemManager: () => systemManager,
     dialogCapture: { confirmations, localizations, notifications, confirm: options.confirm },

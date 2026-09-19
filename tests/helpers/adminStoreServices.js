@@ -47,8 +47,8 @@ export function makeSystem(overrides = {}) {
 }
 
 /**
- * `getSetting`/`setSetting` over a caller-owned record. Without one the historical defaults hold
- * (`lastManagedCraftingSystem` -> `sys1`); with one the record is the ONLY source, so a suite that
+ * `getSetting`/`setSetting` over a caller-owned record. Without one the fixture's defaults hold
+ * (`lastManagedCraftingSystem` -> `sys1`); with one the record is the only source, so a suite that
  * seeds nothing starts with no selected system.
  */
 function settingAccessors(settings) {
@@ -104,9 +104,9 @@ function dialogAccessors({ confirmations, localizations, notifications, confirm 
 }
 
 /**
- * The shared services double. `overrides` reaches the returned services object, never the managers
- * inside it, so a suite whose items live under a key other than `system.items`, or whose write log
- * is read positionally, composes its own manager through `overrides.getCraftingSystemManager`.
+ * The shared services double. `updateRecipe`, `settings`, `systemWrites` and `dialogCapture` are
+ * consumed here and reach the managers; every other `overrides` key lands on the services object
+ * only, so a suite that needs a different manager passes `overrides.getCraftingSystemManager`.
  */
 export function createServices(system, recipes = [], capture = [], overrides = {}) {
   const { updateRecipe, settings, systemWrites, dialogCapture, ...serviceOverrides } = overrides;

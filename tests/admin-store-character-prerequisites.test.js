@@ -35,7 +35,6 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
   });
   return createSharedServices(system, [], [], {
     settings: {},
-    systemWrites: [],
     getCharacterLibrariesStore: () => characterLibrariesStore,
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getFoundrySystemId: () => foundrySystemId,
