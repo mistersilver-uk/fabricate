@@ -13,7 +13,13 @@ export default {
   phase: 'phase-E',
   section: null,
   publishes: [],
-  consumes: ['cleanup', 'craftingSetup', 'executionFixtures', 'alchemyFixtures', 'd0TeardownTolerated'],
+  consumes: [
+    'cleanup',
+    'craftingSetup',
+    'executionFixtures',
+    'alchemyFixtures',
+    'd0TeardownTolerated',
+  ],
   async run(ctx) {
     const { page, results, screenshot, shouldRunScreenshotPhase } = ctx;
     if (!shouldRunScreenshotPhase('phase-E')) {
@@ -30,9 +36,9 @@ export default {
         await runPhaseEAlchemyAndJournal(ctx, { appShell });
         results.steps.push({ step: 'craft-item-phase', passed: true });
         process.stdout.write('Phase E complete.\n');
-      } catch (err) {
-        results.steps.push({ step: 'craft-item-phase', passed: false, error: err.message });
-        process.stderr.write(`Phase E failed: ${err.message}\n`);
+      } catch (error) {
+        results.steps.push({ step: 'craft-item-phase', passed: false, error: error.message });
+        process.stderr.write(`Phase E failed: ${error.message}\n`);
         // Issue #807: wrap the failure screenshot (mirroring journal-failure).
         try {
           await screenshot(page, 'craft-failure');
@@ -41,5 +47,5 @@ export default {
         }
       }
     }
-  }
+  },
 };
