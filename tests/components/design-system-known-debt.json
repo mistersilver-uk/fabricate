@@ -454,7 +454,6 @@
     "src/ui/svelte/apps/manager/checks/CheckTriggers.svelte | 1",
     "src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte | 1",
     "src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte | 1",
-    "src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte | 1",
     "src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte | 1",
     "src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte | 1",
     "src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte | 1",

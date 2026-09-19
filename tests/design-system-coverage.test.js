@@ -604,7 +604,7 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 31 shipped rows the library does not name. RE-COUNTED at issue 1392 rather than incremented.
+ * The 32 shipped rows the library does not name. RE-COUNTED at issue 1392 rather than incremented.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
@@ -628,6 +628,8 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
+  // Issue 1707's gathering modifier panel: no specimen names a condition-and-character editor.
+  'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   // Issue 1648 reuses these domain authoring compositions across crafting and gathering.
   // The manifest records their new shared membership and why no generic library entry applies.
