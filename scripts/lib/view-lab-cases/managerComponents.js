@@ -107,11 +107,10 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
-  // The first open-panel frame in the component studio (issue 1510), and the only way to photograph
-  // a converted control's own subject: the option list exists only while the panel is open, and an
-  // open panel cannot double as this editor's closed-state frame because the portal occludes the
-  // screen behind it. The category card's control is the phase's widest `form` trigger and its
-  // list is UNTICKED, which is the polarity the ticked recipe frame beside it does not draw.
+  // The first open-panel frame in the component studio (issue 1510): the option list exists only
+  // while the panel is open, so a closed-state frame cannot double for it (the portal occludes
+  // the screen behind it). The category card's control is the widest `form` trigger, and its
+  // list is unticked, the polarity the ticked recipe frame beside it does not draw.
   managerCase({
     id: 'manager-component-edit-category-list',
     label: 'Manager — Component edit category list',
@@ -126,7 +125,7 @@ export const CASES = Object.freeze([
       { selector: '[data-component-edit-category]' },
     ],
     expectView: 'component-edit',
-    // Three claims a closed-state frame fails: the panel exists, it is the UNTICKED list, and its inherit row — the one option that is not a category at all — is drawn inside it.
+    // Three claims a closed-state frame fails: the panel exists, it is the unticked list, and its inherit row — the one option that is not a category at all — is drawn inside it.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover:not(.fabricate-select-popover-ticked) ' +
       '[data-popover-option="__inherit"] .fabricate-select-label',

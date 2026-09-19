@@ -303,7 +303,7 @@
     )
   );
 
-  /** Named triggers, plus a DANGLING authored id, which keeps that clause inert rather than invalid. */
+  /** Named triggers, plus a dangling authored id, which keeps that clause inert rather than invalid. */
   function triggerOptionsFor(complication) {
     const named = triggerOptions.map((option) => ({
       value: option.id,
@@ -764,7 +764,7 @@
                       )}
                   >
                     <Select
-                      size="inline"
+                      size="toolbar"
                       class="fab-complication-trigger-select"
                       value={complication.when?.checkTrigger || ''}
                       options={triggerOptionsFor(complication)}
@@ -843,7 +843,7 @@
                     <!-- The SIX numeric comparators, filtered off the shared prerequisite table by
                          `isValuelessOperator`: an `exists` against a roll total always fires. -->
                     <Select
-                      size="inline"
+                      size="toolbar"
                       class="fab-complication-comparator"
                       value={complication.rollCondition?.cmp || ''}
                       options={comparatorOptions}
@@ -1231,12 +1231,11 @@
     min-width: 0;
   }
 
-  /* THE COMPARATOR'S SLOT, on the picker ROOT since issue 1510, and the box the trigger takes of it.
-     `:global` because the class rides a COMPONENT tag and the trigger is its grandchild, neither of
-     which Svelte stamps a scoping hash on, so the scoped form matches nothing and dies silently. An
-     EXPLICIT basis, not `0 0 auto`: the width is the six options' measure plus the glyph, and
-     `flex-shrink: 1` gives ground first, because a truncated "at least" still reads and a truncated
-     dice expression does not. `min-height` overrides the rung's 30: the row's fields share a 34. */
+  /* The comparator's slot, on the picker root since issue 1510 (the class rides a component tag
+     and the trigger is its grandchild, so only `:global` reaches it). An explicit basis, not
+     `0 0 auto`: the width is the six options' measure plus the glyph, and `flex-shrink: 1` gives
+     ground first, because a truncated "at least" still reads and a truncated dice expression does
+     not. The `toolbar` rung already gives the row's shared 34px. */
   .fab-complication-condition-row > :global(.fab-complication-comparator) {
     flex: 0 1 156px;
     min-width: 0;
@@ -1245,7 +1244,6 @@
   .fab-complication-condition-row
     > :global(.fab-complication-comparator .fabricate-select-trigger) {
     width: 100%;
-    min-height: 34px;
   }
 
   /* The comparand SLOT. The Stepper is `fill`, so it needs a slot with an intrinsic width to
@@ -1277,7 +1275,7 @@
     line-height: 1.45;
   }
 
-  /* The trigger picker's SLOT and the trigger's width; `:global` for the reason above. */
+  /* The trigger picker's slot and the trigger's width; `:global` for the reason above. */
   .fab-complication-trigger :global(.fab-complication-trigger-select) {
     flex: 1 1 220px;
     min-width: 0;

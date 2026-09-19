@@ -134,7 +134,7 @@
     onOpenWorldEntry = () => {},
   } = $props();
 
-  // Minted per INSTANCE (issue 1510), because the salvage routing rows' captions name their own
+  // Minted per instance (issue 1510), because the salvage routing rows' captions name their own
   // triggers by id and two editors can be open at once — a fixed literal would name both.
   const instanceId = $props.id();
 
@@ -1315,7 +1315,9 @@
             </div>
             <!-- The shared one-of-N picker since issue 1510, so the app draws the list. Both hooks
             ride `triggerData` onto the trigger button; `class` lands on the picker root, which is
-            where the sheet hangs the trigger's width and its `border-strong` hairline. -->
+            where the sheet hangs the trigger's width and its `border-strong` hairline. No tick: the
+            trigger states the value and the six rows are distinct names (design-system/spec.md, the
+            configurable tick). -->
             <Select
               class="manager-component-category-select"
               value={categorySelectValue}
@@ -1328,7 +1330,7 @@
               disabled={saving}
               triggerData={{
                 'data-component-edit-category': '',
-                'data-component-edit-category-locked': String(categoryLocked),
+                ...(categoryLocked ? { 'data-component-edit-category-locked': '' } : {}),
               }}
               onChange={setCategorySelection}
             />
@@ -2212,11 +2214,7 @@
                   )}
                 </p>
                 {#if salvageOutcomeNames.length > 0}
-                  <!-- A `<div>` PER ROW RATHER THAN THE `<label>` IT WAS (issue 1510): the control
-                   is the shared picker now, a button opening a portaled panel dismissed on
-                   `mousedown` while open, and a `<label>` forwards a caption click into it, so from
-                   open the caption dismissed the list and the forwarded click re-opened it. The
-                   outcome name keeps its column and names its trigger by id, not by containment. -->
+                  <!-- A `<div>`, not a `<label>`: `Select.svelte`'s host invariant. The caption names the trigger with `aria-labelledby` (issue 1510). -->
                   <div class="manager-salvage-routing-list">
                     {#each salvageOutcomeNames as outcomeName, routeIndex (outcomeName)}
                       <div class="manager-salvage-routing-row">
@@ -2268,7 +2266,7 @@
                come from. -->
               <Field as="div" class="manager-salvage-dc-card" data-salvage-dc-override="">
                 <div class="manager-salvage-dc-copy">
-                  <span class="manager-salvage-dc-title"
+                  <span id={`${instanceId}-salvage-dc-title`} class="manager-salvage-dc-title"
                     >{text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride',
                       'Salvage check DC'
@@ -2284,13 +2282,11 @@
                 <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7), never a
                  hard-coded DC list. Storage is unchanged: null = system default, else an integer. -->
                 <Select
+                  size="toolbar"
                   class="manager-salvage-dc-select"
                   value={salvageDcSelection}
                   options={salvageDcOptions}
-                  ariaLabel={text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride',
-                    'DC override'
-                  )}
+                  ariaLabelledBy={`${instanceId}-salvage-dc-title`}
                   disabled={saving}
                   triggerData={{ 'data-salvage-dc-preset': '' }}
                   onChange={setSalvageDcSelection}
