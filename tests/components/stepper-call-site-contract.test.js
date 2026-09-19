@@ -214,7 +214,7 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
   });
 
   it('routes both character-modifier scopes through the one shared bounds row', () => {
-    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max. Since issue
+    // D1a names four genuine-absence fields here — drop min/max and event min/max. Since issue
     // 1707 wrote the modifier panel once, the bounds row has one call site rather than two; phase
     // 2 then moved the two panel tags into the task and event leaves and phase 3 moved the chain
     // that picks between them into the rail, so each scope's wiring spans the leaf's panel tag and

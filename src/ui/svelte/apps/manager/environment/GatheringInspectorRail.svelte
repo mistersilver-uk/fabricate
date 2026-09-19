@@ -7,7 +7,8 @@
 
   Every reader and writer arrives as a prop from the shell, which still owns the state; the
   two `bind:` props are the character-modifier search anchor and term, shared by both subjects.
-  `characterModifierSearchOpenUp` is a plain value because only the drop list computes it.
+  `characterModifierSearchOpenUp` is a plain value because only the shell computes it and the
+  drop list reads it.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -74,17 +75,17 @@
     selectedEnvironment,
     selectedEnvironmentFacts,
     selectedEnvironmentSceneState,
-    environmentList,
+    environmentList = [],
     environmentValidationCount,
     environmentSaveError,
-    environmentDirtyFor,
+    environmentDirtyFor = () => false,
     environmentInvalidFor,
     environmentImage,
     environmentName,
     environmentSelectionModeLabel,
     environmentStatusLabel,
     hasEnvironmentImage,
-    truncateDescription,
+    truncateDescription = () => '',
     characterModifierSearchAnchor = $bindable(),
     characterModifierSearchTerm = $bindable(),
     onDuplicateDrop = () => {},

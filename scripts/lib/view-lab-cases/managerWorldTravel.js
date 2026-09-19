@@ -69,6 +69,8 @@ export const CASES = Object.freeze([
       // Issue 1707 moved this column's markup out of the root; `world/` has no directory regex,
       // so each travel case claims the leaf by name or it stops being photographed.
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -88,6 +90,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -110,6 +114,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -133,6 +139,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -153,6 +161,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -174,6 +184,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
       /^styles\/fabricate\.css$/,
     ],
   }),

@@ -63,7 +63,7 @@ const CLASS_EXCEPTIONS = Object.freeze([
     file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
     count: 2,
     why:
-      'deferred with a named reason: issue 1707 RELOCATED these two without converting either — ' +
+      'deferred with a named reason: issue 1707 relocated these two without converting either — ' +
       'the condition-modifier card and the character-modifier card of the panel it wrote once — ' +
       'so the deferral is unchanged in substance and the file is now small enough for a ' +
       'conversion lane to take this screen on its own. Pinned by count so a later partial pass ' +

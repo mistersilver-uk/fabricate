@@ -36,7 +36,7 @@ const {
 
 /**
  * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
- * PERSISTS a picked character modifier before the panel is rendered again (issue 1707).
+ * persists a picked character modifier before the panel is rendered again (issue 1707).
  */
 function modifierEditorShell(subject, attached = []) {
   const picked = [];
@@ -2953,7 +2953,7 @@ export function registerEnvironmentsCases() {
     );
   });
 
-  // The DOM half of what `gathering-event-editor.test.js` pinned as root TEXT: the panel is one
+  // The DOM half of what `gathering-event-editor.test.js` pinned as root text: the panel is one
   // component now, so only rendering both subjects can prove their hooks stayed distinct.
   for (const subject of ['drop', 'event']) {
     it(`renders the shared modifier panel under its own ${subject} hook prefix`, async () => {
@@ -3160,10 +3160,8 @@ export function registerEnvironmentsCases() {
     );
   });
 
-  // The rail's OWN states (issue 1707 phase 3). The branch chain moved into
-  // `environment/GatheringInspectorRail.svelte`, and these two cases are the first DOM assertions
-  // on the summary and empty-library cards it draws itself: both were pinned only as root source
-  // text before, which a relocation satisfies without rendering anything.
+  // The two states the rail draws itself (issue 1707 phase 3): the selected environment's
+  // summary card and the empty-library setup card, neither of which had a DOM assertion.
   it('draws the selected environment summary in the rail, and follows the row that is picked', async () => {
     const calls = [];
     target = document.createElement('div');

@@ -1865,8 +1865,8 @@ export function registerGatheringCases() {
     );
   });
 
-  // The EVENT half of the shared panel, asserted through the ROOT (issue 1707): only the rendered
-  // hook name can prove the shell still asks for the event subject at THIS call site.
+  // The event half of the shared panel, asserted through the root (issue 1707): only the rendered
+  // hook name can prove the shell still asks for the event subject at this call site.
   it('renders the shared modifier panel at the event subject on the event editor route', async () => {
     await openDirtyGatheringEventEditor([], {});
 
