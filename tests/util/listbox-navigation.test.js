@@ -541,7 +541,7 @@ describe('listbox navigation: the cursor arithmetic', () => {
 
     it('drops a prefix the inactivity window has expired', () => {
       assert.deepEqual(
-        typeAheadOwnsKey({ key: 'b' }, holder({ buffer: { text: 'q', at: 1 }, resetAfter: 500 })),
+        typeAheadOwnsKey({ key: 'b' }, holder({ buffer: { text: 'q', at: 800 }, resetAfter: 50 })),
         { buffer: { text: 'b', at: 1000 }, index: 1 }
       );
     });
@@ -570,21 +570,21 @@ describe('listbox navigation: the cursor arithmetic', () => {
     const ROWS = [
       ['opens a closed holder at the top on ArrowDown', { key: 'ArrowDown' }, { open: false }, { kind: 'open', index: 0 }],
       ['opens a closed holder at the bottom on ArrowUp', { key: 'ArrowUp' }, { open: false }, { kind: 'open', index: 2 }],
-      ['opens a closed holder at the ends on Home and End', { key: 'Home' }, { open: false }, { kind: 'open', index: 0 }],
+      ['opens a closed holder at the first row on Home', { key: 'Home' }, { open: false }, { kind: 'open', index: 0 }],
       ['opens a closed holder on End at the last row', { key: 'End' }, { open: false }, { kind: 'open', index: 2 }],
       ['opens on alt+ArrowDown without moving the cursor', { key: 'ArrowDown', altKey: true }, { open: false }, { kind: 'open', index: null }],
       ['opens at the first enabled row when the top one is gated', { key: 'ArrowDown' }, { open: false, isDisabled: gateRow(0) }, { kind: 'open', index: 1 }],
       ['leaves a closed holder with a query field to open itself by click', { key: 'ArrowDown' }, { open: false, showSearch: true }, PASS_THROUGH],
       ['leaves a closed holder the caller has gated alone', { key: 'ArrowDown' }, { open: false, holderDisabled: true }, PASS_THROUGH],
       ['types a closed holder open, carrying the row the prefix found', { key: 'b' }, { open: false }, { kind: 'type-ahead', buffer: { text: 'b', at: 1000 }, index: 1 }],
-      ['types a closed holder`s buffer forward without opening it on no match', { key: 'z' }, { open: false }, { kind: 'type-ahead', buffer: { text: 'z', at: 1000 }, index: null }],
+      ['types a closed holder’s buffer forward without opening it on no match', { key: 'z' }, { open: false }, { kind: 'type-ahead', buffer: { text: 'z', at: 1000 }, index: null }],
       ['leaves Enter on a closed holder to the browser', { key: 'Enter' }, { open: false }, PASS_THROUGH],
       ['leaves shift+ArrowDown on a closed holder alone', { key: 'ArrowDown', shiftKey: true }, { open: false }, PASS_THROUGH],
       ['chooses the active row on Enter', { key: 'Enter' }, { current: 1 }, { kind: 'choose', index: 1 }],
       ['chooses nothing on Enter over the sentinel', { key: 'Enter' }, { current: -1 }, PASS_THROUGH],
       ['chooses nothing on Enter over an index the list no longer holds', { key: 'Enter' }, { current: 5 }, PASS_THROUGH],
       ['moves the cursor down a row', { key: 'ArrowDown' }, { current: 0 }, { kind: 'move-cursor', index: 1 }],
-      ['moves the cursor up over the ring`s end', { key: 'ArrowUp' }, { current: 0 }, { kind: 'move-cursor', index: 2 }],
+      ['moves the cursor up over the ring’s end', { key: 'ArrowUp' }, { current: 0 }, { kind: 'move-cursor', index: 2 }],
       ['moves the cursor to the first row on Home', { key: 'Home' }, { current: 2 }, { kind: 'move-cursor', index: 0 }],
       ['moves the cursor to the last row on End', { key: 'End' }, { current: 0 }, { kind: 'move-cursor', index: 2 }],
       ['moves the cursor over a gated row rather than onto it', { key: 'ArrowDown' }, { current: 0, isDisabled: gateRow(1) }, { kind: 'move-cursor', index: 2 }],
@@ -595,11 +595,13 @@ describe('listbox navigation: the cursor arithmetic', () => {
       ['leaves ctrl+ArrowDown to the browser', { key: 'ArrowDown', ctrlKey: true }, { current: 0 }, PASS_THROUGH],
       ['leaves shift+ArrowDown to the browser', { key: 'ArrowDown', shiftKey: true }, { current: 0 }, PASS_THROUGH],
       ['leaves Home to the caret while there is text behind it', { key: 'Home', target: queryField(1) }, { current: 2, showSearch: true }, PASS_THROUGH],
-      ['takes Home for the list once the caret sits at the field`s start', { key: 'Home', target: queryField(0) }, { current: 2, showSearch: true }, { kind: 'move-cursor', index: 0 }],
+      ['takes Home for the list once the caret sits at the field’s start', { key: 'Home', target: queryField(0) }, { current: 2, showSearch: true }, { kind: 'move-cursor', index: 0 }],
       ['leaves Escape alone, because one dismissal path owns it', { key: 'Escape' }, { current: 0 }, PASS_THROUGH],
       ['leaves Tab alone, so focus can leave the picker', { key: 'Tab' }, { current: 0 }, PASS_THROUGH],
       ['has nothing to move over an empty list', { key: 'ArrowDown' }, { current: -1, count: 0 }, PASS_THROUGH],
     ];
+
+    assert.equal(ROWS.length, 31);
 
     for (const [name, event, context, intent] of ROWS) {
       it(name, () => {

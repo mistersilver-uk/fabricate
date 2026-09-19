@@ -42,8 +42,8 @@
     the trigger's root and one on the portaled panel, which escapes the first.
   - THE FOCUS MODEL, the key map, the caret-edge rules, the type-ahead and the flat-order option ids
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
-    arithmetic and the key decision alike are `util/listboxNavigation.js`'s and
-    `util/pickerOptionModel.js`'s, this component applying the intent they hand back, and
+    arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
+    this component applying the intent the latter hands back, and
     `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin it.
   - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
     its own chrome refusing focus above all — are stated there rather than restated here.
@@ -253,22 +253,30 @@
       labels: typeAheadLabels,
       buffer: typeAheadBuffer,
     });
-    if (intent.kind === 'pass-through') return;
-    event.preventDefault();
-    if (intent.kind === 'choose') {
-      chooseOption(renderedOptions[intent.index]);
-      return;
+    switch (intent.kind) {
+      case 'choose':
+        event.preventDefault();
+        chooseOption(renderedOptions[intent.index]);
+        return;
+      case 'move-cursor':
+        event.preventDefault();
+        moveCursorTo(intent.index);
+        return;
+      case 'type-ahead':
+        event.preventDefault();
+        typeAheadBuffer = intent.buffer;
+        if (intent.index === null) return;
+        open = true;
+        moveCursorTo(intent.index);
+        return;
+      case 'open':
+        event.preventDefault();
+        open = true;
+        if (intent.index !== null) moveCursorTo(intent.index);
+        return;
+      default:
+        return;
     }
-    if (intent.kind === 'move-cursor') {
-      moveCursorTo(intent.index);
-      return;
-    }
-    if (intent.kind === 'type-ahead') {
-      typeAheadBuffer = intent.buffer;
-      if (intent.index === null) return;
-    }
-    open = true;
-    if (intent.index !== null) moveCursorTo(intent.index);
   }
 
   function restoreTriggerFocus() {

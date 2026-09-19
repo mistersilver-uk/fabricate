@@ -1,4 +1,4 @@
-// Where the keyboard cursor goes next, and what to call the row it lands on (issues 1503, 1504).
+// Where the keyboard cursor goes next, which intent a holder key carries, and what to call the row it lands on (issues 1503, 1504).
 // `openspec/specs/design-system/spec.md` requires a listbox to hold DOM focus on ONE element and
 // drive selection with `aria-activedescendant`, so "which row is current" is arithmetic — with
 // wrap-around, an out-of-range guard, a grid form and a sentinel — whose only honest test is a table
