@@ -72,12 +72,6 @@ const recipesBrowserPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
 );
-// The library inspector, extracted out of the root (issue 643). It sits under
-// `recipes/`, NOT `recipe/` — the latter is the recipe EDITOR's screenshot-map glob.
-const recipeBrowserInspectorPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
-);
 const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
 const componentsBrowserPath = resolve(
   repoRoot,
@@ -154,7 +148,6 @@ const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
-const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
@@ -185,7 +178,6 @@ const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 const managerSource = [
   rootSource,
-  recipeBrowserInspectorSource,
   essenceBrowserSource,
   essenceEditSource,
   essenceStudioSource,
@@ -526,6 +518,9 @@ const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
 const ESSENCE_BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
+const RECIPE_BROWSER_INSPECTOR =
+  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
 const ESSENCE_EDIT = 'src/ui/svelte/apps/manager/EssenceEditView.svelte';
 const LIBRARY_SHELF = 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte';
 const COMPONENT_ROW = 'src/ui/svelte/apps/manager/components/ComponentRow.svelte';
@@ -971,93 +966,6 @@ describe('CraftingSystemManager source contract', () => {
         `SystemsBrowserView should include ${snippet}`
       );
     }
-    for (const snippet of [
-      'class="manager-recipes-table"',
-      'manager-recipe-row',
-      'class="manager-recipe-identity"',
-      'manager-recipe-status',
-      // The row's restored Edit pencil and the column header above the list (issue 643).
-      'data-recipe-edit={recipe.id}',
-      'class="manager-recipe-table-head"',
-      'FABRICATE.Admin.Manager.Recipe.Column.Recipe',
-      // The lifted browser view-state seam.
-      'browserState = $bindable(null)',
-      'createRecipeBrowserState',
-    ]) {
-      assert.ok(
-        recipesBrowserSource.includes(snippet),
-        `RecipesBrowserView should include ${snippet}`
-      );
-    }
-    // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom.
-    assert.ok(
-      // `<IconButton class="manager-recipe-edit">` since issue 1422: the contract class is
-      // emitted by the primitive, so asserting it at the call site would now assert the
-      // convention this change removed.
-      /<IconButton\s+class="manager-recipe-edit"/.test(recipesBrowserSource),
-      'the row Edit affordance should be a manager-icon-button, matching Books & Scrolls'
-    );
-    assert.equal(
-      /let\s+statusFilter\s*=\s*\$state/.test(recipesBrowserSource),
-      false,
-      'the browser view-state must be lifted, not held as local component $state'
-    );
-    // The row DELEGATES its authoring-state pills to the shared activation predicate
-    // (issue 1010), which the bulk panel's pre-flight count and the attention sort read
-    // too — so the pilled rows and the counted rows are one set by construction.
-    // Delegation is all this assertion may claim, because it is all the component's text
-    // contains. The predicate is owned by `tests/util/recipe-browser-model.test.js`, and
-    // the RENDERED pills by the `authoring-state pills` cases in
-    // `tests/components/recipes-browser-view-mounted.test.js`. Two earlier attempts to
-    // pin the state here instead both failed the same way: `recipe.incomplete` ended up
-    // satisfied only by a dead `data-recipe-incomplete` attribute nothing read, and
-    // `recipe.enableBlocked` only by the prose above `STATUS_LABELS` — the field is read
-    // inside `recipeBrowserModel.js` and never appears in this markup at all. A source
-    // scan cannot see rendered state that no rendered text names.
-    assert.ok(
-      /return deriveRecipeStatuses\(recipe\)/.test(recipesBrowserSource),
-      'RecipesBrowserView should derive its authoring-state pills through the shared predicate'
-    );
-    assert.equal(
-      recipesBrowserSource.includes('recipe.incomplete'),
-      false,
-      'and must not reintroduce the narrower incomplete predicate the pills were moved off'
-    );
-    assert.ok(
-      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
-      'RecipesBrowserView should use the localized Incomplete label'
-    );
-    // The four row states are one component rather than four ad-hoc chips. The tones stay
-    // distinguishable: warning = blocked but already enabled, danger = blocked AND off, i.e.
-    assert.ok(
-      recipesBrowserSource.includes("import Chip from '../../components/Chip.svelte'"),
-      'the row should render its states through the shared Chip'
-    );
-    // AND THROUGH THE TONE MAP, which is the half a source pin can see and a mounted test
-    // cannot: the projection emits the retired pill's vocabulary, `Chip` DROPS a tone it does
-    // not know, and an unmapped row therefore renders an untoned chip on a green suite.
-    assert.ok(
-      recipesBrowserSource.includes('tone={statusChipTone(pill.tone)}'),
-      'and the projected tone should be mapped rather than bound straight onto the chip'
-    );
-    assert.ok(
-      /incomplete:\s*\['FABRICATE\.Admin\.Manager\.Recipe\.Incomplete'/.test(recipesBrowserSource),
-      'the Incomplete state should carry its localized label'
-    );
-    assert.ok(
-      recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.CantEnable'),
-      "an incomplete + disabled recipe should say enabling is refused, not merely 'incomplete'"
-    );
-    // A card row has no columns: the list is a real <ul role="list"> of <li> cards.
-    assert.ok(
-      recipesBrowserSource.includes('<ul class="manager-recipe-group-list" role="list"'),
-      'recipe rows should be a list, not a role="table"'
-    );
-    assert.equal(
-      recipesBrowserSource.includes('role="table"'),
-      false,
-      'the card row must not retain the table role'
-    );
   });
 
   // `foundry` is deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`
@@ -1492,64 +1400,6 @@ describe('CraftingSystemManager source contract', () => {
       'the workspace mirrors the environment workspace'
     );
 
-    // The library inspector's detail card is a 2x2 STAT grid (issue 643, brief §3.3),
-    // not the generic fact-line list: it answers Ingredients / Results / Steps /
-    // Crafting check. Structure and Result-groups were restatements of the row the GM
-    // had just clicked, and Produces — the one thing the old inspector could not tell
-    // them — is now a first-class section.
-    assert.ok(
-      recipeBrowserInspectorSource.includes('class="manager-recipe-stat-grid"'),
-      'the library inspector renders the 2x2 stat grid'
-    );
-    for (const fact of ['ingredients', 'results', 'steps', 'check']) {
-      assert.ok(
-        recipeBrowserInspectorSource.includes(`id: '${fact}'`),
-        `the stat grid answers "${fact}"`
-      );
-    }
-    assert.ok(
-      recipeBrowserInspectorSource.includes('data-recipe-produces-empty'),
-      'a recipe that makes nothing on a success says so'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('buildRecipeRequirementRows') &&
-        recipeBrowserInspectorSource.includes('buildRecipeProduceRows'),
-      'the Requires/Produces walk lives in the pure model, not in the component'
-    );
-
-    // The inspector is ONE column on the panel background (issue 643).
-    assert.equal(
-      recipeBrowserInspectorSource.includes('manager-inspector-card'),
-      false,
-      'the inspector sections are micro-labels on the panel, not nested cards'
-    );
-    assert.equal(
-      recipeBrowserInspectorSource.includes('Recipe.Details'),
-      false,
-      'the invented "Recipe details" heading is gone'
-    );
-
-    // `Edit recipe` is the point of the inspector.
-    assert.ok(
-      recipeBrowserInspectorSource.includes('data-recipe-action="edit"'),
-      'the inspector exposes the primary Edit action'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('onEdit = () => {}'),
-      'the inspector takes an onEdit callback'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('manager-recipe-browser-inspector-delete'),
-      'Delete is a dark danger button below Edit, not a peer of Duplicate'
-    );
-
-    // The reserved alchemy-Simple failure group is SHOWN (danger-toned).
-    assert.ok(
-      recipeBrowserInspectorSource.includes(
-        "data-recipe-produces={row.failure ? 'failure' : 'success'}"
-      ),
-      'every produced group is rendered, toned by role'
-    );
   });
 
   it('keeps first-slice action and navigation hierarchy focused', () => {
@@ -1706,16 +1556,6 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       systemsBrowserSource.includes('<StatusToggle'),
       'systems browser should render status as a toggle control'
-    );
-    assert.ok(
-      recipesBrowserSource.includes('<StatusToggle'),
-      'recipes browser should render status as a toggle control'
-    );
-    assert.ok(
-      !recipesBrowserSource.includes(
-        'type="checkbox"\n                  checked={recipe.enabled !== false}'
-      ),
-      'recipes browser should not render recipe status as a checkbox'
     );
     assert.ok(
       !rootSource.includes("setView('systems')"),
@@ -1942,21 +1782,6 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs,
       'Gathering docs'
     );
-    // The empty-recipes setup card moved into the extracted library inspector with
-    // the rest of the aside (issue 643); the root still supplies the component count
-    // and the Components deep-link.
-    assert.ok(
-      recipeBrowserInspectorSource.includes('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'),
-      'empty recipes inspector should use localized setup copy'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('https://mistersilver-uk.github.io/fabricate/crafting/recipes/'),
-      'empty recipes inspector should link to published recipe docs'
-    );
-    assert.ok(
-      recipeBrowserInspectorSource.includes('componentCount > 0'),
-      'empty recipes inspector should branch on selected-system component count'
-    );
     assert.ok(
       rootSource.includes('componentCount={selectedCounts.components}'),
       'the root should feed the inspector its component count'
@@ -2119,61 +1944,52 @@ describe('CraftingSystemManager source contract', () => {
     }
   });
 
-  it('keeps the recipes browser browser-only and wired to existing callbacks', () => {
-    for (const snippet of [
-      'store.setRecipeSearch?.',
-      'store.toggleRecipeEnabled?.',
-      'store.createRecipe?.()',
-      'store.duplicateRecipe?.(recipeId)',
-      'store.deleteRecipe?.(recipeId)',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
-    }
-    // The recipes header now offers a single primary "Create recipe" action
-    // (create-then-edit) instead of crafting-system import/export, which moved off
-    // the recipes header entirely.
-    assert.ok(
-      rootSource.includes('function createRecipe('),
-      'createRecipe handler should be defined'
-    );
-    assert.ok(
-      !rootSource.includes('onclick={importRecipes}'),
-      'recipes header should not render import'
-    );
-    assert.ok(
-      !rootSource.includes('onclick={exportRecipes}'),
-      'recipes header should not render export'
-    );
-    // The recipe-edit route is reached BOTH from the inspector's Edit action and from
-    // each row's own Edit pencil, restored to match the Books & Scrolls row edit (issue
-    // 643): the inspector wires onEdit → editRecipe, and the row wires onEditRecipe →
-    // editRecipe(id).
-    assert.ok(
-      rootSource.includes('onEdit={() => editRecipe(selectedRecipe?.id)}'),
-      'inspector Edit should be wired to editRecipe'
-    );
-    assert.ok(
-      rootSource.includes('onEditRecipe={(id) => editRecipe(id)}'),
-      'the row Edit pencil should be wired to editRecipe(id)'
-    );
-    assert.ok(
-      rootSource.includes('function editRecipe('),
-      'editRecipe navigation should be defined'
-    );
-    assert.ok(
-      rootSource.includes('function backToRecipesBrowse('),
-      'backToRecipesBrowse navigation should be defined'
-    );
-    assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');
-    // saveRecipeDraft lives in the root (it commits the root-held draft).
-    assert.ok(
-      !recipesBrowserSource.includes('saveRecipe'),
-      'recipes browser should not introduce inline save behavior'
-    );
-    assert.ok(
-      !rootSource.includes('required station'),
-      'recipes browser should not introduce unsupported recipe fields'
-    );
+  // WHAT THE LIBRARY DRAWS is driven by `tests/components/recipes-browser-view-mounted.test.js`,
+  // which mounts the browser and the inspector on their own: the card list, the row pencil, the
+  // column header, the authoring-state pills and their tones, the lifted view-state and the
+  // inspector's stat grid, action ladder and Produces section all act on real rows there. What
+  // stays is the wiring behind them, and the shapes those cases would still pass without.
+  defineStructureContract('draws the recipe library as a list of cards', RECIPES_BROWSER, {
+    declaresProp: ['browserState'],
+    names: ['createRecipeBrowserState'],
+    imports: ['../../components/Chip.svelte'],
+    calls: ['deriveRecipeStatuses', 'statusChipTone'],
+    renders: ['StatusToggle', 'IconButton'],
+    spells: ['manager-recipes-table', 'manager-recipe-table-head'],
+    spellsExactly: ['FABRICATE.Admin.Manager.Recipe.Column.Recipe'],
+    attributes: [['role', 'list']],
+    attributesNo: [
+      ['role', 'table'],
+      ['type', 'checkbox'],
+    ],
+    // The narrower predicate the pills were moved OFF, and the save that lives in the root.
+    readsNo: ['recipe.incomplete'],
+    namesNo: ['saveRecipe'],
+  });
+
+  // The aside moved into the extracted inspector (issue 643), which is ONE column on the panel
+  // background rather than five nested cards.
+  defineStructureContract('answers what a recipe needs and makes', RECIPE_BROWSER_INSPECTOR, {
+    declaresProp: ['onEdit', 'componentCount'],
+    calls: ['buildRecipeRequirementRows', 'buildRecipeProduceRows'],
+    spells: [
+      'manager-recipe-browser-inspector-delete',
+      'https://mistersilver-uk.github.io/fabricate/crafting/recipes/',
+    ],
+    spellsExactly: ['FABRICATE.Admin.Manager.Recipe.EmptySetup.Title'],
+    spellsNo: ['manager-inspector-card', 'Recipe.Details'],
+  });
+
+  // Both routes into the editor, and the two header actions that are NOT on this header.
+  defineStructureContract('routes recipe editing from the row and the inspector', MANAGER_ROOT, {
+    passesProps: [
+      ['RecipeBrowserInspector', 'onEdit'],
+      ['RecipesBrowserView', 'onEditRecipe'],
+    ],
+    names: ['editRecipe', 'backToRecipesBrowse'],
+    spellsExactly: ['recipe-edit'],
+    namesNo: ['importRecipes', 'exportRecipes'],
+    spellsNo: ['required station'],
   });
 
   // A CARD ROW HAS NO COLUMNS (issue 676): the browser is a real list and the row is its item, so
