@@ -698,7 +698,12 @@ const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svel
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
+// The reward and event limit counts are one shared component (issue 1050).
+const GATHERING_RULE_STEPPER =
+  'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte';
 const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
+const GATHERING_ECONOMY = 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 const GATHERING_TASK_EDIT = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
 const GATHERING_TASKS_BROWSER = 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 const MODIFIER_LIBRARY_ROW = 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte';
@@ -1407,33 +1412,35 @@ describe('CraftingSystemManager source contract', () => {
     passesProps: [['CraftingSettingsView', 'onSetSalvageResolutionMode']],
   });
 
-  it('authors straight, d100 and routed on each task rather than the gathering economy', () => {
-    const gatheringEconomySource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte'),
-      'utf8'
-    );
-    assert.ok(
-      !gatheringEconomySource.includes('data-gathering-resolution-mode'),
-      'the inert economy mode has no authoring selector'
-    );
-    const taskEditorSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte'),
-      'utf8'
-    );
-    assert.ok(taskEditorSource.includes('<RadioCardGroup'), 'task mode reuses the shared radio cards');
-    const optionsMatch = taskEditorSource.match(
-      /resolutionModeOptions\s*=\s*\[([\s\S]*?)\];/
-    );
-    assert.ok(optionsMatch, 'the task editor defines its mode choices');
-    const optionsBlock = optionsMatch[1];
-    for (const mode of ['straight', 'd100', 'routed']) {
-      assert.ok(optionsBlock.includes(`value: '${mode}'`), `the task offers ${mode}`);
+  // The task owns its resolution mode; the inert gathering economy offers no authoring selector
+  // for one. `resolutionMode={gatheringTaskResolutionMode}` is stated by the task-library contract
+  // below, which owns every prop the root threads into this editor.
+  defineStructureContract(
+    'offers no resolution mode on the inert gathering economy',
+    GATHERING_ECONOMY,
+    { writesNo: ['data-gathering-resolution-mode'], spellsNo: ['data-gathering-resolution-mode'] }
+  );
+
+  defineStructureContract(
+    'authors straight, d100 and routed on each task, all three selectable',
+    { file: GATHERING_TASK_EDIT, constant: 'resolutionModeOptions' },
+    {
+      property: [
+        ['value', 'straight'],
+        ['value', 'd100'],
+        ['value', 'routed'],
+      ],
+      // Dormant progressive is not offered, and none of the three authored modes is disabled.
+      propertyNo: [['value', 'progressive']],
+      keysNo: ['disabled'],
     }
-    assert.ok(!optionsBlock.includes("value: 'progressive'"), 'dormant progressive is not offered');
-    assert.ok(!optionsBlock.includes('disabled:'), 'all three authored modes are selectable');
-    assert.ok(taskEditorSource.includes('onUpdateTask({ resolutionMode: mode })'), 'mode edits patch the task');
-    assert.ok(rootSource.includes('resolutionMode={gatheringTaskResolutionMode}'), 'the parent supplies the task mode');
-  });
+  );
+
+  defineStructureContract(
+    'reuses the shared radio cards for the task mode, and patches the TASK',
+    { file: GATHERING_TASK_EDIT, fn: 'setTaskResolutionMode' },
+    { callsWith: [['onUpdateTask', 'mode']], keys: ['resolutionMode'] }
+  );
 
   it('renames the standalone overview page and retires the keys it replaced', () => {
     assert.equal(
@@ -2114,21 +2121,12 @@ describe('CraftingSystemManager source contract', () => {
     readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
   });
 
-  it('uses a purpose-built manager environment editor instead of mounting the legacy tab', () => {
-    assert.ok(
-      rootSource.includes("import EnvironmentEditView from './EnvironmentEditView.svelte';"),
-      'environment edit route should import the v2 editor view'
-    );
-    assert.ok(
-      !rootSource.includes("import EnvironmentsTab from '../EnvironmentsTab.svelte';"),
-      'manager root should not import the full legacy environments tab'
-    );
-    assert.ok(
-      !rootSource.includes('forceEditorOpen'),
-      'manager edit route should not force-open the legacy environment editor'
-    );
-    // The v2 environment editor is a composition/wrapper editor.
-    for (const snippet of [
+  // The v2 environment editor is a COMPOSITION editor (issue 429): it wraps records the libraries
+  // author rather than authoring tasks of its own, so every task-authoring store action stays out
+  // of it and the root threads the composition in.
+  defineStructureContract('uses a purpose-built manager environment editor', MANAGER_ROOT, {
+    imports: ['./EnvironmentEditView.svelte'],
+    reads: [
       'store.updateEnvironmentDraft',
       'store.saveEnvironmentDraft',
       'store.deleteEnvironmentDraft',
@@ -2138,136 +2136,104 @@ describe('CraftingSystemManager source contract', () => {
       'store.excludeEnvironmentRecord',
       'store.restoreEnvironmentRecord',
       'store.reorderEnvironmentRecord',
-      'composition={$viewState.environmentComposition}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `environment edit route should wire ${snippet}`);
-    }
-    for (const snippet of [
+      '$viewState.environmentComposition',
+    ],
+    passesProps: [['EnvironmentEditView', 'composition']],
+    importsNo: ['../EnvironmentsTab.svelte'],
+    namesNo: ['forceEditorOpen'],
+  });
+
+  defineStructureContract('composes an environment rather than authoring its tasks', ENVIRONMENT_EDIT, {
+    readsNo: [
       'store.addEnvironmentTaskResultGroup',
       'store.addEnvironmentTaskCatalyst',
       'store.updateEnvironmentTaskVisibility',
       'store.updateEnvironmentTaskCheck',
-    ]) {
-      assert.ok(
-        !environmentEditSource.includes(snippet),
-        `environment composition editor should not author tasks via ${snippet}`
-      );
-    }
-    assert.ok(
-      !environmentEditSource.includes("id: 'advanced'"),
-      'environment editor should not define an advanced task tab'
-    );
-    assert.ok(
-      !environmentEditSource.includes('manager-environment-details-tabs'),
-      'environment editor should not render environment advanced tabs'
-    );
-    assert.ok(
-      !environmentEditSource.includes('manager-environment-evidence-column'),
-      'environment editor should no longer render the duplicated evidence column'
-    );
+    ],
+    propertyNo: [['id', 'advanced']],
+    spellsNo: ['manager-environment-details-tabs', 'manager-environment-evidence-column'],
   });
 
-  it('wires Manager gathering libraries, global conditions, and environment composition controls', () => {
-    // Global conditions and vocabularies are authored from the gathering
-    // workspace browser (settings tab); library task/event authoring and rules
-    // live on their own routes, so those store actions are invoked by root-owned
-    // functions rather than passed into the environment composition editor.
-    for (const snippet of [
-      'gatheringConfig={$viewState.gatheringConfig}',
-      'onUpdateGatheringConditions={store.updateGatheringConditions}',
-      'onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}',
-      'onAddGatheringConditionValue={store.addGatheringConditionValue}',
-      'onDeleteGatheringConditionValue={store.deleteGatheringConditionValue}',
-      'onAddGatheringVocabularyValue={store.addGatheringVocabularyValue}',
-      'onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}',
-      'onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
-    }
-    // NOTE: per-token environment-editor contracts were removed when the editor
-    // was placeholder'd out pending redesign. The store wirings above and the
-    // settings/browser surfaces below still need to pass.
-    assert.ok(
-      rootSource.includes('data-gathering-inspector-rules'),
-      'root should render the settings rules inspector'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'),
-      'settings tab should render condition vocabulary panels'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onToggleGatheringConditionEnabled?.'),
-      'settings condition panels should wire matching toggles'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onAddGatheringConditionValue?.'),
-      'settings condition panels should wire value additions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onUpdateGatheringConditionValue?.'),
-      'settings condition panels should wire label and icon updates'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDeleteGatheringConditionValue?.'),
-      'settings condition panels should wire value deletion'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('data-gathering-vocabulary-panel={vocabulary.kind}'),
-      'settings tab should render region and biome vocabulary panels'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onAddGatheringVocabularyValue?.'),
-      'settings vocabulary panels should wire value additions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onUpdateGatheringVocabularyValue?.'),
-      'settings vocabulary panels should wire label, icon, and colour updates'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDeleteGatheringVocabularyValue?.'),
-      'settings vocabulary panels should wire value deletion'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('ManagerColorPicker'),
-      'settings biome panels should use the manager color picker'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('IconPicker'),
-      'settings condition panels should reuse the shared icon picker'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('manager-condition-label-input'),
-      'settings condition panels should expose editable display labels'
-    );
-    assert.ok(
-      /onAddGatheringConditionValue\?\.\(\s*kind,\s*\{ label: value, icon: conditionAddIcon\(kind\) \}/.test(
-        environmentsBrowserSource
-      ),
-      'settings condition add should include the selected icon'
-    );
-    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Conditions.NewIcon, 'New value icon');
-    // NOTE: vocabulary-CSV contracts on environmentEditSource removed pending editor redesign.
-    assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
-    assert.ok(
-      rootSource.includes('manager-rule-copy'),
-      'root should render rule descriptions beside inspector icons'
-    );
+  // Global conditions and vocabularies are authored from the gathering workspace browser (settings
+  // tab); library task/event authoring and rules live on their own routes, so those store actions
+  // are invoked by root-owned functions rather than passed into the composition editor.
+  defineStructureContract('wires the Manager gathering libraries and global conditions', MANAGER_ROOT, {
+    renders: ['GatheringRuleLimitStepper'],
+    passesProps: [
+      ['EnvironmentsBrowserView', 'gatheringConfig'],
+      ['EnvironmentsBrowserView', 'onUpdateGatheringConditions'],
+      ['EnvironmentsBrowserView', 'onToggleGatheringConditionEnabled'],
+      ['EnvironmentsBrowserView', 'onAddGatheringConditionValue'],
+      ['EnvironmentsBrowserView', 'onDeleteGatheringConditionValue'],
+      ['EnvironmentsBrowserView', 'onAddGatheringVocabularyValue'],
+      ['EnvironmentsBrowserView', 'onUpdateGatheringVocabularyValue'],
+      ['EnvironmentsBrowserView', 'onDeleteGatheringVocabularyValue'],
+    ],
+    reads: [
+      '$viewState.gatheringConfig',
+      'store.updateGatheringConditions',
+      'store.toggleGatheringConditionEnabled',
+      'store.addGatheringConditionValue',
+      'store.deleteGatheringConditionValue',
+      'store.addGatheringVocabularyValue',
+      'store.updateGatheringVocabularyValue',
+      'store.deleteGatheringVocabularyValue',
+    ],
+    names: ['updateSelectedGatheringRules', 'selectedGatheringConditionShortcuts'],
+    calls: ['buildSelectedGatheringConditionShortcuts'],
+    writes: [
+      'data-gathering-inspector-rules',
+      'data-systems-gathering-conditions',
+      'data-systems-gathering-condition',
+    ],
+    spellsExactly: [
+      'manager-rule-copy',
+      'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
+    ],
     // The two limits are one shared component now (issue 1050).
-    for (const rule of ['rewardLimit', 'eventLimit']) {
-      assert.match(
-        rootSource,
-        new RegExp(String.raw`<GatheringRuleLimitStepper\s+rule="${rule}"`),
-        `root should render the ${rule} stepper`
-      );
+    attributes: [
+      ['rule', 'rewardLimit'],
+      ['rule', 'eventLimit'],
+    ],
+  });
+
+  // The shortcut persists against the SELECTED system rather than against the world, which is the
+  // whole point of a per-system shortcut card.
+  defineStructureContract(
+    'persists a condition shortcut against the selected system',
+    { file: MANAGER_ROOT, fn: 'updateSelectedGatheringCondition' },
+    {
+      reads: ['store.updateGatheringConditions'],
+      keys: ['systemId'],
+      names: ['selectedSystemId'],
     }
-    assert.ok(
-      gatheringRuleLimitStepperSource.includes('data-gathering-rule-stepper={rule}'),
-      'the shared limit stepper marks itself with the rules field it edits'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'),
-      'event rule select should use event-specific drop labels'
-    );
+  );
+
+  defineStructureContract('marks the shared limit stepper with the field it edits', GATHERING_RULE_STEPPER, {
+    writes: ['data-gathering-rule-stepper'],
+    declaresProp: ['rule'],
+  });
+
+  // The settings tab is where a world's condition and vocabulary values are authored, through the
+  // shared pickers rather than through bespoke inputs.
+  defineStructureContract('authors global conditions and vocabularies on the settings tab', ENVIRONMENTS_BROWSER, {
+    renders: ['ManagerColorPicker', 'IconPicker'],
+    writes: ['data-gathering-condition-panel', 'data-gathering-vocabulary-panel'],
+    calls: [
+      'onToggleGatheringConditionEnabled',
+      'onAddGatheringConditionValue',
+      'onUpdateGatheringConditionValue',
+      'onDeleteGatheringConditionValue',
+      'onAddGatheringVocabularyValue',
+      'onUpdateGatheringVocabularyValue',
+      'onDeleteGatheringVocabularyValue',
+    ],
+    callsWith: [['onAddGatheringConditionValue', 'conditionAddIcon']],
+    spellsExactly: ['manager-condition-label-input'],
+  });
+
+  it('states the gathering rule and condition copy the inspector reads', () => {
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.Conditions.NewIcon, 'New value icon');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop,
       'Highest ranked successful drop'
@@ -2289,33 +2255,7 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.Rules.EventLimitedDrops,
       'Limit triggered events'
     );
-    assert.ok(
-      rootSource.includes('selectedGatheringConditionShortcuts'),
-      'root should derive selected-system condition shortcuts'
-    );
-    assert.ok(
-      rootSource.includes('buildSelectedGatheringConditionShortcuts'),
-      'root should keep shortcut visibility gated by selected-system gathering conditions'
-    );
-    assert.ok(
-      rootSource.includes('data-systems-gathering-conditions'),
-      'systems inspector should render a global condition shortcut card'
-    );
-    assert.ok(
-      rootSource.includes('data-systems-gathering-condition={condition.kind}'),
-      'systems inspector should render one shortcut per enabled condition dimension'
-    );
-    assert.ok(
-      rootSource.includes(
-        'store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId })'
-      ),
-      'systems inspector shortcuts should reuse current condition persistence with selected system id'
-    );
-    // NOTE: per-token environment-editor negative assertions removed pending editor redesign.
   });
-
-  // NOTE: FilePicker and scene-drop-zone contracts on environmentEditSource removed
-  // when the editor was placeholder'd out pending redesign.
 
   // The gathering task library, its inspector and the focused editor. What each of these DRAWS
   // and does — the rows, the drop rules, the component browser, the chance sliders, the paging,
