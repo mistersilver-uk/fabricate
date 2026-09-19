@@ -182,6 +182,8 @@ Fabricate covers this two ways:
 
 - **Control re-trigger** means taking control of a token that is already inside a region the interactable does not conceal re-raises the prompt (a locked interactable still re-prompts, and the lock is still enforced at Interact time).
 - **Keybinding** means the client keybinding *Fabricate: interact here* (default **E**) re-raises the prompt for the controlled token's current region.
+  This keybinding does not currently register, so it will not appear in Configure Controls and pressing the key does nothing.
+  Use Control re-trigger instead until this is fixed.
 
 Both re-trigger paths also honour the token's elevation, so an elevation-ranged region re-prompts a token standing in it.
 The two checks are not quite the same at the **bottom** edge of a range, though.
