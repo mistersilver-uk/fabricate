@@ -1,7 +1,4 @@
-/**
- * Phase E's second half: the alchemy chooser and workbench, the craft itself, the crafter's
- * post-craft inventory, the craft-execution and gather assertions, and the player Journal capture.
- */
+/** Phase E's second half: the alchemy chooser and workbench, the craft, the post-craft inventory, the craft and gather assertions, and the Journal capture. */
 
 import {
   TRANSIENT_TEARDOWN_SKIP_PREFIX,
@@ -100,9 +97,8 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
       await assertNoScreenshotOverlays(page);
       await screenshot(page, 'player-alchemy-workbench');
 
-      // Narrow-window stacked evidence: shrink below the alchemy grid's 900px
-      // container-query breakpoint so the three columns reflow into a single
-      // vertical stack (workbench leading).
+      // Narrow-window stacked evidence: shrink below the alchemy grid's 900px container-query
+      // breakpoint so the three columns reflow into a single vertical stack (workbench leading).
       const alchemyStackedSize = await page.evaluate(() => {
         const app = document.querySelector('#fabricate-app');
         if (!app) return null;

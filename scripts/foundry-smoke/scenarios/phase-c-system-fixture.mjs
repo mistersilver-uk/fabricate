@@ -1,7 +1,4 @@
-/**
- * Seed the smoke world's crafting systems, components, essences, recipes, tools, gathering
- * environments and interactables — everything phases D0 and E walk.
- */
+/** Seed the smoke world's systems, components, essences, recipes, tools, environments and interactables — everything phases D0 and E walk. */
 
 export async function seedSmokeCraftingSystem(page, { gathererUserId, crafterId, travelMemberId }) {
   return page.evaluate(
@@ -127,9 +124,8 @@ export async function seedSmokeCraftingSystem(page, { gathererUserId, crafterId,
           maxModifierPicks: 2,
           routed: {
             type: 'relative',
-            // `1d20 + 20` (base total 21-40, plus a small ability mod) always meets the
-            // Masterwork threshold, so the Phase-E Brew Healing Potion craft deterministically
-            // succeeds.
+            // `1d20 + 20` (base total 21-40, plus a small ability mod) always meets the Masterwork
+            // threshold, so the Phase-E Brew Healing Potion craft deterministically succeeds.
             rollFormula: '1d20 + 20',
             dc: 12,
             thresholdMode: 'meet',
@@ -345,10 +341,9 @@ export async function seedSmokeCraftingSystem(page, { gathererUserId, crafterId,
         ],
       });
 
-      // Books & Scrolls fixture (issue 796): seed five resolvable book/scroll recipe items and
-      // link them all to "Brew Healing Potion" so its Books & Scrolls editor tab renders the
-      // populated auto-fill grid — the tiling + specificity-cascade evidence the empty "Not in
-      // any book or scroll" panel cannot show.
+      // Books & Scrolls fixture (issue 796): five resolvable recipe items all linked to "Brew
+      // Healing Potion", so its editor tab renders the populated auto-fill grid — the tiling and
+      // specificity-cascade evidence the empty panel cannot show.
       const bookItemType = worldItemByName['Mystic Herb']?.type || 'loot';
       const bookItems = await Item.createDocuments([
         {
@@ -426,11 +421,9 @@ export async function seedSmokeCraftingSystem(page, { gathererUserId, crafterId,
         ],
       });
 
-      // Showcase recipe whose single ingredient set exercises every requirement row type so the
-      // Ingredients tab renders: a plain component, an OR group (one group with two component
-      // options), a tag requirement, an essence requirement, and a currency cost. complex:true
-      // forces the full set-card render; allowIncomplete persists it as a structurally-valid
-      // editor shell.
+      // Showcase recipe whose one ingredient set carries every requirement row type: a plain
+      // component, an OR group, a tag, an essence and a currency cost. complex:true forces the
+      // full set-card render; allowIncomplete persists it as a valid editor shell.
       const showcaseRecipe = await rm.createRecipe(
         {
           name: 'Showcase Requirements',
@@ -880,28 +873,9 @@ export async function seedSmokeCraftingSystem(page, { gathererUserId, crafterId,
         },
       });
 
-      // Tools remain SYSTEM-OWNED (the `craftingSystems` setting): the Tools view and the
-      // gathering tool gate both read `getSystem(id).tools`. Persist through the canonical
-      // manager update after the Gathering fixture exists.
-      //
-      // Modifiers AND character prerequisites both moved to WORLD scope (issue 1308,
-      // rehomed onto their own World > Rules & Resources routes by issue 1311). Every
-      // screen that lists either — World > Rules & Resources > Modifiers /
-      // Character Prerequisites, and every per-activity picker fed from
-      // `selectedSystemModifiers` / `selectedCharacterPrerequisites` in
-      // `CraftingSystemManagerRoot.svelte` (Checks cards, salvage/gathering modifier
-      // pickers, and the Tool Studio Requirements tab) — reads the `characterLibraries`
-      // world setting ONLY (`CharacterLibrariesStore#listModifiers` /
-      // `#listCharacterPrerequisites`); none of them fall back to
-      // `getSystem(id).modifiers` / `.characterPrerequisites`. `resolveModifierLibrary`
-      // and `resolveCharacterPrerequisiteLibrary` (`src/systems/characterLibraries.js`)
-      // still union in a system's legacy copies for worlds the 1.28.0 migration has not
-      // yet lifted, but this smoke world is created fresh under current code, so nothing
-      // exercises that fallback here — seeding only the world lists is what every
-      // consumer actually needs. This is the FIRST write to `characterLibraries` in the
-      // run, so a plain object literal is safe; any LATER write to this setting (e.g. the
-      // Tool Studio fixture below) must read-modify-write it instead, because
-      // `settings.set` REPLACES the whole value rather than merging.
+      // Tools remain SYSTEM-OWNED; modifiers and character prerequisites are WORLD scope (issues
+      // 1308/1311). This is the FIRST write to `characterLibraries`, so an object literal is safe;
+      // a LATER one must read-modify-write, since `settings.set` REPLACES rather than merges.
       await csm.updateSystem(systemId, {
         tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || [],
       });

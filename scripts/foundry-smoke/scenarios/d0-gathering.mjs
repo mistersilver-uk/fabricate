@@ -1,8 +1,4 @@
-/**
- * Phase D0's gathering section. It enters via `exerciseManagerEnvironmentPointerTargets`, which
- * clicks the Gathering nav first (absolute), and only browses and edits — the phase-E gathering
- * fixtures were seeded earlier in the always-run spine.
- */
+/** Phase D0's gathering section: it browses and edits only, against the environments the spine seeded. */
 
 import { assertManagerLayoutStable, captureStableManagerView } from '../pageOps/managerViews.mjs';
 import {
@@ -176,12 +172,8 @@ export default {
     await assertNoScreenshotOverlays(page);
     await screenshot(page, 'manager-environment-edit-placeholder');
 
-    // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
-    // capture the environment editor's composition Tasks and Events tabs so the
-    // docs can show how reusable library tasks and events are composed into an
-    // environment. The Overview tab is already captured above as
-    // manager-environment-edit-placeholder. Tab ids come from
-    // EnvironmentEditorTabs.svelte (data-environment-tab-button / -tab).
+    // Doc journey (quickstart Step 7): the environment editor's composition Tasks and Events
+    // tabs. Tab ids come from EnvironmentEditorTabs.svelte.
     for (const [tabId, label] of [
       ['tasks', 'manager-environment-edit-tasks'],
       ['events', 'manager-environment-edit-events'],
@@ -251,9 +243,8 @@ export default {
     await assertNoScreenshotOverlays(page);
     await screenshot(page, 'manager-gathering-event-editor-normal');
 
-    // World Parties plus World Travel (#1179, moved to world scope by #1282): the Travel
-    // disclosure starts collapsed. Capture each disclosure/selection state through its
-    // stable navigation id.
+    // World Parties plus World Travel (#1179, moved to world scope by #1282): the Travel disclosure
+    // starts collapsed. Capture each disclosure/selection state through its stable navigation id.
     await setManagerWindowSize(page, { width: 1280, height: 820 });
     await page
       .locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="false"]')
@@ -393,12 +384,8 @@ export default {
       }, craftingSetup.systemId);
     }
 
-    // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
-    // the gathering Settings tab hosts the d100 Gathering Rules (reward / event
-    // selection, event outcome) and the Stamina / Resource-node Limitation
-    // toggles. Capture it so the docs can show where those system-level rules
-    // live. Nav id from CraftingSystemManagerRoot.svelte (gathering nav 'settings'),
-    // panel id from EnvironmentsBrowserView.svelte.
+    // Doc journey (quickstart Step 7): the gathering Settings tab, which hosts the d100
+    // Gathering Rules and the Stamina / Resource-node Limitation toggles.
     await page.locator('.fabricate-manager #manager-gathering-nav-settings').first().click();
     await page
       .locator('.fabricate-manager #manager-gathering-panel-settings')

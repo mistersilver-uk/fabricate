@@ -1,7 +1,4 @@
-/**
- * Boot: the setup page, the license and admin-auth flows, the world launch and join, and the
- * Fabricate module activation the rest of the walk depends on.
- */
+/** Boot: the setup page, the license and auth flows, the world launch and join, and the module activation the rest of the walk depends on. */
 
 import {
   acceptLicenseIfPresent as acceptLicenseIfPresentShared,

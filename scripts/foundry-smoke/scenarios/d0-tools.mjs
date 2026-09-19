@@ -1,8 +1,4 @@
-/**
- * Phase D0's Tool Studio section, with the fixture pair and the live-replacement, breakage,
- * clipboard and pagination helpers it drives. `runFixturedScreenshotSection` owns the
- * setup -> exercise -> finally-restore scaffold; its `finally` is the leak guard.
- */
+/** Phase D0's Tool Studio section and its fixture pair; `runFixturedScreenshotSection` owns the setup-exercise-restore scaffold whose `finally` is the leak guard. */
 
 import { runFixturedScreenshotSection } from '../../lib/smokeSectionFixture.js';
 
@@ -52,11 +48,8 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
       if (!replacementSource)
         throw new Error('Tool Studio fixture could not create its replacement Item');
 
-      // Character prerequisites are world scope (issue 1308/1311): the Tool Studio Requirements tab's
-      // `prerequisiteOptions` (`ToolRequirementsTab.svelte`, threaded through `ToolEditView`) reads
-      // `selectedCharacterPrerequisites`, which is `$viewState.worldCharacterPrerequisites` — the
-      // `characterLibraries` world setting's `characterPrerequisites` list — never
-      // `getSystem(id).characterPrerequisites`.
+      // Character prerequisites are world scope (issues 1308/1311): the Tool Studio Requirements
+      // tab reads the `characterLibraries` world setting, never `getSystem(id)`.
       const worldCharacterLibraries = game.settings.get('fabricate', 'characterLibraries') || {};
       const restore = {
         tools: clone(system.tools || []),
@@ -127,10 +120,8 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
         },
         { itemUuid: source.uuid }
       );
-      // dnd5e Item schemas vary in how they retain a cloned description. The parity
-      // fixture tests Tool Studio, not that system-specific schema edge, so pin the
-      // normalized Tool snapshot after the source-linked upsert has established its
-      // durable identity.
+      // dnd5e Item schemas vary in how they retain a cloned description, so pin the
+      // normalized Tool snapshot after the source-linked upsert establishes durable identity.
       ({ item: upsertedTool } = await csm.upsertTool(systemId, {
         ...upsertedTool,
         description:

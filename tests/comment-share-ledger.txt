@@ -1,5 +1,8 @@
-scripts	2657
+scripts	1271
 scripts/foundry	13
+scripts/foundry-smoke	88
+scripts/foundry-smoke/pageOps	225
+scripts/foundry-smoke/scenarios	1071
 scripts/lib	1712
 scripts/lib/view-lab-cases	949
 scripts/visual-parity	51
@@ -53,7 +56,7 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1218
 src/utils	944
 styles	1042
-tests	19839
+tests	19848
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
@@ -64,7 +67,7 @@ tests/fixtures/manager-select	20
 tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
-tests/helpers	4289
+tests/helpers	4292
 tests/helpers/manager	307
 tests/helpers/scale	622
 tests/journal	157

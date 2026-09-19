@@ -1,8 +1,4 @@
-/**
- * Phase D0's components and checks section. It re-enters via an absolute Components nav click, so
- * it does not depend on the recipes section having run, and is net-zero: the issue-800 restore, the
- * economy revert and the system-switch re-selection all happen inline.
- */
+/** Phase D0's components and checks section. It re-enters by an absolute Components nav click, so it does not depend on the recipes section, and restores every fixture it touches inline. */
 
 import { railSelector } from '../../lib/managerRailEntries.js';
 import {
@@ -51,10 +47,8 @@ export default {
     });
     process.stdout.write('  D0: components normal screenshotted\n');
 
-    // --------------------------------------------------------------------- Issue 772 — the
-    // components browser's bulk edit rail panel, in two of its three frames (see
-    // `captureComponentBulkEditFrame` for why one frame cannot carry the panel's four
-    // sections).
+    // Issue 772 — the components browser's bulk edit rail panel, in two of its three frames
+    // (one frame cannot carry all four of the panel's sections).
     await captureBulkEditFrame(ctx, {
       studio: COMPONENT_BULK_EDIT_STUDIO,
       stepName: 'components-bulk-edit',
@@ -68,9 +62,8 @@ export default {
           .first()
           .waitFor({ state: 'visible', timeout: 5000 });
 
-        // The tag chips cycle none → add → remove → none, so one click stages an
-        // addition and two stage a removal. Both tri-states are in the frame because
-        // the tri-state IS the feature.
+        // The tag chips cycle none → add → remove → none, so one click stages an addition and two
+        // stage a removal. Both tri-states are in the frame because the tri-state IS the feature.
         const tagChips = bulkPanel.locator('[data-bulk-tag]');
         if ((await tagChips.count()) < 2) {
           throw new Error('Bulk edit panel rendered fewer than two item-tag chips to cycle.');
@@ -152,8 +145,7 @@ export default {
       if (entries.length < 2) throw new Error('issue 800: dnd5e.items index too small');
       const [first, second] = entries;
 
-      // The label-less reference is the headline case (it resolves to the document's real
-      // name).
+      // The label-less reference is the headline case (it resolves to the document's real name).
       const GATED_SECRET = 'GM-ONLY-SECRET-800';
       const rawFor = (label) =>
         `${label}: @UUID[Compendium.dnd5e.items.Item.${first._id}], ` +
@@ -598,10 +590,9 @@ export default {
         )
         .first();
       await modifierCard.waitFor({ state: 'visible', timeout: 5000 });
-      // Scroll to the pick-cap field rather than the card top or the rule group: the card
-      // authors two things (issue 1055) — the four-option combination rule as a 2x2
-      // RadioCardGroup (Add all / Highest / Recipe picks / Player picks), and, under the two
-      // rules that defer the selection, the `maxModifierPicks` cap.
+      // Scroll to the pick-cap field, not the card top: the card authors both the four-option
+      // combination rule and, under the two rules that defer the selection, the
+      // `maxModifierPicks` cap (issue 1055).
       const maxPicksField = modifierCard.locator('[data-crafting-modifier-max-picks]').first();
       await maxPicksField.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
       await assertNoScreenshotOverlays(page);

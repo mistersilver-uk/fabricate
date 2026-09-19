@@ -1,7 +1,4 @@
-/**
- * The Tool Studio pointer hit-test and layout sweep, with the breakage-authority, persisted-state,
- * clipboard and pagination helpers it drives.
- */
+/** The Tool Studio pointer hit-test and layout sweep, with the breakage-authority, persisted-state, clipboard and pagination helpers it drives. */
 
 import { railSelector } from '../../lib/managerRailEntries.js';
 import { openChecksActivity, openManagerRecipeEditor } from '../pageOps/managerViews.mjs';
@@ -297,10 +294,9 @@ async function replaceToolStudioTools(page, systemId, tools) {
 
 export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeName, fixture }) {
   const { page, screenshot } = ctx;
-  // Request the prototype's outer geometry inside its exact source viewport.
-  // ApplicationV2 contributes its own frame and V13 truthfully clamps it to that
-  // viewport; capture the settled inner product rectangle rather than fabricating
-  // room outside the source. This path is shared by local and CI screenshot profiles.
+  // Request the prototype's outer geometry inside its exact source viewport: ApplicationV2 adds its
+  // own frame and V13 clamps it, so capture the settled inner product rectangle rather than
+  // fabricating room outside the source. This path is shared by local and CI screenshot profiles.
   let wideGeometry = await setManagerWindowSize(page, {
     width: 1214,
     height: 724,

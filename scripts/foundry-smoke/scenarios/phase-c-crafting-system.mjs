@@ -127,10 +127,8 @@ export default {
           process.stderr.write(`Seeding craft-execution fixtures failed: ${error.message}\n`);
         }
 
-        // Issue #543: seed the player Alchemy workbench coverage fixtures (two enabled alchemy
-        // systems + valid recipes) so the shared app surfaces the Alchemy tab and its discipline
-        // chooser in Phase E. Screenshot-profile only — rc/ci never opens the player app's alchemy
-        // captures.
+        // Issue #543: the player Alchemy workbench fixtures, so the shared app surfaces the
+        // Alchemy tab and its discipline chooser in phase E. Screenshot profiles only.
         let alchemyFixtures = null;
         if (RUN_SCREENSHOT_PHASES) {
           try {

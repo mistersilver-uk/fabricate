@@ -38,12 +38,7 @@ export function createSmokeContext({
   /** @type {{ name: string, startedAt: string, t0: number } | null} */
   let currentPhase = null;
 
-  // ── Per-view timings (R3, #750) ─────────────────────────────────────────────
-  // Phase timings are phase-granular only. This records the wall-clock spent
-  // reaching each captured view — the elapsed time between the previous captured
-  // frame (or the current phase start) and this frame — so the end-of-run summary
-  // can surface the slowest individual views. It is an enabler for measuring
-  // future cuts; it saves ~0s itself.
+  // Per-view timings: the wall clock between the previous captured frame (or the phase start).
   /** @type {Array<{ label: string, phase: string, durationMs: number }>} */
   const viewTimings = [];
   let lastViewMarkAt = performance.now();

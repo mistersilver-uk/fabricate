@@ -1,7 +1,4 @@
-/**
- * Phase B: the smoke world's actors, users, items and inventories, plus the Items sidebar and
- * actor-sheet captures. Its ids land on `ctx.shared.cleanup`, which phase F deletes.
- */
+/** Phase B: the smoke world's actors, users, items and inventories; every id it creates lands on `ctx.shared.cleanup`, which phase F deletes. */
 
 export default {
   id: 'phase-b-actors-items',
@@ -66,10 +63,9 @@ export default {
           }
         }
 
-        // 2. Clear stale smoke-world chat before any later phase opens the chat
-        //    sidebar. Old crafting cards retain image URLs from the product version
-        //    that created them; allowing them to render makes an otherwise clean run
-        //    fail the zero-console-error gate on obsolete asset 404s.
+        // 2. Clear stale smoke-world chat before a later phase opens the sidebar: old crafting
+        //    cards keep image URLs from the version that wrote them, and rendering them fails the
+        //    zero-console-error gate on obsolete asset 404s.
         const staleMessages = game.messages?.contents ?? [];
         if (staleMessages.length > 0) {
           console.log(`Cleaning ${staleMessages.length} stale smoke chat messages`);

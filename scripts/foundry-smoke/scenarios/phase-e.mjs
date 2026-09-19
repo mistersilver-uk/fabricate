@@ -1,8 +1,7 @@
 /**
  * Phase E: the player-facing craft walk. Its two body halves share one `try`, so a throw in either
- * records the same `craft-item-phase` failure and the same `craft-failure` frame. Issue #807: with
- * the D0 rethrow removed, phase E is reachable after a tolerated D0 teardown, and the shared app it
- * drives cannot open on a torn-down page, so it skips.
+ * records the same `craft-item-phase` failure and the same `craft-failure` frame. It skips after a
+ * tolerated D0 teardown (issue #807): the shared app cannot open on a torn-down page.
  */
 
 import { runPhaseEAlchemyAndJournal } from './phase-e-alchemy-journal.mjs';

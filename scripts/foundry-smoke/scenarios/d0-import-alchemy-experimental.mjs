@@ -1,7 +1,4 @@
-/**
- * Phase D0's import-report, alchemy and experimental-features section. It publishes
- * `d0RequiredCapturesComplete`, the milestone the phase's tolerate-or-fail `catch` reads.
- */
+/** Phase D0's import-report, alchemy and experimental-features section; it publishes `d0RequiredCapturesComplete`, the milestone the phase's tolerate-or-fail `catch` reads. */
 
 import { railSelector } from '../../lib/managerRailEntries.js';
 import {

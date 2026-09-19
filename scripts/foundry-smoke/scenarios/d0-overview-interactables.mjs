@@ -1,7 +1,4 @@
-/**
- * Phase D0's system overview, validation and interactables section. Its sub-blocks switch systems
- * and open independent apps, and restore the smoke-system selection and active scene inline.
- */
+/** Phase D0's system overview, validation and interactables section; its sub-blocks switch systems and restore the smoke selection and active scene inline. */
 
 import { railSelector } from '../../lib/managerRailEntries.js';
 import {
@@ -28,10 +25,8 @@ export default {
     const { page, results, screenshot } = ctx;
     const { cleanup, craftingSetup } = ctx.shared;
 
-    // Select the deliberately-broken "Broken Workshop" system (progressive mode with no
-    // progressive check + an incomplete recipe) and capture: (a) the System Overview page's
-    // Validation tab showing the kind-grouped issue rows and the system-blocker callout; and
-    // (b) the Settings tab showing the system-blocker banner above identity.
+    // The deliberately-broken "Broken Workshop" system: the Validation tab's kind-grouped issue
+    // rows and system-blocker callout, then the Settings tab's system-blocker banner.
     try {
       await setManagerWindowSize(page, { width: 1280, height: 900 });
       // Return to the system library, then select the broken system.
@@ -104,10 +99,8 @@ export default {
       await assertNoScreenshotOverlays(page);
       await screenshot(page, 'manager-system-edit-blocked');
 
-      // (c) Progressive difficulty UI — this system is in progressive crafting mode, so its
-      // components browser badges each row's difficulty (a value for component 0, "None" for
-      // component 1) and the component editor's body exposes the staged Progressive difficulty
-      // control.
+      // (c) Progressive difficulty UI — the components browser badges each row's difficulty and
+      // the component editor exposes the staged Progressive difficulty control.
       try {
         const blockedNames = craftingSetup.blockedComponentNames || [];
         await page.locator(railSelector('manager-nav-component-rules')).click();
@@ -284,10 +277,8 @@ export default {
       process.stderr.write(`Interactable config capture failed: ${error.message}\n`);
     }
 
-    // Capture the new Identity/source section in both states: (a) unconfigured — the prominent
-    // "Needs configuration" state on a natively-added (empty-system) behaviour, born inert; and
-    // (b) configured — the collapsed "Change source" section expanded on a fully-configured
-    // interactable (re-target affordance).
+    // The Identity/source section in both states: the "Needs configuration" state on a natively
+    // added behaviour, and the expanded "Change source" re-target affordance on a configured one.
     const closeAllConfigWindows = async () => {
       await page
         .evaluate(async () => {
@@ -378,11 +369,8 @@ export default {
       process.stderr.write(`Interactable config source capture failed: ${error.message}\n`);
     }
 
-    // Open the GM-only Manage Interactables scene panel and capture: a populated list spanning
-    // multiple marker-status variants (region-only gathering task + a real Tile marker + a
-    // missing marker) AND a Tool-type row, the dedicated empty state (a scene with zero
-    // interactables), and the expanded Promote affordance with a populated Source dropdown +
-    // visible action buttons.
+    // The GM-only Manage Interactables scene panel: a populated list spanning every marker-status
+    // variant and a Tool-type row, the empty state, and the expanded Promote affordance.
     try {
       // Sweep any window left over from the config block before opening +
       // capturing, so a still-fading ApplicationV2 cannot bleed through.
@@ -505,8 +493,7 @@ export default {
       await screenshot(page, 'interactables-manager-list');
 
       // Expand the Promote affordance and capture the source picker with a populated Source
-      // dropdown (proving the Tool enumeration fix) and the Promote/Cancel action buttons in
-      // frame.
+      // dropdown (proving the Tool enumeration fix) and the Promote/Cancel action buttons in frame.
       const promoteToggle = page
         .locator('.fabricate-interactables-manager [data-interactable-manager-promote-toggle]')
         .first();
@@ -517,9 +504,8 @@ export default {
         .first();
       await promotePanel.waitFor({ state: 'visible', timeout: 10_000 });
 
-      // The three blocks this replaces were `page.evaluate` bodies that did
-      // `querySelectorAll('… .fab-im-promote select')` and then set `.value` on whatever they
-      // found.
+      // The three blocks this replaces were `page.evaluate` bodies that did `querySelectorAll('…
+      // .fab-im-promote select')` and then set `.value` on whatever they found.
 
       // Pin the crafting system that actually owns the seeded Tool.
       await page

@@ -1,8 +1,8 @@
 /**
- * Phase D0's spine: it owns the phase's one try/catch/finally, its single `screenshot-manager`
- * step, the world-scoped `experimentalFeatures` flip its `finally` restores, and the issue-#807
- * tolerance signals phase E reads. Its nine children run in declared order inside that `try`.
- * `phase` is null because the skipped branch opens a differently-named phase.
+ * Phase D0's spine owns the phase's one try/catch/finally, its single `screenshot-manager` step,
+ * the world-scoped `experimentalFeatures` flip its `finally` restores, and the issue-#807 signals
+ * phase E reads; its nine children run in order inside that `try`. `phase` is null because the
+ * skipped branch opens a differently-named phase.
  */
 
 import {
@@ -312,9 +312,8 @@ export default {
     const { page, results, screenshot, startPhase } = ctx;
     const { cleanup, craftingSetup } = ctx.shared;
     const { RUN_SCREENSHOT_PHASES, SCREENSHOT_SCOPING_ACTIVE, SMOKE_PROFILE } = ctx.profile;
-    // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the ~25 manager captures
-    // and pointer hit-tests; local `full` runs continue to regenerate them for visual
-    // verification.
+    // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the ~25 manager captures and
+    // pointer hit-tests; local `full` runs continue to regenerate them for visual verification.
     if (RUN_SCREENSHOT_PHASES) {
       startPhase('phase-D0');
       process.stdout.write('Phase D0: Opening Crafting System Manager...\n');
@@ -841,11 +840,8 @@ export default {
           .catch(() => {});
 
         // --- Settings-list ergonomics (issue 768) ---
-        // The three lists no longer share a page. Currency Units left for its own World route in
-        // issue 1278, and Modifiers and Character prerequisites followed in issue 1311, so this
-        // walk navigates to World > Rules & Resources > Modifiers and captures the ergonomics
-        // there: the shared IconPicker open on a modifier (icon-picker parity) and the row-level
-        // copy button on a summary row.
+        // The three lists each own a World > Rules & Resources route now, so this captures the
+        // ergonomics on Modifiers: the shared IconPicker open, and a row-level copy button.
         await setManagerWindowSize(page, { width: 1280, height: 980 });
         await page.locator('#manager-world-nav-rules').first().click();
         await page.locator('#manager-rules-nav-modifiers').first().click();
@@ -886,11 +882,9 @@ export default {
           await page.waitForTimeout(150);
         }
 
-        // --- World currency configuration (#393, rehomed by #1278, folded under Rules & Resources
-        // by #1311) --- The ladder is world scope now, so this walks to World > Rules & Resources >
-        // Currency rather than a crafting system's Settings tab, and needs no participation toggle
-        // to get there: the page is ungated precisely so a GM can author the coins BEFORE any
-        // system enables them.
+        // --- World currency configuration (#393) --- The ladder is world scope, so this walks to
+        // World > Rules & Resources > Currency, which is ungated precisely so a GM can author the
+        // coins before any system enables them.
         await setManagerWindowSize(page, { width: 1280, height: 900 });
         await page.locator('.fabricate-manager #manager-rules-nav-currency').first().click();
         await page.waitForTimeout(300);
@@ -948,10 +942,9 @@ export default {
 
         await runChildren();
 
-        // On a scoped `screenshots` run the experimental-off milestone capture (which sets
-        // d0RequiredCapturesComplete) may be skipped, so mark the D0 required captures complete
-        // here: every targeted D0 section has run by this point, so a later transient renderer
-        // teardown is the tolerable post-milestone class.
+        // A scoped `screenshots` run may skip the experimental-off milestone capture, so mark the
+        // required captures complete here: every targeted section has run, which makes a later
+        // renderer teardown the tolerable post-milestone class.
         if (SCREENSHOT_SCOPING_ACTIVE) {
           ctx.shared.d0RequiredCapturesComplete = true;
         }

@@ -32,9 +32,8 @@ export default {
     // Tags & Categories → Item tags panel, scrolled to its seeded rows (issue #752 — evidence
     // for #735's row rendering).
     try {
-      // The issue-689 redesign is tabbed (one vocabulary at a time) and renames the tab
-      // "Component tags"; the pre-redesign screen stacks all three panels with the old "Item
-      // tags" label.
+      // The issue-689 redesign is tabbed (one vocabulary at a time) and renames the tab "Component
+      // tags"; the pre-redesign screen stacks all three panels with the old "Item tags" label.
       const tagsTabButton = page.locator('.fabricate-manager [data-vocabulary-tab="tag"]').first();
       if ((await tagsTabButton.count()) > 0) {
         await tagsTabButton.click();

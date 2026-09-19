@@ -446,10 +446,8 @@ export async function seedSmokeCraftExecutionFixtures(page, craftingSetup, craft
               {
                 id: 'smoke-star-essence-group',
                 name: 'Star Essence',
-                // 6, not the pre-917 3: the world now holds 4 Star (2 + 1 + 1 across the three carriers),
-                // and a need of 3 would clear the shopping-list shortage this recipe is also the fixture
-                // for — `player-crafting-essence-shopping` waits on an acquire row that would then never
-                // render.
+                // 6, not 3: the world holds 4 Star across three carriers, and a need of 3 would clear
+                // the shopping-list shortage this recipe is also the fixture for.
                 options: [
                   {
                     quantity: 1,
@@ -1078,10 +1076,9 @@ export async function seedSmokeCraftExecutionFixtures(page, craftingSetup, craft
       await game.settings.set('fabricate', 'gatheringConfig', config);
 
       const environmentStore = game.fabricate.getGatheringEnvironmentStore();
-      // rc/ci gather env: manual composition picks ONLY the guaranteed task (issue 1315: manual
-      // composes exactly `enabledTaskIds`, so the id lives there rather than on a force list, which
-      // manual mode ignores) and no events, so the always-run inventory-delta assertion cannot be
-      // perturbed by a hazardous event flipping the outcome.
+      // rc/ci gather env: manual composition picks ONLY the guaranteed task (it composes exactly
+      // `enabledTaskIds`, issue 1315) and no events, so the always-run inventory-delta assertion
+      // cannot be perturbed by a hazardous event.
       const rcGatherEnvironment = await environmentStore.create({
         craftingSystemId: arcaneSystemId,
         name: 'Smoke RC Meadow',

@@ -1,8 +1,8 @@
 /**
  * Everything the runner's `finally` does: the full-profile world cleanup, the split smoke signal,
- * the browser close, the timing tables and the three `test-results/` files. It is deliberately not
- * a scenario — driven from the loop it would be skipped by every mid-walk throw and would record
- * its `cleanup` step before the verdict.
+ * the browser close, the timing tables and the three `test-results/` files. It is not a scenario:
+ * driven from the loop it would be skipped by every mid-walk throw and would record its `cleanup`
+ * step before the verdict.
  */
 
 import { writeFile, appendFile } from 'node:fs/promises';

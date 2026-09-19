@@ -1,8 +1,4 @@
-/**
- * Manager-surface page primitives: the section and editor navigation, the layout and hit-test
- * assertions, the bulk-edit and continuation frames, and the captures that pair a stable manager
- * view with a screenshot. Capture-taking helpers take the smoke context, not a bare page.
- */
+/** Manager-surface page primitives: section and editor navigation, the layout and hit-test assertions, and the captures that pair a stable view with a screenshot. */
 
 import {
   FABRICATE_THEME_IDS,
@@ -227,9 +223,8 @@ export async function captureStableManagerView(
 
 /** The Component Studio's bulk-edit surface, as data (issues 772 / 1010). */
 export const COMPONENT_BULK_EDIT_STUDIO = Object.freeze({
-  // The browser surface is unchanged by the selection — the list, the row and the row identity
-  // are all still on screen, and only the RAIL swapped the inspector for the panel — so this
-  // reuses the plain browser frame's pinned selectors rather than declaring a second layout.
+  // The selection changes only the RAIL, which swaps the inspector for the panel, so this reuses
+  // the plain browser frame's pinned selectors rather than declaring a second layout.
   layout: 'components normal',
   noun: 'component',
   rowSelector: '.fabricate-manager .manager-component-row',
@@ -522,9 +517,8 @@ export async function captureRecipeEditorRoundtrip(ctx, craftingSetup) {
     }
 
     // The collapsed single-category group renders zero rows on purpose, so
-    // `assertManagerLayoutStable` (which throws "Manager rendered no table rows" when no row and no
-    // edit-form is present) does not apply here — the recipe-item validation and recipe-editor tab
-    // captures skip it for the same reason.
+    // `assertManagerLayoutStable` does not apply — the recipe-item validation and recipe-editor
+    // tab captures skip it for the same reason.
     await settleManagerNav(page);
     await page.waitForTimeout(200);
     await assertNoScreenshotOverlays(page);

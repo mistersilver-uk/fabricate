@@ -1,7 +1,4 @@
-/**
- * Phase D0's GM Knowledge surface section and its fixture, including the companion contract's
- * runtime proof, which runs last and on a throwaway actor of its own.
- */
+/** Phase D0's GM Knowledge surface section and its fixture, including the companion contract's runtime proof on a throwaway actor of its own. */
 
 import { runFixturedScreenshotSection } from '../../lib/smokeSectionFixture.js';
 import { assertManagerLayoutStable, openManagerCraftingSection } from '../pageOps/managerViews.mjs';

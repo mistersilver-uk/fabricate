@@ -1,9 +1,4 @@
-/**
- * Page primitives the whole walk shares: overlay and notification handling, window sizing and
- * settle waits, manager pointer targets, application close sweeps, scene activation and the
- * console capture. `attachConsoleCapture` takes its three sinks as an argument so it is drivable
- * from a test.
- */
+/** Page primitives the whole walk shares: overlays, window sizing and settle waits, manager pointer targets, close sweeps, scene activation and the console capture. */
 
 import { isCanvasReadyForScene } from '../../lib/foundryCanvasReadiness.js';
 import { classifyCapturedError } from '../../lib/foundrySmokeSignal.js';
@@ -552,10 +547,8 @@ export async function exerciseManagerSystemEditPointerTargets(page, systemId) {
     .locator('.fabricate-manager #manager-system-description')
     .first()
     .fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  // Note: the recipe-resolution-mode control moved off the system-edit view into the dedicated
-  // Crafting Settings section (`data-crafting-resolution-mode-option` in CraftingSettingsView) with
-  // the issue-511 Books & Scrolls refactor, so the old `data-system-resolution-mode-option`
-  // interaction that lived here is gone.
+  // The recipe-resolution-mode control lives in the Crafting Settings section
+  // (`data-crafting-resolution-mode-option`), not on the system-edit view (issue 511).
   await softClick(page.locator('.fabricate-manager [data-edit-control="advanced-options"] input'), {
     trial: true,
   });
@@ -624,9 +617,8 @@ export async function exerciseManagerEnvironmentPointerTargets(page) {
 
 /** Dismiss global Foundry notifications that can cover screenshot targets. */
 export async function dismissFoundryNotifications(page) {
-  // Notifications are globally hidden via `installNotificationHidingCss()` at world-load, so this
-  // helper is largely defensive — kept in case the CSS is bypassed by a Foundry update or an
-  // in-test addStyleTag removal.
+  // `installNotificationHidingCss()` hides notifications at world load, so this is defensive:
+  // it covers a Foundry update or an in-test addStyleTag removal bypassing that CSS.
   await page.evaluate(() => {
     const notifications = document.querySelectorAll(
       '#notifications .notification, body > .notification, .notification'
@@ -842,10 +834,8 @@ export function attachConsoleCapture(page, ignoredErrorPatterns, sinks) {
     const text = location ? `${msg.text()} (${location})` : msg.text();
     consoleLog.push(`[${msg.type()}] ${text}`);
     if (msg.type() === 'error') {
-      // Route through the SHARED classifier (the same seam the pageerror handler
-      // below uses): a match against the waiver patterns (in-source defaults +
-      // any appended via --allowed-console-error-patterns) is recorded as waived
-      // for audit only; anything else enters the gating consoleErrors list.
+      // Route through the SHARED classifier the pageerror handler below also uses: a waiver
+      // match is recorded for audit only; anything else enters the gating consoleErrors list.
       if (classifyCapturedError(text, ignoredErrorPatterns).waived) {
         waivedConsoleErrors.push(text);
       } else {

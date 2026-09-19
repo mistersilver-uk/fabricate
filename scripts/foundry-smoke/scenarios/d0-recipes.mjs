@@ -1,8 +1,4 @@
-/**
- * Phase D0's recipes section: the recipes browser and editor walk, its bulk-edit and continuation
- * frames, and the result, ingredient and access captures. Inert under rc/ci/full; skipped on a
- * scoped `screenshots` run whose target set touches none of its labels.
- */
+/** Phase D0's recipes section: the browser and editor walk, the bulk-edit and continuation frames, and the result, ingredient and access captures. */
 
 import {
   RECIPE_BULK_EDIT_STUDIO,
@@ -237,10 +233,8 @@ export default {
         .locator('.fabricate-manager [data-books-scrolls]')
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
-      // The Books & Scrolls management surface now lists the book/scroll recipe items seeded
-      // for "Brew Healing Potion" (issue 796) plus the two recipe items seeded for the
-      // Validation-tab captures (issue 797) — the all-clear "Tome of Brewing" and the mixed
-      // "Torn Recipe Scroll" — so it is deliberately populated.
+      // The Books & Scrolls surface is deliberately populated: the items seeded for "Brew
+      // Healing Potion" (issue 796) plus the two seeded for the Validation-tab captures (797).
       await assertNoScreenshotOverlays(page);
       await screenshot(page, 'manager-books-scrolls-normal');
       await openManagerCraftingSection(page, 'settings', 'crafting-settings');

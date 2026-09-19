@@ -123,5 +123,5 @@ test('every label in the membership loop is authored beside its own rail id', ()
 test('railSelector scopes to the manager window', () => {
   // A bare `#id` would match the same id in any other open Foundry application.
   assert.equal(railSelector('manager-nav-tags'), '.fabricate-manager #manager-nav-tags');
-  assert.ok(harness.includes("from './lib/managerRailEntries.js'"));
+  assert.match(harness, /railSelector[\s\S]{0,120}?from '[^']*managerRailEntries\.js'/);
 });

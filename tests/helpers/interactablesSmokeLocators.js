@@ -9,10 +9,7 @@ import { byCodePoint } from './ratchetBaseline.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
 
-/**
- * A lazy `[\s\S]*?` scan must not run from one module into the next, so the concatenation below
- * is joined by this marker and scanners that use one split on it first.
- */
+/** A lazy `[\s\S]*?` scan must not cross a module, so a scanner that uses one splits on this. */
 export const SMOKE_SOURCE_BOUNDARY = '\n/* ==== fabricate smoke module boundary ==== */\n';
 
 const smokeModulesIn = (relativeDir) =>
@@ -21,10 +18,7 @@ const smokeModulesIn = (relativeDir) =>
     .sort(byCodePoint)
     .map((entry) => `${relativeDir}/${entry}`);
 
-/**
- * Every file the smoke walk lives in: the runner, then the modules it drives. Derived from the
- * directory rather than listed, so a new module cannot be missed (issue 1692).
- */
+/** Every file the walk lives in, derived from the directory so a new module cannot be missed. */
 export const SMOKE_SOURCE_FILES = [
   'scripts/foundry-test-run.mjs',
   ...smokeModulesIn('scripts/foundry-smoke'),
@@ -32,7 +26,7 @@ export const SMOKE_SOURCE_FILES = [
   ...smokeModulesIn('scripts/foundry-smoke/scenarios'),
 ];
 
-/** Each file's text, in `SMOKE_SOURCE_FILES` order. Read once; every consumer reads the same text. */
+/** Each file's text, in order. Read once; every consumer reads the same text. */
 export const SMOKE_SOURCE_SEGMENTS = SMOKE_SOURCE_FILES.map((file) =>
   readFileSync(resolve(REPO_ROOT, file), 'utf8')
 );

@@ -1,8 +1,4 @@
-/**
- * Phase E's first half: opening the shared Fabricate app, the inventory and salvage captures, the
- * gathering states and the player Crafting tab. It returns the app-shell locator the second half
- * continues against — the two halves are one `try` in the scenario that drives them.
- */
+/** Phase E's first half: the shared app, the inventory and salvage captures, the gathering states and the Crafting tab; it returns the app-shell locator the second half continues against. */
 
 import {
   assertProgressiveStageListSound,
@@ -52,9 +48,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
   const navItems = appShell.locator('.fabricate-app-nav-item');
   await navItems.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  // The shared actor-selection top bar mounts with the shell and flips [data-actor-bar-state]
-  // from "loading" to "ready" once its selectable actor list and gathering conditions have
-  // loaded.
+  // The shared actor-selection top bar mounts with the shell and flips [data-actor-bar-state] from
+  // "loading" to "ready" once its selectable actor list and gathering conditions have loaded.
   await appShell
     .locator('[data-actor-bar-state="ready"]')
     .first()
@@ -103,8 +98,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     .first()
     .waitFor({ state: 'visible', timeout: 10_000 });
 
-  // The populated layout now fills the center column with the environment detail
-  // (GatheringDetail).
+  // The populated layout now fills the center column with the environment detail (GatheringDetail).
   if ((await appShell.locator('[data-gathering-state="populated"]').count()) > 0) {
     await appShell
       .locator('[data-gathering-detail] [data-gathering-detail-state="selected"]')
@@ -205,10 +199,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'player-salvage-tools');
 
-  // Issue 766: one physical stack registered as a salvageable component in two crafting
-  // systems (Smoke Air Shard, in the simple AND progressive forges) must render as a single
-  // inventory card, its quantity counted once, carrying a System selector drop-down that
-  // re-scopes the whole detail body.
+  // Issue 766: one physical stack registered as salvageable in two systems must render as a
+  // single inventory card, counted once, carrying a System selector that re-scopes the detail.
   const collapseSearch = appShell.locator('[data-inventory-filters] input').first();
   await collapseSearch.waitFor({ state: 'visible', timeout: 10_000 });
   await collapseSearch.fill('Smoke Air Shard');
@@ -393,8 +385,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
       .locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]')
       .first()
       .click();
-    // An immediate (d100) attempt opens the interactive roll prompt: capture it and click
-    // Roll.
+    // An immediate (d100) attempt opens the interactive roll prompt: capture it and click Roll.
     await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
     await appShell
       .locator('[data-gathering-state="populated"]')
@@ -617,14 +608,11 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         );
       }
 
-      // Multi-option ingredient selector evidence (issue #552): select the seeded 'Smoke Weave
-      // Filigree' recipe, whose single ingredient group offers a held component or authored
-      // essence, so the detail renders the IngredientOptionSelector "Alternatives" radiogroup
-      // with two selectable rows.
+      // Multi-option ingredient selector evidence (issue #552): 'Smoke Weave Filigree' offers a
+      // held component or an authored essence, so the detail renders the two-row radiogroup.
       try {
-        // The recipe list is paginated (12/page); filter to the multi-option
-        // recipe via the browser search so its row is in the DOM regardless of
-        // which page it would otherwise fall on.
+        // The recipe list is paginated (12/page); filter to the multi-option recipe via the browser
+        // search so its row is in the DOM regardless of which page it would otherwise fall on.
         const recipeSearch = appShell.locator('.crafting-browser-search input').first();
         await recipeSearch.fill('Smoke Weave Filigree');
         await page.waitForTimeout(350);
@@ -633,8 +621,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .first();
         await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5000 });
-        // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always
-        // present.
+        // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always present.
         await appShell
           .locator('[data-recipe-section="requirement-rail"]')
           .first()
@@ -645,9 +632,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await ensureSlotOpen(altSlotTile).catch(() => {});
         const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
         await altSection.waitFor({ state: 'visible', timeout: 10_000 });
-        // Pointer hit-test (issue 917): the slot tile is a new card-shaped `<button>`
-        // whose whole 80px column is the control, layered under the rail's wrapping
-        // flex row. happy-dom computes no cascade, so only a real frame can prove
+        // Pointer hit-test (issue 917): the whole 80px slot-tile column is the control, under the
+        // rail's wrapping flex row. happy-dom computes no cascade, so only a real frame can prove
         // Foundry's global button chrome is not swallowing the click.
         await assertPointerTarget(
           page,
@@ -714,8 +700,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await screenshot(page, 'player-crafting-essence-ingredient');
 
         await firstClass.row.locator('.crafting-recipe-row-add').click({ timeout: 5000 });
-        // Issue 1506: the acquire card's essence row draws the shared art tile in its glyph
-        // face.
+        // Issue 1506: the acquire card's essence row draws the shared art tile in its glyph face.
         await appShell
           .locator('[data-shopping-acquire-components] [data-medallion="glyph"]')
           .first()
@@ -745,10 +730,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           await input.blur().catch(() => {});
           await page.waitForTimeout(300);
         };
-        // `ensureSlotOpen` (issue 917): the essence slot's tile is a real disclosure, and focus
-        // auto-advance already opens the rail's first unsatisfied openable slot — which is this
-        // very essence slot in both recipes this helper is used against — the moment the recipe
-        // is selected.
+        // `ensureSlotOpen` (issue 917): the tile is a real disclosure, and focus auto-advance
+        // already opens the rail's first unsatisfied openable slot the moment a recipe is picked.
         const openEssencePool = async () => {
           await ensureSlotOpen(
             appShell.locator('[data-requirement-slot][data-slot-kind="essence"]').first()
@@ -774,10 +757,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .locator('[data-recipe-section="requirement-rail"] [data-requirement-rail-slots]')
           .first();
 
-        // (1) The rail's three states in ONE frame: a met fixed slot, an UNCHOSEN
-        // choice slot in accent (a to-do, never danger — the state the two-state
-        // predecessor could not express), and a zero-delivered essence slot in danger,
-        // with exactly one chooser open beneath it.
+        // (1) The rail's three states in ONE frame: a met fixed slot, an UNCHOSEN choice slot in
+        // accent (a to-do, never danger), and a zero-delivered essence slot in danger, with one
+        // chooser open beneath it.
         const railRecipe = await selectCraftingRecipeByName('Smoke Runestaff Binding');
         await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
         const railStates = await page.evaluate(() =>
@@ -933,10 +915,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-crafting-essence-pool-shared');
 
-        // (6) The same recipe and the same essence allocation, framed on the consumption plan:
-        // a fixed row (the runeplate the craft spends) and an essence-carrier row (one entry
-        // per item key however many requirements that item funds), plus the "still to choose"
-        // line.
+        // (6) The same recipe and allocation framed on the consumption plan: a fixed row, an
+        // essence-carrier row (one entry per item key), and the "still to choose" line.
         const planPanel = appShell.locator('[data-recipe-section="consumption-plan"]').first();
         await planPanel.waitFor({ state: 'visible', timeout: 10_000 });
         await planPanel.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
@@ -964,10 +944,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             'Consumption plan showed no "still to choose" line for the unsettled requirement'
           );
         }
-        // The tile's own name is the chosen option's name, not the authored group name —
-        // `_resolveGroupDescription`/`_resolveIngredientVisual` in `RecipeManager.js` report
-        // the option (here 'Smoke Anvil', the default pick among the unaffordable pair), never
-        // the group label ('Fitting').
+        // The tile's name is the chosen option's, not the group's: `_resolveGroupDescription` and
+        // `_resolveIngredientVisual` report the option ('Smoke Anvil'), never the label.
         if (!planReport.pending.includes('Smoke Anvil')) {
           throw new Error(
             `Consumption plan pending line did not name the unchosen Fitting requirement's option: ${JSON.stringify(planReport)}`

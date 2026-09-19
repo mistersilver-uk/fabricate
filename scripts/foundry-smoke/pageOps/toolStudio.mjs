@@ -1,7 +1,4 @@
-/**
- * Tool Studio page primitives: the single-mutation probes, the tab and control assertions, the
- * horizontal-scroll guards and the geometry reads its captures are measured against.
- */
+/** Tool Studio page primitives: the single-mutation probes, the tab and control assertions, the scroll guards and the geometry its captures are measured against. */
 
 import { assertPointerTarget } from './pageLifecycle.mjs';
 
