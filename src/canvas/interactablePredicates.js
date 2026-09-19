@@ -85,8 +85,8 @@ export function canControlActor({ actor, user } = {}) {
 }
 
 /**
- * The region rectangle overlaying a spawn: a Tile renders CENTRED on its `x/y`, a Region rectangle
- * TOP-LEFT. It emits no anchor (V14 initialises those at 0) and keeps the non-zero `gridSize`
+ * The region rectangle overlaying a spawn: a Tile renders centred on its `x/y`, a Region rectangle
+ * top-left. It emits no anchor (V14 initialises those at 0) and keeps the non-zero `gridSize`
  * fallback, since V13 rejects a zero dimension and resolves the create to a silent no-spawn.
  */
 export function regionRectangleFor({ tile, region, gridSize } = {}) {
@@ -148,7 +148,7 @@ export function iconTextureFor({ classification, components = [] } = {}) {
   return DEFAULT_INTERACTABLE_IMG;
 }
 
-/** The first candidate grid size that is a positive number, else one square of 100. */
+/** The first non-nullish candidate when it is a positive number, else one square of 100. */
 export function gridSizeFrom(...candidates) {
   const size = candidates.find((candidate) => candidate !== undefined && candidate !== null);
   return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;

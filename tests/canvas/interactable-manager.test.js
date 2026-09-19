@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 
 import { InteractableManager } from '../../src/canvas/InteractableManager.js';
 import { gridScene, tokenDoc as tokenDocFake } from '../helpers/regionContainmentFakes.js';
+import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
 
 const GLOBAL_KEYS = ['game', 'Hooks', 'canvas', 'foundry', 'CONFIG', 'ui'];
 
@@ -1212,4 +1213,15 @@ test('the close re-prompt delegates to the shared _promptForTokenInsideRegion pa
   } finally {
     restoreGlobals(saved);
   }
+});
+
+test('the manager constructor reads no Foundry global and every collaborator is a thunk', async () => {
+  await underFoundryGlobalTrap('InteractableManager construction', () => {
+    const manager = new InteractableManager();
+    for (const bag of ['_spawnDeps', '_promptDeps', '_grantDeps']) {
+      for (const [key, value] of Object.entries(manager[bag])) {
+        assert.equal(typeof value, 'function', `${bag}.${key} must be a thunk`);
+      }
+    }
+  });
 });
