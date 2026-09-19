@@ -201,6 +201,7 @@ describe('no shipped source references a Font Awesome Pro icon', () => {
       'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
       'src/ui/playerExtensions.js',
       'src/ui/svelte/util/foundryIconCatalogue.js',
+      'src/ui/svelte/util/foundryIconCatalogue.json',
       'lang/en.json',
     ]) {
       assert.ok(named.has(expected), `${expected} must be inside the scanned corpus`);

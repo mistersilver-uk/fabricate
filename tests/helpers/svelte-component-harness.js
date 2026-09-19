@@ -251,6 +251,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/essenceTint.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   // THE ONE TONE MAP (issue 1506), spread from its own roster rather than copied.
   ...STATUS_TONE_RAW_MODULES,

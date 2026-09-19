@@ -222,6 +222,6 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
   // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
   // `deleteEmbeddedDocuments` throw and stranded a run.
-  assert.equal(files, 109, 'oversized files');
+  assert.equal(files, 108, 'oversized files');
   assert.equal(keys.length - files, 116, 'oversized functions');
 });

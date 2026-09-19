@@ -22,6 +22,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
+  'src/ui/svelte/util/foundryIconCatalogue.json',
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',

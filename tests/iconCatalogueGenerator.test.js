@@ -4,11 +4,15 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+// `prettier/index.mjs`, not `prettier`: `npm test` runs under `--conditions=browser`, which
+// resolves the bare specifier to the standalone build, and that build has no `resolveConfig`.
+import { check as prettierCheck, resolveConfig } from 'prettier/index.mjs';
+
 import {
   freeIconNamesFrom,
   intersectWithFreeIconNames,
   readFreeIconNames,
-  renderCatalogueModule,
+  renderCatalogueJson,
   resolveFreeStylesheetPath,
 } from '../scripts/generate-icon-catalogue.mjs';
 import {
@@ -24,9 +28,8 @@ import {
 
 const BACKSLASH = '\\';
 
-// Every bundle the project has measured — Foundry 13's Font Awesome 6, Foundry 14's 7, and Free
-// 7.3.1 — assigns glyphs with `--fa`, so this fixture carries the two-declaration body Foundry 13
-// ships alongside the single-declaration body Foundry 14 does.
+// Every bundle measured so far assigns glyphs with `--fa`, so this fixture carries Foundry 13's
+// two-declaration body alongside Foundry 14's single-declaration one.
 const MODERN_STYLESHEET = [
   '/*! Font Awesome Pro 7.2.0 */',
   `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013";--fa--fa:"${BACKSLASH}f013"}`,
@@ -63,16 +66,7 @@ describe('icon catalogue generator compatibility support', () => {
 
 const RELEASE = { edition: 'Pro', version: '7.2.0' };
 const FREE_RELEASE = { edition: 'Free', version: '7.3.1' };
-const MEASUREMENTS = {
-  foundryVersion: '14.365.0',
-  glyphRules: 3,
-  declaredNames: 5,
-  multiNameRules: 1,
-  classicGlyphs: 3,
-  offeredGlyphs: 3,
-  brandGlyphs: 0,
-  classicFaceCodepoints: 3,
-};
+const MEASUREMENTS = { foundryVersion: '14.365.0' };
 
 const FIXTURE_DEFINITIONS = [
   { iconCode: '0', label: '0', aliases: [] },
@@ -80,58 +74,72 @@ const FIXTURE_DEFINITIONS = [
   { iconCode: 'yen', label: 'Yen', aliases: ['cny', 'jpy'] },
 ];
 
-function renderFixtureModule(definitions = FIXTURE_DEFINITIONS) {
-  return renderCatalogueModule({
+const CATALOGUE_PATH = fileURLToPath(
+  new URL('../src/ui/svelte/util/foundryIconCatalogue.json', import.meta.url)
+);
+
+function renderFixtureJson(definitions = FIXTURE_DEFINITIONS) {
+  return renderCatalogueJson({
     release: RELEASE,
     freeRelease: FREE_RELEASE,
     definitions,
-    measurements: { ...MEASUREMENTS, offeredGlyphs: definitions.length },
+    measurements: MEASUREMENTS,
   });
 }
 
-function readEmittedRows(moduleText) {
-  const blob = /const ICON_ROWS = `\n([\S\s]*?)\n`;/.exec(moduleText);
-  assert.ok(blob, 'the emitted module carries the entries in one ICON_ROWS template literal');
-  return blob[1].split('\n');
+function readEmittedRows(catalogueText) {
+  return JSON.parse(catalogueText).rows;
 }
 
-async function importModuleText(moduleText) {
-  const encoded = Buffer.from(moduleText, 'utf8').toString('base64');
-  return import(`data:text/javascript;base64,${encoded}`);
+function decodeRow(row) {
+  const [iconCode, label, aliases] = row.split('|');
+  return { iconCode, label, aliases: aliases === undefined ? [] : aliases.split(',') };
 }
 
-describe('icon catalogue module rendering', () => {
-  it('emits the entries as one delimited text blob, not one object literal each', () => {
-    const rendered = renderFixtureModule();
+/** The one read of a `src/` file here; `tests/source-pin-ledger.txt` pins this module at one. */
+function readCommittedCatalogue() {
+  return fs.readFileSync(CATALOGUE_PATH, 'utf8');
+}
+
+function renderFromExports() {
+  return renderCatalogueJson({
+    release: FOUNDRY_ICON_BUNDLE_RELEASE,
+    freeRelease: FOUNDRY_ICON_FREE_INTERSECTION,
+    definitions: FOUNDRY_ICON_DEFINITIONS,
+    measurements: { foundryVersion: FOUNDRY_ICON_BUNDLE_RELEASE.foundryVersion },
+  });
+}
+
+describe('icon catalogue JSON rendering', () => {
+  it('emits the entries as delimited strings, not one object literal each', () => {
+    const rendered = renderFixtureJson();
 
     assert.deepEqual(readEmittedRows(rendered), ['0|0', 'gear|Gear|cog', 'yen|Yen|cny,jpy']);
     assert.ok(
-      !/iconCode: "/.test(rendered),
+      !/"iconCode"/.test(rendered),
       'no per-entry object literal survives: that repetition is what SonarCloud reports as duplication'
     );
   });
 
-  it('round-trips the blob back to the same frozen entries the generator was given', async () => {
-    const { FOUNDRY_ICON_DEFINITIONS: parsed, FOUNDRY_ICON_BUNDLE_RELEASE: release } =
-      await importModuleText(renderFixtureModule());
+  it('records both releases beside the rows, in the shape the loader exports', () => {
+    const { bundleRelease, freeIntersection } = JSON.parse(renderFixtureJson());
 
-    assert.deepEqual(
-      parsed.map(({ iconCode, label, aliases }) => ({ iconCode, label, aliases: [...aliases] })),
-      FIXTURE_DEFINITIONS
-    );
-    assert.ok(Object.isFrozen(parsed), 'the exported array is frozen');
-    assert.ok(
-      parsed.every((entry) => Object.isFrozen(entry) && Object.isFrozen(entry.aliases)),
-      'every entry and every alias list is frozen, so a filter cannot hand out a writable row'
-    );
-    assert.deepEqual({ ...release }, { ...RELEASE, foundryVersion: MEASUREMENTS.foundryVersion });
+    assert.deepEqual(bundleRelease, {
+      ...RELEASE,
+      foundryVersion: MEASUREMENTS.foundryVersion,
+    });
+    assert.deepEqual(freeIntersection, FREE_RELEASE);
   });
 
-  it('records the free release it was narrowed to, beside the bundle it was measured from', async () => {
-    const { FOUNDRY_ICON_FREE_INTERSECTION: intersection } =
-      await importModuleText(renderFixtureModule());
-
-    assert.deepEqual({ ...intersection }, FREE_RELEASE);
+  it('round-trips the committed rows back to the entries the loader exports', () => {
+    assert.deepEqual(
+      FOUNDRY_ICON_DEFINITIONS.map(({ iconCode, label, aliases }) => ({
+        iconCode,
+        label,
+        aliases: [...aliases],
+      })),
+      readEmittedRows(readCommittedCatalogue()).map((row) => decodeRow(row))
+    );
   });
 
   it('fails closed, naming the entry, on a value the row encoding cannot represent', () => {
@@ -147,38 +155,33 @@ describe('icon catalogue module rendering', () => {
 
     for (const definition of unencodable) {
       assert.throws(
-        () => renderFixtureModule([definition]),
+        () => renderFixtureJson([definition]),
         new RegExp(`Icon "${definition.iconCode.replace('|', '\\|')}".*cannot represent`, 's'),
         `${definition.iconCode} must stop generation rather than emit a row that parses wrong`
       );
     }
 
     assert.throws(
-      () => renderFixtureModule([{ iconCode: 'empty', label: '', aliases: [] }]),
+      () => renderFixtureJson([{ iconCode: 'empty', label: '', aliases: [] }]),
       /Icon "empty" has an empty or non-string label/
     );
   });
 
-  it('keeps the committed catalogue in step with the renderer', () => {
-    const committed = fs.readFileSync(
-      fileURLToPath(new URL('../src/ui/svelte/util/foundryIconCatalogue.js', import.meta.url)),
-      'utf8'
+  it('keeps the committed catalogue byte-identical to what the renderer emits', () => {
+    assert.equal(
+      readCommittedCatalogue(),
+      renderFromExports(),
+      'the committed JSON is what this renderer emits for the entries it exports; regenerate on drift'
     );
-    const rendered = renderCatalogueModule({
-      release: FOUNDRY_ICON_BUNDLE_RELEASE,
-      freeRelease: FOUNDRY_ICON_FREE_INTERSECTION,
-      definitions: FOUNDRY_ICON_DEFINITIONS,
-      measurements: {
-        ...MEASUREMENTS,
-        foundryVersion: FOUNDRY_ICON_BUNDLE_RELEASE.foundryVersion,
-        offeredGlyphs: FOUNDRY_ICON_DEFINITIONS.length,
-      },
-    });
+  });
 
-    assert.deepEqual(
-      readEmittedRows(committed),
-      readEmittedRows(rendered),
-      'the committed rows are what this renderer emits for the entries it exports; regenerate on drift'
+  // Output needing reformatting would fail `format:check` with no way to regenerate past it.
+  it('emits JSON that is already Prettier-clean', async () => {
+    const options = await resolveConfig(CATALOGUE_PATH);
+
+    assert.ok(
+      await prettierCheck(renderFromExports(), { ...options, filepath: CATALOGUE_PATH }),
+      'the renderer must emit exactly what Prettier would format the catalogue to'
     );
   });
 });
@@ -198,8 +201,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
     assert.deepEqual(narrowed, [{ iconCode: 'gear', label: 'Gear', aliases: ['cog'] }]);
   });
 
-  // An alias is recorded in the committed file, searched by the picker and resolved for stored
-  // data, so it is a referenced name in exactly the sense the Pro licence forbids.
+  // An alias is a referenced name in exactly the sense the Pro licence forbids.
   it('drops a Pro-only alias from a glyph it keeps, because an alias is a referenced name', () => {
     const narrowed = intersectWithFreeIconNames(
       [{ iconCode: 'star', label: 'Star', aliases: ['star-sharp', 'star-christmas'] }],
@@ -209,8 +211,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
     assert.deepEqual(narrowed, [{ iconCode: 'star', label: 'Star', aliases: [] }]);
   });
 
-  // No entry needs this against Foundry 14's bundle and Free 7.3.1 — every surviving glyph's
-  // offered name is already free.
+  // No entry needs this against Foundry 14's bundle and Free 7.3.1.
   it('re-offers a kept glyph under a free name when its offered name is Pro-only', () => {
     const narrowed = intersectWithFreeIconNames(
       [{ iconCode: 'wand-magic-sparkles', label: 'Wand Magic Sparkles', aliases: ['magic'] }],
@@ -236,8 +237,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
     );
   });
 
-  // The oracle decides what Fabricate may write down, so a Pro stylesheet reaching it would not
-  // narrow the catalogue at all while looking exactly like a run that had.
+  // A Pro stylesheet as oracle would not narrow the catalogue, while looking like a run that had.
   it('refuses a stylesheet that is not a free release, rather than trusting it as the oracle', () => {
     assert.throws(
       () => freeIconNamesFrom(MODERN_STYLESHEET, 'fixture'),
@@ -251,12 +251,10 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
   });
 });
 
-// THE LICENSING GUARD. Foundry ships Font Awesome Pro under a licence that forbids a third-party
-// package developer from having the icons "used, re-packaged, or referenced in code", and a
-// catalogue of names is a reference in code.
+// The licensing guard. Why a catalogue of names is a reference in code, and why the intersection
+// is not optional: `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`.
 describe('the committed catalogue names only icons Font Awesome publishes for free', () => {
-  // Resolved and read at collection, so a missing or unreadable devDependency throws HERE, naming
-  // the package.
+  // Resolved and read at collection, so a missing devDependency throws here, naming the package.
   const stylesheetPath = resolveFreeStylesheetPath();
   const { release, names } = readFreeIconNames(stylesheetPath);
 
@@ -288,8 +286,7 @@ describe('the committed catalogue names only icons Font Awesome publishes for fr
     );
   });
 
-  // The guard's own negative control, and the reason it is worth having. `candle-holder` renders in
-  // Foundry, a companion module offers it, and this vocabulary declines it: it is a Pro-only name.
+  // The guard's negative control: `candle-holder` renders in Foundry, and is a Pro-only name.
   it('still declines the Pro-only glyph the whole narrowing was decided over', () => {
     assert.ok(!names.has('candle-holder'), 'candle-holder must be absent from the free set');
     assert.ok(

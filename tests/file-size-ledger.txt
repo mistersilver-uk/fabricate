@@ -220,6 +220,5 @@ src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	128
 src/ui/svelte/stores/worldScopeProjection.js	924
-src/ui/svelte/util/foundryIconCatalogue.js	1553
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	163
 src/utils/rollExpressionAverage.js::createReader	181

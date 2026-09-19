@@ -210,7 +210,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/systems\/characterModifierPrerequisiteCopy\.js$/,
       // The shared IconPicker and the vocabulary it lists (issue 1269).
       /^src\/ui\/svelte\/components\/IconPicker\.svelte$/,
-      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.(?:js|json)$/,
     ],
   },
   {

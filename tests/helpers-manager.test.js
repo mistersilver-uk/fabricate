@@ -1,7 +1,7 @@
 /** Direct proof for the shared manager harness in `tests/helpers/manager/` (issue 1669). */
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -11,7 +11,7 @@ import {
   deriveManagerModuleClosure,
 } from './helpers/manager/managerCompile.js';
 import { act, createManagerQueries } from './helpers/manager/managerQueries.js';
-import { repoRoot } from './helpers/sourceScan.js';
+import { repoRoot, stripComments } from './helpers/sourceScan.js';
 import { setupDOM, teardownDOM } from './helpers/svelte-dom.js';
 
 const closure = deriveManagerModuleClosure();
@@ -32,8 +32,8 @@ test('the derivation reaches the real manager graph and splits it by what the tr
     'a compiled entry is always a component'
   );
   assert.ok(
-    closure.modules.every((path) => path.endsWith('.js')),
-    'a copied entry is always a plain module'
+    closure.modules.every((path) => /\.(?:js|json)$/.test(path)),
+    'a copied entry is always a plain module or a JSON data file'
   );
   const absent = [...closure.components, ...closure.modules].filter(
     (path) => !existsSync(resolve(repoRoot, path))
@@ -117,4 +117,22 @@ test('a locator resolves against the live mount target, not the one it was creat
   } finally {
     teardownDOM();
   }
+});
+
+test('every relative import of a derived module is itself in the closure', () => {
+  const inClosure = new Set([...closure.components, ...closure.modules]);
+  const missing = [];
+  for (const entry of inClosure) {
+    const absolute = resolve(repoRoot, entry);
+    const source = stripComments(readFileSync(absolute, 'utf8'));
+    for (const [, specifier] of source.matchAll(/(?:\bfrom|\bimport)\s*\(?\s*['"](\.[^'"\s]+)['"]/g)) {
+      const child = relative(repoRoot, resolve(dirname(absolute), specifier)).replaceAll('\\', '/');
+      if (!inClosure.has(child)) missing.push(`${entry} -> ${child}`);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    'the walk queues by extension, so a dependency it does not recognise compiles into a hang rather than a failure'
+  );
 });

@@ -57,7 +57,7 @@ export function deriveManagerModuleClosure(rootPath = MANAGER_ROOT) {
     const source = stripComments(readFileSync(absolute, 'utf8'));
     for (const [, specifier] of source.matchAll(RELATIVE_SPECIFIER)) {
       const child = relative(repoRoot, resolve(dirname(absolute), specifier)).replaceAll('\\', '/');
-      if (child.endsWith('.js') || child.endsWith('.svelte')) queue.push(child);
+      if (/\.(?:js|json|svelte)$/.test(child)) queue.push(child);
     }
   }
   if (seen.size < CLOSURE_FLOOR) {
