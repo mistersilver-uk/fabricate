@@ -2357,7 +2357,6 @@ describe('CraftingSystemManager source contract', () => {
       'saveSelectedToolDraft',
       // The per-section inherit switch.
       'setFocusedToolSectionInherited',
-      'routeExitGuardFor',
       'toolsNavCount',
       'createWorldToolFromItemDrop',
       'adoptWorldToolIntoSystem',
@@ -2380,6 +2379,8 @@ describe('CraftingSystemManager source contract', () => {
       // Task 4: the editor behind `Edit rules` offers the route the rules list already advertises.
       ['ToolEditView', 'onEditWorldTool'],
     ],
+    // The row by name, because `routeExitGuardFor` alone is satisfied by any row at all.
+    callsLiteral: [['routeExitGuardFor', 'tool-edit']],
     spellsExactly: ['world-tool-entry'],
     // And the system route carries no creation drop. The two screens had the drop zone exactly
     // inverted against the design, so this is the half that proves the move rather than a copy.

@@ -51,8 +51,8 @@ function inertRow(guard, calls) {
   }
   return {
     ...shared,
-    finish: (action) => {
-      calls.push([guard.view, 'finish', action]);
+    finish: (action, nextView) => {
+      calls.push([guard.view, 'finish', action, nextView]);
       return true;
     },
   };
@@ -114,25 +114,33 @@ describe('the route-exit guard table', () => {
     assert.equal(typeof result.then, 'undefined');
   });
 
-  it('answers a raw `true` while every row is skipped, never a promise', () => {
-    // The ten rows that waive a navigation are dirty and waiving it; the three that waive none
-    // are inactive, because a skip they do not have cannot be what answers for them.
+  it('answers a raw `true` for a skipped row, never a promise, row by row', () => {
+    // Row by row because an all-skipped whole table is unconstructible: the skip shapes answer to
+    // different destinations, and no one `(nextView, nextRouteId)` pair waives all ten at once.
+    const calls = [];
     const overrides = {};
     for (const { view, skip } of ROUTE_EXIT_GUARDS) {
-      overrides[view] =
-        skip === 'none'
-          ? { active: () => false }
-          : prompting({ subject: () => 'subject-1', family: () => true });
+      if (skip !== 'none')
+        overrides[view] = prompting({ subject: () => 'subject-1', family: () => true });
     }
-    const rows = buildRouteExitGuards(contextOf(overrides));
-    assert.equal(
-      rows.filter((row) => row.skip?.(row.view, 'subject-1')).length,
-      10,
-      'every skip shape waives a re-entry that keeps its subject'
+    const rows = buildRouteExitGuards(contextOf(overrides, calls)).filter((row) => row.skip);
+    assert.equal(rows.length, 10, 'every skip shape waives a re-entry that keeps its subject');
+    for (const row of rows) {
+      const answer = runRouteExitGuard(row, row.view, 'subject-1');
+      assert.strictEqual(answer, true, `${row.view} waives its own re-entry`);
+      assert.equal(typeof answer.then, 'undefined', `${row.view} answered with a promise`);
+    }
+    assert.deepEqual(calls, [], 'and a waived row reaches no finisher, so nothing was saved');
+  });
+
+  it('hands the destination subject to every row, not only to the first that reads one', () => {
+    const calls = [];
+    const rows = buildRouteExitGuards(
+      contextOf({ 'essence-edit': prompting({ subject: () => 'e1' }) }, calls)
     );
-    const result = confirmRouteExitGuards(rows, 'world-essence-entry', 'subject-1');
-    assert.strictEqual(result, true);
-    assert.equal(typeof result.then, 'undefined');
+    const result = confirmRouteExitGuards(rows, 'essence-edit', 'e1');
+    assert.strictEqual(result, true, 'a dirty essence row waives a re-entry on the same essence');
+    assert.deepEqual(calls, [], 'so it never prompted: a withheld subject would prompt here');
   });
 
   it('stops at the first refusal and asks no later row', () => {
@@ -171,6 +179,10 @@ describe('the three skip shapes', () => {
       assert.equal(skip(view, ''), false, `${view} guards a caller that states no subject`);
       assert.equal(skip('systems', 'subject-1'), false, `${view} guards a move off the route`);
     }
+    // And a row holding no subject waives nothing, rather than matching the caller that states
+    // none: every navigation off these routes passes one, and the floor is what separates them.
+    const unheld = buildRouteExitGuards(contextOf({ 'essence-edit': { subject: () => '' } }));
+    assert.equal(rowFor(unheld, 'essence-edit').skip('essence-edit', ''), false);
   });
 
   it('waives a same-view navigation on the view token alone for the four rows that must', () => {
@@ -231,7 +243,11 @@ describe('the prompt each row raises', () => {
         continue;
       }
       assert.equal(calls.length, 1, `${guard.view} reached its finisher once`);
-      assert.strictEqual(calls[0][2], guard.missing, `${guard.view} defaults to its own action`);
+      assert.deepEqual(
+        calls[0].slice(1),
+        ['finish', guard.missing, 'systems'],
+        `${guard.view} defaults to its own action, and is told where the GM is going`
+      );
       seen.push([guard.view, guard.missing]);
     }
     assert.equal(seen.length, 13);
@@ -263,7 +279,11 @@ describe('the prompt each row raises', () => {
     );
     const answer = await confirmRouteExitGuards(rows, 'systems');
     assert.equal(answer, true);
-    assert.deepEqual(calls, [['essence-edit', 'finish', 'save']]);
+    assert.deepEqual(
+      calls,
+      [['essence-edit', 'finish', 'save', 'systems']],
+      'the finisher is told where the GM is going, which is what the two gathering rows move to'
+    );
   });
 
   it('carries both finisher polarities unchanged, because the driver decides nothing', () => {
@@ -353,7 +373,8 @@ describe('the microtask cost of a dirty exit', () => {
     // one row can be active — twelve compare the single `activeView` token and the checks row
     // reads a `currentView` derived from it — so this IS the reachable worst case; a synthetic
     // thirteen-dirty-row table costs about 59 turns, which no state of the shell reaches.
-    for (const { view } of ROUTE_EXIT_GUARDS) {
+    for (const guard of ROUTE_EXIT_GUARDS) {
+      const { view } = guard;
       const context = contextOf({
         [view]: prompting({
           confirm: () => Promise.resolve('discard'),
@@ -363,7 +384,13 @@ describe('the microtask cost of a dirty exit', () => {
       });
       const result = confirmRouteExitGuards(buildRouteExitGuards(context), 'systems');
       const depth = await microtaskDepthOf(result);
-      assert.ok(depth <= 24, `a dirty ${view} exit settles in ${depth} turns, over the 24 drained`);
+      // Each position costs the same, whichever row is dirty: a shared finisher resolves one turn
+      // sooner than a row's own async one, and no row pays for the twelve it is asked beside.
+      assert.equal(
+        depth,
+        guard.finish === 'scoped-entry' ? 3 : 5,
+        `a dirty ${view} exit settles in ${depth} turns, against the 24 drained`
+      );
     }
   });
 });

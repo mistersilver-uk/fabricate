@@ -1027,6 +1027,13 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     const guardStart = rootSource.indexOf("'recipe-edit': {");
     assert.ok(guardStart > -1, 'the manager states the recipe row of the guard table');
     const guardBody = rootSource.slice(guardStart, rootSource.indexOf('\n    },', guardStart));
+    // The window has to reach the row's body: an end anchor that matched too early leaves a slice
+    // that says nothing about the guard, and the assertion below then reads an empty string.
+    const seamAt = rootSource.indexOf('store.confirmDiscardDirtyRecipeDraft?.()');
+    assert.ok(
+      seamAt > guardStart && seamAt - guardStart < guardBody.length,
+      'the recipe row falls outside the window this test slices'
+    );
     assert.equal(
       guardBody.includes('globalThis.confirm'),
       false,
