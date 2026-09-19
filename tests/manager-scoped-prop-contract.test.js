@@ -117,6 +117,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './TagsCategoriesView.svelte',
   './ToolEditView.svelte',
   './ToolsBrowserView.svelte',
+  // ADDED BY ISSUE 1706's SHARED BULK-SELECTION COMPOSABLE.
+  './bulkSelection.svelte.js',
   './checks/ChecksView.svelte',
   './checks/checkTriggerSummary.js',
   './checks/checksCopy.js',
