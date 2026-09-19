@@ -113,7 +113,7 @@ test('the harness routes every scene activation through the readiness helper', (
       ' test; do not delete it — it is what keeps a new scene switch from being written the old way.'
   );
   assert.ok(
-    code.includes('foundryCanvasReadiness.js'),
+    /isCanvasReadyForScene\b[\s\S]{0,40}?from '[^']*foundryCanvasReadiness\.js'/.test(code),
     'the harness no longer imports the shared readiness predicate'
   );
 
