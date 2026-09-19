@@ -2300,6 +2300,36 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
+test('the broad SearchablePopoverPanel signal captures every deliberate picker state (issue 1719)', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  ]).map((viewCase) => viewCase.id);
+
+  // The representative pair plus the panel's fifteen overrides.
+  assert.deepEqual(
+    selected.sort((a, b) => a.localeCompare(b)),
+    [
+      'fabricate-app-shell',
+      'interactables-manager-region-open',
+      'manager-components-normal',
+      'manager-essences-source-picker',
+      'manager-gathering-task-availability-menu',
+      'manager-recipe-edit-crafting-modifier-cap-reached',
+      'manager-recipe-edit-ingredients-or-menu',
+      'manager-recipe-edit-tag-picker',
+      'manager-recipe-item-contents-picker',
+      'manager-recipes-bulk-edit-check-tier',
+      'manager-system-edit-lists',
+      'manager-world-parties-actor-picker',
+      'manager-world-parties-realm-override-picker',
+      'player-actor-picker',
+      'player-crafting-sources-picker',
+      'player-inventory-page-size',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
+    ]
+  );
+});
+
 // The twenty frames a change to the shared positioning seam must publish (issue 1500; the eleventh
 // joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the twelfth and
 // thirteenth at issue 1504, when `Select`'s option list got two — one of them in the PLAYER window,

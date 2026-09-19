@@ -1254,8 +1254,7 @@ test('the option list a capture producer clicks is rooted where the portal puts 
   assert.ok(
     popover.includes('data-popover-option'),
     '`SearchablePopoverPanel.svelte` no longer writes `data-popover-option`, so the identity ' +
-      'handle ' +
-      'every converted driver clicks by is on no row at all'
+      'handle every converted driver clicks by is on no row at all'
   );
 
   // HARNESS-ONLY, on the `interpolationSafeTrap` precedent above.

@@ -181,8 +181,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-item-contents-picker',
   ]),
   // The primitive's portaled panel (issue 1719), which draws the whole of what a picker presents.
-  // SEVENTEEN frames rather than the parent's ten, because the panel is also what `Select`,
-  // `ActionMenu`, `ModifierPillSelect` and `IconPicker` open, and the three `Select` frames are the
+  // Fifteen frames rather than the parent's ten, because the panel is also what `Select`,
+  // `ModifierPillSelect` and `IconPicker` open, and the three `Select` frames are the
   // only ones that draw it with no header and no search row — the shape most importers get.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
@@ -198,8 +198,6 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipes-bulk-edit-check-tier',
     'player-inventory-page-size',
     'interactables-manager-region-open',
-    'manager-environment-edit-automatic-force-add',
-    'manager-systems-row-menu-open',
     'manager-recipe-edit-crafting-modifier-cap-reached',
     'manager-system-edit-lists',
   ]),

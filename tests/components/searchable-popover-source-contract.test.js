@@ -214,9 +214,9 @@ const PROPS_BLOCK_DIGEST = 'e01ee104cdd7442f362b3e569cdf14c3d62d2fccf399b176bdf7
 const PROPS_BLOCK_NAMES = 59;
 
 test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
-  // WHY A DIGEST AND NOT A LIST. The decomposition at issue 1719 moved two thirds of this
+  // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this
   // component out of it, and the one thing it must not have moved is what its 24 importers pass:
-  // a name, an order or a DEFAULT silently changed here is a behaviour change at every one of
+  // a name, an order or a default silently changed here is a behaviour change at every one of
   // them, and the mounted suites would keep passing because they pass their props by name. A
   // names-only assertion cannot see a changed default and a sorted one cannot see a reordering,
   // so the whole block is compared; the count below is the readable half of the same claim.
@@ -231,7 +231,7 @@ test('the declared prop surface is byte-identical to the pre-decomposition block
     PROPS_BLOCK_DIGEST,
     'the `$props()` destructure is no longer byte-identical to the block this component shipped ' +
       'before its panel was extracted. A decomposition must not touch it. If the surface is ' +
-      'MEANT to change, re-derive this digest in the same commit and say which name, order or ' +
+      'meant to change, re-derive this digest in the same commit and say which name, order or ' +
       `default moved and why. The block read:\n${block}`
   );
 });
@@ -300,8 +300,8 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
 });
 
 test('the anchor the picker hands its panel is what the panel positions against', () => {
-  // ONE CHAIN ACROSS TWO FILES (issue 1719). The picker owns the trigger element and the panel owns
-  // the attachment, so the fact `anchoredPopover` is measured against the TRIGGER — not the picker
+  // One chain across two files (issue 1719). The picker owns the trigger element and the panel owns
+  // the attachment, so the fact `anchoredPopover` is measured against the trigger — not the picker
   // root, and not a `triggerButton` options object — is now two spellings that have to agree. A
   // mounted assertion cannot see the difference: happy-dom returns a zero-valued
   // `getBoundingClientRect` for either node, so the panel lands at the same place when it is wrong.
@@ -317,6 +317,11 @@ test('the anchor the picker hands its panel is what the panel positions against'
     /trigger: anchor,/,
     `${PANEL_PATH} no longer positions against the anchor it was handed, so the panel would be ` +
       'measured against whatever the attachment defaults to'
+  );
+  assert.ok(
+    declaredPropNames(panel).includes('anchor'),
+    `${PANEL_PATH} no longer declares an \`anchor\` prop, so the regex above could match a ` +
+      'renamed local rather than the prop the picker actually passes'
   );
 });
 

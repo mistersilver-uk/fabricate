@@ -1,14 +1,8 @@
 <!--
   `SearchablePopover`'s portaled panel and nothing else: the `role="dialog"` box `anchoredPopover`
   positions, the shared header, the query row, the `role="listbox"` with its groups and rows, and
-  the empty note. An INTERNAL PART with one caller — it adds no vocabulary name and carries the
+  the empty note. An internal part with one caller — it adds no vocabulary name and carries the
   `<SearchPopover>` entry that specifies its parent, whose docblock owns the public prop table.
-
-  Inbound contract, in summary: every name arrives from that table unchanged, plus `anchor` (the
-  element the panel is measured against), `totalCount`, and the parent's own
-  `chooseOption`/`optionIsSelected`/`close`/`stop`/`keepFocusOnHolder`. `searchFieldAttributes` and
-  `popoverLayout` arrive COMPUTED and are never re-derived here: rebuilding the attribute bag would
-  silently drop `onHolderKeydown` and `aria-activedescendant` while rendering identically at rest.
 
   Invariants that moved with the markup:
   - `fabricate-picker-popover` is the primitive's second namespace root, written here because the
@@ -16,10 +10,10 @@
   - THE PANEL'S CHROME MUST NOT TAKE FOCUS: `role="dialog" tabindex="-1"` plus the `mousedown`
     guard, which excepts the query field and the LIST, because a scrollbar drag arrives with the
     scrolling element as its target.
-  - THREE CELLS CROSS THE BOUNDARY, each named for what it holds: `popover` is the dialog element,
+  - Three cells cross the boundary, each named for what it holds: `popover` is the dialog element,
     read by the parent's dismissal `additionalNodes` and its active-option scroll effect; `search`
-    is the query FIELD element, two-way because the parent's `inlineSearchTrigger` branch writes the
-    same cell; `query` is the query VALUE. `optionsList` is private — every reader of it moved here.
+    is the query field element, two-way because the parent's `inlineSearchTrigger` branch writes the
+    same cell; `query` is the query value. `optionsList` is private — every reader of it moved here.
   - The compact presentation's rules root on this panel, so they live in this file's scoped block.
 -->
 <script>
