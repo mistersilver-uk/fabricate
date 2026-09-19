@@ -9,110 +9,32 @@
  * the exact-head stamp.
  */
 
-import { chromium } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { chromium } from 'playwright';
+
+import { runSmokeCleanup } from './foundry-smoke/cleanup.mjs';
+import { createSmokeContext } from './foundry-smoke/context.mjs';
+import {
+  attachConsoleCapture,
+  suppressFoundryTours,
+} from './foundry-smoke/pageOps/pageLifecycle.mjs';
+import {
+  readAllowedConsoleErrorPatternsCsv,
+  resolveSmokeProfileFlags,
+} from './foundry-smoke/profile.mjs';
+import { SMOKE_SCENARIOS } from './foundry-smoke/registry.mjs';
+import { runScenarios } from './foundry-smoke/runScenarios.mjs';
+import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 import {
   appendAllowedConsoleErrorPatterns,
   evaluateSmokeOutcome,
   isTransientPageTeardown,
-  shouldTolerateSmokeTeardown,
-  TRANSIENT_TEARDOWN_SKIP_PREFIX
 } from './lib/foundrySmokeSignal.js';
-import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
-import {
-  planWorldScopeIdentitySmoke,
-  seededFlagPaths,
-  WORLD_SCOPE_SMOKE_FLAG_NAMESPACE,
-} from './lib/worldScopeIdentitySmoke.js';
-import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
-// The setup -> license -> auth -> launch -> join path lives in scripts/lib/foundryBrowserBoot.js so
-// the narrow V13 arm (scripts/foundry-version-assert.mjs) can boot a Foundry page without importing
-// this file, which exports nothing and runs `main()` on import.
-import {
-  acceptLicenseIfPresent as acceptLicenseIfPresentShared,
-  authenticateIfRequired as authenticateIfRequiredShared,
-  createBootReporter,
-  getPathname,
-  joinWorldSession as joinWorldSessionShared,
-  launchWorld as launchWorldShared
-} from './lib/foundryBrowserBoot.js';
-// The rail's (id, label) pairs (issue 1362).
-import {
-  MANAGER_SYSTEM_RAIL_ENTRIES,
-  MANAGER_WORLD_SCOPED_RAIL_ENTRIES,
-  railSelector
-} from './lib/managerRailEntries.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
-import { readAllowedConsoleErrorPatternsCsv, resolveSmokeProfileFlags } from './foundry-smoke/profile.mjs';
-import { createSmokeContext } from './foundry-smoke/context.mjs';
-import { runSmokeCleanup } from './foundry-smoke/cleanup.mjs';
-import { runScenarios } from './foundry-smoke/runScenarios.mjs';
-import { SMOKE_SCENARIOS } from './foundry-smoke/registry.mjs';
-import d0Spine from './foundry-smoke/scenarios/d0-spine.mjs';
-import phaseE from './foundry-smoke/scenarios/phase-e.mjs';
-import {
-  activateSceneAndAwaitCanvasReady,
-  assertNoScreenshotOverlays,
-  assertPointerTarget,
-  attachConsoleCapture,
-  closeOpenApplications,
-  describeBlockingOverlay,
-  dismissFoundryNotifications,
-  exerciseManagerEnvironmentPointerTargets,
-  exerciseManagerPointerTargets,
-  exerciseManagerSystemEditPointerTargets,
-  installNotificationHidingCss,
-  managerSystemRowSelector,
-  selectSmokeSystemInManager,
-  setManagerWindowSize,
-  settleManagerNav,
-  softClick,
-  suppressFoundryTours
-} from './foundry-smoke/pageOps/pageLifecycle.mjs';
-import {
-  assertManagerLayoutStable,
-  assertProgressiveStageListSound,
-  assertRecipeRowsHittable,
-  captureAlchemyThemes,
-  captureBulkEditFrame,
-  captureGroupedContinuationFrame,
-  captureManagerThemes,
-  captureRecipeEditorRoundtrip,
-  captureRecipeResultsTab,
-  captureStableManagerView,
-  chooseSelectOption,
-  clickSegment,
-  COMPONENT_BULK_EDIT_STUDIO,
-  handleRollPromptIfPresent,
-  openChecksActivity,
-  openChecksSection,
-  openManagerCraftingSection,
-  openManagerMultiStepFeatureTile,
-  openManagerRecipeEditor,
-  RECIPE_BULK_EDIT_STUDIO,
-  returnToSystemLibrary,
-  selectRecipeRowsByName
-} from './foundry-smoke/pageOps/managerViews.mjs';
-import {
-  assertDisabledToolOnBreakFieldset,
-  assertSavedToolStudioCapture,
-  assertToolStudioEditorLayout,
-  assertToolStudioLibraryLayout,
-  captureToolStudioProduct,
-  clickToolTabAndAssertEffect,
-  ensureSlotOpen,
-  requireSingleLocator,
-  resetToolStudioScroll,
-  saveToolStudioDraftIfDirty,
-  scrollToolEditorPanelToReveal,
-  toggleToolControlAndRestore,
-  withSingleToolDraftTransition,
-  withSingleToolStoreMutation
-} from './foundry-smoke/pageOps/toolStudio.mjs';
-
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being killed while a
 // final screenshot click is still in flight) can leave a floating page promise that rejects AFTER
@@ -137,21 +59,13 @@ const RESULTS_DIR = join(ROOT, 'test-results');
 const FOUNDRY_URL = reconcileFoundryEndpoint({
   url: process.env.FOUNDRY_URL,
   hostPort: process.env.FOUNDRY_HOST_PORT,
-  fallbackPort: deriveRunIdentity(ROOT).port
+  fallbackPort: deriveRunIdentity(ROOT).port,
 }).url;
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 
 const profile = resolveSmokeProfileFlags();
-const {
-  RAW_SMOKE_PROFILE,
-  SMOKE_PROFILE,
-  RUN_SCREENSHOT_PHASES,
-  RUN_FULL_ONLY_BEHAVIORS,
-  RUN_FULL_ONLY_GATHERING_STATES,
-  SCREENSHOT_TARGET_LABELS,
-  SCREENSHOT_SCOPING_ACTIVE
-} = profile;
+const { RAW_SMOKE_PROFILE, SMOKE_PROFILE, SCREENSHOT_TARGET_LABELS } = profile;
 
 /** @type {string[]} */
 const consoleErrors = [];
@@ -188,7 +102,7 @@ const cleanup = {
   // Issue #489 craft-execution coverage fixtures: dedicated per-mode crafting systems (simple /
   // routedByIngredients / routedByCheck / progressive) and their world items.
   executionSystemIds: [],
-  executionItemIds: []
+  executionItemIds: [],
 };
 
 async function main() {
@@ -202,7 +116,9 @@ async function main() {
     const raw = await readFile(join(RESULTS_DIR, 'boot-timings.json'), 'utf8');
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed?.bootTimings)) bootTimings = parsed.bootTimings;
-  } catch { /* boot timings are optional (e.g., when invoking foundry-test-run.mjs directly) */ }
+  } catch {
+    /* boot timings are optional (e.g., when invoking foundry-test-run.mjs directly) */
+  }
 
   // Wipe stale artifacts so the uploaded test-results/ artifact contains
   // only the current run. Every consumer (CI artifact upload, local triage)
@@ -210,11 +126,13 @@ async function main() {
   await rm(RESULTS_DIR, { recursive: true, force: true });
   await mkdir(RESULTS_DIR, { recursive: true });
 
-  process.stdout.write(`Smoke profile: ${SMOKE_PROFILE}${RAW_SMOKE_PROFILE !== SMOKE_PROFILE ? ` (from FOUNDRY_SMOKE_PROFILE=${RAW_SMOKE_PROFILE})` : ''}\n`);
+  const profileSuffix =
+    RAW_SMOKE_PROFILE === SMOKE_PROFILE ? '' : ` (from FOUNDRY_SMOKE_PROFILE=${RAW_SMOKE_PROFILE})`;
+  process.stdout.write(`Smoke profile: ${SMOKE_PROFILE}${profileSuffix}\n`);
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 }
+    viewport: { width: 1920, height: 1080 },
   });
   await suppressFoundryTours(context);
   const page = await context.newPage();
@@ -238,13 +156,17 @@ async function main() {
     ALLOWED_CONSOLE_ERROR_PATTERNS_CSV
   );
 
-  attachConsoleCapture(page, ignoredErrorPatterns, { consoleErrors, waivedConsoleErrors, consoleLog });
+  attachConsoleCapture(page, ignoredErrorPatterns, {
+    consoleErrors,
+    waivedConsoleErrors,
+    consoleLog,
+  });
 
   const results = {
     passed: false,
     steps: [],
     errors: [],
-    consoleErrors: []
+    consoleErrors: [],
   };
 
   const ctx = createSmokeContext({
@@ -259,7 +181,7 @@ async function main() {
     screenshotRunIdentity,
     consoleErrors,
     waivedConsoleErrors,
-    consoleLog
+    consoleLog,
   });
 
   // Issue #807: page.isClosed() is causation-blind (true for an intentional close OR a renderer
@@ -285,10 +207,10 @@ async function main() {
 
     results.passed = true;
     process.stdout.write('Smoke test PASSED.\n');
-  } catch (err) {
+  } catch (error) {
     results.passed = false;
-    results.errors.push(err.message);
-    process.stderr.write(`Smoke test FAILED: ${err.message}\n`);
+    results.errors.push(error.message);
+    process.stderr.write(`Smoke test FAILED: ${error.message}\n`);
 
     // Capture failure screenshot
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-failure.png') }).catch(() => {});
@@ -301,7 +223,8 @@ async function main() {
   process.exit(results.passed ? 0 : 1);
 }
 
-main().catch(err => {
-  process.stderr.write(`foundry-test-run fatal error: ${err.message}\n`);
+// eslint-disable-next-line unicorn/prefer-top-level-await -- main() ends in a deterministic process.exit; a top-level await would leave the rejection to the event-loop drain.
+main().catch((error) => {
+  process.stderr.write(`foundry-test-run fatal error: ${error.message}\n`);
   process.exit(1);
 });
