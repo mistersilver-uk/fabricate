@@ -217,11 +217,12 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  // 105/115 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
+  // 105/114 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
   // threshold at 820, and `createFoundryJournalRunAuthority` crossed the 100-line function
   // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
   // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
-  // `deleteEmbeddedDocuments` throw and stranded a run.
+  // `deleteEmbeddedDocuments` throw and stranded a run. Issue 1701 banked `craft`: every pipeline
+  // function it split into is under the threshold, and `craftPipeline.js` under the file one.
   assert.equal(files, 105, 'oversized files');
-  assert.equal(keys.length - files, 115, 'oversized functions');
+  assert.equal(keys.length - files, 114, 'oversized functions');
 });

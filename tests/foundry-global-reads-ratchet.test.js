@@ -75,11 +75,11 @@ test('the ledger reports the figures issue 1677 measured', (t) => {
   const pinned = gate.pinned();
   const total = Object.values(pinned).reduce((sum, count) => sum + count, 0);
   assert.equal(Object.keys(pinned).length, 13, 'domain files with a bare Foundry-global read');
-  // 140 as of issue 1648. The versioned run lifecycle added 20 reads to `CraftingEngine.js` and 3
-  // to `CraftingRunManager.js`, all of them the idiom those files already use behind their own
-  // disable: `game.fabricate?.getX?.()` service lookups, `game.users?.get?.()` and
-  // `game.time?.worldTime`.
-  assert.equal(total, 140, 'bare reads across them');
+  // 140 as of issue 1648, less the two `craft()` banked at issue 1701 by resolving its whole edge
+  // once — one `game.user` binding for the run's author and the access guard, and one thunk for
+  // the two time-gate clock reads. The remaining reads are the idiom those files already use
+  // behind their own disable: `game.fabricate?.getX?.()` service lookups and `game.users?.get?.()`.
+  assert.equal(total, 138, 'bare reads across them');
 });
 
 test('the scan looked at the whole domain layer, not a truncated corpus', () => {
