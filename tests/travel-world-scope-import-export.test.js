@@ -221,6 +221,25 @@ describe('the library survives the WHOLE import composition, not just the merge 
     }
   });
 
+  it('lands the realm library BEFORE the environments that cite it', async () => {
+    // T18 (issue 1848). The destination world has no realms at all, and the environment store
+    // validates every realm id it is handed against the world library on each write — so an
+    // import that persisted the environments first rejected the whole import of a realm-gated
+    // system. Ordering, not validation, is what makes this land.
+    const world = destinationWorld();
+    assert.deepEqual(realmIds(world.getSetting('travelConfig')), [], 'nowhere to gate on yet');
+
+    const { persisted } = await runWholeComposition(world, exportedEnvelope());
+
+    const imported = world.environmentStore.list().find((env) => env.name === 'Vale Foraging');
+    assert.deepEqual(
+      imported.includedRealmIds,
+      [VALE_ID],
+      'the gate survives the import rather than being rejected or silently pruned'
+    );
+    assert.ok(realmIds(persisted).includes(VALE_ID), 'and the place it names arrived with it');
+  });
+
   it('seeds the reveal mode and modifier visibility into an unconfigured world', async () => {
     const world = destinationWorld();
     const { persisted } = await runWholeComposition(world, exportedEnvelope());
