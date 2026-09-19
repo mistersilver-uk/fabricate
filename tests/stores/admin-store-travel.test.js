@@ -210,6 +210,8 @@ function createServices({
     },
     // GatheringRealmStore.delete cascades: every citing environment loses the realm from its
     // membership BEFORE the realm leaves the library, and the delete never blocks (issue 1848).
+    // This fake deliberately models the per-environment `update` fallback seam; the real store
+    // takes the single `save(list)` path, which tests/gathering-realm-store.test.js pins.
     delete: async (id, collaborators) => {
       calls.realmDelete.push({ id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } });
       const citing = environmentRecords.filter(e => realmMembership(e).includes(id));

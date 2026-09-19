@@ -586,13 +586,18 @@ test('a full-record patch re-sending the record’s OWN stale id does not count 
 
 test('create owns every id it names; duplicate inherits its source’s and owns its overrides', async () => {
   // T9. A record with no persisted counterpart has no inherited membership to forgive.
-  const { store } = staleWorld({ ids: ['env-new', 'env-copy', 'env-copy-2'] });
+  const { store } = staleWorld({ ids: ['env-new', 'env-copy', 'env-copy-2', 'env-copy-3'] });
   store.load();
 
   await assert.rejects(
     () => store.create(environment({ id: undefined, name: 'Fresh', includedRealmIds: ['gone'] })),
     /unknown realm "gone"/
   );
+
+  // Before any persist has pruned the source: an override re-sending the source's own stale id
+  // is indistinguishable from inheritance, so it is pruned rather than rejected.
+  const resent = await store.duplicate('env-mine', { includedRealmIds: ['gone', 'known'] });
+  assert.deepEqual(resent.includedRealmIds, ['known'], 'a re-sent inherited stale id is pruned');
 
   const copy = await store.duplicate('env-mine', { name: 'Copy of the Mine' });
   assert.deepEqual(copy.includedRealmIds, ['known'], 'the inherited stale id is pruned, not fatal');
@@ -602,6 +607,24 @@ test('create owns every id it names; duplicate inherits its source’s and owns 
     /unknown realm "elsewhere"/,
     'an override naming an id the source never carried is a new reference, so it is rejected'
   );
+});
+
+test('a list-level save still rejects a record with no persisted counterpart that names an unknown realm', async () => {
+  // The prune's blast radius, pinned. A whole-list save is how an IMPORT lands, so a baseline
+  // rule that forgave every stale id would silently strip an imported environment's realm gate
+  // instead of reporting that the world lacks the place it names.
+  const { store, writes } = staleWorld();
+  store.load();
+
+  await assert.rejects(
+    () =>
+      store.save([
+        ...store.list(),
+        environment({ id: 'env-imported', name: 'Imported', includedRealmIds: ['gone'] })
+      ]),
+    /unknown realm "gone"/
+  );
+  assert.equal(writes.length, 0, 'a record the world has never seen owns every id it names');
 });
 
 test('delete, reorder and cleanupByCraftingSystem all succeed on a world carrying stale ids', async () => {
@@ -671,6 +694,10 @@ test('a world whose realm library cannot be read prunes nothing and rejects noth
 
   const saved = await store.update('env-mine', { name: 'Still Mine' });
   assert.deepEqual(saved.includedRealmIds, ['gone'], 'unresolvable is not the same as stale');
+  await assert.doesNotReject(
+    () => store.update('env-mine', { includedRealmIds: ['gone', 'brand-new'] }),
+    'with no library there is no evidence to reject on either'
+  );
 });
 
 test('an EMPTY realm library is a readable one, so it still prunes', async () => {

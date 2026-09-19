@@ -649,7 +649,7 @@ Environments you never edited fail too, so no environment in the world can be sa
 
 **Cause:**
 
-Versions up to 1.9.6 removed the realm from the world realm library but left its id on every environment that listed it.
+Fabricate 1.9.6 and earlier removed the realm from the world realm library but left its id on every environment that listed it.
 Environments are stored as one world list, and a single id that names no realm made the whole list invalid, so every environment save was rejected rather than only the saves of environments that cited the deleted realm.
 
 **Fix:** Update to 1.9.7 or later.

@@ -3098,13 +3098,6 @@ export function createAdminStore(services) {
             environmentStore: _getEnvironmentStore(),
             partyStore: getPartyStore(),
           });
-          // The delete cascades into the world environment list, so the travel-section
-          // `patch()` alone is not enough: without a re-read the Environments tab, the realm
-          // membership editor and a clean draft all keep citing an id that names no realm,
-          // and the next environment save re-sends it (issue 1848).
-          await refresh();
-          _stripRealmFromEnvironmentDraft(realmId);
-          return true;
         } catch (error) {
           applyError(error);
           return false;
@@ -3112,6 +3105,18 @@ export function createAdminStore(services) {
           travelSaving.set(false);
           patch();
         }
+        // The delete cascades into the world environment list, so the travel-section
+        // `patch()` alone is not enough: without a re-read the Environments tab, the realm
+        // membership editor and a clean draft all keep citing an id that names no realm,
+        // and the next environment save re-sends it (issue 1848). The delete has already
+        // succeeded, so a failing re-read is logged rather than reported as a failed delete.
+        try {
+          await refresh();
+        } catch (error) {
+          console.warn('Fabricate | Failed to refresh after deleting a realm', error);
+        }
+        _stripRealmFromEnvironmentDraft(realmId);
+        return true;
       },
     };
 

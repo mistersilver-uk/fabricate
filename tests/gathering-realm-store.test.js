@@ -208,6 +208,53 @@ test('a rejected environment write is logged and the realm is deleted anyway', a
   assert.equal(warnings.length, 1, 'the failure is reported rather than swallowed');
 });
 
+test('a partial per-environment fallback reports the environments actually written', async () => {
+  // A fallback that fails on the second record has still repaired the first; the count says so.
+  const warnings = [];
+  const { store } = makeStore(
+    { realms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }] },
+    { warn: (...args) => warnings.push(args) }
+  );
+  const environmentStore = makeEnvironmentStore({ save: 'omit' });
+  const realUpdate = environmentStore.store.update;
+  environmentStore.store.update = async (id, patch) => {
+    if (id === 'env2') throw new Error('env2 is invalid for an unrelated reason');
+    return realUpdate(id, patch);
+  };
+
+  const result = await store.delete('r1', { environmentStore: environmentStore.store });
+
+  assert.equal(store.list().length, 1, 'the realm is gone regardless');
+  assert.equal(result.repaired.environments, 1, 'one environment was written before the failure');
+  assert.equal(warnings.length, 1);
+});
+
+test('an unreadable environment list never blocks the delete', async () => {
+  // Both the evidence read and the repair read sit behind the same promise: the GM asked for a
+  // deletion, and a collaborator that cannot even list is no reason to refuse it.
+  const warnings = [];
+  const { store } = makeStore(
+    { realms: [{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }] },
+    { warn: (...args) => warnings.push(args) }
+  );
+  const environmentStore = {
+    list: () => {
+      throw new Error('setting not registered');
+    },
+    save: async () => {
+      throw new Error('never reached');
+    }
+  };
+
+  const result = await store.delete('r1', { environmentStore });
+
+  assert.equal(result.deleted.id, 'r1');
+  assert.equal(store.list().length, 1, 'the realm is gone regardless');
+  assert.deepEqual(result.referencedBy.environments, []);
+  assert.equal(result.repaired.environments, 0);
+  assert.equal(warnings.length, 2, 'both the evidence read and the repair read are reported');
+});
+
 test('the environment write happens while the realm is still in the library', async () => {
   // T5. Order is the whole point: the environment store validates realm ids against the world
   // library on every write, so a rewrite issued after the removal would be rejected by the very

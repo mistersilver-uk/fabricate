@@ -235,7 +235,16 @@ export class GatheringRealmStore {
    * @returns {Promise<number>}
    */
   async _stripRealmFromEnvironments(realmId, environmentStore) {
-    const list = typeof environmentStore?.list === 'function' ? environmentStore.list() : null;
+    let list;
+    try {
+      list = typeof environmentStore?.list === 'function' ? environmentStore.list() : null;
+    } catch (error) {
+      this.warn(
+        `Fabricate | Could not read the environment list to strip deleted realm "${realmId}"; deleting it anyway`,
+        error
+      );
+      return 0;
+    }
     if (!Array.isArray(list)) return 0;
 
     const repairedIds = new Set();
@@ -252,6 +261,7 @@ export class GatheringRealmStore {
     });
     if (repairedIds.size === 0) return 0;
 
+    let written = 0;
     try {
       if (typeof environmentStore.save === 'function') {
         await environmentStore.save(scrubbed);
@@ -264,14 +274,16 @@ export class GatheringRealmStore {
           includedRealmIds: env.includedRealmIds ?? [],
           excludedRealmIds: env.excludedRealmIds ?? [],
         });
+        written += 1;
       }
-      return repairedIds.size;
+      return written;
     } catch (error) {
       this.warn(
         `Fabricate | Could not strip deleted realm "${realmId}" from environment realm membership; deleting it anyway`,
         error
       );
-      return 0;
+      // The per-environment fallback may have landed some writes before the failure; report those.
+      return written;
     }
   }
 
@@ -282,7 +294,16 @@ export class GatheringRealmStore {
     // Every environment in the world, not one system's: a world realm can be cited by
     // environments belonging to any crafting system that opted in, and the GM needs to see all
     // of them before deleting the place they name.
-    const envList = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
+    // Evidence collection must not block the delete either: an unreadable list reports nothing.
+    let envList = [];
+    try {
+      envList = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
+    } catch (error) {
+      this.warn(
+        `Fabricate | Could not read the environment list for realm "${realmId}" delete evidence`,
+        error
+      );
+    }
     for (const env of Array.isArray(envList) ? envList : []) {
       const included =
         Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);

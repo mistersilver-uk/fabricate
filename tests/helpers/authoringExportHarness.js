@@ -58,6 +58,9 @@ export function makeHarness(fixture) {
     if (key === 'travelConfig') travelStore?.load?.();
   };
   travelStore = new GatheringRealmStore({ getSetting, setSetting });
+  // Warm, the way `src/main.js` loads it at startup: a COLD store lazily reads the setting on
+  // its first `list()`, which hides an import that writes the realms too late.
+  travelStore.load();
 
   const systems = new Map([[fixture.system.id, structuredClone(fixture.system)]]);
   const systemManager = {

@@ -228,9 +228,10 @@ The entire location-availability evaluation is additionally gated by `gatheringR
 `includedRealmIds`/`excludedRealmIds` are validated against the WORLD realm library, and only at save boundaries; load paths never throw on, and never prune, stale ids.
 A save rejects a realm id that names no realm only when that write introduces it.
 The baseline a write is measured against is the record as persisted under the same id (for `duplicate`, the persisted source record); `create`, and a list-level save of a record with no persisted counterpart, own every id on the record.
-A stale id the baseline already carried — in either list — is PRUNED instead of rejected, even when the write re-sends it; because environments persist as one world list, a successful environment save prunes every persisted environment's stale ids in the same write and logs, once, the environments and ids it dropped.
+A stale id the baseline already carried — in whichever of the two lists carried it — is PRUNED instead of rejected, even when the write re-sends it; because environments persist as one world list, a successful environment save prunes every persisted environment's stale ids in the same write and logs, once, the environments and ids it dropped.
 Pruning is keyed to a resolved realm library: when the library cannot be read, nothing is pruned and nothing is rejected.
 So a deleted realm never blocks saving an environment; an environment the prune leaves with no realm ids is simply no longer realm-gated, and the prune never deletes or disables it.
+A save RETURNS the record as persisted rather than as submitted, so a caller that re-sends what it was handed cannot re-introduce an id the write pruned.
 Environment realm membership is pruned where a party's `currentRealmOverride.realmIds` is kept as stale repair evidence, because the party card exposes a control to clear a stale override and the environment editor cannot show, let alone remove, an id that names no realm.
 
 ## Location-Aware Gathering
