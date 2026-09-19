@@ -1,10 +1,7 @@
 /**
  * The Foundry edge of the region-first interactable model: one singleton wiring `dropCanvasData`,
- * the `tokenEnter`/`tokenExit` seam, the `controlToken` re-trigger and the "interact here"
- * keybinding to the pure modules that hold every decision. Spawning is GM-only, transaction-like.
- * The behaviour events run on EVERY connected client, so the prompt shows only where
- * {@link InteractableManager#_shouldPromptForEnter} says and the mutation routes to the active
- * GM — which is what stops N prompts and double-writes.
+ * the region enter/exit seam, the `controlToken` re-trigger and the keybinding to the pure modules
+ * that hold every decision. Every Foundry global this feature reads is read here.
  */
 
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
@@ -50,14 +47,14 @@ import {
 } from './regionHitTest.js';
 import { isInteractableRegionBehavior } from './regions/interactableRegionFlags.js';
 
-/** Client keybinding id for the "interact here" re-trigger. */
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
 
 /**
- * The activation collaborators, each a function invoked where the manager's own `globalThis` read
- * used to happen. Nothing is resolved here: the singleton is built during page parse, before
- * `game`, `canvas`, `ui.notifications` or `game.time` exist, so a captured value is permanently
- * undefined in production and no test that installs its fakes first can see it.
+ * Every collaborator below is a FUNCTION, invoked where the manager's own `globalThis` read used to
+ * happen, and none is resolved at construction: this singleton is built during page parse, before
+ * `game`, `canvas`, `ui.notifications` and `game.time` exist, so a captured value would be
+ * permanently undefined in production and no suite that installs its fakes first could see it.
+ * Each re-entry thunk goes through the manager method, so a test that replaces one still wins.
  */
 function spawnCollaborators(manager) {
   return {
@@ -68,11 +65,8 @@ function spawnCollaborators(manager) {
       const TileDocument =
         globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
       if (TileDocument?.create) return (await TileDocument.create(data, { parent: scene })) ?? null;
-      if (scene.createEmbeddedDocuments) {
-        const [created] = await scene.createEmbeddedDocuments('Tile', [data]);
-        return created ?? null;
-      }
-      return null;
+      const [created] = (await scene.createEmbeddedDocuments?.('Tile', [data])) ?? [];
+      return created ?? null;
     },
     deleteRegion: (regionDoc) => regionDoc?.delete?.(),
     updateBehavior: (behavior, update) => behavior.update(update),
@@ -86,7 +80,7 @@ function spawnCollaborators(manager) {
     notifyInfo: (message) => globalThis.ui?.notifications?.info?.(message),
     localize: (key) => globalThis.game?.i18n?.localize?.(key),
     formatMessage: (key, data) => globalThis.game?.i18n?.format?.(key, data),
-    spawnInteractableRegion: (spawnRequest) => manager._spawnInteractableRegion(spawnRequest),
+    spawnInteractableRegion: (request) => manager._spawnInteractableRegion(request),
   };
 }
 
@@ -98,7 +92,7 @@ function promptCollaborators(manager) {
     viewedScene: () => globalThis.canvas?.scene,
     getScene: (sceneId) => globalThis.game?.scenes?.get?.(String(sceneId)),
     controlledTokens: () => globalThis.canvas?.tokens?.controlled ?? [],
-    requestActivation: (behavior, ctx) => manager._requestActivation(behavior, ctx),
+    requestActivation: (...args) => manager._requestActivation(...args),
     behaviorsContainingToken: (token) =>
       interactableBehaviorsContainingToken({
         scene: globalThis.canvas?.scene,
@@ -119,11 +113,10 @@ function grantCollaborators(manager) {
     currentUserId: () => globalThis.game?.user?.id ?? null,
     worldTime: () => Number(globalThis.game?.time?.worldTime || 0),
     getUser: (userId) => globalThis.game?.users?.get?.(String(userId ?? '')),
-    canControlActor: (userId, actorId) => manager._userCanControlActor(userId, actorId),
+    canControlActor: (...args) => manager._userCanControlActor(...args),
     sourceExists: (system) => manager._sourceExists(system),
     environmentExists: (environmentId) => manager._environmentExists(environmentId),
-    tokenInside: (behavior, actorId, userId) =>
-      manager._tokenInsideRegion(behavior, actorId, userId),
+    tokenInside: (...args) => manager._tokenInsideRegion(...args),
     resolutionDeps: () => manager._resolutionDeps(),
     notifyWarn: (message) => globalThis.ui?.notifications?.warn?.(message),
     localize: (key) => globalThis.game?.i18n?.localize?.(key),
@@ -145,9 +138,9 @@ class InteractableManager {
     this._getPromptAppClass = getPromptAppClass;
     this._regionEnvironmentIdsAtPoint = regionHitTest;
     this._promptDropEnvironment = promptEnvironment;
-    this._grantDeps = grantCollaborators(this);
-    this._promptDeps = promptCollaborators(this);
     this._spawnDeps = spawnCollaborators(this);
+    this._promptDeps = promptCollaborators(this);
+    this._grantDeps = grantCollaborators(this);
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._onControlToken = this._onControlToken.bind(this);
@@ -159,8 +152,7 @@ class InteractableManager {
     const hooks = globalThis.Hooks;
     if (hooks?.on) {
       hooks.on('dropCanvasData', this._onDrop);
-      // A token already INSIDE a region on scene load never fires `tokenEnter`, so re-raise the
-      // prompt when the player controls one.
+      // A token already INSIDE a region on scene load never fires `tokenEnter`; control does.
       hooks.on('controlToken', this._onControlToken);
     }
     this._registerKeybinding();
@@ -187,25 +179,20 @@ class InteractableManager {
     }
   }
 
-  // --- Drop → Region + Behaviour + linked Tile --------------------------------
-
   /** `dropCanvasData`: false suppresses Foundry's drop (GM-only); undefined lets it through. */
   _onDrop(_canvas, data) {
     const classification = classifyInteractableDrop(data, this._resolutionDeps());
     if (!classification) return; // not ours — let Foundry handle it.
-
-    // Interactable spawning is GM-only.
     if (globalThis.game?.user?.isGM !== true) {
       globalThis.ui?.notifications?.warn?.(
         globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.GMOnlySpawn') ??
           'Only a GM can place Fabricate interactables on the canvas.'
       );
-      return false; // suppress: we recognized it but cannot spawn.
+      return false; // recognized, but spawning is GM-only.
     }
 
     const point = dropPoint(data);
-    // The browser's "Region only" action carries `fabricate.visualMode:'none'`; a drag defaults
-    // to 'marker'.
+    // The browser's "Region only" action sets `visualMode:'none'`; a drag defaults to 'marker'.
     const visualMode = data?.fabricate?.visualMode === 'none' ? 'none' : 'marker';
     if (classification.interactableType !== 'gatheringTask') {
       const spawnRequest = this._buildRegionSpawnRequest({ classification, point, visualMode });
@@ -221,113 +208,66 @@ class InteractableManager {
   }
 
   /** Click-to-place a11y fallback: the same payload through {@link _onDrop} at the view centre. */
-  placeInteractableAtViewCenter({
-    interactableType,
-    systemId,
-    referenceId,
-    visualMode = 'marker',
-  } = {}) {
-    const payload = buildInteractableDragPayload({
-      interactableType,
-      systemId,
-      referenceId,
-      visualMode,
-    });
+  placeInteractableAtViewCenter(request = {}) {
+    const payload = buildInteractableDragPayload(request);
     if (!payload) return false;
     const center = this._viewCenter();
-    const data = { ...payload, x: center.x, y: center.y };
-    return this._onDrop(globalThis.canvas, data) === false;
+    return this._onDrop(globalThis.canvas, { ...payload, x: center.x, y: center.y }) === false;
   }
 
   _buildRegionSpawnRequest(args = {}) {
     return buildSpawnRequest(args, this._spawnDeps);
   }
-
   async _spawnGatheringTask(args) {
     return spawnTask(args, this._spawnDeps);
   }
-
-  /** The environments of one crafting system, as `{ id, name }` rows. */
-  _systemEnvironments(systemId) {
-    const environments =
-      globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
-    return (Array.isArray(environments) ? environments : [])
-      .filter((env) => String(env?.craftingSystemId ?? '') === String(systemId))
-      .map((env) => ({ id: String(env.id), name: String(env.name ?? env.id) }));
-  }
-
   async _spawnInteractableRegion(spawnRequest) {
     return spawnRegion(spawnRequest, this._spawnDeps);
   }
 
-  _notifySpawnFailure() {
-    globalThis.ui?.notifications?.warn?.(
-      globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.SpawnFailed') ??
-        'Failed to place the Fabricate interactable on the canvas.'
-    );
-  }
-
-  // --- Activation: region enter / exit ---------------------------------------
-
-  /** `tokenEnter` seam, on every client: raise the Interact prompt where it belongs. */
   onRegionEnter(event, behavior) {
     raiseEnterPrompt(event, behavior, this._promptDeps);
   }
-
-  /** `tokenExit` seam: dismiss by ref on every client, however the token left. */
   onRegionExit(event, behavior) {
     dismissExitPrompt(event, behavior, this._promptDeps);
   }
-
   /** `controlToken` re-trigger for a token already inside, which `tokenEnter` never fires for. */
   _onControlToken(tokenPlaceable, controlled) {
     if (controlled !== true) return;
     this._promptForTokenInsideRegion(tokenPlaceable);
   }
-
   _interactHere() {
     interactHere(this._promptDeps);
   }
-
   _promptForTokenInsideRegion(tokenPlaceable) {
     promptInsideRegion(tokenPlaceable, this._promptDeps);
   }
-
   _repromptAfterInteractableClose(args = {}) {
     repromptAfterClose(args, this._promptDeps);
   }
 
-  // --- Activation: request / validate-grant / open ---------------------------
-
   _requestActivation(behavior, ctx = {}) {
     requestActivation(behavior, ctx, this._grantDeps);
   }
-
   async validateAndGrant(request) {
     return validateActivationAndGrant(request, this._grantDeps);
   }
-
   openGrant(payload) {
     openGrantLocally(payload, this._grantDeps);
   }
-
   /** Local-user body for `interactableActivationDenied`: warn WHY. No-throw. */
   notifyActivationDenied(reason) {
     this._grantDeps.notifyWarn(denialMessage(reason, this._grantDeps));
   }
-
-  // --- Foundry-edge helpers (activation) -------------------------------------
 
   _resolveBehavior({ sceneId, regionId, behaviorId } = {}) {
     const scene = globalThis.game?.scenes?.get?.(String(sceneId ?? ''));
     const region = scene?.regions?.get?.(String(regionId ?? ''));
     return region?.behaviors?.get?.(String(behaviorId ?? '')) ?? null;
   }
-
   _shouldPromptForEnter(event, token) {
     return shouldPromptForEnter({ event, token, currentUser: globalThis.game?.user });
   }
-
   _userCanControlActor(userId, actorId) {
     if (!actorId) return false;
     return canControlActor({
@@ -335,36 +275,43 @@ class InteractableManager {
       user: globalThis.game?.users?.get?.(String(userId ?? '')) ?? null,
     });
   }
-
   _sourceExists(system) {
     const parsed = parseInteractableSourceUuid(system?.sourceUuid);
     if (!parsed) return false;
     const deps = this._resolutionDeps();
-    if (parsed.interactableType === 'tool') {
-      return deps.getTool({ systemId: parsed.systemId, toolId: parsed.referenceId }) != null;
-    }
-    return deps.getTask({ systemId: parsed.systemId, taskId: parsed.referenceId }) != null;
+    return parsed.interactableType === 'tool'
+      ? deps.getTool({ systemId: parsed.systemId, toolId: parsed.referenceId }) != null
+      : deps.getTask({ systemId: parsed.systemId, taskId: parsed.referenceId }) != null;
   }
 
+  _gatheringEnvironments() {
+    const stored = globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
+    return Array.isArray(stored) ? stored : [];
+  }
   _environmentExists(environmentId) {
     if (!environmentId) return false;
-    const environments =
-      globalThis.game?.fabricate?.getGatheringEnvironmentStore?.()?.list?.() ?? [];
-    return (Array.isArray(environments) ? environments : []).some(
-      (env) => String(env?.id) === String(environmentId)
-    );
+    return this._gatheringEnvironments().some((env) => String(env?.id) === String(environmentId));
+  }
+  /** The environments of one crafting system, as `{ id, name }` rows. */
+  _systemEnvironments(systemId) {
+    return this._gatheringEnvironments()
+      .filter((env) => String(env?.craftingSystemId ?? '') === String(systemId))
+      .map((env) => ({ id: String(env.id), name: String(env.name ?? env.id) }));
   }
 
   /**
-   * Is the actor's token still inside? Runs on the ACTIVE GM's client for every player request, so
-   * it may execute against a scene that client is not viewing and nothing canvas-rendered may be
-   * consulted (`data-models/spec.md` § fabricate.interactable Region Behaviour, requirement 6).
+   * Runs on the ACTIVE GM's client for every player request, so it may execute against a scene that
+   * client is not viewing and nothing canvas-rendered may be consulted (requirement 6).
    */
   _tokenInsideRegion(behavior, actorId, _userId) {
     return tokenInsideRegion({ behavior, actorId });
   }
-
-  // --- Foundry-edge helpers (placement) --------------------------------------
+  _notifySpawnFailure() {
+    globalThis.ui?.notifications?.warn?.(
+      globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.SpawnFailed') ??
+        'Failed to place the Fabricate interactable on the canvas.'
+    );
+  }
 
   _viewCenter() {
     return viewCenterFrom({
@@ -372,7 +319,6 @@ class InteractableManager {
       dimensions: globalThis.canvas?.scene?.dimensions ?? globalThis.canvas?.dimensions ?? null,
     });
   }
-
   _screenCenterToScene() {
     return screenCenterToScene({
       stage: globalThis.canvas?.stage,
@@ -381,32 +327,25 @@ class InteractableManager {
       height: globalThis.window?.innerHeight ?? 0,
     });
   }
-
   _resolveIconTexture(classification) {
     const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem?.(classification?.systemId);
     return iconTextureFor({ classification, components: resolvedComponentsFor(system) });
   }
-
   _gridSize() {
-    return gridSizeFrom(
-      globalThis.canvas?.scene?.grid?.size,
-      globalThis.canvas?.grid?.size,
-      globalThis.canvas?.dimensions?.size
-    );
+    const canvas = globalThis.canvas;
+    return gridSizeFrom(canvas?.scene?.grid?.size, canvas?.grid?.size, canvas?.dimensions?.size);
   }
 
   _resolutionDeps() {
     const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
     return {
-      getTool: ({ systemId, toolId }) => {
-        const system = systemManager?.getSystem?.(systemId);
-        return resolvedToolsFor(system).find((tool) => tool?.id === toolId) ?? null;
-      },
-      getTask: ({ systemId, taskId }) => {
-        const tasks = this._readLibraryTasks(systemId);
-        return tasks.find((task) => task?.id === taskId) ?? null;
-      },
+      getTool: ({ systemId, toolId }) =>
+        resolvedToolsFor(systemManager?.getSystem?.(systemId)).find(
+          (tool) => tool?.id === toolId
+        ) ?? null,
+      getTask: ({ systemId, taskId }) =>
+        this._readLibraryTasks(systemId).find((task) => task?.id === taskId) ?? null,
       resolveItemUuidToTool: (uuid) =>
         resolveItemUuidToTool(uuid, {
           resolveItem: (id) => globalThis.fromUuidSync?.(id) ?? null,
@@ -414,25 +353,18 @@ class InteractableManager {
         }),
     };
   }
-
   _readLibraryTasks(systemId) {
     if (!systemId) return [];
-    const config = getSetting(SETTING_KEYS.GATHERING_CONFIG);
-    const tasks = config?.systems?.[systemId]?.tasks;
+    const tasks = getSetting(SETTING_KEYS.GATHERING_CONFIG)?.systems?.[systemId]?.tasks;
     return Array.isArray(tasks) ? tasks : [];
   }
 
   _registered = false;
 }
 
-/** The shared InteractableManager singleton. */
-const instance = new InteractableManager();
-
-// Expose the singleton as a static so callers use `InteractableManager.instance.register()`.
-InteractableManager.instance = instance;
+/** The shared singleton, exposed as a static so callers use `InteractableManager.instance`. */
+InteractableManager.instance = new InteractableManager();
 
 export { InteractableManager };
-
 export default InteractableManager;
-
 export { parseInteractableSourceUuid } from './interactableResolution.js';

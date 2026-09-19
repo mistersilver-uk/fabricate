@@ -1,8 +1,7 @@
 /**
- * Spawning an interactable: a dropped gathering task's environment precedence, the spawn request,
- * and the transaction-like Region plus linked Tile write. Every Foundry collaborator is an injected
- * function resolved at call time — `scene()` is re-read at each site, because the GM can change
- * scene while the environment dialog is open.
+ * Environment precedence for a dropped gathering task, the spawn request, and the transaction-like
+ * Region plus linked Tile write. Every collaborator is injected as a call-time function, and
+ * `scene()` is re-read per site because the GM can change scene while the dialog is open.
  */
 
 import { resolveDropEnvironment } from './environmentResolution.js';
@@ -87,9 +86,9 @@ function notifyAutoResolved(environments, environmentId, deps) {
 }
 
 /**
- * Create the Region and its linked Tile, transaction-like: an orphan of either is deleted when
- * its partner fails, and once both exist the `linkedVisual` ref is written back so relink,
- * recreate and missing-policy can resolve it. No-throw; GM-notify on failure.
+ * Create the Region and its linked Tile, transaction-like: an orphan of either is deleted when its
+ * partner fails, and once both exist the `linkedVisual` ref is written back so relink, recreate and
+ * missing-policy can resolve it. No-throw; GM-notify on failure.
  */
 export async function spawnInteractableRegion(spawnRequest, deps) {
   if (!spawnRequest) return null;
@@ -104,8 +103,7 @@ export async function spawnInteractableRegion(spawnRequest, deps) {
   }
 
   const behavior = firstInteractableBehavior(regionDoc);
-  // Region-only: the builder returns `tile: null`, and the behaviour already carries
-  // `linkedVisual.mode='none'` — there is no Tile, no orphan and no ref to write back.
+  // Region-only: no Tile, so no orphan and no ref to write back.
   if (!tile) return regionDoc;
 
   const tileDoc = await createLinkedTile({ scene, tile, regionDoc, behavior }, deps);
@@ -131,8 +129,8 @@ async function createRegionDocument({ scene, region, behaviorSystem, tile }, dep
       name: region.name,
       shapes: [{ type: 'rectangle', x, y, width, height }],
       behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }],
-      // Stamp region-level ownership: Fabricate CREATED this region, so its delete may take the
-      // whole region. A PROMOTED region never gets this flag (issue 533).
+      // Fabricate CREATED this region, so its delete may take the whole one; a PROMOTED one's
+      // delete may not (issue 533).
       flags: buildInteractableRegionFlags(),
     });
     return created ?? null;
@@ -162,10 +160,7 @@ async function createLinkedTile({ scene, tile, regionDoc, behavior }, deps) {
   }
 }
 
-/**
- * If THIS fails the interactable still works region-only, so keep the orphan Tile — it points back
- * at the region — rather than tearing down a working one.
- */
+/** A failed write-back keeps the orphan Tile: it points back, and region-only still works. */
 async function writeLinkedVisualBack(behavior, tileDoc, deps) {
   const tileUuid = typeof tileDoc?.uuid === 'string' ? tileDoc.uuid : null;
   if (!behavior?.update || !tileUuid) return;

@@ -1,7 +1,7 @@
 /**
- * Activation request routing, the active-GM validation re-check, the grant payload and the
- * denial route. Every Foundry collaborator is injected as a function resolved at call time, so
- * this module reads no global and a manager method a test replaces still intercepts.
+ * Request routing, the active-GM validation re-check, the grant payload and the denial route.
+ * Every collaborator is injected as a call-time function, so nothing reads a Foundry global and a
+ * manager method a test replaces still intercepts.
  */
 
 import { buildActiveCanvasTool } from './interactableResolution.js';
@@ -48,10 +48,7 @@ export function requestActivation(behavior, ctx = {}, deps) {
   deps.emit(request);
 }
 
-/**
- * Active-GM body for `interactableActivate`: resolve the target, compute the validation
- * collaborators, run {@link validateActivationRequest}, and on a pass emit the grant. No-throw.
- */
+/** Active-GM body for `interactableActivate`: validate the request, and on a pass grant. No-throw. */
 export async function validateAndGrant(request, deps) {
   if (!request || typeof request !== 'object') return false;
   const behavior = deps.resolveBehavior(request);
@@ -65,8 +62,7 @@ export async function validateAndGrant(request, deps) {
   const validation = validateActivationRequest(request, {
     behaviorSystem: system,
     now: deps.worldTime(),
-    // The REQUESTING user's override status, not the validating GM's, so the actor-control gate
-    // cannot be bypassed by a non-owning, non-GM player.
+    // The REQUESTING user's override status, so a non-owning player cannot bypass actor control.
     isGM: deps.getUser(request.userId)?.isGM === true,
     canControlActor: deps.canControlActor(request.userId, request.actorId),
     sourceExists: deps.sourceExists(system),
@@ -93,17 +89,15 @@ export async function validateAndGrant(request, deps) {
   }
   if (!payload) return false;
 
-  // The requester opens the session locally; when the GM IS the requester, open it here, since
-  // a socket emit never reaches its emitter.
+  // When the GM IS the requester, open here: a socket emit never reaches its own emitter.
   if (deps.currentUserId() === (request.userId ?? null)) deps.openGrant(payload);
   else deps.emit(payload);
   return true;
 }
 
 /**
- * The `interactableActivationGranted` payload for a validated request, or a denial `reason` when
- * a tool station's live `activeCanvasTool` no longer resolves — a bare refusal here answered a
- * station whose Tool had gone with nothing at all, which is what hid the issue-1119 defect.
+ * The `interactableActivationGranted` payload, or a denial `reason` when a tool station's live
+ * `activeCanvasTool` no longer resolves — refusing silently there hid the issue-1119 defect.
  */
 export function buildGrantPayload({ request, system, resolutionDeps }) {
   const grant = describeGrant(system);
@@ -136,8 +130,7 @@ export function buildGrantPayload({ request, system, resolutionDeps }) {
         interactableType: system.interactableType,
         environmentId: system.environmentId ?? null,
         taskId: system.taskId ?? null,
-        // The interacting actor is the default selected actor in the granted session; already
-        // ownership-validated above.
+        // The default selected actor in the granted session; ownership-validated above.
         actorId: request.actorId ?? null,
       },
     },
@@ -147,7 +140,7 @@ export function buildGrantPayload({ request, system, resolutionDeps }) {
 
 /**
  * Local-user body for `interactableActivationGranted`: Crafting for a tool, Gathering scoped to
- * `{ environmentId, taskId }` for a task. `grant.ref` is threaded through as `interactableRef`
+ * `{ environmentId, taskId }` for a task, with `grant.ref` threaded through as `interactableRef`
  * so an UNLINKED task decrements its own pool rather than the environment's (issue 302).
  */
 export function openGrant(payload, deps) {
@@ -156,14 +149,12 @@ export function openGrant(payload, deps) {
   const AppClass = deps.getAppClass();
   if (!AppClass?.show) return;
 
-  // The interacting actor becomes the default-selected actor in the opened session's top bar.
   const actorId = grant.actorId ?? null;
 
   if (grant.interactableType === 'tool') {
     const activeCanvasTool = grant.context?.activeCanvasTool ?? null;
     if (!activeCanvasTool) return;
-    // A Tool station belongs to crafting: inject the station tool as virtual-present so
-    // prerequisite checks pass without the actor owning the item.
+    // The station tool goes in virtual-present, so prerequisites pass without the actor owning it.
     void AppClass.show('crafting', { activeCanvasTool, actorId });
     return;
   }
@@ -176,12 +167,9 @@ export function openGrant(payload, deps) {
     environmentId,
     taskId,
     actorId,
-    // Always passed through: the engine falls back to the environment scope when the behaviour
-    // is environment-scoped or gone (issue 302).
+    // Always passed: the engine falls back to environment scope when the behaviour is gone (302).
     interactableRef: grant.ref && typeof grant.ref === 'object' ? refOf(grant.ref) : null,
-    // On close, re-raise the prompt if the token is STILL inside, so a large region need not be
-    // re-entered and an accidental close is recoverable; the re-prompt re-applies the hit-test,
-    // guard and ref-matching, so a token that has left is not re-prompted (issue 332).
+    // On close, re-raise the prompt iff the token is still inside, so a close is recoverable (332).
     onClose: () => deps.onGrantClose({ ref: grant.ref, actorId }),
   };
   Promise.resolve(AppClass.show('gathering', gatheringOptions)).catch(() => {});
