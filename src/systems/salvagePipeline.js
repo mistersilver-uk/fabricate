@@ -125,7 +125,7 @@ export async function validateSalvageTools(engine, ctx) {
 export async function openSalvageRun(engine, ctx) {
   const { actor, actorUuid, component, componentId, craftingSystemId } = ctx;
   const { options, readWorldTime, salvageRunManager } = ctx;
-  // ONE sample, reused across the `createRun` and `markRunWaitingForTime` awaits below and by the
+  // One sample, reused across the `createRun` and `markRunWaitingForTime` awaits below and by the
   // gate's remaining figure. `core.time` moves from the socket at exactly those yields, so a
   // second read here would measure the wait from a clock that has already advanced.
   const now = readWorldTime();
@@ -230,11 +230,7 @@ export async function runSalvageCheck(engine, ctx) {
   return null;
 }
 
-/**
- * The resolution snapshot and the pending settlement, written OUTSIDE the award bracket exactly
- * where `salvage()` opens it today: this actor-flag write's rejection must escape uncaught rather
- * than reach the uncertainty recorder, which would overwrite it with a second write.
- */
+/** The resolution snapshot and the pending settlement the award bracket will settle. */
 export async function beginSalvageSettlement(engine, ctx) {
   const { actor, checkResult, failurePolicy, salvageRun, salvageRunManager, system } = ctx;
   const salvageCheck = resolveSalvageCheck(system);

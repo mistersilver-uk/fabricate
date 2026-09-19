@@ -6625,7 +6625,7 @@ export class CraftingEngine {
     if (opened) return opened.result;
     const checked = await runSalvageCheck(this, ctx);
     if (checked) return checked.result;
-    // The settlement write stays OUTSIDE the bracket, where `try` opened before this split: it is
+    // The settlement write stays outside the bracket, where `try` opened before this split: it is
     // an actor-flag write whose rejection must escape uncaught, because inside the bracket
     // `_recordSalvageUncertainty` would answer it with a second write to the same flag.
     await beginSalvageSettlement(this, ctx);
@@ -6655,9 +6655,8 @@ export class CraftingEngine {
       options,
       deferComplicationDelivery: options?.deferComplicationDelivery === true,
       actor: await fromUuid(actorUuid),
-      // CACHE-ONCE, unlike `craft()`'s thunk: `openSalvageRun` samples this exactly once and
-      // reuses that sample across its awaits, because salvage measures its gate from the instant
-      // the run opened. It exists only to keep the bare `game` read inside this file.
+      // The thunk exists only to keep the bare `game` read in this file; `openSalvageRun` samples
+      // it once.
       readWorldTime: () => Number(game.time?.worldTime || 0),
       refusal: null,
     };
