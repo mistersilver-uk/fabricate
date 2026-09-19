@@ -15,7 +15,7 @@ import { readInteractableBehaviorSystem } from './regions/interactableRegionFlag
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
 /**
- * `tokenEnter` seam, on every client. Gated on VISIBILITY, not eligibility, so a LOCKED
+ * `tokenEnter` seam, on every client. Gated on visibility, not eligibility, so a locked
  * interactable still prompts and Interact is what routes its localized denial.
  */
 export function onRegionEnter(event, behavior, deps) {
@@ -33,7 +33,7 @@ export function onRegionEnter(event, behavior, deps) {
 }
 
 /**
- * `tokenExit` seam: dismiss UNCONDITIONALLY. The dismissal is ref-matched and a no-op elsewhere, so
+ * `tokenExit` seam: dismiss unconditionally. The dismissal is ref-matched and a no-op elsewhere, so
  * the showing clients drop it however the token left, GM-staged or walked out.
  */
 export function onRegionExit(_event, behavior, deps) {

@@ -1,7 +1,7 @@
 /**
  * Request routing, the active-GM validation re-check, the grant payload and the denial route.
- * Every collaborator is injected as a call-time function, so nothing reads a Foundry global and a
- * manager method a test replaces still intercepts.
+ * Every collaborator is injected as a call-time function, so nothing reads a Foundry global, and
+ * every re-entry into the manager goes through a manager method a test can still replace.
  */
 
 import { buildActiveCanvasTool } from './interactableResolution.js';
@@ -62,7 +62,7 @@ export async function validateAndGrant(request, deps) {
   const validation = validateActivationRequest(request, {
     behaviorSystem: system,
     now: deps.worldTime(),
-    // The REQUESTING user's override status, so a non-owning player cannot bypass actor control.
+    // The requesting user's override status, so a non-owning player cannot bypass actor control.
     isGM: deps.getUser(request.userId)?.isGM === true,
     canControlActor: deps.canControlActor(request.userId, request.actorId),
     sourceExists: deps.sourceExists(system),
@@ -73,7 +73,7 @@ export async function validateAndGrant(request, deps) {
     tokenInside: deps.tokenInside(behavior, request.actorId, request.userId),
   });
   if (!validation.ok) {
-    // Tell the requesting user WHY (localized) instead of failing silently.
+    // Tell the requesting user why (localized) instead of failing silently.
     routeActivationDenied(request.userId, validation.reason, deps);
     return false;
   }
@@ -141,7 +141,7 @@ export function buildGrantPayload({ request, system, resolutionDeps }) {
 /**
  * Local-user body for `interactableActivationGranted`: Crafting for a tool, Gathering scoped to
  * `{ environmentId, taskId }` for a task, with `grant.ref` threaded through as `interactableRef`
- * so an UNLINKED task decrements its own pool rather than the environment's (issue 302).
+ * so an unlinked task decrements its own pool rather than the environment's (issue 302).
  */
 export function openGrant(payload, deps) {
   const grant = payload?.grant;

@@ -50,11 +50,9 @@ import { isInteractableRegionBehavior } from './regions/interactableRegionFlags.
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
 
 /**
- * Every collaborator below is a FUNCTION, invoked where the manager's own `globalThis` read used to
- * happen, and none is resolved at construction: this singleton is built during page parse, before
- * `game`, `canvas`, `ui.notifications` and `game.time` exist, so a captured value would be
- * permanently undefined in production and no suite that installs its fakes first could see it.
- * Each re-entry thunk goes through the manager method, so a test that replaces one still wins.
+ * Every collaborator below is a function resolved at call time, never at construction: this
+ * singleton is built during page parse, before `game`, `canvas`, `ui.notifications` and `game.time`
+ * exist. Each re-entry thunk goes through the manager method, so a patched method still wins.
  */
 function spawnCollaborators(manager) {
   return {
@@ -152,7 +150,7 @@ class InteractableManager {
     const hooks = globalThis.Hooks;
     if (hooks?.on) {
       hooks.on('dropCanvasData', this._onDrop);
-      // A token already INSIDE a region on scene load never fires `tokenEnter`; control does.
+      // A token already inside a region on scene load never fires `tokenEnter`; control does.
       hooks.on('controlToken', this._onControlToken);
     }
     this._registerKeybinding();
@@ -300,7 +298,7 @@ class InteractableManager {
   }
 
   /**
-   * Runs on the ACTIVE GM's client for every player request, so it may execute against a scene that
+   * Runs on the active GM's client for every player request, so it may execute against a scene that
    * client is not viewing and nothing canvas-rendered may be consulted (requirement 6).
    */
   _tokenInsideRegion(behavior, actorId, _userId) {
@@ -328,7 +326,8 @@ class InteractableManager {
     });
   }
   _resolveIconTexture(classification) {
-    const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
+    const isTool = classification?.interactableType === 'tool';
+    const systemManager = isTool ? globalThis.game?.fabricate?.getCraftingSystemManager?.() : null;
     const system = systemManager?.getSystem?.(classification?.systemId);
     return iconTextureFor({ classification, components: resolvedComponentsFor(system) });
   }

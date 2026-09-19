@@ -129,7 +129,7 @@ async function createRegionDocument({ scene, region, behaviorSystem, tile }, dep
       name: region.name,
       shapes: [{ type: 'rectangle', x, y, width, height }],
       behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }],
-      // Fabricate CREATED this region, so its delete may take the whole one; a PROMOTED one's
+      // Fabricate created this region, so its delete may take the whole one; a promoted one's
       // delete may not (issue 533).
       flags: buildInteractableRegionFlags(),
     });
