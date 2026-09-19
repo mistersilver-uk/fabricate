@@ -17,6 +17,7 @@ import {
 } from './gatheringMatch.js';
 import { normalizeNodeRuntime } from './gatheringNodeConfig.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
 const VALID_COMPOSITION_MODES = new Set(['automatic', 'manual']);
@@ -82,7 +83,7 @@ export class GatheringEnvironmentValidationError extends Error {
  * leaving callers' draft state intact; UI layers map error strings to inline
  * field targets and summary links.
  */
-export class GatheringEnvironmentStore {
+export class GatheringEnvironmentStore extends SettingsBackedStore {
   constructor({
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
@@ -92,21 +93,21 @@ export class GatheringEnvironmentStore {
     randomID = null,
     runCleanup = null,
   } = {}) {
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey: SETTING_KEYS.GATHERING_ENVIRONMENTS });
     this.systemManager = systemManager;
     this.getSystems = getSystems;
     this.travelStore = travelStore;
     this.randomID = randomID || (() => foundry.utils.randomID());
     this.runCleanup = runCleanup;
     this.environments = [];
-    this.loaded = false;
+  }
+
+  _setCache(value) {
+    this.environments = value;
   }
 
   load() {
-    const saved = this.getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS);
-    this.environments = this._normalizeEnvironmentList(saved);
-    this.loaded = true;
+    this._publish(this._normalizeEnvironmentList(this._readSetting()));
     return cloneJson(this.environments);
   }
 
@@ -148,9 +149,7 @@ export class GatheringEnvironmentStore {
     }
 
     const payload = cloneJson(normalized);
-    await this.setSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS, payload);
-    this.environments = normalized;
-    this.loaded = true;
+    await this._writeThenPublish(normalized, payload);
     return cloneJson(payload);
   }
 
@@ -263,10 +262,6 @@ export class GatheringEnvironmentStore {
     await this._persistEnvironmentList(candidate);
     await this._removeRunsForSystem(systemId);
     return true;
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   _normalizeEnvironmentList(raw) {

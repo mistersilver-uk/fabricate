@@ -7,6 +7,7 @@ import { cloneJson } from '../utils/scalars.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
+import { SettingsBackedStore } from './SettingsBackedStore.js';
 
 /**
  * Persists the world character libraries to the `characterLibraries` world setting (issue 1308):
@@ -34,18 +35,20 @@ import { normalizeModifierLibrary } from './modifierLibrary.js';
  * update, delete, reorder, seed presets — live in `adminStore`, which is where the currency and
  * realm list edits live too, composed from the same shared helpers.
  */
-export class CharacterLibrariesStore {
+export class CharacterLibrariesStore extends SettingsBackedStore {
   constructor({
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
     randomID = null,
   } = {}) {
-    this.getSetting = getSetting;
-    this.setSetting = setSetting;
+    super({ getSetting, setSetting, settingKey: SETTING_KEYS.CHARACTER_LIBRARIES });
     this.randomID = randomID || (() => globalThis.foundry?.utils?.randomID?.());
     this.libraries = null;
-    this.loaded = false;
     this.seeded = { characterPrerequisites: false, modifiers: false };
+  }
+
+  _setCache(value) {
+    this.libraries = value;
   }
 
   /**
@@ -75,20 +78,10 @@ export class CharacterLibrariesStore {
    * UNKNOWN basis, not take the module down.
    */
   load() {
-    let raw;
-    try {
-      raw = this.getSetting(SETTING_KEYS.CHARACTER_LIBRARIES);
-    } catch {
-      raw = null;
-    }
+    const raw = this._readSettingGuarded();
     this.seeded = _carriedLibraryKeys(raw);
-    this.libraries = this._normalize(raw);
-    this.loaded = true;
+    this._publish(this._normalize(raw));
     return cloneJson(this.libraries);
-  }
-
-  _ensureLoaded() {
-    if (!this.loaded) this.load();
   }
 
   _normalize(raw) {
@@ -139,31 +132,12 @@ export class CharacterLibrariesStore {
     return cloneJson(this.libraries.modifiers);
   }
 
-  /**
-   * PUBLISH THE CACHE BEFORE AWAITING THE WRITE, not after — the rule `CurrencyConfigStore`
-   * documents, for the same reason and with more at stake here.
-   *
-   * Callers read-modify-write: `adminStore` reads `get()`, mutates one list, and saves. The
-   * editor fires one of those per keystroke on a label field, so a second edit routinely starts
-   * while the first `setSetting` is still in flight. Publish after the await and that second edit
-   * reads the pre-first-edit libraries and clobbers them — the GM's typing silently disappears.
-   *
-   * The stake is higher here than for currency because ONE key carries TWO libraries: a stale
-   * read taken during a modifier keystroke would write back a stale `characterPrerequisites`
-   * alongside it, losing an edit in a list the GM was not even touching.
-   *
-   * The cost is a cache briefly ahead of the setting if the write rejects — recoverable on the
-   * next `load()`, which the replication bridge calls whenever the setting changes. A lost
-   * update is not recoverable at all.
-   */
   async _persist(next) {
-    this.libraries = next;
-    this.loaded = true;
     // A write is by definition a real payload, so the setting is seeded from here on. Without
     // this the store would keep reporting UNKNOWN until the next reload and go on refusing to
     // prune ids the GM has just deliberately removed.
     this.seeded = { characterPrerequisites: true, modifiers: true };
-    await this.setSetting(SETTING_KEYS.CHARACTER_LIBRARIES, cloneJson(next));
+    await this._publishThenWrite(next, cloneJson(next));
     return cloneJson(next);
   }
 
