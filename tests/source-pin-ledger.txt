@@ -74,7 +74,7 @@ tests/components/manager-layout-gathering.js	2
 tests/components/manager-layout-primitives-fixtures.js	4
 tests/components/manager-layout-primitives.js	1
 tests/components/manager-layout-recipes-fixtures.js	3
-tests/components/manager-layout-recipes.js	1
+tests/components/manager-layout-recipes.js	5
 tests/components/manager-layout-select.js	6
 tests/components/manager-layout-shared.js	5
 tests/components/manager-layout-tools-fixtures.js	1

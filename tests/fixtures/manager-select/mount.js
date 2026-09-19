@@ -177,10 +177,12 @@ const SUBJECTS = {
       props: {
         recipe: {
           id: 'r1',
-          category: 'Alchemical reagent',
-          checkTierId: startValue || 'tier-easy',
-          minSuccessOutcomeId: startValue || 'tier-easy',
-          craftingModifier: { modifierIds: ['steady'] },
+          category: ['Metal', 'Alchemical reagent'].includes(startValue)
+            ? startValue
+            : 'Alchemical reagent',
+          checkTierId: startValue?.startsWith('tier-') ? startValue : 'tier-easy',
+          minSuccessOutcomeId: startValue?.startsWith('tier-') ? startValue : 'tier-easy',
+          craftingModifier: startValue === 'inherit' ? null : { modifierIds: ['steady'] },
         },
         name: 'Tincture of clarity',
         categories: ['Alchemical reagent', 'Metal'],
