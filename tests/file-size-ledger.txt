@@ -133,11 +133,11 @@ src/ui/svelte/apps/journal/StepDetails.svelte	569
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	547
 src/ui/svelte/apps/manager/ComponentEditView.svelte	2498
-src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	862
-src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	11777
+src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	832
+src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	11575
 src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte::viewSubtitle	230
 src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte	1432
-src/ui/svelte/apps/manager/EssenceBrowserView.svelte	670
+src/ui/svelte/apps/manager/EssenceBrowserView.svelte	639
 src/ui/svelte/apps/manager/EssenceEditView.svelte	802
 src/ui/svelte/apps/manager/GatheringEconomyView.svelte	837
 src/ui/svelte/apps/manager/GatheringEventEditView.svelte	700
@@ -150,7 +150,7 @@ src/ui/svelte/apps/manager/PartyExpandedBody.svelte	563
 src/ui/svelte/apps/manager/RecipeEditView.svelte	603
 src/ui/svelte/apps/manager/RecipeItemEditor.svelte	737
 src/ui/svelte/apps/manager/RecipeItemEditor.svelte::$derived.by#4	103
-src/ui/svelte/apps/manager/RecipesBrowserView.svelte	870
+src/ui/svelte/apps/manager/RecipesBrowserView.svelte	839
 src/ui/svelte/apps/manager/SystemEditView.svelte	564
 src/ui/svelte/apps/manager/ToolsBrowserView.svelte	868
 src/ui/svelte/apps/manager/checks/CheckTriggers.svelte	911
