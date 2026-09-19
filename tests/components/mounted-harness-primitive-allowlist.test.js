@@ -82,6 +82,11 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   // THE manager's searchable picker (issue 1458), and the entry with the LONGEST tail.
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // Its portaled panel (issue 1719), which inherits that tail whole: the picker renders it in
+  // every open state, so it is in the static closure of every suite the entry above reaches. It
+  // is the sharpest silent-failure case on this list, because a panel missing from a roster
+  // CANCELS the suite at the click that opens it rather than failing an assertion.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   // THE shared overflow action menu (issue 1477). It is a LEAF TWO RUNGS DOWN.
   'src/ui/svelte/components/ActionMenu.svelte',
   // THE THREE THAT SHIPPED TOGETHER (issue 1505).

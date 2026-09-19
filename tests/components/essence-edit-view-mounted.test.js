@@ -109,6 +109,7 @@ const harness = createMountedComponentHarness({
     // `EssenceSourceSelector` are `SearchablePopover` call sites, so the primitive is a STATIC
     // import of this tree; omitting it throws in `before()` and reports `# cancelled`.
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/EssenceSourceSelector.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
     'src/ui/svelte/components/EditorTabs.svelte',

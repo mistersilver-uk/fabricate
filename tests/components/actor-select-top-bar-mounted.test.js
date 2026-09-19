@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     // The two the bar reaches as of issue 1514's crafting phase. `FillBar` is the stamina
     // track the bar draws directly; `Avatar` arrives through `ComponentSourcesBar` below, whose
     // two actor portraits are the shared tile now — so the bar pulls a portrait in without
