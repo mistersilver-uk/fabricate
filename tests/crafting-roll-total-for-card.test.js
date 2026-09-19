@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { rollTotalForCard } from '../src/systems/CraftingEngine.js';
+import { rollTotalForCard } from '../src/systems/craftCardFields.js';
 
 test('prefers data.total (the raw roll) over value for a forced-crit progressive check', () => {
   // A forced SUCCESS crit awards everything: value === MAX_SAFE_INTEGER, but the

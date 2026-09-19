@@ -884,7 +884,7 @@ describe('BulkSalvageService.run: what the run hands back', () => {
   it('prefers the run record total over the top-level value for a subject roll', async () => {
     // `salvage()` threads the top-level `value` only on the SUCCESS return, and a
     // progressive forced crit overwrites it with the AWARDING value — so the raw
-    // `data.total` wins wherever a run record carries one (`rollTotalForCard`'s order).
+    // `data.total` wins wherever a run record carries one (`craftCardFields`' order).
     const service = makeService({
       systems: [bulkSystem({ components: [ORE] })],
       salvage: async () => ({
