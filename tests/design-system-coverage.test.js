@@ -604,7 +604,7 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 32 shipped rows the library does not name. RE-COUNTED at issue 1392 rather than incremented.
+ * The 32 shipped rows the library does not name, re-counted at issue 1392 rather than incremented.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
