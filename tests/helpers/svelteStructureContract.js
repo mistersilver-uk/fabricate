@@ -1,10 +1,9 @@
 /**
  * Structural questions about a Svelte component, answered from its AST rather than its text
- * (issues 1658, 1691), pinned by `tests/svelte-structure-contract.test.js` and edited with it.
+ * (issues 1658, 1691), pinned by `tests/svelte-structure-contract.test.js`.
  * Do not add a string `includes` on component source to a test. That is the shape
- * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
- * The residue they deliberately do not address: exact JS expression text, and a receiver that
- * is a loop variable rather than a literal; a `.js` target is answered by `moduleAst.js`.
+ * `tests/source-pin-ratchet.test.js` bounds; the residue is exact JS expression text, and a
+ * receiver that is a loop variable rather than a literal.
  */
 import { parse } from 'svelte/compiler';
 import { parseForESLint } from 'svelte-eslint-parser';
@@ -126,6 +125,25 @@ export function attributeValue(element, name) {
   return chunk?.type === 'Text' ? chunk.data : undefined;
 }
 
+/** The expression one element gives a `{…}` attribute, or `undefined` for a static one. */
+export function attributeExpression(element, name) {
+  const attribute = (element.attributes ?? []).find(
+    (candidate) => candidate.type === 'Attribute' && candidate.name === name
+  );
+  return attribute?.value?.type === 'ExpressionTag' ? attribute.value.expression : undefined;
+}
+
+/** Every `bind:` target a template declares, which is how a component reaches its own node. */
+export function boundDirectives(ast) {
+  const names = new Set();
+  for (const node of collect(ast, () => true)) {
+    for (const attribute of node.attributes ?? []) {
+      if (attribute.type === 'BindDirective' && attribute.name) names.add(attribute.name);
+    }
+  }
+  return names;
+}
+
 /** The props a component destructures from `$props()`, and those it declares with no default. */
 function declaredProps(ast) {
   const declared = new Set();
@@ -149,6 +167,18 @@ export function declaresProp(ast, name) {
 /** Declared with no default, so an unthreaded caller fails loudly rather than taking a fallback. */
 export function requiresProp(ast, name) {
   return declaredProps(ast).required.has(name);
+}
+
+/** The literal default one component declares for a prop, which is where a class stem is stated. */
+export function propDefault(ast, name) {
+  for (const node of walkNodes(ast)) {
+    if (node.type !== 'VariableDeclarator' || calledName(node.init) !== '$props') continue;
+    for (const property of node.id?.properties ?? []) {
+      if (property.key?.name !== name || property.value?.right?.type !== 'Literal') continue;
+      return property.value.right.value;
+    }
+  }
+  return undefined;
 }
 
 function scriptBodies(ast) {
@@ -208,10 +238,8 @@ function memberName(node) {
     : undefined;
 }
 
-/**
- * Both legs are required: a free reference (`game.user`) and a member read off a free host
- * (`globalThis.game.user`). Scope resolution is what denies a local `const game` and an `obj.game`.
- */
+/** Both legs, scope-resolved so a local `const game` and an `obj.game` are denied: a free
+ * reference (`game.user`), and a member read off a free host (`globalThis.game.user`). */
 export function readsGlobal({ ast, scopeManager }, name) {
   const free = scopeManager?.globalScope?.through ?? [];
   if (free.some((reference) => reference.identifier?.name === name)) return true;
