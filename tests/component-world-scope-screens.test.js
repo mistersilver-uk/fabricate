@@ -11,6 +11,15 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
+/** Every module under the View Lab case directory as one text (issue 1671 split the index). */
+const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
+const caseRegistrySource = () =>
+  readdirSync(resolve(repoRoot, CASE_FILE_DIRECTORY))
+    .filter((name) => name.endsWith('.js'))
+    .sort()
+    .map((name) => read(`${CASE_FILE_DIRECTORY}/${name}`))
+    .join('\n');
+
 const MANAGER = 'src/ui/svelte/apps/manager';
 const SCOPED = `${MANAGER}/scoped`;
 
@@ -333,7 +342,7 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
     // NON-VACUITY: the token IS a live capture-case id, so a scan that had stopped matching
     // anything would report the same clean answer above.
     assert.ok(
-      readFileSync(resolve(repoRoot, 'scripts/lib/viewLabCases.js'), 'utf8').includes(DEAD_TOKEN),
+      caseRegistrySource().includes(DEAD_TOKEN),
       'the case registry still owns it, so the assertion above is about the gateway'
     );
   });

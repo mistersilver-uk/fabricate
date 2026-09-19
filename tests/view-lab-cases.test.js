@@ -1,6 +1,6 @@
 /** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -19,6 +19,7 @@ import {
   LAB_SURFACE_CASES,
   LAB_SURFACE_CASE_IDS,
   VIEW_LAB_CASES,
+  VIEW_LAB_CASE_FILES,
   caseIds,
   fallbackCase,
   getCaseById,
@@ -2613,7 +2614,7 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 const MANAGER_APP_PATH = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const RUNNER_PATH = 'scripts/view-lab-screenshots.mjs';
 const sourceOf = (path) => readFileSync(resolve(ROOT, path), 'utf8').split('\n');
-const registrySource = sourceOf(REGISTRY_PATH);
+const caseFileSources = new Map(VIEW_LAB_CASE_FILES.map(({ path }) => [path, sourceOf(path)]));
 const labActorsSource = sourceOf(LAB_ACTORS_PATH);
 const labMountSource = sourceOf(LAB_MOUNT_PATH);
 
@@ -2621,22 +2622,13 @@ const labMountSource = sourceOf(LAB_MOUNT_PATH);
 const selectedIds = (files, options) =>
   mapChangedFilesToCases(files, options).map((viewCase) => viewCase.id);
 
-/**
- * The 1-based line of a file holding an exact piece of text, asserted present so that a rename
- * fails the test loudly rather than quietly turning it into an assertion about line 0.
- *
- * @param {string[]} source The file, by line.
- * @param {string} text The whole line.
- * @param {string} where The file's path, for the failure message.
- * @returns {number} Its 1-based line number.
- */
+/** The 1-based line holding an exact piece of text, asserted so a rename fails loudly, not as line 0. */
 function lineOf(source, text, where) {
   const index = source.indexOf(text);
   assert.notEqual(index, -1, `${where} no longer contains the line: ${text}`);
   return index + 1;
 }
 
-const registryLineOf = (text) => lineOf(registrySource, text, 'the registry');
 const labActorsLineOf = (text) => lineOf(labActorsSource, text, LAB_ACTORS_PATH);
 
 /**
@@ -2711,31 +2703,52 @@ function patchEditing(source, { line, removed = 1, replaced = true }) {
   ].join('\n');
 }
 
-const registryPatch = (lineNumbers) => patchAdding(registrySource, lineNumbers);
-
 /** @returns {object} The `patches` option carrying one patch for one path. */
 const patchesFor = (path, patch) => ({ patches: { [path]: patch } });
 
-/** @returns {object} The `patches` option carrying one patch for this registry. */
-const registryPatches = (lineNumbers) => patchesFor(REGISTRY_PATH, registryPatch(lineNumbers));
+/** One file, with the helpers that name a line of it and build a patch adding those lines. */
+function fileAt(path) {
+  const source = caseFileSources.get(path) ?? sourceOf(path);
+  return {
+    path,
+    source,
+    lineOf: (text) => lineOf(source, text, path),
+    patches: (lineNumbers) => patchesFor(path, patchAdding(source, lineNumbers)),
+  };
+}
+
+/** The case file declaring a case's literal, asserted so a generated case fails rather than drifts. */
+function caseFile(id) {
+  const found = [...caseFileSources].find(([, source]) => source.includes(`    id: '${id}',`));
+  assert.ok(found, `no case file declares a literal for "${id}"`);
+  return fileAt(found[0]);
+}
+
+/** The 1-based line of a case's own `id:` line, in its own file. */
+const caseIdLine = (id) => caseFile(id).lineOf(`    id: '${id}',`);
+
+/** The ids a patch at those lines of a case's own file selects. */
+function selectedForCase(id, lineNumbers) {
+  const file = caseFile(id);
+  return selectedIds([file.path], file.patches(lineNumbers));
+}
+
+/** True when some case file declares this case as a literal. */
+const isInlineCase = (id) =>
+  [...caseFileSources.values()].some((source) => source.includes(`    id: '${id}',`));
 
 /** @returns {object} The `patches` option carrying one patch for the lab's actor fixture. */
 const labActorsPatches = (lineNumbers) =>
   patchesFor(LAB_ACTORS_PATH, patchAdding(labActorsSource, lineNumbers));
 
-/**
- * The 1-based span of the case literal containing an id line, found the way a reader would: up to
- * the factory call that opens it, down to the line that closes it.
- *
- * @param {string} id A case id declared inline in the array.
- * @returns {number[]} Every line number of the literal.
- */
+/** Every line of a case's literal, from the factory call that opens it to the line that closes it. */
 function caseLiteralLines(id) {
-  const idLine = registryLineOf(`    id: '${id}',`);
+  const { source } = caseFile(id);
+  const idLine = caseIdLine(id);
   let start = idLine;
-  while (start > 1 && !/^ {2}[A-Za-z]\w*\(\{$/.test(registrySource[start - 1])) start -= 1;
+  while (start > 1 && !/^ {2}[A-Za-z]\w*\(\{$/.test(source[start - 1])) start -= 1;
   let end = idLine;
-  while (end < registrySource.length && registrySource[end - 1] !== '  }),') end += 1;
+  while (end < source.length && source[end - 1] !== '  }),') end += 1;
   assert.ok(start < idLine && end > idLine, `could not bound the case literal for "${id}"`);
   return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
 }
@@ -2979,25 +2992,26 @@ test('widening unions with what was already attributed, at every level it can ha
     'the fixture case must be outside coverage, or this test cannot see the difference'
   );
 
-  const inside = registryLineOf(`    id: '${INSIDE_A_CASE_LITERAL}',`);
-  const outside = registryLineOf('function managerCase(entry) {');
+  const file = caseFile(INSIDE_A_CASE_LITERAL);
+  const inside = caseIdLine(INSIDE_A_CASE_LITERAL);
+  const outside = file.lineOf(ARRAY_OPEN_LINE);
   const expected = [...new Set([...LAB_SURFACE_CASE_IDS, INSIDE_A_CASE_LITERAL])];
   const inRegistryOrder = (ids) => caseIds.filter((id) => ids.includes(id));
 
   // Two hunks of ONE patch: one attributable, one not. (`touchedRegionKeys`.)
   assert.deepEqual(
-    selectedIds([REGISTRY_PATH], registryPatches([inside, outside])),
+    selectedIds([file.path], file.patches([inside, outside])),
     inRegistryOrder(expected),
     'a patch that is part attributable must keep the part it attributed'
   );
 
   // Two lab inputs in one change: one attributable, one not. (`selectAllLabInputCases`.)
   for (const order of [
-    [REGISTRY_PATH, 'tests/view-lab/world/labContent.js'],
-    ['tests/view-lab/world/labContent.js', REGISTRY_PATH],
+    [file.path, 'tests/view-lab/world/labContent.js'],
+    ['tests/view-lab/world/labContent.js', file.path],
   ]) {
     assert.deepEqual(
-      selectedIds(order, registryPatches([inside])),
+      selectedIds(order, file.patches([inside])),
       inRegistryOrder(expected),
       `an unattributable input must not discard an attributed one (${order.join(' + ')})`
     );
@@ -3005,9 +3019,7 @@ test('widening unions with what was already attributed, at every level it can ha
 
   // The control: the attributable half ALONE still narrows to one frame, so the assertions above
   // are about the union rather than about a narrowing that quietly stopped working.
-  assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([inside])), [
-    INSIDE_A_CASE_LITERAL,
-  ]);
+  assert.deepEqual(selectedForCase(INSIDE_A_CASE_LITERAL, [inside]), [INSIDE_A_CASE_LITERAL]);
 });
 
 test('a region-attributed input widens by union too, and so does a straddling hunk', () => {
@@ -3035,12 +3047,17 @@ test('a region-attributed input widens by union too, and so does a straddling hu
   // ONE hunk that STRADDLES a boundary: two adjacent changed lines, the first the closing line of a
   // case literal and the second the array's spread of `journalBlindRunCases()` — which is a call to
   // shared code and therefore inside no region at all.
-  const spread = registryLineOf('  ...journalBlindRunCases(),');
-  assert.equal(registrySource[spread - 2], '  }),', 'the line above the spread must close a case');
-  const closedCase = caseIdByLine().get(spread - 1);
+  const journal = fileAt(fileDeclaring('  ...journalBlindRunCases(),'));
+  const spread = journal.lineOf('  ...journalBlindRunCases(),');
+  assert.equal(
+    journal.source[spread - 2],
+    '  }),',
+    'the line above the spread must close a case'
+  );
+  const closedCase = caseIdByLineIn(journal.path).get(spread - 1);
   assert.ok(closedCase, 'the line above the spread must be inside a parsed case region');
 
-  const straddling = selectedIds([REGISTRY_PATH], registryPatches([spread - 1, spread]));
+  const straddling = selectedIds([journal.path], journal.patches([spread - 1, spread]));
   assert.ok(
     straddling.includes(closedCase),
     `a hunk straddling a case boundary dropped "${closedCase}", the half it could attribute`
@@ -3198,6 +3215,7 @@ test('no single changed file selects more than one window, and every lab input r
     'tests/view-lab/world/labRunStates.js',
     'tests/view-lab/mount.js',
     'scripts/lib/viewLabCases.js',
+    ...VIEW_LAB_CASE_FILES.map(({ path }) => path),
     'scripts/lib/viewLabLayoutAssertion.js',
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
@@ -3222,6 +3240,141 @@ test('no single changed file selects more than one window, and every lab input r
   );
 });
 
+/** The modules under the case directory that declare no cases: everything else is a manifest entry. */
+const SHARED_CASE_MODULES = Object.freeze([
+  'broadSignals.js',
+  'caseConstants.js',
+  'caseFactories.js',
+  'journalBlindRunCases.js',
+  'journalHistoryCases.js',
+  'journalLifecycleCases.js',
+]);
+
+const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
+
+test('the manifest names every case file under the directory, and only case files', () => {
+  const declared = VIEW_LAB_CASE_FILES.map(({ path }) => path);
+  assert.deepEqual(
+    declared.filter((path, index) => declared.indexOf(path) !== index),
+    [],
+    'a case file is listed twice in the manifest, so its cases would be captured twice'
+  );
+
+  const onDisk = readdirSync(resolve(ROOT, CASE_FILE_DIRECTORY)).filter((name) =>
+    name.endsWith('.js')
+  );
+  const unaccounted = onDisk.filter(
+    (name) =>
+      !declared.includes(`${CASE_FILE_DIRECTORY}/${name}`) && !SHARED_CASE_MODULES.includes(name)
+  );
+  assert.deepEqual(
+    unaccounted,
+    [],
+    `these files sit under ${CASE_FILE_DIRECTORY}/ and are in neither the manifest nor the ` +
+      'shared-module list, so whatever they declare is captured by nothing:\n  ' +
+      unaccounted.join('\n  ')
+  );
+
+  // And the allowlist cannot carry a name that has gone, or one the manifest also claims.
+  for (const name of SHARED_CASE_MODULES) {
+    assert.ok(onDisk.includes(name), `${name} is allowlisted but no longer exists`);
+    assert.ok(
+      !declared.includes(`${CASE_FILE_DIRECTORY}/${name}`),
+      `${name} is both allowlisted as a shared module and named by the manifest`
+    );
+  }
+  assert.deepEqual(
+    declared.filter((path) => !onDisk.includes(path.slice(CASE_FILE_DIRECTORY.length + 1))),
+    [],
+    'the manifest names a case file that is not on disk'
+  );
+});
+
+test('every case file opens its array exactly once, on the line the selector parses it by', () => {
+  for (const { path, cases } of VIEW_LAB_CASE_FILES) {
+    const opens = caseFileSources.get(path).filter((line) => line.startsWith(ARRAY_OPEN_LINE));
+    assert.deepEqual(
+      opens.length,
+      1,
+      `${path} carries ${opens.length} lines starting "${ARRAY_OPEN_LINE}" — the selector reads ` +
+        'the first and stops, so any other count attributes part of the file to nothing'
+    );
+    assert.ok(cases.length > 0, `${path} declares no cases, so it earns no manifest entry`);
+  }
+});
+
+test('a patch inside any case file attributes to that file\'s own case, and nothing else', () => {
+  const attributed = new Set();
+  for (const { path, cases } of VIEW_LAB_CASE_FILES) {
+    const file = fileAt(path);
+    const inline = cases.map((viewCase) => viewCase.id).filter((id) => isInlineCase(id));
+    assert.ok(inline.length > 0, `${path} declares no case literal, so no patch can be attributed`);
+
+    for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
+      assert.deepEqual(
+        selectedIds([path], file.patches([caseIdLine(id)])),
+        [id],
+        `a one-line patch at "${id}" in ${path} must select that case alone`
+      );
+      attributed.add(id);
+    }
+
+    assert.deepEqual(
+      selectedIds([path], file.patches([file.lineOf(ARRAY_OPEN_LINE)])),
+      coverageIds(),
+      `a patch outside every literal of ${path} must widen to surface coverage`
+    );
+  }
+
+  assert.ok(attributed.size >= VIEW_LAB_CASE_FILES.length, 'every case file must be exercised');
+
+  for (const name of SHARED_CASE_MODULES) {
+    const path = `${CASE_FILE_DIRECTORY}/${name}`;
+    const shared = fileAt(path);
+    assert.deepEqual(
+      selectedIds([path], shared.patches([shared.source.length - 2])),
+      coverageIds(),
+      `a patch on the shared module ${path} must select one frame of every surface`
+    );
+  }
+});
+
+test('every case literal parses as its own attributable region', () => {
+  for (const { path, cases } of VIEW_LAB_CASE_FILES) {
+    const file = fileAt(path);
+    const inline = cases.map((viewCase) => viewCase.id).filter((id) => isInlineCase(id));
+    assert.deepEqual(
+      inline.filter((id) => {
+        const selected = selectedIds([path], file.patches([caseIdLine(id)]));
+        return selected.length !== 1 || selected[0] !== id;
+      }),
+      [],
+      `${path}: a patch confined to these case literals widens past them, so \`CASE_OPEN_PATTERN\` ` +
+        'no longer matches the line that opens them'
+    );
+  }
+});
+
+test('the registry order and its surface coverage match the committed golden files', () => {
+  // Generated on the base commit: nothing else here would notice a run landing out of order.
+  const golden = (name) =>
+    readFileSync(resolve(ROOT, `tests/fixtures/view-lab/${name}.golden.txt`), 'utf8')
+      .split('\n')
+      .filter((line) => line !== '');
+
+  assert.deepEqual(
+    [...caseIds],
+    golden('caseIds'),
+    'the registry order changed. `chooseSurfaceRepresentatives` breaks ties first-in-order, so ' +
+      'a reordered run silently changes which frame represents a surface'
+  );
+  assert.deepEqual(
+    [...LAB_SURFACE_CASE_IDS],
+    golden('labSurfaceCaseIds'),
+    'surface coverage changed — the frame set every unattributable change publishes'
+  );
+});
+
 test('a registry change with no usable patch selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
@@ -3233,17 +3386,19 @@ test('a registry change with no usable patch selects surface coverage', () => {
   assert.deepEqual(selectedIds([REGISTRY_PATH], {}), coverageIds());
   assert.deepEqual(selectedIds([REGISTRY_PATH], { patches: {} }), coverageIds());
 
-  const idLine = registryLineOf(`    id: '${FALLBACK_CASE_ID}',`);
-  const wrongRevision = registryPatch([idLine]).replace(
-    registrySource[idLine - 1],
+  const fallback = caseFile(FALLBACK_CASE_ID);
+  const idLine = caseIdLine(FALLBACK_CASE_ID);
+  const fallbackPatch = patchAdding(fallback.source, [idLine]);
+  const wrongRevision = fallbackPatch.replace(
+    fallback.source[idLine - 1],
     "    id: 'a-line-this-file-does-not-have',"
   );
 
   // A malformed header over a body that WOULD anchor.
-  const [, ...anchorableBody] = registryPatch([idLine]).split('\n');
+  const [, ...anchorableBody] = fallbackPatch.split('\n');
   const malformedHeader = ['@@ this is not a hunk header @@', ...anchorableBody].join('\n');
   assert.deepEqual(
-    selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, registryPatch([idLine]))),
+    selectedForCase(FALLBACK_CASE_ID, [idLine]),
     [FALLBACK_CASE_ID],
     'the same body under a WELL-FORMED header must narrow to one case, or the fixture below ' +
       'proves nothing about the header check'
@@ -3259,7 +3414,7 @@ test('a registry change with no usable patch selects surface coverage', () => {
     [wrongRevision, 'a patch whose lines do not match this checkout'],
   ]) {
     assert.deepEqual(
-      selectedIds([REGISTRY_PATH], { patches: { [REGISTRY_PATH]: patch } }),
+      selectedIds([fallback.path], { patches: { [fallback.path]: patch } }),
       coverageIds(),
       `${why} must select one frame of every surface`
     );
@@ -3267,49 +3422,53 @@ test('a registry change with no usable patch selects surface coverage', () => {
 });
 
 test('a registry change confined to case literals selects only those cases', () => {
-  const inline = caseIds.filter((id) => registrySource.includes(`    id: '${id}',`));
+  const inline = caseIds.filter((id) => isInlineCase(id));
   assert.ok(inline.length > 100, 'expected most cases to be declared inline in the array');
 
-  // One case, sampled across the file so this is not an assertion about its first entry.
+  // One case, sampled across the registry so this is not an assertion about its first entry.
   for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
-    const idLine = registryLineOf(`    id: '${id}',`);
-    assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([idLine])), [id]);
+    const idLine = caseIdLine(id);
+    assert.deepEqual(selectedForCase(id, [idLine]), [id]);
     // A line elsewhere in the same literal — the label, not the id — attributes the same way.
-    assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([idLine + 1])), [id]);
+    assert.deepEqual(selectedForCase(id, [idLine + 1]), [id]);
   }
 
-  // Two cases, two hunks: the honest answer is two frames, where it used to be 157.
-  const [first, second] = [inline[3], inline[40]];
-  const bothPatches = registryPatches([
-    registryLineOf(`    id: '${first}',`),
-    registryLineOf(`    id: '${second}',`),
-  ]);
-  assert.deepEqual(selectedIds([REGISTRY_PATH], bothPatches), [first, second]);
+  // Two cases of one file, two hunks: the honest answer is two frames, where it used to be 157.
+  const siblings = caseFileSources.get(caseFile(inline[3]).path);
+  const [first, second] = inline.filter((id) => siblings.includes(`    id: '${id}',`)).slice(0, 2);
+  const file = caseFile(first);
+  assert.deepEqual(
+    selectedIds([file.path], file.patches([caseIdLine(first), caseIdLine(second)])),
+    [first, second]
+  );
 });
 
 test('ADDING a case to the registry selects that one case', () => {
   // The shape a diff has when a case is added: every line of the literal arrives as a `+`.
   const id = 'coverage-experimental-off-player';
-  assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches(caseLiteralLines(id))), [id]);
+  assert.deepEqual(selectedForCase(id, caseLiteralLines(id)), [id]);
 });
 
 test('a registry change OUTSIDE a case literal selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
 
-  // A shared helper, a pattern constant, the array's own spread of a case factory, and the mapping
-  // function itself.
-  for (const line of [
-    'function managerCase(entry) {',
+  // A shared factory, a pattern constant, a generator spread, and the mapping function itself.
+  for (const [path, line] of [
+    ['scripts/lib/view-lab-cases/caseFactories.js', 'export function managerCase(entry) {'],
     // Was ` 'RadioCardGroup',`, one element of the hand-written `MANAGER_PRIMITIVES` array (issue
     // 1378).
-    "const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');",
-    '  ...journalBlindRunCases(),',
-    'export function mapChangedFilesToCases(files = [], { patches } = {}) {',
+    [
+      'scripts/lib/view-lab-cases/broadSignals.js',
+      "export const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');",
+    ],
+    [fileDeclaring('  ...journalBlindRunCases(),'), '  ...journalBlindRunCases(),'],
+    [REGISTRY_PATH, 'export function mapChangedFilesToCases(files = [], { patches } = {}) {'],
   ]) {
+    const file = fileAt(path);
     assert.deepEqual(
-      selectedIds([REGISTRY_PATH], registryPatches([registryLineOf(line)])),
+      selectedIds([path], file.patches([file.lineOf(line)])),
       coverageIds(),
-      `a change to \`${line.trim()}\` must select one frame of every surface`
+      `a change to \`${line.trim()}\` in ${path} must select one frame of every surface`
     );
   }
 });
@@ -3317,10 +3476,9 @@ test('a registry change OUTSIDE a case literal selects surface coverage', () => 
 test('a comment-only registry change selects one frame — not 157, and not none', () => {
   // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
   // cost this narrowing exists to remove.
-  const commentLine = registryLineOf(
-    "    // Reached the way the smoke reaches it: by CLICKING the system row's identity, which is what"
-  );
-  assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([commentLine])), [
+  const COMMENT = "    // Reached the way the smoke reaches it, by clicking the system row's identity.";
+  const file = fileAt(fileDeclaring(COMMENT));
+  assert.deepEqual(selectedIds([file.path], file.patches([file.lineOf(COMMENT)])), [
     FALLBACK_CASE_ID,
   ]);
 });
@@ -3405,19 +3563,27 @@ function survivableShifts(patch) {
   return [3, 17, 400, 4000, 1 - Math.min(...starts)].filter((delta) => delta !== 0);
 }
 
-/**
- * The case literal each registry line sits in, derived the way a reader would — from the factory
- * call that opens an element to the line that closes it.
- *
- * @returns {Map<number, string>} Line number -> case id, for lines inside a case literal.
- */
-function caseIdByLine() {
+/** Line number -> case id for one case file, read from the factory call down to the closing line. */
+function caseIdByLineIn(path) {
+  const source = caseFileSources.get(path);
   const byLine = new Map();
   for (const id of caseIds) {
-    if (!registrySource.includes(`    id: '${id}',`)) continue;
+    if (!source.includes(`    id: '${id}',`)) continue;
     for (const line of caseLiteralLines(id)) byLine.set(line, id);
   }
   return byLine;
+}
+
+/** The array-open line every case file carries, and the registry parses each file by. */
+const ARRAY_OPEN_LINE = 'export const CASES = Object.freeze([';
+
+/** The one case file holding an exact line, asserted unique so a spread fixture line fails here. */
+function fileDeclaring(text) {
+  const holders = [...caseFileSources]
+    .filter(([, source]) => source.includes(text))
+    .map(([path]) => path);
+  assert.deepEqual(holders.length, 1, `exactly one case file must contain the line: ${text}`);
+  return holders[0];
 }
 
 /**
@@ -3512,17 +3678,18 @@ function recurringWindows(source, owner, size) {
 test('a patch whose hunk headers do not land still selects exactly what its content names', () => {
   // The regression this replaces: the same patch with its headers moved down three lines selected
   // all 181 frames.
-  const inline = caseIds.filter((id) => registrySource.includes(`    id: '${id}',`));
+  const inline = caseIds.filter((id) => isInlineCase(id));
   for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
-    const patch = registryPatch([registryLineOf(`    id: '${id}',`)]);
+    const file = caseFile(id);
+    const patch = patchAdding(file.source, [caseIdLine(id)]);
     assert.deepEqual(
-      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+      selectedIds([file.path], patchesFor(file.path, patch)),
       [id],
       'an aligned patch whose content is unique must still narrow to its own case'
     );
     for (const delta of survivableShifts(patch)) {
       assert.deepEqual(
-        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, shiftHunkHeaders(patch, delta))),
+        selectedIds([file.path], patchesFor(file.path, shiftHunkHeaders(patch, delta))),
         [id],
         `a header shifted by ${delta} lines must select the same case, not the whole corpus`
       );
@@ -3534,11 +3701,12 @@ test('ADDING a case still narrows to that case when the hunk header numbers are 
   // The frame a PR that adds a case most needs is that case's own. Before content anchoring, a base
   // that had moved this file cost exactly that: 181 frames instead of the one that is new.
   const id = 'coverage-experimental-off-player';
-  const patch = registryPatch(caseLiteralLines(id));
-  assert.deepEqual(selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)), [id]);
+  const file = caseFile(id);
+  const patch = patchAdding(file.source, caseLiteralLines(id));
+  assert.deepEqual(selectedIds([file.path], patchesFor(file.path, patch)), [id]);
   for (const delta of survivableShifts(patch)) {
     assert.deepEqual(
-      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, shiftHunkHeaders(patch, delta))),
+      selectedIds([file.path], patchesFor(file.path, shiftHunkHeaders(patch, delta))),
       [id],
       `a header shifted by ${delta} lines must still select the added case alone`
     );
@@ -3547,7 +3715,12 @@ test('ADDING a case still narrows to that case when the hunk header numbers are 
 
 test('a hunk whose content recurs in two different cases selects THOSE cases, not the corpus', () => {
   const everything = publishableCases().length;
-  const windows = recurringWindows(registrySource, caseIdByLine(), 7);
+  const windows = VIEW_LAB_CASE_FILES.flatMap(({ path }) =>
+    recurringWindows(caseFileSources.get(path), caseIdByLineIn(path), 7).map((window) => ({
+      ...window,
+      path,
+    }))
+  );
   assert.ok(
     windows.length > 0,
     'this registry is supposed to contain seven-line windows that recur; if it no longer does, ' +
@@ -3569,7 +3742,8 @@ test('a hunk whose content recurs in two different cases selects THOSE cases, no
   for (const window of crossCase.slice(0, 3)) {
     const line = window.starts[0] + 3;
     const expected = [...new Set(window.ids)];
-    const selected = selectedIds([REGISTRY_PATH], registryPatches([line]));
+    const file = fileAt(window.path);
+    const selected = selectedIds([file.path], file.patches([line]));
     assert.deepEqual(
       [...selected].sort(),
       [...expected].sort(),
@@ -3586,20 +3760,23 @@ test('a hunk whose content recurs in two different cases selects THOSE cases, no
 
 test('the SAME edit applied to sibling cases selects exactly those siblings (issue 1125 shape)', () => {
   // The shape that made this worth fixing (issue 1125).
-  const window = recurringWindows(registrySource, caseIdByLine(), 7)
+  const window = VIEW_LAB_CASE_FILES.flatMap(({ path }) =>
+    recurringWindows(caseFileSources.get(path), caseIdByLineIn(path), 7).map((entry) => ({
+      ...entry,
+      path,
+    }))
+  )
     .filter((entry) => entry.ids.every(Boolean) && new Set(entry.ids).size > 2)
     .at(0);
   assert.ok(
     window,
-    'no seven-line window recurs across three or more case literals, so this registry can no ' +
-      'longer produce the multi-sibling edit issue 1125 hit'
+    'no seven-line window recurs across three or more case literals of one file, so this registry ' +
+      'can no longer produce the multi-sibling edit issue 1125 hit'
   );
 
   const siblings = [...new Set(window.ids)];
-  const selected = selectedIds(
-    [REGISTRY_PATH],
-    registryPatches(window.starts.map((start) => start + 3))
-  );
+  const file = fileAt(window.path);
+  const selected = selectedIds([file.path], file.patches(window.starts.map((start) => start + 3)));
   assert.deepEqual(
     [...selected].sort(),
     [...siblings].sort(),
@@ -3610,7 +3787,11 @@ test('the SAME edit applied to sibling cases selects exactly those siblings (iss
 test('no recurring window mixes inside-a-region with outside-every-region, so no real diff needs that path', () => {
   // The measurement, kept for what it still measures, with its original justification retired.
   for (const [where, source, owner] of [
-    ['the registry', registrySource, caseIdByLine()],
+    ...VIEW_LAB_CASE_FILES.map(({ path }) => [
+      path,
+      caseFileSources.get(path),
+      caseIdByLineIn(path),
+    ]),
     [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],
     [LAB_MOUNT_PATH, labMountSource, mountRegionNameByLine()],
   ]) {
@@ -3628,18 +3809,19 @@ test('no recurring window mixes inside-a-region with outside-every-region, so no
 
 test('a hunk the selector cannot anchor selects surface coverage', () => {
   const coverage = LAB_SURFACE_CASE_IDS.length;
+  const anchorFile = caseFile(FALLBACK_CASE_ID).path;
 
   // Every way a hunk can fail to name a unique place in the file that will render.
   for (const [patch, why] of [
     ['@@ -100,0 +100,0 @@', 'a zero-context (`-U0`) hunk anchors nowhere'],
     ['@@ -1,2 +1,0 @@\n-one\n-two', 'a removal-only hunk has no new-file content to find'],
     [
-      '@@ -1,2 +1,3 @@\n a line this registry does not contain\n+nor this one',
+      '@@ -1,2 +1,3 @@\n a line this case file does not contain\n+nor this one',
       'content this checkout does not have',
     ],
   ]) {
     assert.deepEqual(
-      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+      selectedIds([anchorFile], patchesFor(anchorFile, patch)),
       coverageIds(),
       `${why} — that must select one frame of every surface`
     );
@@ -3662,26 +3844,25 @@ function windowOccurrences(source, line) {
   return (windowIndex(source, 7).get(source.slice(from - 1, from + 6).join('\n')) ?? []).length;
 }
 
-/**
- * Cases whose id line, and whose LAST content line, both anchor uniquely — so a fixture built at
- * either lands on exactly one place in the file.
- *
- * @param {number} howMany How many to return.
- * @returns {{id: string, idLine: number, lastContentLine: number}[]} Qualifying cases.
- */
+/** Cases whose id line and last content line both anchor uniquely, so a fixture at either is exact. */
 function uniquelyAnchoredCases(howMany) {
   const qualifying = caseIds
-    .filter((id) => id !== FALLBACK_CASE_ID && registrySource.includes(`    id: '${id}',`))
+    .filter((id) => id !== FALLBACK_CASE_ID && isInlineCase(id))
     .map((id) => {
       const lines = caseLiteralLines(id);
       // `.at(-1)` is the `  }),` that closes the literal, so `.at(-2)` is its last content line —
       // the boundary a replace run has to be attributed on the correct side of.
-      return { id, idLine: registryLineOf(`    id: '${id}',`), lastContentLine: lines.at(-2) };
+      return {
+        id,
+        file: caseFile(id),
+        idLine: caseIdLine(id),
+        lastContentLine: lines.at(-2),
+      };
     })
     .filter(
-      ({ idLine, lastContentLine }) =>
-        windowOccurrences(registrySource, idLine) === 1 &&
-        windowOccurrences(registrySource, lastContentLine) === 1
+      ({ file, idLine, lastContentLine }) =>
+        windowOccurrences(file.source, idLine) === 1 &&
+        windowOccurrences(file.source, lastContentLine) === 1
     );
 
   assert.ok(
@@ -3700,20 +3881,20 @@ function uniquelyAnchoredCases(howMany) {
 test('a one-line EDIT inside a case literal selects the same case its addition does', () => {
   // The commonest diff shape there is, and the one no fixture had: one `-` for the old text, one
   // `+` for the new, three lines of context either side.
-  for (const { id, idLine } of uniquelyAnchoredCases(3)) {
-    const patch = patchEditing(registrySource, { line: idLine });
+  for (const { id, file, idLine } of uniquelyAnchoredCases(3)) {
+    const patch = patchEditing(file.source, { line: idLine });
     assert.deepEqual(
-      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
-      selectedIds([REGISTRY_PATH], registryPatches([idLine])),
+      selectedIds([file.path], patchesFor(file.path, patch)),
+      selectedForCase(id, [idLine]),
       `editing line ${idLine} must select what adding it selects`
     );
-    assert.deepEqual(selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)), [id]);
+    assert.deepEqual(selectedIds([file.path], patchesFor(file.path, patch)), [id]);
 
     // And under the merge-commit shift, which is the state this whole section exists for: an edit
     // is no more anchored by its header's numbers than an addition is.
     for (const delta of survivableShifts(patch)) {
       assert.deepEqual(
-        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, shiftHunkHeaders(patch, delta))),
+        selectedIds([file.path], patchesFor(file.path, shiftHunkHeaders(patch, delta))),
         [id],
         `an edit whose header is shifted by ${delta} lines must still select "${id}" alone`
       );
@@ -3724,11 +3905,11 @@ test('a one-line EDIT inside a case literal selects the same case its addition d
 test("a replace run at a case literal's last line is not attributed to its neighbour", () => {
   // N removals followed by one addition, on the LAST content line of a literal — the shape a PR has
   // when it replaces a block of steps with one.
-  for (const { id, lastContentLine } of uniquelyAnchoredCases(3)) {
+  for (const { id, file, lastContentLine } of uniquelyAnchoredCases(3)) {
     for (const removed of [1, 3, 8]) {
-      const patch = patchEditing(registrySource, { line: lastContentLine, removed });
+      const patch = patchEditing(file.source, { line: lastContentLine, removed });
       assert.deepEqual(
-        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+        selectedIds([file.path], patchesFor(file.path, patch)),
         [id],
         `a ${removed}-line replace run at line ${lastContentLine} must stay inside "${id}" — ` +
           'a removed line occupies no line of the file that will render'
@@ -3740,11 +3921,11 @@ test("a replace run at a case literal's last line is not attributed to its neigh
 test('a deletion-only hunk inside a case literal selects that case, not the fallback', () => {
   // A hunk with `-` lines and no `+` at all still CHANGES the case it sits in, so it must select
   // that case.
-  for (const { id, idLine } of uniquelyAnchoredCases(3)) {
+  for (const { id, file, idLine } of uniquelyAnchoredCases(3)) {
     for (const removed of [1, 3]) {
-      const patch = patchEditing(registrySource, { line: idLine, removed, replaced: false });
+      const patch = patchEditing(file.source, { line: idLine, removed, replaced: false });
       assert.deepEqual(
-        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+        selectedIds([file.path], patchesFor(file.path, patch)),
         [id],
         `deleting ${removed} line(s) inside "${id}" must select it, not the fallback frame`
       );

@@ -1255,9 +1255,14 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
   });
 });
 
-/** THIS SCREEN'S POINTER HIT-TESTS ARE IN THE CAPTURE REGISTRY. */
 describe('the entry’s pointer proofs survive in the capture registry', () => {
-  const registry = () => sourceOf('scripts/lib/viewLabCases.js');
+  const caseFileDirectory = 'scripts/lib/view-lab-cases';
+  const registry = () =>
+    readdirSync(resolve(repoRoot, caseFileDirectory))
+      .filter((name) => name.endsWith('.js'))
+      .sort()
+      .map((name) => sourceOf(`${caseFileDirectory}/${name}`))
+      .join('\n');
 
   it('carries a centre-hit on the world tag chip, which the page still emits', () => {
     // `moss`, not `fuel` (issue 1371 r15-entry): the run offers the vocabulary's tags alone.

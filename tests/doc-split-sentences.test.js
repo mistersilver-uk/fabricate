@@ -110,10 +110,23 @@ const RENAMED = [
       "**Player listing counts are a separate, engine-owned surface.** The player-facing listing is produced by `GatheringEngine.listForActor` — a thin delegator to the engine's injected `GatheringListingBuilder` collaborator, whose `_buildEnvironmentListing` in `src/ui/presenters/GatheringListingBuilder.js` does the construction — not the admin store.",
     identifiers: [['src/ui/presenters/GatheringListingBuilder.js', 'src/systems/GatheringListingBuilder.js']],
   },
+  // Issue #1671 moved the cases into one file per surface, so these three sentences name the directory.
+  {
+    before: 'Cases live in `scripts/lib/viewLabCases.js`.',
+    after: 'Cases live in `scripts/lib/view-lab-cases/`.',
+    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
+  },
+  {
+    before:
+      'A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.',
+    after:
+      'A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunks fall inside.',
+    identifiers: [['scripts/lib/view-lab-cases/', 'scripts/lib/viewLabCases.js']],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 3;
+const RENAMED_COUNT = 5;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {

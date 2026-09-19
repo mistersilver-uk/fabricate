@@ -23,6 +23,7 @@ import {
 import {
   FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
+  VIEW_LAB_CASE_FILES,
   hasUiChanges as labHasUiChanges,
   mapChangedFilesToCases,
 } from '../scripts/lib/viewLabCases.js';
@@ -63,11 +64,14 @@ const MS_PER_MINUTE = 60_000;
 const CHANGED_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
 const EXPECTED_CASE_IDS = mapChangedFilesToCases(CHANGED_FILES).map((viewCase) => viewCase.id);
 
-/** The View Lab case registry, which is both a lab input and a patch-attributable one. */
-const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
+/** The case file declaring the fallback case: both a lab input and a patch-attributable one. */
+const REGISTRY_PATH = VIEW_LAB_CASE_FILES.map(({ path }) => path).find((path) =>
+  readFileSync(path, 'utf8').includes(`    id: '${FALLBACK_CASE_ID}',`)
+);
+assert.ok(REGISTRY_PATH, `no case file declares ${FALLBACK_CASE_ID} inline`);
 
 /**
- * The 1-based line on which the registry declares the fallback case's id, asserted present so a
+ * The 1-based line on which that file declares the fallback case's id, asserted present so a
  * rename fails loudly instead of quietly turning the patch below into an assertion about line 0.
  *
  * @returns {number} The line number.
@@ -80,8 +84,8 @@ function fallbackCaseIdLine() {
 }
 
 /**
- * A unified diff claiming one line of the registry was just added, with the three lines of context
- * either side that `git` emits.
+ * A unified diff claiming one line of that case file was just added, with the three lines of
+ * context either side that `git` emits.
  *
  * @param {number} line The 1-based line to mark as added.
  * @returns {string} The patch.
@@ -1543,6 +1547,7 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     'src/ui/model/componentBrowserModel.js',
     'src/ui/svelte/util/foundryIconCatalogue.json',
     'scripts/lib/viewLabCases.js',
+    REGISTRY_PATH,
     'docs/README.md',
     'main.js',
   ];
