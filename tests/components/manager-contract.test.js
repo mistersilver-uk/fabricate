@@ -36,6 +36,7 @@ import {
   readsGlobal,
   referencesIdentifier,
   rendersComponent,
+  rendersElement,
   requiresProp,
   spellsLiteral,
 } from '../helpers/svelteStructureContract.js';
@@ -348,6 +349,17 @@ function namedCodeAst(scope, name) {
   throw new Error(`no binding \`${name}\``);
 }
 
+/** Every `bind:` target a template declares, which is how a component reaches its own node. */
+function boundDirectives(component) {
+  const names = new Set();
+  for (const node of templateNodes(component)) {
+    for (const attribute of node.attributes ?? []) {
+      if (attribute.type === 'BindDirective' && attribute.name) names.add(attribute.name);
+    }
+  }
+  return names;
+}
+
 /** The expression one element gives a `{…}` attribute, or `undefined` for a static one. */
 function attributeExpression(node, name) {
   const attribute = (node.attributes ?? []).find(
@@ -431,6 +443,16 @@ function propertyKeys(node) {
   return keys;
 }
 
+/** The object literal a subtree pushes onto one named array — the allowlist a collector writes. */
+function pushedRecord(node, arrayName) {
+  for (const inner of walkNodes(node)) {
+    if (calledName(inner) !== 'push' || inner.callee?.object?.name !== arrayName) continue;
+    const [record] = inner.arguments;
+    if (record?.type === 'ObjectExpression') return record;
+  }
+  return undefined;
+}
+
 /** The claims any plain code subtree answers: a module, a class member, or one function body. */
 function claimsOverCode(code) {
   return {
@@ -460,6 +482,8 @@ function claimsForComponent(component) {
   return {
     ...claimsOverCode(component),
     renders: (name) => rendersComponent(component, name),
+    element: (name) => rendersElement(component, name),
+    binds: (name) => boundDirectives(component).has(name),
     imports: (specifier) => importsModule(component, specifier),
     declares: (name) => declaredConstant(component, name),
     names: (name) => referencesIdentifier(component, name),
@@ -537,6 +561,9 @@ function labelOf(target) {
 /** Each claim a contract row may make: the question to ask, and the answer it must get. */
 const CONTRACT_CLAIMS = Object.freeze({
   renders: { ask: 'renders', holds: true, says: (v) => `renders <${v}>` },
+  elements: { ask: 'element', holds: true, says: (v) => `renders a <${v}> element` },
+  elementsNo: { ask: 'element', holds: false, says: (v) => `renders no <${v}> element` },
+  binds: { ask: 'binds', holds: true, says: (v) => `binds ${v}` },
   rendersNo: { ask: 'renders', holds: false, says: (v) => `no longer renders <${v}>` },
   imports: { ask: 'imports', holds: true, says: (v) => `imports ${v}` },
   importsNo: { ask: 'imports', holds: false, says: (v) => `no longer imports ${v}` },
@@ -616,6 +643,13 @@ const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
+// The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable `ArmedDangerButton` sit
+// at the manager root; the rows and the pure projection live under `knowledge/`.
+const KNOWLEDGE_VIEW = 'src/ui/svelte/apps/manager/KnowledgeView.svelte';
+const ARMED_DANGER_BUTTON = 'src/ui/svelte/components/ArmedDangerButton.svelte';
+const KNOWLEDGE_COPY_ROW = 'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte';
+const KNOWLEDGE_LEARNED_ROW = 'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte';
+const KNOWLEDGE_STUDIO = 'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
 
 /** The manager views a claim may hold of any one of, which the joined text used to ask of all. */
 const MANAGER_VIEWS = [
@@ -2993,121 +3027,97 @@ describe('CraftingSystemManager source contract', () => {
     readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
   });
 
-  // The GM Knowledge surface (issue 785). Everything asserted here is a wiring
-  // decision whose absence is SILENT at runtime: an un-suppressed inspector holds a
-  // dead 300px strip open, an un-threaded `resolutionMode` hides the rail entry from
-  // the `global` + alchemy configuration that motivated the widened gate, and an
-  // ungated `setKnowledgeActive` puts a whole-world actors x items scan on every one
-  // of `refresh()`'s callers.
-  it('routes the Knowledge surface, releases its third column, and gates its projection', () => {
-    assert.ok(
-      rootSource.includes("import KnowledgeView from './KnowledgeView.svelte';"),
-      'root should import the Knowledge surface'
-    );
-    for (const snippet of [
-      "currentView === 'knowledge'",
-      'knowledge={knowledgeState}',
-      "const knowledgeState = $derived($viewState.knowledge || null)",
-      "store.setKnowledgeActive?.(currentView === 'knowledge')",
-      'store.selectKnowledgeActor?.(actorId)',
-      'store.expendRecipeItemUse?.(actorId, itemId)',
-      'store.deleteOwnedRecipeItem?.(actorId, itemId)',
-      'store.eraseLearnedRecipe?.(actorId, recipeId)',
-      'store.resetActorSystemKnowledge?.(actorId)',
-      'store.resetActorAllKnowledge?.(actorId)',
-      'resolutionMode: craftingResolutionMode,',
-      "const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '')",
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
-    }
-    // The CSS column release and this aside suppression are ONE decision expressed
-    // twice; doing only the first leaves an empty 300px inspector holding the strip.
-    assert.ok(
-      /id: 'knowledge',\s*\n\s*layoutClass: 'self-owned-3-track'/.test(rootSource) &&
-        rootSource.includes('class="manager-inspector"'),
-      'the shared inspector is suppressed for the full-width knowledge surface'
-    );
+  // The GM Knowledge surface (issue 785). Everything asserted here is a wiring decision whose
+  // absence is SILENT at runtime: an un-suppressed inspector holds a dead 300px strip open, an
+  // un-threaded `resolutionMode` hides the rail entry from the `global` + alchemy configuration
+  // that motivated the widened gate, and an ungated `setKnowledgeActive` puts a whole-world
+  // actors x items scan on every one of `refresh()`'s callers.
+  defineStructureContract('routes the Knowledge surface and gates its projection', MANAGER_ROOT, {
+    imports: ['./KnowledgeView.svelte'],
+    compares: ['knowledge'],
+    declares: ['knowledgeState', 'craftingResolutionMode'],
+    reads: [
+      '$viewState.knowledge',
+      'selectedSystem.resolutionMode',
+      'store.setKnowledgeActive',
+      'store.selectKnowledgeActor',
+      'store.expendRecipeItemUse',
+      'store.deleteOwnedRecipeItem',
+      'store.eraseLearnedRecipe',
+      'store.resetActorSystemKnowledge',
+      'store.resetActorAllKnowledge',
+    ],
+    callsWith: [['setKnowledgeActive', 'currentView']],
+    passesProps: [['KnowledgeView', 'knowledge']],
     // The projection is published TOP-LEVEL, never hung off selectedSystem.
-    assert.equal(
-      rootSource.includes('selectedSystem.knowledge'),
-      false,
-      'the knowledge projection must not be read off selectedSystem'
-    );
+    readsNo: ['selectedSystem.knowledge'],
+  });
 
-    // The view owns the single armed token and every disarm rule.
-    for (const snippet of [
-      'data-knowledge-view',
+  defineStructureContract(
+    'threads the resolution mode the widened rail gate reads',
+    { file: MANAGER_ROOT, constant: 'craftingNavArgs' },
+    { keys: ['resolutionMode'], names: ['craftingResolutionMode'] }
+  );
+
+  // The CSS column release and the aside suppression are ONE decision expressed twice; doing only
+  // the first leaves an empty 300px inspector holding the strip. The shared inspector element
+  // itself is stated by `renders the manager shell and the routes it hosts`.
+  defineStructureContract(
+    'releases the third column for the full-width Knowledge surface',
+    { file: MANAGER_ROOT, constant: 'FULL_WIDTH_VIEWS', record: ['id', 'knowledge'] },
+    { property: [['layoutClass', 'self-owned-3-track']] }
+  );
+
+  // The view owns the single armed token and every disarm rule, and seeds its default tab ONCE.
+  defineStructureContract('owns the armed token and the seeded default tab', KNOWLEDGE_VIEW, {
+    renders: [
       'KnowledgeRoster',
       'KnowledgeTabs',
       'KnowledgeRecipeItemsTab',
       'KnowledgeLearnedRecipesTab',
-      'filterKnowledgeRoster',
-      'let armedToken = $state',
-      "role=\"tabpanel\"",
-    ]) {
-      assert.ok(knowledgeSource.includes(snippet), `KnowledgeView should include ${snippet}`);
-    }
-    // The default tab is seeded ONCE from the store.
-    assert.ok(
-      knowledgeSource.includes('let tabSeeded = $state(false)'),
-      'the default tab should be seeded once on surface entry'
-    );
+    ],
+    names: ['filterKnowledgeRoster', 'armedToken', 'tabSeeded'],
+    writes: ['data-knowledge-view'],
+    attributes: [['role', 'tabpanel']],
+  });
 
-    // The armed control is a REAL focusable button.
-    assert.ok(
-      armedDangerButtonSource.includes('<button\n  bind:this={element}\n  type="button"'),
-      'the armed confirmation should be a real button element'
+  // A REAL focusable button, not the prototype's span affordance.
+  defineStructureContract('arms a real button rather than a span', ARMED_DANGER_BUTTON, {
+    elements: ['button'],
+    binds: ['this'],
+    attributes: [['type', 'button']],
+    writes: ['data-armed', 'data-arm-token', 'aria-label'],
+    names: ['armed', 'token', 'consequence', 'handleBlur'],
+    reads: ['event.key'],
+    compares: ['Escape'],
+    spellsExactly: ['fas fa-triangle-exclamation'],
+    spellsNo: ['sc-on-click'],
+  });
+
+  // The armed token is keyed on the DOCUMENT id, so two copies of one recipe arm separately, and
+  // `inert` renders as its own chip rather than fused into the "Spent" label.
+  defineStructureContract('keys the delete token on the item document id', KNOWLEDGE_COPY_ROW, {
+    spells: ['delete:'],
+    reads: ['copy.itemId'],
+    writes: ['data-knowledge-inert'],
+  });
+
+  defineStructureContract('keys the erase token on the recipe id', KNOWLEDGE_LEARNED_ROW, {
+    spells: ['erase:'],
+    reads: ['learned.recipeId'],
+  });
+
+  // Only `spent` disables Expend. An `!inert` term would apply a gate the engine does not:
+  // `_filterNonExhausted` reads `timesUsed` alone. Read off the ONE disablable control rather
+  // than off the whole file, which legitimately reads `copy.inert` for the chip beside it.
+  it('disables Expend from the projected affordance alone', () => {
+    const expend = templateNodes(componentAstOf(KNOWLEDGE_COPY_ROW)).find((node) =>
+      declaresAttribute(node, 'disabled', { directives: false })
     );
-    assert.equal(
-      /sc-on-click/.test(armedDangerButtonSource),
-      false,
-      'the prototype span affordance must not be copied'
-    );
-    for (const snippet of [
-      "data-armed={armed ? 'true' : 'false'}",
-      'data-arm-token={token}',
-      'aria-label={consequence}',
-      "event.key !== 'Escape'",
-      'function handleBlur()',
-      'armedIcon = \'fas fa-triangle-exclamation\'',
-    ]) {
-      assert.ok(
-        armedDangerButtonSource.includes(snippet),
-        `ArmedDangerButton should include ${snippet}`
-      );
-    }
-    const copyRowSource = readFileSync(
-      resolve(knowledgeComponentDir, 'KnowledgeOwnedCopyRow.svelte'),
-      'utf8'
-    );
-    const learnedRowSource = readFileSync(
-      resolve(knowledgeComponentDir, 'KnowledgeLearnedRow.svelte'),
-      'utf8'
-    );
-    assert.ok(
-      copyRowSource.includes('`delete:${copy?.itemId'),
-      'the delete token should be keyed on the item document id'
-    );
-    assert.ok(
-      learnedRowSource.includes('`erase:${learned?.recipeId'),
-      'the erase token should be keyed on the recipe id'
-    );
-    // Only `spent` disables Expend. An `!inert` term would apply a gate the engine
-    // does not: `_filterNonExhausted` reads `timesUsed` alone.
-    assert.ok(
-      copyRowSource.includes('disabled={!copy.canExpend}'),
-      'Expend should be disabled purely from the projected affordance'
-    );
-    assert.equal(
-      /!\s*copy\.inert/.test(copyRowSource),
-      false,
-      'inert must not gate the Expend affordance'
-    );
-    // `inert` is an INDEPENDENT chip, so the fused "Spent · inert" label is retired.
-    assert.ok(
-      copyRowSource.includes('data-knowledge-inert'),
-      'inert should render as its own chip'
-    );
+    assert.ok(Boolean(expend), 'the copy row still renders a disablable Expend control');
+    const gate = attributeExpression(expend, 'disabled');
+    assert.ok(memberPaths(gate).includes('copy.canExpend'), 'Expend reads the affordance');
+    assert.ok(!identifierNames(gate).has('inert'), 'and inert does not gate it');
   });
 
   // The Knowledge seam (issue 785). Every rule here is invisible at unit level and silent at
@@ -3212,7 +3222,7 @@ describe('CraftingSystemManager source contract', () => {
   // Foundry step opens no Knowledge row for its throwaway actor; and the View Lab frame is a
   // screenshot, not a gate.
   it('names every learned-entry field the display ladder reads', () => {
-    const studioSource = readFileSync(resolve(knowledgeComponentDir, 'knowledgeStudio.js'), 'utf8');
+    const studio = moduleAstOf(KNOWLEDGE_STUDIO).ast;
     // Walked to a FIXED POINT from the projection the collected rows are fed to: every
     // `raw.<field>` that projection reads, and the same again for every function it hands the
     // same `raw` to, at any depth. One level would miss `granted`/`grantedBy`, which
@@ -3224,9 +3234,15 @@ describe('CraftingSystemManager source contract', () => {
       const name = queue.shift();
       if (walked.has(name)) continue;
       walked.add(name);
-      const body = moduleFunctionSource(studioSource, name, 'knowledgeStudio.js');
-      for (const [, field] of body.matchAll(/\braw\.([A-Za-z_$][\w$]*)/g)) readFields.add(field);
-      for (const [, callee] of body.matchAll(/\b([A-Za-z_$][\w$]*)\(raw\)/g)) queue.push(callee);
+      const body = namedCodeAst(studio, name);
+      for (const path of memberPaths(body)) {
+        const [head, field] = path.split('.');
+        if (head === 'raw' && field) readFields.add(field);
+      }
+      for (const node of walkNodes(body)) {
+        if (node.type !== 'CallExpression' || node.arguments.length !== 1) continue;
+        if (node.arguments[0]?.name === 'raw') queue.push(calledName(node));
+      }
     }
     // A VACUITY guard, not the subject. The walk keys on the ladder's input still being named
     // `raw` and still being read field by field; a rewrite that destructured it would leave
@@ -3236,22 +3252,17 @@ describe('CraftingSystemManager source contract', () => {
       `the learned-row ladder no longer reads \`raw.<field>\`, so this derivation proves nothing (found ${[...readFields].join(', ') || 'nothing'})`
     );
 
-    const collector = classMemberSource(
-      appSource,
-      '_collectKnowledgeLearnedEntries(actor, items, context) {',
-      'SvelteCraftingSystemManagerApp.svelte.js'
+    const collector = classMemberAst(
+      moduleAstOf(APP_SHELL).ast,
+      '_collectKnowledgeLearnedEntries'
     );
-    const literalStart = collector.indexOf('learnedRecipes.push({');
-    const literalEnd = collector.indexOf('\n      });', literalStart);
+    const literal = pushedRecord(collector, 'learnedRecipes');
     assert.ok(
-      literalStart >= 0 && literalEnd > literalStart,
+      Boolean(literal),
       'the learned-row literal is locatable inside the collector, so this is not an empty slice'
     );
-    const literal = collector.slice(literalStart, literalEnd);
-    // A field is named either as `field: value` or as the `field,` shorthand.
-    const named = new Set(
-      [...literal.matchAll(/^\s+([A-Za-z_$][\w$]*)[:,]/gm)].map(([, key]) => key)
-    );
+    // A field is named either as `field: value` or as the `field` shorthand.
+    const named = new Set(literal.properties.map((property) => property.key?.name));
     for (const field of readFields) {
       assert.ok(
         named.has(field),
