@@ -13,6 +13,8 @@ export function noRefusal() {
 /**
  * `prepare` answers the attempt context or a `{ refusal }`, `validate` and `checkPersistAvailable`
  * a `{ kind, details }` refusal or null, and a `writeTerminalHistory` response ends the pipeline.
+ * A `writeTerminalHistory` answering `{ run: null, response: <falsy> }` is a contract violation:
+ * the pipeline would commit against a null run.
  */
 export function createGatheringAttemptResolution({
   prepare,

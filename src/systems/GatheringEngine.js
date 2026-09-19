@@ -1304,20 +1304,22 @@ export class GatheringEngine {
     return settlement;
   }
 
-  async _refuseMaturedAttempt(kind, { waitingRun, activeRun, resolved, ...context }) {
+  async _refuseMaturedAttempt(kind, context) {
+    const { waitingRun, activeRun, resolved, viewer, actor, versionedContext } = context;
     if (kind === 'cancelled') {
       throw gatheringLifecycleError(
         'A timed gathering outcome cannot be cancelled',
         'CANCELLED_TIMED_OUTCOME'
       );
     }
-    const { viewer, actor, versionedContext } = context;
     if (kind === 'missing-reference') {
       return this._cancelMissingReferenceRun({ viewer, actor, run: activeRun, resolved });
     }
+    const { environment, task, errors, outcome } = context;
+    const cleared = { viewer, actor, environment, task, errors, outcome };
     return versionedContext
-      ? this._clearInvalidVersionedRun({ ...context, run: waitingRun })
-      : this._clearMisconfiguredWaitingRun({ ...context, run: activeRun });
+      ? this._clearInvalidVersionedRun({ ...cleared, run: waitingRun, versionedContext })
+      : this._clearMisconfiguredWaitingRun({ ...cleared, run: activeRun });
   }
 
   /**
