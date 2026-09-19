@@ -3159,4 +3159,121 @@ export function registerEnvironmentsCases() {
       'the event has never drawn one, and gains none from sharing the panel'
     );
   });
+
+  // The rail's OWN states (issue 1707 phase 3). The branch chain moved into
+  // `environment/GatheringInspectorRail.svelte`, and these two cases are the first DOM assertions
+  // on the summary and empty-library cards it draws itself: both were pinned only as root source
+  // text before, which a relocation satisfies without rendering anything.
+  it('draws the selected environment summary in the rail, and follows the row that is picked', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const rail = () => target.querySelector('.manager-inspector');
+    const facts = () =>
+      Array.from(rail().querySelectorAll('[data-environment-fact]')).map((fact) => [
+        fact.dataset.environmentFact,
+        fact.querySelector('strong').textContent.trim(),
+      ]);
+    const chips = () =>
+      Array.from(rail().querySelectorAll('.manager-chip-row .manager-chip')).map((chip) =>
+        chip.textContent.trim()
+      );
+
+    assert.equal(rail().querySelector('.manager-kicker').textContent.trim(), 'Selected environment');
+    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Moonlit Forest');
+    assert.deepEqual(chips(), ['Active', 'Targeted', 'Linked scene']);
+    assert.deepEqual(facts(), [
+      ['tasks', '1'],
+      ['events', '0'],
+      ['required-tools', '0'],
+      ['mode', 'Targeted'],
+      // The hook the smoke harness reads as `.manager-inspector [data-environment-fact="scene"]`.
+      ['scene', 'Moonlit Forest'],
+    ]);
+    assert.equal(
+      rail().querySelector('.manager-environment-preview').classList.contains('is-fallback'),
+      false,
+      'the linked scene supplies the preview, so the fallback modifier stays off'
+    );
+
+    target
+      .querySelector('[data-environment-id="env-cavern"] .manager-environment-identity')
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Quiet Cavern');
+    assert.deepEqual(chips(), ['Disabled', 'Blind', 'Scene unresolved']);
+    assert.deepEqual(facts(), [
+      ['tasks', '1'],
+      ['events', '0'],
+      ['required-tools', '0'],
+      ['mode', 'Blind'],
+      ['scene', 'Scene.missing'],
+    ]);
+    assert.ok(
+      rail().querySelector('.manager-environment-preview').classList.contains('is-fallback'),
+      'and an unresolved scene with no image of its own falls back'
+    );
+  });
+
+  it('draws the empty-library setup card in the rail, with its published gathering-docs link', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyEnvironments: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const card = target.querySelector('.manager-inspector .manager-setup-card');
+    assert.ok(Boolean(card), 'an empty library draws the setup card rather than a row summary');
+    assert.equal(card.getAttribute('aria-label'), 'Plan gathering content');
+    assert.equal(card.querySelector('.manager-kicker').textContent.trim(), 'Gathering setup');
+    assert.equal(card.querySelector('h3').textContent.trim(), 'Plan gathering content');
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('.manager-setup-list li')).map((step) =>
+        step.textContent.trim()
+      ),
+      [
+        'Define gathering tasks with their checks, timing, result groups, and failure outcomes.',
+        'Prepare event options that can be reused across your locations.',
+        'Create environments after the gathering task and event libraries are ready to attach.',
+      ]
+    );
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('.manager-setup-links a')).map((link) => [
+        link.getAttribute('href'),
+        link.textContent.trim(),
+      ]),
+      [
+        ['https://mistersilver-uk.github.io/fabricate/gathering/environments', 'Gathering docs'],
+        ['https://mistersilver-uk.github.io/fabricate/help/quickstart', 'Quickstart'],
+      ]
+    );
+    assert.equal(
+      Boolean(target.querySelector('.manager-inspector [data-environment-fact]')),
+      false,
+      'and no summary fact, since there is no row to summarise'
+    );
+  });
+
 }
