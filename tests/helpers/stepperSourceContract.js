@@ -217,20 +217,24 @@ export const CHARACTER_MODIFIER_BOUNDS_SCOPES = Object.freeze([
   'onUpdateEventCharacterModifier',
 ]);
 
+/** The rail that picks between the two leaves since issue 1707 phase 3. */
+export const CHARACTER_MODIFIER_RAIL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
+
 /**
- * The two leaves that render the shared panel since issue 1707 phase 2, each with the root tag
- * that renders it and the scope its chain has to carry. The wiring spans two tags now: the drop
- * side binds its row id inside its leaf, the event side forwards the root's function through.
+ * The two leaves that render the shared panel since issue 1707 phase 2, each with the rail tag
+ * that renders it and the scope its chain has to carry. The wiring spans three files since phase
+ * 3: the leaf's panel tag, the rail's tag for the leaf, and the root's one tag for the rail.
  */
 export const CHARACTER_MODIFIER_PANEL_LEAVES = Object.freeze([
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
-    rootTag: 'GatheringTaskInspector',
+    railTag: 'GatheringTaskInspector',
     scope: 'onUpdateDropCharacterModifier',
   }),
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
-    rootTag: 'GatheringEventInspector',
+    railTag: 'GatheringEventInspector',
     scope: 'onUpdateEventCharacterModifier',
   }),
 ]);

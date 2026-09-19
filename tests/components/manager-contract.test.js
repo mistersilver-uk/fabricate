@@ -1491,14 +1491,10 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Docs, 'Docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.EmptySetup.Title'),
-      'empty environments inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering/environments'),
-      'empty environments inspector should link to published gathering docs'
-    );
+    // The empty-library setup card moved into `environment/GatheringInspectorRail.svelte` with the
+    // chain that drew it (issue 1707 phase 3). Its localized copy and its published gathering-docs
+    // link are asserted through the DOM in `manager-environments-mounted.js`, which renders the
+    // rail with an empty library rather than reading either file's text.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.EmptyTitle,
       'Prepare gathering building blocks first'
@@ -1570,10 +1566,9 @@ describe('CraftingSystemManager source contract', () => {
       environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'),
       'gathering page should report tab changes to the root'
     );
-    assert.ok(
-      rootSource.includes('data-gathering-inspector-placeholder'),
-      'right inspector should render placeholders for non-environment gathering tabs'
-    );
+    // The placeholder hook moved into `environment/GatheringInspectorRail.svelte` with the branch
+    // that drew it (issue 1707 phase 3), and is asserted through the DOM in
+    // `manager-gathering-mounted.js` on a non-environment gathering tab.
     assert.equal(
       rootSource.match(/FABRICATE\.Admin\.Manager\.Environment\.Actions/g)?.length ?? 0,
       1,
@@ -2001,11 +1996,13 @@ describe('CraftingSystemManager source contract', () => {
     // was placeholder'd out pending redesign. The store wirings above and the
     // settings/browser surfaces below still need to pass.
     // The card's own hook moved into `environment/GatheringRulesInspector.svelte` with the branch
-    // that drew it (issue 1707 phase 2); the root's fact is that the settings branch renders it,
-    // and the hook itself is asserted through the DOM in `manager-environments-mounted.js`.
+    // that drew it (issue 1707 phase 2), and the branch chain itself into
+    // `environment/GatheringInspectorRail.svelte` (phase 3); the root's fact is that it renders the
+    // rail, and the settings arm and the hook are asserted through the DOM in
+    // `manager-environments-mounted.js`.
     assert.ok(
-      rootSource.includes('<GatheringRulesInspector'),
-      'root should render the settings rules inspector'
+      rootSource.includes('<GatheringInspectorRail'),
+      'root should render the inspector rail that owns the settings branch'
     );
     assert.ok(
       environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'),
@@ -2143,9 +2140,10 @@ describe('CraftingSystemManager source contract', () => {
       'onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}',
       'store.duplicateGatheringLibraryTask',
       // The task and drop inspector markup moved into `environment/GatheringTaskInspector.svelte`
-      // (issue 1707 phase 2), so the root's fact is that it renders that leaf and hands it the
-      // drop writers; the hooks are asserted through the DOM in the mounted route modules.
-      '<GatheringTaskInspector',
+      // (issue 1707 phase 2) and the chain that picks it into the rail (phase 3), so the root's
+      // fact is that it renders the rail and hands it the drop writers; the hooks and the arm that
+      // selects each leaf are asserted through the DOM in the mounted route modules.
+      '<GatheringInspectorRail',
       'GatheringTaskEditView',
       '{itemCards}',
       'addGatheringDropModifier',

@@ -27,16 +27,16 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    count: 9,
+    count: 5,
     why:
-      'deferred: root convergence pending. Nine hand-rolled cards remain — the tags at-a-glance ' +
-      'card, the four systems feature panels, and the four the inspector rail still draws around ' +
-      'its own branches — and they are held out of the sweep because the converging root is the ' +
-      'wrong place to land its tail. The count was 32 until issue 1707 wrote the twice-authored ' +
-      'modifier panel once (two cards de-duplicated, not converted), and 28 until its phase 2 ' +
-      'moved nineteen more into the four rows below with the branches that drew them. Pinned by ' +
-      'count so a later root pass that converts some of the nine fails here instead of leaving a ' +
-      'fraction of a deferral nobody is tracking.',
+      'deferred: root convergence pending. Five hand-rolled cards remain — the tags at-a-glance ' +
+      'card and the four systems feature panels — and they are held out of the sweep because the ' +
+      'converging root is the wrong place to land its tail. The count was 32 until issue 1707 ' +
+      'wrote the twice-authored modifier panel once (two cards de-duplicated, not converted), 28 ' +
+      'until its phase 2 moved nineteen into the leaf rows below, and 9 until its phase 3 moved ' +
+      'the four the chain drew around those branches into the rail row below. Pinned by count so ' +
+      'a later root pass that converts some of the five fails here instead of leaving a fraction ' +
+      'of a deferral nobody is tracking.',
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
@@ -47,6 +47,17 @@ const CLASS_EXCEPTIONS = Object.freeze([
       'the deferral is unchanged in substance and this screen is now small enough for a ' +
       'conversion lane to take on its own. Pinned by count so a later partial pass fails here ' +
       'rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte',
+    count: 4,
+    why:
+      'deferred with a named reason: issue 1707 phase 3 relocated the inspector chain without ' +
+      'converting a card — the gathering-tab placeholder, and the selected environment\'s ' +
+      'summary, details and draft-state cards — so the deferral is unchanged in substance and ' +
+      'this file is now small enough for a conversion lane to take on its own. Pinned by count ' +
+      'so a later partial pass fails here rather than silently reducing a deferral nobody is ' +
+      'tracking.',
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
