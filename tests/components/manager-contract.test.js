@@ -56,14 +56,6 @@ const worldCurrencyPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
 );
-const craftingSettingsPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
-);
-const resolutionModeOptionsPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/resolutionModeOptions.js'
-);
 const systemsBrowserPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/SystemsBrowserView.svelte'
@@ -144,8 +136,6 @@ const essenceStudioSource = essenceStudioSources.join('\n');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
 const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
-const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
-const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
 const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
 const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
@@ -183,8 +173,6 @@ const managerSource = [
   essenceStudioSource,
   tagsCategoriesSource,
   systemEditSource,
-  craftingSettingsSource,
-  resolutionModeOptionsSource,
   systemsBrowserSource,
   recipesBrowserSource,
   componentsBrowserSource,
@@ -368,13 +356,13 @@ function callsWithArgument(node, [name, argument]) {
   return false;
 }
 
-/** One named function out of a component's instance script, declared or assigned to a binding. */
-function componentFunctionAst(ast, name) {
-  for (const node of walkNodes(ast.instance ?? {})) {
+/** One named function or binding value out of a subtree — the AST of the slice it replaces. */
+function namedCodeAst(scope, name) {
+  for (const node of walkNodes(scope ?? {})) {
     if (node.type === 'FunctionDeclaration' && node.id?.name === name) return node;
     if (node.type === 'VariableDeclarator' && node.id?.name === name && node.init) return node.init;
   }
-  throw new Error(`no function \`${name}\``);
+  throw new Error(`no binding \`${name}\``);
 }
 
 /** The static value one element or component gives an attribute, or `undefined`. */
@@ -451,15 +439,17 @@ function structureOf(target) {
       ...moduleAstsIn(target.dir).map(({ ast }) => claimsOverCode(ast)),
     ]);
   }
-  const { file, member, property, fn } = typeof target === 'string' ? { file: target } : target;
+  const { file, member, property, fn, constant } =
+    typeof target === 'string' ? { file: target } : target;
   if (file.endsWith('.svelte')) {
     const component = componentAstOf(file);
-    if (fn) return claimsOverCode(componentFunctionAst(component, fn));
+    if (fn) return claimsOverCode(namedCodeAst(component.instance, fn));
     const scope = componentScopeOf(file);
     return { ...claimsForComponent(component), global: (name) => readsGlobal(scope, name) };
   }
   const { ast } = moduleAstOf(file);
   let code = member ? classMemberAst(ast, member) : ast;
+  if (constant) code = namedCodeAst(code, constant);
   if (property) code = propertyAst(code, property);
   return claimsOverCode(code);
 }
@@ -469,7 +459,8 @@ function labelOf(target) {
   if (Array.isArray(target)) return `any of ${target.length} manager views`;
   if (typeof target === 'string') return target;
   if (target.dir) return `any of ${target.dir}`;
-  return [target.file, target.member, target.property, target.fn].filter(Boolean).join(' > ');
+  const parts = [target.file, target.member, target.constant, target.property, target.fn];
+  return parts.filter(Boolean).join(' > ');
 }
 
 /** Each claim a contract row may make: the question to ask, and the answer it must get. */
@@ -485,6 +476,7 @@ const CONTRACT_CLAIMS = Object.freeze({
   spells: { ask: 'spells', holds: true, says: (v) => `spells "${v}"` },
   spellsNo: { ask: 'spells', holds: false, says: (v) => `no longer spells "${v}"` },
   spellsExactly: { ask: 'spellsExactly', holds: true, says: (v) => `spells "${v}" in full` },
+  spellsExactlyNo: { ask: 'spellsExactly', holds: false, says: (v) => `spells no "${v}"` },
   reads: { ask: 'reads', holds: true, says: (v) => `reads ${v}` },
   readsNo: { ask: 'reads', holds: false, says: (v) => `never reads ${v}` },
   calls: { ask: 'calls', holds: true, says: (v) => `calls ${v}()` },
@@ -518,6 +510,8 @@ const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
 const ESSENCE_BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const CRAFTING_SETTINGS = 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte';
+const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
 const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
 const RECIPE_BROWSER_INSPECTOR =
   'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
@@ -1170,22 +1164,6 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('store.setResolutionMode?.'),
       'root should pass the resolution-mode callback through to the system-edit view'
     );
-    // Scope the resolution/salvage persistence-value assertions to the resolution
-    // mode options module: the alchemy check-mode selector at the top of the Checks
-    // tab's Crafting sub-tab legitimately carries a `value: 'tiered'` check-mode
-    // option that is unrelated to the retired legacy resolution/salvage `tiered` mode.
-    assert.ok(
-      resolutionModeOptionsSource.includes("value: 'routed'"),
-      'salvage resolution should offer the canonical routed persistence value'
-    );
-    assert.ok(
-      !resolutionModeOptionsSource.includes("value: 'mapped'"),
-      'resolution options should not offer the legacy mapped persistence value'
-    );
-    assert.ok(
-      !resolutionModeOptionsSource.includes("value: 'tiered'"),
-      'resolution options should not offer the legacy tiered persistence value'
-    );
     assert.ok(
       !rootSource.includes('store.toggleAdvancedOptions?.'),
       'root should not retain the removed advanced visibility toggle wiring'
@@ -1208,30 +1186,8 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
-    // The recipe card legend is renamed.
+  it('renames the recipe resolution-mode legend and states the salvage copy', () => {
     assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
-    // `legend=` since issue 1509 phase 3.
-    assert.ok(
-      craftingSettingsSource.includes('legend="Recipe resolution mode"'),
-      'crafting settings inline fallback should match the renamed value'
-    );
-
-    // Salvage card source hooks: fieldset + option attribute names and the radio group name.
-    assert.ok(
-      craftingSettingsSource.includes('data-crafting-salvage-resolution-mode'),
-      'crafting settings should declare the salvage fieldset hook'
-    );
-    assert.ok(
-      craftingSettingsSource.includes('data-crafting-salvage-resolution-mode-option'),
-      'crafting settings should declare the salvage option hook'
-    );
-    assert.ok(
-      craftingSettingsSource.includes('manager-crafting-salvage-resolution-mode'),
-      'crafting settings should use the dedicated salvage radio group name'
-    );
-
-    // New salvage i18n keys are present and non-empty.
     for (const key of [
       'SalvageResolutionMode',
       'SalvageResolutionModeHint',
@@ -1246,37 +1202,40 @@ describe('CraftingSystemManager source contract', () => {
       assert.equal(typeof value, 'string', `SystemSettings.${key} should be a string`);
       assert.ok(value.length > 0, `SystemSettings.${key} should be non-empty`);
     }
+  });
 
-    // Salvage option-set guard: the salvage options offer simple (default) +
-    // progressive + routed, but never alchemy (no ingredient-set routing).
-    const salvageOptionsMatch = resolutionModeOptionsSource.match(
-      /salvageResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/
-    );
-    assert.ok(
-      salvageOptionsMatch,
-      'the shared module should define a salvageResolutionModeOptions array'
-    );
-    const salvageOptionsBlock = salvageOptionsMatch[1];
-    assert.ok(salvageOptionsBlock.includes("value: 'simple'"), 'salvage should offer simple');
-    assert.ok(
-      salvageOptionsBlock.includes("value: 'progressive'"),
-      'salvage should offer progressive'
-    );
-    assert.ok(salvageOptionsBlock.includes("value: 'routed'"), 'salvage should offer routed');
-    assert.ok(
-      !salvageOptionsBlock.includes("value: 'alchemy'"),
-      'salvage should NOT offer alchemy'
-    );
+  // The salvage card's own hooks, which reach `RadioCardGroup` as prop VALUES since issue 1509
+  // folded the `ResolutionModeCard` shim away.
+  defineStructureContract('draws a salvage resolution card of its own', CRAFTING_SETTINGS, {
+    declaresProp: ['onSetSalvageResolutionMode'],
+    attributes: [
+      ['legend', 'Recipe resolution mode'],
+      ['cardId', 'manager-crafting-salvage-resolution-mode'],
+      ['groupName', 'manager-crafting-salvage-resolution-mode'],
+      ['dataAttr', 'data-crafting-salvage-resolution-mode'],
+      ['optionDataAttr', 'data-crafting-salvage-resolution-mode-option'],
+    ],
+  });
 
-    // Persistence wiring threaded from the root through the crafting settings view to the store.
-    assert.ok(
-      craftingSettingsSource.includes('onSetSalvageResolutionMode'),
-      'crafting settings should accept the salvage persistence prop'
-    );
-    assert.ok(
-      rootSource.includes('store.setSalvageResolutionMode?.'),
-      'root should pass the salvage callback through to the crafting settings view'
-    );
+  // Salvage has exactly ONE ingredient, so ingredient-set routing is meaningless and `alchemy`
+  // is not offered; the narrowing to the salvage binding is what keeps that absence honest,
+  // because the recipe list beside it does offer alchemy.
+  defineStructureContract(
+    'offers salvage every resolution except the ingredient-set ones',
+    { file: RESOLUTION_MODE_OPTIONS, constant: 'salvageResolutionModeOptions' },
+    { spellsExactly: ['simple', 'progressive', 'routed'], spellsExactlyNo: ['alchemy'] }
+  );
+
+  // The two retired persistence tokens, across the WHOLE module: neither list may offer them.
+  defineStructureContract(
+    'retires the legacy mapped and tiered persistence values',
+    RESOLUTION_MODE_OPTIONS,
+    { spellsExactlyNo: ['mapped', 'tiered'] }
+  );
+
+  defineStructureContract('threads the salvage persistence callback', MANAGER_ROOT, {
+    reads: ['store.setSalvageResolutionMode'],
+    passesProps: [['CraftingSettingsView', 'onSetSalvageResolutionMode']],
   });
 
   it('authors straight, d100 and routed on each task rather than the gathering economy', () => {
