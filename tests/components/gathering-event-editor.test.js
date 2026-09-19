@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
@@ -198,7 +200,7 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(rootSource.includes('const gatheringEventValidation = $derived'), 'root should expose an event validation derived');
     assert.ok(rootSource.includes('function saveGatheringEventDraft'), 'root should expose saveGatheringEventDraft');
     assert.ok(rootSource.includes('function deleteGatheringEventDraft'), 'root should expose deleteGatheringEventDraft');
-    assert.ok(rootSource.includes('function confirmGatheringEventRouteExit'), 'route-exit chain should include event confirm');
+    assert.ok(ROUTE_EXIT_GUARDS.some((guard) => guard.view === 'gathering-event-edit'), 'route-exit chain should include event confirm');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
     assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
     assert.ok(rootSource.includes('event={editingGatheringEvent}'), 'editor mount should bind the draft event');

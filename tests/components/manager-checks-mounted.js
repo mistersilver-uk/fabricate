@@ -3782,7 +3782,7 @@ export function registerChecksCases() {
   });
 
   it('stays on the Checks route when a Save-on-navigate does not land', async () => {
-    // `finishChecksRouteExit` returned `true` unconditionally after awaiting the save.
+    // The checks row's finisher returned `true` unconditionally after awaiting the save.
     const calls = [];
     await mountChecks(calls, {
       alchemyResolutionMode: 'simple',

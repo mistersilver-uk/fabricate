@@ -609,6 +609,7 @@ const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
 const RECIPE_BROWSER_INSPECTOR =
   'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
 const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
+const ROUTE_EXIT_GUARDS = 'src/ui/svelte/apps/manager/routeExitGuards.js';
 const SYSTEMS_BROWSER = 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
@@ -1767,8 +1768,14 @@ describe('CraftingSystemManager source contract', () => {
   // editor for the same essence skips the prompt and switching to another one does not.
   defineStructureContract(
     'skips a same-essence route exit rather than a same-token one',
-    { file: MANAGER_ROOT, fn: 'confirmEssenceRouteExit' },
-    { names: ['nextEssenceId', 'selectedEssenceId'], compares: ['essence-edit'] }
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'essence-edit'] },
+    { property: [['skip', 'subject']] }
+  );
+
+  defineStructureContract(
+    'and names the essence that subject is, or the comparison compares nothing',
+    { file: MANAGER_ROOT, constant: 'routeExitGuards', property: 'essence-edit' },
+    { names: ['activeView', 'selectedEssenceId'], compares: ['essence-edit'] }
   );
 
   defineStructureContract(
@@ -1918,19 +1925,25 @@ describe('CraftingSystemManager source contract', () => {
     calls: ['updateComponent'],
   });
 
-  // A load-bearing asymmetry: `confirmComponentRouteExit` deliberately lacks the
-  // `|| nextView === '<kind>-edit'` bypass its recipe sibling carries, which is why the two are
-  // asserted together: the sibling is what makes the absence a choice rather than an oversight.
+  // A load-bearing asymmetry: the component row deliberately waives no navigation where its
+  // recipe sibling waives a same-view one, which is why the two are asserted together: the
+  // sibling is what makes the absence a choice rather than an oversight.
   defineStructureContract(
     'AC14: the component route guard keeps NO component-edit bypass (issue 676)',
-    { file: MANAGER_ROOT, fn: 'confirmComponentRouteExit' },
-    { names: ['activeView'], compares: ['component-edit'], namesNo: ['nextView'] }
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'component-edit'] },
+    { property: [['skip', 'none']] }
   );
 
   defineStructureContract(
     'and the recipe sibling still carries the bypass it omits',
-    { file: MANAGER_ROOT, fn: 'confirmRecipeRouteExit' },
-    { names: ['activeView', 'nextView'], compares: ['recipe-edit'] }
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'recipe-edit'] },
+    { property: [['skip', 'same-view']] }
+  );
+
+  defineStructureContract(
+    'and the component row is asked about the route it is on, not the one it is leaving',
+    { file: MANAGER_ROOT, constant: 'routeExitGuards', property: 'component-edit' },
+    { names: ['activeView'], compares: ['component-edit'], namesNo: ['nextView'] }
   );
 
   // `foundry` is not in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
@@ -2365,7 +2378,7 @@ describe('CraftingSystemManager source contract', () => {
       'saveSelectedToolDraft',
       // The per-section inherit switch.
       'setFocusedToolSectionInherited',
-      'confirmToolsRouteExit',
+      'routeExitGuardFor',
       'toolsNavCount',
       'createWorldToolFromItemDrop',
       'adoptWorldToolIntoSystem',
@@ -2394,6 +2407,20 @@ describe('CraftingSystemManager source contract', () => {
     namesNo: ['onCreateToolDrop', 'deleteSelectedLibraryTool'],
     readsNo: ['store.createToolDraft', 'store.deleteToolDraft'],
   });
+
+  // The editor's own route-exit guard, which compares the TOOL and not only the view token, so
+  // opening another tool from the library prompts and re-opening the focused one does not.
+  defineStructureContract(
+    'and guards the focused tool editor on the tool rather than the view token',
+    { file: ROUTE_EXIT_GUARDS, record: ['view', 'tool-edit'] },
+    { property: [['skip', 'subject']] }
+  );
+
+  defineStructureContract(
+    'and names which tool that subject is, and the seam the prompt comes from',
+    { file: MANAGER_ROOT, constant: 'routeExitGuards', property: 'tool-edit' },
+    { names: ['focusedToolDraft'], reads: ['services.confirmDirtyToolsNavigation'] }
+  );
 
   // Adoption is a named handler that selects what it adopted, rather than leaving the GM on a row
   // that has silently changed cohort.

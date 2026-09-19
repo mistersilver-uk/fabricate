@@ -25,6 +25,7 @@ import {
   mintEssenceId,
   worldAddressableEffectSources,
 } from '../src/ui/svelte/apps/manager/scoped/essenceScoped.js';
+import { ROUTE_EXIT_GUARDS } from '../src/ui/svelte/apps/manager/routeExitGuards.js';
 import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 import { membershipKey } from '../src/systems/scopedDefinitions.js';
 import { createWorldScopeActions } from '../src/ui/svelte/stores/worldScopeActions.js';
@@ -253,23 +254,19 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
   });
 
   it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {
-    // THE HALF A MOUNT CANNOT REACH.
-    assert.match(
-      rootSource,
-      /function confirmWorldEssenceEntryRouteExit\(/,
-      'the shell declares no world-entry route-exit guard'
-    );
-    assert.match(
-      rootSource,
-      /const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit\(nextView, nextRouteId\);/,
-      'the guard is declared but never reached from `confirmRouteExitGuards`, which is the ' +
-        'cascade every navigation in this shell passes through'
+    // THE HALF A MOUNT CANNOT REACH, read as the table's own data rather than as source text.
+    const guard = ROUTE_EXIT_GUARDS.find((row) => row.view === 'world-essence-entry');
+    assert.ok(Boolean(guard), 'the shell declares no world-entry route-exit guard');
+    assert.equal(
+      ROUTE_EXIT_GUARDS.indexOf(guard),
+      0,
+      'the guard is declared but never reached from the cascade every navigation passes through'
     );
     // …and it delegates rather than restating the shape: the three-way answer, the save-gated
     // navigation and the synchronous clean path are all `scopedEntryDraft.js`'s.
-    assert.match(
-      rootSource,
-      /return confirmScopedEntryExit\(\{/,
+    assert.equal(
+      guard.finish,
+      'scoped-entry',
       'the guard hand-rolls the three-way prompt shape instead of taking the shared one'
     );
     assert.match(
