@@ -38,6 +38,11 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      // This width draws the selected environment's summary cards, which issue 1707 phase 3 moved
+      // into the rail, and it carries no `environment/` directory pattern of its own: on a
+      // maintainer ruling it now asks for a frame when that column changes, so the stacked
+      // geometry of these cards is seen rather than inferred from the default-width frame.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({

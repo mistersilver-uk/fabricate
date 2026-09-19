@@ -196,6 +196,10 @@ export const CASES = Object.freeze([
       // The only frame that draws the Gathering Rules rail, which issue 1707 moved out of the
       // root: this is the case that has to fire when its ten selects change.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
+      // And the rail that picks that arm, which phase 3 moved out of the root. On a maintainer
+      // ruling this frame now asks for one when the chain changes, since it is the only case that
+      // photographs the settings arm at all.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
