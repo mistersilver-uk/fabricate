@@ -470,6 +470,7 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
+const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 const MODIFIER_CATALOGUE =
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
@@ -747,6 +748,49 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  // World scope, not per system (issue 1278). Every rendered half of this editor — the ladder,
+  // the three peer strategies, the provider-managed read-only branch and the macro zones — is
+  // DRIVEN by `tests/components/world-currency-tab.test.js`. What stays here is what a mounted
+  // case cannot see: the drop pipeline behind the zones, and two keys claimed IN FULL because
+  // each has a longer neighbour.
+  defineStructureContract('authors the world coin ladder on one page', WORLD_CURRENCY, {
+    declaresProp: ['currencyValidationErrors'],
+    declares: ['currencyHasProviders', 'currencyMacroMode', 'currencyUnitsReadOnly'],
+    names: ['dragDrop'],
+    calls: ['resolveDropData'],
+    compares: ['Macro'],
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint',
+      'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
+    ],
+    namesNo: ['inventoryMode'],
+    spellsNo: ['data-world-currency-inventory-mode-select'],
+  });
+
+  // `passesProps` requires EVERY `<WorldCurrencyTab>` occurrence to declare the prop, which is
+  // the "on the tag itself" claim the sliced tag used to make, for the whole set at once. The
+  // validation report is a three-link join: the store publishes it, the root derives off it, and
+  // the root threads the derivation (issue 1493).
+  defineStructureContract('threads the world currency profile and its report', MANAGER_ROOT, {
+    passesProps: [
+      ['WorldCurrencyTab', 'currencyUnits'],
+      ['WorldCurrencyTab', 'currencySpendStrategy'],
+      ['WorldCurrencyTab', 'currencyProviderId'],
+      ['WorldCurrencyTab', 'currencyProviderOptions'],
+      ['WorldCurrencyTab', 'currencyMacros'],
+      ['WorldCurrencyTab', 'currencyValidationErrors'],
+      ['WorldCurrencyTab', 'onAddCurrencySubUnit'],
+      ['WorldCurrencyTab', 'onSetCurrencySpendStrategy'],
+      ['WorldCurrencyTab', 'onSetCurrencyProvider'],
+      ['WorldCurrencyTab', 'onSetCurrencyMacro'],
+      ['WorldCurrencyTab', 'onClearCurrencyMacro'],
+    ],
+    declares: ['currencyValidationErrors', 'worldCurrencyValidation'],
+    reads: ['$viewState.worldCurrencyValidation', 'worldCurrencyValidation.errors'],
+    names: ['getCurrencyProvidersForFoundrySystem'],
+    namesNo: ['onSetCurrencyInventoryMode'],
+  });
+
   // Formula-only since issue 1440: one labelled expression field, no provider leg. The key is
   // claimed IN FULL, because `…Modifiers.ExpressionHint` next door satisfies a substring.
   defineStructureContract('authors a character modifier as a formula alone', WORLD_MODIFIERS, {
@@ -829,243 +873,6 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // --- World > Currency (issue 1278) --------------------------------------------------
-    // The ladder, spend strategy, provider and macro set are WORLD scope: a world runs one
-    // ruleset, so there is one way actors store coins and two crafting systems cannot
-    // meaningfully disagree about it. The whole editor therefore reads WorldCurrencyTab. What
-    // survives on System Settings is the participation toggle alone, asserted at the end.
-    for (const snippet of [
-      'data-world-currency-units',
-      'manager-currency-unit-card',
-      'handleAddCurrencyUnit',
-      'onSeedCurrencyPresets',
-      'manager-currency-subunit-builder',
-      // The unit card's collapsed summary row reuses the character-modifier summary class.
-      'manager-character-modifier-summary',
-      // The sub-unit token is the shared `Chip` as of issue 1515.
-      'data-world-currency-subunit={contained.unitId}',
-      'manager-currency-subunit-amount',
-    ]) {
-      assert.ok(
-        worldCurrencySource.includes(snippet),
-        `WorldCurrencyTab should include ${snippet}`
-      );
-    }
-    // Asserted as patterns rather than snippets in the list above.
-    assert.ok(
-      /onUpdateCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId,\s*event\.currentTarget\.value\s*\)/.test(
-        worldCurrencySource
-      ),
-      'WorldCurrencyTab should bind the sub-unit amount input to onUpdateCurrencySubUnit'
-    );
-    assert.ok(
-      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(worldCurrencySource),
-      'WorldCurrencyTab should wire the sub-unit delete action'
-    );
-    assert.ok(
-      rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
-      'root should pass the world currency units to WorldCurrencyTab'
-    );
-    // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}`.
-    assert.ok(
-      rootSource.includes(' {onAddCurrencySubUnit}'),
-      'root should pass currency sub-unit actions to WorldCurrencyTab'
-    );
-    assert.ok(
-      rootSource.includes('{currencySpendStrategy}'),
-      'root should thread the spend strategy to WorldCurrencyTab'
-    );
-    // Three peer top-level spend strategies (actorProperty / actorInventory / macro). The strategy
-    // select renders all three options and the editor branches on each strategy.
-    assert.ok(
-      worldCurrencySource.includes("currencySpendStrategy === 'actorInventory'"),
-      'currency editor should branch on the actorInventory spend strategy'
-    );
-    for (const value of ['actorProperty', 'actorInventory', 'macro']) {
-      assert.ok(
-        worldCurrencySource.includes(`value: '${value}'`),
-        `currency editor should offer the ${value} spend strategy option`
-      );
-    }
-    // Currency spend-strategy / provider / macro controls.
-    for (const snippet of [
-      'data-world-currency-strategy-select',
-      // Issue 1510: the shared `<Select>` hands the caller its OWN typed value.
-      'onChange={(next) => onSetCurrencySpendStrategy(next)}',
-      // The single shared strategy hint reflects the selected strategy.
-      'data-world-currency-strategy-hint',
-      'currencySpendStrategyHint()',
-      'data-world-currency-provider-select',
-      'onChange={(next) => onSetCurrencyProvider(next)}',
-      'data-world-currency-no-provider',
-      'data-world-currency-macros',
-      'data-world-currency-macro-dropzone',
-      'manager-component-source-drop-zone',
-      'use:dragDrop',
-      'resolveDropData',
-      "type !== 'Macro'",
-      'onClearCurrencyMacro(field.key)',
-      // Each empty macro drop zone exposes a field-specific accessible name so the three zones are
-      // distinguishable to assistive tech (the linked-state group already has a field-specific label).
-      'aria-label={currencyMacroDropZoneLabel(field)}',
-    ]) {
-      assert.ok(
-        worldCurrencySource.includes(snippet),
-        `WorldCurrencyTab should include ${snippet}`
-      );
-    }
-    // The nested inventory-mode select is gone — macro is now a peer top-level strategy.
-    assert.ok(
-      !worldCurrencySource.includes('data-world-currency-inventory-mode-select'),
-      'currency editor should not render the removed nested inventory-mode select'
-    );
-    assert.ok(
-      !worldCurrencySource.includes('inventoryMode'),
-      'currency editor should not reference the removed inventoryMode model'
-    );
-    // The macro branch renders only under the peer macro strategy.
-    assert.ok(
-      worldCurrencySource.includes("currencySpendStrategy === 'macro'"),
-      'currency editor should branch on the macro spend strategy'
-    );
-    // A world with no registered provider can still select actorInventory but is steered to the
-    // macro strategy via a no-provider callout, and its units are never wiped.
-    assert.ok(
-      worldCurrencySource.includes(
-        'const currencyHasProviders = $derived(currencyProviderOptions.length > 0)'
-      ),
-      'currency editor should derive whether the world has any providers'
-    );
-    // The three macro drop zones (canAfford / increment / decrement) lay out side-by-side in a
-    // single responsive row via a namespaced container class.
-    assert.ok(
-      worldCurrencySource.includes('manager-currency-macro-zones manager-currency-macro-row'),
-      'macro drop zones should be wrapped in the single-row container'
-    );
-    // Sub-units only drive the engine in actorProperty mode.
-    assert.ok(
-      worldCurrencySource.includes('const currencyMacroMode = $derived('),
-      'currency editor should derive a macro-mode flag'
-    );
-    assert.ok(
-      worldCurrencySource.includes('{#if currencyMacroMode}'),
-      'currency editor should gate the per-unit editor body on the macro-mode flag'
-    );
-    // The sub-unit section markup (heading, add-sub-unit control, chips) lives only inside the
-    // non-macro branch, after the `{#if currencyMacroMode}` gate.
-    assert.ok(
-      worldCurrencySource.indexOf('{#if currencyMacroMode}') <
-        worldCurrencySource.indexOf('manager-currency-subunit-section'),
-      'sub-unit section should render only in the non-macro (actorProperty) branch'
-    );
-    // Macro mode shows a conversion hint instead of any sub-unit controls.
-    assert.ok(
-      worldCurrencySource.includes('FABRICATE.Admin.Manager.CurrencyUnits.MacroConversionHint'),
-      'macro mode should include the macro-conversion hint'
-    );
-    // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
-    assert.ok(
-      worldCurrencySource.includes(
-        'const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'
-      ),
-      'currency editor should derive a read-only flag for the active provider inventory branch'
-    );
-    assert.ok(
-      worldCurrencySource.includes('{#if !currencyUnitsReadOnly}'),
-      'currency editor should gate the Add/Seed header actions behind the non-provider (editable) condition'
-    );
-    assert.ok(
-      worldCurrencySource.includes('{#if currencyUnitsReadOnly}'),
-      'currency editor should render a dedicated read-only branch in provider mode'
-    );
-    for (const snippet of [
-      'data-world-currency-provider-managed',
-      'manager-currency-provider-managed-callout',
-      'currencyProviderManagedHint()',
-      'manager-currency-provider-managed-summary',
-      'manager-currency-readonly-fields',
-      'data-world-currency-readonly-label',
-      'data-world-currency-abbreviation',
-      'data-world-currency-denomination',
-      'FABRICATE.Admin.Manager.CurrencyUnits.ProviderManagedTitle',
-    ]) {
-      assert.ok(
-        worldCurrencySource.includes(snippet),
-        `WorldCurrencyTab should include read-only ${snippet}`
-      );
-    }
-    // Provider read-only units present label/abbreviation/denomination as static field/value pairs;
-    // they must NOT render sub-unit chips. The only `data-world-currency-subunit` occurrence lives
-    // in the editable (actorProperty) branch, after the provider-managed read-only branch.
-    assert.ok(
-      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
-        worldCurrencySource.indexOf('data-world-currency-subunit'),
-      'provider-managed read-only branch should render before the editable sub-unit chips'
-    );
-    assert.equal(
-      worldCurrencySource.split('data-world-currency-subunit=').length - 1,
-      1,
-      'sub-unit chips should appear only once (in the editable actorProperty branch)'
-    );
-    // The read-only branch precedes the editable branch.
-    assert.ok(
-      worldCurrencySource.indexOf('data-world-currency-provider-managed') <
-        worldCurrencySource.indexOf('class="manager-currency-subunit-amount"'),
-      'provider-managed read-only branch should render before the editable unit list'
-    );
-    for (const prop of [
-      '{currencyProviderId}',
-      '{currencyMacros}',
-      '{currencyProviderOptions}',
-      // Shorthand, like the three above.
-      '{onSetCurrencySpendStrategy}',
-      '{onSetCurrencyProvider}',
-      '{onSetCurrencyMacro}',
-      '{onClearCurrencyMacro}',
-      // The world currency validation report (issue 1493).
-      '{currencyValidationErrors}',
-    ]) {
-      assert.ok(rootSource.includes(prop), `root should thread ${prop} to WorldCurrencyTab`);
-    }
-    // --- The world currency validation join (issue 1493) ---------------------------------
-    // `validateCurrencyProfile` shipped with ZERO callers in the manager, so a world whose
-    // currency profile could not be spent against said nothing at all on the page that authors
-    // it. What makes it visible is a THREE-link join: `adminStore` publishes
-    // `worldCurrencyValidation`, the root derives `currencyValidationErrors` off it, and the
-    // root threads that to `WorldCurrencyTab`.
-    const worldCurrencyTag = /<WorldCurrencyTab\b[\s\S]*?\/>/.exec(rootSource)?.[0] ?? '';
-    assert.ok(worldCurrencyTag.length > 0, 'root should render a self-closing <WorldCurrencyTab />');
-    assert.ok(
-      worldCurrencyTag.includes('{currencyValidationErrors}'),
-      'root should thread {currencyValidationErrors} on the WorldCurrencyTab tag itself'
-    );
-    assert.ok(
-      /currencyValidationErrors\s*=\s*\[\]/.test(worldCurrencySource),
-      'WorldCurrencyTab should DECLARE currencyValidationErrors in its $props(); an undeclared prop is silently dropped'
-    );
-    assert.ok(
-      worldCurrencySource.includes('data-world-currency-validation'),
-      'WorldCurrencyTab should render the validation live region the threaded errors feed'
-    );
-    assert.ok(
-      rootSource.includes('$viewState.worldCurrencyValidation'),
-      'root should read the store-published worldCurrencyValidation report, not invent its own'
-    );
-    assert.ok(
-      /const currencyValidationErrors = \$derived\([\s\S]{0,200}?worldCurrencyValidation\.errors/.test(
-        rootSource
-      ),
-      'root should derive currencyValidationErrors FROM the published report'
-    );
-    // The removed nested inventory-mode setter must no longer be threaded.
-    assert.ok(
-      !rootSource.includes('onSetCurrencyInventoryMode'),
-      'root should not thread the removed inventory-mode setter'
-    );
-    assert.ok(
-      rootSource.includes('getCurrencyProvidersForFoundrySystem'),
-      'root should derive provider options from the currency provider registry'
-    );
     // --- What survives on System Settings ------------------------------------------------
     // The participation toggle and nothing else. It reads `requirements.currency.enabled` and
     // calls `onToggleCurrency`, and renders always so the Optional features section is never
