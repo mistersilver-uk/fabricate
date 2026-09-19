@@ -27,6 +27,9 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-essence-browser-',
+  // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied;
+  // copied verbatim it throws `ReferenceError: $state is not defined`.
+  runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
