@@ -132,6 +132,14 @@ import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionToke
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import {
+  buildComponentSourceSnapshot,
+  buildFallbackSourceReferences,
+  buildRecipeItemSourceSnapshot,
+  buildToolSourceSnapshot,
+  extractSourceDescription,
+  rawSourceDescription,
+} from './sourceIdentitySnapshots.js';
 import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
@@ -806,46 +814,24 @@ export class CraftingSystemManager {
     return descriptionTextCandidate(value, seen);
   }
 
-  /** The ordered description fields a Foundry Item may carry, most specific first. Shared by
-   * {@link _extractSourceDescription} and the repair pass's priming sweep, which needs the RAW
-   * text only. */
-  _sourceDescriptionCandidates(source = null) {
-    if (!source || typeof source !== 'object') return [];
-    return [
-      source?.system?.description?.value,
-      source?.system?.description,
-      source?.description?.value,
-      source?.description,
-    ];
+  /** The snapshot cluster's collaborators (issue 1699), rebuilt on EVERY call: several suites
+   * patch `_enrichToHtml`, `_buildComponentSourceSnapshot` or `_resolveImportedComponentSourceData`
+   * on an already-constructed instance, and a bag captured once would never see them. */
+  _sourceSnapshotCollaborators() {
+    return {
+      enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
+      resolveImportedComponentSourceData: (itemUuid, source) =>
+        this._resolveImportedComponentSourceData(itemUuid, source),
+      plainTextDescription: (value) => this._plainTextDescription(value),
+      descriptionTextCandidate: (value, seen) => this._descriptionTextCandidate(value, seen),
+      normalizeComponentDescription: (description) =>
+        this._normalizeComponentDescription(description),
+      extractSourceDescription: (source) => this._extractSourceDescription(source),
+    };
   }
 
-  /** The first non-empty RAW description text on a source document, without resolving anything;
-   * feeds the repair pass's single priming sweep. */
-  _rawSourceDescription(source = null) {
-    for (const candidate of this._sourceDescriptionCandidates(source)) {
-      const raw = this._descriptionTextCandidate(candidate);
-      if (raw) return raw;
-    }
-    return '';
-  }
-
-  /** RESOLVE a source document's description through Foundry's enricher, then normalize the
-   * enriched HTML to display-safe plain text — the whole point of issue 800, so a label-less
-   * `@UUID[…]` becomes the referenced document's real NAME. Async because `enrichHTML` is. */
   async _extractSourceDescription(source = null) {
-    if (!source || typeof source !== 'object') return '';
-
-    const candidates = this._sourceDescriptionCandidates(source);
-
-    for (const candidate of candidates) {
-      const raw = this._descriptionTextCandidate(candidate);
-      if (!raw) continue;
-      const enriched = await this._enrichToHtml(raw, { relativeTo: source });
-      const plainText = this._plainTextDescription(enriched);
-      if (plainText) return plainText;
-    }
-
-    return '';
+    return extractSourceDescription(this._sourceSnapshotCollaborators(), source);
   }
 
   async _buildComponentSourceSnapshot(
@@ -854,61 +840,26 @@ export class CraftingSystemManager {
     fallbackItem = null,
     sourceData = null
   ) {
-    const resolvedSourceData =
-      sourceData ?? (await this._resolveImportedComponentSourceData(itemUuid, source));
-    const sourceResolved = !!source;
-    const fallbackName = fallbackItem?.name || itemUuid?.split('.')?.pop() || 'Imported Item';
-    const fallbackImg = fallbackItem?.img || 'icons/svg/item-bag.svg';
-
-    return {
-      name: sourceResolved ? source?.name || fallbackName : fallbackName,
-      img: sourceResolved ? source?.img || fallbackImg : fallbackImg,
-      description: sourceResolved
-        ? await this._extractSourceDescription(source)
-        : this._normalizeComponentDescription(fallbackItem?.description),
-      registeredItemUuid: resolvedSourceData.currentUuid,
-      originItemUuid: resolvedSourceData.canonicalUuid,
-      aliasItemUuids: resolvedSourceData.aliasItemUuids,
-      sourceFallbacks: resolvedSourceData.sourceFallbacks,
-      references: resolvedSourceData.references,
-    };
+    return buildComponentSourceSnapshot(
+      this._sourceSnapshotCollaborators(),
+      itemUuid,
+      source,
+      fallbackItem,
+      sourceData
+    );
   }
 
   async _buildRecipeItemSourceSnapshot(itemUuid, source = null, fallbackDefinition = null) {
-    // Resolve the same union of source refs a component records (live document uuid +
-    // canonical compendium uuid + broken-source fallbacks), so a recipe item claims the
-    // full breadth for matching (issue 555). Clone-gated identity is applied inside
-    // `_resolveImportedSourceData`, so a duplicated source keys on its own uuid.
-    const sourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
-    const fallbackName = fallbackDefinition?.name || itemUuid?.split('.')?.pop() || 'Recipe Item';
-    const fallbackImg = fallbackDefinition?.img || 'icons/svg/item-bag.svg';
-
-    return {
-      name: source?.name || fallbackName,
-      img: source?.img || fallbackImg,
-      description: source
-        ? await this._extractSourceDescription(source)
-        : this._normalizeComponentDescription(fallbackDefinition?.description),
-      registeredItemUuid: sourceData.currentUuid,
-      originItemUuid: sourceData.canonicalUuid,
-      aliasItemUuids: sourceData.aliasItemUuids,
-    };
+    return buildRecipeItemSourceSnapshot(
+      this._sourceSnapshotCollaborators(),
+      itemUuid,
+      source,
+      fallbackDefinition
+    );
   }
 
-  /** Build a first-class Tool's source snapshot from an Item uuid (issue 561): the same union of
-   * source refs a component records, plus the `name` and `img` display snapshot — but NEVER
-   * `label`, which is a distinct user-authored override. */
   async _buildToolSourceSnapshot(itemUuid, source = null) {
-    const sourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
-    const fallbackName = itemUuid?.split('.')?.pop() || 'Imported Tool';
-    return {
-      name: source?.name || fallbackName,
-      img: source?.img || 'icons/svg/item-bag.svg',
-      description: source ? await this._extractSourceDescription(source) : '',
-      registeredItemUuid: sourceData.currentUuid,
-      originItemUuid: sourceData.canonicalUuid,
-      aliasItemUuids: sourceData.aliasItemUuids,
-    };
+    return buildToolSourceSnapshot(this._sourceSnapshotCollaborators(), itemUuid, source);
   }
 
   _buildFallbackSourceReferences(
@@ -917,16 +868,12 @@ export class CraftingSystemManager {
     nextSourceItemUuid,
     additionalFallbacks = []
   ) {
-    const fallbackSet = new Set(Array.isArray(item?.aliasItemUuids) ? item.aliasItemUuids : []);
-    for (const ref of [item?.registeredItemUuid, item?.originItemUuid]) {
-      if (ref) fallbackSet.add(ref);
-    }
-    for (const ref of Array.isArray(additionalFallbacks) ? additionalFallbacks : []) {
-      if (ref) fallbackSet.add(ref);
-    }
-    fallbackSet.delete(nextSourceUuid);
-    fallbackSet.delete(nextSourceItemUuid);
-    return [...fallbackSet];
+    return buildFallbackSourceReferences(
+      item,
+      nextSourceUuid,
+      nextSourceItemUuid,
+      additionalFallbacks
+    );
   }
 
   _normalizeComponent(item, options) {
@@ -2928,7 +2875,7 @@ export class CraftingSystemManager {
         continue;
       }
       resolved.push({ definition, source });
-      const raw = this._rawSourceDescription(source);
+      const raw = rawSourceDescription(this._sourceSnapshotCollaborators(), source);
       if (raw) rawTexts.push(raw);
     }
 
