@@ -65,12 +65,14 @@ const BASE_SCAN = Object.freeze({
  */
 const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique tool/receipt reads in two engines; #1666 and #1665 relocated ten files.
+  // #1701 moved nine of `CraftingEngine.js`'s validated-tool reads into `craftPipeline.js`, so
+  // only the per-file keying moved: no read was added or removed.
   matches: 168,
   lines: 153,
-  files: 18,
-  pairs: 124,
-  collisionGroups: 17,
-  collisionSites: 46,
+  files: 19,
+  pairs: 126,
+  collisionGroups: 18,
+  collisionSites: 45,
 });
 
 /**
@@ -101,13 +103,15 @@ const LEDGER = Object.freeze([
   ['src/systems/CompendiumImporter.js', "summary.components.remapped.push({", 2, 'import'],
   ['src/systems/CompendiumImporter.js', "summary.components.unresolved.push({", 1, 'import'],
   ['src/systems/CompendiumImporter.js', "summary.components.retained.push({", 1, 'import'],
-  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools,", 4, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "usedToolPairs = toolValidation.tools;", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "usedToolPairsOnValidationFail = toolValidation.tools;", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "toolValidation.tools,", 2, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "const usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "tools: toolValidation.tools,", 3, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools,", 2, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "tools: toolValidation.tools,", 2, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "toolItems: toolValidation.tools,", 2, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "usedToolPairs = toolValidation.tools;", 1, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "usedToolsOnFail = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "usedToolPairsOnValidationFail = toolValidation.tools;", 1, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "toolValidation.tools,", 2, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "const usedTools = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
+  ['src/systems/craftPipeline.js', "tools: toolValidation.tools,", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "const components = Array.isArray(system?.components)", 1, 'guard'],
