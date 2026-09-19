@@ -12,7 +12,6 @@ import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntity
 import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
 
 import { promptDropEnvironment } from './environmentDialog.js';
-import { resolveDropEnvironment } from './environmentResolution.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
 import {
   denialMessage,
@@ -22,24 +21,22 @@ import {
 } from './interactableGrant.js';
 import { resolveItemUuidToTool } from './interactableItemResolution.js';
 import {
-  DEFAULT_INTERACTABLE_IMG,
   canControlActor,
   dropPoint,
-  firstInteractableBehavior,
   gridSizeFrom,
   iconTextureFor,
-  regionRectangleFor,
   screenCenterToScene,
   shouldPromptForEnter,
   tokenInsideRegion,
   viewCenterFrom,
 } from './interactablePredicates.js';
-import {
-  classifyInteractableDrop,
-  buildRegionSpawnRequest,
-  parseInteractableSourceUuid,
-} from './interactableResolution.js';
+import { classifyInteractableDrop, parseInteractableSourceUuid } from './interactableResolution.js';
 import { INTERACTABLE_SOCKET } from './interactableSocket.js';
+import {
+  buildRegionSpawnRequest as buildSpawnRequest,
+  spawnGatheringTask as spawnTask,
+  spawnInteractableRegion as spawnRegion,
+} from './interactableSpawner.js';
 import {
   interactHere,
   onRegionEnter as raiseEnterPrompt,
@@ -51,12 +48,7 @@ import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
 } from './regionHitTest.js';
-import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
-import {
-  buildInteractableBehaviorSystem,
-  isInteractableRegionBehavior,
-  buildLinkedVisualFlags,
-} from './regions/interactableRegionFlags.js';
+import { isInteractableRegionBehavior } from './regions/interactableRegionFlags.js';
 
 /** Client keybinding id for the "interact here" re-trigger. */
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
@@ -67,6 +59,37 @@ const INTERACT_KEYBINDING = 'fabricateInteractHere';
  * `game`, `canvas`, `ui.notifications` or `game.time` exist, so a captured value is permanently
  * undefined in production and no test that installs its fakes first can see it.
  */
+function spawnCollaborators(manager) {
+  return {
+    scene: () => globalThis.canvas?.scene,
+    createRegion: (scene, data) => scene.createEmbeddedDocuments('Region', [data]),
+    // Resolved in-call, so an `init`- or `setup`-time `CONFIG.Tile.documentClass` override wins.
+    createTile: async (scene, data) => {
+      const TileDocument =
+        globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
+      if (TileDocument?.create) return (await TileDocument.create(data, { parent: scene })) ?? null;
+      if (scene.createEmbeddedDocuments) {
+        const [created] = await scene.createEmbeddedDocuments('Tile', [data]);
+        return created ?? null;
+      }
+      return null;
+    },
+    deleteRegion: (regionDoc) => regionDoc?.delete?.(),
+    updateBehavior: (behavior, update) => behavior.update(update),
+    gridSize: () => manager._gridSize(),
+    iconTexture: (classification) => manager._resolveIconTexture(classification),
+    resolutionDeps: () => manager._resolutionDeps(),
+    listEnvironments: (systemId) => manager._systemEnvironments(systemId),
+    regionEnvironmentIdsAtPoint: (args) => manager._regionEnvironmentIdsAtPoint(args),
+    promptDropEnvironment: (args) => manager._promptDropEnvironment(args),
+    notifySpawnFailure: () => manager._notifySpawnFailure(),
+    notifyInfo: (message) => globalThis.ui?.notifications?.info?.(message),
+    localize: (key) => globalThis.game?.i18n?.localize?.(key),
+    formatMessage: (key, data) => globalThis.game?.i18n?.format?.(key, data),
+    spawnInteractableRegion: (spawnRequest) => manager._spawnInteractableRegion(spawnRequest),
+  };
+}
+
 function promptCollaborators(manager) {
   return {
     getPromptAppClass: () => manager._getPromptAppClass?.(),
@@ -124,6 +147,7 @@ class InteractableManager {
     this._promptDropEnvironment = promptEnvironment;
     this._grantDeps = grantCollaborators(this);
     this._promptDeps = promptCollaborators(this);
+    this._spawnDeps = spawnCollaborators(this);
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._onControlToken = this._onControlToken.bind(this);
@@ -215,67 +239,12 @@ class InteractableManager {
     return this._onDrop(globalThis.canvas, data) === false;
   }
 
-  /** The spawn request from a classified drop, resolving icon texture and grid size at the edge. */
-  _buildRegionSpawnRequest({ classification, point, environmentId, visualMode = 'marker' } = {}) {
-    return buildRegionSpawnRequest({
-      classification,
-      point,
-      environmentId: environmentId ?? undefined,
-      texture: this._resolveIconTexture(classification),
-      width: this._gridSize(),
-      height: this._gridSize(),
-      gridSize: this._gridSize(),
-      visualMode,
-      buildBehaviorSystem: (spawn) => buildInteractableBehaviorSystem(spawn),
-    });
+  _buildRegionSpawnRequest(args = {}) {
+    return buildSpawnRequest(args, this._spawnDeps);
   }
 
-  /** Resolve a dropped task's environment by precedence and spawn it; a cancelled dialog aborts. */
-  async _spawnGatheringTask({ classification, point, forceDialog, visualMode = 'marker' }) {
-    const deps = this._resolutionDeps();
-    const task = deps.getTask({
-      systemId: classification.systemId,
-      taskId: classification.referenceId,
-    });
-    const environments = this._systemEnvironments(classification.systemId);
-    const environmentExists = (id) => environments.some((env) => String(env.id) === String(id));
-
-    const scene = globalThis.canvas?.scene;
-    const regionEnvironmentIds = this._regionEnvironmentIdsAtPoint({ scene, point });
-    const resolution = resolveDropEnvironment({
-      regionEnvironmentIds,
-      defaultEnvironmentId: task?.defaultEnvironmentId ?? null,
-      forceDialog,
-      environmentExists,
-    });
-
-    let environmentId = resolution.environmentId;
-    if (resolution.needsDialog) {
-      environmentId = await this._promptDropEnvironment({
-        environments,
-        defaultEnvironmentId: task?.defaultEnvironmentId ?? '',
-        localize: (key, fallback) => globalThis.game?.i18n?.localize?.(key) ?? fallback,
-      });
-      if (!environmentId) return null; // cancel ⇒ abort.
-    }
-
-    if (resolution.notify && environmentId) {
-      const env = environments.find((candidate) => String(candidate.id) === String(environmentId));
-      const name = env?.name || environmentId;
-      const message =
-        globalThis.game?.i18n?.format?.('FABRICATE.Canvas.Interactable.EnvironmentAutoResolved', {
-          environment: name,
-        }) ?? `Resource node placed in environment "${name}".`;
-      globalThis.ui?.notifications?.info?.(message);
-    }
-
-    const spawnRequest = this._buildRegionSpawnRequest({
-      classification,
-      point,
-      environmentId: environmentId ?? undefined,
-      visualMode,
-    });
-    return this._spawnInteractableRegion(spawnRequest);
+  async _spawnGatheringTask(args) {
+    return spawnTask(args, this._spawnDeps);
   }
 
   /** The environments of one crafting system, as `{ id, name }` rows. */
@@ -287,105 +256,8 @@ class InteractableManager {
       .map((env) => ({ id: String(env.id), name: String(env.name ?? env.id) }));
   }
 
-  /**
-   * Create the Region and its linked Tile, transaction-like: an orphan of either is deleted when
-   * its partner fails, and once both exist the `linkedVisual` ref is written back so relink,
-   * recreate and missing-policy can resolve it. No-throw; GM-notify on failure.
-   */
   async _spawnInteractableRegion(spawnRequest) {
-    if (!spawnRequest) return null;
-    const scene = globalThis.canvas?.scene;
-    if (!scene?.createEmbeddedDocuments) return null;
-
-    const { region, behaviorSystem, tile } = spawnRequest;
-    const { x, y, width, height } = regionRectangleFor({
-      tile,
-      region,
-      gridSize: this._gridSize(),
-    });
-
-    let regionDoc;
-    try {
-      const [created] = await scene.createEmbeddedDocuments('Region', [
-        {
-          name: region.name,
-          shapes: [{ type: 'rectangle', x, y, width, height }],
-          behaviors: [{ type: 'fabricate.interactable', system: behaviorSystem }],
-          // Stamp region-level ownership: Fabricate CREATED this region, so its delete may take
-          // the whole region. A PROMOTED region never gets this flag (issue 533).
-          flags: buildInteractableRegionFlags(),
-        },
-      ]);
-      regionDoc = created ?? null;
-    } catch {
-      regionDoc = null;
-    }
-    if (!regionDoc) {
-      this._notifySpawnFailure();
-      return null;
-    }
-
-    const behavior = firstInteractableBehavior(regionDoc);
-    const regionUuid = typeof regionDoc?.uuid === 'string' ? regionDoc.uuid : null;
-    const behaviorId = behavior?.id ?? behavior?._id ?? null;
-
-    // Region-only: the builder returns `tile: null`, and the behaviour already carries
-    // `linkedVisual.mode='none'` — there is no Tile, no orphan and no ref to write back.
-    if (!tile) {
-      return regionDoc;
-    }
-
-    // Create the linked Tile carrying the reverse flags; on failure delete the orphan Region.
-    let tileDoc = null;
-    if (regionUuid && behaviorId) {
-      try {
-        const { fabricate } = buildLinkedVisualFlags({ regionUuid, behaviorId });
-        const tileData = {
-          texture: { src: tile?.texture?.src || DEFAULT_INTERACTABLE_IMG },
-          x: Number(tile?.x ?? 0),
-          y: Number(tile?.y ?? 0),
-          width: Number(tile?.width ?? this._gridSize()),
-          height: Number(tile?.height ?? this._gridSize()),
-          flags: { fabricate },
-        };
-        const TileDocument =
-          globalThis.foundry?.documents?.TileDocument ?? globalThis.CONFIG?.Tile?.documentClass;
-        if (TileDocument?.create) {
-          tileDoc = (await TileDocument.create(tileData, { parent: scene })) ?? null;
-        } else if (scene.createEmbeddedDocuments) {
-          const [created] = await scene.createEmbeddedDocuments('Tile', [tileData]);
-          tileDoc = created ?? null;
-        }
-      } catch {
-        tileDoc = null;
-      }
-    }
-
-    if (!tileDoc) {
-      // Roll back the orphan Region so the failed spawn leaves no trace.
-      try {
-        await regionDoc.delete?.();
-      } catch {
-        /* tolerate. */
-      }
-      this._notifySpawnFailure();
-      return null;
-    }
-
-    // Write the ref back. If THIS fails the interactable still works region-only, so keep the
-    // orphan Tile — it points back at the region — rather than tearing down a working one.
-    const tileUuid = typeof tileDoc?.uuid === 'string' ? tileDoc.uuid : null;
-    if (behavior?.update && tileUuid) {
-      try {
-        await behavior.update({
-          system: { linkedVisual: { uuid: tileUuid, documentName: 'Tile' } },
-        });
-      } catch {
-        // Defensive: a working region-only interactable is acceptable.
-      }
-    }
-
-    return regionDoc;
+    return spawnRegion(spawnRequest, this._spawnDeps);
   }
 
   _notifySpawnFailure() {
