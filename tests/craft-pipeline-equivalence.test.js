@@ -284,16 +284,31 @@ const SCENARIOS = [
     async run() {
       const world = craftProbe({
         optionGroups: {
-          'group-1': {
-            defaultOptionId: 'option-a',
-            options: { 'option-a': 'birch', 'option-b': 'wood' },
-          },
+          'group-1': { options: ['birch', 'wood'] },
+        },
+      });
+      await world.craft(null, {
+        ingredientOptionOverrides: { 'group-1': { optionIndex: 1, heldItemId: null } },
+      });
+      return world.journal.entries;
+    },
+    journal: SIMPLE_SUCCESS_JOURNAL,
+  },
+  {
+    // Production's `resolveGroupOverride` discards a non-conforming override (no integer
+    // `optionIndex`) and falls back to index 0, never to the stocked option — proving the double
+    // now matches the contract rather than a bare option-id shape production never accepts.
+    name: 'a non-conforming per-group override shape falls back to the unstocked default and refuses',
+    async run() {
+      const world = craftProbe({
+        optionGroups: {
+          'group-1': { options: ['birch', 'wood'] },
         },
       });
       await world.craft(null, { ingredientOptionOverrides: { 'group-1': 'option-b' } });
       return world.journal.entries;
     },
-    journal: SIMPLE_SUCCESS_JOURNAL,
+    journal: refused('Missing required items:\n1x birch: have 0, need 1'),
   },
   {
     name: 'simple failure with consumeIngredientsOnFail off',
