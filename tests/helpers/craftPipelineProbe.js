@@ -41,7 +41,7 @@ function label(value, seen = new Set()) {
 }
 
 /** The journal: `push` appends one `[name, ...args]` effect in call order. */
-function makeJournal() {
+export function makeJournal() {
   const entries = [];
   return {
     entries,
@@ -52,14 +52,14 @@ function makeJournal() {
 }
 
 /** Strip a chat card's markup to its rendered text, so the journal carries what a player reads. */
-function cardText(content) {
+export function cardText(content) {
   return String(content ?? '')
     .replaceAll(/<[^>]*>/g, ' ')
     .replaceAll(/\s+/g, ' ')
     .trim();
 }
 
-class ProbeItem {
+export class ProbeItem {
   constructor({ id, name, quantity = 1, componentId = null, img = null }) {
     this.id = id;
     this.uuid = `Item.${id}`;
@@ -125,7 +125,7 @@ class ProbeItem {
   }
 }
 
-class ProbeActor {
+export class ProbeActor {
   constructor(name, items = []) {
     this.id = `actor-${name}`;
     this.uuid = `Actor.${name}`;
@@ -199,7 +199,7 @@ class ProbeActor {
  * engine-to-manager call and its arguments while the gate record, `durationToSeconds` and the
  * multi-step continuation stay the shipped ones.
  */
-function recordingRunManager(real, journal, onCall) {
+export function recordingRunManager(real, journal, onCall) {
   const wrapped = new Map();
   return new Proxy(real, {
     get(target, prop, receiver) {
@@ -237,7 +237,7 @@ export async function versionedExecutionKey(engine) {
 }
 
 /** Install the headless Foundry edge the engine reads, plus recording chat and notification seams. */
-function installProbeEnv(journal, { worldTime = 0, actorAlias = 'Crafter' } = {}) {
+export function installProbeEnv(journal, { worldTime = 0, actorAlias = 'Crafter' } = {}) {
   installRoutedCheckEnv();
   // Per-world id sequence: a scenario's journal must not depend on how many scenarios ran first.
   let ids = 0;
