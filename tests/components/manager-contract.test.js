@@ -1,10 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { classMemberSource, moduleFunctionSource } from '../helpers/boundedSource.js';
 import {
   calledName,
   declaredConstant as declaredConstantOf,
@@ -41,109 +40,35 @@ import {
   spelledLiterals,
   spellsLiteral,
 } from '../helpers/svelteStructureContract.js';
+import { SHIPPED_LANG as lang } from '../helpers/manager/managerLocalization.js';
 import { declaredManagerClasses } from '../helpers/manager/managerStylesheet.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
-const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-const environmentEditPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'
-);
-const environmentsBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'
-);
-const gatheringTaskEditPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte'
-);
-const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte');
-const gatheringTasksBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte'
-);
-// The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable
-// `ArmedDangerButton` sit at the manager root; the surface's own children live
-// under `knowledge/`, which is also where the pure projection lives.
-const knowledgePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/KnowledgeView.svelte');
-const armedDangerButtonPath = resolve(
-  repoRoot,
-  'src/ui/svelte/components/ArmedDangerButton.svelte'
-);
-const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
-const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
-const toolBreakagePath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte'
-);
-// The system-scope band that replaced the retired Overview tab (issue 1373).
-const toolSystemScopePath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte'
-);
-const toolInheritCardPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte'
-);
-const toolRequirementsPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte'
-);
-const toolValidationPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte'
-);
-const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
-const langPath = resolve(repoRoot, 'lang/en.json');
 
-const rootSource = readFileSync(rootPath, 'utf8');
-// The reward and event limit counts are one shared component (issue 1050).
-const gatheringRuleLimitStepperSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
-  'utf8'
-);
-const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
-const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
-const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
-const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
-const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
-const knowledgeSource = readFileSync(knowledgePath, 'utf8');
-const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
-const toolEditSource = readFileSync(toolEditPath, 'utf8');
-const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
-const toolSystemScopeSource = readFileSync(toolSystemScopePath, 'utf8');
-const toolInheritCardSource = readFileSync(toolInheritCardPath, 'utf8');
-const toolEditorTabsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte'),
-  'utf8'
-);
-const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
-const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
-// The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
-const worldToolEntrySource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte'),
-  'utf8'
-);
-const appSource = readFileSync(appPath, 'utf8');
-const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-
+/** Every `.svelte` file in one directory, as the repo-relative paths a contract target takes. */
+function componentPathsIn(dir) {
+  return readdirSync(resolve(repoRoot, dir))
+    .filter((entry) => entry.endsWith('.svelte'))
+    .map((entry) => `${dir}/${entry}`);
+}
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
 }
 
-function decodeStaticString(quote, body) {
-  return Function(`return ${quote}${body}${quote};`)();
-}
-
-function staticTextCalls(source) {
-  const pattern =
-    /text\(\s*(["'])(FABRICATE(?:\\.|(?!\1).)*)\1\s*,\s*(["'])((?:\\.|(?!\3).)*)\3\s*\)/gs;
-  return [...source.matchAll(pattern)].map((match) => ({
-    key: match[2],
-    fallback: decodeStaticString(match[3], match[4]),
-  }));
+/** Every `text(key, fallback)` a component states with BOTH arguments spelled out. */
+function staticTextCalls(component) {
+  const calls = [];
+  for (const node of walkNodes(component)) {
+    if (calledName(node) !== 'text') continue;
+    const [key, fallback] = node.arguments;
+    if (typeof key?.value !== 'string' || typeof fallback?.value !== 'string') continue;
+    if (key.type === 'Literal' && fallback.type === 'Literal') {
+      calls.push({ key: key.value, fallback: fallback.value });
+    }
+  }
+  return calls;
 }
 
 function isChangedManagerEnvironmentLocalizationKey(key) {
@@ -162,10 +87,6 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
       'FABRICATE.Admin.Manager.CurrentWeather',
     ].includes(key)
   );
-}
-
-function sourceName(filePath) {
-  return filePath.replace(`${repoRoot}\\`, '').replace(`${repoRoot}/`, '');
 }
 
 // A structural claim is a ROW in a `defineStructureContract` table, never another
@@ -1311,33 +1232,25 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
-    const environmentComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/environment');
     const contractFiles = [
-      rootPath,
-      environmentEditPath,
-      environmentsBrowserPath,
-      knowledgePath,
-      armedDangerButtonPath,
-      ...readdirSync(environmentComponentDir)
-        .filter((name) => name.endsWith('.svelte'))
-        .map((name) => resolve(environmentComponentDir, name)),
-      ...readdirSync(knowledgeComponentDir)
-        .filter((name) => name.endsWith('.svelte'))
-        .map((name) => resolve(knowledgeComponentDir, name)),
+      MANAGER_ROOT,
+      ENVIRONMENT_EDIT,
+      ENVIRONMENTS_BROWSER,
+      KNOWLEDGE_VIEW,
+      ARMED_DANGER_BUTTON,
+      ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
+      ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
     const failures = [];
 
-    for (const filePath of contractFiles) {
-      const source = readFileSync(filePath, 'utf8');
-      for (const { key, fallback } of staticTextCalls(source)) {
+    for (const file of contractFiles) {
+      for (const { key, fallback } of staticTextCalls(componentAstOf(file))) {
         if (!isChangedManagerEnvironmentLocalizationKey(key)) continue;
         const value = catalogValue(key);
         if (typeof value !== 'string') {
-          failures.push(`${sourceName(filePath)}: missing ${key}`);
+          failures.push(`${file}: missing ${key}`);
         } else if (value !== fallback) {
-          failures.push(
-            `${sourceName(filePath)}: ${key} fallback "${fallback}" does not match en.json "${value}"`
-          );
+          failures.push(`${file}: ${key} fallback "${fallback}" does not match en.json "${value}"`);
         }
       }
     }
