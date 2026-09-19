@@ -25,10 +25,15 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 5,
     files: Object.freeze([
-      // 39 sites — 30 `<button>` and 9 `<a href>`.
+      // 39 sites — 30 `<button>` and 9 `<a href>` — less 2 that issue 1707 phase 2 moved into
+      // `environment/GatheringTaskInspector.svelte` (the drop Duplicate/Delete pair) below.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-        sites: 39,
+        sites: 37,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+        sites: 2,
       }),
     ]),
   }),
@@ -1043,8 +1048,9 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    41,
-    'across 41 components'
+    42,
+    // 41 -> 42 (issue 1707 phase 2): the root's task-5 pair split across the file it moved into.
+    'across 42 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

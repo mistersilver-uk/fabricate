@@ -214,7 +214,7 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
 
   it('routes both character-modifier scopes through the one shared bounds row', () => {
     // D1a names FOUR genuine-absence fields here — drop min/max and event min/max. Since issue
-    // 1707 wrote the modifier panel once, the bounds row has ONE call site rather than two; phase
+    // 1707 wrote the modifier panel once, the bounds row has one call site rather than two; phase
     // 2 then moved the two panel tags out of the root into the task and event leaves, so each
     // scope's wiring spans that leaf's panel tag and the root's tag for the leaf.
     const root = markup['src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'] ?? '';

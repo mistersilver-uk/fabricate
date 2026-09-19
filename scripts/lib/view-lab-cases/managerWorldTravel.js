@@ -173,6 +173,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
