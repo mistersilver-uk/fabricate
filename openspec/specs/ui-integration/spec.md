@@ -1738,7 +1738,7 @@ When the selected system has no recipe items, the surface shows an empty state.
 
 Selecting a row opens the `ItemPageInspector` aside; its quick-limit toggle is the sole remaining live-apply caller of `store.updateRecipeItemCaps` (the patch merges and normalizes onto the recipe item definition), and that toggle stages no dirty draft.
 Editing a recipe item opens the full-window `recipe-item-edit` route — a tabbed editor (`RecipeItemEditorTabs`: Overview / Contents / Limits / Validation) over a root-held staged draft plus its last-persisted baseline.
-That draft **is** part of the Manager confirm-discard route-exit chain (`confirmRecipeItemRouteExit`), so navigating away with unsaved edits prompts to discard.
+That draft **is** part of the Manager confirm-discard route-exit chain (the `recipe-item-edit` row of `ROUTE_EXIT_GUARDS`), so navigating away with unsaved edits prompts to discard.
 The one exception is recorded under Manager Shell's Crafting route-exit guard rule: the read-time reconciliation there invokes no guard, so a cross-client `visibilityMode` edit that removes `Books & Scrolls` while this draft is open can redirect away from it with no prompt.
 The learn cap authors `caps.learn.limitRecipes` / `maxRecipes` / `destroyWhenSpent` and `caps.learn.consumeOnLearn`; `consumeOnLearn` is hidden while the learn cap is enabled (the learn cap's `destroyWhenSpent` supersedes it).
 The surface reads configuration only (recipe-item definitions plus the recipes referencing each item) and never reads per-item-instance runtime flags, so the admin store stays Foundry-free.

@@ -346,19 +346,22 @@ The restored-availability announcement is local in the same way — `Hooks.callA
 Every editor in the Crafting System Manager (component, essence, environment, gathering task, gathering event, tools) guards an unsaved draft on route exit.
 The pattern is three layers; new editor kinds MUST mirror it rather than reach for `globalThis.confirm()` or thread callbacks through `services` directly.
 
+The Svelte layer below is stated in its pre-1705 shape, kept verbatim for the doc-split gate; what ships now is the table described after it.
+
 **1.
 Svelte layer — `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`.** Each kind has a `confirm{Kind}RouteExit(nextView)` function that early-returns `true` when the view isn't this kind or the local dirty flag is false, then calls the matching store helper.
 An orchestrator `confirmRouteExit(nextView)` chains all of them; it's what every "Back to …" / nav-click handler invokes.
 Helpers today: `confirmEnvironmentRouteExit`, `confirmEssenceRouteExit`, `confirmComponentRouteExit`, `confirmGatheringTaskRouteExit`, `confirmGatheringEventRouteExit`, `confirmToolsRouteExit`.
 Each pairs with a `finish{Kind}RouteExit` that calls `store.cancel{Kind}Draft?.()` to actually clear the draft *after* the user confirms.
 
-Those four sentences describe the shape issue 1705 replaced, and they are kept because the rule they state did not change: a guard answers for its own route, and one orchestrator asks them all.
+Those five sentences describe the shape issue 1705 replaced, and they are kept because the rule they state did not change: a guard answers for its own route, and one orchestrator asks them all.
 What ships now is one ordered table of thirteen rows in `src/ui/svelte/apps/manager/routeExitGuards.js`, asked row by row through `runRouteExitGuard` and as a whole through `confirmRouteExitGuards`.
+In cascade order those rows are `world-essence-entry`, `world-tool-entry`, `world-component-entry`, `environment-edit`, `essence-edit`, `recipe-edit`, `recipe-item-edit`, `component-edit`, `gathering-task-edit`, `gathering-event-edit`, `tool-edit`, `checks` and `system-edit`, which is the list that supersedes the six helpers named above.
 `confirmRouteExit` is still the orchestrator every handler invokes, under the same name and signature.
-`ROUTE_EXIT_GUARDS` states each row's place in the cascade, which navigation it waives (`subject`, `same-view`, `family`, or `none`), and the action its finisher receives when the store helper is absent — a per-row fact that is deliberately not uniform, so do not normalise it.
-The manager supplies one context of arrow accessors over its runes, keyed by the same view tokens: `active`, `isDirty`, `confirm` and `finish`, plus `whenClean` where a clean exit still has work to do, and `subject` or `family` where the row's skip shape needs one.
+`ROUTE_EXIT_GUARDS` states each row's place in the cascade, which navigation it waives (`subject`, `same-view`, `family`, or `none`), the action its finisher receives when the store helper is absent — a per-row fact that is deliberately not uniform, so do not normalise it — and whether the row carries its own finisher (`finish: 'own'`) or shares the world entries' (`finish: 'scoped-entry'`).
+The manager supplies one context of arrow accessors over its runes, keyed by the same view tokens: `active`, `isDirty` and `confirm` on every row, plus `whenClean` where a clean exit still has work to do, `subject` or `family` where the row's skip shape needs one, and either `finish` on an `'own'` row or the `save`/`discard` pair `finishScopedEntryExit` calls on a `'scoped-entry'` row.
 The cascade stops at the first `false` and creates no promise while every row is inactive or skipped, because `selectSystem`, `openSystemEssenceRules` and `openToolEditor` read the answer as a boolean and `afterTruthyResult` runs its callback inline only for a non-thenable.
-`tests/manager-route-exit-guards.test.js` pins the table directly, and the mounted suites pin ten of its rows through the real shell.
+`tests/manager-route-exit-guards.test.js` pins the table directly, and the mounted suites pin every row through the real shell.
 
 **2.
 Store layer — `src/ui/svelte/stores/adminStore.js`.** Each kind has a `confirmDiscardDirty{Kind}Draft()` async helper exported on the store.
@@ -379,6 +382,8 @@ So a scope-select **system switch** from such a view calls `confirmRouteExit` wi
 A view in that position needs a separate identity-change check invoked from `changeScopeSystem` before `confirmRouteExit`; `confirmSystemDetailsScopeChange` is the worked example (issue 767).
 `environment-edit` and `tools` also pair a same-view skip with no map entry, so check them against their own scope-change paths before assuming they are covered.
 Keep the same-view skip as well: a genuine same-view re-entry on the SAME system (the validation-blocker link) leaves the form mounted with its draft intact, so prompting there is a spurious dialog.
+Two corrections to the paragraph above, against the table as it ships: the map also lists `tool-edit`, whose row waives a re-entry on the same tool rather than on the view token alone, and `tools` is not a guard row at all.
+The same-view rows are `environment-edit`, `recipe-edit`, `recipe-item-edit` and `system-edit`, and of those only `environment-edit` pairs a same-view skip with no `SCOPE_BROWSER_BY_VIEW` entry.
 
 **Anti-patterns:** adding `globalThis.confirm(message)` as a fallback (DialogV2 is always present in Foundry; missing-DialogV2 means a test environment that should stub the store helper); adding a `services?.confirmDiscard{Kind}Draft?.()` seam that nothing wires up in production; skipping the dirty check at the Svelte layer and relying solely on the store helper (the Svelte layer is the source of truth for which view is active and whether its draft is dirty; the store helper just asks the user).
 
