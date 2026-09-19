@@ -311,6 +311,16 @@ function callsWithArgument(node, [name, argument]) {
   return false;
 }
 
+/** Whether a subtree calls one function with a given literal argument — what a route press is. */
+function callsWithLiteral(node, [name, value]) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'CallExpression' || calledName(inner) !== name) continue;
+    if (inner.arguments.some((argument) => argument?.type === 'Literal' && argument.value === value))
+      return true;
+  }
+  return false;
+}
+
 /** Every literal a subtree assigns to one binding, which is what a route transition is. */
 function assignedLiterals(node, name) {
   const values = [];
@@ -503,6 +513,7 @@ function claimsOverCode(code) {
     reads: (path) => memberPaths(code).includes(path),
     calls: (name) => callNames(code).has(name),
     callsWith: (pair) => callsWithArgument(code, pair),
+    callsLiteral: (pair) => callsWithLiteral(code, pair),
     extendsCall: (name) => extendsCallOf(code, name),
     exports: (name) => exportedNames(code).has(name),
     hooks: (event) => hookNames(code).has(event),
@@ -578,10 +589,12 @@ function structureOf(target) {
       const scope = componentScopeOf(file);
       return { ...claimsForComponent(component), global: (name) => readsGlobal(scope, name) };
     }
-    const scoped = binding
+    let scoped = binding
       ? namedCodeAst([component.instance, component.module], binding)
       : component;
-    return claimsOverCode(record ? recordAst(scoped, record) : scoped);
+    if (record) scoped = recordAst(scoped, record);
+    if (property) scoped = propertyAst(scoped, property);
+    return claimsOverCode(scoped);
   }
   const { ast } = moduleAstOf(file);
   let code = member ? classMemberAst(ast, member) : ast;
@@ -627,6 +640,12 @@ const CONTRACT_CLAIMS = Object.freeze({
     ask: 'callsWith',
     holds: false,
     says: ([f, a]) => `never calls ${f}() with ${a}`,
+  },
+  callsLiteral: { ask: 'callsLiteral', holds: true, says: ([f, v]) => `calls ${f}("${v}")` },
+  callsLiteralNo: {
+    ask: 'callsLiteral',
+    holds: false,
+    says: ([f, v]) => `never calls ${f}("${v}")`,
   },
   declaresProp: { ask: 'declaresProp', holds: true, says: (v) => `declares the ${v} prop` },
   requiresProp: {
@@ -1495,173 +1514,225 @@ describe('CraftingSystemManager source contract', () => {
     { property: [['layoutClass', 'full-width-2-track']] }
   );
 
-  it('keeps first-slice action and navigation hierarchy focused', () => {
-    // ISSUE 1515 REVERSED THE TWO CLAUSES THAT USED TO STAND HERE. They said the top bar renders
-    // "only the page title and subtitle", and no view kicker, which was true of the SHELL and
-    // false of the product: six routes drew their own eyebrow a few pixels lower, inside a second
-    // page header of their own. Deleting those headers moved the eyebrow up rather than removing
-    // it, so the shell resolves one per route — and the clause the old assertions were really
-    // protecting, that an eyebrow must not restate the title, is now stated positively below.
+  // ISSUE 1515 REVERSED THE TWO CLAUSES THAT USED TO STAND HERE. They said the top bar renders
+  // "only the page title and subtitle", and no view kicker, which was true of the SHELL and false
+  // of the product: six routes drew their own eyebrow a few pixels lower, inside a second page
+  // header of their own. Deleting those headers moved the eyebrow up rather than removing it, so
+  // the shell resolves one per route — and the clause the old assertions were really protecting,
+  // that an eyebrow must not restate the title, is stated positively here.
+  defineStructureContract('resolves the page eyebrow per route, beside the title', MANAGER_ROOT, {
+    names: ['viewKicker'],
+    calls: ['viewKicker'],
+  });
+
+  defineStructureContract(
+    'gives system-edit no eyebrow, and resolves none from a route title',
+    { file: MANAGER_ROOT, fn: 'viewKicker' },
+    { spellsExactlyNo: ['system-edit'], callsNo: ['viewTitle'] }
+  );
+
+  // Issue 745: the Crafting group is unconditional (v1.3 headline), so the recipes-route
+  // experimental gate is gone and the disabled Recipes placeholder with it. Essences and Tags are
+  // real routes now, which is why neither may reappear in the placeholder list either.
+  defineStructureContract('derives the placeholder rail from selection and feature gates', MANAGER_ROOT, {
+    names: ['visiblePlaceholderViews', 'selectSystemAndShowBrowser'],
+    declares: ['experimentalFeaturesEnabled'],
+    reads: ['$viewState.experimentalFeaturesEnabled'],
+    assigns: [['activeView', 'essence-edit']],
+    callsLiteral: [
+      ['setView', 'essences'],
+      ['setView', 'tags'],
+    ],
+    namesNo: ['recipesRouteEnabled', 'recipesAvailable', 'clearSelectedSystem', 'openCurrentAdmin'],
+    // Systems is reached from the scope card, never as a left-rail tab, and the rail card never
+    // clears the real store selection.
+    callsLiteralNo: [
+      ['setView', 'systems'],
+      ['selectSystem', ''],
+    ],
+  });
+
+  defineStructureContract(
+    'advertises the Graph placeholder as the only one, behind the experimental toggle',
+    { file: MANAGER_ROOT, constant: 'placeholderViews' },
+    {
+      property: [
+        ['id', 'graph'],
+        // The rail id as a COMPLETE LITERAL rather than a `manager-nav-${view.id}` template.
+        ['navId', 'manager-nav-graph'],
+        ['icon', 'fas fa-project-diagram'],
+      ],
+      propertyNo: [
+        ['id', 'recipes'],
+        ['id', 'essences'],
+        ['id', 'tags'],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'and gates it on the experimental toggle rather than on a system feature',
+    { file: MANAGER_ROOT, fn: 'isViewAvailableForSystem' },
+    { compares: ['graph'], names: ['experimentalFeaturesEnabled'] }
+  );
+
+  // The rail card SELECTS (issue 643): the static name span, the x clear icon and the inline count
+  // cluster are retired rather than merely hidden.
+  defineStructureContract('renders the selected system in a rail card that selects', MANAGER_ROOT, {
+    writes: ['data-manager-scope-select', 'data-manager-rail-section'],
+    spells: ['manager-scope-return'],
+    spellsExactly: [
+      'manager-scope-card',
+      'FABRICATE.Admin.Manager.AllCraftingSystems',
+      'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
+    ],
+    spellsNo: [
+      'manager-scope-name',
+      'manager-scope-clear',
+      'manager-count-cluster',
+      'SystemEdit.EditBadge',
+      'FABRICATE.Admin.Manager.Workspace',
+      'FABRICATE.Admin.Manager.QuickActions',
+    ],
+  });
+
+  // Three claims a whole-file search cannot make: which element carries which hook, what order two
+  // rail regions render in, and that the gathering parent takes no selected-pill class.
+  it('labels the rail before the scope card, and keeps Import on the library header', () => {
+    const root = componentAstOf(MANAGER_ROOT);
+    const nodes = templateNodes(root);
+    const label = nodes.findIndex((node) =>
+      declaresAttribute(node, 'data-manager-rail-section', { directives: false })
+    );
+    const block = nodes.findIndex((node) => attributeValue(node, 'class') === 'manager-rail-block');
+    assert.ok(label >= 0 && block >= 0, 'both rail regions still render');
+    assert.ok(label < block, 'GM management labels the rail before the crafting-system scope card');
+
+    // The legacy system-library header rendered an admin launch button beside Import, so the
+    // `openCurrentAdmin` absence above is vacuous against a header that no longer exists.
+    const [importButton] = nodes.filter((node) =>
+      declaresAttribute(node, 'data-manager-import-system', { directives: false })
+    );
+    assert.ok(Boolean(importButton), 'the system library header still renders Import');
+    assert.equal(importButton.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(attributeExpression(importButton, 'onclick')?.name, 'importSystem');
+
+    const parentClasses = [...walkNodes(root.fragment)].filter(
+      (node) =>
+        node.type === 'TemplateLiteral' &&
+        literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
+    );
+    assert.ok(parentClasses.length > 0, 'the gathering parent still composes its class');
     assert.ok(
-      rootSource.includes('function viewKicker'),
-      'the shell resolves the page eyebrow per route, beside viewTitle and viewSubtitle'
+      parentClasses.every((node) => !identifierNames(node).has('isGatheringRoute')),
+      'and does not take the selected pill class from the route it groups'
     );
-    assert.ok(
-      rootSource.includes('{viewKicker()}'),
-      'and renders it in the page header rather than leaving the resolver unread'
-    );
-    // NO EYEBROW ON `system-edit`, deliberately.
-    const kickerBody = rootSource.slice(
-      rootSource.indexOf('function viewKicker'),
-      rootSource.indexOf('function viewTitle')
-    );
-    assert.ok(kickerBody.length > 0, 'the viewKicker body read is broken');
-    assert.ok(
-      !kickerBody.includes("'system-edit'"),
-      'system-edit renders no eyebrow; its title is the record and its trail names the route'
-    );
-    assert.ok(
-      !kickerBody.includes('viewTitle('),
-      'and no route resolves its eyebrow from its own title'
-    );
-    assert.ok(
-      rootSource.includes('visiblePlaceholderViews'),
-      'root should derive selected-system placeholder nav from selection and feature gates'
-    );
-    // Issue 745: the Crafting group is unconditional (v1.3 headline).
-    assert.ok(
-      rootSource.includes(
-        'const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true)'
-      ),
-      'root should derive the experimental gate for the Graph placeholder'
-    );
-    assert.ok(
-      !rootSource.includes('recipesRouteEnabled'),
-      'the recipes-route experimental gate should be gone'
-    );
-    assert.ok(
-      !rootSource.includes('!recipesAvailable'),
-      'route normalization should no longer gate crafting views on the experimental toggle'
-    );
-    assert.ok(
-      !rootSource.includes('{#if recipesRouteEnabled}'),
-      'the Crafting rail group should render unconditionally'
-    );
-    assert.ok(
-      rootSource.includes("if (view.id === 'graph') return experimentalFeaturesEnabled;"),
-      'the Graph placeholder should be gated on the experimental toggle'
-    );
-    assert.ok(
-      !rootSource.includes("{ id: 'recipes', icon: 'fas fa-scroll'"),
-      'the disabled Recipes placeholder should be removed now that Crafting is always available'
-    );
-    assert.ok(
-      /id: 'graph',[\s\S]{0,600}?icon: 'fas fa-project-diagram'/.test(rootSource),
-      'the Graph placeholder should remain in the planned placeholder list'
-    );
-    // And it carries its rail id as a COMPLETE LITERAL (issue 1362).
-    assert.ok(
-      rootSource.includes("navId: 'manager-nav-graph'"),
-      'the Graph placeholder declares its rail id as a complete literal'
-    );
-    assert.ok(
-      rootSource.includes('selectSystemAndShowBrowser'),
-      'root should keep an explicit systems-browser route'
-    );
-    assert.ok(
-      rootSource.includes('manager-scope-card'),
-      'root should render the selected system in a rail card'
-    );
-    assert.ok(
-      rootSource.indexOf('data-manager-rail-section') <
-        rootSource.indexOf('class="manager-rail-block"'),
-      'GM management should label the rail before the crafting-system scope card'
-    );
-    // The rail card SELECTS (issue 643).
-    assert.ok(
-      rootSource.includes('data-manager-scope-select'),
-      'the rail card should carry a real system select'
-    );
-    assert.ok(
-      !rootSource.includes('manager-scope-name'),
-      'the static rail name span is retired, not merely hidden'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.AllCraftingSystems'),
-      'the rail back link should be localized'
-    );
-    assert.ok(
-      !rootSource.includes('FABRICATE.Admin.Manager.Workspace'),
-      'the rail should not repeat "GM management" below its own section label'
-    );
-    assert.ok(
-      rootSource.includes('manager-scope-return'),
-      'root should expose a return-to-system-library rail action'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.ReturnToSystemLibrary'),
-      'return-to-library action should be localized'
-    );
-    assert.ok(
-      !rootSource.includes('SystemEdit.EditBadge'),
-      'system settings nav should not render the former Edit badge'
-    );
-    assert.ok(
-      rootSource.includes("setView('essences')"),
-      'essences should be exposed as a real selected-system route'
-    );
-    assert.ok(
-      rootSource.includes("setView('tags')"),
-      'tags and categories should be exposed as a real selected-system route'
-    );
-    assert.ok(
-      rootSource.includes("activeView = 'essence-edit'"),
-      'essence edit actions should transition to the local edit route'
-    );
-    assert.ok(
-      !rootSource.includes("{ id: 'essences'"),
-      'essences should not remain a disabled placeholder route'
-    );
-    assert.ok(
-      !rootSource.includes("{ id: 'tags'"),
-      'tags should not remain a disabled placeholder route'
-    );
-    assert.ok(
-      !rootSource.includes('clearSelectedSystem'),
-      'root should not expose a selected-system clear route'
-    );
-    assert.ok(
-      !rootSource.includes("selectSystem('', 'systems')"),
-      'selected-system rail should not clear real store selection'
-    );
-    assert.ok(
-      !rootSource.includes('manager-scope-clear'),
-      'selected-system rail should not render the old x clear icon'
-    );
-    assert.ok(
-      !rootSource.includes("setView('systems')"),
-      'systems should not be exposed as a left-rail tab'
-    );
-    assert.ok(
-      !rootSource.includes('manager-count-cluster'),
-      'system rows should not duplicate inspector counts inline'
-    );
-    assert.ok(
-      !rootSource.includes('FABRICATE.Admin.Manager.QuickActions'),
-      'inspector should not duplicate row actions'
-    );
-    // The legacy system-library header rendered an admin launch button beside Import.
-    assert.ok(
-      /<ManagerButton[^<>]*\bdata-manager-import-system\b[^<>]*onclick=\{importSystem\}[^<>]*>/.test(
-        rootSource
-      ),
-      'the system library header should still render Import — the absence check below is ' +
-        'vacuous against a header that no longer exists'
-    );
-    assert.ok(
-      !rootSource.includes('openCurrentAdmin'),
-      'system library header should not render the legacy admin launch button'
-    );
+  });
+
+  // The gathering rail is one submenu group with its own expand/collapse control and a rollup
+  // count summarising the three sections beneath it.
+  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_ROOT, {
+    spells: ['manager-nav-group '],
+    reads: ['railGroupExpanded.gathering'],
+    writes: ['data-gathering-inspector-placeholder'],
+    spellsExactly: [
+      'manager-nav-submenu',
+      'manager-nav-toggle',
+      'is-expanded',
+      'FABRICATE.Admin.Manager.Nav.ExpandGathering',
+      'FABRICATE.Admin.Manager.Nav.CollapseGathering',
+    ],
+    names: ['activeGatheringTab'],
+  });
+
+  defineStructureContract(
+    'counts each gathering section for its own rail entry',
+    { file: MANAGER_ROOT, constant: 'gatheringNavCounts' },
+    { keys: ['environments', 'tasks', 'encounters', 'total'] }
+  );
+
+  // Narrowed to `total`, because the three lengths are each read for their own section beside it:
+  // asked of the whole derivation, a rollup that had dropped one would still answer yes.
+  defineStructureContract(
+    'and summarises environments, tasks AND events in the parent rollup',
+    { file: MANAGER_ROOT, constant: 'gatheringNavCounts', property: 'total' },
+    {
+      reads: [
+        'environmentList.length',
+        'gatheringTaskDefinitions.length',
+        'gatheringEventDefinitions.length',
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'derives the reusable event count from the selected gathering config',
+    { file: MANAGER_ROOT, constant: 'gatheringEventDefinitions' },
+    { reads: ['selectedGatheringSystemConfig.events'] }
+  );
+
+  defineStructureContract(
+    'owns the gathering tab state for inspector coordination',
+    { file: MANAGER_ROOT, constant: 'activeGatheringTab' },
+    { spellsExactly: ['environments'] }
+  );
+
+  // The gathering page renders NO section tabs of its own: the rail owns that hierarchy, and the
+  // page reports the tab it was given back to the root.
+  defineStructureContract('reports gathering tab changes to the root', ENVIRONMENTS_BROWSER, {
+    defaults: [['activeGatheringTab', 'environments']],
+    callsWith: [
+      ['onSelectGatheringTab', 'tabId'],
+      ['onEditEnvironment', 'environment'],
+      ['onDuplicateEnvironment', 'environment'],
+      ['onDeleteEnvironment', 'environment'],
+    ],
+    callsLiteral: [
+      ['selectGatheringTab', 'tasks'],
+      ['selectGatheringTab', 'encounters'],
+    ],
+    spellsExactly: [
+      'manager-environment-action-grid',
+      'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
+    ],
+    spellsNo: ['manager-gathering-tabs'],
+  });
+
+  // The empty-state inspectors route the GM to the missing building block and to the published
+  // docs, rather than restating the row actions beside them.
+  defineStructureContract('routes every empty setup inspector to its own next step', MANAGER_ROOT, {
+    writes: ['componentCount', 'onAddComponents'],
+    reads: ['selectedCounts.components'],
+    callsLiteral: [['setView', 'components']],
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.EmptySetup.Title',
+      'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
+      'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
+      'FABRICATE.Admin.Manager.Essence.EmptySetup.Title',
+    ],
+    spells: [
+      'https://mistersilver-uk.github.io/fabricate/help/quickstart',
+      'https://mistersilver-uk.github.io/fabricate/gathering/environments',
+      'https://mistersilver-uk.github.io/fabricate/components/',
+      'https://mistersilver-uk.github.io/fabricate/essences',
+    ],
+  });
+
+  it('keeps the environment and task action keys to their header aria labels alone', () => {
+    const spelled = spelledLiterals(componentAstOf(MANAGER_ROOT));
+    for (const key of [
+      'FABRICATE.Admin.Manager.Environment.Actions',
+      'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
+    ]) {
+      assert.equal(
+        spelled.filter((literal) => literal === key).length,
+        1,
+        `${key} is the header label, not a second inspector card heading beside it`
+      );
+    }
+  });
+
+  it('states the rail, empty-setup and gathering-tab copy those routes read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemLibraryHint,
       'Select a row to view counts and enabled features.'
@@ -1670,29 +1741,9 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.InspectorHint,
       'The inspector shows counts, resolution mode, and enabled features for the selected system.'
     );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.EmptySetup.Title'),
-      'no-systems inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/help/quickstart'),
-      'no-systems inspector should link to the published quickstart'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate'),
-      'no-systems inspector should link to the published docs'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Docs, 'Docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.EmptySetup.Title'),
-      'empty environments inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering/environments'),
-      'empty environments inspector should link to published gathering docs'
-    );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.EmptyTitle,
       'Prepare gathering building blocks first'
@@ -1701,118 +1752,7 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.EmptyHint,
       'Define gathering tasks and events before creating environments, then attach those building blocks to each location players can gather from.'
     );
-    assert.ok(
-      rootSource.includes('manager-nav-submenu'),
-      'gathering sections should render in the left rail submenu'
-    );
-    assert.ok(
-      rootSource.includes('manager-nav-toggle'),
-      'gathering rail should expose an expand/collapse control'
-    );
-    assert.ok(
-      rootSource.includes("manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}"),
-      'expanded gathering rail should style as one submenu group'
-    );
-    assert.ok(
-      /const gatheringEventDefinitions = \$derived\(\s*Array\.isArray\(selectedGatheringSystemConfig\.events\)\s*\? selectedGatheringSystemConfig\.events\s*: \[\]\s*\)/.test(
-        rootSource
-      ),
-      'root should derive reusable gathering event counts from selected gathering config'
-    );
-    assert.ok(
-      /total:\s*environmentList\.length \+ gatheringTaskDefinitions\.length \+ gatheringEventDefinitions\.length/.test(
-        rootSource
-      ),
-      'gathering parent count should summarize environments, tasks, and events'
-    );
-    // Issue 643: a rail count is a bare mono numeral, not a chip.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{gatheringNavCounts.total}</span>'),
-      'gathering parent should render a summary count numeral'
-    );
-    assert.ok(
-      rootSource.includes('gatheringNavCounts[gatheringItem.id]'),
-      'gathering submenu items should render their count chips from gathered section counts'
-    );
-    assert.equal(
-      rootSource.includes("manager-nav-parent ${isGatheringRoute ? 'is-active' : ''}"),
-      false,
-      'gathering parent should not use the selected pill class'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandGathering'),
-      'gathering rail expand label should be localized'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseGathering'),
-      'gathering rail collapse label should be localized'
-    );
-    assert.equal(
-      environmentsBrowserSource.includes('manager-gathering-tabs'),
-      false,
-      'gathering page should not render local section tabs'
-    );
-    assert.ok(
-      rootSource.includes("let activeGatheringTab = $state('environments')"),
-      'root should own gathering tab state for inspector coordination'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes("activeGatheringTab = 'environments'"),
-      'gathering page should accept environments as the default active tab'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'),
-      'gathering page should report tab changes to the root'
-    );
-    assert.ok(
-      rootSource.includes('data-gathering-inspector-placeholder'),
-      'right inspector should render placeholders for non-environment gathering tabs'
-    );
-    assert.equal(
-      rootSource.match(/FABRICATE\.Admin\.Manager\.Environment\.Actions/g)?.length ?? 0,
-      1,
-      'environment actions localization should remain only for the header aria label, not a redundant inspector card'
-    );
-    assert.ok(
-      !rootSource.includes(
-        "<h3 class=\"manager-card-title\">{text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions')}</h3>"
-      ),
-      'selected environment inspector should not render a redundant Environment actions card'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint'
-      ),
-      'gathering task browser copy should be localized'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes("selectGatheringTab('tasks')"),
-      'empty environments guidance should route to the Tasks tab'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes("selectGatheringTab('encounters')"),
-      'empty environments guidance should route events to the Events tab'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('manager-environment-action-grid'),
-      'environment rows should keep quick action wiring'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onEditEnvironment(environment.id)'),
-      'environment rows should wire edit quick actions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDuplicateEnvironment(environment.id)'),
-      'environment rows should wire duplicate quick actions'
-    );
-    assert.ok(
-      environmentsBrowserSource.includes('onDeleteEnvironment(environment.id)'),
-      'environment rows should wire delete quick actions'
-    );
-    assert.equal(
-      lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Label,
-      'Gathering sections'
-    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Label, 'Gathering sections');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments,
       'Environments'
@@ -1823,10 +1763,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandGathering, 'Expand gathering menu');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseGathering, 'Collapse gathering menu');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenTasks, 'Review tasks');
-    assert.equal(
-      lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents,
-      'Review events'
-    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.OpenEvents, 'Review events');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint,
       'Browse gathering tasks before attaching them to environments.'
@@ -1859,14 +1796,6 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs,
       'Gathering docs'
     );
-    assert.ok(
-      rootSource.includes('componentCount={selectedCounts.components}'),
-      'the root should feed the inspector its component count'
-    );
-    assert.ok(
-      rootSource.includes("onAddComponents={() => setView('components')}"),
-      'empty recipes inspector should route zero-component setup to Components'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.Title, 'Set up recipes');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint,
@@ -1874,26 +1803,8 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents, 'Add components');
     assert.equal(lang.FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs, 'Recipe docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Component.EmptySetup.Title'),
-      'empty components inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes(
-        'https://mistersilver-uk.github.io/fabricate/components/'
-      ),
-      'empty components inspector should link to published component docs'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.Title, 'Set up components');
     assert.equal(lang.FABRICATE.Admin.Manager.Component.EmptySetup.ComponentDocs, 'Component docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Essence.EmptySetup.Title'),
-      'empty essences inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/essences'),
-      'empty essences inspector should link to published essence docs'
-    );
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.Title, 'Set up essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs, 'Essence docs');
   });
@@ -2576,6 +2487,15 @@ describe('CraftingSystemManager source contract', () => {
     for (const count of ['gatheringNavCounts.total', 'toolsNavCount']) {
       assert.ok(read.includes(count), `the rail renders ${count} as a bare count numeral`);
     }
+    assert.ok(
+      rendered.some(
+        (expression) =>
+          expression.type === 'MemberExpression' &&
+          expression.computed &&
+          expression.object?.name === 'gatheringNavCounts'
+      ),
+      'and each gathering sub-item reads its own section count out of the same derivation'
+    );
   });
 
   defineStructureContract('renders the requirements tab from the focused editor', TOOL_EDIT, {
