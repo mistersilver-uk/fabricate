@@ -10,13 +10,12 @@ import {
   railSelector,
 } from '../scripts/lib/managerRailEntries.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const HARNESS_PATH = 'scripts/foundry-test-run.mjs';
-
 // Read as TEXT. `foundry-test-run.mjs` launches Chromium on import, so a suite that imported it
 // would start the whole smoke run inside `node --test`.
-const harness = readFileSync(resolve(ROOT, HARNESS_PATH), 'utf8');
+const harness = SMOKE_SOURCE;
 
 const RAIL_BUTTON_CLASS = 'manager-nav-button';
 const RAIL_ENTRIES = [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES];

@@ -9,9 +9,9 @@ import {
   expectedSelectorsForManagerSurface,
   MANAGER_SURFACE_EXPECTED_SELECTORS,
 } from '../scripts/lib/managerLayoutGuards.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const HARNESS_PATH = join(__dirname, '..', 'scripts', 'foundry-test-run.mjs');
 
 // Per-element metrics exactly as `assertManagerLayoutStable` builds them: one
 // record per matched element, each carrying its `.selector`.
@@ -161,7 +161,7 @@ test('expectedSelectorsForManagerSurface returns [] for an unmapped label', () =
 // carries it) → a guaranteed false failure at smoke time.
 
 test('every pinned selector is in the harness measured-selector list', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
   const measured = new Set(
     Array.from(source.matchAll(/'(\.[a-z-]+)'/g)).map((match) => match[1])
   );

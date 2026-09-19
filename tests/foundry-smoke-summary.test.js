@@ -17,6 +17,8 @@ import {
   shouldTolerateSmokeTeardown,
   TRANSIENT_TEARDOWN_SKIP_PREFIX,
 } from '../scripts/lib/foundrySmokeSignal.js';
+import { attachConsoleCapture } from '../scripts/foundry-smoke/pageOps/pageLifecycle.mjs';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HARNESS_PATH = join(__dirname, '..', 'scripts', 'foundry-test-run.mjs');
@@ -202,53 +204,66 @@ test('classifyCapturedError routes identically regardless of console-vs-pageerro
   assert.equal(classifyCapturedError(text, nonMatching).waived, false);
 });
 
-// Source contract: assert BOTH capture handlers route through the shared classifier and push to the
-// GATING consoleErrors list only on the not-waived branch.
-test('both attachConsoleCapture handlers route through classifyCapturedError, gating only on not-waived', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+// Behaviour contract: both capture handlers route through the shared classifier and reach the
+// GATING list only on the not-waived branch. `attachConsoleCapture` takes its three sinks as an
+// argument, so it is driven here against a fake page rather than read as source text.
+test('attachConsoleCapture routes a waived line, a gating line and a pageerror to the right sink', () => {
+  const handlers = new Map();
+  const page = { on: (event, handler) => handlers.set(event, handler) };
+  const consoleErrors = [];
+  const waivedConsoleErrors = [];
+  const consoleLog = [];
+  attachConsoleCapture(page, [/benign/i], { consoleErrors, waivedConsoleErrors, consoleLog });
 
-  // Isolate the attachConsoleCapture body so the assertions cannot be satisfied
-  // by matching tokens elsewhere in the harness.
-  const fnStart = source.indexOf('function attachConsoleCapture(');
-  assert.ok(fnStart > 0, 'expected attachConsoleCapture in the harness');
-  const fnEnd = source.indexOf('\nasync function assertNoScreenshotOverlays', fnStart);
-  assert.ok(fnEnd > fnStart, 'expected to bound the attachConsoleCapture body');
-  const body = source.slice(fnStart, fnEnd);
+  const consoleMessage = (type, text, url = '') => ({
+    type: () => type,
+    text: () => text,
+    location: () => ({ url }),
+  });
 
-  // Exactly two call sites — one per handler; no third path may bypass the seam.
-  const callSites = body.match(/classifyCapturedError\(/g) ?? [];
-  assert.equal(callSites.length, 2, 'both handlers (and only they) must call classifyCapturedError');
+  handlers.get('console')(consoleMessage('error', 'a benign teardown noise'));
+  handlers.get('console')(consoleMessage('error', 'a real failure', 'https://example/x.js'));
+  handlers.get('console')(consoleMessage('log', 'just chatter'));
+  handlers.get('pageerror')({ message: 'a benign pageerror', stack: 'at somewhere' });
+  handlers.get('pageerror')({ message: 'a real pageerror' });
 
-  // ── console handler: condition + branch routing ──
-  const consoleBlockStart = body.indexOf("if (msg.type() === 'error')");
-  const consoleBlockEnd = body.indexOf("page.on('pageerror'", consoleBlockStart);
-  assert.ok(consoleBlockStart > 0 && consoleBlockEnd > consoleBlockStart, 'expected the console handler block');
-  const consoleBlock = body.slice(consoleBlockStart, consoleBlockEnd);
-  // Routes on the classifier's .waived, not a constant. Catches "console never
-  // consults the waiver".
-  assert.match(consoleBlock, /if \(classifyCapturedError\(text, ignoredErrorPatterns\)\.waived\)/);
-  // Waived branch first (audit list), gating push in the else branch. Catches
-  // "console pushes WAIVED errors into the gating consoleErrors list".
-  const cWaived = consoleBlock.indexOf('waivedConsoleErrors.push(text)');
-  const cGating = consoleBlock.indexOf('consoleErrors.push(text)');
-  assert.ok(cWaived > 0 && cGating > cWaived, 'console handler must gate only on the not-waived (else) branch');
+  assert.deepEqual(waivedConsoleErrors, [
+    'a benign teardown noise',
+    'pageerror: a benign pageerror',
+  ]);
+  assert.deepEqual(consoleErrors, [
+    'a real failure (https://example/x.js)',
+    'pageerror: a real pageerror',
+  ]);
+  // The stack is diagnostic only: widening what the gate matches its waivers against would change
+  // which runs fail.
+  assert.ok(consoleLog.includes('[pageerror-stack] at somewhere'));
+  assert.equal(consoleErrors.some((entry) => entry.includes('at somewhere')), false);
+  assert.ok(consoleLog.includes('[log] just chatter'));
+});
 
-  // ── pageerror handler: condition + branch routing ──
-  const pageBlockStart = body.indexOf("page.on('pageerror'");
-  const pageBlock = body.slice(pageBlockStart);
-  // Routes on classifier .waived over err.message. Catches BOTH "pageerror skips
-  // the waiver (if(false))" and "pageerror waives unconditionally (if(true))" —
-  // either replaces this exact condition.
-  assert.match(pageBlock, /if \(classifyCapturedError\(err\.message, ignoredErrorPatterns\)\.waived\)/);
-  const pWaived = pageBlock.indexOf('waivedConsoleErrors.push(`pageerror:');
-  const pGating = pageBlock.indexOf('consoleErrors.push(`pageerror:');
-  assert.ok(pWaived > 0 && pGating > pWaived, 'pageerror handler must gate only on the not-waived (else) branch');
+test('attachConsoleCapture logs failed responses and requests without gating on them', () => {
+  const handlers = new Map();
+  const page = { on: (event, handler) => handlers.set(event, handler) };
+  const consoleErrors = [];
+  const consoleLog = [];
+  attachConsoleCapture(page, [], { consoleErrors, waivedConsoleErrors: [], consoleLog });
+
+  handlers.get('response')({ status: () => 404, url: () => 'https://example/missing.png' });
+  handlers.get('response')({ status: () => 200, url: () => 'https://example/ok.png' });
+  handlers.get('requestfailed')({ failure: () => ({ errorText: 'net::ERR' }), url: () => 'https://example/dead' });
+
+  assert.deepEqual(consoleLog, [
+    '[response 404] https://example/missing.png',
+    '[requestfailed net::ERR] https://example/dead',
+  ]);
+  assert.deepEqual(consoleErrors, []);
 });
 
 // ── Source contract: the signal is written from the finally block ─────────
 
 test('stepFailures/consoleErrorCount are assigned in the finally block, beside results.consoleErrors', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
   // NOTE: this is an INTENTIONAL literal coupling to the harness spelling (`results.consoleErrors =
   // consoleErrors;`, `} finally {`, the summary path).
@@ -262,7 +277,7 @@ test('stepFailures/consoleErrorCount are assigned in the finally block, beside r
   const finallyOpen = source.lastIndexOf('} finally {', anchor);
   assert.ok(finallyOpen > 0 && finallyOpen < anchor, 'anchor must live inside a finally block');
 
-  const summaryWrite = source.indexOf("join(RESULTS_DIR, 'summary.json')", anchor);
+  const summaryWrite = source.indexOf("join(resultsDir, 'summary.json')", anchor);
   assert.ok(summaryWrite > anchor, 'summary.json write must follow the anchor');
 
   const stepFailuresAssign = source.indexOf('results.stepFailures =');
@@ -312,7 +327,7 @@ test('isTransientPageTeardown recognises browser/page teardown, not real failure
 });
 
 test('the harness guards the process against a late teardown rejection and exits deterministically', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
   // A process-level unhandledRejection guard routes through the tested predicate,
   // swallowing teardown-shaped rejections and failing fast on anything else.
   assert.match(source, /process\.on\('unhandledRejection'/);
@@ -325,7 +340,7 @@ test('the harness guards the process against a late teardown rejection and exits
 });
 
 test('source: Manager readiness resolves the explicit or registered owner of the unique connected DOM', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
   const start = source.indexOf('async function waitForManagerApplicationRendered(page)');
   const end = source.indexOf('/**\n * Resize the rendered Crafting System Manager', start);
   assert.ok(start > 0 && end > start, 'expected to bound the Manager readiness helper');
@@ -349,7 +364,7 @@ test('source: Manager readiness resolves the explicit or registered owner of the
 });
 
 test('source: responsive evidence viewports narrowly waive Foundry minimum-resolution warnings', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
   assert.match(
     source,
     /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|1280px by 520px\|900px by 700px\|680px by 700px/,
@@ -360,14 +375,14 @@ test('source: responsive evidence viewports narrowly waive Foundry minimum-resol
 });
 
 test('source: smoke-world cleanup removes stale chat cards before stale documents', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
   const messageCleanup = source.indexOf('const staleMessages = game.messages?.contents ?? []');
-  const actorCleanup = source.indexOf('const staleActors = game.actors.contents.filter', messageCleanup);
+  const actorCleanup = source.indexOf('const staleActors = game.actors.contents.filter(', messageCleanup);
   assert.ok(messageCleanup > 0, 'expected stale smoke chat cleanup');
   assert.ok(actorCleanup > messageCleanup, 'chat cards must be removed before their source documents');
   assert.match(
     source.slice(messageCleanup, actorCleanup),
-    /ChatMessage\.deleteDocuments\(staleMessages\.map\(message => message\.id\)\)/
+    /ChatMessage\.deleteDocuments\(staleMessages\.map\(\(message\) => message\.id\)\)/
   );
 });
 
@@ -483,35 +498,37 @@ test('a tolerated D0 skip step does NOT waive a coincident console error — con
 // ── Source contracts: the harness wiring (region-bounded literal couplings) ──
 
 test('source: the D0 screenshot-manager catch tolerates WITHOUT rethrowing', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
-  // Bound the catch region between its unique passed:false push (the hard-failure branch) and the
-  // D0 finally. The old code had `throw err;` in exactly this span; the fix removes it.
-  const failPush = source.indexOf("step: 'screenshot-manager', passed: false, error: err.message");
+  // Bound the catch region between its enclosing `catch` and the D0 `finally`. The old code had
+  // `throw err;` in exactly this span; the fix removes it.
+  const failPush = source.indexOf("step: 'screenshot-manager', passed: false, error: error.message");
   assert.ok(failPush > 0, 'expected the D0 screenshot-manager hard-failure push');
   const finallyClose = source.indexOf('} finally {', failPush);
   assert.ok(finallyClose > failPush, 'expected the D0 finally after the hard-failure push');
-  const catchRegion = source.slice(failPush, finallyClose);
+  const catchOpen = source.lastIndexOf('} catch (error) {', failPush);
+  assert.ok(catchOpen > 0 && catchOpen < failPush, 'expected the enclosing D0 catch');
+  const catchRegion = source.slice(catchOpen, finallyClose);
 
   // The tolerate branch lives in this span and it does NOT rethrow.
-  assert.match(catchRegion, /d0TeardownTolerated = true/);
+  assert.match(catchRegion, /ctx\.shared\.d0TeardownTolerated = true/);
   assert.ok(!/\bthrow\b/.test(catchRegion), 'the D0 catch must not rethrow (would double-record in Phase C)');
 
   // The tolerate decision routes through the shared predicate — assert against the
   // whole catch (the condition precedes the hard-failure push, so it is upstream
   // of the bounded no-throw span above).
-  const catchStart = source.lastIndexOf('} catch (err) {', failPush);
+  const catchStart = source.lastIndexOf('} catch (error) {', failPush);
   assert.ok(catchStart > 0 && catchStart < failPush, 'expected the enclosing D0 catch');
   assert.match(source.slice(catchStart, finallyClose), /shouldTolerateSmokeTeardown\(\{/);
 });
 
 test('source: d0RequiredCapturesComplete flips true AFTER the last capture, BEFORE the screenshot-manager pass push (not hoisted)', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
   const screenshotAnchor = source.indexOf("screenshot(page, 'manager-experimental-off')");
   assert.ok(screenshotAnchor > 0, 'expected the manager-experimental-off milestone capture');
 
-  const milestoneAssign = source.indexOf('d0RequiredCapturesComplete = true', screenshotAnchor);
+  const milestoneAssign = source.indexOf('ctx.shared.d0RequiredCapturesComplete = true', screenshotAnchor);
   assert.ok(milestoneAssign > screenshotAnchor, 'milestone flag must be set AFTER the last capture');
 
   // The success push {step:'screenshot-manager', passed:true} (single line, no skipped).
@@ -520,22 +537,22 @@ test('source: d0RequiredCapturesComplete flips true AFTER the last capture, BEFO
 
   // Pin against hoisting: the ONLY `= true` assignment is the post-milestone one.
   assert.equal(
-    source.indexOf('d0RequiredCapturesComplete = true'),
+    source.indexOf('ctx.shared.d0RequiredCapturesComplete = true'),
     milestoneAssign,
     'd0RequiredCapturesComplete must not be assigned true anywhere before the milestone'
   );
-  // And it is declared false to begin with.
-  assert.match(source, /let d0RequiredCapturesComplete = false;/);
+  // And it is initialised false on the shared channel to begin with.
+  assert.match(source, /d0RequiredCapturesComplete: false,/);
 });
 
 test('source: results.degraded and results.rendererCrashed are assigned in the finally block before summary.json', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
   const anchor = source.indexOf('results.consoleErrors = consoleErrors;');
   assert.ok(anchor > 0, 'expected the finally-block consoleErrors anchor');
   const finallyOpen = source.lastIndexOf('} finally {', anchor);
   assert.ok(finallyOpen > 0 && finallyOpen < anchor, 'anchor must live inside a finally block');
-  const summaryWrite = source.indexOf("join(RESULTS_DIR, 'summary.json')", anchor);
+  const summaryWrite = source.indexOf("join(resultsDir, 'summary.json')", anchor);
   assert.ok(summaryWrite > anchor, 'summary.json write must follow the anchor');
 
   const degradedAssign = source.indexOf('results.degraded =', finallyOpen);
@@ -555,7 +572,7 @@ test('source: results.degraded and results.rendererCrashed are assigned in the f
 });
 
 test('source (F2): the Phase E craft-failure screenshot is wrapped, and the Phase E guard keys on d0TeardownTolerated', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
   // (a) A gone-page failure screenshot cannot throw out of the Phase E catch into
   // the Phase C catch and revive the deleted create-crafting-system record.
@@ -567,13 +584,13 @@ test('source (F2): the Phase E craft-failure screenshot is wrapped, and the Phas
 
   // (b) The Phase E entry guard keys on d0TeardownTolerated, not page.isClosed() alone —
   // a 'browser has been disconnected'-class teardown leaves page.isClosed() false.
-  assert.match(source, /if \(page\.isClosed\?\.\(\) \|\| d0TeardownTolerated\)/);
+  assert.match(source, /if \(page\.isClosed\?\.\(\) \|\| ctx\.shared\.d0TeardownTolerated\)/);
   // When skipping, craft-item-phase is recorded skipped (not silently dropped).
   assert.match(source, /step: 'craft-item-phase', passed: true, skipped: true/);
 });
 
 test('source (F4): both teardown-skip writer sites reference the exported TRANSIENT_TEARDOWN_SKIP_PREFIX symbol, no re-inlined literal', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
   // Both writer sites (D0 skip + Journal skip) stamp the error via the symbol.
   const symbolWrites = source.match(/error: TRANSIENT_TEARDOWN_SKIP_PREFIX \+ /g) ?? [];
@@ -970,7 +987,7 @@ test('explainSmokeSummaryRefusal quotes exactly the steps computeSmokeSignal cou
 });
 
 test('source: the run verdict that feeds summary.passed is set on both the success and the catch path', async () => {
-  const source = await readFile(HARNESS_PATH, 'utf8');
+  const source = SMOKE_SOURCE;
 
   // `passed` is the one evidence condition `computeSmokeSignal` does NOT return, so the drift
   // guard above cannot cover it. Anchor it here instead: both assignment sites must survive.

@@ -17,6 +17,7 @@ import { deflateSync } from 'node:zlib';
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
 import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { SMOKE_SOURCE, SMOKE_SOURCE_SEGMENTS } from './helpers/interactablesSmokeLocators.js';
 
 import {
   buildScreenshotMarkdown,
@@ -371,7 +372,7 @@ describe('UI PR screenshot evidence', () => {
       'the retired Gathering Travel evidence recipe must not survive'
     );
 
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const harness = SMOKE_SOURCE;
     assert.equal(harness.includes('#manager-gathering-nav-travel'), false);
     assert.equal(harness.includes('manager-gathering-travel-normal'), false);
     assert.equal(harness.includes('manager-gathering-travel-stacked'), false);
@@ -748,7 +749,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('maps all four player crafting essence icon states to dedicated evidence views', () => {
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const harness = SMOKE_SOURCE;
 
     // RE-DRIVEN from the surviving co-located matchers (issue 1506).
     const drivenBy = {
@@ -794,7 +795,7 @@ describe('UI PR screenshot evidence', () => {
   ];
 
   it('maps the requirement-rail surfaces to six dedicated single-label evidence views', () => {
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const harness = SMOKE_SOURCE;
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view]));
 
     for (const id of REQUIREMENT_RAIL_VIEW_IDS) {
@@ -836,7 +837,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('pins the smoke-world seeding each requirement-rail frame depends on', () => {
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const harness = SMOKE_SOURCE;
 
     // A SECOND authored essence with its own colour token — without it the shared-pool
     // frame has one tint and cannot show which carrier unit funded which requirement.
@@ -876,7 +877,7 @@ describe('UI PR screenshot evidence', () => {
   it('keeps the new rail fixtures off page one of the player recipe browser', () => {
     // The browser sorts A→Z and pages at 12, and `selectCraftingRecipeByMode` only iterates the
     // rows in the DOM — page one.
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const harness = SMOKE_SOURCE;
     const recipeNames = [
       ...harness.matchAll(/createRecipe\(\{[^}]*?\bname: '([^']+)'/g),
     ].map(match => match[1]);
@@ -894,7 +895,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('re-points the pinned crafting selectors the requirement rail moved', () => {
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const harness = SMOKE_SOURCE;
 
     // DEAD: a first-class essence requirement is no longer an essence thumb in the ingredient image
     // grid, so this selector matches nothing and would time out (issue 1506).
@@ -1970,34 +1971,36 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps every recipe smoke label backed by a real smoke-harness screenshot', () => {
-    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
     const emitted = new Set();
+    // Per MODULE, never over the concatenation: a lazy `[\s\S]*?` would otherwise run out of one
+    // module's unlabelled call and capture the next module's first `label:`.
+    for (const harness of SMOKE_SOURCE_SEGMENTS) {
     for (const match of harness.matchAll(/screenshot\(\s*page\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
-    for (const match of harness.matchAll(/captureToolStudioProduct\(\s*page\s*,\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/captureToolStudioProduct\(\s*ctx\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
-    for (const match of harness.matchAll(/captureStableManagerView\(\s*page\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
+    for (const match of harness.matchAll(/captureStableManagerView\(\s*ctx\s*,\s*\{[\s\S]*?label:\s*'([^']+)'[\s\S]*?\}\s*\)/g)) {
       emitted.add(match[1]);
     }
     // Issue 801: the grouped-continuation frames route through the shared
     // captureGroupedContinuationFrame(page, results, { … label: '…' … }) helper, which
     // forwards `label` to captureStableManagerView as a variable — so the literal lives in
     // the helper CALL's options object, not in the captureStableManagerView call itself.
-    for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*ctx,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     // Issues 772 / 1010: the SIX bulk-edit frames — three per studio — route through the
     // shared captureBulkEditFrame(page, results, { studio, stepName, label, … }) helper for
     // the same reason: the literal lives in the helper CALL, and the helper forwards `label`
     // onward as a variable.
-    for (const match of harness.matchAll(/captureBulkEditFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/captureBulkEditFrame\(\s*ctx,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,
     // <recipeName>, '<label>', <selector>); the label is the third, string-literal arg.
-    for (const match of harness.matchAll(/captureRecipeResultsTab\(\s*page,\s*[^,]+,\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/captureRecipeResultsTab\(\s*ctx,\s*[^,]+,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     for (const match of harness.matchAll(/captureCurrentPlayerGathering\(\s*'([^']+)'/g)) {
@@ -2009,10 +2012,11 @@ describe('UI PR screenshot evidence', () => {
     // Issue 855: the interactive crafting-check roll prompt routes through
     // handleRollPromptIfPresent(page, '<label>'), which forwards `label` to screenshot() as a
     // variable — so the literal lives in the helper CALL, not in a screenshot() call.
-    for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*page\s*,\s*'([^']+)'/g)) {
+    for (const match of harness.matchAll(/handleRollPromptIfPresent\(\s*ctx\s*,\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
-    assert.ok(emitted.size > 0, 'expected to parse smoke labels from foundry-test-run.mjs');
+    }
+    assert.ok(emitted.size > 0, 'expected to parse smoke labels from the smoke walk');
     for (const recipe of VIEW_RECIPES) {
       for (const label of recipe.smokeLabels) {
         assert.ok(emitted.has(label), `${recipe.id} references smoke label '${label}' not emitted by the harness`);

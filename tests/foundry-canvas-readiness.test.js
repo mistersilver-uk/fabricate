@@ -9,9 +9,9 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { isCanvasReadyForScene } from '../scripts/lib/foundryCanvasReadiness.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const HARNESS_PATH = path.join(REPO_ROOT, 'scripts', 'foundry-test-run.mjs');
 
 const SCENE_ID = 'sceneAzureGrove';
 const OTHER_SCENE_ID = 'scenePreviouslyViewed';
@@ -31,7 +31,7 @@ function withCanvas(canvasValue, body) {
 
 /** The harness source with whole-line comments removed, so prose cannot satisfy a code assertion. */
 function harnessCode() {
-  return readFileSync(HARNESS_PATH, 'utf8')
+  return SMOKE_SOURCE
     .split('\n')
     .filter((line) => {
       const trimmed = line.trimStart();
@@ -113,7 +113,7 @@ test('the harness routes every scene activation through the readiness helper', (
       ' test; do not delete it — it is what keeps a new scene switch from being written the old way.'
   );
   assert.ok(
-    code.includes("from './lib/foundryCanvasReadiness.js'"),
+    code.includes('foundryCanvasReadiness.js'),
     'the harness no longer imports the shared readiness predicate'
   );
 

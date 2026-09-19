@@ -25,8 +25,29 @@ import {
   isD0SectionNeededForTargets,
 } from '../scripts/lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from '../scripts/lib/smokeSectionFixture.js';
+import {
+  SMOKE_SOURCE,
+  SMOKE_SOURCE_FILES,
+  SMOKE_SOURCE_SEGMENTS,
+} from './helpers/interactablesSmokeLocators.js';
+import { SMOKE_SCENARIOS } from '../scripts/foundry-smoke/registry.mjs';
 
-const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+/** Every scenario in the registry, groups and their children alike, in walk order. */
+function* flattenScenarios(scenarios) {
+  for (const scenario of scenarios) {
+    yield scenario;
+    yield* flattenScenarios(scenario.children ?? []);
+  }
+}
+
+const HARNESS = SMOKE_SOURCE;
+
+/** One smoke module's own text, so an ordered pin cannot be satisfied across a module boundary. */
+function smokeModule(fileSuffix) {
+  const at = SMOKE_SOURCE_FILES.findIndex((file) => file.endsWith(fileSuffix));
+  assert.ok(at >= 0, `no smoke module ends with ${fileSuffix}`);
+  return SMOKE_SOURCE_SEGMENTS[at];
+}
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
 // Every `.js` under the case directory, so an offender is reported against its authoring file.
@@ -113,10 +134,12 @@ function writeScopedRunEvidence(results, changedFiles, frames = []) {
 
 function harnessFunctionSpan(start, end) {
   const match = HARNESS.match(new RegExp(
-    String.raw`function ${start}[^]*?(?=\n(?:async )?function ${end})`,
+    String.raw`function ${start}[^]*?(?=\n(?:export )?(?:async )?function ${end})`,
   ));
   assert.ok(match, `${start} harness function was not found`);
-  return match[0];
+  // The span can enclose later declarations, which are `export`ed now that the walk is modules;
+  // `new Function` compiles a script, where `export` is a syntax error.
+  return match[0].replaceAll(/^export (?=(?:async )?function )/gm, '');
 }
 
 const assertSingleToolMutation = new Function(
@@ -440,31 +463,31 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
 });
 
 test('Phase C seeds world modifiers and character prerequisites canonically before the settings-list action', () => {
-  const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
-  const gatheringStart = HARNESS.indexOf(
-    "await game.settings.set('fabricate', 'gatheringConfig'",
-    phaseCStart
+  const worldSeed = smokeModule('phase-c-system-fixture.mjs');
+  const d0Spine = smokeModule('d0-spine.mjs');
+  assert.ok(HARNESS.includes("startPhase('phase-C')"), 'phase C still opens its own phase');
+  const gatheringStart = worldSeed.indexOf(
+    "await game.settings.set('fabricate', 'gatheringConfig'"
   );
-  const systemPatchStart = HARNESS.indexOf('// Tools remain SYSTEM-OWNED', gatheringStart);
-  const systemPatchEnd = HARNESS.indexOf(
+  const systemPatchStart = worldSeed.indexOf('// Tools remain SYSTEM-OWNED', gatheringStart);
+  const systemPatchEnd = worldSeed.indexOf(
     '// Reference the deliberately-unlabelled tool',
     systemPatchStart
   );
-  const listStart = HARNESS.indexOf('// --- Settings-list ergonomics (issue 768) ---');
-  const firstAction = HARNESS.indexOf("locator('[data-toggle-modifier]')", listStart);
+  const listStart = d0Spine.indexOf('// --- Settings-list ergonomics (issue 768) ---');
+  const firstAction = d0Spine.indexOf("locator('[data-toggle-modifier]')", listStart);
   assert.ok(
-    phaseCStart >= 0 &&
-      phaseCStart < gatheringStart &&
+    gatheringStart >= 0 &&
       gatheringStart < systemPatchStart &&
       systemPatchStart < systemPatchEnd &&
-      systemPatchEnd < listStart &&
+      listStart >= 0 &&
       listStart < firstAction,
     'the Phase-C gathering patch, canonical system patch, and list action must remain strictly ordered'
   );
 
-  const gatheringPatch = HARNESS.slice(gatheringStart, systemPatchStart);
-  const systemPatch = HARNESS.slice(systemPatchStart, systemPatchEnd);
-  const beforeFirstAction = HARNESS.slice(listStart, firstAction);
+  const gatheringPatch = worldSeed.slice(gatheringStart, systemPatchStart);
+  const systemPatch = worldSeed.slice(systemPatchStart, systemPatchEnd);
+  const beforeFirstAction = d0Spine.slice(listStart, firstAction);
   const systemObjectMatch = gatheringPatch.match(/^(\s*)\[systemId\]: \{/m);
   assert.ok(systemObjectMatch, 'the Phase-C gathering fixture must retain its system object');
   const topLevelCharacterModifiers = new RegExp(
@@ -521,7 +544,7 @@ test('Phase C seeds world modifiers and character prerequisites canonically befo
   assert.match(characterLibrariesCall, /smoke-pre-trained/);
   assert.match(characterLibrariesCall, /smoke-pre-focused/);
 
-  const systemCreationPatch = HARNESS.slice(phaseCStart, gatheringStart);
+  const systemCreationPatch = worldSeed.slice(0, gatheringStart);
   assert.doesNotMatch(
     systemCreationPatch,
     /characterPrerequisites:\s*\[/,
@@ -552,7 +575,7 @@ test('manager stability counts populated system Travel realm and map rows', () =
       `${selector} must participate in overflow measurement`
     );
     assert.ok(
-      rowCountBlock.includes(`metric.selector === '${selector}'`),
+      rowCountBlock.includes(`'${selector}'`),
       `${selector} must satisfy the populated-row backstop`
     );
   }
@@ -768,9 +791,9 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
   );
   // It goes through `captureStableManagerView`, as the plain browser frame beside it does, so the
   // overflow and overlay guards run on the bulk state too rather than only the bare `screenshot()`.
-  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: studio\.layout, label \}\)/);
+  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(ctx, \{ layout: studio\.layout, label \}\)/);
   // The panel REPLACES the single-row inspector; a rail rendering both is a failure, not a frame.
-  assert.match(BULK_EDIT_SCAFFOLD, /studio\.displacedInspectorSelector\)\.count\(\) > 0/);
+  assert.match(BULK_EDIT_SCAFFOLD, /studio\.displacedInspectorSelector\)\.count\(\)\) > 0/);
   // The selection is cleared in a `finally`, so a failed capture cannot leave the rail showing the
   // bulk panel for every following frame in the section — and a failed CLEAR is recorded as its own
   // failed step rather than swallowed, because that leak is silent evidence corruption.
@@ -837,7 +860,7 @@ test('the recipe bulk-edit frames pin their rows by NAME, not by position', () =
   // The failure this exists to refuse: `manager-recipes-bulk-edit-blocked` is about ONE row — the
   // seeded off-and-un-enableable recipe that makes the panel's blocked count non-zero.
   const blocked = HARNESS
-    .split('await captureBulkEditFrame(page, results, {')
+    .split('await captureBulkEditFrame(ctx, {')
     .slice(1)
     .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === 'manager-recipes-bulk-edit-blocked');
   assert.ok(blocked, 'the blocked recipe bulk-edit call site was not found');
@@ -1319,7 +1342,7 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   // from the staged frame satisfy — or here, break — an assertion about another.
   const callOf = (label) => {
     const segment = HARNESS
-      .split('captureBulkEditFrame(page, results, {')
+      .split('captureBulkEditFrame(ctx, {')
       .slice(1)
       .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === label);
     if (!segment) return null;
@@ -1339,7 +1362,10 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   const unstaged = callOf('manager-components-bulk-edit-unstaged');
   assert.ok(unstaged, 'the unstaged bulk-edit call site was not found');
   assert.match(unstaged, /data-component-bulk-essences-staged="false"/);
-  assert.match(unstaged, /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/);
+  assert.match(
+    unstaged,
+    /if \(!\(await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)\)/
+  );
   for (const stagingControl of [
     'data-component-bulk-category-option',
     'data-bulk-tag',
@@ -1374,15 +1400,17 @@ test('a Tool Studio target runs only the dedicated persisted-net-zero tools sect
 });
 
 test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer coverage, and restoration', () => {
-  const toolStudioWalk = HARNESS.match(
-    /async function exerciseToolStudioPointerTargets[\s\S]*?(?=\n\/\*\*\n \* Close Foundry application windows)/,
+  const pointerTargets = smokeModule('d0-tools-pointer-targets.mjs');
+  const toolStudioWalk = pointerTargets.match(
+    /async function exerciseToolStudioPointerTargets[\s\S]*$/,
   )?.[0];
   assert.ok(toolStudioWalk, 'Tool Studio walk source was not found');
-  const managerSizing = HARNESS.match(
-    /async function setManagerWindowSize[\s\S]*?(?=\n\/\*\*\n \* Capture a manager view)/,
+  const lifecycle = smokeModule('pageOps/pageLifecycle.mjs');
+  const managerSizing = lifecycle.match(
+    /async function setManagerWindowSize[\s\S]*?(?=\n(?:export )?(?:async )?function )/,
   )?.[0];
   assert.ok(managerSizing, 'manager sizing helper source was not found');
-  const managerReadiness = HARNESS.match(
+  const managerReadiness = lifecycle.match(
     /async function waitForManagerApplicationRendered[\s\S]*?(?=\n\/\*\*\n \* Resize the rendered Crafting System Manager)/,
   )?.[0];
   assert.ok(managerReadiness, 'manager render-readiness helper source was not found');
@@ -1401,7 +1429,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     assert.match(
       toolStudioWalk,
       new RegExp(
-        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(page, '${label}', \w+\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
+        String.raw`await resetToolStudioScroll\(page\);\s*await (?:captureToolStudioProduct\(\s*ctx,\s*'${label}',\s*\w+\s*\)|screenshot\(page, '${label}'(?:, \{[\s\S]*?\})?\));`
       ),
       `${label} must reset the actual Tool Studio scroll owners immediately before capture`,
     );
@@ -1485,7 +1513,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.match(HARNESS, /typeof sourceSystem\?\.description === 'string'[\s\S]*?sourceSystem\.description\.value = parityDescription/);
   assert.match(
     HARNESS,
-    /normalized Tool snapshot[\s\S]*?description: 'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
+    /normalized Tool snapshot[\s\S]*?description:\s*'A well-balanced forge hammer\. Durable, but the haft splinters when hard used\.'/,
   );
   // NAME-ASCENDING, THE WHOLE LIST, IN ORDER (issue 1373).
   assert.match(
@@ -1552,7 +1580,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /scrollToolEditorPanelToReveal\([\s\S]*?data-tool-remove-from-system[\s\S]*?manager-tool-parity-02-remove-1280x720/,
     'the remove-from-system frame must reveal the callout it exists to show',
   );
-  assert.match(HARNESS, /async function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length !== 0/);
+  assert.match(HARNESS, /function withSingleToolClipboardWrite[\s\S]*?copyToClipboard[\s\S]*?calls\?\.length === 1[\s\S]*?info\.length !== 1[\s\S]*?errors\.length > 0/);
   assert.match(
     HARNESS,
     /async function assertToolLibraryPagination[\s\S]*?data-tool-library[\s\S]*?data-tool-library-scroll[\s\S]*?data-tool-browser-pagination[\s\S]*?await assertSelectionRetained\(\)[\s\S]*?DOCUMENT_POSITION_FOLLOWING[\s\S]*?footer moved when only the result list scrolled/,
@@ -1571,18 +1599,32 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.doesNotMatch(
     HARNESS,
-    /manager-tools-row:first-child'\)\?\.classList\.contains\('is-selected'\)/,
+    /manager-tools-row:first-child'\)\s*\?\.classList\.contains\('is-selected'\)/,
     'Tool library selection must never be pinned to row position again',
   );
   for (const paginationCall of [
-    "{ expectedTotal: 8, expectedPage: 1, expectFooter: false, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 8, expectedPage: 1, expectScrollable: true, expectFooter: false, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId }",
-    "{ expectedTotal: 9, expectedPage: 1, expectScrollable: true, selectedToolId: fixture.toolId }",
+    ['expectedTotal: 8', 'expectedPage: 1', 'expectFooter: false', 'selectedToolId: fixture.toolId'],
+    [
+      'expectedTotal: 8',
+      'expectedPage: 1',
+      'expectScrollable: true',
+      'expectFooter: false',
+      'selectedToolId: fixture.toolId',
+    ],
+    ['expectedTotal: 9', 'expectedPage: 1', 'selectedToolId: fixture.toolId'],
+    [
+      'expectedTotal: 9',
+      'expectedPage: 1',
+      'expectScrollable: true',
+      'selectedToolId: fixture.toolId',
+    ],
   ]) {
-    assert.ok(
-      toolStudioWalk.includes(paginationCall),
-      `Tool pagination call ${paginationCall} must name the selected Tool`,
+    // Matched field by field rather than as one spelling: Prettier puts each field on its own line.
+    const shape = new RegExp(paginationCall.map((field) => `${field},?`).join(String.raw`\s*`));
+    assert.match(
+      toolStudioWalk,
+      shape,
+      `Tool pagination call {${paginationCall.join(', ')}} must name the selected Tool`,
     );
   }
   const issue800Search = HARNESS.indexOf("getByRole('searchbox', { name: 'Search components' })");
@@ -1602,12 +1644,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     /paginationComponentId[\s\S]*?smoke-tool-studio-pagination-ninth[\s\S]*?componentId: paginationComponentId/,
     'the synthetic ninth Tool must carry a valid managed Component identity',
   );
-  assert.ok(HARNESS.includes("editor.locator('[data-tool-prerequisite-row]').count() !== 5"));
+  assert.match(HARNESS, /editor\.locator\('\[data-tool-prerequisite-row\]'\)\.count\(\)\) !== 5/);
   assert.match(
     toolStudioWalk,
     /const expectedPrerequisiteNames = \[[\s\S]*?'Expert Crafter'[\s\S]*?"Proficient with Smith's Tools"[\s\S]*?'Attuned to the Weave'[\s\S]*?'Strength 13 or higher'[\s\S]*?'Trained in Arcana'[\s\S]*?Tool Studio parity prerequisite order drifted/,
   );
-  assert.ok(HARNESS.includes("editor.locator('[data-tool-validation-check].is-invalid').count() !== 0"));
+  assert.match(
+    HARNESS,
+    /editor\.locator\('\[data-tool-validation-check\]\.is-invalid'\)\.count\(\)\) !== 0/
+  );
   assert.match(
     toolStudioWalk,
     /input\[name="tool-on-break"\]\[value="destroy"\][\s\S]*?saveToolStudioDraftIfDirty\(editor\)[\s\S]*?tab\('requirements'\)/,
@@ -1626,15 +1671,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     'manager-tool-parity-04-requirements-1280x720',
     'manager-tool-parity-05-validation-1280x720',
   ]) {
-    assert.ok(
-      HARNESS.includes(`captureToolStudioProduct(page, '${label}', wideGeometry)`),
+    assert.match(
+      HARNESS,
+      new RegExp(String.raw`captureToolStudioProduct\(\s*ctx,\s*'${label}',\s*wideGeometry\s*\)`),
       `${label} must capture the truthful settled wide product frame`,
     );
   }
-  assert.ok(
-    HARNESS.includes(
-      "captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry)"
-    ),
+  assert.match(
+    HARNESS,
+    /captureToolStudioProduct\(\s*ctx,\s*'manager-tool-parity-06-breakage-900x700',\s*narrowGeometry\s*\)/,
     'the 900px parity frame must capture the truthful settled narrow product frame',
   );
   assert.match(
@@ -1675,23 +1720,23 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /const addRepairAlternative = firstRepairGroup\.locator\('\[data-recipe-add="alternative-component"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
+    /const addRepairAlternative = firstRepairGroup\.locator\(\s*'\[data-recipe-add="alternative-component"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairAlternative,[\s\S]*?Tool repair OR add-component control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair OR add'/,
   );
   assert.match(
     HARNESS,
-    /const addRepairGroup = editor\.locator\('\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\);[\s\S]*?assertPointerTarget\(page, addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
+    /const addRepairGroup = editor\.locator\(\s*'\[data-tool-repair-requirements\] \[data-recipe-add="tag-requirement"\]'\s*\);[\s\S]*?assertPointerTarget\(\s*page,\s*addRepairGroup,[\s\S]*?Tool repair AND control[\s\S]*?withSingleToolStoreMutation\([\s\S]*?'Tool repair AND add'/,
     'the repair group control must choose one strict-safe pointer target and mutate once',
   );
   assert.doesNotMatch(HARNESS, /\.manager-tool-repair-add-option select/);
   assert.doesNotMatch(HARNESS, /\.manager-recipe-or-trigger/);
   assert.match(
     HARNESS,
-    /const componentTarget = replacementGrid\.locator\('\.manager-tool-replacement-component-trigger'\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/,
+    /const componentTarget = replacementGrid\.locator\(\s*'\.manager-tool-replacement-component-trigger'\s*\);[\s\S]*?'Component replacement selection'[\s\S]*?\(\) => componentOption\.click\(\)[\s\S]*?Component replacement selection did not update the draft control/,
   );
   assert.doesNotMatch(toolStudioWalk, /Direct Item replacement|data-tool-replacement-type|data-tool-replacement-picker/);
   assert.match(
     toolStudioWalk,
-    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
+    /withSingleToolStoreMutation\(\s*page,\s*'setToolBreakageAuthority',\s*'check-driven authority',\s*\(\) => checkDriven\.click\(\),\s*\(\) => waitForToolBreakageAuthority\(page, systemId\),?[\s\S]*?withSingleToolDraftTransition\(\s*page,\s*fixture\.toolId,\s*'check-driven Tool Edit route'/,
     'the persisted + projected authority mutation must settle before the exactly-once Edit route',
   );
   assert.match(
@@ -1701,15 +1746,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
   assert.match(
     HARNESS,
-    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
+    /async function waitForToolBreakageAuthority[\s\S]*?getCraftingSystemManager\(\)\.getSystem\(systemId\)\s*\?\.toolBreakage\?\.authority[\s\S]*?__fabricateSmokeManagerApp\?\._adminStore\?\.viewState\?\.subscribe[\s\S]*?timeout: 10_000/,
   );
   assert.match(
     toolStudioWalk,
-    /const liveManagerApp = await requireSingleLocator\(page\.locator\('#fabricate-crafting-system-manager'\), 'live Crafting System Manager app'\);[\s\S]*?const editorManager = liveManagerApp\.locator\('\.fabricate-manager\[data-manager-view="tool-edit"\]'\);/,
+    /const liveManagerApp = await requireSingleLocator\(\s*page\.locator\('#fabricate-crafting-system-manager'\),\s*'live Crafting System Manager app'\s*\);[\s\S]*?const editorManager = liveManagerApp\.locator\(\s*'\.fabricate-manager\[data-manager-view="tool-edit"\]'\s*\);/,
   );
   assert.match(
     toolStudioWalk,
-    /const immuneOnBreakFieldset = editor\.locator\('\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{ state: 'visible', timeout: 10_000 \}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
+    /const immuneOnBreakFieldset = editor\.locator\(\s*'\[data-tool-breakage-tab\]:has\(input\[name="tool-check-breakable"\]\[value="immune"\]:checked\) \[data-tool-on-break-controls\]:disabled'\s*\);[\s\S]*?await immuneOnBreakFieldset\.waitFor\(\{\s*state: 'visible',\s*timeout: 10_000,?\s*\}\);[\s\S]*?await assertDisabledToolOnBreakFieldset\(immuneOnBreakFieldset\);/,
   );
   assert.match(
     HARNESS,
@@ -1747,7 +1792,7 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   // through that helper's `restore` slot — never that it merely mentions the function.
   assert.match(
     HARNESS,
-    /runFixturedScreenshotSection\(\{[\s\S]*?step: 'tool-studio-evidence',[\s\S]*?restore: \(fixture\) => restoreToolStudioFixture\(/,
+    /runFixturedScreenshotSection\(\{[\s\S]*?step: 'tool-studio-evidence',[\s\S]*?restore: \(fixture\) =>\s*restoreToolStudioFixture\(/,
     'the Tool Studio section must hand its restore to the shared fixtured-section helper',
   );
   assert.match(
@@ -1959,7 +2004,7 @@ test('the Knowledge walk seeds every projected state, proves the inert merge, an
   // The section wires the shared lifecycle helper and restores in its `finally` slot.
   assert.match(
     HARNESS,
-    /shouldRunScreenshotSection\('knowledge'\)[\s\S]*?runFixturedScreenshotSection\(\{[\s\S]*?step: 'knowledge-surface-evidence',[\s\S]*?restore: \(fixture\) => restoreKnowledgeFixture\(/,
+    /section: 'knowledge'[\s\S]*?runFixturedScreenshotSection\(\{[\s\S]*?step: 'knowledge-surface-evidence',[\s\S]*?restore: \(fixture\) =>\s*restoreKnowledgeFixture\(/,
     'the Knowledge section must hand its restore to the shared fixtured-section helper',
   );
   // The narrow frame is captured ABOVE the 831px collapse, which is the band where
@@ -2071,7 +2116,7 @@ test('the Tool Studio fixture composes durable Tool identity through the canonic
   assert.match(HARNESS, /source\.unsetFlag\('fabricate', 'fabricate\.roles'\)/);
   assert.match(
     HARNESS,
-    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\) await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
+    /if \(source\) \{\s*await source\.unsetFlag\('fabricate', 'fabricate\.roles'\);\s*if \(fixture\.sourceRoles\)\s*await source\.setFlag\('fabricate', 'fabricate\.roles', fixture\.sourceRoles\);\s*if \(fixture\.sourceCreated\) await source\.delete\(\);\s*\}/,
     'restoration must clear the fixture leaf, restore any prior roles snapshot, and delete the owned Smith fixture',
   );
   assert.match(
@@ -2112,13 +2157,19 @@ test('an unknown section name is fail-safe (runs) rather than silently skipped',
   assert.equal(isD0SectionNeededForTargets('not-a-real-section', ['manager-recipes-normal']), true);
 });
 
-test('the harness wires a scoped-skip guard for every declared section (drift guard)', () => {
+test('the walk registers a scoped-skip section for every declared section (drift guard)', () => {
+  // The guard is no longer a literal per block: `runScenarios` reads each scenario's `section` and
+  // skips it, so what must not drift is the registry's section map.
+  const registered = new Set(
+    [...flattenScenarios(SMOKE_SCENARIOS)].map((scenario) => scenario.section).filter(Boolean)
+  );
   for (const section of D0_SKIPPABLE_SECTIONS) {
     assert.ok(
-      HARNESS.includes(`shouldRunScreenshotSection('${section.name}')`),
-      `section '${section.name}' has no shouldRunScreenshotSection guard in the harness — it would never be skipped`,
+      registered.has(section.name),
+      `section '${section.name}' has no registered scenario — it would never be skipped`,
     );
   }
+  assert.match(smokeModule('runScenarios.mjs'), /ctx\.shouldRunScreenshotSection\(scenario\.section\)/);
   // The guard is inert under rc/ci/full: it short-circuits true when scoping is off.
   assert.ok(/function shouldRunScreenshotSection[\s\S]*?if \(!SCREENSHOT_SCOPING_ACTIVE\) return true;/.test(HARNESS));
 });
@@ -2133,22 +2184,16 @@ test('no skippable-section label sits inside a DIFFERENT section\'s guard block 
   // captureRecipeEditorRoundtrip -> 'manager-recipes-editor-roundtrip') fall in no span
   // and are simply never attributed here — the invariant is only that a label must never
   // land in the WRONG span, which such labels cannot.
-  const guards = D0_SKIPPABLE_SECTIONS.map(section => {
-    const at = HARNESS.indexOf(`shouldRunScreenshotSection('${section.name}')`);
-    assert.ok(at !== -1, `section '${section.name}' guard not found in harness`);
-    return { name: section.name, at };
-  }).sort((a, b) => a.at - b.at);
-
-  for (let i = 0; i < guards.length; i += 1) {
-    const start = guards[i].at;
-    const end = i + 1 < guards.length ? guards[i + 1].at : HARNESS.length;
-    const span = HARNESS.slice(start, end);
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    const at = SMOKE_SOURCE_SEGMENTS.findIndex((text) => text.includes(`section: '${section.name}'`));
+    assert.ok(at >= 0, `section '${section.name}' has no owning module`);
+    const span = SMOKE_SOURCE_SEGMENTS[at];
     for (const other of D0_SKIPPABLE_SECTIONS) {
-      if (other.name === guards[i].name) continue;
+      if (other.name === section.name) continue;
       for (const label of other.labels) {
         assert.ok(
           !span.includes(`'${label}'`),
-          `label '${label}' is mapped to section '${other.name}' but its literal sits inside the '${guards[i].name}' guard block — a scoped run for '${other.name}' would skip its frame (cross-section drift)`,
+          `label '${label}' is mapped to section '${other.name}' but its literal sits in the '${section.name}' scenario module — a scoped run for '${other.name}' would skip its frame (cross-section drift)`,
         );
       }
     }

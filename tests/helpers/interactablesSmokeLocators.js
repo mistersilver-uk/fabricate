@@ -1,5 +1,5 @@
 /** The Foundry smoke harness read as the OTHER END of a hand-maintained mirror (issue 1520). */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -7,12 +7,38 @@ import assert from 'node:assert/strict';
 import { byCodePoint } from './ratchetBaseline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(__dirname, '../..');
 
-/** The Foundry smoke harness, whole. Read once; every consumer reads the same text. */
-export const SMOKE_SOURCE = readFileSync(
-  resolve(__dirname, '../../scripts/foundry-test-run.mjs'),
-  'utf8'
+/**
+ * A lazy `[\s\S]*?` scan must not run from one module into the next, so the concatenation below
+ * is joined by this marker and scanners that use one split on it first.
+ */
+export const SMOKE_SOURCE_BOUNDARY = '\n/* ==== fabricate smoke module boundary ==== */\n';
+
+const smokeModulesIn = (relativeDir) =>
+  readdirSync(resolve(REPO_ROOT, relativeDir))
+    .filter((entry) => entry.endsWith('.mjs'))
+    .sort(byCodePoint)
+    .map((entry) => `${relativeDir}/${entry}`);
+
+/**
+ * Every file the smoke walk lives in: the runner, then the modules it drives. Derived from the
+ * directory rather than listed, so a new module cannot be missed (issue 1692).
+ */
+export const SMOKE_SOURCE_FILES = [
+  'scripts/foundry-test-run.mjs',
+  ...smokeModulesIn('scripts/foundry-smoke'),
+  ...smokeModulesIn('scripts/foundry-smoke/pageOps'),
+  ...smokeModulesIn('scripts/foundry-smoke/scenarios'),
+];
+
+/** Each file's text, in `SMOKE_SOURCE_FILES` order. Read once; every consumer reads the same text. */
+export const SMOKE_SOURCE_SEGMENTS = SMOKE_SOURCE_FILES.map((file) =>
+  readFileSync(resolve(REPO_ROOT, file), 'utf8')
 );
+
+/** The Foundry smoke walk, whole, as one text. */
+export const SMOKE_SOURCE = SMOKE_SOURCE_SEGMENTS.join(SMOKE_SOURCE_BOUNDARY);
 
 /**
  * Read a Svelte root's source by repository-relative path.

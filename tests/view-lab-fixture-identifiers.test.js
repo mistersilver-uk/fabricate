@@ -11,6 +11,7 @@ import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 import { buildLabActors, buildDocumentIndex } from './view-lab/world/labActors.js';
 import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   buildLabRunStates,
@@ -644,7 +645,7 @@ test('future authored stages acquire preview projections only after the builder,
 });
 
 test('shared smoke Journal walk uses selection-button identity and composite detail keys', () => {
-  const source = readFileSync(new URL('../scripts/foundry-test-run.mjs', import.meta.url), 'utf8');
+  const source = SMOKE_SOURCE;
   const start = source.indexOf('const journalActiveCard =');
   const end = source.indexOf('let journalErr =', start);
   assert.ok(start > 0 && end > start);
