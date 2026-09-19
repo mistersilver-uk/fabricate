@@ -240,6 +240,46 @@ describe('the library survives the WHOLE import composition, not just the merge 
     assert.ok(realmIds(persisted).includes(VALE_ID), 'and the place it names arrived with it');
   });
 
+  it('lands BOTH libraries before an enabled automatic environment that needs them', async () => {
+    // Issues 1315 and 1848 each moved a library ahead of the environments; the release backport
+    // of 1848 briefly persisted the environments twice, once BEFORE the task library. An enabled
+    // automatic environment is the shape that notices: its enable gate asks the live task library
+    // whether anything composes, so an import into a world with neither library used to reject it.
+    const world = destinationWorld();
+    const task = {
+      id: 'task-vale-forage',
+      name: 'Forage the vale',
+      enabled: true,
+      biomes: [],
+      weather: [],
+      timeOfDay: [],
+      dropRows: [],
+    };
+    // Forced rather than matched, so the test asks only "is the task library there yet" and not
+    // the automatic matching rule: a forced id still has to name a record the library holds.
+    const environment = { ...realmGatedEnvironment(), enabled: true, forcedTaskIds: [task.id] };
+    const envelope = buildExportPayload(
+      sourceSystem(),
+      [],
+      '1.27.0',
+      [environment],
+      { systems: { [SOURCE_SYSTEM_ID]: { tasks: [task] } } },
+      {},
+      worldTravelConfig()
+    );
+
+    await runWholeComposition(world, envelope);
+
+    const library = world.getSetting('gatheringConfig')?.systems ?? {};
+    assert.ok(
+      Object.values(library).some((slice) => (slice?.tasks ?? []).some((t) => t.id === task.id)),
+      'the task library landed under the destination system'
+    );
+    const imported = world.environmentStore.list().find((env) => env.name === 'Vale Foraging');
+    assert.equal(imported.enabled, true, 'the enable gate was answered against the imported library');
+    assert.deepEqual(imported.includedRealmIds, [VALE_ID], 'and the realm gate survived too');
+  });
+
   it('seeds the reveal mode and modifier visibility into an unconfigured world', async () => {
     const world = destinationWorld();
     const { persisted } = await runWholeComposition(world, exportedEnvelope());

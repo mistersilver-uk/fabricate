@@ -22,7 +22,7 @@ src/models/Recipe.js::_validate	126
 src/models/Recipe.js::constructor	107
 src/systems/AlchemyListingBuilder.js::buildListing	120
 src/systems/BulkSalvageService.js	816
-src/systems/CompendiumImporter.js	1547
+src/systems/CompendiumImporter.js	1546
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
 src/systems/CompendiumImporter.js::importFromPackData	291
 src/systems/CraftingEngine.js	9969
