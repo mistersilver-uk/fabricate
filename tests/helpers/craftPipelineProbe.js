@@ -401,11 +401,18 @@ function probeIngredientSet(id, ingredients, currencySpends, shortAllocation) {
 
 /**
  * The per-group ingredient option the craftability gate resolves through `optionOverrides` (issue
- * 552): each option names the one component that funds it, so an unstocked choice reports missing.
+ * 552): `group.options` is an ordered array of the componentIds that fund each option, exactly the
+ * shape `resolveGroupOverride` (`src/models/ingredientAssignment.js:615-621`) reads — a valid
+ * integer `optionIndex` in range picks that option, anything else (absent, non-integer, or
+ * out-of-range) falls back to index 0. An unstocked choice reports missing.
  */
 function optionGroupShortfall(actors, optionGroups, optionOverrides) {
   for (const [groupId, group] of Object.entries(optionGroups)) {
-    const componentId = group.options[optionOverrides?.[groupId] ?? group.defaultOptionId];
+    const options = group.options || [];
+    const raw = optionOverrides?.[groupId];
+    const idx = Number(raw?.optionIndex);
+    const valid = raw && Number.isInteger(idx) && idx >= 0 && idx < options.length;
+    const componentId = options[valid ? idx : 0];
     const stocked = actors.some((actor) =>
       (actor.items || []).some((item) => item.componentId === componentId)
     );
