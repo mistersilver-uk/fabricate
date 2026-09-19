@@ -29,9 +29,7 @@ function restoreGlobals(saved) {
   }
 }
 
-/**
- * A coherent fake Foundry runtime that records created Region + Tile documents and notifications.
- */
+/** A coherent fake Foundry runtime recording created Region + Tile documents and notifications. */
 function installFakeFoundry({
   isGM = true,
   tools = [{ id: 'tool-1' }],
@@ -61,8 +59,7 @@ function installFakeFoundry({
   const user = { id: 'gm-1', isGM };
   globalThis.game = {
     user,
-    // When this client is the GM, it is also the active GM (same object so the
-    // `game.user === game.users.activeGM` identity gate passes).
+    // A GM client is also the active GM: one object, so the identity gate passes.
     users: { activeGM: isGM ? user : { id: 'gm-other' }, get: () => user },
     time: { worldTime: 0, calendar: null },
     socket: { emit: () => {} },
@@ -131,8 +128,6 @@ const TOOL_DROP = { fabricate: { interactableType: 'tool', systemId: 'sysA', too
 const TASK_DROP = { fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } };
 const FOREIGN_DROP = { type: 'Item', uuid: 'Item.unknown' };
 
-// --- register() seam set ----------------------------------------------------
-
 test('register() binds ONLY dropCanvasData + controlToken, once', () => {
   const saved = snapshotGlobals();
   try {
@@ -176,8 +171,6 @@ test('register() registers the "interact here" client keybinding when the API ex
   }
 });
 
-// --- _onDrop SUPPRESSION CONTRACT + GM gate ---------------------------------
-
 test('_onDrop returns false (suppresses Foundry) for a Fabricate Tool drop', async () => {
   const saved = snapshotGlobals();
   try {
@@ -217,8 +210,6 @@ test('_onDrop GM-gate: a non-GM is suppressed, warned, and spawns nothing', asyn
   }
 });
 
-// --- transaction-like Region + linked Tile spawn ----------------------------
-
 test('_spawnInteractableRegion creates a Region (with nested behaviour) + linked Tile and writes the ref back', async () => {
   const saved = snapshotGlobals();
   try {
@@ -246,19 +237,14 @@ test('_spawnInteractableRegion creates a Region (with nested behaviour) + linked
     assert.equal(regionPayload.behaviors[0].system.interactableType, 'tool');
     assert.equal(regionPayload.behaviors[0].system.sourceUuid, 'Fabricate.sysA.tool.tool-1');
     assert.equal(regionPayload.shapes[0].type, 'rectangle');
-    // Issue 533: a Fabricate-CREATED region is stamped with the ownership flag so
-    // its later deletion may safely remove the whole region (a promoted user region
-    // never gets this flag, so its delete removes only Fabricate's behaviour).
+    // Issue 533: only a Fabricate-CREATED region is flagged, so only its delete takes the region.
     assert.equal(regionPayload.flags.fabricate.interactableRegion, true);
 
     assert.equal(createdTiles.length, 1, 'one linked Tile created');
-    // The linked Tile is CENTERED on its stored x/y (Foundry renders tiles
-    // centered), so the tile's stored x/y IS the drop point.
+    // Foundry renders a Tile CENTRED on its stored x/y, so that x/y IS the drop point.
     assert.equal(createdTiles[0].x, 150, 'tile center == drop point x');
     assert.equal(createdTiles[0].y, 250, 'tile center == drop point y');
-    // The Region rectangle renders TOP-LEFT at its x/y, so to OVERLAY the tile it
-    // is created at the tile's top-left (`tile.x - width/2`, `tile.y - height/2`)
-    // with the tile's width/height — i.e. the region covers the tile's footprint.
+    // A Region renders TOP-LEFT, so overlaying the tile means `tile.x - width/2` at its footprint.
     assert.equal(regionPayload.shapes[0].x, createdTiles[0].x - createdTiles[0].width / 2);
     assert.equal(regionPayload.shapes[0].y, createdTiles[0].y - createdTiles[0].height / 2);
     assert.equal(regionPayload.shapes[0].width, createdTiles[0].width);
@@ -375,8 +361,6 @@ test('_spawnInteractableRegion notifies + aborts when the Region create fails (n
   }
 });
 
-// --- gathering-task env-resolution still gates the region spawn -------------
-
 const SYS_A_ENVS = [
   { id: 'env-forest', craftingSystemId: 'sysA', name: 'Forest' },
   { id: 'env-cave', craftingSystemId: 'sysA', name: 'Cave' }
@@ -435,17 +419,13 @@ test('(d) dialog cancel → NO region created (abort)', async () => {
   }
 });
 
-// --- onRegionEnter prompt gate ----------------------------------------------
-
 /**
- * A `fabricate.interactable` behaviour on a region on a scene, wired the way real Foundry wires
- * them: `behavior.parent` is the region, `region.parent` is the scene, and every token document in
- * `scene.tokens` has that same scene as its `parent`.
+ * A behaviour wired the way real Foundry wires one: `behavior.parent` is the region, `region.parent`
+ * the scene, and every token document in `scene.tokens` carries that same scene as its `parent`.
  */
 function interactableBehavior({ system, sceneId = 'scene-1', regionId = 'region-1', behaviorId = 'beh-1', testPoint = () => true, tokens = [], gridSize = 100 } = {}) {
   const scene = gridScene({ id: sceneId, gridSize });
-  // `tokens` may be a factory so a token document can be parented to THIS scene
-  // (real Foundry guarantees `tokenDoc.parent === scene` for embedded tokens).
+  // `tokens` may be a factory, so a token document can be parented to THIS scene as Foundry does.
   scene.tokens.contents.push(...(typeof tokens === 'function' ? tokens(scene) : tokens));
   const region = {
     id: regionId,
@@ -492,8 +472,6 @@ test('onRegionEnter shows the prompt when the controlling user is the mover (and
     restoreGlobals(saved);
   }
 });
-
-// --- _shouldPromptForEnter guard matrix -------------------------------------
 
 test('_shouldPromptForEnter matrix: mover, non-GM owner, GM autonomous-player move, non-owner', () => {
   const saved = snapshotGlobals();
@@ -582,8 +560,7 @@ test('onRegionEnter SHOWS the prompt for a LOCKED interactable (lock has teeth a
       { user: me, data: { token: { document: { isOwner: true, actor: { id: 'a1' } } } } },
       interactableBehavior({ system: lockedSystem })
     );
-    // A locked interactable is VISIBLE: the prompt fires; the LOCKED denial is
-    // routed only when the player presses Interact (validateActivationRequest).
+    // A locked interactable is VISIBLE: the denial routes only when the player presses Interact.
     assert.equal(shows.length, 1, 'a locked interactable still raises the prompt');
     assert.equal(typeof shows[0].onInteract, 'function', 'and Interact is wired (the denial routes from there)');
   } finally {
@@ -638,15 +615,12 @@ test('onRegionEnter uses the ENTERING token actor, never the linked Token marker
     const me = { id: 'u-1' };
     globalThis.game.user = me;
 
-    // The interactable links a Token marker owned by a DIFFERENT actor (e.g. a
-    // merchant NPC the GM placed). The entering player drives their OWN token.
+    // The interactable links a Token marker owned by a DIFFERENT actor; the player drives theirs.
     const linkedTokenSystem = {
       ...TOOL_SYSTEM,
       linkedVisual: { uuid: 'Scene.scene-1.Token.merchant', documentName: 'Token', mode: 'marker', missingPolicy: 'warn' }
     };
-    // The region-enter event's `data.token` is the entering TokenDocument: its
-    // actor info lives directly on it (that is where onRegionEnter reads actorId),
-    // while `_shouldPromptForEnter` reads ownership off `.document`.
+    // `data.token` is the entering TokenDocument: actor info sits on it, ownership on `.document`.
     const enteringToken = {
       isOwner: true,
       actor: { id: 'player-actor' },
@@ -661,8 +635,7 @@ test('onRegionEnter uses the ENTERING token actor, never the linked Token marker
     manager.onRegionEnter({ user: me, data: { token: enteringToken } }, interactableBehavior({ system: linkedTokenSystem }));
     assert.equal(shows.length, 1, 'the controlling user sees the prompt');
 
-    // Invoking the prompt fires the activation request — its actorId must be the
-    // ENTERING token's actor, never the linked merchant Token's actor.
+    // The request's actorId must be the ENTERING token's actor, never the linked marker's.
     shows[0].onInteract();
     assert.ok(requestedCtx, 'the prompt drives an activation request');
     assert.equal(requestedCtx.actorId, 'player-actor', 'activation uses the entering token actor');
@@ -681,8 +654,7 @@ test('onRegionExit dismisses the prompt by ref UNCONDITIONALLY (no mover gate)',
     const me = { id: 'u-1', isGM: false };
     const other = { id: 'u-2', isGM: false };
     globalThis.game.user = me;
-    // A DIFFERENT user (e.g. the GM staged the token and the player walks it out) moved the token
-    // out; this client still dismisses by ref.
+    // A DIFFERENT user moved the token out; this client still dismisses by ref.
     manager.onRegionExit(
       { user: other, data: { token: { document: { isOwner: false } } } },
       interactableBehavior({ system: TOOL_SYSTEM })
@@ -692,8 +664,6 @@ test('onRegionExit dismisses the prompt by ref UNCONDITIONALLY (no mover gate)',
     restoreGlobals(saved);
   }
 });
-
-// --- _requestActivation routing (active GM vs socket vs no-GM) ---------------
 
 test('_requestActivation validates+grants LOCALLY when this client is the active GM', () => {
   const saved = snapshotGlobals();
@@ -751,8 +721,6 @@ test('_requestActivation warns + aborts when NO active GM is connected', () => {
     restoreGlobals(saved);
   }
 });
-
-// --- validateAndGrant (active GM) → grant emit/local open --------------------
 
 /** Shared harness for the validateAndGrant tests, mirroring `setupReprompt`. */
 function setupValidateAndGrant({
@@ -817,8 +785,7 @@ test('validateAndGrant emits a tool grant (with activeCanvasTool) to the request
 test('validateAndGrant REJECTS a non-GM requester who does NOT control the named actor (no grant, no open)', async () => {
   const saved = snapshotGlobals();
   try {
-    // The validating client is the active GM, but the REQUESTER (u-1) is a non-GM player who does
-    // NOT own actor a1 (testUserPermission → false).
+    // The validating client is the active GM; the REQUESTER u-1 does not own actor a1.
     const { manager, emits, request } = setupValidateAndGrant({ canControlActor: false });
     let opened = null;
     manager.openGrant = (payload) => { opened = payload; };
@@ -867,9 +834,8 @@ test('validateAndGrant notifies LOCALLY (no socket) when the GM requester is den
   }
 });
 
-// validateAndGrant containment re-check (issue 999). The re-check runs on the ACTIVE GM'S client,
-// which may not be viewing the requester's scene, so no token document here has a placeable
-// (`object`).
+// Containment re-check (issue 999): it runs on the ACTIVE GM's client, which may not be viewing
+// the requester's scene, so no token document here has a placeable.
 const CONTAINMENT_RECT = { x: 100, y: 100, w: 100, h: 100 };
 
 /** A region testPoint recording every submitted point on `calls`. */
@@ -886,9 +852,8 @@ function recordingRectTestPoint(calls, rect = CONTAINMENT_RECT) {
 test('validateAndGrant ADMITS a token whose CENTRE is inside on a GM client with no rendered canvas (issue 999)', async () => {
   const saved = snapshotGlobals();
   try {
-    // The headline regression: the GM validating this request is not viewing the scene, so
-    // `tokenDoc.object` is null and the old code fell back to the token's top-left anchor — ~70px
-    // off-centre for a Medium token — and denied a player standing squarely in the region.
+    // The headline regression: with `tokenDoc.object` null the old code used the top-left anchor,
+    // ~70px off-centre for a Medium token, and denied a player standing squarely inside.
     const points = [];
     const { manager, emits, request } = setupValidateAndGrant({
       testPoint: recordingRectTestPoint(points),
@@ -925,9 +890,8 @@ test('validateAndGrant DENIES TOKEN_NOT_INSIDE when the token is genuinely outsi
 test('validateAndGrant DENIES when Foundry containment says outside even though the centre is inside (issue 999)', async () => {
   const saved = snapshotGlobals();
   try {
-    // `TokenDocument#testInsideRegion` knows the footprint, the elevation band and
-    // (on V14) the scene level; the centre-point test is a strictly worse
-    // approximation and must never overturn it.
+    // `testInsideRegion` knows the footprint, band and level; the centre point is strictly worse
+    // and must never overturn it.
     const points = [];
     const { manager, emits, request } = setupValidateAndGrant({
       testPoint: recordingRectTestPoint(points),
@@ -1035,8 +999,6 @@ test('validateAndGrant opens LOCALLY when the GM activated their own token (no s
   }
 });
 
-// --- openGrant → SvelteFabricateApp.show -------------------------------------
-
 test('openGrant opens the CRAFTING tab with the tool activeCanvasTool', () => {
   const saved = snapshotGlobals();
   try {
@@ -1085,13 +1047,6 @@ test('openGrant opens a gathering-task session scoped to env+task with NO node o
   }
 });
 
-// --- issue 332: re-prompt after the gathering window closes ------------------
-
-/**
- * Build a canvas scene fake usable by BOTH the close re-prompt resolver (`scene.tokens` +
- * `selectRepromptTokenDoc`) and the existing re-prompt path (`interactableBehaviorsContainingToken`
- * over `scene.regions`, then `identifyRegionBehaviorRef` over `behavior.parent`/`region.parent`).
- */
 const REPROMPT_REF = { sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1' };
 
 /**
@@ -1105,20 +1060,17 @@ function buildRepromptScene({ system = TOOL_SYSTEM, regionContains = true, actor
   const behavior = { id: 'beh-1', type: 'fabricate.interactable', system, parent: region };
   region.behaviors = { contents: [behavior] };
   scene.regions = { contents: [region] };
-  // `_ownsToken` reads the token document's `isOwner` boolean for a non-GM user.
+  // Ownership reads the token document's `isOwner` boolean for a non-GM user.
   const tokenDoc = { actorId, actor: { id: actorId }, isOwner };
-  // The live placeable references its document (Foundry's placeable→document link)
-  // and carries the center the hit-test reads.
+  // The live placeable references its document and carries the centre the hit-test reads.
   tokenDoc.object = { center: { x: 50, y: 50 }, document: tokenDoc };
   if (tokenInScene) scene.tokens.contents.push(tokenDoc);
   return { scene, region, behavior, tokenDoc };
 }
 
 /**
- * Shared harness for the issue-332 close-reprompt tests: installs the fake runtime, a non-GM
- * controlling user, the re-prompt scene (as the active + lookup scene unless `viewedScene`
- * overrides the active one), an app `show` recorder, and a prompt recorder injected into the
- * manager.
+ * Harness for the issue-332 close-reprompt tests: the fake runtime, a non-GM controlling user, the
+ * re-prompt scene (active and lookup unless `viewedScene` overrides), and two recorders.
  */
 function setupReprompt(sceneOpts = {}, { viewedScene } = {}) {
   installFakeFoundry({ isGM: false });
@@ -1231,14 +1183,12 @@ test('the close re-prompt never throws on a malformed ref or missing globals (is
 test('the close re-prompt does NOT fire for a token the player does not control (issue 332)', () => {
   const saved = snapshotGlobals();
   try {
-    // A non-GM user (installed by setupReprompt) whose token is still inside the
-    // region but is NOT owned by this client: `_ownsToken` reads `isOwner:false`.
+    // A non-GM user whose token is still inside the region but is NOT owned by this client.
     const { manager, prompts } = setupReprompt({ regionContains: true, isOwner: false });
     manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
     assert.equal(prompts.length, 0, 'an unowned token in-region is not re-prompted on close');
 
-    // Control: the SAME in-region scenario WITH ownership DOES re-prompt, proving
-    // the guard above suppressed a path that would otherwise have fired.
+    // Control: the SAME scenario WITH ownership DOES re-prompt, so the guard is not a dead path.
     const owned = setupReprompt({ regionContains: true, isOwner: true });
     owned.manager._repromptAfterInteractableClose({ ref: REPROMPT_REF, actorId: 'actor-1' });
     assert.equal(owned.prompts.length, 1, 'the owned equivalent IS re-prompted (the guard is not a dead path)');
@@ -1251,8 +1201,7 @@ test('the close re-prompt delegates to the shared _promptForTokenInsideRegion pa
   const saved = snapshotGlobals();
   try {
     const { manager, tokenDoc } = setupReprompt({ regionContains: true });
-    // Spy on the shared re-prompt path: a future duplicated show-path would bypass
-    // this and fail the call-count assertion.
+    // Spy on the shared path: a duplicated show-path would bypass this and fail the count.
     const calls = [];
     manager._promptForTokenInsideRegion = (p) => calls.push(p);
 

@@ -1,7 +1,6 @@
 /**
- * The Interact prompt's lifecycle: the `tokenEnter`/`tokenExit` seams, the control and keybinding
- * re-triggers for a token already inside, and the post-close re-prompt. Every Foundry collaborator
- * is an injected function resolved at call time; this module reads no global.
+ * The Interact prompt's lifecycle: the region enter and exit seams, the control and keybinding
+ * re-triggers for a token already inside, and the post-close re-prompt, over call-time functions.
  */
 
 import {
@@ -16,9 +15,8 @@ import { readInteractableBehaviorSystem } from './regions/interactableRegionFlag
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
 /**
- * `tokenEnter` seam, on every client. Prompts per {@link shouldPromptForEnter} when the behaviour
- * is `regionEnter`-triggered and currently visible — the prompt is gated on VISIBILITY, not
- * eligibility, so a LOCKED interactable still prompts and Interact routes the localized denial.
+ * `tokenEnter` seam, on every client. Gated on VISIBILITY, not eligibility, so a LOCKED
+ * interactable still prompts and Interact is what routes its localized denial.
  */
 export function onRegionEnter(event, behavior, deps) {
   const system = readInteractableBehaviorSystem(behavior);
@@ -35,9 +33,8 @@ export function onRegionEnter(event, behavior, deps) {
 }
 
 /**
- * `tokenExit` seam: dismiss UNCONDITIONALLY. `PromptApp.dismiss(ref)` is ref-matched and a no-op
- * elsewhere, so the showing clients drop it however the token left — the stale-prompt case where
- * a GM staged a player's token and the player walks out.
+ * `tokenExit` seam: dismiss UNCONDITIONALLY. The dismissal is ref-matched and a no-op elsewhere, so
+ * the showing clients drop it however the token left, GM-staged or walked out.
  */
 export function onRegionExit(_event, behavior, deps) {
   const ref = identifyRegionBehaviorRef(behavior);
@@ -71,8 +68,7 @@ export function promptForTokenInsideRegion(tokenPlaceable, deps) {
 
 /**
  * Re-raise the prompt after a gathering session closes, iff the token is still inside (issue 332),
- * through the injected {@link promptForTokenInsideRegion}, which re-applies the hit-test, guard
- * and ref-matching. No-throw: a close-handler error must never break the app close.
+ * through the injected re-prompt, which re-applies the hit-test, guard and ref-matching. No-throw.
  */
 export function repromptAfterClose({ ref, actorId } = {}, deps) {
   try {

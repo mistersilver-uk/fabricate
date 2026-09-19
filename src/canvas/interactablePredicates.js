@@ -1,7 +1,6 @@
 /**
- * The pure decisions and shape tolerance behind `InteractableManager`: ownership, prompt
- * eligibility, containment, drop geometry and icon choice. Nothing here reads a Foundry global —
- * every runtime value arrives as a parameter the manager edge computed.
+ * The pure decisions behind `InteractableManager` — ownership, prompt eligibility, containment,
+ * drop geometry, icon choice — with every runtime value a parameter the manager edge computed.
  */
 
 import { regionContainsTokenDocument } from './regionHitTest.js';
@@ -22,11 +21,7 @@ export function ownsToken(token, { isGM } = {}) {
   return false;
 }
 
-/**
- * Which client(s) show the enter prompt: the user who MOVED the token, and a NON-GM player who
- * OWNS it — so a GM dragging a player's token prompts both. Deliberately NOT the
- * GM-owns-everything case, which would spam the GM on every autonomous player move.
- */
+/** The mover and a NON-GM owner see the prompt; never GM-owns-everything, which would spam. */
 export function shouldPromptForEnter({ event, token, currentUser } = {}) {
   const isMover = !!(
     event?.user &&
@@ -61,11 +56,7 @@ function collectionEntries(collection) {
   return [];
 }
 
-/**
- * Is the actor's token still inside? Delegates to {@link regionContainsTokenDocument}, which owns
- * the signal rule (`data-models/spec.md` § fabricate.interactable Region Behaviour, requirement 6).
- * "Cannot locate ⇒ do not block" and "any of the actor's tokens inside admits" are both deliberate.
- */
+/** Containment per `data-models/spec.md` requirement 6: cannot locate ⇒ admit, any token admits. */
 export function tokenInsideRegion({ behavior, actorId } = {}) {
   const region = behavior?.parent ?? null;
   const tokenDocs = sceneTokenDocs(region?.parent ?? null).filter(
@@ -75,7 +66,6 @@ export function tokenInsideRegion({ behavior, actorId } = {}) {
   return tokenDocs.some((tokenDoc) => regionContainsTokenDocument(region, tokenDoc) === true);
 }
 
-/** The scene-space point a `dropCanvasData` payload names. */
 export function dropPoint(data) {
   return { x: Number(data?.x ?? 0), y: Number(data?.y ?? 0) };
 }
@@ -95,11 +85,9 @@ export function canControlActor({ actor, user } = {}) {
 }
 
 /**
- * The region rectangle overlaying a spawn: a Tile renders CENTRED on its stored `x/y` and a Region
- * rectangle TOP-LEFT, so with a marker the region's top-left is `tile.x - tile.width/2`. Emits no
- * anchor — V14's `RectangleShapeData` initialises `anchorX`/`anchorY` at 0, which is this shape —
- * and keeps the non-zero `gridSize` fallback, since V13 requires a positive width and height and
- * resolves a zero one to a silent no-spawn.
+ * The region rectangle overlaying a spawn: a Tile renders CENTRED on its `x/y`, a Region rectangle
+ * TOP-LEFT. It emits no anchor (V14 initialises those at 0) and keeps the non-zero `gridSize`
+ * fallback, since V13 rejects a zero dimension and resolves the create to a silent no-spawn.
  */
 export function regionRectangleFor({ tile, region, gridSize } = {}) {
   if (!tile) {
