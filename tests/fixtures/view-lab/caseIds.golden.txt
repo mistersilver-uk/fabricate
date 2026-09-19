@@ -200,6 +200,7 @@ manager-environment-empty-membership-narrow
 manager-environment-edit-events
 manager-gathering-events-normal
 manager-gathering-event-editor-normal
+manager-gathering-task-drop-modifiers-normal
 manager-world-travel-default-collapsed
 manager-world-travel-expanded-neutral
 manager-world-parties-normal

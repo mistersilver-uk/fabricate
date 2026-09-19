@@ -94,15 +94,20 @@ const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
-// The reward and event limit counts are one shared component (issue 1050).
-const gatheringRuleLimitStepperSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
-  'utf8'
-);
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
 const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
+// The drop inspector's and the rules card's own markup, moved out of the root at issue 1707
+// phase 2 with the branches that drew them.
+const taskInspectorSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte'),
+  'utf8'
+);
+const rulesInspectorSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte'),
+  'utf8'
+);
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const knowledgeSource = readFileSync(knowledgePath, 'utf8');
 const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
@@ -1486,14 +1491,10 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Docs, 'Docs');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.EmptySetup.Title'),
-      'empty environments inspector should use localized setup copy'
-    );
-    assert.ok(
-      rootSource.includes('https://mistersilver-uk.github.io/fabricate/gathering/environments'),
-      'empty environments inspector should link to published gathering docs'
-    );
+    // The empty-library setup card moved into `environment/GatheringInspectorRail.svelte` with the
+    // chain that drew it (issue 1707 phase 3). Its localized copy and its published gathering-docs
+    // link are asserted through the DOM in `manager-environments-mounted.js`, which renders the
+    // rail with an empty library rather than reading either file's text.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.EmptyTitle,
       'Prepare gathering building blocks first'
@@ -1565,10 +1566,9 @@ describe('CraftingSystemManager source contract', () => {
       environmentsBrowserSource.includes('onSelectGatheringTab(tabId)'),
       'gathering page should report tab changes to the root'
     );
-    assert.ok(
-      rootSource.includes('data-gathering-inspector-placeholder'),
-      'right inspector should render placeholders for non-environment gathering tabs'
-    );
+    // The placeholder hook moved into `environment/GatheringInspectorRail.svelte` with the branch
+    // that drew it (issue 1707 phase 3), and is asserted through the DOM in
+    // `manager-gathering-mounted.js` on a non-environment gathering tab.
     assert.equal(
       rootSource.match(/FABRICATE\.Admin\.Manager\.Environment\.Actions/g)?.length ?? 0,
       1,
@@ -1995,9 +1995,14 @@ describe('CraftingSystemManager source contract', () => {
     // NOTE: per-token environment-editor contracts were removed when the editor
     // was placeholder'd out pending redesign. The store wirings above and the
     // settings/browser surfaces below still need to pass.
+    // The card's own hook moved into `environment/GatheringRulesInspector.svelte` with the branch
+    // that drew it (issue 1707 phase 2), and the branch chain itself into
+    // `environment/GatheringInspectorRail.svelte` (phase 3); the root's fact is that it renders the
+    // rail, and the settings arm and the hook are asserted through the DOM in
+    // `manager-environments-mounted.js`.
     assert.ok(
-      rootSource.includes('data-gathering-inspector-rules'),
-      'root should render the settings rules inspector'
+      rootSource.includes('<GatheringInspectorRail'),
+      'root should render the inspector rail that owns the settings branch'
     );
     assert.ok(
       environmentsBrowserSource.includes('data-gathering-condition-panel={condition.kind}'),
@@ -2055,25 +2060,24 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Conditions.NewIcon, 'New value icon');
     // NOTE: vocabulary-CSV contracts on environmentEditSource removed pending editor redesign.
-    assert.ok(rootSource.includes('updateSelectedGatheringRules'), 'root should wire rule updates');
-    assert.ok(
-      rootSource.includes('manager-rule-copy'),
-      'root should render rule descriptions beside inspector icons'
-    );
-    // The two limits are one shared component now (issue 1050).
+    // The rule rows themselves moved into `environment/GatheringRulesInspector.svelte` at issue
+    // 1707 phase 2, and both pins retired with them rather than moving: the shell renders that
+    // leaf (asserted above), and `manager-environments-mounted.js` now changes a rule select and
+    // asserts the payload `updateGatheringRules` receives, which is the fact
+    // `includes('updateSelectedGatheringRules')` stood in for.
+    // The two limits are one shared component now (issue 1050), rendered by the rules leaf since
+    // issue 1707 phase 2. The stepper's own `data-gathering-rule-stepper={rule}` marker retired
+    // from here with that move: `manager-environments-mounted.js` now reveals the reward limit and
+    // acts on `[data-gathering-rule-stepper="rewardLimit"]`, which is that fact in the DOM.
     for (const rule of ['rewardLimit', 'eventLimit']) {
       assert.match(
-        rootSource,
+        rulesInspectorSource,
         new RegExp(String.raw`<GatheringRuleLimitStepper\s+rule="${rule}"`),
-        `root should render the ${rule} stepper`
+        `the rules inspector should render the ${rule} stepper`
       );
     }
     assert.ok(
-      gatheringRuleLimitStepperSource.includes('data-gathering-rule-stepper={rule}'),
-      'the shared limit stepper marks itself with the rules field it edits'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'),
+      rulesInspectorSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'),
       'event rule select should use event-specific drop labels'
     );
     assert.equal(
@@ -2135,13 +2139,15 @@ describe('CraftingSystemManager source contract', () => {
       'onDeleteGatheringTask={deleteGatheringTask}',
       'onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}',
       'store.duplicateGatheringLibraryTask',
-      'data-gathering-task-inspector',
+      // The task and drop inspector markup moved into `environment/GatheringTaskInspector.svelte`
+      // (issue 1707 phase 2) and the chain that picks it into the rail (phase 3), so the root's
+      // fact is that it renders the rail and hands it the drop writers; the hooks and the arm that
+      // selects each leaf are asserted through the DOM in the mounted route modules.
+      '<GatheringInspectorRail',
       'GatheringTaskEditView',
       '{itemCards}',
-      'data-gathering-task-drop-inspector',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'manager-drop-editor-actions',
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
@@ -2249,23 +2255,32 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(chanceSliderSource.includes(snippet), `shared chance slider should include ${snippet}`);
     }
+    // The shell keeps the three helpers and the count keydown; the markup that reads them, and
+    // the shared slider, moved into the task inspector leaf (issue 1707 phase 2).
     for (const snippet of [
-      'manager-drop-editor-values',
-      'data-gathering-drop-inspector-rate',
-      'data-gathering-drop-inspector-count',
       'gatheringDropRateTierClass',
       'gatheringDropRateTierColor',
       'onGatheringDropCountKeydown',
-      'ChanceSlider',
     ]) {
       assert.ok(
         rootSource.includes(snippet),
         `root should include selected drop inspector ${snippet}`
       );
     }
+    for (const snippet of [
+      'manager-drop-editor-values',
+      'data-gathering-drop-inspector-rate',
+      'data-gathering-drop-inspector-count',
+      'ChanceSlider',
+    ]) {
+      assert.ok(
+        taskInspectorSource.includes(snippet),
+        `the task inspector should include selected drop inspector ${snippet}`
+      );
+    }
     // Issue 883: the inspector's slider IS `ChanceSlider`. It used to hand-roll the same
     // track/fill/range structure and its own input/blur/keydown trio beside it, so the
-    // structure and the handlers must be gone from the root, not merely unused — a
+    // structure and the handlers must be gone from the file that draws it, not merely unused — a
     // surviving copy is what the next divergence gets written against.
     for (const dead of [
       'manager-drop-rate-control',
@@ -2276,9 +2291,9 @@ describe('CraftingSystemManager source contract', () => {
       'onGatheringDropRateKeydown',
     ]) {
       assert.equal(
-        rootSource.includes(dead),
+        taskInspectorSource.includes(dead),
         false,
-        `root should render the drop-rate slider through ChanceSlider, not ${dead}`
+        `the task inspector should render the drop-rate slider through ChanceSlider, not ${dead}`
       );
     }
     assert.ok(
@@ -2342,7 +2357,7 @@ describe('CraftingSystemManager source contract', () => {
       'drop quantity row values should not render an extra helper label'
     );
     assert.ok(
-      !rootSource.includes('selectedGatheringDrop.componentId ||'),
+      !taskInspectorSource.includes('selectedDrop.componentId ||'),
       'selected drop inspector should not render a component selector'
     );
     assert.ok(

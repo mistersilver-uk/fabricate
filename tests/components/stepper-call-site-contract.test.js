@@ -10,6 +10,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   CHARACTER_MODIFIER_BOUNDS_PATH,
+  CHARACTER_MODIFIER_PANEL_PATH,
+  CHARACTER_MODIFIER_PANEL_LEAVES,
+  CHARACTER_MODIFIER_RAIL_PATH,
   CHARACTER_MODIFIER_BOUNDS_SCOPES,
   MIGRATED_INPUT_HOOKS,
   MINIMUM_SCANNED_SVELTE_FILES,
@@ -211,18 +214,51 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
   });
 
   it('routes both character-modifier scopes through the one shared bounds row', () => {
-    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max.
+    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max. Since issue
+    // 1707 wrote the modifier panel once, the bounds row has one call site rather than two; phase
+    // 2 then moved the two panel tags into the task and event leaves and phase 3 moved the chain
+    // that picks between them into the rail, so each scope's wiring spans the leaf's panel tag and
+    // the rail's tag for the leaf, and the root carries both scopes through its one rail tag.
     const root = markup['src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'] ?? '';
-    const rendered = [...root.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
+    const rail = markup[CHARACTER_MODIFIER_RAIL_PATH] ?? '';
+    const panel = markup[CHARACTER_MODIFIER_PANEL_PATH] ?? '';
+    const rendered = [...panel.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
       (tag) => tag[0]
     );
-    assert.equal(rendered.length, 2, 'one bounds row per character-modifier scope, no more');
+    assert.equal(rendered.length, 1, 'the shared panel renders the bounds row once, no more');
+    const chains = CHARACTER_MODIFIER_PANEL_LEAVES.map((leaf) => {
+      const leafSource = markup[leaf.path] ?? '';
+      const panelTags = [...leafSource.matchAll(/<GatheringModifierEditor\b[\s\S]*?\/>/g)];
+      const railTags = [...rail.matchAll(new RegExp(`<${leaf.railTag}\\b[\\s\\S]*?\\/>`, 'g'))];
+      return { leaf, panelTags, railTags };
+    });
+    assert.deepEqual(
+      chains.filter(({ panelTags, railTags }) => panelTags.length !== 1 || railTags.length !== 1),
+      [],
+      'each leaf renders the shared panel exactly once and the rail renders that leaf exactly once'
+    );
+    assert.deepEqual(
+      chains.filter(({ leaf, panelTags, railTags }) => {
+        const chain = [...panelTags, ...railTags].map((tag) => tag[0]).join('\n');
+        const other = CHARACTER_MODIFIER_BOUNDS_SCOPES.find((scope) => scope !== leaf.scope);
+        return !chain.includes(leaf.scope) || chain.includes(other);
+      }).map(({ leaf }) => leaf.path),
+      [],
+      'each chain carries its own scope update function and never the other scope\'s'
+    );
+    const rootRailTags = [...root.matchAll(/<GatheringInspectorRail\b[\s\S]*?\/>/g)];
+    assert.equal(rootRailTags.length, 1, 'the root renders the rail exactly once');
+    assert.deepEqual(
+      CHARACTER_MODIFIER_BOUNDS_SCOPES.filter((scope) => !rootRailTags[0][0].includes(scope)),
+      [],
+      'and hands it both scope update functions, since the rail owns the arm that picks each leaf'
+    );
     assert.deepEqual(
       CHARACTER_MODIFIER_BOUNDS_SCOPES.filter(
-        (scope) => rendered.filter((tag) => tag.includes(scope)).length !== 1
+        (scope) => !CHARACTER_MODIFIER_PANEL_LEAVES.some((leaf) => leaf.scope === scope)
       ),
       [],
-      'each scope wires the shared row to exactly one of its own update functions'
+      'both D1a scopes are still named by a leaf that renders the panel'
     );
     // And the component the two of them render really is the one the table entry resolves in,
     // so this cannot pass against some other file with the same tag name.

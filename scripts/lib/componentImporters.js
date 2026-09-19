@@ -54,6 +54,7 @@ export function measureImporters(repoRoot, sourceRoot = 'src') {
   const files = listFiles(path.join(repoRoot, sourceRoot), sourceRoot);
   const known = new Set(files);
   const importers = new Map();
+  const imports = new Map();
   let importEdgeCount = 0;
 
   const codeFiles = files.filter((candidate) => CODE_FILE_PATTERN.test(candidate));
@@ -62,6 +63,8 @@ export function measureImporters(repoRoot, sourceRoot = 'src') {
       if (target === file || !known.has(target)) continue;
       if (!importers.has(target)) importers.set(target, new Set());
       importers.get(target).add(file);
+      if (!imports.has(file)) imports.set(file, new Set());
+      imports.get(file).add(target);
       importEdgeCount += 1;
     }
   }
@@ -69,6 +72,9 @@ export function measureImporters(repoRoot, sourceRoot = 'src') {
   return {
     /** The files that import `file`, in code-point order. */
     importersOf: (file) => [...(importers.get(file) ?? [])].sort(byCodePoint),
+
+    /** The files `file` itself imports, in code-point order. */
+    importsOf: (file) => [...(imports.get(file) ?? [])].sort(byCodePoint),
 
     /** Every resolved import edge in the walked root. */
     importEdgeCount,

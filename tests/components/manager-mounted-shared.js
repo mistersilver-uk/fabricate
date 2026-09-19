@@ -78,6 +78,17 @@ async function prepareManagerSuite() {
     EnvironmentEditViewComponent: await load(
       'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'
     ),
+    // Mounted DIRECTLY at both subjects: the prefix is the whole discriminator (issue 1707).
+    GatheringModifierEditorComponent: await load(
+      'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte'
+    ),
+    // Mounted DIRECTLY to pin `characterModifierSearchOpenUp`'s forward across this boundary too.
+    GatheringTaskInspectorComponent: await load(
+      'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte'
+    ),
+    GatheringEventInspectorComponent: await load(
+      'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
+    ),
     ChecksRightMenuComponent: await load('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte'),
     CraftingCheckEditorComponent: await load(
       'src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'

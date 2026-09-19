@@ -77,7 +77,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
-  '../../components/ChanceSlider.svelte',
   // MOVED BY ISSUE 1506, not added.
   '../../components/Chip.svelte',
   // Moved by issue 1710, not added.
@@ -110,7 +109,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './ImportReportModal.svelte',
   './ItemPageInspector.svelte',
   './KnowledgeView.svelte',
-  './RealmNameField.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
@@ -132,8 +130,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './downtime/WorldDowntimeExtensionHost.svelte',
   './downtime/routeChromeChannel.js',
   './downtime/worldDowntimePreviewProvider.js',
-  './environment/CharacterModifierBoundsRow.svelte',
-  './environment/GatheringRuleLimitStepper.svelte',
+  // Added by issue 1707, which moved the gathering, travel and environment inspector branch out
+  // of the root. The rail owns the whole chain, so it — not the root — imports the four leaves,
+  // `GatheringModifierEditor`, `GatheringRuleLimitStepper`, `ChanceSlider`, `RealmNameField` and
+  // `CharacterModifierBoundsRow`, and the root no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
+  './environment/GatheringInspectorRail.svelte',
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
   './essences/EssenceBulkEditPanel.svelte',

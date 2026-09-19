@@ -66,6 +66,9 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
+      // Issue 1707 moved this column's markup out of the root; `world/` has no directory regex,
+      // so each travel case claims the leaf by name or it stops being photographed.
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -84,6 +87,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -105,6 +109,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -127,6 +132,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -146,6 +152,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -166,6 +173,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -185,6 +193,13 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+      // The only frame that draws the Gathering Rules rail, which issue 1707 moved out of the
+      // root: this is the case that has to fire when its ten selects change.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
+      // And the rail that picks that arm, which phase 3 moved out of the root. On a maintainer
+      // ruling this frame now asks for one when the chain changes, since it is the only case that
+      // photographs the settings arm at all.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({

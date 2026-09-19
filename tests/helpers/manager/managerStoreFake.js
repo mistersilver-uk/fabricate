@@ -1506,6 +1506,42 @@ function createStore(calls = [], options = {}) {
       calls.push(['updateGatheringVocabularyValue', ...args]),
     deleteGatheringVocabularyValue: (...args) =>
       calls.push(['deleteGatheringVocabularyValue', ...args]),
+    // Issue 1707 phase 2: the ten Gathering Rules selects and two drop-limit steppers had no
+    // handler here, so no write could act on that column; this republishes the aggregate.
+    updateGatheringRules: (systemId, updates = {}) => {
+      calls.push(['updateGatheringRules', systemId, updates]);
+      viewState.update((state) => {
+        const systemConfig = state.gatheringConfig?.systems?.[systemId];
+        if (!systemConfig) return state;
+        return {
+          ...state,
+          gatheringConfig: {
+            ...state.gatheringConfig,
+            systems: {
+              ...state.gatheringConfig.systems,
+              [systemId]: { ...systemConfig, rules: { ...systemConfig.rules, ...updates } },
+            },
+          },
+        };
+      });
+      return true;
+    },
+    // The realm inspector's own two writers, absent for the same reason: the root reaches them
+    // through `store.deleteRealm?.()` and `store.renameRealm?.()`.
+    deleteRealm: (realmId) => {
+      calls.push(['deleteRealm', realmId]);
+      return true;
+    },
+    renameRealm: (realmId, name) => {
+      calls.push(['renameRealm', realmId, name]);
+      viewState.update((state) => ({
+        ...state,
+        worldRealms: (state.worldRealms || []).map((realm) =>
+          realm.id === realmId ? { ...realm, name } : realm
+        ),
+      }));
+      return true;
+    },
     // Participation is a CRAFTING SYSTEM write since issue 1282, so the double republishes BOTH
     // projections of it: the System Settings tile reads `selectedSystem.gatheringRealmSettings` and
     // the travel view-model carries its own copy.

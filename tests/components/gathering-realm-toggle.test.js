@@ -154,13 +154,12 @@ describe('World and Travel navigation', () => {
     );
     assert.ok(managerRootSource.includes('<GatheringRealmsTab realms={worldRealms}'), 'Realms destination');
     assert.ok(managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'), 'Map destination');
-    // Unlike World > Currency it KEEPS the right-hand inspector.
-    assert.ok(
-      managerRootSource.includes(
-        '{:else if isWorldTravelRoute} <section class="fabricate-card manager-inspector-card manager-travel-inspector"'
-      ),
-      'the realm/map inspector lives under the new route'
-    );
+    // Unlike World > Currency it keeps the right-hand inspector. Its markup moved into
+    // `world/TravelInspector.svelte` at issue 1707 phase 2 and the arm that selects it into
+    // `environment/GatheringInspectorRail.svelte` at phase 3, so neither is root source text any
+    // more: `manager-world-scope-mounted.js` asserts the realms route reaches
+    // `.manager-travel-inspector` through the root, and the card is pinned by count in
+    // `inspector-card-source-contract.test.js`.
     assert.equal(managerRootSource.includes('!isWorldTravelRoute && !isWorldDowntimeRoute'), false);
   });
 });

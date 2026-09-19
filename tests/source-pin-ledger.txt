@@ -47,13 +47,13 @@ tests/components/gathering-chance-bar-mounted.test.js	2
 tests/components/gathering-detail-mounted.test.js	30
 tests/components/gathering-environments-mounted.test.js	33
 tests/components/gathering-environments-source.test.js	133
-tests/components/gathering-event-editor.test.js	87
+tests/components/gathering-event-editor.test.js	80
 tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
-tests/components/gathering-realm-toggle.test.js	37
+tests/components/gathering-realm-toggle.test.js	36
 tests/components/gathering-task-browser-redesign.test.js	24
 tests/components/gathering-task-editor-economy.test.js	44
-tests/components/gathering-task-editor-summary.test.js	45
+tests/components/gathering-task-editor-summary.test.js	44
 tests/components/gathering-view-actor-bar.test.js	31
 tests/components/icon-picker-layout.test.js	4
 tests/components/interactable-browser-app.test.js	86
@@ -65,7 +65,7 @@ tests/components/journal-source.test.js	64
 tests/components/knowledge-view-mounted.test.js	7
 tests/components/manager-browse-views-are-lists.test.js	10
 tests/components/manager-button-cascade-inventory.test.js	5
-tests/components/manager-contract.test.js	249
+tests/components/manager-contract.test.js	245
 tests/components/manager-control-rungs.test.js	7
 tests/components/manager-launch-readiness.test.js	9
 tests/components/manager-layout-downtime-fixtures.js	4
