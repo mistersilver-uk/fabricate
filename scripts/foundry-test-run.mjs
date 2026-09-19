@@ -11,35 +11,22 @@
 
 import { chromium } from 'playwright';
 import { randomUUID } from 'node:crypto';
-import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FABRICATE_THEME_IDS, FABRICATE_THEME_ATTRIBUTE, DEFAULT_FABRICATE_THEME } from '../src/ui/theme.js';
 import {
   appendAllowedConsoleErrorPatterns,
-  classifyCapturedError,
-  computeSmokeSignal,
   evaluateSmokeOutcome,
   isTransientPageTeardown,
   shouldTolerateSmokeTeardown,
   TRANSIENT_TEARDOWN_SKIP_PREFIX
 } from './lib/foundrySmokeSignal.js';
-import {
-  assertExpectedSelectorsPresent,
-  expectedSelectorsForManagerSurface
-} from './lib/managerLayoutGuards.js';
-import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
 import {
   planWorldScopeIdentitySmoke,
   seededFlagPaths,
   WORLD_SCOPE_SMOKE_FLAG_NAMESPACE,
 } from './lib/worldScopeIdentitySmoke.js';
-import {
-  CORE_TOUR_IDS,
-  TOUR_PROGRESS_STORAGE_KEY,
-  SUPPRESSED_STEP_INDEX,
-} from './lib/foundryTourSuppression.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 // The setup -> license -> auth -> launch -> join path lives in scripts/lib/foundryBrowserBoot.js so
 // the narrow V13 arm (scripts/foundry-version-assert.mjs) can boot a Foundry page without importing
@@ -58,9 +45,72 @@ import {
   MANAGER_WORLD_SCOPED_RAIL_ENTRIES,
   railSelector
 } from './lib/managerRailEntries.js';
-import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
-import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
+import { readAllowedConsoleErrorPatternsCsv, resolveSmokeProfileFlags } from './foundry-smoke/profile.mjs';
+import { createSmokeContext } from './foundry-smoke/context.mjs';
+import { runSmokeCleanup } from './foundry-smoke/cleanup.mjs';
+import { runScenarios } from './foundry-smoke/runScenarios.mjs';
+import { SMOKE_SCENARIOS } from './foundry-smoke/registry.mjs';
+import {
+  activateSceneAndAwaitCanvasReady,
+  assertNoScreenshotOverlays,
+  assertPointerTarget,
+  attachConsoleCapture,
+  closeOpenApplications,
+  describeBlockingOverlay,
+  dismissFoundryNotifications,
+  exerciseManagerEnvironmentPointerTargets,
+  exerciseManagerPointerTargets,
+  exerciseManagerSystemEditPointerTargets,
+  installNotificationHidingCss,
+  managerSystemRowSelector,
+  selectSmokeSystemInManager,
+  setManagerWindowSize,
+  settleManagerNav,
+  softClick,
+  suppressFoundryTours
+} from './foundry-smoke/pageOps/pageLifecycle.mjs';
+import {
+  assertManagerLayoutStable,
+  assertProgressiveStageListSound,
+  assertRecipeRowsHittable,
+  captureAlchemyThemes,
+  captureBulkEditFrame,
+  captureGroupedContinuationFrame,
+  captureManagerThemes,
+  captureRecipeEditorRoundtrip,
+  captureRecipeResultsTab,
+  captureStableManagerView,
+  chooseSelectOption,
+  clickSegment,
+  COMPONENT_BULK_EDIT_STUDIO,
+  handleRollPromptIfPresent,
+  openChecksActivity,
+  openChecksSection,
+  openManagerCraftingSection,
+  openManagerMultiStepFeatureTile,
+  openManagerRecipeEditor,
+  RECIPE_BULK_EDIT_STUDIO,
+  returnToSystemLibrary,
+  selectRecipeRowsByName
+} from './foundry-smoke/pageOps/managerViews.mjs';
+import {
+  assertDisabledToolOnBreakFieldset,
+  assertSavedToolStudioCapture,
+  assertToolStudioEditorLayout,
+  assertToolStudioLibraryLayout,
+  captureToolStudioProduct,
+  clickToolTabAndAssertEffect,
+  ensureSlotOpen,
+  requireSingleLocator,
+  resetToolStudioScroll,
+  saveToolStudioDraftIfDirty,
+  scrollToolEditorPanelToReveal,
+  toggleToolControlAndRestore,
+  withSingleToolDraftTransition,
+  withSingleToolStoreMutation
+} from './foundry-smoke/pageOps/toolStudio.mjs';
+
 
 // A browser/page teardown at the very end of a long headless run (the Chromium being killed while a
 // final screenshot click is still in flight) can leave a floating page promise that rejects AFTER
@@ -90,68 +140,16 @@ const FOUNDRY_URL = reconcileFoundryEndpoint({
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 
-// Smoke profile selector. Four profiles.
-const RAW_SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
-// `resolveSmokeProfile` replicates the exact normalization RAW_SMOKE_PROFILE feeds
-// (nullish-default `'full'`, lowercase, `'ci'` → `'rc'`); shared with the parent
-// wrapper so they can never drift on what `full`/`ci` mean.
-const SMOKE_PROFILE = resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE);
-const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full' || SMOKE_PROFILE === 'screenshots';
-const RUN_FULL_ONLY_BEHAVIORS = SMOKE_PROFILE === 'full';
-const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
-
-// The scoped `screenshots` profile target set (issue #826).
-function readScreenshotTargetLabels(argv = process.argv.slice(2), env = process.env) {
-  const FLAG = '--target-labels';
-  let csv = '';
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === FLAG) { csv = argv[i + 1] ?? ''; break; }
-    if (arg.startsWith(`${FLAG}=`)) { csv = arg.slice(FLAG.length + 1); break; }
-  }
-  if (!csv) csv = env.FOUNDRY_SCREENSHOT_TARGET_LABELS ?? '';
-  return new Set(csv.split(/[\s,]+/).map(label => label.trim()).filter(Boolean));
-}
-
-const SCREENSHOT_TARGET_LABELS = readScreenshotTargetLabels();
-// Scoping is active only under `screenshots` AND when a non-empty target set was supplied.
-const SCREENSHOT_SCOPING_ACTIVE = SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
-
-/**
- * Whether the given view-bearing phase must run for this invocation. Always true except under an
- * actively-scoped `screenshots` run, where a phase whose labels are all off-target is skipped.
- */
-function shouldRunScreenshotPhase(phase) {
-  if (!SCREENSHOT_SCOPING_ACTIVE) return true;
-  return isPhaseNeededForTargets(phase, SCREENSHOT_TARGET_LABELS);
-}
-
-/** Whether a skippable Phase-D0 capture section must run (issue #826 increment 2). */
-function shouldRunScreenshotSection(sectionName) {
-  if (!SCREENSHOT_SCOPING_ACTIVE) return true;
-  const needed = isD0SectionNeededForTargets(sectionName, SCREENSHOT_TARGET_LABELS);
-  if (!needed) {
-    process.stdout.write(`Phase D0: ${sectionName} section skipped (off scoped target set).\n`);
-  }
-  return needed;
-}
-
-// Exact set of screenshot labels the `rc` profile captures. Every other `screenshot(page, label)`
-// call is a no-op under `rc` (the surrounding behavioral assertions still run).
-const RC_SCREENSHOT_BUDGET = new Set([
-  'world-loaded',
-  'fabricate-app-shell',
-  'fabricate-journal',
-  'post-craft',
-  'crafter-post-craft-inventory'
-]);
-
-// R2 (#750): the two 7-theme sweeps (`captureManagerThemes` + `captureAlchemyThemes`) produce 14
-// `*-theme-<id>` frames that nothing asserts and that `scripts/ui-pr-screenshot-evidence.mjs`
-// VIEW_RECIPES deliberately does not map.
-const CAPTURE_THEME_SWEEPS =
-  ['1', 'true', 'yes'].includes(String(process.env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase())
-  || process.argv.slice(2).includes('--themes');
+const profile = resolveSmokeProfileFlags();
+const {
+  RAW_SMOKE_PROFILE,
+  SMOKE_PROFILE,
+  RUN_SCREENSHOT_PHASES,
+  RUN_FULL_ONLY_BEHAVIORS,
+  RUN_FULL_ONLY_GATHERING_STATES,
+  SCREENSHOT_TARGET_LABELS,
+  SCREENSHOT_SCOPING_ACTIVE
+} = profile;
 
 /** @type {string[]} */
 const consoleErrors = [];
@@ -162,42 +160,8 @@ const waivedConsoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
 
-/** Read the extra console-error waiver patterns for this run. */
-function readAllowedConsoleErrorPatternsCsv(argv = process.argv.slice(2), env = process.env) {
-  const FLAG = '--allowed-console-error-patterns';
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === FLAG) return argv[i + 1] ?? '';
-    if (arg.startsWith(`${FLAG}=`)) return arg.slice(FLAG.length + 1);
-  }
-  return env.FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS ?? '';
-}
-
 const ALLOWED_CONSOLE_ERROR_PATTERNS_CSV = readAllowedConsoleErrorPatternsCsv();
 
-/**
- * Echo every waived console error to $GITHUB_STEP_SUMMARY for audit. A waiver must never be silent:
- * the CI log records which known-benign errors were admitted this run.
- */
-async function echoWaivedConsoleErrorsToStepSummary(waived) {
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  if (!summaryPath || waived.length === 0) return;
-  const lines = [
-    '### Smoke test — waived console errors',
-    '',
-    `${waived.length} console error(s) matched an allowed pattern and did NOT fail the run:`,
-    '',
-    ...waived.map(entry => `- \`${entry.replace(/`/g, "'")}\``),
-    ''
-  ];
-  try {
-    await appendFile(summaryPath, `${lines.join('\n')}\n`);
-  } catch { /* step summary is best-effort audit output */ }
-}
-
-// ── Screenshot counter ──────────────────────────────────────────────────────
-let screenshotCounter = 0;
-const screenshotManifestEntries = [];
 const screenshotRunIdentity = {
   runId: randomUUID(),
   headSha: resolveScreenshotHeadSha({
@@ -206,1891 +170,6 @@ const screenshotRunIdentity = {
   }),
   targetLabels: [...SCREENSHOT_TARGET_LABELS].sort((a, b) => a.localeCompare(b)),
 };
-
-// ── Phase timings ───────────────────────────────────────────────────────────
-/** @type {Array<{ phase: string, startedAt: string, durationMs: number }>} */
-const phaseTimings = [];
-
-/** @type {{ name: string, startedAt: string, t0: number } | null} */
-let currentPhase = null;
-
-// ── Per-view timings (R3, #750) ─────────────────────────────────────────────
-// Phase timings are phase-granular only. This records the wall-clock spent
-// reaching each captured view — the elapsed time between the previous captured
-// frame (or the current phase start) and this frame — so the end-of-run summary
-// can surface the slowest individual views. It is an enabler for measuring
-// future cuts; it saves ~0s itself.
-/** @type {Array<{ label: string, phase: string, durationMs: number }>} */
-const viewTimings = [];
-let lastViewMarkAt = performance.now();
-
-/**
- * Record the time taken to reach a captured view, attributed to `label`, and reset the stopwatch
- * for the next view. Called from `screenshot()` after a frame is actually written (never for an rc
- * no-op).
- */
-function markViewTiming(label) {
-  const now = performance.now();
-  viewTimings.push({
-    label,
-    phase: currentPhase?.name ?? 'unknown',
-    durationMs: Math.round(now - lastViewMarkAt)
-  });
-  lastViewMarkAt = now;
-}
-
-/**
- * Begin a phase stopwatch. If another phase is already running it ends automatically — phases are
- * sequential, never nested.
- */
-function startPhase(name) {
-  if (currentPhase) endPhase();
-  currentPhase = { name, startedAt: new Date().toISOString(), t0: performance.now() };
-  // Reset the per-view stopwatch so the first view of a phase is not charged
-  // for the inter-phase gap.
-  lastViewMarkAt = performance.now();
-}
-
-/** End the current phase and push its duration into `phaseTimings`. */
-function endPhase() {
-  if (!currentPhase) return;
-  phaseTimings.push({
-    phase: currentPhase.name,
-    startedAt: currentPhase.startedAt,
-    durationMs: Math.round(performance.now() - currentPhase.t0)
-  });
-  currentPhase = null;
-}
-
-/**
- * Format a list of timing entries as an aligned stdout table so slow phases are obvious in CI logs.
- */
-function formatTimingsTable(timings) {
-  if (timings.length === 0) return '';
-  const rows = timings.map(({ phase, durationMs }) => ({
-    phase,
-    seconds: (durationMs / 1000).toFixed(1)
-  }));
-  const totalMs = timings.reduce((sum, entry) => sum + entry.durationMs, 0);
-  rows.push({ phase: 'TOTAL', seconds: (totalMs / 1000).toFixed(1) });
-  const phaseWidth = Math.max(...rows.map(row => row.phase.length));
-  const secondsWidth = Math.max(...rows.map(row => row.seconds.length));
-  const lines = ['Phase timings', '─'.repeat(phaseWidth + secondsWidth + 5)];
-  for (const row of rows) {
-    lines.push(`  ${row.phase.padEnd(phaseWidth)}  ${row.seconds.padStart(secondsWidth)}s`);
-  }
-  return lines.join('\n');
-}
-
-/**
- * Render the slowest captured views as an aligned stdout table (R3, #750). Only the top `limit` are
- * shown — enough to spot where the D0 walk spends its time — with each view's phase for context.
- */
-function formatSlowestViewsTable(timings, limit = 12) {
-  if (timings.length === 0) return '';
-  const sorted = timings.slice().sort((a, b) => b.durationMs - a.durationMs).slice(0, limit);
-  const rows = sorted.map(({ label, phase, durationMs }) => ({
-    view: `${label} (${phase})`,
-    seconds: (durationMs / 1000).toFixed(1)
-  }));
-  const viewWidth = Math.max(...rows.map(row => row.view.length));
-  const secondsWidth = Math.max(...rows.map(row => row.seconds.length));
-  const lines = [
-    `Slowest views (top ${sorted.length} of ${timings.length})`,
-    '─'.repeat(viewWidth + secondsWidth + 5)
-  ];
-  for (const row of rows) {
-    lines.push(`  ${row.view.padEnd(viewWidth)}  ${row.seconds.padStart(secondsWidth)}s`);
-  }
-  return lines.join('\n');
-}
-
-/** Take a screenshot with an auto-incrementing numeric prefix. */
-async function screenshot(page, label, options = {}) {
-  if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
-  if (SCREENSHOT_SCOPING_ACTIVE && !SCREENSHOT_TARGET_LABELS.has(label)) return;
-  screenshotCounter++;
-  const num = String(screenshotCounter).padStart(2, '0');
-  const path = join(RESULTS_DIR, `screenshot-${num}-${label}.png`);
-  // `options` forwards Playwright screenshot options (e.g. a `clip` box for a
-  // region capture such as the chat sidebar); default is a full-page shot.
-  await page.screenshot({ path, ...options });
-  screenshotManifestEntries.push({
-    label,
-    file: `screenshot-${num}-${label}.png`,
-    width: options.clip?.width ?? null,
-    height: options.clip?.height ?? null,
-  });
-  markViewTiming(label);
-}
-
-/**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (a Foundry
- * DialogV2 carrying `.fabricate-roll-prompt`).
- */
-async function handleRollPromptIfPresent(page, label) {
-  const dialog = page
-    .locator('.application.dialog:has(.fabricate-roll-prompt), .dialog:has(.fabricate-roll-prompt)')
-    .first();
-  try {
-    await dialog.waitFor({ state: 'visible', timeout: 2500 });
-  } catch {
-    return false;
-  }
-  await screenshot(page, label);
-  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage) or "Roll" for a
-  // non-d20 / d100 check (single button).
-  const rollBtn = dialog
-    .locator(
-      'button[data-action="normal"], button[data-action="roll"], button:has-text("Normal"), button:has-text("Roll")'
-    )
-    .first();
-  await rollBtn.click().catch(() => {});
-  await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
-  return true;
-}
-
-/**
- * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme setting's onChange
- * (applyFabricateTheme) does: set the theme attribute on the document element and every
- * `.fabricate` root.
- */
-async function applyManagerTheme(page, themeId) {
-  await page.evaluate(({ id, attr }) => {
-    document.documentElement.setAttribute(attr, id);
-    for (const root of document.querySelectorAll('.fabricate')) root.setAttribute(attr, id);
-  }, { id: themeId, attr: FABRICATE_THEME_ATTRIBUTE });
-  await page.waitForTimeout(200);
-}
-
-/**
- * Capture the currently-open manager view under every Fabricate theme, then restore the default
- * theme so later Phase D0 captures stay unthemed.
- */
-async function captureManagerThemes(page) {
-  // R2 (#750): opt-in only — these 14 theme frames are unasserted and unmapped.
-  if (!CAPTURE_THEME_SWEEPS) return;
-  for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
-    await applyManagerTheme(page, themeId);
-    await screenshot(page, `manager-theme-${themeId}`);
-  }
-  await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
-}
-
-// Recipes now nests inside the gated Crafting nav group (issue 511).
-async function openManagerCraftingSection(page, subitemId, managerView) {
-  await page.locator(railSelector('manager-nav-crafting')).click();
-  const subitem = page.locator(`.fabricate-manager #manager-crafting-nav-${subitemId}`).first();
-  await subitem.waitFor({ state: 'visible', timeout: 5_000 });
-  await subitem.click();
-  await page
-    .locator(`.fabricate-manager[data-manager-view="${managerView}"]`)
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-}
-
-/** Select one of the open Checks activity route's five sections (issue 1096). */
-async function openChecksSection(page, section) {
-  const button = page
-    .locator(`.fabricate-manager [data-checks-section-button="${section}"]`)
-    .first();
-  await button.waitFor({ state: 'visible', timeout: 5_000 });
-  await button.click();
-  await page
-    .locator(`.fabricate-manager [data-checks-section-button="${section}"][aria-selected="true"]`)
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-}
-
-/** Open a Checks Studio activity route, and optionally one of its sections (issue 1096). */
-async function openChecksActivity(page, activity, section = '') {
-  await page.locator(railSelector('manager-nav-checks')).click();
-  const navItem = page.locator(`.fabricate-manager #manager-checks-nav-${activity}`).first();
-  await navItem.waitFor({ state: 'visible', timeout: 5_000 });
-  await navItem.click();
-  await page
-    .locator('.fabricate-manager [data-checks-editor]')
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  await page
-    .locator(`.fabricate-manager [data-checks-panel="${activity}"]`)
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  if (section) await openChecksSection(page, section);
-}
-
-// Return to the recipes browser (via the Crafting group) and open the named recipe's editor,
-// waiting for the recipe-edit route.
-async function openManagerRecipeEditor(page, recipeName) {
-  await openManagerCraftingSection(page, 'recipes', 'recipes');
-  await page
-    .locator(`.fabricate-manager .manager-recipe-row:has-text("${recipeName}") [data-recipe-edit]`)
-    .first()
-    .click();
-  await page
-    .locator('.fabricate-manager[data-manager-view="recipe-edit"]')
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-}
-
-// The rail's "All crafting systems" back-link is inert on the systems browser itself (issue 643):
-// there is nowhere to go back to, so it renders disabled.
-async function returnToSystemLibrary(page) {
-  const link = page.locator('.fabricate-manager .manager-scope-return').first();
-  if ((await link.count()) === 0) return false;
-  if (await link.isDisabled().catch(() => false)) return false;
-  await link.click();
-  return true;
-}
-
-/**
- * Open a recipe, switch to its Results tab, wait for a mode-specific content marker to be VISIBLE,
- * and capture the frame.
- */
-async function captureRecipeResultsTab(page, recipeName, label, contentSelector) {
-  await openManagerRecipeEditor(page, recipeName);
-  await page.locator('.fabricate-manager [data-recipe-tab-button="results"]').first().click();
-  await page.locator('.fabricate-manager [data-recipe-tab="results"]').first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator(`.fabricate-manager [data-recipe-tab="results"] ${contentSelector}`).first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  await assertManagerLayoutStable(page, label);
-  await assertNoScreenshotOverlays(page);
-  await screenshot(page, label);
-}
-
-/**
- * Drive the manager's persistent nav rail to the selected system's Edit route and bring the
- * multi-step-recipes feature tile into frame.
- */
-async function openManagerMultiStepFeatureTile(page) {
-  await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
-  await page
-    .locator('.fabricate-manager[data-manager-view="system-edit"]')
-    .first()
-    .waitFor({ state: 'visible', timeout: 5_000 });
-  const tile = page.locator('.fabricate-manager [data-feature-key="multiStepRecipes"]').first();
-  await tile.waitFor({ state: 'visible', timeout: 5_000 });
-  await tile.scrollIntoViewIfNeeded().catch(() => {});
-  return tile;
-}
-
-/**
- * Capture the currently-open player Alchemy workbench under every Fabricate theme, then restore the
- * default theme.
- */
-async function captureAlchemyThemes(page) {
-  // R2 (#750): opt-in only — these theme frames are unasserted and unmapped.
-  if (!CAPTURE_THEME_SWEEPS) return;
-  for (const themeId of Object.values(FABRICATE_THEME_IDS)) {
-    await applyManagerTheme(page, themeId);
-    await screenshot(page, `player-alchemy-theme-${themeId}`);
-  }
-  await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
-}
-
-/** Normalize text for stable UI matching. */
-function normalizeText(value) {
-  return String(value ?? '').trim().toLowerCase();
-}
-
-/** Name whatever modal is currently covering the interface, or return null when nothing is. */
-async function describeBlockingOverlay(page) {
-  try {
-    return await page.evaluate(() => {
-      const activeTour = globalThis.foundry?.nue?.Tour?.activeTour;
-      if (activeTour) return `a Foundry NUE tour ("${activeTour.title ?? activeTour.id ?? 'unknown'}")`;
-      const dialog = document.querySelector('dialog[open], .application.dialog, #client-settings');
-      if (dialog) {
-        const label = dialog.getAttribute('aria-label') || dialog.querySelector('.window-title')?.textContent;
-        return `a modal dialog${label ? ` ("${label.trim()}")` : ''}`;
-      }
-      if (document.querySelector('#pause:not(.paused)') === null && globalThis.game?.paused) {
-        return 'the Game Paused overlay';
-      }
-      return null;
-    });
-  } catch {
-    // The page may be gone; a diagnostic must never mask the original failure.
-    return null;
-  }
-}
-
-/** Stop Foundry's New User Experience tours ever starting, for the whole browser context. */
-async function suppressFoundryTours(context) {
-  // The body is inlined rather than passed by reference because `addInitScript` serializes the
-  // function to run in the page, where this module's imports do not exist.
-  await context.addInitScript(
-    ({ key, tourIds, stepIndex }) => {
-      try {
-        const raw = window.localStorage.getItem(key);
-        const parsed = raw ? JSON.parse(raw) : null;
-        const base = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-        const core =
-          base.core && typeof base.core === 'object' && !Array.isArray(base.core)
-            ? { ...base.core }
-            : {};
-        // Merge, never lower: a tour the run legitimately advanced keeps its real progress.
-        for (const id of tourIds) if (typeof core[id] !== 'number') core[id] = stepIndex;
-        window.localStorage.setItem(key, JSON.stringify({ ...base, core }));
-      } catch {
-        // A malformed or unavailable localStorage must not stop the run booting; the
-        // reactive Tour.activeTour.exit() calls remain as defence in depth.
-      }
-    },
-    {
-      key: TOUR_PROGRESS_STORAGE_KEY,
-      tourIds: [...CORE_TOUR_IDS],
-      stepIndex: SUPPRESSED_STEP_INDEX,
-    }
-  );
-}
-
-/**
- * Race a promise against a deadline. Used to surface page.evaluate hangs as
- * thrown errors (with context) rather than silent waits that consume the
- * job timeout. Discovered cause for an earlier 13-minute Phase D0 hang
- * in CI: a page.evaluate after a viewport resize was waiting indefinitely
- * for the page's JS thread, with no timeout of its own. The script-level
- * deadline guarantees we get a useful error and a `screenshot-failure.png`
- * instead of a cancelled job.
- * @template T
- * @param {Promise<T>} promise
- * @param {number} ms
- * @param {string} label
- * @returns {Promise<T>}
- */
-function withDeadline(promise, ms, label) {
-  let timer;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Operation '${label}' exceeded ${ms}ms deadline`)), ms);
-  });
-  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
-}
-
-/**
- * Wait until an in-page `predicate` returns truthy, polling on animation frames so a settled layout
- * is detected as soon as it quiesces instead of always paying a fixed wait (R4, #750).
- */
-async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs = 500 } = {}) {
-  try {
-    await page.waitForFunction(predicate, arg, { timeout, polling: 'raf' });
-  } catch {
-    await page.waitForTimeout(fallbackMs);
-  }
-}
-
-/**
- * Settle the Crafting System Manager frame after a resize: wait for the app's measured geometry to
- * reach the requested size and hold steady across a few animation frames, then return.
- */
-async function waitForManagerGeometrySettled(page, { timeout = 1500, fallbackMs = 500 } = {}) {
-  await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
-  await waitForSettled(page, () => {
-    const manager = document.querySelector('.fabricate-manager');
-    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-    if (!app) return false;
-    const outer = app.getBoundingClientRect();
-    const product = manager.getBoundingClientRect();
-    const state = window.__fabGeomSettle || { sig: null, stable: 0 };
-    const sig = [
-      window.innerWidth,
-      window.innerHeight,
-      Math.round(outer.left),
-      Math.round(outer.top),
-      Math.round(outer.width),
-      Math.round(outer.height),
-      Math.round(product.left),
-      Math.round(product.top),
-      Math.round(product.width),
-      Math.round(product.height),
-    ].join(':');
-    if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
-    window.__fabGeomSettle = state;
-    return state.stable >= 4; // ~4 steady RAF samples ≈ 65ms of quiescence.
-  }, undefined, { timeout, fallbackMs });
-  return page.evaluate(() => {
-    const manager = document.querySelector('.fabricate-manager');
-    const app = manager?.closest('.application, .app') || document.querySelector('#fabricate-crafting-system-manager');
-    if (!manager || !app) throw new Error('Crafting System Manager geometry is unavailable');
-    const rectangle = (element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        left: Math.round(rect.left),
-        top: Math.round(rect.top),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        right: Math.round(rect.right),
-        bottom: Math.round(rect.bottom),
-      };
-    };
-    return {
-      browser: { width: window.innerWidth, height: window.innerHeight },
-      outer: rectangle(app),
-      product: rectangle(manager),
-    };
-  });
-}
-
-/**
- * Settle the manager after an in-frame navigation (system-identity click, return-to-library,
- * scope-select) that re-renders the nav rail.
- */
-async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {}) {
-  await page.evaluate(() => { delete window.__fabNavSettle; }).catch(() => {});
-  await waitForSettled(page, () => {
-    const manager = document.querySelector('.fabricate-manager');
-    if (!manager) return false;
-    const navCount = manager.querySelectorAll('.manager-nav-label').length;
-    if (navCount === 0) return false;
-    const rect = manager.getBoundingClientRect();
-    const sig = `${Math.round(rect.width)}x${Math.round(rect.height)}:${navCount}`;
-    const state = window.__fabNavSettle || { sig: null, stable: 0 };
-    if (state.sig === sig) state.stable += 1; else { state.sig = sig; state.stable = 0; }
-    window.__fabNavSettle = state;
-    return state.stable >= 6; // ~6 steady RAF samples ≈ 100ms of quiescence.
-  }, undefined, { timeout, fallbackMs });
-}
-
-async function waitForManagerApplicationRendered(page) {
-  const outerSelector = '#fabricate-crafting-system-manager';
-  const resolveRegisteredManager = (selector) => {
-    const renderedOuters = Array.from(document.querySelectorAll(selector))
-      .filter((element) => element?.isConnected);
-    const renderedManagers = renderedOuters
-      .map((element) => element.querySelector('.fabricate-manager'))
-      .filter((element) => element?.isConnected);
-    if (renderedOuters.length !== 1 || renderedManagers.length !== 1) {
-      throw new Error(
-        'Crafting System Manager DOM resolution was not unique: '
-        + JSON.stringify({
-          renderedOuterCount: renderedOuters.length,
-          renderedManagerCount: renderedManagers.length,
-        })
-      );
-    }
-    const renderedOuter = renderedOuters[0];
-    const renderedManager = renderedManagers[0];
-    const explicitApp = globalThis.__fabricateSmokeManagerApp ?? null;
-    const instances = foundry?.applications?.instances;
-    const registeredApps = instances?.values
-      ? Array.from(instances.values())
-      : (instances ? Array.from(instances) : []);
-    const uniqueApps = Array.from(
-      new Set([explicitApp, ...registeredApps].filter(Boolean))
-    );
-    const applicationCandidates = uniqueApps.map((app, index) => {
-      const rawElement = app?.element ?? app?._element ?? null;
-      const element = rawElement?.[0] ?? rawElement;
-      const manager = element?.matches?.('.fabricate-manager')
-        ? element
-        : element?.querySelector?.('.fabricate-manager')
-          ?? element?.closest?.('.fabricate-manager');
-      const ownsManager = Boolean(
-        manager?.isConnected
-        && (
-          element === manager
-          || element?.contains?.(manager)
-          || manager?.contains?.(element)
-        )
-      );
-      const ownsRenderedManager = Boolean(
-        element === renderedOuter
-        || element === renderedManager
-        || element?.contains?.(renderedManager)
-        || renderedManager?.contains?.(element)
-      );
-      return {
-        app,
-        index,
-        source: app === explicitApp ? 'explicit' : 'registry',
-        appType: app?.constructor?.name ?? typeof app,
-        appRendered: app?.rendered ?? null,
-        elementType: element?.constructor?.name ?? typeof element,
-        elementId: element?.id ?? null,
-        elementConnected: Boolean(element?.isConnected),
-        elementHasStyle: Boolean(element?.style),
-        managerConnected: Boolean(manager?.isConnected),
-        ownsManager,
-        ownsRenderedManager,
-        liveMatch: Boolean(
-          element?.isConnected
-          && element?.style
-          && manager?.isConnected
-          && ownsManager
-          && ownsRenderedManager
-        ),
-      };
-    });
-    const liveMatches = applicationCandidates.filter((candidate) => candidate.liveMatch);
-    if (liveMatches.length !== 1) {
-      const diagnostics = applicationCandidates.map(({ app: _app, ...candidate }) => candidate);
-      throw new Error(
-        `Crafting System Manager application resolution found ${liveMatches.length} owners `
-        + 'for the connected Manager DOM: '
-        + JSON.stringify({
-          renderedOuterCount: renderedOuters.length,
-          renderedManagerCount: renderedManagers.length,
-          applicationCandidates: diagnostics,
-        })
-      );
-    }
-    globalThis.__fabricateSmokeManagerApp = liveMatches[0].app;
-    const { app: _app, ...selected } = liveMatches[0];
-    return selected;
-  };
-  const inspectReadiness = (diagnostic = false) => {
-    const app = globalThis.__fabricateSmokeManagerApp;
-    const rawElement = app?.element ?? app?._element ?? null;
-    const appElement = rawElement?.[0] ?? rawElement;
-    const manager = appElement?.matches?.('.fabricate-manager')
-      ? appElement
-      : appElement?.querySelector?.('.fabricate-manager')
-        ?? appElement?.closest?.('.fabricate-manager');
-    const report = {
-      ready: Boolean(appElement?.isConnected && appElement?.style && manager?.isConnected),
-      appRendered: app?.rendered ?? null,
-      elementType: appElement?.constructor?.name ?? typeof appElement,
-      elementId: appElement?.id ?? null,
-      elementConnected: Boolean(appElement?.isConnected),
-      elementHasStyle: Boolean(appElement?.style),
-      managerConnected: Boolean(manager?.isConnected),
-      selectorManagerConnected: Boolean(
-        document.querySelector('#fabricate-crafting-system-manager .fabricate-manager')?.isConnected
-      ),
-    };
-    if (diagnostic || report.ready) return report;
-    return false;
-  };
-  try {
-    await page.locator(outerSelector).waitFor({ state: 'attached', timeout: 15_000 });
-    await page.locator(`${outerSelector} .fabricate-manager`).waitFor({
-      state: 'attached',
-      timeout: 15_000,
-    });
-    await page.evaluate(resolveRegisteredManager, outerSelector);
-    await page.waitForFunction(inspectReadiness, false, { timeout: 15_000, polling: 'raf' });
-  } catch (error) {
-    const readiness = await page.evaluate(inspectReadiness, true).catch((diagnosticError) => ({
-      diagnosticError: diagnosticError.message,
-    }));
-    const causeMessage = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Crafting System Manager ApplicationV2 render readiness failed (${causeMessage}): `
-      + JSON.stringify(readiness),
-      { cause: error }
-    );
-  }
-}
-
-/**
- * Resize the rendered Crafting System Manager application frame for
- * responsive screenshots and hit testing.
- *
- * A supplied source viewport is exact screenshot evidence; ordinary manager
- * callers retain the roomy shared viewport. The outer frame is always resized
- * through the live ApplicationV2 instance, then the browser, outer frame, and
- * inner product rectangles are measured after they settle. Foundry V13 may
- * clamp the requested outer height to the exact browser viewport.
- * @param {import('playwright').Page} page
- * @param {{ width: number, height: number, sourceViewport?: {width: number, height: number} }} size
- */
-async function setManagerWindowSize(page, { width, height, sourceViewport = null }) {
-  const viewport = sourceViewport || {
-    width: Math.max(1366, width + 80),
-    height: Math.max(768, height + 80),
-  };
-
-  await withDeadline(
-    page.setViewportSize(viewport),
-    15_000,
-    `setViewportSize ${width}x${height}`
-  );
-  await waitForManagerApplicationRendered(page);
-  await withDeadline(
-    page.evaluate(async ({ width, height, viewport }) => {
-      const app = globalThis.__fabricateSmokeManagerApp;
-      if (!app || typeof app.setPosition !== 'function') {
-        throw new Error('Live Crafting System Manager ApplicationV2 instance has no setPosition');
-      }
-      await app.setPosition({
-        width,
-        height,
-        left: Math.max(0, Math.round((viewport.width - width) / 2)),
-        top: 0,
-      });
-    }, { width, height, viewport }),
-    15_000,
-    `setManagerWindowSize evaluate ${width}x${height}`
-  );
-  const geometry = await waitForManagerGeometrySettled(page, { timeout: 1500, fallbackMs: 500 });
-  if (geometry.browser.width !== viewport.width || geometry.browser.height !== viewport.height) {
-    throw new Error(`Manager source viewport drifted: ${JSON.stringify({ expected: viewport, actual: geometry.browser })}`);
-  }
-  if (
-    geometry.outer.left < 0
-    || geometry.outer.top < 0
-    || geometry.outer.right > geometry.browser.width
-    || geometry.outer.bottom > geometry.browser.height
-  ) {
-    throw new Error(`ApplicationV2 outer rectangle escapes the browser viewport: ${JSON.stringify(geometry)}`);
-  }
-  if (
-    geometry.product.left < geometry.outer.left
-    || geometry.product.top < geometry.outer.top
-    || geometry.product.right > geometry.outer.right
-    || geometry.product.bottom > geometry.outer.bottom
-  ) {
-    throw new Error(`Tool Studio product rectangle escapes the ApplicationV2 frame: ${JSON.stringify(geometry)}`);
-  }
-  return geometry;
-}
-
-/**
- * Capture a manager view after applying the standard layout and overlay checks.
- * @param {import('playwright').Page} page
- * @param {{ width?: number, height?: number, layout: string, label: string, settleMs?: number }} options
- */
-async function captureStableManagerView(page, { width, height, layout, label, settleMs = 0 }) {
-  if (typeof width === 'number' && typeof height === 'number') {
-    await setManagerWindowSize(page, { width, height });
-  }
-  if (settleMs > 0) {
-    await page.waitForTimeout(settleMs);
-  }
-  await assertManagerLayoutStable(page, layout);
-  await assertNoScreenshotOverlays(page);
-  await screenshot(page, label);
-}
-
-/** The Component Studio's bulk-edit surface, as data (issues 772 / 1010). */
-const COMPONENT_BULK_EDIT_STUDIO = Object.freeze({
-  // The browser surface is unchanged by the selection — the list, the row and the row identity
-  // are all still on screen, and only the RAIL swapped the inspector for the panel — so this
-  // reuses the plain browser frame's pinned selectors rather than declaring a second layout.
-  layout: 'components normal',
-  noun: 'component',
-  rowSelector: '.fabricate-manager .manager-component-row',
-  selectedRowSelector: '.fabricate-manager .manager-component-row.is-bulk-selected',
-  rowBoxSelector: 'label:has(input[data-component-select])',
-  panelSelector: '.fabricate-manager [data-component-bulk-panel]',
-  displacedInspectorSelector: '.fabricate-manager [data-component-inspector]',
-  toolbarCountSelector:
-    '.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]',
-  clearSelector: '.fabricate-manager [data-component-clear-selection]',
-  selectRows: async (rows, studio) => {
-    for (const index of [0, 1]) {
-      await rows.nth(index).locator(studio.rowBoxSelector).first().click();
-    }
-  },
-});
-
-/** The Recipe Studio's bulk-edit surface (issue 1010) — the same shape, none of the same hooks. */
-const RECIPE_BULK_EDIT_STUDIO = Object.freeze({
-  layout: 'recipes normal',
-  noun: 'recipe',
-  rowSelector: '.fabricate-manager .manager-recipe-row',
-  selectedRowSelector: '.fabricate-manager .manager-recipe-row.is-bulk-selected',
-  rowBoxSelector: 'label:has(input[data-recipe-select])',
-  panelSelector: '.fabricate-manager [data-recipe-bulk-panel]',
-  displacedInspectorSelector: '.fabricate-manager [data-recipe-inspector]',
-  toolbarCountSelector:
-    '.fabricate-manager [data-recipe-selection-toolbar] [data-recipe-selection-count]',
-  clearSelector: '.fabricate-manager [data-recipe-clear-selection]',
-});
-
-/** Tick the two rows whose names are given, in order. */
-function selectRecipeRowsByName(...names) {
-  return async (rows, studio) => {
-    for (const name of names) {
-      const row = rows.filter({ hasText: name }).first();
-      if (await row.count() === 0) {
-        throw new Error(`Recipe browser rendered no row named "${name}" to bulk-select.`);
-      }
-      await row.locator(studio.rowBoxSelector).first().click();
-    }
-  };
-}
-
-/** Issue 1504 — choose an option from a shared `<Select>`, the way a GM does. */
-async function chooseSelectOption(page, trigger, option) {
-  // Naming neither row is A caller's defect, and it is refused here rather than carried into
-  // Playwright.
-  if (option.value === undefined && !Number.isInteger(option.index)) {
-    throw new Error(
-      'chooseSelectOption was given neither a `value` nor an integer `index`, so it names no row. '
-      + 'Address the row by its own `data-popover-option` handle, or positionally by index.'
-    );
-  }
-  await trigger.waitFor({ state: 'visible', timeout: 5_000 });
-  await trigger.click();
-  // `.first()` is safe though it is not bound to this trigger the way `select-control.js` is:
-  // the click above fires `dismissOnOutsideClick`, so any other panel is already shut.
-  const panel = page.locator('.fabricate-select-popover').first();
-  await panel.waitFor({ state: 'visible', timeout: 5_000 });
-  if (option.value !== undefined) {
-    const row = panel.locator(`[data-popover-option="${option.value}"]`).first();
-    await row.waitFor({ state: 'visible', timeout: 5_000 });
-    await row.click();
-    return;
-  }
-  const rows = panel.locator('[role="option"]');
-  const count = await rows.count();
-  if (count <= option.index) {
-    throw new Error(
-      `The option list rendered ${count} row(s); index ${option.index} was asked for. A positional `
-      + 'choice here means the world authored no vocabulary for this axis, not that the control broke.'
-    );
-  }
-  await rows.nth(option.index).click();
-}
-
-/** Choose one segment of a `SegmentedControl`, by its `optionDataAttr` value. */
-async function clickSegment(scope, optionDataAttr, value) {
-  const segment = scope.locator(`label[${optionDataAttr}="${value}"]`).first();
-  await segment.waitFor({ state: 'visible', timeout: 5_000 });
-  await segment.click();
-}
-
-/** Issue 772 / 1010 — capture one state of a manager browser's bulk edit rail panel. */
-async function captureBulkEditFrame(page, results, { studio, stepName, label, selectRows, stage }) {
-  const pickRows = selectRows ?? studio.selectRows;
-  try {
-    const rows = page.locator(studio.rowSelector);
-    if (await rows.count() < 2) {
-      throw new Error(`Browser rendered fewer than two ${studio.noun} rows to bulk-select.`);
-    }
-    await pickRows(rows, studio);
-    const bulkPanel = page.locator(studio.panelSelector).first();
-    await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
-    // The panel replaces the single-row inspector rather than sitting beside it, so the inspector's
-    // absence is half of what the frame is evidence for.
-    if (await page.locator(studio.displacedInspectorSelector).count() > 0) {
-      throw new Error(`The ${studio.noun} bulk panel mounted alongside the inspector it replaces.`);
-    }
-    const bulkSelectedRows = await page.locator(studio.selectedRowSelector).count();
-    if (bulkSelectedRows !== 2) {
-      throw new Error(`Expected two bulk-selected ${studio.noun} rows, found ${bulkSelectedRows}.`);
-    }
-    await page.locator(studio.toolbarCountSelector)
-      .first().waitFor({ state: 'visible', timeout: 5_000 });
-
-    await stage(bulkPanel);
-
-    await captureStableManagerView(page, { layout: studio.layout, label });
-    process.stdout.write(`  D0: ${stepName} screenshotted\n`);
-    results.steps.push({ step: stepName, passed: true });
-  } catch (err) {
-    results.steps.push({ step: stepName, passed: false, error: err.message });
-    process.stderr.write(`${stepName} capture failed: ${err.message}\n`);
-  } finally {
-    // Clear whether or not the capture succeeded: a live selection keeps the rail on the
-    // bulk panel, and the count-to-zero transition is what discards the staged draft.
-    await softClick(page.locator(studio.clearSelector));
-    try {
-      await page.locator(studio.panelSelector)
-        .first().waitFor({ state: 'detached', timeout: 5_000 });
-    } catch (err) {
-      results.steps.push({ step: `${stepName}-cleared`, passed: false, error: err.message });
-      process.stderr.write(`${stepName} left the bulk panel mounted: ${err.message}\n`);
-    }
-  }
-}
-
-/**
- * Issue 801 — capture a GM library's grouped-category continuation frame: seed one category large
- * enough to span a page boundary, shrink the pager to page size 10, advance to the continuation
- * page (the category's remaining slice, "N of M", at the head), and screenshot.
- */
-async function captureGroupedContinuationFrame(page, results, options) {
-  const {
-    seed, hasSeed, cleanup, openBrowser, settle, settleAfterReset,
-    groupCountSelector, layout, label, stepName, failMessage,
-  } = options;
-  let handle = null;
-  try {
-    handle = await seed();
-    await openBrowser();
-    const size = page.locator('.fabricate-manager [data-pagination-size]').first();
-    await chooseSelectOption(page, size, { value: '10' });
-    await settle();
-    await page.locator('.fabricate-manager [data-pagination-next]').first().click();
-    await settle();
-    await page.locator(groupCountSelector).first().waitFor({ state: 'visible', timeout: 5_000 });
-    await captureStableManagerView(page, { layout, label });
-    results.steps.push({ step: stepName, passed: true });
-  } catch (err) {
-    results.steps.push({ step: stepName, passed: false, error: err.message });
-    process.stderr.write(`${failMessage}: ${err.message}\n`);
-  } finally {
-    const sizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
-    if (await sizeReset.count() > 0) {
-      // Narrowed, not removed (issue 1504).
-      try {
-        await chooseSelectOption(page, sizeReset, { value: '25' });
-      } catch (error) {
-        process.stderr.write(`${failMessage}: the page size was not reset to 25: ${error.message}\n`);
-      }
-      await settleAfterReset();
-    }
-    if (handle && hasSeed(handle)) {
-      await cleanup(handle);
-    }
-    await openBrowser();
-  }
-}
-
-/** Issue 806 — the editor round-trip preservation frame for the recipe library. */
-async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
-  const CATEGORY = 'Roundtrip Brews';
-  let ids = [];
-  try {
-    ids = await page.evaluate(async ({ sysId, category }) => {
-      const rm = game.fabricate.getRecipeManager();
-      const created = [];
-      for (let index = 1; index <= 3; index += 1) {
-        const recipe = await rm.createRecipe({
-          name: `Roundtrip Draught ${String(index).padStart(2, '0')}`,
-          description: 'Issue 806 editor round-trip preservation fixture.',
-          craftingSystemId: sysId,
-          ingredientSets: [{
-            ingredientGroups: [{
-              name: 'Any reagent',
-              options: [{ quantity: 1, match: { type: 'tags', tags: ['reagent'], tagMatch: 'any' } }]
-            }]
-          }]
-        }, { allowIncomplete: true, notify: false });
-        await rm.updateRecipe(recipe.id, { category }, { allowIncomplete: true, notify: false });
-        created.push(recipe.id);
-      }
-      await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
-      return created;
-    }, { sysId: craftingSetup.systemId, category: CATEGORY });
-
-    await openManagerCraftingSection(page, 'recipes', 'recipes');
-
-    // Filter to the seeded category: a visible chip and a single-group filtered list.
-    const categoryFilter = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
-    await categoryFilter.selectOption(CATEGORY);
-    await settleManagerNav(page);
-    await page.locator('.fabricate-manager [data-recipe-filter-chip="category"]').first()
-      .waitFor({ state: 'visible', timeout: 5_000 });
-
-    // Select a row into the shared shell inspector, so its Edit action survives the
-    // collapse below (a collapsed group renders no rows to click).
-    await page.locator('.fabricate-manager .manager-recipe-row .manager-recipe-identity').first().click();
-    const inspectorEdit = page.locator('.fabricate-manager .manager-recipe-browser-inspector [data-recipe-action="edit"]').first();
-    await inspectorEdit.waitFor({ state: 'visible', timeout: 5_000 });
-
-    // Collapse the category group, then open the editor from the inspector.
-    const header = page.locator('.fabricate-manager .manager-recipe-group [data-group-header]').first();
-    await header.click();
-    await settleManagerNav(page);
-    await inspectorEdit.click();
-    await page.locator('.fabricate-manager[data-manager-view="recipe-edit"]').first()
-      .waitFor({ state: 'visible', timeout: 5_000 });
-
-    // Return to the browser: the category filter chip and the collapsed group both survive.
-    await page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to recipes")').first().click();
-    await page.locator('.fabricate-manager[data-manager-view="recipes"]').first()
-      .waitFor({ state: 'visible', timeout: 5_000 });
-    await page.locator('.fabricate-manager [data-recipe-filter-chip="category"]').first()
-      .waitFor({ state: 'visible', timeout: 5_000 });
-    const stillCollapsed = await page.locator('.fabricate-manager .manager-recipe-group [data-group-header]').first()
-      .getAttribute('aria-expanded');
-    if (stillCollapsed !== 'false') {
-      throw new Error(`Expected the collapsed group to survive the round-trip; aria-expanded=${stillCollapsed}`);
-    }
-
-    // The collapsed single-category group renders zero rows on purpose, so
-    // `assertManagerLayoutStable` (which throws "Manager rendered no table rows" when no row and no
-    // edit-form is present) does not apply here — the recipe-item validation and recipe-editor tab
-    // captures skip it for the same reason.
-    await settleManagerNav(page);
-    await page.waitForTimeout(200);
-    await assertNoScreenshotOverlays(page);
-    await screenshot(page, 'manager-recipes-editor-roundtrip');
-    results.steps.push({ step: 'recipes-editor-roundtrip', passed: true });
-  } catch (err) {
-    results.steps.push({ step: 'recipes-editor-roundtrip', passed: false, error: err.message });
-    process.stderr.write(`Recipes editor round-trip capture failed: ${err.message}\n`);
-  } finally {
-    const categoryReset = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
-    if (await categoryReset.count() > 0) {
-      await categoryReset.selectOption('all').catch(() => {});
-      await settleManagerNav(page);
-    }
-    if (ids.length > 0) {
-      await page.evaluate(async (recipeIds) => {
-        const rm = game.fabricate.getRecipeManager();
-        for (const id of recipeIds) {
-          await rm.deleteRecipe(id, { notify: false }).catch(() => {});
-        }
-        await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
-      }, ids);
-    }
-    await openManagerCraftingSection(page, 'recipes', 'recipes');
-  }
-}
-
-/** Assert manager table rows and summary regions do not horizontally overflow. */
-async function assertManagerLayoutStable(page, label) {
-  const metrics = await withDeadline(page.evaluate(() => {
-    const selectors = [
-      '.fabricate-manager',
-      '.manager-main',
-      '.manager-table-scroll',
-      '.manager-system-row',
-      '.manager-system-identity',
-      '.manager-recipes-table',
-      '.manager-recipe-row',
-      '.manager-recipe-identity',
-      '.manager-environments-table',
-      '.manager-environment-row',
-      '.manager-environment-identity',
-      '.manager-environment-editor-shell',
-      '.manager-components-list',
-      '.manager-component-row',
-      '.manager-component-identity',
-      // The essence library's list container and its selecting button (issue 1036).
-      '.manager-essences-table',
-      '.manager-essence-row',
-      '.manager-essence-identity',
-      '.manager-vocabulary-row',
-      '.manager-gathering-task-row',
-      '.manager-gathering-event-row',
-      '.manager-tools-row',
-      // GM Knowledge surface (issue 785).
-      '.manager-knowledge-copy-row',
-      '.manager-knowledge-learned-row',
-      '[data-manager-tool-id]',
-      '[data-tool-edit-view]',
-      '.manager-inspector-card',
-      '.manager-system-edit-form',
-      '.manager-edit-card',
-      '.manager-toggle-row',
-      '.manager-essence-edit-view',
-      '.manager-recipe-edit-main',
-      '.manager-component-edit-view',
-      '.manager-component-identity-strip',
-      '.environment-draft-editor',
-      '.manager-environment-edit-view',
-      '.manager-gathering-task-edit-view',
-      '.manager-gathering-event-edit-view',
-      '.manager-environment-workspace',
-      '.environment-fields',
-      '.environment-task-layout',
-      '.manager-travel-view',
-      '.manager-travel-parties-row',
-      '.manager-travel-realms-row',
-      '.manager-map-link-row',
-      '.manager-party-member-row',
-      '.manager-fact'
-    ];
-    return selectors.flatMap(selector => Array.from(document.querySelectorAll(selector)).map((element, index) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        selector,
-        index,
-        width: rect.width,
-        height: rect.height,
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-        text: element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) || ''
-      };
-    }));
-  }), 30_000, `assertManagerLayoutStable ${label}`);
-
-  const overflowing = metrics.filter(metric => metric.scrollWidth > metric.clientWidth + 2);
-  if (overflowing.length > 0) {
-    throw new Error(`Manager horizontal overflow at ${label}: ${JSON.stringify(overflowing.slice(0, 5))}`);
-  }
-
-  // Fail loud when a per-surface critical class is renamed/removed: the overflow pass above only
-  // measures what it finds, so a selector that matches nothing is silently uncovered.
-  assertExpectedSelectorsPresent(metrics, expectedSelectorsForManagerSurface(label), label);
-
-  const rowCount = metrics.filter(metric =>
-    metric.selector === '.manager-system-row'
-      || metric.selector === '.manager-recipe-row'
-      || metric.selector === '.manager-environment-row'
-      || metric.selector === '.manager-component-row'
-      || metric.selector === '.manager-essence-row'
-      || metric.selector === '.manager-vocabulary-row'
-      || metric.selector === '.manager-gathering-task-row'
-      || metric.selector === '.manager-gathering-event-row'
-      || metric.selector === '[data-manager-tool-id]'
-      || metric.selector === '.manager-knowledge-copy-row'
-      || metric.selector === '.manager-knowledge-learned-row'
-      || metric.selector === '.manager-travel-parties-row'
-      || metric.selector === '.manager-travel-realms-row'
-      || metric.selector === '.manager-map-link-row'
-  ).length;
-  const editFormCount = metrics.filter(metric =>
-    metric.selector === '.manager-system-edit-form'
-      || metric.selector === '.manager-environment-editor-shell'
-      || metric.selector === '.manager-environment-edit-view'
-      || metric.selector === '.manager-gathering-task-edit-view'
-      || metric.selector === '.manager-gathering-event-edit-view'
-      || metric.selector === '.manager-essence-edit-view'
-      || metric.selector === '.manager-recipe-edit-main'
-      || metric.selector === '[data-tool-edit-view]'
-      || metric.selector === '.manager-component-edit-view'
-      || metric.selector === '.environment-draft-editor'
-  ).length;
-  if (rowCount === 0 && editFormCount === 0) {
-    throw new Error(`Manager rendered no table rows at ${label}`);
-  }
-}
-
-/** Assert at least one recipe row is actually reachable — a pointer hit-test, not a DOM count. */
-async function assertRecipeRowsHittable(page, label) {
-  const report = await withDeadline(page.evaluate(() => {
-    const rows = Array.from(document.querySelectorAll('.manager-recipe-row'));
-    rows[0]?.scrollIntoView({ block: 'center' });
-    const hittable = rows.filter((row) => {
-      const rect = row.getBoundingClientRect();
-      if (rect.width < 8 || rect.height < 8) return false;
-      const x = Math.round(rect.left + Math.min(rect.width / 2, 60));
-      const y = Math.round(rect.top + (rect.height / 2));
-      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return false;
-      const hit = document.elementFromPoint(x, y);
-      return Boolean(hit) && row.contains(hit);
-    }).length;
-    return { total: rows.length, hittable };
-  }), 30_000, `assertRecipeRowsHittable ${label}`);
-
-  if (report.hittable === 0) {
-    throw new Error(
-      `Recipe library rendered no VISIBLE row at ${label}: ${report.total} row(s) present in the DOM, 0 reachable by a pointer (clipped, zero-height, or painted over).`
-    );
-  }
-}
-
-/**
- * Assert the player's progressive stage list is sound — the checks no unit test can make (issue
- * 651).
- */
-async function assertProgressiveStageListSound(page, label, { expectAnnouncement = false } = {}) {
-  const report = await withDeadline(page.evaluate(() => {
-    const contains = (outer, inner) =>
-      inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5 &&
-      inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
-
-    const rows = Array.from(document.querySelectorAll('[data-progressive-stage]'));
-    const thresholds = Array.from(document.querySelectorAll('[data-progressive-stage-threshold]'))
-      .map((node) => Number(node.getAttribute('data-progressive-stage-threshold')));
-
-    const chevrons = Array.from(document.querySelectorAll('[data-progressive-stage-move] button'))
-      .map((button) => {
-        const box = button.getBoundingClientRect();
-        const glyph = button.querySelector('i')?.getBoundingClientRect() ?? null;
-        return {
-          height: box.height,
-          width: box.width,
-          glyphContained: glyph ? contains(box, glyph) : false,
-          hasGlyph: Boolean(glyph)
-        };
-      });
-
-    // Per row: the horizontal gap between the up and down buttons.
-    const chevronGaps = Array.from(document.querySelectorAll('[data-progressive-stage-move]'))
-      .map((group) => {
-        const buttons = Array.from(group.querySelectorAll('button'));
-        if (buttons.length < 2) return null;
-        const a = buttons[0].getBoundingClientRect();
-        const b = buttons[1].getBoundingClientRect();
-        return Math.round(b.left - a.right);
-      })
-      .filter((gap) => gap !== null);
-
-    const region = document.querySelector('[data-progressive-stage-status]');
-    const regionBox = region?.getBoundingClientRect() ?? null;
-
-    return {
-      rowCount: rows.length,
-      thresholds,
-      chevrons,
-      chevronGaps,
-      region: region
-        ? {
-            text: region.textContent?.trim() ?? '',
-            width: regionBox.width,
-            height: regionBox.height
-          }
-        : null
-    };
-  }), 30_000, `assertProgressiveStageListSound ${label}`);
-
-  if (report.rowCount < 3) {
-    throw new Error(`${label}: expected >= 3 progressive stages, saw ${report.rowCount}`);
-  }
-
-  const cropped = report.chevrons.filter((c) => !c.hasGlyph || !c.glyphContained || c.height < 30);
-  if (cropped.length > 0) {
-    throw new Error(
-      `${label}: chevron buttons cropped or under-sized (Foundry .app button reset leaked): ${JSON.stringify(cropped.slice(0, 4))}`
-    );
-  }
-
-  const spaced = report.chevronGaps.filter((gap) => gap > 8);
-  if (spaced.length > 0) {
-    throw new Error(`${label}: chevrons not adjacent — a leaked .app button margin: gaps ${JSON.stringify(spaced)}`);
-  }
-
-  if (expectAnnouncement) {
-    if (!report.region) throw new Error(`${label}: no aria-live region rendered`);
-    if (report.region.text.length === 0) {
-      throw new Error(`${label}: the live region carries no text, so its visibility proves nothing`);
-    }
-    if (report.region.width > 2 || report.region.height > 2) {
-      throw new Error(
-        `${label}: the live region is VISIBLE (${report.region.width}x${report.region.height}) — the .fabricate .visually-hidden block is missing or overridden. Text: "${report.region.text}"`
-      );
-    }
-  }
-
-  for (let i = 1; i < report.thresholds.length; i++) {
-    if (report.thresholds[i] < report.thresholds[i - 1]) {
-      throw new Error(
-        `${label}: thresholds are not monotonic (${JSON.stringify(report.thresholds)}) — a stage cannot be reached at a lower budget than the stage above it. This is the carried-threshold defect.`
-      );
-    }
-  }
-
-  return report;
-}
-
-/** Click a target only if it is present, swallowing transient failures. */
-async function softClick(locator, options = {}) {
-  if (await locator.count() === 0) return;
-  await locator.first().click(options).catch(() => {});
-}
-
-async function assertPointerTarget(page, locator, targetSelector, label) {
-  await locator.scrollIntoViewIfNeeded();
-  await locator.waitFor({ state: 'visible', timeout: 5_000 });
-  const box = await locator.boundingBox();
-  if (!box) throw new Error(`No pointer box found for ${label}`);
-  const hit = await page.evaluate(({ x, y, targetSelector }) => {
-    const element = document.elementFromPoint(x, y);
-    return {
-      matched: Boolean(element?.closest?.(targetSelector)),
-      tag: element?.tagName || 'none',
-      className: String(element?.className || ''),
-    };
-  }, { x: box.x + box.width / 2, y: box.y + box.height / 2, targetSelector });
-  if (!hit.matched) {
-    throw new Error(`${label} pointer missed ${targetSelector}; hit ${hit.tag} ${hit.className}`);
-  }
-}
-
-/** Open a requirement-rail slot's chooser only if it is not already open (issue 917). */
-async function ensureSlotOpen(slotLocator) {
-  await slotLocator.waitFor({ state: 'visible', timeout: 8_000 });
-  if (await slotLocator.getAttribute('aria-expanded') === 'true') return;
-  await slotLocator.click({ timeout: 5_000 });
-}
-
-function assertSingleToolMutation(report, expectedMethod, label) {
-  const matchingCalls = report?.calls?.filter((call) => call.method === expectedMethod) ?? [];
-  const unexpectedCalls = report?.calls?.filter((call) => call.method !== expectedMethod) ?? [];
-  if (matchingCalls.length !== 1 || unexpectedCalls.length > 0) {
-    throw new Error(
-      `${label} must dispatch exactly one ${expectedMethod} mutation: ${JSON.stringify(report)}`
-    );
-  }
-}
-
-async function beginToolStoreMutationProbe(page, methodNames) {
-  await page.evaluate((names) => {
-    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
-    if (!store) throw new Error('Tool mutation probe could not resolve the live manager store');
-    if (globalThis.__fabricateToolMutationProbe) {
-      throw new Error('Tool mutation probe was already active');
-    }
-    const calls = [];
-    const restorations = [];
-    const systemManager = game?.fabricate?.getCraftingSystemManager?.();
-    for (const method of names) {
-      const persistentBoundary = {
-        toggleToolEnabled: 'upsertTool',
-        setToolBreakageAuthority: 'updateSystem',
-      }[method];
-      if (persistentBoundary) {
-        const original = systemManager?.[persistentBoundary];
-        if (typeof original !== 'function') {
-          throw new Error(`Tool mutation probe could not wrap systemManager.${persistentBoundary}`);
-        }
-        systemManager[persistentBoundary] = function (...args) {
-          calls.push({
-            method,
-            args: args.map((value) => {
-              try {
-                return JSON.parse(JSON.stringify(value));
-              } catch {
-                return String(value);
-              }
-            }),
-          });
-          return original.apply(this, args);
-        };
-        restorations.push(() => {
-          systemManager[persistentBoundary] = original;
-        });
-        continue;
-      }
-      if (!store.viewState?.subscribe) {
-        throw new Error(`Tool mutation probe could not observe store.${method}`);
-      }
-      let initial = true;
-      const unsubscribe = store.viewState.subscribe((state) => {
-        if (initial) {
-          initial = false;
-          return;
-        }
-        calls.push({
-          method,
-          args: [{
-            toolId: String(state?.toolDraft?.id || ''),
-            dirty: state?.toolDraftDirty === true,
-          }],
-        });
-      });
-      restorations.push(unsubscribe);
-    }
-    globalThis.__fabricateToolMutationProbe = { calls, restorations };
-  }, methodNames);
-}
-
-async function finishToolStoreMutationProbe(page) {
-  return page.evaluate(() => {
-    const probe = globalThis.__fabricateToolMutationProbe;
-    if (!probe) return { calls: [], missing: true };
-    for (const restore of probe.restorations) restore();
-    delete globalThis.__fabricateToolMutationProbe;
-    return { calls: probe.calls };
-  });
-}
-
-async function withSingleToolStoreMutation(page, method, label, action, assertEffect) {
-  await beginToolStoreMutationProbe(page, [method]);
-  let report;
-  try {
-    await action();
-    await assertEffect();
-  } finally {
-    report = await finishToolStoreMutationProbe(page);
-  }
-  assertSingleToolMutation(report, method, label);
-}
-
-async function withSingleToolDraftTransition(page, expectedToolId, label, action, assertEffect) {
-  await page.evaluate(() => {
-    const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
-    if (!store?.viewState?.subscribe) {
-      throw new Error('Tool draft transition probe could not resolve the live manager view state');
-    }
-    if (globalThis.__fabricateToolDraftTransitionProbe) {
-      throw new Error('Tool draft transition probe was already active');
-    }
-    const transitions = [];
-    let initial = true;
-    const unsubscribe = store.viewState.subscribe((state) => {
-      if (initial) {
-        initial = false;
-        return;
-      }
-      transitions.push({
-        toolId: String(state?.toolDraft?.id || ''),
-        dirty: state?.toolDraftDirty === true,
-      });
-    });
-    globalThis.__fabricateToolDraftTransitionProbe = { transitions, unsubscribe };
-  });
-  let report;
-  try {
-    await action();
-    await assertEffect();
-  } finally {
-    report = await page.evaluate(() => {
-      const probe = globalThis.__fabricateToolDraftTransitionProbe;
-      if (!probe) return { transitions: [], missing: true };
-      probe.unsubscribe();
-      delete globalThis.__fabricateToolDraftTransitionProbe;
-      return { transitions: probe.transitions };
-    });
-  }
-  const distinctTransitions = report.transitions.filter((transition, index, transitions) => (
-    index === 0
-    || transition.toolId !== transitions[index - 1].toolId
-    || transition.dirty !== transitions[index - 1].dirty
-  ));
-  const matching = distinctTransitions.filter(({ toolId }) => toolId === String(expectedToolId));
-  if (distinctTransitions.length !== 1 || matching.length !== 1) {
-    throw new Error(
-      `${label} must publish exactly one distinct Tool draft transition for ${expectedToolId}: ${JSON.stringify({
-        ...report,
-        distinctTransitions,
-      })}`
-    );
-  }
-}
-
-async function clickToolTabAndAssertEffect(page, editor, name, label) {
-  const target = editor.locator(`#tool-tab-${name}`);
-  await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
-  if (await target.getAttribute('aria-selected') !== 'false') {
-    throw new Error(`${label} must begin on a different Tool tab`);
-  }
-  await target.evaluate((element) => {
-    const transitions = [];
-    const observer = new MutationObserver(() => {
-      transitions.push(element.getAttribute('aria-selected'));
-    });
-    observer.observe(element, { attributes: true, attributeFilter: ['aria-selected'] });
-    element.__fabricateToolTabProbe = { observer, transitions };
-  });
-  await target.click();
-  await editor.locator(`[data-tool-editor-panel="${name}"]`).waitFor({ state: 'visible', timeout: 5_000 });
-  const effect = await target.evaluate((element) => {
-    const probe = element.__fabricateToolTabProbe;
-    probe?.observer?.disconnect();
-    delete element.__fabricateToolTabProbe;
-    const tablist = element.closest('[role="tablist"]');
-    return {
-      selected: tablist?.querySelectorAll('[role="tab"][aria-selected="true"]').length ?? 0,
-      expectedSelected: element.getAttribute('aria-selected'),
-      selectedTransitions: probe?.transitions?.filter((value) => value === 'true').length ?? 0,
-      transitions: probe?.transitions ?? [],
-    };
-  });
-  if (
-    effect.selected !== 1
-    || effect.expectedSelected !== 'true'
-    || effect.selectedTransitions !== 1
-  ) {
-    throw new Error(`${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`);
-  }
-}
-
-async function toggleToolControlAndRestore(page, locator, label) {
-  await assertPointerTarget(page, locator, 'input', label);
-  const before = await locator.isChecked();
-  await withSingleToolStoreMutation(
-    page,
-    'patchToolDraft',
-    `${label} apply`,
-    () => locator.click(),
-    async () => {
-      if (await locator.isChecked() === before) {
-        throw new Error(`${label} did not apply its observable toggle effect`);
-      }
-    },
-  );
-  await withSingleToolStoreMutation(
-    page,
-    'patchToolDraft',
-    `${label} restore`,
-    () => locator.click(),
-    async () => {
-      if (await locator.isChecked() !== before) {
-        throw new Error(`${label} did not restore its original persisted state`);
-      }
-    },
-  );
-}
-
-async function selectOptionAndAssertSingleChange(
-  locator,
-  value,
-  label,
-  { expectRetainedValue = true } = {},
-) {
-  await locator.evaluate((element) => {
-    element.__fabricateSelectChangeCount = 0;
-    element.__fabricateSelectChangeListener = () => {
-      element.__fabricateSelectChangeCount += 1;
-    };
-    element.addEventListener('change', element.__fabricateSelectChangeListener);
-  });
-  await locator.selectOption(value);
-  const effect = await locator.evaluate((element) => {
-    element.removeEventListener('change', element.__fabricateSelectChangeListener);
-    const report = {
-      changes: element.__fabricateSelectChangeCount,
-      value: element.value,
-    };
-    delete element.__fabricateSelectChangeCount;
-    delete element.__fabricateSelectChangeListener;
-    return report;
-  });
-  if (effect.changes !== 1 || (expectRetainedValue && effect.value !== value)) {
-    throw new Error(`${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`);
-  }
-}
-
-async function saveToolStudioDraftIfDirty(editor) {
-  if (await editor.locator('[data-tool-editor-dirty]').count() === 0) return;
-  await editor.locator('[data-tool-editor-save]').click();
-  await editor.locator('[data-tool-editor-dirty]').waitFor({
-    state: 'detached',
-    timeout: 10_000,
-  });
-}
-
-async function assertSavedToolStudioCapture(editor, label) {
-  if (await editor.locator('[data-tool-editor-dirty]').count() > 0) {
-    throw new Error(`${label} must capture a saved Tool draft`);
-  }
-  const save = editor.locator('[data-tool-editor-save]');
-  if (await save.count() !== 1 || !await save.isDisabled()) {
-    throw new Error(`${label} must expose the recipe-parity clean state with Save tool disabled`);
-  }
-}
-
-async function requireSingleLocator(locator, label) {
-  const count = await locator.count();
-  if (count !== 1) {
-    throw new Error(`${label} expected exactly one match, found ${count}`);
-  }
-  return locator;
-}
-
-async function assertDisabledToolOnBreakFieldset(fieldset) {
-  const fieldsetState = await fieldset.evaluate((element) => ({
-    disabled: element.disabled === true,
-    matchesDisabled: element.matches(':disabled'),
-  }));
-  if (!fieldsetState.disabled || !fieldsetState.matchesDisabled) {
-    throw new Error(`Check-driven immune fieldset did not expose native disabled state: ${JSON.stringify(fieldsetState)}`);
-  }
-  const controls = fieldset.locator('button, input, select, textarea');
-  const controlCount = await controls.count();
-  if (controlCount === 0) {
-    throw new Error('Check-driven immune fieldset exposed no actionable controls');
-  }
-  for (let index = 0; index < controlCount; index += 1) {
-    if (!(await controls.nth(index).isDisabled())) {
-      throw new Error(`Check-driven immune on-break control ${index + 1} remained interactive`);
-    }
-  }
-}
-
-function assertToolStudioHorizontalScrollSettled(positions, label) {
-  const unsettled = (positions || []).filter(({ scrollLeft }) => scrollLeft !== 0);
-  if (unsettled.length > 0) {
-    throw new Error(`${label} leaked horizontal scroll: ${JSON.stringify(unsettled)}`);
-  }
-}
-
-async function readToolStudioHorizontalScroll(page, { reset = false } = {}) {
-  return page.evaluate((shouldReset) => {
-    const manager = document.querySelector('#fabricate-crafting-system-manager .fabricate-manager');
-    if (!manager) return [];
-    const explicitSelectors = [
-      'html',
-      'body',
-      '#fabricate-crafting-system-manager',
-      '.fabricate-manager',
-      '.fabricate-manager .manager-body',
-      '.fabricate-manager .manager-main',
-      '.fabricate-manager [data-tool-edit-view]',
-      '.fabricate-manager .manager-tool-editor-tabs',
-      '.fabricate-manager [data-tool-editor-panel]',
-      '.fabricate-manager [data-tool-behavior-preview]',
-      '.fabricate-manager .manager-inspector',
-      '.fabricate-manager .manager-tool-repair',
-      '.fabricate-manager [data-tool-repair-requirements] [data-recipe-group]',
-    ];
-    const elements = new Set([document.scrollingElement]);
-    for (const selector of explicitSelectors) {
-      for (const element of document.querySelectorAll(selector)) elements.add(element);
-    }
-    for (const element of manager.querySelectorAll('*')) {
-      if (element.scrollWidth > element.clientWidth + 1) elements.add(element);
-    }
-    const positions = [];
-    let index = 0;
-    for (const element of elements) {
-      if (!element) continue;
-      if (shouldReset) element.scrollLeft = 0;
-      positions.push({
-        index,
-        tag: element.tagName,
-        id: element.id || '',
-        className: String(element.className || ''),
-        scrollLeft: element.scrollLeft,
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-      });
-      index += 1;
-    }
-    return positions;
-  }, reset);
-}
-
-async function assertToolStudioHorizontalScroll(page, label) {
-  const positions = await readToolStudioHorizontalScroll(page);
-  assertToolStudioHorizontalScrollSettled(positions, label);
-}
-
-async function resetToolStudioHorizontalScroll(page, label = 'Tool Studio') {
-  await readToolStudioHorizontalScroll(page, { reset: true });
-  await page.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  }));
-  await assertToolStudioHorizontalScroll(page, `${label} horizontal reset`);
-}
-
-async function resetToolStudioScroll(page) {
-  const selectors = [
-    '.fabricate-manager .manager-body',
-    '.fabricate-manager .manager-main',
-    '.fabricate-manager [data-tool-editor-panel]',
-    '.fabricate-manager [data-tool-behavior-preview]',
-    '.fabricate-manager .manager-inspector',
-  ];
-  await page.evaluate((targets) => {
-    for (const selector of targets) {
-      for (const element of document.querySelectorAll(selector)) element.scrollTop = 0;
-    }
-  }, selectors);
-  await resetToolStudioHorizontalScroll(page);
-  const scroll = await page.evaluate((targets) => targets.flatMap((selector) => (
-    Array.from(document.querySelectorAll(selector), (element, index) => ({
-      selector,
-      index,
-      scrollTop: element.scrollTop,
-    }))
-  )), selectors);
-  const unsettled = scroll.filter(({ scrollTop }) => scrollTop !== 0);
-  if (unsettled.length > 0) {
-    throw new Error(`Tool Studio vertical scroll reset failed: ${JSON.stringify(unsettled)}`);
-  }
-}
-
-async function scrollToolEditorPanelToReveal(page, editor, selector, label) {
-  const panel = editor.locator('[data-tool-editor-panel]');
-  const target = editor.locator(selector);
-  const fixedBefore = await editor.evaluate(() => {
-    const read = (selector) => {
-      const rect = document.querySelector(selector)?.getBoundingClientRect();
-      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
-    };
-    return {
-      header: read('[data-tool-editor-header]'),
-      tabs: read('.manager-tool-editor-tabs'),
-      preview: read('[data-tool-behavior-preview]'),
-    };
-  });
-  await target.evaluate((element) => element.scrollIntoView({
-    block: 'center',
-    inline: 'nearest',
-  }));
-  await resetToolStudioHorizontalScroll(page, label);
-  const report = await panel.evaluate((element, targetSelector) => {
-    const targetElement = element.querySelector(targetSelector);
-    if (!targetElement) return null;
-    const panelRect = element.getBoundingClientRect();
-    const targetRect = targetElement.getBoundingClientRect();
-    return {
-      scrollTop: element.scrollTop,
-      targetVisible: targetRect.top >= panelRect.top && targetRect.bottom <= panelRect.bottom,
-      targetContained: targetRect.left >= panelRect.left - 1 && targetRect.right <= panelRect.right + 1,
-    };
-  }, selector);
-  if (!report || report.scrollTop <= 0 || !report.targetVisible || !report.targetContained) {
-    throw new Error(`${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`);
-  }
-  const fixedAfter = await editor.evaluate(() => {
-    const read = (selector) => {
-      const rect = document.querySelector(selector)?.getBoundingClientRect();
-      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
-    };
-    return {
-      header: read('[data-tool-editor-header]'),
-      tabs: read('.manager-tool-editor-tabs'),
-      preview: read('[data-tool-behavior-preview]'),
-    };
-  });
-  for (const key of ['header', 'tabs', 'preview']) {
-    for (const edge of ['left', 'right', 'top', 'bottom']) {
-      if (Math.abs((fixedBefore[key]?.[edge] ?? 0) - (fixedAfter[key]?.[edge] ?? 0)) > 1) {
-        throw new Error(
-          `${label} moved fixed ${key} context while revealing stress content: `
-          + `${JSON.stringify({ fixedBefore, fixedAfter })}`
-        );
-      }
-    }
-  }
-  for (const [identitySelector, identityLabel] of [
-    ['[data-tool-editor-header]', 'header'],
-    ['.manager-tool-editor-tabs', 'tabs'],
-    ['[data-tool-behavior-preview]', 'preview'],
-  ]) {
-    if (!(await editor.locator(identitySelector).isVisible())) {
-      throw new Error(`${label} lost ${identityLabel} identity context`);
-    }
-  }
-}
-
-async function captureToolStudioProduct(page, label, expectedGeometry) {
-  const manager = await requireSingleLocator(
-    page.locator('#fabricate-crafting-system-manager .fabricate-manager'),
-    `${label} live Tool Studio manager`
-  );
-  const box = await manager.boundingBox();
-  if (!box) throw new Error(`${label} Tool Studio product rectangle is not measurable`);
-  const measured = { width: Math.round(box.width), height: Math.round(box.height) };
-  const expected = expectedGeometry?.product;
-  if (!expected || measured.width !== expected.width || measured.height !== expected.height) {
-    throw new Error(
-      `${label} Tool Studio product rectangle drifted: ${JSON.stringify({ measured, expectedGeometry })}`
-    );
-  }
-  await assertToolStudioHorizontalScroll(page, `${label} before capture`);
-  await screenshot(page, label, {
-    clip: { x: box.x, y: box.y, width: box.width, height: box.height },
-  });
-  await assertToolStudioHorizontalScroll(page, `${label} after capture`);
-}
-
-async function readToolStudioLayout(page) {
-  return page.evaluate(() => {
-    const readRect = (selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return null;
-      const rect = element.getBoundingClientRect();
-      return {
-        left: rect.left,
-        right: rect.right,
-        top: rect.top,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      };
-    };
-    const readType = (selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return null;
-      const style = getComputedStyle(element);
-      return {
-        fontSize: Number.parseFloat(style.fontSize),
-        lineHeight: style.lineHeight,
-        overflow: style.overflow,
-        textOverflow: style.textOverflow,
-        whiteSpace: style.whiteSpace,
-      };
-    };
-    const readOverflow = (selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return null;
-      const style = getComputedStyle(element);
-      return {
-        overflowY: style.overflowY,
-        clientHeight: element.clientHeight,
-        scrollHeight: element.scrollHeight,
-      };
-    };
-    const readHorizontalOverflow = (selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return null;
-      const style = getComputedStyle(element);
-      return {
-        overflowX: style.overflowX,
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-        scrollLeft: element.scrollLeft,
-      };
-    };
-    return {
-      manager: readRect('.fabricate-manager'),
-      body: readRect('.fabricate-manager .manager-body'),
-      main: readRect('[data-tool-edit-view]')?.width > 0
-        ? readRect('.fabricate-manager .manager-main')
-        : readRect('.fabricate-manager .manager-body'),
-      inspector: readRect('.fabricate-manager .manager-inspector'),
-      libraryRow: readRect('.fabricate-manager [data-manager-tool-id]'),
-      editorHeader: readRect('[data-tool-editor-header]'),
-      editorActions: readRect('.manager-tool-edit-actions'),
-      tabs: readRect('.manager-tool-editor-tabs'),
-      tabButtons: Array.from(
-        document.querySelectorAll('.manager-tool-editor-tabs > [role="tab"]'),
-        (element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            id: element.id,
-            left: rect.left,
-            right: rect.right,
-            top: rect.top,
-            bottom: rect.bottom,
-            width: rect.width,
-            height: rect.height,
-          };
-        },
-      ),
-      tabsOverflow: readHorizontalOverflow('.manager-tool-editor-tabs'),
-      composition: readRect('.manager-tool-edit-composition')?.width > 0
-        ? readRect('.manager-tool-edit-composition')
-        : readRect('.fabricate-manager .manager-body'),
-      editorPanel: readRect('[data-tool-editor-panel]'),
-      firstSection: readRect('[data-tool-editor-panel] > *'),
-      preview: readRect('[data-tool-behavior-preview]'),
-      previewIdentity: readRect('[data-tool-preview-identity]'),
-      libraryNameType: readType('.manager-tools-library-copy > strong'),
-      inspectorNameType: readType('.manager-tool-inspector-hero h2'),
-      editorNameType: readType('.manager-tool-edit-identity h2'),
-      previewNameType: readType('.manager-tool-preview-identity h3'),
-      bodyOverflow: readOverflow('.fabricate-manager .manager-body'),
-      mainOverflow: readOverflow('.fabricate-manager .manager-main'),
-      panelOverflow: readOverflow('[data-tool-editor-panel]'),
-      previewOverflow: readOverflow('[data-tool-behavior-preview]'),
-      headerCount: document.querySelectorAll('[data-tool-editor-header]').length,
-      genericTitleCount: document.querySelectorAll('.manager-heading > .manager-title, .manager-heading > .manager-subtitle').length,
-    };
-  });
-}
-
-function assertHorizontalContainment(parent, child, label) {
-  if (!parent || !child || child.left < parent.left - 1 || child.right > parent.right + 1) {
-    throw new Error(`${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`);
-  }
-}
-
-// Three, not four.
-function assertToolStudioTabContainment(report) {
-  if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 3) {
-    throw new Error(`Tool editor must render three measurable tabs: ${JSON.stringify(report)}`);
-  }
-  const overflow = report.tabsOverflow;
-  if (
-    !overflow
-    || overflow.scrollLeft !== 0
-    || overflow.scrollWidth > overflow.clientWidth + 1
-  ) {
-    throw new Error(`Tool editor tabs remain horizontally scrollable: ${JSON.stringify(overflow)}`);
-  }
-  for (const tab of report.tabButtons) {
-    assertHorizontalContainment(report.tabs, tab, `${tab.id} within visible tab list`);
-    assertHorizontalContainment(report.manager, tab, `${tab.id} within Tool Studio product root`);
-  }
-}
-
-function assertToolStudioTypography(report, pairs) {
-  for (const [key, maximum, label] of pairs) {
-    const type = report[key];
-    if (!type || !Number.isFinite(type.fontSize) || type.fontSize > maximum) {
-      throw new Error(`${label} typography is not compact: ${JSON.stringify(type)}`);
-    }
-    if (type.whiteSpace !== 'nowrap' || !['hidden', 'clip'].includes(type.overflow)) {
-      throw new Error(`${label} does not bound long identity copy: ${JSON.stringify(type)}`);
-    }
-  }
-}
-
-async function assertToolStudioLibraryLayout(page) {
-  const report = await readToolStudioLayout(page);
-  assertHorizontalContainment(report.body, report.main, 'Tool library center');
-  assertHorizontalContainment(report.body, report.inspector, 'Tool library inspector');
-  assertHorizontalContainment(report.main, report.libraryRow, 'Tool library row');
-  if (!report.inspector || report.inspector.width < 330 || report.inspector.width > 342) {
-    throw new Error(`Tool library inspector is not the complete 340px rail: ${JSON.stringify(report.inspector)}`);
-  }
-  assertToolStudioTypography(report, [
-    ['libraryNameType', 14, 'Tool library name'],
-    ['inspectorNameType', 17, 'Tool inspector name'],
-  ]);
-}
-
-async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
-  const report = await readToolStudioLayout(page);
-  if (report.headerCount !== 1 || report.genericTitleCount !== 0) {
-    throw new Error(`Tool editor identity chrome drifted: ${JSON.stringify({ headerCount: report.headerCount, genericTitleCount: report.genericTitleCount })}`);
-  }
-  for (const [parent, child, label] of [
-    [report.main, report.editorHeader, 'Tool editor header'],
-    [report.editorHeader, report.editorActions, 'Tool editor actions'],
-    [report.main, report.tabs, 'Tool editor tabs'],
-    [report.composition, report.editorPanel, 'Tool editor panel'],
-    [report.composition, report.preview, 'Tool behavior preview'],
-    [report.preview, report.previewIdentity, 'Tool preview identity'],
-    [report.editorPanel, report.firstSection, 'Tool editor first section'],
-  ]) {
-    assertHorizontalContainment(parent, child, label);
-  }
-  assertToolStudioTabContainment(report);
-  assertToolStudioTypography(report, [
-    ['editorNameType', 20, 'Tool editor name'],
-    ['previewNameType', 17, 'Tool preview name'],
-  ]);
-  if (!stacked) {
-    if (!report.preview || report.preview.width < 338 || report.preview.width > 342) {
-      throw new Error(`Tool preview is not the complete 340px rail: ${JSON.stringify(report.preview)}`);
-    }
-    if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
-      throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
-    }
-    return;
-  }
-  if (report.preview.height <= 0 || report.preview.top < report.editorPanel.top) {
-    throw new Error(`Tool preview is clipped or precedes the editor in stacked reading order: ${JSON.stringify(report.preview)}`);
-  }
-  if (report.bodyOverflow?.overflowY !== 'auto') {
-    throw new Error(`Tool stacked body does not own scrolling: ${JSON.stringify(report.bodyOverflow)}`);
-  }
-  for (const [key, label] of [
-    ['mainOverflow', 'main'],
-    ['panelOverflow', 'panel'],
-    ['previewOverflow', 'preview'],
-  ]) {
-    if (['auto', 'scroll'].includes(report[key]?.overflowY)) {
-      throw new Error(`Tool stacked ${label} unexpectedly owns nested scrolling: ${JSON.stringify(report[key])}`);
-    }
-  }
-}
-
-function managerSystemRowSelector(systemId) {
-  return `.fabricate-manager .manager-system-row[data-system-id="${systemId}"]`;
-}
-
-/** Exercise manager pointer targets without triggering destructive actions. */
-async function exerciseManagerPointerTargets(page, systemId) {
-  const search = page.locator('.fabricate-manager input[type="search"]').first();
-  await search.fill('forge');
-  await page.waitForTimeout(250);
-  await search.fill('');
-  await page.waitForTimeout(250);
-
-  await page.locator('.fabricate-manager .manager-filter select').first().selectOption('active');
-  await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager .manager-filter select').first().selectOption('all');
-
-  await page.locator(`${managerSystemRowSelector(systemId)} .manager-system-identity`).first().click();
-  // Breadcrumb / scope / header pointer targets only exist in certain navigation states (e.g.
-  // inside a system sub-view).
-  await softClick(page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("The Herbalist")'), { trial: true });
-  await softClick(page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")'), { trial: true });
-  await softClick(page.locator('.fabricate-manager .manager-scope-return'), { trial: true });
-  await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Import")'), { trial: true });
-  await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Export")'), { trial: true });
-  await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create")'), { trial: true });
-  const rowActionButtons = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`);
-  for (let index = 0; index < await rowActionButtons.count(); index += 1) {
-    await rowActionButtons.nth(index).click({ trial: true });
-  }
-}
-
-/** Select the smoke test crafting system in Manager. */
-async function selectSmokeSystemInManager(page, systemId) {
-  const row = page.locator(managerSystemRowSelector(systemId)).first();
-  await row.waitFor({ state: 'visible', timeout: 10_000 });
-  const alreadySelected = await row.evaluate(element => element.getAttribute('aria-selected') === 'true')
-    .catch(() => false);
-  if (alreadySelected) return;
-  await row.locator('.manager-system-identity').click();
-  await settleManagerNav(page);
-}
 
 async function seedSmokeGatheringLibrary(page, craftingSetup) {
   await page.evaluate(async ({ sysId, componentMap }) => {
@@ -3658,97 +1737,6 @@ async function runFullProfileGatherAsserts(page, craftingSetup, gatherFixture, c
   });
 }
 
-/** Exercise manager system edit controls without saving destructive changes. */
-async function exerciseManagerSystemEditPointerTargets(page, systemId) {
-  if (await page.locator('.fabricate-manager #manager-system-name').count() === 0) {
-    let editButton = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`).nth(0);
-    if (await editButton.count() === 0) {
-      const systemsBreadcrumb = page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")').first();
-      if (await systemsBreadcrumb.count() > 0) {
-        await systemsBreadcrumb.click();
-        await page.waitForTimeout(500);
-      }
-      const search = page.locator('.fabricate-manager input[type="search"]').first();
-      if (await search.count() > 0) {
-        await search.fill('');
-        await page.waitForTimeout(250);
-      }
-      await page.locator(managerSystemRowSelector(systemId)).first().waitFor({ state: 'visible', timeout: 5_000 });
-      editButton = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`).nth(0);
-    }
-    await editButton.click();
-  }
-  await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
-  await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  // Note: the recipe-resolution-mode control moved off the system-edit view into the dedicated
-  // Crafting Settings section (`data-crafting-resolution-mode-option` in CraftingSettingsView) with
-  // the issue-511 Books & Scrolls refactor, so the old `data-system-resolution-mode-option`
-  // interaction that lived here is gone.
-  await softClick(page.locator('.fabricate-manager [data-edit-control="advanced-options"] input'), { trial: true });
-  await softClick(page.locator('.fabricate-manager [data-feature-key="gathering"] input'), { trial: true });
-  await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")'), { trial: true });
-}
-
-/** Exercise manager environment browser pointer targets without mutating environments. */
-async function exerciseManagerEnvironmentPointerTargets(page) {
-  await page.locator(railSelector('manager-nav-gathering')).click();
-  await page.locator('.fabricate-manager .manager-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
-
-  const search = page.locator('.fabricate-manager input[aria-label="Search environments"]').first();
-  await search.fill('Azure');
-  await page.waitForTimeout(250);
-  await search.fill('');
-  await page.waitForTimeout(250);
-
-  await page.locator('.fabricate-manager select[aria-label="Filter environments by status"]').first().selectOption('active');
-  await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager select[aria-label="Filter environments by status"]').first().selectOption('all');
-  await page.locator('.fabricate-manager select[aria-label="Filter environments by selection mode"]').first().selectOption('targeted');
-  await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager select[aria-label="Filter environments by selection mode"]').first().selectOption('all');
-
-  const azureRow = page.locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove")').first();
-  await azureRow.waitFor({ state: 'visible', timeout: 5_000 });
-  await azureRow.locator('.manager-environment-identity').click();
-  await softClick(azureRow.locator('.manager-status-toggle'), { trial: true });
-  await softClick(azureRow.locator('.manager-icon-button').nth(0), { trial: true });
-  await softClick(azureRow.locator('.manager-icon-button').nth(1), { trial: true });
-  await softClick(azureRow.locator('.manager-icon-button').nth(2), { trial: true });
-  // Reordering happens via composition-list drag-and-drop; row no longer has
-  // standalone move-up / move-down icon buttons.
-  await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create environment")'), { trial: true });
-}
-
-/** Dismiss global Foundry notifications that can cover screenshot targets. */
-async function dismissFoundryNotifications(page) {
-  // Notifications are globally hidden via `installNotificationHidingCss()` at world-load, so this
-  // helper is largely defensive — kept in case the CSS is bypassed by a Foundry update or an
-  // in-test addStyleTag removal.
-  await page.evaluate(() => {
-    document
-      .querySelectorAll('#notifications .notification, body > .notification, .notification')
-      .forEach(notification => {
-        try { notification.remove(); } catch { /* ignore */ }
-      });
-  });
-}
-
-/**
- * Inject a global stylesheet that hides Foundry's notification toasts so they never overlay
- * screenshots or block clicks. Called once per browser context at world-load.
- */
-async function installNotificationHidingCss(page) {
-  await page.addStyleTag({
-    content: `
-      #notifications,
-      body > .notification,
-      .notification {
-        display: none !important;
-      }
-    `
-  });
-}
 
 /**
  * Seed the pre-repair world state acceptance criterion 6c describes: an owned copy stamped with a
@@ -4298,7 +2286,8 @@ async function assertKnowledgeInertSurvivesExpend(page, fixture) {
 }
 
 /** Drive the GM Knowledge surface and capture its evidence frames (issue 785). */
-async function exerciseKnowledgeSurface(page, { fixture }) {
+async function exerciseKnowledgeSurface(ctx, { fixture }) {
+  const { page, screenshot } = ctx;
   const selectKnowledgeCharacter = async (actorId) => {
     await page.locator(`.fabricate-manager [data-knowledge-actor="${actorId}"]`).first().click();
     await page.locator(`.fabricate-manager [data-knowledge-actor="${actorId}"][aria-pressed="true"]`).first()
@@ -4813,7 +2802,8 @@ async function replaceToolStudioTools(page, systemId, tools) {
   }, { systemId, tools });
 }
 
-async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fixture }) {
+async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeName, fixture }) {
+  const { page, screenshot } = ctx;
   // Request the prototype's outer geometry inside its exact source viewport.
   // ApplicationV2 contributes its own frame and V13 truthfully clamps it to that
   // viewport; capture the settled inner product rectangle rather than fabricating
@@ -5034,7 +3024,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertToolStudioLibraryLayout(page);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-01-library-1280x720', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-parity-01-library-1280x720', wideGeometry);
   try {
     await replaceToolStudioTools(page, systemId, []);
     await manager.locator('[data-tool-library-empty]').waitFor({ state: 'visible', timeout: 5_000 });
@@ -5064,7 +3054,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       })}`);
     }
     await resetToolStudioScroll(page);
-    await captureToolStudioProduct(page, 'manager-tool-zero-state-empty-library-1280x720', wideGeometry);
+    await captureToolStudioProduct(ctx, 'manager-tool-zero-state-empty-library-1280x720', wideGeometry);
   } finally {
     await replaceToolStudioTools(page, systemId, parityTools);
     await row.waitFor({ state: 'visible', timeout: 5_000 });
@@ -5186,7 +3176,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await displayLabel.waitFor({ state: 'visible', timeout: 5_000 });
   await displayLabel.fill("Masterwork Smith's Hammer with an Exceptionally Long Display Name");
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-long-name', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-stress-long-name', wideGeometry);
   await displayLabel.fill("Smith's Hammer");
   await saveToolStudioDraftIfDirty(editor);
 
@@ -5236,7 +3226,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     );
   }
   await assertNoScreenshotOverlays(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-02-remove-1280x720', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-parity-02-remove-1280x720', wideGeometry);
   await resetToolStudioScroll(page);
 
   const tab = (name) => editor.locator(`#tool-tab-${name}`);
@@ -5247,7 +3237,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await clickToolTabAndAssertEffect(page, editor, 'breakage', 'Tool Breakage tab at 1280px');
   await assertSavedToolStudioCapture(editor, 'Breakage parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-03-breakage-1280x720', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-parity-03-breakage-1280x720', wideGeometry);
   const flagBrokenChoice = editor.locator('input[name="tool-on-break"][value="flagBroken"]');
   await withSingleToolStoreMutation(
     page,
@@ -5322,7 +3312,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     '[data-tool-repair-requirements] [data-recipe-group] [data-recipe-add="alternative-component"]',
     'Populated repair',
   );
-  await captureToolStudioProduct(page, 'manager-tool-stress-repair', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-stress-repair', wideGeometry);
 
   const replaceWithChoice = editor.locator('input[name="tool-on-break"][value="replaceWith"]');
   await withSingleToolStoreMutation(
@@ -5361,7 +3351,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     '[data-tool-replacement-target]',
     'Component replacement',
   );
-  await captureToolStudioProduct(page, 'manager-tool-stress-replacement', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-stress-replacement', wideGeometry);
   await editor.locator('[data-tool-editor-save]').click();
   await editor.locator('[data-tool-editor-dirty]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   await editor.locator('[data-tool-editor-back]').click();
@@ -5417,7 +3407,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertDisabledToolOnBreakFieldset(immuneOnBreakFieldset);
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-immune', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-stress-immune', wideGeometry);
   await editor.locator('[data-tool-editor-save]').click();
   await editor.locator('[data-tool-editor-back]').click();
   await liveManagerApp.locator('.fabricate-manager[data-manager-view="tools"]').waitFor({ state: 'visible', timeout: 5_000 });
@@ -5481,7 +3471,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, 'Requirements parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-04-requirements-1280x720', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-parity-04-requirements-1280x720', wideGeometry);
 
   await tab('validation').click();
   await editor.locator('[data-tool-validation-tab]').waitFor({ state: 'visible', timeout: 5_000 });
@@ -5494,7 +3484,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   await assertSavedToolStudioCapture(editor, 'Validation parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-05-validation-1280x720', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-parity-05-validation-1280x720', wideGeometry);
   await tab('requirements').click();
   const selectedPrerequisite = editor.locator(
     '[data-tool-prerequisite-row] input[type="checkbox"]:checked',
@@ -5523,7 +3513,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   await assertNoScreenshotOverlays(page);
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-stress-invalid-validation', wideGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-stress-invalid-validation', wideGeometry);
   await tab('requirements').click();
   const prerequisiteToRestore = editor.locator(
     `[data-tool-prerequisite-row] input[type="checkbox"][value="${selectedPrerequisiteId}"]`,
@@ -5553,7 +3543,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, '832px Breakage parity');
   await resetToolStudioScroll(page);
-  await captureToolStudioProduct(page, 'manager-tool-parity-06-breakage-900x700', narrowGeometry);
+  await captureToolStudioProduct(ctx, 'manager-tool-parity-06-breakage-900x700', narrowGeometry);
   await clickToolTabAndAssertEffect(page, editor, 'requirements', 'Tool Requirements tab at 900px');
   await toggleToolControlAndRestore(page, editor.locator('[data-tool-bonus-enabled]'), 'Tool bonus control at 900px');
   await saveToolStudioDraftIfDirty(editor);
@@ -5646,286 +3636,6 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }, systemId);
 }
 
-/**
- * Close Foundry application windows across ApplicationV1 and ApplicationV2.
- * @param {import('playwright').Page} page
- */
-/**
- * Wait for every Fabricate window (manager, shared app) and any dirty-draft
- * "Discard Changes" prompt to leave the DOM after a close sweep (R5, #750).
- * Replaces the two blanket 500ms waits per `closeOpenApplications` attempt with
- * an event-driven detach check; the close usually completes well under 500ms.
- * The capped fallback preserves the old fixed pacing if a window is slow to go,
- * so a stuck close degrades to today's timing rather than hanging.
- * @param {import('playwright').Page} page
- * @param {{ timeout?: number, fallbackMs?: number }} [options]
- */
-async function waitForFabricateWindowsClosed(page, { timeout = 800, fallbackMs = 500 } = {}) {
-  await waitForSettled(page, () => {
-    const windows = document.querySelectorAll([
-      '.fabricate-manager',
-      '.fabricate-app',
-      '.application[id^="fabricate-"]',
-      '.window-app[id^="fabricate-"]',
-    ].join(', ')).length;
-    const hasDiscard = Array.from(document.querySelectorAll('button'))
-      .some(button => /Discard Changes/.test(button.textContent || ''));
-    return windows === 0 && !hasDiscard;
-  }, undefined, { timeout, fallbackMs });
-}
-
-async function closeOpenApplications(page) {
-  const closeSelector = [
-    '.application:not(#sidebar) button[data-action="close"]',
-    '.application:not(#sidebar) button[aria-label="Close"]',
-    '.application:not(#sidebar) button[title="Close"]',
-    '.application:not(#sidebar) .header-button.close',
-    '.application:not(#sidebar) .window-header .close',
-    '.app.window-app .close',
-    '#fabricate-recipe-manager button[data-action="close"]',
-    '#fabricate-crafting-system-manager button[data-action="close"]',
-    '#fabricate-app button[data-action="close"]'
-  ].join(', ');
-
-  async function discardDirtyDraft() {
-    const discardButton = page.locator('button:has-text("Discard Changes")').first();
-    if (await discardButton.count() > 0) {
-      try {
-        await discardButton.click({ timeout: 2_000, force: true });
-        await page.waitForTimeout(500);
-      } catch { /* ignore */ }
-    }
-  }
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await discardDirtyDraft();
-    await page.evaluate(async (selector) => {
-      const closePromises = [];
-
-      if (ui.windows) {
-        for (const app of Object.values(ui.windows)) {
-          try { closePromises.push(Promise.resolve(app.close())); } catch { /* ignore */ }
-        }
-      }
-
-      const instances = foundry?.applications?.instances;
-      const applicationV2s = instances?.values
-        ? Array.from(instances.values())
-        : (instances ? Array.from(instances) : []);
-      for (const app of applicationV2s) {
-        const element = app?.element ?? app?._element ?? null;
-        if (!element || element.id === 'sidebar') continue;
-        if (element.querySelector?.('.fabricate-manager, .fabricate-app') || element.id?.startsWith?.('fabricate-')) {
-          try {
-            closePromises.push(Promise.resolve(app.close({ force: true })));
-          } catch { /* ignore */ }
-        }
-      }
-
-      await Promise.allSettled(closePromises);
-
-      // ApplicationV2 registries can retain a stale instance after its close promise settles.
-      document.querySelectorAll(selector).forEach(btn => {
-        try { btn.click(); } catch { /* ignore */ }
-      });
-    }, closeSelector);
-    await waitForFabricateWindowsClosed(page);
-    await discardDirtyDraft();
-
-    const closeButtons = page.locator(closeSelector);
-    for (let i = 0; i < await closeButtons.count(); i++) {
-      try { await closeButtons.nth(i).click({ timeout: 1_000, force: true }); } catch { /* ignore */ }
-    }
-    await waitForFabricateWindowsClosed(page);
-    await discardDirtyDraft();
-
-    const remaining = await page.locator([
-      '.fabricate-manager',
-      '.fabricate-app',
-      '.application[id^="fabricate-"]',
-      '.window-app[id^="fabricate-"]',
-      'button:has-text("Discard Changes")',
-    ].join(', ')).count();
-    if (remaining === 0) break;
-  }
-
-  const remaining = page.locator([
-    '.fabricate-manager',
-    '.fabricate-app',
-    '.application[id^="fabricate-"]',
-    '.window-app[id^="fabricate-"]',
-    'button:has-text("Discard Changes")',
-  ].join(', '));
-  if (await remaining.count() > 0) {
-    const ids = await remaining.evaluateAll(elements => elements.map(element => (
-      element.id || element.closest?.('[id]')?.id || element.tagName
-    )));
-    throw new Error(`Failed to close Fabricate application(s): ${ids.join(', ')}.`);
-  }
-}
-
-/** Activate a scene and wait until the canvas has finished drawing it. */
-async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 90_000 } = {}) {
-  if (!sceneId) return;
-  await page.evaluate(async (id) => {
-    const scene = game.scenes.get(id);
-    if (scene && !scene.active) await scene.activate();
-  }, sceneId).catch(() => {});
-  await page.waitForFunction(isCanvasReadyForScene, sceneId, { timeout }).catch(err => {
-    // Name the REASON, not just the fact. A timeout and a destroyed execution context both land
-    // here and mean different things, and the previous message asserted "timeout" for both.
-    process.stderr.write(
-      `Canvas never reported ready for scene ${sceneId} (waited up to ${timeout}ms): ` +
-      `${err?.message?.split('\n')[0] ?? err}. Continuing against a possibly undrawn canvas.\n`
-    );
-  });
-}
-
-/** Attach browser console capture to a Playwright page. */
-function attachConsoleCapture(page, ignoredErrorPatterns = []) {
-  page.on('console', msg => {
-    // Browser "Failed to load resource" console errors carry no URL in their text; the resource
-    // path lives in msg.location().
-    const location = msg.type() === 'error' ? (msg.location()?.url || '') : '';
-    const text = location ? `${msg.text()} (${location})` : msg.text();
-    consoleLog.push(`[${msg.type()}] ${text}`);
-    if (msg.type() === 'error') {
-      // Route through the SHARED classifier (the same seam the pageerror handler
-      // below uses): a match against the waiver patterns (in-source defaults +
-      // any appended via --allowed-console-error-patterns) is recorded as waived
-      // for audit only; anything else enters the gating consoleErrors list.
-      if (classifyCapturedError(text, ignoredErrorPatterns).waived) {
-        waivedConsoleErrors.push(text);
-      } else {
-        consoleErrors.push(text);
-      }
-    }
-  });
-
-  page.on('pageerror', err => {
-    const entry = `[pageerror] ${err.message}`;
-    consoleLog.push(entry);
-    // The stack goes to the diagnostic log only, never to consoleErrors — the gate matches its
-    // waiver patterns against the message, and widening what it sees would change which runs fail.
-    if (err.stack) consoleLog.push(`[pageerror-stack] ${err.stack}`);
-    // Pageerror waiving is a deliberate existing capability (the Foundry canvas-artefact default
-    // filters pageerror entries too); an appended pattern extends it, it does not remove it.
-    if (classifyCapturedError(err.message, ignoredErrorPatterns).waived) {
-      waivedConsoleErrors.push(`pageerror: ${err.message}`);
-    } else {
-      consoleErrors.push(`pageerror: ${err.message}`);
-    }
-  });
-
-  // Diagnostic only: a console 'error' is logged for failed resource loads but is not always paired
-  // with a usable URL.
-  page.on('response', response => {
-    const status = response.status();
-    if (status >= 400) {
-      consoleLog.push(`[response ${status}] ${response.url()}`);
-    }
-  });
-
-  page.on('requestfailed', request => {
-    const failure = request.failure();
-    consoleLog.push(`[requestfailed ${failure?.errorText || 'unknown'}] ${request.url()}`);
-  });
-}
-
-async function assertNoScreenshotOverlays(page, options = {}) {
-  await dismissFoundryNotifications(page);
-  // A DialogV2 close() is an async fade-out: Foundry keeps the element in the DOM with a
-  // `minimizing` (and, on some builds, `minimized`) class while it animates away.
-  const OVERLAY_SELECTOR =
-    '.dialog.application, .window-app.dialog, .application.dialog, .app.dialog, #notifications .notification';
-  const visibleOverlayCount = async () =>
-    page.evaluate((selector) => {
-      return Array.from(document.querySelectorAll(selector)).filter((el) => {
-        const style = globalThis.getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      }).length;
-    }, OVERLAY_SELECTOR);
-  const blockingOverlayCount = async () =>
-    page.evaluate((selector) => {
-      return Array.from(document.querySelectorAll(selector)).filter(
-        (el) => !el.classList.contains('minimizing') && !el.classList.contains('minimized')
-      ).length;
-    }, OVERLAY_SELECTOR);
-
-  let visibleCount = await visibleOverlayCount();
-  if (visibleCount > 0) {
-    await page.waitForTimeout(750);
-    await dismissFoundryNotifications(page);
-    visibleCount = await visibleOverlayCount();
-  }
-  if (visibleCount > 0) {
-    await page.waitForFunction((selector) => {
-      return Array.from(document.querySelectorAll(selector)).every((el) => {
-        const style = globalThis.getComputedStyle(el);
-        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return true;
-        const rect = el.getBoundingClientRect();
-        return rect.width === 0 || rect.height === 0;
-      });
-    }, OVERLAY_SELECTOR, { timeout: 2_500 }).catch(() => {});
-    await dismissFoundryNotifications(page);
-    visibleCount = await visibleOverlayCount();
-  }
-  if (visibleCount > 0) {
-    const diag = await page
-      .evaluate((selector) => {
-        return Array.from(document.querySelectorAll(selector))
-          .map((el) => `${el.tagName}#${el.id}.${el.className} :: ${(el.textContent || '').trim().slice(0, 120)}`)
-          .join(' || ');
-      }, OVERLAY_SELECTOR)
-      .catch(() => '');
-    throw new Error(`Screenshot target still has ${visibleCount} visible modal or notification overlay(s). [${diag}]`);
-  }
-
-  let count = await blockingOverlayCount();
-  if (count > 0) {
-    // Give any in-flight close animation a moment, then re-check, before failing.
-    await page.waitForTimeout(750);
-    await dismissFoundryNotifications(page);
-    count = await blockingOverlayCount();
-  }
-  if (count > 0) {
-    const diag = await page
-      .evaluate((selector) => {
-        return Array.from(document.querySelectorAll(selector))
-          .filter((el) => !el.classList.contains('minimizing') && !el.classList.contains('minimized'))
-          .map((el) => `${el.tagName}#${el.id}.${el.className} :: ${(el.textContent || '').trim().slice(0, 120)}`)
-          .join(' || ');
-      }, OVERLAY_SELECTOR)
-      .catch(() => '');
-    throw new Error(`Screenshot target is covered by ${count} modal or notification overlay(s). [${diag}]`);
-  }
-  // Opt-in bleed-through guard: when the caller passes the set of Fabricate window ids it expects
-  // to be open for this capture, fail on any other visible Fabricate-owned window.
-  const allowedIds = options?.allowFabricateWindowIds;
-  if (Array.isArray(allowedIds)) {
-    const allowSet = new Set(allowedIds);
-    const visibleFabricateWindows = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('[id^="fabricate-"]'))
-        .filter((el) => {
-          if (!el.classList.contains('application') && !el.classList.contains('window-app')) return false;
-          const style = globalThis.getComputedStyle(el);
-          if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
-            return false;
-          }
-          const rect = el.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        })
-        .map((el) => el.id);
-    });
-    const stray = visibleFabricateWindows.filter((id) => !allowSet.has(id));
-    if (stray.length > 0) {
-      throw new Error(`Screenshot target has stray Fabricate window(s) bleeding through: ${stray.join(', ')}.`);
-    }
-  }
-}
-
 // ── Cleanup tracking ──────────────────────────────────────────────────────
 const cleanup = {
   actorIds: [],
@@ -5991,7 +3701,22 @@ async function main() {
     ALLOWED_CONSOLE_ERROR_PATTERNS_CSV
   );
 
-  attachConsoleCapture(page, ignoredErrorPatterns);
+  attachConsoleCapture(page, ignoredErrorPatterns, { consoleErrors, waivedConsoleErrors, consoleLog });
+
+  const ctx = createSmokeContext({
+    page,
+    browser,
+    results,
+    profile,
+    resultsDir: RESULTS_DIR,
+    cleanup,
+    bootTimings,
+    screenshotRunIdentity,
+    consoleErrors,
+    waivedConsoleErrors,
+    consoleLog
+  });
+  const { screenshot, startPhase, shouldRunScreenshotPhase, shouldRunScreenshotSection } = ctx;
 
   const results = {
     passed: false,
@@ -6018,6 +3743,7 @@ async function main() {
   });
 
   try {
+    await runScenarios(SMOKE_SCENARIOS, ctx);
     startPhase('boot-and-join');
     // ── Step 1: Navigate to setup page and handle first-run flows ──────────
     await page.goto(`${FOUNDRY_URL}/setup`, { waitUntil: 'networkidle' });
@@ -7554,7 +5280,7 @@ async function main() {
         // Capture the real system-library manager under every Fabricate theme
         // (genuine Foundry-mounted DOM re-themed via the theme attribute), then
         // restore the default theme before continuing the default-theme flow.
-        await captureManagerThemes(page);
+        await captureManagerThemes(ctx);
 
         await page.locator(`${managerSystemRowSelector(craftingSetup.systemId)} .manager-system-identity`).first().click();
         await settleManagerNav(page);
@@ -7981,11 +5707,11 @@ async function main() {
         await page.locator('.fabricate-manager .manager-recipe-row:has-text("Brew Healing Potion")').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         await assertRecipeRowsHittable(page, 'recipes normal');
-        await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
+        await captureStableManagerView(ctx, { layout: 'recipes normal', label: 'manager-recipes-normal' });
 
         // --------------------------------------------------------------------- Issue 1010 — the
         // recipe browser's bulk edit rail panel, in its three frames.
-        await captureBulkEditFrame(page, results, {
+        await captureBulkEditFrame(ctx, {
           studio: RECIPE_BULK_EDIT_STUDIO,
           stepName: 'recipes-bulk-edit',
           label: 'manager-recipes-bulk-edit',
@@ -8007,7 +5733,7 @@ async function main() {
             }
           },
         });
-        await captureBulkEditFrame(page, results, {
+        await captureBulkEditFrame(ctx, {
           studio: RECIPE_BULK_EDIT_STUDIO,
           stepName: 'recipes-bulk-edit-unstaged',
           label: 'manager-recipes-bulk-edit-unstaged',
@@ -8027,7 +5753,7 @@ async function main() {
             }
           },
         });
-        await captureBulkEditFrame(page, results, {
+        await captureBulkEditFrame(ctx, {
           studio: RECIPE_BULK_EDIT_STUDIO,
           stepName: 'recipes-bulk-edit-blocked',
           label: 'manager-recipes-bulk-edit-blocked',
@@ -8049,7 +5775,7 @@ async function main() {
         // identity + I/O readout + check pill + lock + toggle + three actions on one line.
         await setManagerWindowSize(page, { width: 900, height: 700 });
         await assertRecipeRowsHittable(page, 'recipes narrow');
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'recipes narrow',
           label: 'manager-recipes-narrow',
         });
@@ -8065,7 +5791,7 @@ async function main() {
           await page.locator('.fabricate-manager .manager-recipe-row [data-recipe-check="none"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await assertRecipeRowsHittable(page, 'recipes no-check');
-          await captureStableManagerView(page, {
+          await captureStableManagerView(ctx, {
             layout: 'recipes no check',
             label: 'manager-recipes-no-check',
           });
@@ -8076,7 +5802,7 @@ async function main() {
         }
 
         // Issue 801 — the grouped-category continuation frame for the recipe library.
-        await captureGroupedContinuationFrame(page, results, {
+        await captureGroupedContinuationFrame(ctx, {
           stepName: 'recipes-grouped-continuation',
           failMessage: 'Recipes grouped continuation capture failed',
           layout: 'recipes grouped continuation',
@@ -8122,7 +5848,7 @@ async function main() {
 
         // Issue 806 — prove the editor round-trip preserves the browser's view-state
         // (category filter + collapsed group) rather than resetting it on the remount.
-        await captureRecipeEditorRoundtrip(page, results, craftingSetup);
+        await captureRecipeEditorRoundtrip(ctx, craftingSetup);
 
         // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the Books &
         // Scrolls recipe-item surface + the Settings placeholder.
@@ -8261,7 +5987,7 @@ async function main() {
         // Results-tab coverage (issue 643): the most mode-dependent tab previously had zero
         // screenshot coverage — which is why the multi-step Results structural bug shipped unseen.
         await captureRecipeResultsTab(
-          page,
+          ctx,
           'Routed Check Readiness',
           'manager-recipe-edit-results',
           '[data-recipe-result-set-id]'
@@ -8271,7 +5997,7 @@ async function main() {
         // step accordion) — this is the frame that proves the multi-step Results
         // renders something (the C1 fix), not an empty tab.
         await captureRecipeResultsTab(
-          page,
+          ctx,
           'Multi-Step Alloy',
           'manager-recipe-edit-results-multistep',
           '[data-recipe-section$="-results"]'
@@ -8386,7 +6112,7 @@ async function main() {
             await returnToSystemLibrary(page);
             await selectSmokeSystemInManager(page, executionFixtures.progressive.systemId);
             await captureRecipeResultsTab(
-              page,
+              ctx,
               executionFixtures.progressive.recipeName,
               'manager-recipe-edit-results-progressive',
               '[data-recipe-result-row]'
@@ -8409,7 +6135,7 @@ async function main() {
             await returnToSystemLibrary(page);
             await selectSmokeSystemInManager(page, alchemyFixtures.cauldronSystemId);
             await captureRecipeResultsTab(
-              page,
+              ctx,
               'Elixir of Vigor',
               'manager-recipe-edit-results-alchemy',
               '[data-recipe-result-set-static-label]'
@@ -8436,7 +6162,7 @@ async function main() {
             .waitFor({ state: 'visible', timeout: 5_000 });
           await page.locator('.fabricate-manager [data-recipe-access-characters]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          await captureStableManagerView(page, {
+          await captureStableManagerView(ctx, {
             layout: 'recipe edit access rail',
             label: 'manager-recipe-edit-access-rail',
           });
@@ -8470,14 +6196,14 @@ async function main() {
         if (await page.locator('.fabricate-manager .manager-component-drop-zone').count() === 0) {
           throw new Error('Manager components browser did not show the drop-to-add affordance.');
         }
-        await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
+        await captureStableManagerView(ctx, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
         // --------------------------------------------------------------------- Issue 772 — the
         // components browser's bulk edit rail panel, in two of its three frames (see
         // `captureComponentBulkEditFrame` for why one frame cannot carry the panel's four
         // sections).
-        await captureBulkEditFrame(page, results, {
+        await captureBulkEditFrame(ctx, {
           studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit',
           label: 'manager-components-bulk-edit',
@@ -8518,7 +6244,7 @@ async function main() {
             }
           },
         });
-        await captureBulkEditFrame(page, results, {
+        await captureBulkEditFrame(ctx, {
           studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit-unstaged',
           label: 'manager-components-bulk-edit-unstaged',
@@ -8950,7 +6676,7 @@ async function main() {
           await page.locator('.fabricate-manager[data-manager-view="components"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
         };
-        await captureGroupedContinuationFrame(page, results, {
+        await captureGroupedContinuationFrame(ctx, {
           stepName: 'components-grouped-continuation',
           failMessage: 'Components grouped continuation capture failed',
           layout: 'components grouped continuation',
@@ -9003,7 +6729,7 @@ async function main() {
         if (await page.locator('.fabricate-manager [data-tags-evidence="how-it-works"]').count() === 0) {
           throw new Error('Manager tags inspector did not render the How-it-works evidence card.');
         }
-        await captureStableManagerView(page, { layout: 'tags-categories normal', label: 'manager-tags-categories-normal' });
+        await captureStableManagerView(ctx, { layout: 'tags-categories normal', label: 'manager-tags-categories-normal' });
 
         // Tags & Categories → Item tags panel, scrolled to its seeded rows (issue #752 — evidence
         // for #735's row rendering).
@@ -9035,7 +6761,7 @@ async function main() {
           process.stderr.write(`Tags item-tags capture failed: ${err.message}\n`);
         }
 
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           width: 1000,
           height: 700,
           layout: 'tags-categories stacked',
@@ -9138,12 +6864,12 @@ async function main() {
             throw new Error(`Manager gathering task editor is missing "${expected}".`);
           }
         }
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'gathering task editor normal',
           label: 'manager-gathering-task-editor-normal'
         });
 
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           width: 1000,
           height: 720,
           layout: 'gathering task editor stacked',
@@ -9232,7 +6958,7 @@ async function main() {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="false"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'World Travel collapsed by default',
           label: 'manager-world-travel-default-collapsed'
         });
@@ -9240,7 +6966,7 @@ async function main() {
         await page.locator('.fabricate-manager #manager-travel-toggle').first().click();
         await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="true"]')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'World Travel expanded neutral',
           label: 'manager-world-travel-expanded-neutral'
         });
@@ -9254,7 +6980,7 @@ async function main() {
           await gatheringToggle.click();
           await gatheringSubmenu.waitFor({ state: 'visible', timeout: 5_000 });
         }
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'Gathering and World Travel expanded together',
           label: 'manager-world-travel-with-gathering-expanded'
         });
@@ -9266,7 +6992,7 @@ async function main() {
         await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
         await page.locator('.fabricate-manager .manager-travel-parties-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'World Parties normal',
           label: 'manager-world-parties-normal'
         });
@@ -9274,11 +7000,11 @@ async function main() {
         await page.locator('.fabricate-manager #manager-travel-nav-realms').first().click();
         await page.locator('.fabricate-manager [data-travel-panel="realms"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'World Travel Realms normal',
           label: 'manager-world-travel-realms-normal'
         });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           width: 1000,
           height: 720,
           layout: 'World Travel Realms stacked',
@@ -9300,11 +7026,11 @@ async function main() {
           '.fabricate-manager .manager-travel-inspector' +
           '[aria-label="Selected map region link"]:has-text("Northreach Vale")'
         ).first().waitFor({ state: 'visible', timeout: 10_000 });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'World Travel Map Region Links normal',
           label: 'manager-world-travel-map-normal'
         });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           width: 1000,
           height: 720,
           layout: 'World Travel Map Region Links stacked',
@@ -9315,7 +7041,7 @@ async function main() {
         await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
         await page.locator('.fabricate-manager .manager-body.is-rail-collapsed')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
-        await captureStableManagerView(page, {
+        await captureStableManagerView(ctx, {
           layout: 'World Travel Map Region Links collapsed rail',
           label: 'manager-world-travel-map-collapsed-rail'
         });
@@ -9334,7 +7060,7 @@ async function main() {
           }, craftingSetup.systemId);
           await page.locator('.fabricate-manager #manager-world-nav-travel')
             .first().waitFor({ state: 'visible', timeout: 5_000 });
-          await captureStableManagerView(page, {
+          await captureStableManagerView(ctx, {
             layout: 'World Travel present for a non-participating system',
             label: 'manager-world-travel-ungated'
           });
@@ -9376,7 +7102,7 @@ async function main() {
               recipeId: craftingSetup.healingPotionRecipeId,
             }),
             exercise: async (fixture) => {
-              await exerciseToolStudioPointerTargets(page, {
+              await exerciseToolStudioPointerTargets(ctx, {
                 systemId: craftingSetup.systemId,
                 recipeName: 'Brew Healing Potion',
                 fixture,
@@ -9424,7 +7150,7 @@ async function main() {
               partyPoolActorId: cleanup.travelMemberId,
             }),
             exercise: async (fixture) => {
-              await exerciseKnowledgeSurface(page, { fixture });
+              await exerciseKnowledgeSurface(ctx, { fixture });
               // The companion contract's runtime proof (issue 1289, criterion 17) runs LAST
               // and on a throwaway actor of its own, so it can neither disturb a frame above
               // nor the fixture characters those frames photograph.
@@ -9516,7 +7242,7 @@ async function main() {
             // Issue 772 — the bulk panel's fourth section, Progressive DC, which the manager root
             // gates on `componentDifficultyAxisProgressive` (crafting OR salvage OR gathering
             // resolution being progressive).
-            await captureBulkEditFrame(page, results, {
+            await captureBulkEditFrame(ctx, {
               studio: COMPONENT_BULK_EDIT_STUDIO,
               stepName: 'components-bulk-edit-progressive',
               label: 'manager-components-bulk-edit-progressive',
@@ -10533,7 +8259,7 @@ async function main() {
           await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
           // An immediate (d100) attempt opens the interactive roll prompt: capture it and click
           // Roll.
-          await handleRollPromptIfPresent(page, 'player-gathering-roll-prompt');
+          await handleRollPromptIfPresent(ctx, 'player-gathering-roll-prompt');
           await appShell.locator('[data-gathering-state="populated"]').first()
             .waitFor({ state: 'visible', timeout: 10_000 });
         }
@@ -10696,7 +8422,7 @@ async function main() {
             await craftButton.click().catch(() => {});
             // A UI craft now opens the interactive roll prompt: capture it, then
             // click Roll so the run summary resolves and the overlay clears.
-            await handleRollPromptIfPresent(page, 'player-crafting-roll-prompt');
+            await handleRollPromptIfPresent(ctx, 'player-crafting-roll-prompt');
             await appShell.locator('[data-crafting-run-summary]').first()
               .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
           }
@@ -11346,7 +9072,7 @@ async function main() {
           await page.waitForTimeout(400);
           await appShell.locator('[data-alchemy-state="workbench"]').first()
             .waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
-          await captureAlchemyThemes(page);
+          await captureAlchemyThemes(ctx);
 
           results.steps.push({ step: 'player-alchemy', passed: true, size: alchemyStackedSize });
         } catch (alchemyTabError) {
@@ -11677,155 +9403,7 @@ async function main() {
     // Capture failure screenshot
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-failure.png') }).catch(() => {});
   } finally {
-    // Cleanup matters for local dev (the container is preserved across runs and stale state can
-    // shadow fresh fixtures).
-    if (RUN_FULL_ONLY_BEHAVIORS) {
-    startPhase('phase-F');
-    process.stdout.write('Phase F: Cleaning up test data...\n');
-    try {
-      await page.evaluate(async (cleanupData) => {
-        // Delete recipes
-        if (cleanupData.recipeIds.length > 0) {
-          const rm = game.fabricate?.getRecipeManager?.();
-          if (rm) {
-            for (const id of cleanupData.recipeIds) {
-              try { await rm.deleteRecipe(id); } catch { /* already deleted */ }
-            }
-          }
-        }
-
-        // Delete crafting system
-        if (cleanupData.systemId) {
-          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
-          try { await environmentStore?.cleanupByCraftingSystem?.(cleanupData.systemId); } catch { /* ok */ }
-
-          const csm = game.fabricate?.getCraftingSystemManager?.();
-          if (csm) {
-            try { await csm.deleteSystem(cleanupData.systemId); } catch { /* already deleted */ }
-          }
-        }
-
-        // Delete the issue #489 craft-execution coverage systems (and any gather environments/items
-        // they own).
-        if (Array.isArray(cleanupData.executionSystemIds) && cleanupData.executionSystemIds.length > 0) {
-          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
-          const csm = game.fabricate?.getCraftingSystemManager?.();
-          for (const executionSystemId of cleanupData.executionSystemIds) {
-            try { await environmentStore?.cleanupByCraftingSystem?.(executionSystemId); } catch { /* ok */ }
-            try { await csm?.deleteSystem(executionSystemId); } catch { /* already deleted */ }
-          }
-        }
-        if (Array.isArray(cleanupData.executionItemIds) && cleanupData.executionItemIds.length > 0) {
-          try { await Item.deleteDocuments(cleanupData.executionItemIds); } catch { /* ok */ }
-        }
-
-        // Delete the dedicated single-purpose systems: the broken one seeded for the
-        // overview/banner captures, and the restricted-visibility one seeded for the recipe rail's
-        // access branch (issue 643).
-        const singlePurposeSystemIds = [
-          cleanupData.blockedSystemId,
-          cleanupData.restrictedSystemId
-        ].filter(Boolean);
-        if (singlePurposeSystemIds.length > 0) {
-          const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
-          const csm = game.fabricate?.getCraftingSystemManager?.();
-          for (const singlePurposeSystemId of singlePurposeSystemIds) {
-            try { await environmentStore?.cleanupByCraftingSystem?.(singlePurposeSystemId); } catch { /* ok */ }
-            try { await csm?.deleteSystem(singlePurposeSystemId); } catch { /* already deleted */ }
-          }
-        }
-
-        // Delete actors
-        if (cleanupData.actorIds.length > 0) {
-          try { await Actor.deleteDocuments(cleanupData.actorIds); } catch { /* ok */ }
-        }
-
-        // Delete smoke users after actors so ownership references do not matter.
-        if (cleanupData.userIds.length > 0) {
-          try { await User.deleteDocuments(cleanupData.userIds); } catch { /* ok */ }
-        }
-
-        // Delete world items
-        if (cleanupData.itemIds.length > 0) {
-          try { await Item.deleteDocuments(cleanupData.itemIds); } catch { /* ok */ }
-        }
-
-        // Delete smoke scenes
-        if (cleanupData.sceneIds.length > 0) {
-          try { await Scene.deleteDocuments(cleanupData.sceneIds); } catch { /* ok */ }
-        }
-      }, cleanup);
-      process.stdout.write('Cleanup: test data removed.\n');
-    } catch {
-      process.stderr.write('Cleanup: some test data may remain.\n');
-    }
-    } else {
-      startPhase('phase-F-skipped');
-      process.stdout.write(`Phase F: skipped (profile=${SMOKE_PROFILE}).\n`);
-      results.steps.push({ step: 'cleanup', passed: true, skipped: true });
-    }
-
-    endPhase();
-
-    results.consoleErrors = consoleErrors;
-    // Split the smoke signal (issue #628): a gate can then ask "did a step fail, or did we merely
-    // capture noise?".
-    const { stepFailures, consoleErrorCount, degraded } = computeSmokeSignal(results);
-    results.stepFailures = stepFailures;
-    results.consoleErrorCount = consoleErrorCount;
-    // Issue #807: a tolerated transient D0/Journal teardown marks the run degraded (still exit 0,
-    // but distinguishable in summary.json); rendererCrashed carries the causation-bearing page
-    // 'crash' signal (coerced to a boolean here even when the listener never fired).
-    results.degraded = degraded;
-    results.rendererCrashed = Boolean(results.rendererCrashed);
-    results.screenshotRun = screenshotRunIdentity;
-    results.waivedConsoleErrors = waivedConsoleErrors;
-    await echoWaivedConsoleErrorsToStepSummary(waivedConsoleErrors);
-    results.bootTimings = bootTimings;
-    results.phaseTimings = phaseTimings;
-    results.viewTimings = viewTimings;
-    // A browser that already crashed (the teardown case) can make close() reject.
-    try {
-      await browser.close();
-    } catch (closeErr) {
-      process.stderr.write(`browser.close() failed (ignored): ${closeErr.message}\n`);
-    }
-
-    const combinedTimings = [
-      ...bootTimings.map(entry => ({ ...entry, phase: `boot:${entry.phase}` })),
-      ...phaseTimings
-    ];
-    const timingsTable = formatTimingsTable(combinedTimings);
-    if (timingsTable) {
-      process.stdout.write(`\n${timingsTable}\n\n`);
-    }
-    // R3 (#750): surface the slowest individual views under the phase table so a
-    // future measured cut can target them directly.
-    const slowestViewsTable = formatSlowestViewsTable(viewTimings);
-    if (slowestViewsTable) {
-      process.stdout.write(`${slowestViewsTable}\n\n`);
-    }
-
-    // Write summary.json
-    await writeFile(
-      join(RESULTS_DIR, 'summary.json'),
-      JSON.stringify(results, null, 2)
-    );
-    await writeFile(
-      join(RESULTS_DIR, 'screenshot-manifest.json'),
-      JSON.stringify({
-        ...screenshotRunIdentity,
-        captures: screenshotManifestEntries,
-      }, null, 2)
-    );
-
-    // Write console log
-    await writeFile(
-      join(RESULTS_DIR, 'console.log'),
-      consoleLog.join('\n')
-    );
-
-    process.stdout.write(`Results written to test-results/\n`);
+    await runSmokeCleanup(ctx);
   }
 
   // Exit DETERMINISTICALLY on the harness's own verdict, immediately — so a floating
