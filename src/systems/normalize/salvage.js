@@ -1,8 +1,8 @@
 /**
  * The component salvage normalizers (issue 1713): free pure functions the `CraftingSystemManager`
  * delegates to, and the home of the Simple-mode group-count invariant. Internal to that aggregate —
- * a private continuation of the `_normalizeComponent` chokepoint, reached only through the manager,
- * so nothing outside `src/systems/normalize/components.js` imports it.
+ * a private continuation of the `_normalizeComponent` chokepoint, reached only through the
+ * manager's delegates and `./components.js` — nothing else imports it.
  */
 import { normalizeQuantityFormula } from '../../models/Result.js';
 import { authoredCheckModifierIds } from '../../utils/checkModifierPicks.js';

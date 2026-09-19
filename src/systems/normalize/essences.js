@@ -2,7 +2,7 @@
  * The essence-definition and essence-quantity normalizers (issue 1713): free pure functions the
  * `CraftingSystemManager` delegates to, so a definition minted, imported or merged anywhere gets
  * one slug derivation. Internal to that aggregate — a private continuation of the `_normalizeSystem`
- * chokepoint, reached only through the manager, so nothing else imports it.
+ * chokepoint, reached only through the manager's delegates and `./components.js`.
  */
 
 export function normalizeEssenceDefinitions(value) {
