@@ -1247,6 +1247,8 @@ export function registerWorldScopeCases() {
       componentServices = {},
       // The ADMIN store's actor roster.
       actorOptions = [],
+      // The three-way route-exit prompt; absent by default, as it is in production's own tests.
+      choiceDialog,
     } = {}) {
       scopeStores = {
         component: scopeStore(worldComponents ?? worldEntities(3, 'comp')),
@@ -1280,6 +1282,7 @@ export function registerWorldScopeCases() {
         getActorOptions: () => actorOptions,
         getActorRollData: async (uuid) =>
           actorOptions.some((actor) => actor.uuid === uuid) ? { level: 3 } : null,
+        ...(choiceDialog ? { choiceDialog } : {}),
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -2477,6 +2480,121 @@ export function registerWorldScopeCases() {
         );
         assert.ok(saveDisabled(), 'and the Save disarms');
       });
+    });
+
+    describe('a dirty world entry guards the way out (issue 1705)', () => {
+      /** Each entry route, with the corpus that reaches it and the content key its own prompt asks
+       * with, which is what says the answer came from this row's helper and not another's. */
+      const ENTRY_ROWS = [
+        {
+          view: 'world-essence-entry',
+          catalogue: 'world-essences',
+          leaf: 'essence-catalogue',
+          scope: 'essence',
+          mount: { worldEssences: [{ id: 'ash', name: 'Ash' }] },
+          id: 'ash',
+          name: 'Ash',
+          field: '[data-scoped-entry-name]',
+          prompt: 'FABRICATE.Admin.Manager.Essence.DiscardDirtyContent',
+        },
+        {
+          view: 'world-tool-entry',
+          catalogue: 'world-tools',
+          leaf: 'tool-catalogue',
+          scope: 'tool',
+          mount: { worldTools: [{ id: 'pick', name: 'Mining Pick' }] },
+          id: 'pick',
+          name: 'Mining Pick',
+          field: '[data-world-tool-entry-name]',
+          prompt: 'FABRICATE.Admin.Manager.Tools.DiscardDirtyEntryContent',
+        },
+        {
+          view: 'world-component-entry',
+          catalogue: 'world-components',
+          leaf: 'component-catalogue',
+          scope: 'component',
+          // Source-less, so the identity card offers the editable name rather than the locked one.
+          mount: { worldComponents: [{ id: 'salt', name: 'Unbound Salt' }] },
+          id: 'salt',
+          name: 'Unbound Salt',
+          field: '[data-scoped-entry-name]',
+          prompt: 'FABRICATE.Admin.Manager.Component.DiscardDirtyContent',
+        },
+      ];
+
+      const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+      /** The record as a reload would read it, which is the only thing a Save moves. */
+      const persistedName = (row) =>
+        scopeStores[row.scope].get().entities.find((entry) => entry.id === row.id)?.name;
+
+      /** Open the row's entry, rename it, leave by the catalogue crumb; answer the prompts raised. */
+      async function leaveDirtyEntry(row, answer) {
+        const prompts = [];
+        await mountWithRealStore({
+          ...row.mount,
+          choiceDialog: async ({ content }) => {
+            prompts.push(String(content));
+            return answer;
+          },
+        });
+        worldNavItem(row.leaf).click();
+        await settleRouteExit();
+        const open = target.querySelector(
+          `[data-scoped-list-row="${row.id}"] [data-scoped-list-action="open-entry"]`
+        );
+        assert.ok(Boolean(open), `the ${row.leaf} catalogue rendered no open-entry action`);
+        open.click();
+        await settleRouteExit();
+        assert.equal(managerView(), row.view, 'the row action did not commit the entry route');
+
+        const field = target.querySelector(row.field);
+        assert.ok(Boolean(field), `the ${row.view} editor rendered no name field`);
+        field.value = `${row.name} the Second`;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        await settleRouteExit();
+        assert.equal(
+          target.querySelector(row.field).value,
+          `${row.name} the Second`,
+          'the keystroke never reached the draft, so the editor is clean and everything below ' +
+            'passes over an exit that had nothing to guard'
+        );
+
+        const crumb = target.querySelector('[data-breadcrumb-world-scoped-catalogue]');
+        assert.ok(Boolean(crumb), 'the entry route drew no catalogue crumb to leave by');
+        crumb.click();
+        await settleRouteExit();
+        return prompts;
+      }
+
+      for (const row of ENTRY_ROWS) {
+        it(`saves a dirty ${row.view} on the way out`, async () => {
+          const prompts = await leaveDirtyEntry(row, 'save');
+          assert.equal(prompts.length, 1, 'the exit raised exactly one prompt');
+          assert.ok(
+            prompts[0].includes(row.prompt),
+            `and it was this row's own: ${row.view} must not answer through another row's helper`
+          );
+          assert.equal(
+            persistedName(row),
+            `${row.name} the Second`,
+            'Save reached this entry editor’s own save, which is what lands the buffered name'
+          );
+          assert.equal(managerView(), row.catalogue, 'and a landed Save lets the GM go');
+        });
+
+        it(`discards a dirty ${row.view} on the way out`, async () => {
+          const prompts = await leaveDirtyEntry(row, 'discard');
+          assert.equal(prompts.length, 1, 'the exit raised exactly one prompt');
+          assert.ok(prompts[0].includes(row.prompt), 'and it was this row’s own');
+          assert.equal(
+            persistedName(row),
+            row.name,
+            'a discarded exit writes nothing: the record on disk keeps the name it opened with'
+          );
+          assert.equal(managerView(), row.catalogue, 'and the GM leaves the editor');
+        });
+      }
     });
 
     // ── THE WORLD ESSENCE ENTRY HEADING NAMES THE DRAFT (issue 1372, parity round 5) ────

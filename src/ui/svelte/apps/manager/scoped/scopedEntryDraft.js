@@ -15,7 +15,7 @@ function sameValue(left, right) {
 }
 
 /** A promise-ish, by the one property every caller here awaits; a store action may be sync. */
-function isThenable(value) {
+export function isThenable(value) {
   return typeof value?.then === 'function';
 }
 
@@ -133,12 +133,3 @@ export function finishScopedEntryExit(action, { save, discard }) {
   return true;
 }
 
-/** The unsaved-changes guard; synchronously `true` when clean, so route activation stays sync. */
-export function confirmScopedEntryExit({ dirty, confirm, save, discard }) {
-  if (dirty !== true) return true;
-  const answer = confirm();
-  if (isThenable(answer)) {
-    return answer.then((action) => finishScopedEntryExit(action, { save, discard }));
-  }
-  return finishScopedEntryExit(answer, { save, discard });
-}

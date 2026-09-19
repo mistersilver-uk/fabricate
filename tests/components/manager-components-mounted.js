@@ -14,7 +14,12 @@ import { republishHydratedItemCards } from '../../src/ui/svelte/stores/adminComp
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settle, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  managerComponents,
+  settle,
+  settleBetweenTests,
+  settleRouteExit,
+} from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -1360,5 +1365,77 @@ export function registerComponentsCases() {
         'and the row is the same key, so nothing remounted'
       );
     });
+  });
+
+  describe('a dirty component editor guards the way out (issue 1705)', () => {
+    /** Open c1's editor over a salvage yield on c2 to leave by, and stage one tag edit into it. */
+    async function openDirtyEditor(calls, storeOptions = {}) {
+      await openComponentSalvageEditor(calls, {
+        salvageResolutionMode: 'progressive',
+        componentSalvage: {
+          enabled: true,
+          resultGroups: [
+            { id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] },
+          ],
+        },
+        ...storeOptions,
+      });
+      target.querySelector('[data-component-edit-tag-toggle="mineral"]').click();
+      await settle();
+      assert.equal(
+        target.querySelector('button[form="manager-component-edit-form"]').disabled,
+        false,
+        'the tag never staged, so every exit below has nothing to guard and passes vacuously'
+      );
+    }
+
+    const managerView = () => target.querySelector('.fabricate-manager').dataset.managerView;
+    const editedComponent = () =>
+      target.querySelector('[data-component-edit-heading] h1.manager-title')?.textContent?.trim();
+    const promptCount = (calls) =>
+      calls.filter(([name]) => name === 'confirmDiscardDirtyComponentDraft').length;
+
+    it('prompts on a hop to another component, which keeps the view token (issue 676)', async () => {
+      const calls = [];
+      await openDirtyEditor(calls);
+      const yieldEdit = target.querySelector('[data-salvage-result-edit="c2"]');
+      assert.ok(Boolean(yieldEdit), 'the salvage yield row rendered no editor link to leave by');
+      yieldEdit.click();
+      await settleRouteExit();
+
+      assert.equal(
+        promptCount(calls),
+        1,
+        'the component row waives no navigation, not even one that keeps the view token, so a ' +
+          'hop to another component must ask before it abandons the staged tag'
+      );
+      assert.equal(managerView(), 'component-edit');
+      assert.equal(editedComponent(), 'Glass Vial', 'and the discarded exit lands on the yield');
+    });
+
+    /** What each answer to the prompt does to the store and to where the GM ends up. */
+    const EXIT_ANSWERS = [
+      { answer: 'save', writes: true },
+      { answer: 'discard', writes: false },
+    ];
+
+    for (const { answer, writes } of EXIT_ANSWERS) {
+      it(`carries a ${answer} from the prompt to the components browser`, async () => {
+        const calls = [];
+        await openDirtyEditor(calls, { confirmDiscardComponentResult: answer });
+        navButton('Component Rules').click();
+        await settleRouteExit();
+
+        assert.equal(promptCount(calls), 1, 'the exit raised exactly one prompt');
+        const written = calls.find(([name]) => name === 'updateComponent');
+        assert.equal(
+          Boolean(written),
+          writes,
+          `a ${answer} must reach this row's own finisher, which is the only thing that writes`
+        );
+        if (writes) assert.ok(written[2].tags.includes('mineral'), 'and it wrote the staged tag');
+        assert.equal(managerView(), 'components', 'and the GM leaves the editor either way');
+      });
+    }
   });
 }
