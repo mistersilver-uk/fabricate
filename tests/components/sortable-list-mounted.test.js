@@ -1,17 +1,12 @@
 /**
- * The ordered row, mounted (issue 1512). Five obligations are only observable from a rendered tree,
- * and each is a rule the design-system capability states: state is keyed by record id, so a caller
- * round-tripping a REORDERED array of the same ids leaves the open row open; a collapsed body is
- * retained, `hidden` and `inert`, and keeps what was typed — witnessed through `inert`, because
- * happy-dom honours it for `focus()` and applies no UA `[hidden]` rule, while the `display: none`
- * half is a source read over the sheet this harness never loads; a keyboard move reads the name
- * first, moves focus, then announces; both affordances render in every mode, disabled at the ends;
- * and the dragging row says so, which no frame can reach.
+ * The ordered row, mounted (issue 1512): the obligations only a rendered tree can show — state
+ * keyed by record id across a reordered round-trip, a retained `hidden`/`inert` body that keeps
+ * what was typed, a move that follows the row with focus before it announces, both affordances in
+ * every mode disabled at the ends, the dragging row, and always-open drawing no opened row.
  *
- * `createRawSnippet` is imported BY PATH rather than from the bare `svelte` specifier, because the
- * harness drives the compiled component with the client runtime at
- * `node_modules/svelte/src/index-client.js`, and a snippet built from a second copy of that runtime
- * is a different type the component refuses to render.
+ * `createRawSnippet` is imported BY PATH: the harness drives the compiled component with the client
+ * runtime at `node_modules/svelte/src/index-client.js`, and a snippet built from a second copy of
+ * that runtime is a different type the component refuses to render.
  */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -103,8 +98,8 @@ describe('SortableList — the row is the shape the specimen draws', () => {
       'and the numbered badge, which is what makes order legible once the list scrolls'
     );
 
-    // POSITION IS THE CONTRACT, not decoration: the disclosure sits LEADING and the rocker
-    // TRAILING, so the two chevron pairs are never adjacent and cannot be mistaken for each other.
+    // Position is the contract: the disclosure leads and the rocker trails, so the two chevron
+    // pairs are never adjacent and cannot be mistaken for each other.
     const disclosure = first.querySelector('[data-sortable-disclosure]');
     const copy = first.querySelector('[data-row-copy]');
     const rocker = first.querySelector('.fabricate-sortable-list-rocker');
@@ -212,19 +207,17 @@ describe('SortableList — disclosure state is keyed by record id', () => {
       'the row opens'
     );
 
-    // TYPED INTO THE OPEN ROW'S RETAINED BODY, which is what makes the `{#each}` KEY load-bearing
-    // here as well as the disclosure state. Keyed by index, Svelte reuses the DOM node that sits
-    // at each POSITION, so an uncommitted edit follows the position rather than the record — and
-    // the GM finds what they typed about `b` sitting in `c`'s body.
+    // Typed into the open row's retained body, which is what makes the `{#each}` key load-bearing:
+    // keyed by index, Svelte reuses the node at each position, so the GM finds what they typed
+    // about `b` sitting in `c`'s body.
     const rowB = () =>
       [...target.querySelectorAll('.fabricate-sortable-list-row')].find((row) =>
         row.querySelector('[data-sortable-disclosure="b"]')
       );
     rowB().querySelector('[data-body-field]').value = 'belongs to b';
 
-    // A REORDERED ARRAY OF THE SAME IDS, with different object identities — which is what a
-    // caller that round-trips through its store hands back. Keyed by index, the open row would be
-    // whichever record now sits where `b` used to.
+    // A reordered array of the same ids with new object identities, which is what a caller that
+    // round-trips through its store hands back.
     await harness.setProps({
       items: [
         { id: 'c', name: 'Oil the blade' },
@@ -270,10 +263,9 @@ describe('SortableList — a collapsed body is retained and inert (maintainer ru
     assert.ok(body.hasAttribute('hidden'), 'and carries `hidden`');
     assert.ok(body.hasAttribute('inert'), 'and `inert`');
 
-    // THE TAB-ORDER HALF, witnessed through `inert` and not through `hidden`: happy-dom honours
-    // `inert` for `focus()` and applies no UA `[hidden]` rule, which is measured rather than
-    // assumed. A computed-style assertion is impossible here for the same reason — this harness
-    // never loads `styles/fabricate.css` — so the `display: none` half is the source read below.
+    // The tab-order half, witnessed through `inert` rather than `hidden`: happy-dom honours `inert`
+    // for `focus()` and applies no UA `[hidden]` rule, and never loads `styles/fabricate.css`, so
+    // the `display: none` half is the source read below.
     const outside = target.querySelector('[data-sortable-disclosure="a"]');
     outside.focus();
     const control = body.querySelector('[data-body-action]');
@@ -285,8 +277,7 @@ describe('SortableList — a collapsed body is retained and inert (maintainer ru
   });
 
   it('holds what was typed into it across a collapse and re-expand', async () => {
-    // THE WHOLE REASON THE RULING WENT THIS WAY. Unmounting discards uncommitted field state;
-    // retention holds it, and a GM who collapses a row mid-edit does not lose the edit.
+    // The whole reason the ruling went this way: unmounting discards uncommitted field state.
     const target = await harness.mount({
       items: ITEMS,
       itemLabel,
@@ -360,8 +351,7 @@ describe('SortableList — reorder answers both inputs', () => {
       'and the caller`s round-tripped array is what the list renders'
     );
 
-    // FOCUS FOLLOWS THE ROW, keyed by record id rather than by index: after the move, index 1 is
-    // a different record and focus left where it was would be on the row that swapped in.
+    // Focus follows the row by record id: after the move, index 1 is a different record.
     assert.equal(
       globalThis.document.activeElement.getAttribute('data-sortable-grip'),
       'c',
@@ -376,13 +366,10 @@ describe('SortableList — reorder answers both inputs', () => {
   });
 
   it('has focus already on the moved grip at the moment the region`s text changes', async () => {
-    // A RUNTIME witness rather than a source-index read: a `MutationObserver` on the live region
-    // records `document.activeElement` at the instant its text lands, which is the only moment the
-    // ordering is observable at all. Measured limitation, recorded rather than hidden: the focus
-    // call is imperative and the region's text is state, so both orders flush the text after the
-    // effect and this witness passes under either — `tests/sortable-list-source-contract.test.js`
-    // is what discriminates them. This clause proves the composite fact the GM depends on, that
-    // focus is on the moved row's grip by the time the sentence is announced.
+    // A runtime witness: a `MutationObserver` records `document.activeElement` at the instant the
+    // region's text lands. Measured limitation, recorded rather than hidden — both orders flush the
+    // text after the effect, so this passes under either and the source contract discriminates
+    // them. What it proves is the composite fact the GM depends on.
     let items = [...ITEMS];
     const target = await harness.mount({
       items,
@@ -432,8 +419,7 @@ describe('SortableList — reorder answers both inputs', () => {
   });
 
   it('writes the travelling state on the row being dragged', async () => {
-    // THE ONE STATE NO FRAME CAN REACH: the View Lab has no drag verb, so this assertion is the
-    // whole evidence that a GM can see which row is in the air.
+    // The one state no frame can reach: the View Lab has no drag verb.
     const moves = [];
     const target = await harness.mount({
       items: ITEMS,
@@ -466,9 +452,8 @@ describe('SortableList — reorder answers both inputs', () => {
 
 describe('SortableList — the caller keeps its own state and hooks on the row', () => {
   it('writes the caller`s per-record classes and data attributes onto the row element', async () => {
-    // The row element is the PRIMITIVE'S, so without these a converted caller cannot show which
-    // record is selected, and every per-record hook its mounted drivers address a row by would
-    // have nowhere to live.
+    // The row element is the primitive's, so without these a converted caller cannot show which
+    // record is selected and its per-record hooks have nowhere to live.
     const target = await harness.mount({
       items: ITEMS,
       itemLabel,
@@ -487,5 +472,171 @@ describe('SortableList — the caller keeps its own state and hooks on the row',
       rows[0].classList.contains('fabricate-sortable-list-row'),
       'without displacing the primitive`s own root class'
     );
+  });
+});
+
+describe('SortableList — always-open is a render mode, not an emphasis', () => {
+  it('renders every body open and paints NO row as the opened one', async () => {
+    // `is-expanded` fires the accent border and badge the specimen reserves for the row a GM
+    // opened; two converted surfaces are always-open, so deriving it from the body would shout
+    // accent across both whole screens.
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      numbered: true,
+      alwaysOpen: true,
+      row: rowSnippet,
+      body: bodySnippet,
+    });
+
+    const rows = rowsOf(target);
+    for (const row of rows) {
+      assert.ok(Boolean(bodyOf(row)), 'the body is rendered');
+      assert.ok(!bodyOf(row).hasAttribute('hidden'), 'and open');
+      assert.ok(
+        !row.classList.contains('is-expanded'),
+        'while the row is NOT painted as the opened one: accent is for the row a GM opened, and ' +
+          'under always-open no row was'
+      );
+    }
+    assert.ok(
+      !target.querySelector('[data-sortable-disclosure]'),
+      'and no disclosure is drawn, there being nothing to toggle'
+    );
+  });
+
+  it('still paints the row a GM opens in expandable mode', async () => {
+    // The negative control on the clause above: the class must still arrive where it means something.
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      expandable: true,
+      row: rowSnippet,
+      body: bodySnippet,
+    });
+    target.querySelector('[data-sortable-disclosure="b"]').click();
+    flushSync();
+    const rows = rowsOf(target);
+    assert.ok(rows[1].classList.contains('is-expanded'), 'the opened row is painted as opened');
+    assert.ok(!rows[0].classList.contains('is-expanded'), 'and no other row is');
+  });
+});
+
+describe('SortableList — the rocker and the delete are the list`s own trailing cluster', () => {
+  it('returns focus to the chevron the GM pressed, falling back to the grip at an end', async () => {
+    let items = [...ITEMS];
+    const roundTrip = (from, to) => {
+      const next = [...items];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      items = next;
+    };
+    const target = await harness.mount({
+      items,
+      itemLabel,
+      numbered: true,
+      row: rowSnippet,
+      onReorder: roundTrip,
+    });
+
+    // Landing clear of both ends: the pressed chevron is live in the new position, so focus returns
+    // to it rather than jumping to the grip, which is what let a second press repeat the move.
+    rowsOf(target)[0].querySelector('[data-sortable-move="down"]').click();
+    await harness.setProps({ items });
+    flushSync();
+    assert.equal(
+      globalThis.document.activeElement.getAttribute('data-sortable-move'),
+      'down',
+      'focus is on the control that was pressed'
+    );
+    assert.equal(
+      globalThis.document.activeElement.getAttribute('data-sortable-grip'),
+      null,
+      'rather than on the grip, which is where the keyboard path lands it'
+    );
+    assert.ok(
+      globalThis.document.activeElement.closest('.fabricate-sortable-list-row') ===
+        rowsOf(target)[1],
+      'in the row that moved'
+    );
+
+    // Into an end: the pressed chevron disables itself there and cannot take focus, so the grip does
+    // rather than focus falling to the document.
+    rowsOf(target)[1].querySelector('[data-sortable-move="up"]').click();
+    await harness.setProps({ items });
+    flushSync();
+    assert.ok(
+      Boolean(globalThis.document.activeElement.getAttribute('data-sortable-grip')),
+      'the grip takes the focus the disabled chevron cannot'
+    );
+  });
+
+  it('forwards the removed record and keeps the caller`s own delete hook, after the rocker', async () => {
+    const removed = [];
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      numbered: true,
+      removable: true,
+      row: rowSnippet,
+      onRemove: (item) => removed.push(item),
+      removeData: (item) => ({ 'data-caller-remove': item.id, title: 'Remove it' }),
+    });
+
+    const row = rowsOf(target)[1];
+    const remove = row.querySelector('[data-sortable-remove]');
+    assert.ok(Boolean(remove), 'the list draws the delete itself');
+    assert.equal(remove.getAttribute('data-caller-remove'), 'b', 'carrying the caller`s own hook');
+    assert.equal(remove.getAttribute('title'), 'Remove it', 'and its title');
+
+    // `content · rocker · delete` is the specimen's order; a hand-rolled delete sat in the content.
+    const rocker = row.querySelector('.fabricate-sortable-list-rocker');
+    assert.ok(
+      rocker.compareDocumentPosition(remove) & globalThis.Node.DOCUMENT_POSITION_FOLLOWING,
+      'the delete follows the rocker'
+    );
+
+    remove.click();
+    flushSync();
+    assert.deepEqual(
+      removed.map((item) => item.id),
+      ['b'],
+      'and the click forwards the record it was drawn for'
+    );
+  });
+});
+
+describe('SortableList — the list names itself and its drag source is the grip', () => {
+  it('takes its accessible name from the caller and declares itself a list', async () => {
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      row: rowSnippet,
+      ariaLabel: 'Recipe difficulty tiers',
+    });
+    const list = target.querySelector('.fabricate-sortable-list');
+    assert.equal(list.getAttribute('role'), 'list', '`list-style: none` strips the implicit role');
+    assert.equal(list.getAttribute('aria-label'), 'Recipe difficulty tiers');
+
+    await harness.setProps({ ariaLabel: '' });
+    flushSync();
+    assert.ok(
+      !target.querySelector('.fabricate-sortable-list').hasAttribute('aria-label'),
+      'and an empty name is DROPPED rather than emitted blank, which would name the list nothing'
+    );
+  });
+
+  it('makes the grip the drag source, never the whole row', async () => {
+    // An expanded editing body is not something a GM drags.
+    const target = await harness.mount({
+      items: ITEMS,
+      itemLabel,
+      expandable: true,
+      row: rowSnippet,
+      body: bodySnippet,
+    });
+    const [first] = rowsOf(target);
+    assert.ok(!first.hasAttribute('draggable'), 'the row is not itself a drag source');
+    assert.equal(gripOf(first).getAttribute('draggable'), 'true', 'the grip is');
   });
 });

@@ -56,10 +56,9 @@ function names(emitted) {
 }
 
 /**
- * The grip's hook is the shared list's, not this surface's (issue 1512). `[data-tier-grip]` was this
- * component's own attribute on its own `<ManagerButton>`; the grip is the list's control now, so it
- * carries the list's hook. The five hooks this surface still owns — `data-tier-row`,
- * `data-tier-name`, `data-tier-dc`, `data-remove-tier` and `data-add-tier` — are unchanged.
+ * The grip's hook is the shared list's now (issue 1512), not this surface's `[data-tier-grip]`. The
+ * five this surface still owns — `data-tier-row`, `data-tier-name`, `data-tier-dc`,
+ * `data-remove-tier`, `data-add-tier` — are unchanged.
  */
 function gripFor(target, tierId) {
   return target.querySelector(`[data-sortable-grip="${tierId}"]`);
@@ -133,9 +132,8 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
   });
 
   it('draws the chevron rocker as well as the grip, disabled at the ends', async () => {
-    // Issue 1096's one-affordance decision, overturned by the maintainer: the specimen states both
-    // affordances always, and this is the row that refused the rocker in as many words — so its new
-    // controls are asserted here rather than assumed from the primitive's own suite.
+    // This is the row that refused the rocker (issue 1096, overturned), so its new controls are
+    // asserted here rather than assumed from the primitive's own suite.
     const emitted = [];
     const target = await harness.mount({ tiers: TIERS, onChange: (next) => emitted.push(next) });
 
@@ -181,9 +179,8 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
     );
   });
 
-  // The adder is the list's own footer, and reachable at zero (issue 1512). Both halves are
-  // asserted because a change satisfying only the first ships an empty state that says "add one"
-  // with nothing to press — so the empty branch's control is CLICKED and its effect read.
+  // The adder is the list's own footer AND reachable at zero (issue 1512): satisfying only the
+  // first ships an empty state that says "add one" with nothing to press.
   it('renders the adder as the list footer, and after the empty message at zero', async () => {
     const populated = await harness.mount({ tiers: TIERS });
     assert.equal(

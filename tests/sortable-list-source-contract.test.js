@@ -1,12 +1,10 @@
 /**
- * Source contract: the ordered row is one implementation, at its published API (issue 1512).
- *
- * Three obligations are invisible to a mounted test and to a frame alike. The API, because
- * `library.html` states a Svelte API for `<SortableList>` and the claim this change makes is that
- * the component IS that specimen — so the two are read together, in both directions. The shape of
- * the row, because a whole-row button nesting the row's own controls is invalid DOM that renders
- * identically, and an absence is what a source read can prove. And that the collapsed-body ruling
- * is ONE constant with no prop, which is a source fact rather than a rendered one.
+ * Source contract for the ordered row (issue 1512): `SortableList` accepts exactly the prop set
+ * `library.html` publishes for `<SortableList>`, in that order and in both directions; its row is
+ * not a button and exactly one control in it opens the row; the collapsed-body ruling is one
+ * constant with no prop; focus lands before the live region is written and the moved record's name
+ * is read before `onReorder`; every control it draws declares itself focused to Foundry; and the
+ * family is declared in no scoped block.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -42,8 +40,10 @@ const DECLARED_PROPS = Object.freeze([
   'footer',
   'rowClass',
   'rowData',
+  'removeData',
   'dataAttr',
   'dataValue',
+  'ariaLabel',
 ]);
 
 /** The component's `$props()` destructuring, comments stripped, in source order. */
@@ -186,14 +186,13 @@ test('the collapsed-body ruling is one switch, with no prop exposing it', () => 
 });
 
 test('focus lands before the live region is written, in the one place that can hold it', () => {
-  // A region written in the same mutation as the focus change is not announced, which is why the
-  // capability states the ordering. It is pinned here rather than in the mounted suite for a
-  // measured reason: the focus call is imperative and the region's text is state, so the text
-  // lands on the flush that follows the effect either way and swapping the two statements produces
-  // a byte-identical DOM sequence. The mounted suite holds the three facts that ARE observable.
+  // A region written in the same mutation as the focus change is not announced. Pinned here
+  // because swapping the two statements produces a byte-identical DOM sequence: the focus call is
+  // imperative and the region's text is state. `focusTarget` is the control that initiated the
+  // move — the grip for its arrow keys, the pressed chevron for a rocker click.
   const source = read(PRIMITIVE);
   const effect = source.slice(source.indexOf('$effect(() => {'));
-  const focusAt = effect.indexOf('grip?.focus?.();');
+  const focusAt = effect.indexOf('focusTarget?.focus?.();');
   const announceAt = effect.indexOf('announcement = sentence;');
   assert.ok(focusAt !== -1 && announceAt !== -1, 'the effect still focuses and still announces');
   assert.ok(
@@ -205,11 +204,9 @@ test('focus lands before the live region is written, in the one place that can h
 });
 
 test('the moved name is read BEFORE the caller round-trips the array', () => {
-  // A source read for a measured reason: the caller's `onReorder` is synchronous and the list's own
-  // `items` prop does not change until the caller sets it, so a name read AFTER the call still
-  // reads the pre-move array inside a mounted harness and both orders agree. On a real surface the
-  // caller round-trips through its store, `items[index]` afterwards is a different record, and the
-  // announcement names the wrong one — which is invisible to every rendered assertion.
+  // A source read because both orders agree in a mounted harness: `onReorder` is synchronous and
+  // `items` does not change until the caller sets it. On a real surface the caller round-trips
+  // through its store, so `items[index]` afterwards is a different record.
   const source = read(PRIMITIVE);
   const move = source.slice(source.indexOf('function moveFrom('), source.indexOf('/** The keyboard'));
   const nameAt = move.indexOf('reorderAnnouncementText(nameOf(list[index])');
@@ -223,9 +220,7 @@ test('the moved name is read BEFORE the caller round-trips the array', () => {
 });
 
 test('every control the list renders declares itself focused to Foundry', () => {
-  // Not one raw `<button>`: the grip, both rocker chevrons and the remove are `IconButton`s and the
-  // disclosure is `RowDisclosure`, and every one of those emits `data-keyboard-focus="true"`. A raw
-  // button here would be a control `KeyboardManager#hasFocus` cannot see — it returns
+  // A raw `<button>` here would be a control `KeyboardManager#hasFocus` cannot see — it returns
   // `!!focused.form` and this application renders almost no forms — so the arrows would pan the
   // canvas instead of moving the row.
   const source = read(PRIMITIVE);
@@ -245,16 +240,10 @@ test('every control the list renders declares itself focused to Foundry', () => 
   );
 });
 
-test('the family is declared in the global sheet and not in a scoped block', () => {
-  // A shared primitive's family belongs in `styles/fabricate.css`: a Svelte-scoped rule is injected
-  // unlayered against a sheet imported at `layer(modules)`, so it silently out-ranks every global
-  // rule at any specificity, and the gate proving a family is not application-rooted cannot see a
-  // scoped block at all. Anchored at the start of a line, because this component's own header
-  // states the rule and names the element it forbids.
+test('the family is declared in no scoped block', () => {
+  // A Svelte-scoped rule is injected unlayered against a sheet imported at `layer(modules)`, so it
+  // out-ranks every global rule at any specificity, and the application-rooting gate cannot see a
+  // scoped block at all. The sheet's own declarations are read by `recipe-edit-mounted.test.js`.
   const source = read(PRIMITIVE);
   assert.ok(!/^<style>/mu.test(source), `${PRIMITIVE} must declare no scoped <style> block`);
-  assert.ok(
-    read('styles/fabricate.css').includes('.fabricate-sortable-list {'),
-    'and `styles/fabricate.css` declares the family at the root the component emits'
-  );
 });

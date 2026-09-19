@@ -300,7 +300,11 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('OverrideIndicator'), 'rows surface override state via the OverrideIndicator chip');
     assert.ok(listSource.includes('active={entry.hasDropRateAdjustment === true}'), 'override chips are driven by drop-rate adjustment state');
     assert.ok(!listSource.includes('compositionState={entry.compositionState}'), 'override chips are not driven by composition state');
-    assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
+    // The Included list renders through `SortableList` as of issue 1512, so the row it draws is the
+    // primitive's and the caller contributes the state classes only; the other three lists keep
+    // `manager-environment-comp-row`. Pinned at the primitive so this clause cannot pass on them.
+    assert.ok(listSource.includes('<SortableList'), 'the Included list renders the shared ordered list');
+    assert.ok(listSource.includes('manager-environment-comp-entry'), 'and its rows carry the caller`s own family class');
     // Issue 1477 moved the overflow menu into the shared `<ActionMenu>` primitive.
     assert.ok(listSource.includes('<ActionMenu'), 'rows expose an overflow action menu');
     assert.ok(
@@ -386,7 +390,6 @@ describe('environment composition editor structure', () => {
     assert.ok(!/return 'force-include'/.test(listSource), 'availableRowAction no longer returns a force-add action for any row');
     assert.ok(listSource.includes("{#if showEventRankControls}"), 'ranked event rows keep their distinct action/reorder branch');
     assert.ok(listSource.includes('showEventRankControls'), 'event drag reordering is tied to ranked event controls');
-    assert.ok(!listSource.includes('{#if showEventRankControls}<span class="manager-environment-comp-handle"></span>{/if}'), 'non-ranked event sections do not render blank handle placeholders');
   });
 
   it('the right inspector is tab-specific (summary on overview, record on tasks/events)', () => {

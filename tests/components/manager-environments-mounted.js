@@ -13,7 +13,11 @@ import {
   createManagerQueries,
   waitForQueuedAnnouncement,
 } from '../helpers/manager/managerQueries.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  assertDropComponentCellKeyboardPath,
+  managerComponents,
+  settleBetweenTests,
+} from './manager-mounted-shared.js';
 
 let Component;
 let EnvironmentEditViewComponent;
@@ -519,6 +523,12 @@ export function registerEnvironmentsCases() {
       '.manager-drop-component-button'
     );
     assert.ok(populatedComponentButton);
+    // The FILLED branch of the row's keyboard path (issue 1512); the empty branch is asserted in
+    // `manager-gathering-mounted.js`, where a freshly added row renders it.
+    assertDropComponentCellKeyboardPath(populatedDropRow, {
+      empty: false,
+      label: 'Nightshade With An Exceptionally Long Localized Component Name',
+    });
     const populatedComponentThumb = populatedComponentCell.querySelector(
       '.manager-gathering-task-thumb'
     );

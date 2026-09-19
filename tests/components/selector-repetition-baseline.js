@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
  * rather than these 111, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,032 `(at-context, selector)` keys, of which 2,921 appear exactly
+ * Unfiltered, the sheet holds 3,036 `(at-context, selector)` keys, of which 2,925 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,555 rules at that head, 111 repeated keys and 227 appearances
+ * printed from. The sheet holds 2,559 rules at that head, 111 repeated keys and 227 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1512 DELETES TWO REPEATED ROWS AND ADDS NONE. The progressive recipe stage row renders
  * through `SortableList`, so `.fabricate-manager .manager-recipe-result-row.is-reorderable` and
@@ -28,7 +28,12 @@
  * conversion emits, rather than twice. `pinnedTotal` goes 231 -> 227 across 111 rows, and the
  * three contextual figures fall with the retired stage-row, steps-row, grip, rocker and
  * composition-pip families: 2,567 -> 2,555 rules, 3,051 -> 3,032 keys, 2,938 -> 2,921 singletons,
- * and 207 -> 205 selectors keyed alone. Re-derived by running the census twice, not subtracted.
+ * and 207 -> 205 selectors keyed alone. Its review round then adds four rules and one selector list
+ * of two — the Included row's `.is-selected` and `.is-unavailable` state paint, the rocker's bare
+ * icon-button override and the always-open body gate — and drops one selector from the Checks
+ * studio's remove rule, so 2,555 -> 2,559 rules, 3,032 -> 3,036 keys and 2,921 -> 2,925 singletons.
+ * None of the five is a repeated selector, so the 111 rows, the 227 appearances and the 205
+ * selectors keyed alone are unmoved. Re-derived by running the census twice, not subtracted.
  * ISSUE 1515 PHASE 9 MOVES THE THREE CONTEXTUAL FIGURES AND RE-KEYS ONE REPEATED ROW, and the two
  * halves are unrelated to one another. RE-KEYED: the rail's premium chip stops riding the
  * record-count vehicle, so `.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium`

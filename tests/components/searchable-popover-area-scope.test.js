@@ -614,19 +614,17 @@ const PRIMITIVES = Object.freeze([
     ]),
   }),
   Object.freeze({
-    // SORTABLELIST (issue 1512). The product's ONE ordered list. It is the first entry here whose
-    // family was NEVER application-rooted: it arrives at `fabricate-sortable-list` rather than being
-    // moved there, so `namespacedFamily` is what tells this gate that a class matching the family
-    // pattern is a namespace class rather than an application root.
+    // `SortableList` (issue 1512), the first entry here whose family was NEVER application-rooted:
+    // `namespacedFamily` is what tells this gate that a class matching the family pattern is a
+    // namespace class rather than an application root.
     name: 'SortableList',
     components: Object.freeze(['src/ui/svelte/components/SortableList.svelte']),
     roots: Object.freeze(['fabricate-sortable-list']),
     family: 'fabricate-sortable-list[\\w-]*',
     namespacedFamily: true,
-    // `IconButton`'s own root, inherited because the grip and the rocker rules are COMPOUNDED on it:
-    // `.fabricate-icon-button.manager-icon-button` is (0,2,0) and pins a 34px box, so a bare family
-    // class would lose. It is a namespace root of the primitive this one composes, never an
-    // application root.
+    // `IconButton`'s own root, inherited because the grip and rocker rules are compounded on it:
+    // `.fabricate-icon-button.manager-icon-button` is (0,2,0) and pins a 34px box. It is a namespace
+    // root of the primitive this one composes, never an application root.
     inheritedRoots: Object.freeze(['fabricate-icon-button']),
     anchors: Object.freeze([
       'fabricate-sortable-list',
@@ -644,11 +642,9 @@ const PRIMITIVES = Object.freeze([
     writtenFloor: 9,
     familyFloor: 15,
     ownedFloor: 15,
-    // NO pair, and the reason is measured rather than an omission. The only class a hand-written
-    // fixture of a converted list carries is the caller's `manager-checks-tier-row`, and a SECOND,
-    // unconverted surface writes that class too — `checks/CraftingCheckEditor.svelte` hand-rolls
-    // the routed tier rows — so a mirror keyed on it would demand this primitive's row class on
-    // rows this primitive does not render. The converted fixture carries both classes anyway.
+    // No pair, measured rather than omitted: the only class a hand-written fixture of a converted
+    // list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes
+    // too, so a mirror keyed on it would demand this row class on rows this list does not render.
     mirrored: Object.freeze([]),
   }),
 ]);

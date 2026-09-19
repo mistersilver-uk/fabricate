@@ -40,8 +40,8 @@ function rows(table) {
 export const TARGET_LIBRARY_NAMES = rows('libraryTargetNames');
 
 /** @see TARGET_LIBRARY_NAMES */
-// Issue 1512 flips two names to `shipped`: the ordered list ships, and the row disclosure it
-// promoted flips by correcting the specimen to the control that shipped (58 - 2).
+// Measured over the library at issue 1512, which shipped the ordered list and the row disclosure
+// it promoted.
 export const TARGET_LIBRARY_NAME_TOTAL = 56;
 
 /**

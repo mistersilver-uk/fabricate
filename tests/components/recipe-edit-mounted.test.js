@@ -2540,9 +2540,8 @@ describe('RecipeEditView (mounted)', () => {
     node.dispatchEvent(new globalThis.window.Event(type, { bubbles: true, cancelable: true }));
   }
 
-  // The adder is the list's own footer, and reachable at zero (issue 1512). Both halves are
-  // asserted, because a change satisfying only the first ships an empty state that says "add one"
-  // with nothing to press — so the empty branch's control is USED and its effect read.
+  // The adder is the list's own footer AND reachable at zero (issue 1512): satisfying only the
+  // first ships an empty state that says "add one" with nothing to press.
   it('progressive: renders the stage adder as the list footer, and after the empty message at zero', async () => {
     const populated = await mountProgressiveResults([
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
@@ -2591,7 +2590,8 @@ describe('RecipeEditView (mounted)', () => {
       const grip = row.querySelector('[data-sortable-grip]');
       assert.ok(Boolean(grip), `row ${index} renders the grip`);
       assert.equal(grip.tagName, 'BUTTON', `row ${index} grip is a real button`);
-      assert.equal(row.getAttribute('draggable'), 'true', `row ${index} card is the drag source`);
+      assert.equal(grip.getAttribute('draggable'), 'true', `row ${index} grip is the drag source`);
+      assert.ok(!row.hasAttribute('draggable'), `row ${index} card is not itself draggable`);
       assert.ok(grip.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
       const ordinal = row.querySelector('.fabricate-sortable-list-ordinal');
       assert.ok(Boolean(ordinal), `row ${index} renders a separate order badge`);
@@ -2733,8 +2733,8 @@ describe('RecipeEditView (mounted)', () => {
       'the grip names the result it moves'
     );
 
-    // The grip LEADS and the rocker TRAILS, so the disclosure and the rocker chevrons are never
-    // adjacent: the rocker follows the row's whole content, including its DC and its remove.
+    // The grip leads and the trailing cluster is `content · rocker · delete`, the specimen's order:
+    // the delete is the list's own, so it cannot land before the rocker.
     const row = rows[0];
     const dc = row.querySelector('[data-recipe-result-difficulty]');
     const rocker = row.querySelector('.fabricate-sortable-list-rocker');
@@ -2748,8 +2748,12 @@ describe('RecipeEditView (mounted)', () => {
       'the rocker follows the difficulty badge'
     );
     assert.ok(
-      remove.compareDocumentPosition(rocker) & Node.DOCUMENT_POSITION_FOLLOWING,
-      'and the row`s own remove, because the rocker trails everything the caller draws'
+      !remove.closest('.manager-recipe-option-controls'),
+      'the delete is the list`s own rather than one the caller draws inside its content'
+    );
+    assert.ok(
+      rocker.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'and the delete follows the rocker, which is the specimen`s trailing order'
     );
     editHarness.remount();
   });
@@ -3057,9 +3061,8 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('1286: the stage row clips itself and puts its padding on its line, so a band reaches the edges', () => {
-    // Stated in the sheet, not measurable from the mounted markup. The two `:has()` rules this used
-    // to read are retired: the shared list's row is ALREADY a column that clips itself and whose
-    // LINE carries the padding, so every row has the shape the band needs (issue 1512).
+    // Stated in the sheet, not measurable from the mounted markup. The two `:has()` rules this read
+    // are retired: the shared list's row is already a column that clips itself (issue 1512).
     const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
     const rowStart = sheet.indexOf('.fabricate-sortable-list-row {');
     assert.notEqual(rowStart, -1, 'the ordered row is still declared');
@@ -3071,7 +3074,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.notEqual(lineStart, -1, 'and the line is declared');
     assert.match(
       sheet.slice(lineStart, sheet.indexOf('}', lineStart)),
-      /padding:\s*12px/u,
+      /padding:\s*var\(--fab-space-3\)/u,
       'the LINE carries the row`s padding, which is what the band gives back'
     );
   });
@@ -3105,9 +3108,8 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('1286: a row with no strip draws an empty body rather than a second anatomy', async () => {
-    // The `display: contents` wrapper this used to assert is retired with the hand-rolled row
-    // (issue 1512): the list renders ONE anatomy for every row, and a component authoring no
-    // crafting complication simply renders nothing into the body.
+    // The `display: contents` wrapper this asserted is retired with the hand-rolled row (issue
+    // 1512): the list renders one anatomy per row and an unbanded stage renders nothing into it.
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }],
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
@@ -6582,9 +6584,8 @@ describe('RecipeStepsCard (mounted)', () => {
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
     triggers[1].click();
     await flushRender();
-    // SCOPED to the open popover (issue 1512). A collapsed step body stays in the DOM now, and it
-    // carries the inline five-column duration steppers, so an unscoped document query resolves the
-    // FIRST retained body's hours field rather than the editor this click opened.
+    // Scoped to the open popover (issue 1512): a retained collapsed body carries the same inline
+    // duration steppers, so an unscoped query resolves the first one rather than this editor.
     const hoursInput = document.querySelector(
       '.manager-recipe-duration-popover [data-recipe-duration-unit="hours"] [data-stepper-input]'
     );
@@ -6672,16 +6673,13 @@ describe('RecipeStepsCard (mounted)', () => {
     const target = await stepsHarness.mount(
       stepsProps({ onReorderSteps: (from, to) => moves.push([from, to]) })
     );
-    // The ROW is the drag source and the drop target (issue 1512), and the grip is the handle a
-    // pointer grabs it by; a grab inside the expanded body no longer starts a drag, because the body
-    // is the row's sibling rather than part of its head.
+    // The GRIP is the drag source and the ROW is the drop target (issue 1512): `dragstart` bubbles
+    // to the row, so a grab inside the expanded editing body starts no drag at all.
     const firstRow = target.querySelector('[data-recipe-step-id="step-1"]');
-    assert.equal(firstRow.getAttribute('draggable'), 'true', 'the row is the drag source');
-    assert.ok(
-      Boolean(firstRow.querySelector('[data-sortable-grip]')),
-      'and it draws the grip that says so'
-    );
-    firstRow.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
+    const grip = firstRow.querySelector('[data-sortable-grip]');
+    assert.ok(!firstRow.hasAttribute('draggable'), 'the row itself is not the drag source');
+    assert.equal(grip.getAttribute('draggable'), 'true', 'the grip is');
+    grip.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
     target
       .querySelector('[data-recipe-step-id="step-2"]')
       .dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));

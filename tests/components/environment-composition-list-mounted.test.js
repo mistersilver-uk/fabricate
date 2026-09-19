@@ -133,9 +133,8 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/components/IconButton.svelte',
       // THE shared overflow action menu (issue 1477).
       'src/ui/svelte/components/ActionMenu.svelte',
-      // The product's ONE ordered list and the disclosure it renders (issue 1512): the included
-      // list is the primitive now. This loop has NO dependency validator, so omitting either
-      // reports the whole file as `# cancelled` behind one ERR_MODULE_NOT_FOUND in the hook.
+      // The product's one ordered list and the disclosure it renders (issue 1512). This loop has no
+      // dependency validator, so omitting either reports the file as `# cancelled`.
       'src/ui/svelte/components/RowDisclosure.svelte',
       'src/ui/svelte/components/SortableList.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
@@ -292,6 +291,45 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(calls.at(-1), ['openSource', 'task', 'disabled']);
   });
 
+  it('the selected and unavailable included rows keep their state paint through the primitive', async () => {
+    // Issue 1512 renamed this row's family class, and a rename with no matching rule is a silent
+    // loss of paint that only the capture selector reds — so both halves are asserted, the class the
+    // row emits and the rule that paints it.
+    await renderComposition({ selectedId: 'included' });
+
+    const row = target.querySelector('[data-record-id="included"]');
+    assert.ok(
+      row.classList.contains('manager-environment-comp-entry'),
+      'the included row carries its own family class beside the primitive`s row class'
+    );
+    assert.ok(row.classList.contains('is-selected'), 'and the selected row says so');
+    assert.ok(
+      row.classList.contains('is-unavailable') === false,
+      'while an available record is not marked unavailable'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    await renderComposition({
+      records: sampleRecords().map((entry) =>
+        entry.id === 'included' ? { ...entry, runtimeState: 'unavailable' } : entry
+      ),
+    });
+    assert.ok(
+      target.querySelector('[data-record-id="included"]').classList.contains('is-unavailable'),
+      'and an unavailable record says so'
+    );
+
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    for (const state of ['is-selected', 'is-unavailable']) {
+      assert.ok(
+        sheet.includes(`.manager-environment-comp-entry.${state} {`),
+        `styles/fabricate.css paints \`.manager-environment-comp-entry.${state}\`. The class the ` +
+          'row emits with no rule behind it is exactly the defect this clause exists to catch.'
+      );
+    }
+  });
+
   it('task automatic mode retains Excluded and standalone Non-matching sections, and force-adds from the row menu', async () => {
     const calls = [];
     await renderComposition({
@@ -408,27 +446,32 @@ describe('CompositionList mounted layout', () => {
       onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to])
     });
 
-    // The included rows are the shared ordered list's as of issue 1512, so the grip, the badge and
-    // the rocker carry ITS hooks, and the caller's `has-rank-controls` class is gone: the list's own
-    // `reorderable` is what decides whether a row is ranked, so the class that said it twice says it
-    // once.
+    // The included rows are the shared list's as of issue 1512, so the grip, badge and rocker carry
+    // its hooks and `has-rank-controls` is gone: `reorderable` decides whether a row is ranked.
+    const dragSource = (row) => row.querySelector('[data-sortable-grip][draggable="true"]');
     const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
-    assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked event rows are draggable');
+    assert.ok(Boolean(dragSource(includedRow)), 'included ranked event rows have a drag source');
     assert.ok(includedRow.querySelector('[data-sortable-grip] .fa-grip-vertical'), 'included ranked event rows render the grip handle');
     assert.ok(includedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('1'), 'included ranked event rows render the rank number');
-    // RENDERED rather than pinned in source (issue 1512): `environment-editor.test.js` used to read
-    // the component's own `draggable={…}` expression, and the drag source is the list's row now.
+    // Rendered rather than pinned in source (issue 1512), and the drag source is the list's GRIP —
+    // not the whole row, whose expanded body is not something a GM drags.
     assert.ok(
       [...target.querySelectorAll('[data-section="included"] [data-record-id]')].every(
-        (row) => row.getAttribute('draggable') === 'true'
+        (row) => Boolean(dragSource(row))
       ),
       'reorder drag is enabled only when event rank controls are active, and then on every row'
     );
+    assert.ok(
+      [...target.querySelectorAll('[data-section="included"] [data-record-id]')].every(
+        (row) => !row.hasAttribute('draggable')
+      ),
+      'and the row itself is not a drag source'
+    );
     const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
-    assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked event rows are draggable');
+    assert.ok(Boolean(dragSource(forcedRow)), 'force-included ranked event rows have a drag source');
     assert.ok(forcedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('4'), 'force-included rows receive their visible rank');
     const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
-    assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included event rows are draggable');
+    assert.ok(Boolean(dragSource(blockedRow)), 'condition-blocked included event rows have a drag source');
     assert.ok(blockedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
 
     assert.ok(
@@ -436,8 +479,7 @@ describe('CompositionList mounted layout', () => {
       'available-to-add events do not reserve a blank handle placeholder'
     );
 
-    // The rocker replaces the menu's two hidden copies of the same act (issue 1512): a GM can SEE
-    // the range on the row itself, which the menu entries never showed.
+    // The rocker replaces the menu's two hidden copies of the same act (issue 1512).
     const menu = await openRowMenu('first');
     assert.ok(!menu.textContent.includes('Move up'), 'the ranked menu no longer duplicates the move');
     assert.ok(!menu.textContent.includes('Move down'), 'in either direction');
