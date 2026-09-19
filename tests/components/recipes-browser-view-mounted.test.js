@@ -42,8 +42,8 @@ const RECIPE_RAW_MODULES = [
   'src/ui/model/browserGroupCounts.js',
   // ... and, since issue 1036, the shared page-window model too. Same consequence.
   'src/ui/model/browserPagination.js',
-  // The pure bulk selection + staging model (issue 1010). The browser imports it for the
-  // four selection helpers and the toolbar reads the description it returns.
+  // The pure bulk selection + staging model (issue 1010). Since issue 1706 the browser no
+  // longer imports it for the four selection helpers — those moved to the composable below.
   'src/ui/model/recipeBulkEditModel.js',
   // Its shared leaf: those selection helpers live here and `recipeBulkEditModel.js`
   // re-exports them, so it is a STATIC import of that module. Naming only the model HANGS
@@ -331,7 +331,7 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
 // shared, parameterised run in `browserBulkSelectionCases.js`, instantiated here and in
 // `components-browser-view-mounted.test.js` alike: the two studios render the SAME
 // `BulkSelectionToolbar` over the SAME `bulkSelectionModel.js`, so a second hand-copied
-// run of the same seven bodies would be duplication rather than coverage.
+// run of the same eight bodies would be duplication rather than coverage.
 describeBrowserBulkSelection({
   label: 'RecipesBrowserView',
   prefix: 'recipe',
