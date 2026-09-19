@@ -1,16 +1,14 @@
 /**
- * The EQUIVALENCE PIN for the crafting-check, trigger and crit normalizers (issue 1698). It lands
- * against the unchanged `CraftingSystemManager` and is byte-frozen through the extraction into
- * `src/systems/normalize/craftingCheck.js`, so the golden is evidence the move changed nothing.
- * It drives the three activity entry points AND `_normalizeSystem`, because the chokepoint's
- * wiring of the three delegates is part of what must not move.
+ * The equivalence pin for the crafting-check, trigger and crit normalizers (issue 1698): a golden
+ * over the three activity entry points and the `_normalizeSystem` chokepoint, byte-frozen through
+ * their extraction into `src/systems/normalize/craftingCheck.js`.
  */
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 /**
- * A SEEDED id counter, reset exactly once per scenario before the first pass and NEVER before the
+ * A seeded id counter, reset exactly once per scenario before the first pass and never before the
  * idempotence re-feed: resetting before the re-feed would let an accidental re-mint reproduce the
  * first pass's id and go invisible, which is the behaviour the re-feed exists to catch.
  */
@@ -127,7 +125,7 @@ function runCorpus() {
 const { first: actual, refeed } = runCorpus();
 
 /**
- * The golden records the entry-point pass and the two direct modifier-selection calls. It does NOT
+ * The golden records the entry-point pass and the two direct modifier-selection calls. It does not
  * record the `_normalizeSystem` pass a second time: the chokepoint's three checks are proved equal
  * to the delegate outputs run with the same basis, which pins them to the same golden transitively
  * and without a second 90KB copy of it.
