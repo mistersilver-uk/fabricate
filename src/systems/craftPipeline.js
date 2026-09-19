@@ -342,7 +342,7 @@ export async function routeAlchemySimpleFailure(engine, ctx, craftInputs) {
 }
 
 /**
- * A rolled check failure: the policy's consumption and breakage, then THE FAILURE AWARD (issue
+ * A rolled check failure: the policy's consumption and breakage, then the failure award (issue
  * 1098), which runs after both so the reserved output transfers the essences the attempt spent.
  */
 export async function resolveCheckFailure(engine, ctx, craftInputs) {
@@ -405,7 +405,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
 }
 
 /** The run receipt, the card and the return for a rolled check failure and whatever it awarded. */
-export async function publishCheckFailure(engine, ctx, craftInputs, failure) {
+async function publishCheckFailure(engine, ctx, craftInputs, failure) {
   const { craftingActor, options, run, runManager, stepIndex } = ctx;
   const { checkResult, ingredientSet } = craftInputs;
   const { consumedOnFail, failureResults, usedToolPairs, usedToolsOnFail } = failure;
@@ -462,7 +462,7 @@ export async function publishCheckFailure(engine, ctx, craftInputs, failure) {
 }
 
 /**
- * A check that SUCCEEDED but does not satisfy the resolution mode: the same consumption rule as a
+ * A check that succeeded but does not satisfy the resolution mode: the same consumption rule as a
  * rolled failure, and a settlement that awards nothing and records no `createdResults` at all.
  */
 export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
@@ -547,10 +547,9 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
 }
 
 /**
- * PRE-CONSUMPTION MISCONFIGURATION GATE (issue 85). Resolve the awarded result group(s) BEFORE
- * consuming anything: a matched signature whose check outcome resolves to no valid group is a
- * GM-side authoring gap. Abort with ZERO mutation and surface the GM diagnostic (spec
- * `resolution-modes` §Alchemy Mode and `recipes-and-steps` §Alchemy Execution Lifecycle).
+ * The pre-consumption misconfiguration gate (issue 85): resolve the awarded result group(s) before
+ * consuming anything, so a check outcome that routes to no valid group aborts with zero mutation
+ * and surfaces the GM diagnostic (specs `resolution-modes` and `recipes-and-steps`, alchemy).
  */
 export async function runResolutionPreflight(engine, ctx, craftInputs) {
   const { craftingActor, options, resolutionService, run, runManager, step, stepIndex } = ctx;
@@ -608,11 +607,8 @@ export async function runResolutionPreflight(engine, ctx, craftInputs) {
   };
 }
 
-/**
- * The award: consumption, currency, breakage and the result items, then the run's success receipt.
- *
- * @returns {Promise<object>} the `award` record `publishCraftSuccess` and `craft()` read.
- */
+/** The award — consumption, currency, breakage, the result items and the run's success receipt —
+ * as the `award` record `publishCraftSuccess` and `craft()` read. */
 export async function commitCraft(engine, ctx, craftInputs) {
   const { componentSourceActors, craftingActor, options, run, runManager, step, stepIndex } = ctx;
   const { checkResult, craftSelection, currencySpends } = craftInputs;
@@ -740,11 +736,9 @@ export async function publishCraftSuccess(engine, ctx, craftInputs, award) {
 }
 
 /**
- * Collapsed chain (issue 710): a non-final step just succeeded, so continue the atomic action in
- * the SAME craft call, with a NULL ingredient set and cleared per-step overrides so each later
- * step auto-resolves its own satisfiable set. `ingredientEssenceAllocation` MUST be nulled too
- * (issue 917): the chain enters at step 0. The continuation is returned UNAWAITED, so its
- * rejection reaches the caller of `craft()` rather than `craft()`'s own `catch`.
+ * Collapsed chain (issue 710): a non-final step just succeeded, so the atomic action continues in
+ * the same craft call with a null ingredient set and both per-step overrides cleared, including
+ * `ingredientEssenceAllocation` (issue 917). Unawaited: a rejection reaches `craft()`'s caller.
  */
 export function continueCollapsedChain(engine, ctx) {
   const { collapsedChain, componentSourceActors, craftingActor, options, recipe, run, runManager } =
