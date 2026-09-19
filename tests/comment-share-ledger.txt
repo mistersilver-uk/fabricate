@@ -64,7 +64,7 @@ tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
 tests/helpers	4100
-tests/helpers/manager	298
+tests/helpers/manager	296
 tests/helpers/scale	622
 tests/journal	157
 tests/stores	1529
