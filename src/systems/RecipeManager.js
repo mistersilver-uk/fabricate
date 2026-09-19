@@ -1,9 +1,8 @@
-import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
+import { isSafeFlagKeySegment } from '../config/flags.js';
 import { SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
-import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
+import { getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
-import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import {
   accumulateItemEssences,
@@ -11,11 +10,6 @@ import {
   resolveItemEssences,
 } from '../utils/essenceResolver.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
-import {
-  itemResolvesToComponent,
-  itemResolvesToTool,
-  itemIsToolByDurableIdentity,
-} from '../utils/sourceUuid.js';
 
 import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
@@ -31,6 +25,13 @@ import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidation
 import { readStackQuantity } from './itemStackQuantity.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
+import {
+  ingredientMatchesItem,
+  ingredientMatchesItemByFields,
+  tagIngredientMatchesItem,
+  toolMatchesItem,
+  toolMatchesItemByIdentity,
+} from './recipeMatching.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import {
   validateEnabledEssenceReferences,
@@ -106,6 +107,16 @@ function buildDefaultRecipeRepository({ corpus }) {
     serialize: (recipe) => recipe.toJSON(),
     scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
   });
+}
+
+/** The seams `recipeMatching` resolves a recipe's system definitions through. */
+function matchingSeams(manager) {
+  return {
+    component: (recipe, componentId) => manager._getComponent(recipe, componentId),
+    systemComponents: (recipe) => manager._getSystemComponents(recipe),
+    systemTools: (recipe) => manager._getSystemTools(recipe),
+    features: (recipe) => manager._getSystemFeatures(recipe),
+  };
 }
 
 /** The seams `recipeValidation` resolves through. Only the two checks that cannot leave the class
@@ -1850,115 +1861,39 @@ export class RecipeManager {
   }
 
   /** Check whether a concrete item satisfies a recipe ingredient. `resolveComponent` is the
-   * alchemy-path resolver (issue 578), defaulting to {@link resolveComponentForItem}. */
+   * alchemy-path resolver (issue 578), defaulting to {@link findMatchingComponent}. */
   ingredientMatchesItem(recipe, ingredient, item, resolveComponent) {
-    const features = this._getSystemFeatures(recipe);
-    // A component (or legacy systemItem) match resolves its id via the handler; tags/currency/no
-    // match return null and fall to the bare-field fallback, then to `_matchesIngredient`.
-    const componentId = getIngredientComponentId(ingredient);
-
-    if (componentId) {
-      const managedItem = this._getComponent(recipe, componentId);
-      if (!managedItem) return false;
-
-      if (
-        itemResolvesToComponent(
-          item,
-          managedItem,
-          this._getSystemComponents(recipe),
-          recipe?.craftingSystemId,
-          resolveComponent
-        )
-      )
-        return true;
-
-      // Source-UUID matching failed — fall back to an exact case-insensitive name match, because
-      // `_stats.duplicateSource` points at the ORIGINAL template, so a template copy has no ref
-      // back (issue 540).
-      const byName = matchComponentByName(item, managedItem, {
-        caseSensitive: false,
-        systemId: recipe?.craftingSystemId,
-      });
-      if (!byName) return false;
-    } else if (getMatchHandler(ingredient?.match).type === 'tags') {
-      // A by-TAG ingredient's authored tags live on the managed COMPONENT definition rather than
-      // the item's flags, so the item's component is resolved here (issue 857).
-      if (!this._matchesTagIngredient(recipe, ingredient, item, features, resolveComponent)) {
-        return false;
-      }
-    } else if (!this._matchesIngredient(ingredient, item, features)) {
-      return false;
-    }
-
-    return true;
+    return ingredientMatchesItem(recipe, matchingSeams(this), ingredient, item, resolveComponent);
   }
 
-  /** Whether an owned item satisfies a by-TAG ingredient. Fabricate never stamps
-   * `flags.fabricate.tags` onto items (issue 857), so the rule is evaluated against the UNION of
-   * the resolved component's tags and any item-level flag. */
+  /** Whether an owned item satisfies a by-tag ingredient, against the union of the resolved
+   * component's tags and any item-level flag (issue 857). */
   _matchesTagIngredient(recipe, ingredient, item, features, resolveComponent) {
-    if (!features.enableTags) return false;
-    const handler = getMatchHandler(ingredient?.match);
-    const resolve =
-      typeof resolveComponent === 'function' ? resolveComponent : findMatchingComponent;
-    const component = resolve(item, this._getSystemComponents(recipe), recipe?.craftingSystemId);
-    const componentTags = Array.isArray(component?.tags) ? component.tags : [];
-    const flagTags = getFabricateFlag(item, 'tags', []);
-    const itemTags = [...new Set([...(Array.isArray(flagTags) ? flagTags : []), ...componentTags])];
-    return handler.matchesItem(ingredient.match, item, { features, itemTags });
+    return tagIngredientMatchesItem(
+      recipe,
+      matchingSeams(this),
+      ingredient,
+      item,
+      features,
+      resolveComponent
+    );
   }
 
-  /** Check whether a concrete item satisfies a Tool's PRESENCE requirement — the wide,
-   * non-destructive gate (issue 561), resolved against the Tools library directly. */
+  /** Check whether a concrete item satisfies a Tool's presence requirement — the wide,
+   * non-destructive gate (issue 561). */
   toolMatchesItem(recipe, tool, item) {
-    if (!tool) return false;
-    const tools = this._getSystemTools(recipe);
-    if (itemResolvesToTool(item, tool, tools, recipe?.craftingSystemId)) return true;
-    // Snapshot-name fallback (presence only, never destructive): the item-sourced tool's own
-    // snapshot name, or the linked component's name for a migrated componentId-tool (issue 540).
-    const fallbackName = tool.name || this._getComponent(recipe, tool.componentId)?.name || '';
-    if (!fallbackName) return false;
-    return matchComponentByName(
-      item,
-      { name: fallbackName, id: tool.id },
-      { caseSensitive: false, systemId: recipe?.craftingSystemId }
-    );
+    return toolMatchesItem(recipe, matchingSeams(this), tool, item);
   }
 
   /** Whether an owned item may be selected for a Tool's usage or breakage — the narrow
    * durable-identity gate (issue 561), the destructive counterpart to {@link toolMatchesItem}. */
   toolMatchesItemByIdentity(recipe, tool, item) {
-    if (!tool || tool.id == null) return false;
-    return itemIsToolByDurableIdentity(
-      item,
-      tool,
-      this._getSystemTools(recipe),
-      recipe?.craftingSystemId
-    );
+    return toolMatchesItemByIdentity(recipe, matchingSeams(this), tool, item);
   }
 
+  /** The legacy bare-field ingredient path, including the `alternatives` fall-through. */
   _matchesIngredient(ingredient, item, features) {
-    if (ingredient.itemUuid && item.uuid === ingredient.itemUuid) return true;
-
-    // Dispatch ONLY for terminal match types. A `component`/null/unknown match falls through to
-    // the legacy bare-field `ingredient.tag` block and the `alternatives` recursion below.
-    const handler = getMatchHandler(ingredient.match);
-    if (handler.isTerminalInventoryMatch) {
-      return handler.matchesItem(ingredient.match, item, { features });
-    }
-
-    if (ingredient.tag) {
-      if (!features.enableTags) return false;
-      const itemTags = getFabricateFlag(item, 'tags', []);
-      if (!itemTags.includes(ingredient.tag)) return false;
-      return true;
-    }
-
-    if (Array.isArray(ingredient.alternatives) && ingredient.alternatives.length > 0) {
-      return ingredient.alternatives.some((alt) => this._matchesIngredient(alt, item, features));
-    }
-
-    return false;
+    return ingredientMatchesItemByFields(ingredient, item, features);
   }
 
   _getSystemFeatures(recipe) {
