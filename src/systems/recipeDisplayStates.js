@@ -8,7 +8,7 @@ import { findMatchingComponent } from '../utils/essenceResolver.js';
 import { formatCurrencyRequirement } from './currencyProfile.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 
-// Foundry's generic default Item image. On a MATERIAL tile it is a sentinel meaning "no image"
+// Foundry's generic default Item image. On a material tile it is a sentinel meaning "no image"
 // (issue 917), so a tile resolving to it draws its glyph instead. It must stay equal to
 // `FALLBACK_COMPONENT_IMG` in `RecipeManager.js`, which `resolveIngredientVisual` composes with.
 const GENERIC_ITEM_IMG = 'icons/svg/item-bag.svg';
