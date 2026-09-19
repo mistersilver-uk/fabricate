@@ -4,16 +4,18 @@
  * The runner has no Item handle, so `roles[systemId].toolId` is the separate `ready`-body
  * `autoStampToolSources` one-shot instead.
  */
+
+import { forEachSystem } from './migrationHelpers.js';
+
 export function migrateToolsToFirstClass(systems) {
   const safeSystems = Array.isArray(systems) ? systems : [];
-  for (const system of safeSystems) {
-    if (!system || typeof system !== 'object') continue;
-    if (!Array.isArray(system.tools) || system.tools.length === 0) continue;
+  forEachSystem(safeSystems, (system) => {
+    if (!Array.isArray(system.tools) || system.tools.length === 0) return;
     const components = Array.isArray(system.components) ? system.components : [];
     for (const tool of system.tools) {
       deriveToolSourceFromComponents(tool, components);
     }
-  }
+  });
   return { systems: safeSystems };
 }
 

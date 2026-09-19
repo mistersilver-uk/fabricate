@@ -6,7 +6,7 @@
  * the rename guards on "old key present AND new key absent", so no clobber and no drop.
  */
 
-import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
+import { isPlainObject, clone, renameKey, forEachSystem } from './migrationHelpers.js';
 
 /** Rename the failure-consumption key on a check's `consumption` sub-object, if present. */
 function renameConsumptionKey(check) {
@@ -65,7 +65,7 @@ export function migrateBreakToolsOnFail(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
   const gatheringConfig = isPlainObject(data?.gatheringConfig) ? clone(data.gatheringConfig) : {};
 
-  for (const system of systems) migrateSystem(system);
+  forEachSystem(systems, (system) => migrateSystem(system));
   for (const recipe of recipes) stripRecipeCatalysts(recipe);
   stripGatheringTaskCatalysts(gatheringConfig);
 

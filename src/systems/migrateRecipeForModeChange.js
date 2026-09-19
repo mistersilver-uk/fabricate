@@ -5,6 +5,8 @@
  * `destructive-changes-and-migrations/spec.md` § Change Crafting System Resolution Mode the pass.
  */
 
+import { isPlainObject } from '../utils/scalars.js';
+
 // Only ALCHEMY routes via a recipe-level `resultSelection.provider`; the two routed crafting modes
 // derive their basis from the system mode.
 const ROUTED_MODES = new Set(['routedByIngredients', 'routedByCheck']);
@@ -23,7 +25,7 @@ export function classifyModeChange(recipeJSON, fromMode, toMode, system = {}) {
  * For a no-mutation dry run use {@link classifyModeChange}.
  */
 export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system = {}) {
-  if (!_isPlainObject(recipeJSON)) {
+  if (!isPlainObject(recipeJSON)) {
     return { outcome: 'carry', recipe: recipeJSON, reasons: [] };
   }
   if (fromMode === toMode) {
@@ -135,10 +137,6 @@ function _isOneByOne(recipe) {
   const ingredientSets = Array.isArray(recipe.ingredientSets) ? recipe.ingredientSets : [];
   const resultGroups = Array.isArray(recipe.resultGroups) ? recipe.resultGroups : [];
   return ingredientSets.length <= 1 && resultGroups.length <= 1;
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

@@ -7,6 +7,8 @@
  */
 import { SignatureValidator } from '../systems/SignatureValidator.js';
 
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
+
 export function migrateEssencesToIngredientGroups(data = {}) {
   const recipes = _clone(data.recipes);
   if (!Array.isArray(recipes)) {
@@ -14,10 +16,10 @@ export function migrateEssencesToIngredientGroups(data = {}) {
   }
 
   for (const recipe of recipes) {
-    if (!_isPlainObject(recipe)) continue;
+    if (!isPlainObject(recipe)) continue;
     _rewriteRecipeSets(recipe.ingredientSets);
     for (const step of Array.isArray(recipe.steps) ? recipe.steps : []) {
-      if (_isPlainObject(step)) _rewriteRecipeSets(step.ingredientSets);
+      if (isPlainObject(step)) _rewriteRecipeSets(step.ingredientSets);
     }
   }
 
@@ -35,12 +37,12 @@ export function migrateEssencesToIngredientGroups(data = {}) {
 function _rewriteRecipeSets(sets) {
   if (!Array.isArray(sets)) return;
   for (const set of sets) {
-    if (!_isPlainObject(set)) continue;
-    const essences = _isPlainObject(set.essences) ? set.essences : null;
+    if (!isPlainObject(set)) continue;
+    const essences = isPlainObject(set.essences) ? set.essences : null;
     // Idempotency: a set with no essence map (re-run / post-migration author) is
     // untouched, and its `essences` key is left as-is (already absent or empty).
     if (!essences || Object.keys(essences).length === 0) {
-      if ('essences' in set && !_isPlainObject(set.essences)) delete set.essences;
+      if ('essences' in set && !isPlainObject(set.essences)) delete set.essences;
       continue;
     }
     const groups = Array.isArray(set.ingredientGroups) ? set.ingredientGroups : [];
@@ -67,15 +69,15 @@ function _reconcileAlchemyCollisions(recipes, systems) {
   if (!Array.isArray(systems)) return [];
   const recipeById = new Map();
   for (const recipe of recipes) {
-    if (_isPlainObject(recipe) && recipe.id != null) recipeById.set(recipe.id, recipe);
+    if (isPlainObject(recipe) && recipe.id != null) recipeById.set(recipe.id, recipe);
   }
 
   const disabledIds = new Set();
-  for (const system of systems) {
-    if (!_isAlchemySystem(system)) continue;
+  forEachSystem(systems, (system) => {
+    if (!_isAlchemySystem(system)) return;
     const systemId = system.id;
     const systemRecipes = recipes.filter(
-      (recipe) => _isPlainObject(recipe) && recipe.craftingSystemId === systemId
+      (recipe) => isPlainObject(recipe) && recipe.craftingSystemId === systemId
     );
     const components = Array.isArray(system.components) ? system.components : [];
     const validator = new SignatureValidator({
@@ -95,7 +97,7 @@ function _reconcileAlchemyCollisions(recipes, systems) {
         }
       }
     }
-  }
+  });
 
   return [...disabledIds]
     .map((id) => recipeById.get(id)?.name)
@@ -104,14 +106,7 @@ function _reconcileAlchemyCollisions(recipes, systems) {
 
 /** Whether a system is in alchemy mode (accepting the legacy `cauldron` alias). */
 function _isAlchemySystem(system) {
-  return (
-    _isPlainObject(system) &&
-    (system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron')
-  );
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
+  return system.resolutionMode === 'alchemy' || system.resolutionMode === 'cauldron';
 }
 
 function _clone(value) {

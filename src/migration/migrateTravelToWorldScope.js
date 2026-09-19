@@ -6,7 +6,7 @@
  * CANNOT be migrated here at all — the runner has no actor access, so it upgrades lazily on read.
  */
 
-import { isPlainObject, clone } from './migrationHelpers.js';
+import { isPlainObject, clone, forEachSystem, mapSystems } from './migrationHelpers.js';
 
 const SCALAR_KEYS = ['revealMode', 'modifierVisibility'];
 
@@ -33,7 +33,7 @@ export function buildWorldTravelConfig(systems) {
   let scalars = null;
   let scalarsFromEnabled = false;
 
-  for (const system of list) {
+  forEachSystem(list, (system) => {
     const settings = legacyRealmSettings(system);
     const enabled = settings?.enabled === true;
 
@@ -58,16 +58,16 @@ export function buildWorldTravelConfig(systems) {
         collisions.push({
           realmId: id,
           keptFrom: seen.get(id),
-          discardedFrom: isPlainObject(system) ? String(system.id || '') : '',
+          discardedFrom: String(system.id || ''),
         });
         continue;
       }
-      seen.set(id, isPlainObject(system) ? String(system.id || '') : '');
+      seen.set(id, String(system.id || ''));
       // `craftingSystemId` is deliberately dropped: a world realm has no owning system.
       const { craftingSystemId: _ownerDropped, ...rest } = clone(realm);
       realms.push(rest);
     }
-  }
+  });
 
   const built = { ...scalars, realms };
   if (collisions.length > 0) built._collisions = collisions;
@@ -80,8 +80,7 @@ export function buildWorldTravelConfig(systems) {
  */
 export function stripSystemTravelConfig(systems) {
   const list = Array.isArray(systems) ? systems : [];
-  return list.map((system) => {
-    if (!isPlainObject(system)) return system;
+  return mapSystems(list, (system) => {
     const settings = legacyRealmSettings(system);
     const hasRealms = system.gatheringRealms !== undefined || system.gatheringRegions !== undefined;
     const settingsKeys = settings ? Object.keys(settings) : [];

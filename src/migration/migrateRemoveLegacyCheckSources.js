@@ -6,7 +6,7 @@
  * `simple.macroUuid`, the live dynamic-DC macro, is deliberately PRESERVED.
  */
 
-import { isPlainObject, clone } from './migrationHelpers.js';
+import { isPlainObject, clone, forEachSystem } from './migrationHelpers.js';
 
 const DEAD_ROOT_FIELDS = [
   'macroUuid',
@@ -59,7 +59,7 @@ function migrateRecipe(recipe) {
 /** Run the `1.8.0` sweep over the runner's bundle. */
 export function migrateRemoveLegacyCheckSources(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
-  for (const system of systems) migrateSystem(system);
+  forEachSystem(systems, (system) => migrateSystem(system));
 
   const recipes = Array.isArray(data?.recipes) ? clone(data.recipes) : [];
   for (const recipe of recipes) migrateRecipe(recipe);

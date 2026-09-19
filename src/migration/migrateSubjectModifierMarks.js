@@ -7,7 +7,7 @@
 import { normalizeModifierPolicy } from '../systems/checkModifierResolver.js';
 import { normalizeCheckModifierIds } from '../utils/checkModifierPicks.js';
 
-import { isPlainObject, clone } from './migrationHelpers.js';
+import { isPlainObject, clone, forEachSystem } from './migrationHelpers.js';
 
 /** The one combination rule that hands the selection to the record being resolved. */
 const SUBJECT_POLICY = 'bySubject';
@@ -137,8 +137,7 @@ export function migrateSubjectModifierMarks(data = {}) {
     : data.gatheringConfig;
   const configSystems = isPlainObject(gatheringConfig?.systems) ? gatheringConfig.systems : null;
 
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const systemId = String(system.id ?? '');
     applySubjectModifierMarks(system, {
       worldLibraries: data.characterLibraries,
@@ -149,7 +148,7 @@ export function migrateSubjectModifierMarks(data = {}) {
         : [],
       tasks: configSystems?.[systemId]?.tasks,
     });
-  }
+  });
 
   return { systems, recipes, gatheringConfig };
 }

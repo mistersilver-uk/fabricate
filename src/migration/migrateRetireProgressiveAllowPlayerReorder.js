@@ -6,6 +6,8 @@
  * DOES NOT SEED — both readers treat an absent key as `true`, so a seed would churn JSON for nothing.
  */
 
+import { forEachSystem } from './migrationHelpers.js';
+
 const CHECK_KEYS = ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'];
 
 const RETIRED_KEY = 'allowPlayerReorder';
@@ -19,9 +21,8 @@ function _stripRetiredFlag(check) {
 
 export function migrateRetireProgressiveAllowPlayerReorder(systems) {
   const safeSystems = Array.isArray(systems) ? systems : [];
-  for (const system of safeSystems) {
-    if (!system || typeof system !== 'object') continue;
+  forEachSystem(safeSystems, (system) => {
     for (const key of CHECK_KEYS) _stripRetiredFlag(system[key]);
-  }
+  });
   return { systems: safeSystems };
 }

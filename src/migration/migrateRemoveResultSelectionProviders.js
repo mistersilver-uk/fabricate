@@ -6,6 +6,8 @@
  * before persisting.
  */
 
+import { isPlainObject } from './migrationHelpers.js';
+
 const LEGACY_PROVIDERS = new Set(['macroOutcome', 'rollTableOutcome']);
 
 export function migrateRemoveResultSelectionProviders(data = {}) {
@@ -21,7 +23,7 @@ export function migrateRemoveResultSelectionProviders(data = {}) {
     }
   }
 
-  if (_isPlainObject(gatheringConfig) && _isPlainObject(gatheringConfig.systems)) {
+  if (isPlainObject(gatheringConfig) && isPlainObject(gatheringConfig.systems)) {
     for (const [systemId, systemConfig] of Object.entries(gatheringConfig.systems)) {
       _migrateGatheringSystem(systemId, systemConfig, strippedGatheringTasks);
     }
@@ -29,7 +31,7 @@ export function migrateRemoveResultSelectionProviders(data = {}) {
 
   return {
     recipes: Array.isArray(recipes) ? recipes : data.recipes,
-    gatheringConfig: _isPlainObject(gatheringConfig) ? gatheringConfig : data.gatheringConfig,
+    gatheringConfig: isPlainObject(gatheringConfig) ? gatheringConfig : data.gatheringConfig,
     _removedResultSelectionProviders: { droppedRollTableRecipes, strippedGatheringTasks },
   };
 }
@@ -39,7 +41,7 @@ export function migrateRemoveResultSelectionProviders(data = {}) {
  * step in `dropped`.
  */
 function _migrateRecipe(recipe, dropped) {
-  if (!_isPlainObject(recipe)) return;
+  if (!isPlainObject(recipe)) return;
 
   // Recipe-level container (covers routed recipe-level AND alchemy no-`steps[]`).
   if (_rewriteSelection(recipe.resultSelection)) {
@@ -48,7 +50,7 @@ function _migrateRecipe(recipe, dropped) {
 
   if (Array.isArray(recipe.steps)) {
     for (const step of recipe.steps) {
-      if (!_isPlainObject(step)) continue;
+      if (!isPlainObject(step)) continue;
       if (_rewriteSelection(step.resultSelection)) {
         dropped.push({
           recipeId: recipe.id ?? null,
@@ -65,7 +67,7 @@ function _migrateRecipe(recipe, dropped) {
  * the caller can record it.
  */
 function _rewriteSelection(selection) {
-  if (!_isPlainObject(selection)) return false;
+  if (!isPlainObject(selection)) return false;
 
   const wasRollTable = selection.provider === 'rollTableOutcome';
   const hadRollTableUuid = 'rollTableUuid' in selection;
@@ -81,9 +83,9 @@ function _rewriteSelection(selection) {
 
 /** Strip the unsupported `resultSelection` from every routed task, recording each in `stripped`. */
 function _migrateGatheringSystem(systemId, systemConfig, stripped) {
-  if (!_isPlainObject(systemConfig) || !Array.isArray(systemConfig.tasks)) return;
+  if (!isPlainObject(systemConfig) || !Array.isArray(systemConfig.tasks)) return;
   for (const task of systemConfig.tasks) {
-    if (!_isPlainObject(task)) continue;
+    if (!isPlainObject(task)) continue;
     if (!('resultSelection' in task)) continue;
     delete task.resultSelection;
     stripped.push({
@@ -92,10 +94,6 @@ function _migrateGatheringSystem(systemId, systemConfig, stripped) {
       taskName: task.name ?? null,
     });
   }
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

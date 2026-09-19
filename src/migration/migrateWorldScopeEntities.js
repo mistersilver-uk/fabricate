@@ -23,6 +23,7 @@ import {
 import { cloneJson, isPlainObject } from '../utils/scalars.js';
 
 import { markComponentEssenceInheritance } from './migrateComponentEssenceSections.js';
+import { forEachSystem } from './migrationHelpers.js';
 
 /** The `data` keys the three scope payloads travel under inside the migration runner. */
 export const SCOPE_PAYLOAD_KEYS = Object.freeze({
@@ -255,9 +256,9 @@ function collectSystemReferences(system, recipes, gatheringSlice) {
  */
 function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster) {
   const flagged = [];
-  for (const system of arrayOf(systems)) {
-    const systemId = trimmedString(system?.id);
-    if (!systemId) continue;
+  forEachSystem(systems, (system) => {
+    const systemId = trimmedString(system.id);
+    if (!systemId) return;
     const ownComponents = new Set(
       arrayOf(system.components)
         .map((record) => trimmedString(record?.id))
@@ -283,7 +284,7 @@ function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster)
       if (ownTools.has(referenceId) || worldRoster.tools.has(referenceId)) continue;
       flagged.push({ systemId, entityType: 'tools', referenceId });
     }
-  }
+  });
   return flagged;
 }
 
@@ -326,11 +327,11 @@ export function migrateWorldScopeEntities(data) {
     recipesBySystem.get(systemId).push(recipe);
   }
 
-  for (const system of systems) {
-    const systemId = trimmedString(system?.id);
-    if (!systemId) continue;
+  forEachSystem(systems, (system) => {
+    const systemId = trimmedString(system.id);
+    if (!systemId) return;
     const perSystem = rekeyMap[systemId];
-    if (!perSystem) continue;
+    if (!perSystem) return;
     const remappers = {
       remapComponent: keyedRemapper(perSystem.components),
       remapTool: keyedRemapper(perSystem.tools),
@@ -361,7 +362,7 @@ export function migrateWorldScopeEntities(data) {
         if (JSON.stringify(record) !== beforeRewrite) payloadRewriteRepairs += 1;
       }
     }
-  }
+  });
 
   // 2. THE IN-SYSTEM IDENTITY WRITE-BACK — also unconditional. See the module note.
   const identityByNewId = {};
@@ -381,9 +382,9 @@ export function migrateWorldScopeEntities(data) {
   }
 
   let overriddenRecords = 0;
-  for (const system of systems) {
-    const systemId = trimmedString(system?.id);
-    if (!systemId) continue;
+  forEachSystem(systems, (system) => {
+    const systemId = trimmedString(system.id);
+    if (!systemId) return;
     for (const entityType of ENTITY_TYPES) {
       if (isRefusedPair(grouping.refusals, systemId, entityType)) continue;
       for (const record of arrayOf(system[ENTITY_TYPE_FIELDS[entityType]])) {
@@ -393,7 +394,7 @@ export function migrateWorldScopeEntities(data) {
         if (identity) applyIdentity(record, identity, entityType);
       }
     }
-  }
+  });
 
   // 3. THE LIFT/CLAIM HALF — gated PER `(entityId, systemId)` on the corpus.
   const createdEntities = { components: 0, essences: 0, tools: 0 };

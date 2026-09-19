@@ -6,7 +6,7 @@
  * IS LOAD-BEARING: a second run must never re-merge stale system blocks over a GM-edited ladder.
  */
 
-import { isPlainObject, clone } from './migrationHelpers.js';
+import { isPlainObject, clone, forEachSystem, mapSystems } from './migrationHelpers.js';
 
 const SCALAR_KEYS = ['spendStrategy', 'providerId', 'macros'];
 
@@ -27,9 +27,9 @@ export function buildWorldCurrencyConfig(systems) {
   let scalars = null;
   let scalarsFromEnabled = false;
 
-  for (const system of list) {
+  forEachSystem(list, (system) => {
     const currency = legacyCurrencyBlock(system);
-    if (!currency) continue;
+    if (!currency) return;
 
     const enabled = currency.enabled === true;
     // Scalars: prefer the first ENABLED system, falling back to the first carrying a currency block
@@ -57,7 +57,7 @@ export function buildWorldCurrencyConfig(systems) {
       seen.add(id);
       units.push(clone(unit));
     }
-  }
+  });
 
   return { ...scalars, units };
 }
@@ -68,7 +68,7 @@ export function buildWorldCurrencyConfig(systems) {
  */
 export function stripSystemCurrencyConfig(systems) {
   const list = Array.isArray(systems) ? systems : [];
-  return list.map((system) => {
+  return mapSystems(list, (system) => {
     const currency = legacyCurrencyBlock(system);
     if (!currency) return system;
     const keys = Object.keys(currency);

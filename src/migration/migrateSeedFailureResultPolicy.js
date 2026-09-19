@@ -6,6 +6,8 @@
 
 import { SEEDED_FAILURE_RESULT_POLICY } from '../utils/failureResultPolicy.js';
 
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
+
 /** The three activity check blocks that carry a failure-result policy. */
 const CHECK_KEYS = Object.freeze([
   'craftingCheck',
@@ -15,10 +17,6 @@ const CHECK_KEYS = Object.freeze([
 
 const POLICY_KEY = 'failureResultPolicy';
 
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 /**
  * Apply the whole `1.25.0` transform to ONE system, mutated in place. Split out so the
  * world-setting migration and `migrateExportPayload.js` share ONE derivation.
@@ -27,10 +25,10 @@ function _isPlainObject(value) {
  * job is to decide the ABSENT case.
  */
 export function applySeededFailureResultPolicy(system) {
-  if (!_isPlainObject(system)) return;
+  if (!isPlainObject(system)) return;
   for (const key of CHECK_KEYS) {
     const check = system[key];
-    if (!_isPlainObject(check)) continue;
+    if (!isPlainObject(check)) continue;
     if (POLICY_KEY in check) continue;
     check[POLICY_KEY] = SEEDED_FAILURE_RESULT_POLICY;
   }
@@ -45,7 +43,7 @@ export function migrateSeedFailureResultPolicy(data = {}) {
     return { systems: data.systems, recipes: data.recipes };
   }
 
-  for (const system of systems) applySeededFailureResultPolicy(system);
+  forEachSystem(systems, (system) => applySeededFailureResultPolicy(system));
 
   return { systems, recipes: Array.isArray(recipes) ? recipes : data.recipes };
 }

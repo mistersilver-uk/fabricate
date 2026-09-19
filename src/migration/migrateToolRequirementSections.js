@@ -7,7 +7,7 @@
  */
 
 import { toolBonusOverride, toolPrerequisitesOverride } from './migrateWorldScopeEntities.js';
-import { isPlainObject } from './migrationHelpers.js';
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 
 /** The two sections this pass backfills, in the order they are written. */
 export const BACKFILLED_TOOL_SECTIONS = Object.freeze(['prerequisites', 'bonus']);
@@ -15,10 +15,9 @@ export const BACKFILLED_TOOL_SECTIONS = Object.freeze(['prerequisites', 'bonus']
 /** The in-system `Tool` records of every crafting system, keyed `systemId` then tool id. */
 function toolsBySystem(systems) {
   const bySystem = new Map();
-  for (const system of Array.isArray(systems) ? systems : []) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const systemId = typeof system.id === 'string' ? system.id.trim() : '';
-    if (!systemId) continue;
+    if (!systemId) return;
     const byId = new Map();
     for (const tool of Array.isArray(system.tools) ? system.tools : []) {
       if (!isPlainObject(tool)) continue;
@@ -26,7 +25,7 @@ function toolsBySystem(systems) {
       if (toolId && !byId.has(toolId)) byId.set(toolId, tool);
     }
     bySystem.set(systemId, byId);
-  }
+  });
   return bySystem;
 }
 

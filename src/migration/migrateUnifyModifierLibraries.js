@@ -5,6 +5,8 @@
  * whose references this pass can rewrite EXHAUSTIVELY.
  */
 
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
+
 /** Where the check-modifier catalogue lived between `1.22.0` and `1.23.0`. */
 const LEGACY_CHECK_LIBRARY_KEY = 'checkModifiers';
 
@@ -17,12 +19,8 @@ const UNIFIED_LIBRARY_KEY = 'modifiers';
 /** The suffix a re-keyed gathering entry takes when its id collides. */
 const COLLISION_SUFFIX = 'gathering';
 
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function _entryId(entry) {
-  if (!_isPlainObject(entry)) return '';
+  if (!isPlainObject(entry)) return '';
   return typeof entry.id === 'string' ? entry.id.trim() : '';
 }
 
@@ -44,7 +42,7 @@ function _resolveCollision(id, taken) {
 function _rewriteReferences(references, renames) {
   if (!Array.isArray(references) || renames.size === 0) return;
   for (const reference of references) {
-    if (!_isPlainObject(reference)) continue;
+    if (!isPlainObject(reference)) continue;
     const renamed = renames.get(String(reference.modifierId ?? ''));
     if (renamed) reference.modifierId = renamed;
   }
@@ -56,13 +54,13 @@ function _rewriteReferences(references, renames) {
  * argument rests on: if a fourth existed, renaming the gathering side would not be a closed rewrite.
  */
 function _rewriteGatheringReferences(systemConfig, renames) {
-  if (!_isPlainObject(systemConfig) || renames.size === 0) return;
+  if (!isPlainObject(systemConfig) || renames.size === 0) return;
   if (Array.isArray(systemConfig.tasks)) {
     for (const task of systemConfig.tasks) {
-      if (!_isPlainObject(task)) continue;
+      if (!isPlainObject(task)) continue;
       if (Array.isArray(task.dropRows)) {
         for (const row of task.dropRows) {
-          if (_isPlainObject(row)) _rewriteReferences(row.characterModifiers, renames);
+          if (isPlainObject(row)) _rewriteReferences(row.characterModifiers, renames);
         }
       }
       _rewriteReferences(task.staminaCostModifiers, renames);
@@ -70,7 +68,7 @@ function _rewriteGatheringReferences(systemConfig, renames) {
   }
   if (Array.isArray(systemConfig.events)) {
     for (const event of systemConfig.events) {
-      if (_isPlainObject(event)) _rewriteReferences(event.characterModifiers, renames);
+      if (isPlainObject(event)) _rewriteReferences(event.characterModifiers, renames);
     }
   }
 }
@@ -81,13 +79,13 @@ function _rewriteGatheringReferences(systemConfig, renames) {
  * share ONE derivation.
  */
 export function applyUnifiedModifierLibrary(system, systemConfig = null) {
-  if (!_isPlainObject(system)) return 0;
+  if (!isPlainObject(system)) return 0;
 
   const checkEntries = Array.isArray(system[LEGACY_CHECK_LIBRARY_KEY])
     ? system[LEGACY_CHECK_LIBRARY_KEY]
     : null;
   const gatheringEntries =
-    _isPlainObject(systemConfig) && Array.isArray(systemConfig[LEGACY_GATHERING_LIBRARY_KEY])
+    isPlainObject(systemConfig) && Array.isArray(systemConfig[LEGACY_GATHERING_LIBRARY_KEY])
       ? systemConfig[LEGACY_GATHERING_LIBRARY_KEY]
       : null;
 
@@ -153,21 +151,20 @@ export function migrateUnifyModifierLibraries(data = {}) {
   if (!Array.isArray(systems)) {
     return { systems: data.systems, gatheringConfig: data.gatheringConfig };
   }
-  const gatheringConfig = _isPlainObject(data.gatheringConfig)
+  const gatheringConfig = isPlainObject(data.gatheringConfig)
     ? structuredClone(data.gatheringConfig)
     : null;
-  const configSystems = _isPlainObject(gatheringConfig?.systems) ? gatheringConfig.systems : null;
+  const configSystems = isPlainObject(gatheringConfig?.systems) ? gatheringConfig.systems : null;
 
   const collisions = [];
-  for (const system of systems) {
-    if (!_isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const systemId = String(system.id ?? '');
     const systemConfig = systemId && configSystems ? configSystems[systemId] : null;
     const collided = applyUnifiedModifierLibrary(system, systemConfig);
     if (collided > 0) {
       collisions.push({ system: String(system.name ?? systemId), collisions: collided });
     }
-  }
+  });
 
   const result = {
     systems,

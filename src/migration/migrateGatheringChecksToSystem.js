@@ -5,6 +5,9 @@
  * numeric roll; routed is deliberately NOT, because a `rollFormula` with no tiers would make every
  * routed gather fail. Per-task fields are KEPT untouched for back-compat.
  */
+
+import { forEachSystem } from './migrationHelpers.js';
+
 export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
   const safeSystems = Array.isArray(systems) ? systems : [];
   const config = gatheringConfig && typeof gatheringConfig === 'object' ? gatheringConfig : {};
@@ -17,8 +20,8 @@ export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
 
   let seededCount = 0;
 
-  for (const system of safeSystems) {
-    if (!system || typeof system !== 'object' || !system.id) continue;
+  forEachSystem(safeSystems, (system) => {
+    if (!system.id) return;
 
     // Idempotent: skip a system that already carries a configured gathering
     // check (enabled, or a non-empty progressive roll formula).
@@ -30,7 +33,7 @@ export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
       typeof existing?.progressive?.rollFormula === 'string'
         ? existing.progressive.rollFormula.trim()
         : '';
-    if (existing?.enabled === true || existingFormula !== '') continue;
+    if (existing?.enabled === true || existingFormula !== '') return;
 
     const tasks = Array.isArray(configSystems[String(system.id)]?.tasks)
       ? configSystems[String(system.id)].tasks
@@ -44,7 +47,7 @@ export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
         typeof task.check?.formula === 'string' &&
         task.check.formula.trim() !== ''
     );
-    if (!defining) continue;
+    if (!defining) return;
 
     const awardMode = ['partial', 'equal', 'exceed'].includes(defining.progressive?.awardMode)
       ? defining.progressive.awardMode
@@ -62,7 +65,7 @@ export function migrateGatheringChecksToSystem(systems, gatheringConfig) {
       },
     };
     seededCount += 1;
-  }
+  });
 
   return { systems: safeSystems, gatheringConfig: config, seededCount };
 }

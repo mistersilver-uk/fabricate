@@ -6,7 +6,7 @@
  * guards on "old key present AND new key absent", so a stale key beside a new one is left inert.
  */
 
-import { isPlainObject, clone, renameKey } from './migrationHelpers.js';
+import { isPlainObject, clone, renameKey, forEachSystem } from './migrationHelpers.js';
 
 const POLICY_VALUE_REMAP = {
   successWithHazard: 'successWithEvent',
@@ -77,10 +77,9 @@ export function migrateRenameGatheringHazardsToEvents(data = {}) {
   }
 
   // 4. Crafting-system region modifiers: kind value hazardChance → eventChance.
-  for (const system of systems) {
-    if (!isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const regions = system.gatheringRegions;
-    if (!Array.isArray(regions)) continue;
+    if (!Array.isArray(regions)) return;
     for (const region of regions) {
       if (!isPlainObject(region)) continue;
       const modifiers = region.modifiers;
@@ -91,7 +90,7 @@ export function migrateRenameGatheringHazardsToEvents(data = {}) {
         }
       }
     }
-  }
+  });
 
   return { systems, gatheringConfig, environments };
 }

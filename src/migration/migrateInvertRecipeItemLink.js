@@ -5,6 +5,9 @@
  * the old runtime did — by `recipeItemId`, else by `linkedRecipeItemUuid` against an origin uuid.
  * Pure and idempotent: after a run the recipes carry neither field, and existing `recipeIds` survive.
  */
+
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
+
 export function migrateInvertRecipeItemLink(data = {}) {
   const systems = _clone(data.systems);
   const recipes = _clone(data.recipes);
@@ -16,15 +19,14 @@ export function migrateInvertRecipeItemLink(data = {}) {
   // Per-system definition lookups (by id and by source uuid); ensure every
   // definition carries a `recipeIds` array to receive membership.
   const systemIndex = new Map();
-  for (const system of systems) {
-    if (!_isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const definitions = Array.isArray(system.recipeItemDefinitions)
       ? system.recipeItemDefinitions
       : [];
     const byId = new Map();
     const bySource = new Map();
     for (const def of definitions) {
-      if (!_isPlainObject(def)) continue;
+      if (!isPlainObject(def)) continue;
       if (!Array.isArray(def.recipeIds)) def.recipeIds = [];
       const id = String(def.id || '').trim();
       if (id) byId.set(id, def);
@@ -34,10 +36,10 @@ export function migrateInvertRecipeItemLink(data = {}) {
       if (source) bySource.set(source, def);
     }
     systemIndex.set(String(system.id || ''), { byId, bySource });
-  }
+  });
 
   for (const recipe of recipes) {
-    if (!_isPlainObject(recipe)) continue;
+    if (!isPlainObject(recipe)) continue;
     const recipeId = String(recipe.id || '').trim();
     const sysIdx = systemIndex.get(String(recipe.craftingSystemId || ''));
 
@@ -67,10 +69,6 @@ export function migrateInvertRecipeItemLink(data = {}) {
   }
 
   return { systems, recipes };
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

@@ -5,6 +5,8 @@
  * GM can touch the new toggle, so a GM who later sets it OFF is never flipped back.
  */
 
+import { forEachSystem } from './migrationHelpers.js';
+
 function _clearPersistedTimeDisabled(system) {
   const time = system?.requirements?.time;
   if (!time || typeof time !== 'object') return;
@@ -15,9 +17,6 @@ function _clearPersistedTimeDisabled(system) {
 
 export function migrateDefaultOnTimeRequirements(systems) {
   const safeSystems = Array.isArray(systems) ? systems : [];
-  for (const system of safeSystems) {
-    if (!system || typeof system !== 'object') continue;
-    _clearPersistedTimeDisabled(system);
-  }
+  forEachSystem(safeSystems, (system) => _clearPersistedTimeDisabled(system));
   return { systems: safeSystems };
 }

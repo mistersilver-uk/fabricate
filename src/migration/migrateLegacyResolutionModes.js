@@ -6,6 +6,8 @@
  */
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
+
 const LEGACY_MODE_TARGETS = { mapped: 'routedByIngredients', tiered: 'routedByCheck' };
 
 export function migrateLegacyResolutionModes(data = {}) {
@@ -35,8 +37,7 @@ export function migrateLegacyResolutionModes(data = {}) {
  */
 function _migrateSystems(systems) {
   const modeBySystemId = new Map();
-  for (const system of systems) {
-    if (!_isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const target = LEGACY_MODE_TARGETS[system.resolutionMode];
     if (target) {
       modeBySystemId.set(String(system.id), target);
@@ -45,7 +46,7 @@ function _migrateSystems(systems) {
     if (system.salvageResolutionMode === 'tiered') {
       system.salvageResolutionMode = 'routed';
     }
-  }
+  });
   return modeBySystemId;
 }
 
@@ -56,7 +57,7 @@ function _migrateSystems(systems) {
 function _migrateRecipes(recipes, modeBySystemId) {
   const survivors = [];
   for (const recipe of recipes) {
-    const mode = _isPlainObject(recipe)
+    const mode = isPlainObject(recipe)
       ? modeBySystemId.get(String(recipe.craftingSystemId))
       : undefined;
     if (!mode) {
@@ -90,7 +91,7 @@ function _reconcileTieredRecipe(recipe) {
 
   if (Array.isArray(recipe.steps)) {
     for (const step of recipe.steps) {
-      if (!_isPlainObject(step)) continue;
+      if (!isPlainObject(step)) continue;
       const ok = _reconcileContainer(step, `${recipe.id}/${step.id}`);
       migratable &&= ok;
     }
@@ -107,7 +108,7 @@ function _reconcileContainer(container, contextId) {
   const routing = container.outcomeRouting;
   // No routing here: nothing to reconcile. Still drop a present-but-empty map so the data becomes
   // canonical.
-  if (!_isPlainObject(routing)) {
+  if (!isPlainObject(routing)) {
     if ('outcomeRouting' in container) delete container.outcomeRouting;
     return true;
   }
@@ -134,7 +135,7 @@ function _reconcileContainer(container, contextId) {
 function _indexGroupsById(groups) {
   const groupsById = new Map();
   for (const group of groups) {
-    if (_isPlainObject(group) && group.id != null) groupsById.set(String(group.id), group);
+    if (isPlainObject(group) && group.id != null) groupsById.set(String(group.id), group);
   }
   return groupsById;
 }
@@ -175,7 +176,7 @@ function _logOrphanOutcome(outcome, groupId, contextId) {
 function _seedUnroutedNames(groups, outcomesByGroupId) {
   const seenNames = new Set();
   for (const group of groups) {
-    if (!_isPlainObject(group)) continue;
+    if (!isPlainObject(group)) continue;
     const groupId = group.id == null ? '' : String(group.id);
     if (outcomesByGroupId.has(groupId)) continue;
     const normalized = normalizeRoutedName(group.name);
@@ -224,10 +225,6 @@ function _randomId() {
   // `crypto.randomUUID` exists in Node 22 and the Foundry browser context, so the migration stays
   // pure and unit-testable without globals. Result-group ids are free-form internal strings.
   return crypto.randomUUID();
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {

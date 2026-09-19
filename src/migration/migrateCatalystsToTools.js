@@ -6,6 +6,8 @@
  * JSON: semantically different catalysts on one componentId are NOT merged.
  */
 
+import { forEachSystem } from './migrationHelpers.js';
+
 /**
  * Normalize a raw catalyst into the canonical Tool shape used as the dedupe key and the library Tool
  * body. Null when the catalyst has no componentId.
@@ -193,11 +195,9 @@ export function migrateCatalystsToTools(recipes, systems) {
   // One registry per system; built lazily and shared across all recipes targeting it.
   const systemById = new Map();
   const registryById = new Map();
-  for (const system of safeSystems) {
-    if (system && typeof system === 'object' && system.id) {
-      systemById.set(system.id, system);
-    }
-  }
+  forEachSystem(safeSystems, (system) => {
+    if (system.id) systemById.set(system.id, system);
+  });
 
   function registryFor(systemId) {
     if (registryById.has(systemId)) return registryById.get(systemId);
@@ -245,14 +245,14 @@ export function migrateCatalystsToTools(recipes, systems) {
   }
 
   // 2. Component salvage catalysts → tools in the owning system.
-  for (const system of safeSystems) {
-    if (!system || typeof system !== 'object' || !system.id) continue;
+  forEachSystem(safeSystems, (system) => {
+    if (!system.id) return;
     const components = Array.isArray(system.components)
       ? system.components
       : Array.isArray(system.managedItems)
         ? system.managedItems
         : null;
-    if (!Array.isArray(components)) continue;
+    if (!Array.isArray(components)) return;
 
     let registry = null;
     for (const component of components) {
@@ -263,7 +263,7 @@ export function migrateCatalystsToTools(recipes, systems) {
       if (!registry) break;
       convertCatalystArray(salvage, registry, counter);
     }
-  }
+  });
 
   return { recipes: safeRecipes, systems: safeSystems, migratedCount: counter.count };
 }

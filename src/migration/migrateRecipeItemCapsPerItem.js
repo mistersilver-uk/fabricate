@@ -5,6 +5,9 @@
  * `mode` and `learn.dragDropEnabled` STAY system-wide, gating whether the knowledge machinery runs
  * at all. `destroyWhenSpent` (learn) is distinct from `destroyWhenExhausted` (item).
  */
+
+import { isPlainObject, forEachSystem } from './migrationHelpers.js';
+
 export function migrateRecipeItemCapsPerItem(data = {}) {
   const systems = _clone(data.systems);
 
@@ -12,21 +15,20 @@ export function migrateRecipeItemCapsPerItem(data = {}) {
     return { systems: data.systems };
   }
 
-  for (const system of systems) {
-    if (!_isPlainObject(system)) continue;
+  forEachSystem(systems, (system) => {
     const definitions = system.recipeItemDefinitions;
     const knowledge = system.recipeVisibility?.knowledge;
     const seededCaps = _capsFromKnowledge(knowledge);
 
     if (Array.isArray(definitions)) {
       for (const def of definitions) {
-        if (!_isPlainObject(def) || _isPlainObject(def.caps)) continue;
+        if (!isPlainObject(def) || isPlainObject(def.caps)) continue;
         def.caps = _clone(seededCaps);
       }
     }
 
     _stripRelocatedCapFields(knowledge);
-  }
+  });
 
   return { systems };
 }
@@ -36,8 +38,8 @@ export function migrateRecipeItemCapsPerItem(data = {}) {
  * `dragDropEnabled`. A missing config yields uncapped caps — a fresh recipe item's default.
  */
 function _capsFromKnowledge(knowledge) {
-  const item = _isPlainObject(knowledge?.item) ? knowledge.item : {};
-  const learn = _isPlainObject(knowledge?.learn) ? knowledge.learn : {};
+  const item = isPlainObject(knowledge?.item) ? knowledge.item : {};
+  const learn = isPlainObject(knowledge?.learn) ? knowledge.learn : {};
   return {
     item: {
       limitUses: item.limitUses === true,
@@ -55,18 +57,14 @@ function _capsFromKnowledge(knowledge) {
 
 /** Remove the now-per-item cap fields, keeping `mode` and `learn.dragDropEnabled`. */
 function _stripRelocatedCapFields(knowledge) {
-  if (!_isPlainObject(knowledge)) return;
+  if (!isPlainObject(knowledge)) return;
   if ('item' in knowledge) delete knowledge.item;
   const learn = knowledge.learn;
-  if (_isPlainObject(learn)) {
+  if (isPlainObject(learn)) {
     for (const field of ['consumeOnLearn', 'limitRecipes', 'maxRecipes', 'destroyWhenSpent']) {
       if (field in learn) delete learn[field];
     }
   }
-}
-
-function _isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function _clone(value) {
