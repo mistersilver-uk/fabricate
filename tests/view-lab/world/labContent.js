@@ -660,7 +660,7 @@ const RUNEWORK_COMPONENTS = [
     tags: ['ingot'],
     difficulty: 3,
     essences: { earth: 2 },
-    // The world's ONE named `checkTrigger` (issue 1510): `ROUTED_CHECK.checkBreakage.triggers`
+    // The world's one named `checkTrigger` (issue 1510): `ROUTED_CHECK.checkBreakage.triggers`
     // authors two ids, and this is the only complication that names one, so the trigger picker
     // has a photographable frame instead of always rendering unavailable.
     complications: [

@@ -340,7 +340,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     assert.equal(chosenPreset(target), 'custom', 'an override matching no tier selects Custom…');
     assert.equal(
       assertSelectHasResolvedName(target, PRESET_TRIGGER),
-      'DC override',
+      'Salvage check DC',
       'and it still announces the name the native control did'
     );
     assert.equal(
