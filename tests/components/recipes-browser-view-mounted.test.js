@@ -71,6 +71,10 @@ const browser = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipes-browser-',
   rawModules: RECIPE_RAW_MODULES,
+  // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied.
+  // The inspector harness below renders no selection at all, so it is named here rather than
+  // hoisted into RECIPE_RAW_MODULES.
+  runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,

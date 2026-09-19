@@ -32,13 +32,26 @@ test('the derivation reaches the real manager graph and splits it by what the tr
     'a compiled entry is always a component'
   );
   assert.ok(
-    closure.modules.every((path) => /\.(?:js|json)$/.test(path)),
-    'a copied entry is always a plain module or a JSON data file'
+    closure.modules.every((path) => /\.(?:js|json)$/.test(path) && !path.endsWith('.svelte.js')),
+    'a copied entry is always a plain module or a JSON data file, never a runes module'
   );
-  const absent = [...closure.components, ...closure.modules].filter(
+  const absent = [...closure.components, ...closure.modules, ...closure.runeModules].filter(
     (path) => !existsSync(resolve(repoRoot, path))
   );
   assert.deepEqual(absent, [], 'every derived path is a real file the compile can read');
+});
+
+// A runes module copied verbatim throws `ReferenceError: $state is not defined` when the compiled
+// root imports it, so the derivation keeps it out of the copied bucket and compiles it instead.
+test('a reached .svelte.js lands in the compiled runes bucket rather than the copied one', () => {
+  assert.ok(
+    closure.runeModules.includes('src/ui/svelte/apps/manager/bulkSelection.svelte.js'),
+    'the root imports the bulk-selection composable, so the walk must reach it'
+  );
+  assert.ok(
+    closure.runeModules.every((path) => path.endsWith('.svelte.js')),
+    'nothing but a runes module belongs in a bucket the tree compiles as one'
+  );
 });
 
 // THE ACCEPTANCE CRITERION ITSELF, and its negative control.
@@ -120,7 +133,7 @@ test('a locator resolves against the live mount target, not the one it was creat
 });
 
 test('every relative import of a derived module is itself in the closure', () => {
-  const inClosure = new Set([...closure.components, ...closure.modules]);
+  const inClosure = new Set([...closure.components, ...closure.modules, ...closure.runeModules]);
   const missing = [];
   for (const entry of inClosure) {
     const absolute = resolve(repoRoot, entry);
