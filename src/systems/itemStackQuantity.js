@@ -46,8 +46,8 @@
  * test suite — a four-figure-line diff in which the actual change is invisible.
  *
  * This module NEVER touches `game`. That is a hard constraint rather than a preference:
- * `openspec/specs/data-models/spec.md:1328` commits the ingredient model to being
- * Foundry-free and `src/models/IngredientSet.js` is a call site. The path arrives by
+ * `openspec/specs/data-models/spec.md` commits the ingredient model to being
+ * Foundry-free and `src/models/ingredientLedger.js` is a call site. The path arrives by
  * push, from `src/main.js`.
  *
  * ## Two mitigations that are deliberately NOT implemented

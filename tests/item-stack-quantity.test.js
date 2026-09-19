@@ -275,8 +275,8 @@ const SITE_MAPPING = [
     sites: 1,
   },
   {
-    site: 'IngredientSet._initialRemaining (ledger seed)',
-    file: 'src/models/IngredientSet.js',
+    site: 'ingredientLedger.seedRemaining (ledger seed)',
+    file: 'src/models/ingredientLedger.js',
     accessor: 'readStackQuantity',
     sites: 1,
   },
@@ -943,9 +943,9 @@ describe('stackQuantityAdvisory', () => {
   });
 });
 
-// The accessor is Foundry-free. `src/models/IngredientSet.js` is a call site and
-// `openspec/specs/data-models/spec.md:1328` commits the ingredient model to being Foundry-free, so
-// this is a contract, not a preference.
+// The accessor is Foundry-free. `src/models/ingredientLedger.js` is a call site and
+// `openspec/specs/data-models/spec.md` commits the ingredient model to being Foundry-free, so this
+// is a contract, not a preference.
 
 describe('the accessor never reaches for a Foundry global', () => {
   it('names none of game, ui, Hooks or CONFIG', async () => {

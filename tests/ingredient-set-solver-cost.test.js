@@ -12,6 +12,10 @@ globalThis.foundry = { utils: { randomID: () => crypto.randomUUID() } };
 const { IngredientSet, INGREDIENT_SEARCH_NODE_CAP } = await import(
   '../src/models/IngredientSet.js'
 );
+const { buildPassIndexDefault, createIngredientSolver } = await import(
+  '../src/models/ingredientAssignment.js'
+);
+const { seedRemaining: seedRemainingDefault } = await import('../src/models/ingredientLedger.js');
 
 /**
  * A `remaining` ledger that counts the operations performed on it. Counting is ARMED after seeding.
@@ -58,13 +62,12 @@ class CountingLedger extends Map {
   }
 }
 
-/** Swap `set`'s ledger factory for a counting one, and prove the swap took. */
-function installCountingLedger(set, counters, key) {
-  const original = set._initialRemaining.bind(set);
+/** A counting `seedRemaining` seam for the solver, with the guard that proves it was bound. */
+function countingLedgerSeam(counters, key) {
   const ledgers = [];
-  set._initialRemaining = (availableItems) => {
+  const seedRemaining = (availableItems) => {
     const ledger = new CountingLedger(counters, key);
-    for (const [ledgerKey, value] of original(availableItems)) {
+    for (const [ledgerKey, value] of seedRemainingDefault(availableItems)) {
       // Through the prototype, so seeding is not counted.
       Map.prototype.set.call(ledger, ledgerKey, value);
     }
@@ -73,11 +76,17 @@ function installCountingLedger(set, counters, key) {
     return ledger;
   };
   return {
-    assertUsed(expectedStacks) {
+    seedRemaining,
+    assertUsed(expectedStacks, expectedMints = 1) {
       assert.ok(
         ledgers.length > 0,
         'the counting ledger was never minted, so this counter could never go up — the ' +
-          '`_initialRemaining` seam has moved and the probe needs fixing, not the assertion'
+          '`seedRemaining` seam has moved and the probe needs fixing, not the assertion'
+      );
+      assert.equal(
+        ledgers.length,
+        expectedMints,
+        'the seam must be bound at every site that seeds a ledger for this resolution'
       );
       assert.equal(
         ledgers[0].size,
@@ -90,25 +99,32 @@ function installCountingLedger(set, counters, key) {
 }
 
 /**
- * Split every subsequent probe invocation by whether the per-pass index already exists.
- * `_buildPassIndex` is the one place the index is minted, so wrapping it gives an exact boundary
- * between "the deliberate once-per-pass scan" and "per-node work".
+ * Split every subsequent probe invocation by whether the per-pass index already exists: the index is
+ * minted in one place, so this seam is an exact boundary between the once-per-pass scan and a node.
  */
-function armAfterPassIndex(set) {
+function passIndexPhase() {
   const phase = { armed: false, builds: 0 };
-  const original = set._buildPassIndex.bind(set);
-  set._buildPassIndex = (...args) => {
+  phase.buildPassIndex = (...args) => {
     phase.builds += 1;
-    const index = original(...args);
+    const index = buildPassIndexDefault(...args);
     phase.armed = true;
     return index;
   };
   return phase;
 }
 
+function instrumentedSolver(set, ledger, phase) {
+  return createIngredientSolver({
+    ingredientGroups: set.ingredientGroups,
+    ingredientSetId: set.id,
+    seedRemaining: ledger.seedRemaining,
+    buildPassIndex: phase.buildPassIndex,
+  });
+}
+
 /**
  * Wrap a caller-supplied probe (the ingredient matcher, or the essence resolver) so its invocations
- * are counted on either side of the {@link armAfterPassIndex} boundary.
+ * are counted on either side of the {@link passIndexPhase} boundary.
  *
  * @returns {{probe: Function, tally: {beforeIndex: number, afterIndex: number}}}
  */
@@ -181,7 +197,7 @@ function inventoryWithFiller(fillerStacks) {
   return items;
 }
 
-/** The options `_buildPassIndex` runs the matcher over: every non-currency, non-essence one. */
+/** The options the pass index runs the matcher over: every non-currency, non-essence one. */
 function matchedOptionCount(groups) {
   return groups.reduce(
     (total, group) =>
@@ -199,17 +215,17 @@ function matchedOptionCount(groups) {
 function resolveAndCount(fillerStacks, { groups = contendedGroups(), essences = null } = {}) {
   const counters = createOperationCounters();
   const set = new IngredientSet({ id: 's', ingredientGroups: groups });
-  const ledger = installCountingLedger(set, counters, 'ledgerOps');
-  const phase = armAfterPassIndex(set);
+  const ledger = countingLedgerSeam(counters, 'ledgerOps');
+  const phase = passIndexPhase();
   const matcher = countingProbe(CONTENDED_MATCHER, phase);
   const essenceProbe = essences ? countingProbe(essences, phase) : null;
   const items = inventoryWithFiller(fillerStacks);
 
-  const selection = set.resolveIngredientSelection(items, matcher.probe, {
+  const selection = instrumentedSolver(set, ledger, phase).resolve(items, matcher.probe, {
     resolveItemEssences: essenceProbe?.probe,
   });
 
-  ledger.assertUsed(items.length);
+  ledger.assertUsed(items.length, essences ? 2 : 1);
   assert.equal(selection.success, true, 'the contended fixture must be satisfiable');
   return {
     ledgerOps: counters.get('ledgerOps'),
@@ -283,7 +299,7 @@ test('the pass index is built ONCE per resolve, never per node', () => {
 });
 
 test('no matcher invocation happens after the pass index exists', () => {
-  // The guard for `_optionCandidates`.
+  // The guard for `candidateStacksForOption`.
   const small = resolveAndCount(18);
   const large = resolveAndCount(1998);
 
@@ -308,7 +324,7 @@ test('no matcher invocation happens after the pass index exists', () => {
 });
 
 test('no essence probe runs after the pass index exists, at either inventory size', () => {
-  // The essence half of the same fallback (`_essenceCarriers`' `if (index?.essence)`).
+  // The essence half of the same fallback: the block's carrier scan taking its indexed branch.
   const small = resolveAndCount(18, ESSENCE_FIXTURE);
   const large = resolveAndCount(1998, ESSENCE_FIXTURE);
 
@@ -328,9 +344,9 @@ test('no essence probe runs after the pass index exists, at either inventory siz
 });
 
 test('an essence-carrying contended set costs the same ledger operations at any inventory size', () => {
-  // The ledger counter DOES see the essence regression — `_essenceCarriers` reads `remaining` once
-  // per held document per terminal on the unindexed path — but only against a fixture that has an
-  // essence block at all.
+  // The ledger counter DOES see the essence regression — the block's carrier scan reads `remaining`
+  // once per held document per terminal on the unindexed path — but only against a fixture that has
+  // an essence block at all.
   const small = resolveAndCount(18, ESSENCE_FIXTURE);
   const large = resolveAndCount(1998, ESSENCE_FIXTURE);
 
@@ -386,9 +402,23 @@ test('an adversarial cap-hitting search is measured against its stated wall-cloc
   const items = adversarialInventory(994);
   assert.equal(items.length, 1000);
 
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(' '));
   const started = performance.now();
-  const selection = adversarialSet().resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
+  let selection;
+  try {
+    selection = adversarialSet().resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
+  } finally {
+    console.warn = realWarn;
+  }
   const elapsed = performance.now() - started;
+
+  assert.deepEqual(
+    warnings.map((line) => line.split(':')[0]),
+    ['Fabricate | IngredientSet adversarial'],
+    'the cap-hit fallback must announce itself and name the set it gave up on'
+  );
 
   assert.equal(selection.success, false, 'the fixture must be genuinely unsatisfiable');
   assert.equal(
@@ -408,10 +438,14 @@ test('the adversarial search costs the same ledger operations at 20 and 1,000 st
   const measure = (fillerStacks) => {
     const counters = createOperationCounters();
     const set = adversarialSet();
-    const probe = installCountingLedger(set, counters, 'ledgerOps');
+    const probe = countingLedgerSeam(counters, 'ledgerOps');
     const items = adversarialInventory(fillerStacks);
-    const selection = set.resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
-    probe.assertUsed(items.length);
+    const selection = createIngredientSolver({
+      ingredientGroups: set.ingredientGroups,
+      ingredientSetId: set.id,
+      seedRemaining: probe.seedRemaining,
+    }).resolve(items, ADVERSARIAL_MATCHER);
+    probe.assertUsed(items.length, 2);
     return { ledgerOps: counters.get('ledgerOps'), stats: selection.searchStats };
   };
 
@@ -432,11 +466,10 @@ test('the adversarial search costs the same ledger operations at 20 and 1,000 st
 test('the ledger is never cleared wholesale during a search', () => {
   // The mechanism, asserted directly rather than only through its cost.
   const set = new IngredientSet({ id: 's', ingredientGroups: contendedGroups() });
-  const original = set._initialRemaining.bind(set);
+  const minted = [];
   let clears = 0;
   let iterations = 0;
-  set._initialRemaining = (availableItems) => {
-    const seeded = original(availableItems);
+  const seedRemaining = (availableItems) => {
     const ledger = new (class extends Map {
       clear() {
         clears += 1;
@@ -446,14 +479,23 @@ test('the ledger is never cleared wholesale during a search', () => {
         iterations += 1;
         return super[Symbol.iterator]();
       }
-    })(seeded);
+    })(seedRemainingDefault(availableItems));
+    minted.push(ledger);
     return ledger;
   };
 
-  const selection = set.resolveIngredientSelection(inventoryWithFiller(18), CONTENDED_MATCHER);
+  const items = inventoryWithFiller(18);
+  const selection = createIngredientSolver({
+    ingredientGroups: set.ingredientGroups,
+    ingredientSetId: set.id,
+    seedRemaining,
+  }).resolve(items, CONTENDED_MATCHER);
 
   assert.equal(selection.success, true);
   assert.ok(selection.searchStats.nodes > 0, 'the fixture must search');
+  // Both counters read zero when nothing was instrumented, so the seam is proved live first.
+  assert.ok(minted.length > 0, 'the instrumented ledger was never minted');
+  assert.equal(minted[0].size, items.length, 'the seeded ledger holds one entry per held stack');
   assert.equal(clears, 0, 'the search must not clear the ledger');
   assert.equal(iterations, 0, 'the search must not copy the ledger by iterating it');
 });

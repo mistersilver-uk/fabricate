@@ -43,10 +43,13 @@ const RAW_MODULES = [
   // omitted-when-default machinery (issue 1135).
   'src/models/reconstructibleDefaults.js',
   'src/models/IngredientSet.js',
-  // IngredientSet imports the shared essence allocator (issue 917).
+  'src/models/ingredientAssignment.js',
+  'src/models/ingredientEssenceBlock.js',
+  'src/models/ingredientLedger.js',
+  // The essence block imports the shared essence allocator (issue 917).
   'src/utils/essenceAllocation.js',
-  // …and, since issue 1024, the canonical stack-quantity accessor plus its own two
-  // dependencies (the shared path walker and the per-system preset table).
+  // …and the ledger, since issue 1024, the canonical stack-quantity accessor plus its own
+  // two dependencies (the shared path walker and the per-system preset table).
   'src/systems/itemStackQuantity.js',
   'src/config/stackQuantityPathPresets.js',
   'src/utils/objectPath.js',
