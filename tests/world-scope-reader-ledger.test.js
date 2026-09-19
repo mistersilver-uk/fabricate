@@ -65,14 +65,15 @@ const BASE_SCAN = Object.freeze({
  */
 const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique tool/receipt reads in two engines; #1666 and #1665 relocated ten files.
-  // #1701 moved nine of `CraftingEngine.js`'s validated-tool reads into `craftPipeline.js`, so
-  // only the per-file keying moved: no read was added or removed.
+  // #1701 moved nine of `CraftingEngine.js`'s validated-tool reads into `craftPipeline.js`, and
+  // #1714 moved five more into `salvagePipeline.js`, so only the per-file keying moved: no read
+  // was added or removed, which is why `matches` and `lines` hold.
   matches: 168,
   lines: 153,
-  files: 19,
-  pairs: 126,
-  collisionGroups: 18,
-  collisionSites: 45,
+  files: 20,
+  pairs: 127,
+  collisionGroups: 17,
+  collisionSites: 43,
 });
 
 /**
@@ -103,8 +104,7 @@ const LEDGER = Object.freeze([
   ['src/systems/CompendiumImporter.js', "summary.components.remapped.push({", 2, 'import'],
   ['src/systems/CompendiumImporter.js', "summary.components.unresolved.push({", 1, 'import'],
   ['src/systems/CompendiumImporter.js', "summary.components.retained.push({", 1, 'import'],
-  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools,", 2, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "tools: toolValidation.tools,", 2, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools,", 1, 'not-a-system'],
   ['src/systems/craftPipeline.js', "toolItems: toolValidation.tools,", 2, 'not-a-system'],
   ['src/systems/craftPipeline.js', "usedToolPairs = toolValidation.tools;", 1, 'not-a-system'],
   ['src/systems/craftPipeline.js', "usedToolsOnFail = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
@@ -116,8 +116,20 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingEngine.js', "usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "const components = Array.isArray(system?.components)", 1, 'guard'],
   ['src/systems/CraftingEngine.js', "for (const tool of missing.tools || []) {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {", 1, 'not-a-system'],
+  ['src/systems/salvagePipeline.js', "toolItems: toolValidation.tools,", 1, 'not-a-system'],
+  ['src/systems/salvagePipeline.js', "tools: toolValidation.tools,", 2, 'not-a-system'],
+  [
+    'src/systems/salvagePipeline.js',
+    "usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {",
+    1,
+    'not-a-system',
+  ],
+  [
+    'src/systems/salvagePipeline.js',
+    "const usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {",
+    1,
+    'not-a-system',
+  ],
   ['src/systems/CraftingSystemExporter.js', "if (Array.isArray(system.essenceDefinitions)) {", 1, 'export'],
   ['src/systems/CraftingSystemExporter.js', "for (const def of system.essenceDefinitions) {", 1, 'export'],
   ['src/systems/CraftingSystemManager.js', "system?.components ?? system?.managedItems ?? system?.items", 1, 'basis'],
