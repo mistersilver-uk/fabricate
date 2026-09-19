@@ -1958,7 +1958,7 @@
   // Discard the staged draft when the selection empties — a clear, a system switch, a prune that
   // removed the last id, or a successful apply.
   $effect(() => {
-    if (essenceBulk.count === 0) essenceBulkDraft = createEssenceBulkDraft();
+    if (essenceBulk.ids.size === 0) essenceBulkDraft = createEssenceBulkDraft();
     essenceBulkDeleteArmed = false;
   });
   const canSaveComponentEdit = $derived(
@@ -2034,7 +2034,7 @@
   // Discard the staged draft when the selection empties — a clear, a system switch, a prune that
   // removed the last id, or a successful apply.
   $effect(() => {
-    if (componentBulk.count === 0) componentBulkDraft = createComponentBulkDraft();
+    if (componentBulk.ids.size === 0) componentBulkDraft = createComponentBulkDraft();
     componentBulkDeleteArmed = false;
   });
   // ── The recipe bulk selection (issue 1010) ─────────────────────────────────────── Owned by the
