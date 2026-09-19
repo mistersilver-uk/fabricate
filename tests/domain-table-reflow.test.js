@@ -31,13 +31,13 @@ const TABLE_ROWS = DOMAIN.split('\n').filter((line) => isTableRow(line));
 
 test('DOMAIN.md is the corpus these assertions think it is', () => {
   // A guard over a file that stopped having tables — or stopped being read — reports success
-  // forever. 223 rows across four tables, four of them added with the result-side choice group and the rolled amount.
+  // forever. 224 rows across four tables; the newest is the terminal attempt resolution row.
   // The count is exact because two looser ones are close enough to be mistaken for it:
   // `line.startsWith('|')` answers 316 and `/^\s*\|/` answers 326. The difference is 107 lines of
   // an ASCII tree of the world-settings layout, which `isTableRow` excludes because they do not
   // CLOSE with a pipe. A floor above the real corpus fails forever and invites lowering until it
   // passes, at which point it measures nothing, so this is an exact equality.
-  assert.equal(TABLE_ROWS.length, 223, 'the DOMAIN.md table corpus changed size');
+  assert.equal(TABLE_ROWS.length, 224, 'the DOMAIN.md table corpus changed size');
   assert.ok(DOMAIN.length > 100_000, 'DOMAIN.md is far smaller than any version of this document');
 });
 
