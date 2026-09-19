@@ -1,0 +1,309 @@
+/**
+ * The structural pins the suites importing `MigrationRunner.js` lack: the writeback order the leg
+ * table encodes, each leg's own empty default, per-leg isolation of the snapshot and compare
+ * passes, and the containment of the version bump.
+ */
+
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { SETTING_KEYS } from '../src/config/settings.js';
+import {
+  compareSemver,
+  getHighestRegisteredMigrationVersion,
+  MIGRATION_DEFERRAL_REASONS,
+  MigrationRunner,
+} from '../src/migration/MigrationRunner.js';
+import { MIGRATIONS } from '../src/migration/migrationRegistry.js';
+import { WRITEBACK_LEGS } from '../src/migration/migrationWritebackLegs.js';
+import { SEALED_MIGRATIONS } from '../src/migration/sealedMigrationRegistry.js';
+
+/** A migration replacing exactly the named payload keys, each with a distinct new value. */
+function changeOnly(...keys) {
+  return {
+    version: '9.9.9',
+    label: 'change the named legs',
+    migrate: () => Object.fromEntries(keys.map((key) => [key, { changed: key }])),
+  };
+}
+
+/**
+ * A world whose every setting holds a distinct non-empty value, and a runner over it recording each
+ * `setSetting` key in order. The distinct seeds are what make a swapped snapshot visible: every
+ * existing fixture starts these legs at the same empty value, so a swap reads clean there.
+ */
+function makeWorld(migrations) {
+  const store = new Map([[SETTING_KEYS.MIGRATION_VERSION, '0.0.0']]);
+  const written = [];
+  const getSetting = (key) => (store.has(key) ? store.get(key) : { seed: key });
+  const setSetting = async (key, value) => {
+    written.push(key);
+    store.set(key, value);
+  };
+  return { runner: new MigrationRunner({ getSetting, setSetting, migrations }), written, store };
+}
+
+/**
+ * The setting key one leg writes through, observed from the leg itself and from the runner's own
+ * default corpus adapters rather than re-typed here as a second key list that would drift.
+ */
+async function writeKeyOf(leg) {
+  const written = [];
+  const record = async (key) => {
+    written.push(key);
+  };
+  const probe = new MigrationRunner({ getSetting: () => null, setSetting: record });
+  await leg.write(null, {
+    setSetting: record,
+    recipeCorpus: probe._recipeCorpus,
+    craftingSystemCorpus: probe._craftingSystemCorpus,
+  });
+  return written[0];
+}
+
+/**
+ * The writeback order with the clause fixing each position, all of them in
+ * `destructive-changes-and-migrations/spec.md` § Migration Policy. Positions 12 and 13 are free,
+ * and `gatheringParties` is deliberately not ordered against the systems write.
+ */
+const ANNOTATED_WRITEBACK_ORDER = [
+  [
+    'worldScopeRekeyMap',
+    '§ World-Scope Entity Migration requirement 10 and § Migration Registry: the FIRST leg of the ' +
+      'writeback, the 1.30.0 pass\u2019s durable decision record (#1829 tracks the stale ' +
+      '§ Startup Migration Flow phrasing that still calls it the only leg ahead of recipes)',
+  ],
+  [
+    'worldEssenceMergeMap',
+    '§ Equivalent World Essence Merge requirement 10: the SECOND leg, immediately after ' +
+      'worldScopeRekeyMap and before recipes',
+  ],
+  ['recipes', '§ Startup Migration Flow: the recipe writeback is ordered first'],
+  ['currencyConfig', '§ Startup Migration Flow item 13: destination before the systems source'],
+  ['travelConfig', '§ Startup Migration Flow item 13: destination before the systems source'],
+  [
+    'characterLibraries',
+    '§ Startup Migration Flow item 13: destination before the systems source',
+  ],
+  [
+    'componentScope',
+    '§ World-Scope Entity Migration requirement 10: a scope destination, before the systems source',
+  ],
+  [
+    'essenceScope',
+    '§ World-Scope Entity Migration requirement 10: a scope destination, before the systems source',
+  ],
+  [
+    'toolScope',
+    '§ World-Scope Entity Migration requirement 10: a scope destination, before the systems source',
+  ],
+  ['systems', '§ Startup Migration Flow item 13: the source every lift above was lifted from'],
+  [
+    'gatheringConfig',
+    '§ Migration Registry: 0.7.0 reads it as the SOURCE and the systems as the DESTINATION, and ' +
+      'reordering it would destroy a pre-0.7.0 world tool library outright',
+  ],
+  ['environments', 'incidental'],
+  [
+    'gatheringParties',
+    'incidental, and a documented NON-constraint: its collapse is a transform of parties into ' +
+      'themselves and takes nothing from the systems, so a tear either side is equally recoverable',
+  ],
+];
+
+test('table shape: the leg table carries the writeback order, position by position', async () => {
+  assert.deepEqual(
+    WRITEBACK_LEGS.map((leg) => leg.key),
+    ANNOTATED_WRITEBACK_ORDER.map(([key]) => key),
+    'the annotated order above is the contract; a leg moved in the table moves without its clause'
+  );
+  const writeKeys = [];
+  for (const leg of WRITEBACK_LEGS) writeKeys.push(await writeKeyOf(leg));
+  assert.equal(new Set(writeKeys).size, WRITEBACK_LEGS.length, 'no two legs share a setting key');
+});
+
+test('behavioural: a pass changing every leg writes them in table order, the bump last', async () => {
+  const world = makeWorld([changeOnly(...WRITEBACK_LEGS.map((leg) => leg.key))]);
+
+  await world.runner.run();
+
+  const expected = [];
+  for (const leg of WRITEBACK_LEGS) expected.push(await writeKeyOf(leg));
+  expected.push(SETTING_KEYS.MIGRATION_VERSION);
+  assert.deepEqual(
+    world.written,
+    expected,
+    'the table is load-bearing rather than decorative: the pass writes in exactly its order'
+  );
+});
+
+test('every leg reproduces its own empty default when the world holds nothing', async () => {
+  let captured = null;
+  const runner = new MigrationRunner({
+    getSetting: () => null,
+    setSetting: async () => {},
+    migrations: [
+      {
+        version: '9.9.9',
+        label: 'capture the payload',
+        migrate: (data) => {
+          captured = { ...data };
+        },
+      },
+    ],
+  });
+
+  await runner.run();
+
+  assert.deepEqual(captured, {
+    recipes: [],
+    systems: [],
+    gatheringConfig: {},
+    environments: [],
+    gatheringParties: [],
+    currencyConfig: {},
+    travelConfig: {},
+    characterLibraries: {},
+    componentScope: {},
+    essenceScope: {},
+    toolScope: {},
+    worldScopeRekeyMap: {},
+    worldEssenceMergeMap: {},
+  });
+});
+
+for (const leg of WRITEBACK_LEGS) {
+  test(`a pass changing only ${leg.key} writes that leg and the bump, nothing else`, async () => {
+    const world = makeWorld([changeOnly(leg.key)]);
+
+    await world.runner.run();
+
+    const settingKey = await writeKeyOf(leg);
+    assert.deepEqual(
+      world.written,
+      [settingKey, SETTING_KEYS.MIGRATION_VERSION],
+      'a leg compared against another leg snapshot writes a setting nothing changed'
+    );
+    assert.deepEqual(
+      world.store.get(settingKey),
+      { changed: leg.key },
+      'the leg wrote its own payload, not a neighbour\u2019s'
+    );
+  });
+}
+
+test('a rejecting version bump defers the pass rather than escaping run()', async () => {
+  const runner = new MigrationRunner({
+    getSetting: () => null,
+    setSetting: async (key) => {
+      if (key === SETTING_KEYS.MIGRATION_VERSION) throw new Error('tear on the bump');
+    },
+    migrations: [{ version: '9.9.9', label: 'change nothing', migrate: () => ({}) }],
+  });
+
+  const summary = await runner.run();
+
+  assert.equal(summary.deferred, true, 'the rejection did not escape run()');
+  assert.equal(summary.deferredReason, MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED);
+});
+
+const SEALED_BOUNDARY = '1.17.0';
+const CURRENT_MIGRATIONS = MIGRATIONS.slice(SEALED_MIGRATIONS.length);
+
+test('the registry holds 44 entries with unique versions and labels, strictly ascending', () => {
+  assert.equal(MIGRATIONS.length, 44);
+  assert.equal(new Set(MIGRATIONS.map((m) => m.version)).size, 44, 'unique versions');
+  assert.equal(new Set(MIGRATIONS.map((m) => m.label)).size, 44, 'unique labels');
+  for (const [index, migration] of MIGRATIONS.entries()) {
+    assert.equal(typeof migration.migrate, 'function', `${migration.version} is runnable`);
+    if (index === 0) continue;
+    assert.equal(
+      compareSemver(MIGRATIONS[index - 1].version, migration.version),
+      -1,
+      `${migration.version} follows ${MIGRATIONS[index - 1].version}`
+    );
+  }
+  assert.equal(getHighestRegisteredMigrationVersion(), '1.34.0');
+});
+
+test('the sealed half is the head of the registry, entry by entry and by identity', () => {
+  assert.equal(SEALED_MIGRATIONS.length, 27);
+  assert.equal(CURRENT_MIGRATIONS.length, 17);
+  for (const [index, migration] of SEALED_MIGRATIONS.entries()) {
+    // Identity, not deep equality: a re-literalled or cloned entry is a second copy to maintain.
+    assert.equal(MIGRATIONS[index], migration, `sealed entry ${index} is the registry's own`);
+  }
+});
+
+test('the sealed half is exactly the entries at or below 1.17.0, on the closed entry shape', () => {
+  for (const migration of SEALED_MIGRATIONS) {
+    assert.ok(
+      compareSemver(migration.version, SEALED_BOUNDARY) <= 0,
+      `${migration.version} is at or below the boundary`
+    );
+    assert.deepEqual(
+      Object.keys(migration).sort(),
+      ['label', 'migrate', 'version'],
+      `${migration.version} carries no metadata beyond the sealed shape`
+    );
+  }
+  for (const migration of CURRENT_MIGRATIONS) {
+    assert.ok(
+      compareSemver(migration.version, SEALED_BOUNDARY) > 0,
+      `${migration.version} is above the boundary`
+    );
+    assert.equal(typeof migration.downgradeTo, 'string', `${migration.version} names a downgrade`);
+  }
+  assert.equal(SEALED_MIGRATIONS.at(-1).version, SEALED_BOUNDARY, 'the boundary entry');
+  assert.equal(CURRENT_MIGRATIONS[0].version, '1.18.0', 'the first entry past the boundary');
+});
+
+test('both registry arrays are frozen, and their entries are not', () => {
+  assert.equal(Object.isFrozen(MIGRATIONS), true);
+  assert.equal(Object.isFrozen(SEALED_MIGRATIONS), true);
+  assert.equal(Object.isFrozen(MIGRATIONS[0]), false, 'entries are left as they were');
+});
+
+
+test('the setting reads run in one uninterrupted synchronous block', async () => {
+  let microtaskRan = false;
+  let interrupted = false;
+  let reads = 0;
+  const getSetting = (key) => {
+    if (key === SETTING_KEYS.MIGRATION_VERSION) return '0.0.0';
+    reads += 1;
+    if (reads === 1) {
+      queueMicrotask(() => {
+        microtaskRan = true;
+      });
+    } else if (microtaskRan) interrupted = true;
+    return null;
+  };
+  const noCorpus = () => ({ loadAll: async () => [], createOrUpdateAll: async () => {} });
+  await new MigrationRunner({
+    getSetting,
+    setSetting: async () => {},
+    recipeCorpus: noCorpus(),
+    craftingSystemCorpus: noCorpus(),
+    migrations: [{ version: '9.9.9', label: 'x', migrate: () => ({}) }],
+  }).run();
+  assert.equal(reads, 11, 'eleven setting-backed legs were read');
+  assert.equal(interrupted, false, 'an await landed between two setting reads');
+});
+
+test('an empty default is fresh per pass, so one pass cannot poison the next', async () => {
+  const make = (migrate) =>
+    new MigrationRunner({
+      getSetting: () => null,
+      setSetting: async () => {},
+      migrations: [{ version: '9.9.9', label: 'l', migrate }],
+    });
+  await make((data) => {
+    data.gatheringConfig.poisoned = true;
+  }).run();
+  let captured = null;
+  await make((data) => {
+    captured = { ...data };
+  }).run();
+  assert.deepEqual(captured.gatheringConfig, {}, 'a previous pass poisoned the shared default');
+});
