@@ -1,5 +1,3 @@
-src/canvas/InteractableManager.js	901
-src/canvas/InteractableManager.js::_spawnInteractableRegion	107
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	109
 src/main.js	4685
 src/main.js::Hooks.once#2	208
