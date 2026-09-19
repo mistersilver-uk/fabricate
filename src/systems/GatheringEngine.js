@@ -19,6 +19,11 @@ import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOut
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { fireComplications } from './complicationRuntime.js';
+import {
+  createGatheringAttemptResolution,
+  noRefusal,
+  passThroughAttempt,
+} from './gatheringAttemptResolution.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import {
   actorMatchesId,
@@ -1234,186 +1239,87 @@ export class GatheringEngine {
         'AUTHORITY_UNAVAILABLE'
       );
     }
-    const viewer = await this._viewerForRun({ actor, run });
-    // A blind run's task and start-time snapshot live in the GM-owned blind-run
-    // store, not on the actor flag. Fold them back in here so the whole maturity
-    // path below — context resolution, outcome, history, cancellation — is the
-    // unchanged code that already knows how to read them off a run. Non-blind
-    // runs, and blind runs written before issue 901, pass through untouched.
-    const resolvedRun = this._hydrateBlindWaitingRun(run);
-    const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
+    const resolveAttempt = createGatheringAttemptResolution({
+      prepare: this._prepareMaturedAttempt.bind(this),
+      validate: this._validateMaturedTask.bind(this),
+      resolveOutcome: this._resolveTaskOutcome.bind(this),
+      checkPersistAvailable: noRefusal,
+      planSideEffects: this._terminalSideEffectPlan.bind(this),
+      composeHistory: this._terminalHistoryWrite.bind(this),
+      writeTerminalHistory: this._writeMaturedTerminalHistory.bind(this),
+      commit: this._commitMaturedTerminal.bind(this),
+      respond: this._respondTerminalAttempt.bind(this),
+      refuse: this._refuseMaturedAttempt.bind(this),
+    });
+    return resolveAttempt({ actor, waitingRun: run, versionedContext });
+  }
+
+  async _prepareMaturedAttempt({ actor, waitingRun, versionedContext }) {
+    const viewer = await this._viewerForRun({ actor, run: waitingRun });
+    // A blind run's task and start-time snapshot live in the GM-owned store, not the actor flag.
+    const activeRun = this._hydrateBlindWaitingRun(waitingRun);
+    const resolved = this._resolveWaitingRunContext({ actor, run: activeRun });
     if (resolved.missingReference) {
-      if (versionedContext) {
-        return this._cancelInvalidVersionedRun({
-          viewer,
-          actor,
-          run,
-          resolved,
-          reason: resolved.missingReference,
-          versionedContext,
-        });
-      }
-      return this._cancelMissingReferenceRun({ viewer, actor, run: resolvedRun, resolved });
+      return { refusal: { kind: 'missing-reference', details: { viewer, activeRun, resolved } } };
     }
-
-    const { system, environment, task, interactableRef } = resolved;
-    const configuration = this._validateStartTask(task, system);
-    if (configuration.valid !== true) {
-      if (versionedContext) {
-        return this._clearInvalidVersionedRun({
-          viewer,
-          actor,
-          run,
-          environment,
-          task,
-          errors: configuration.errors,
-          versionedContext,
-        });
-      }
-      return this._clearMisconfiguredWaitingRun({
-        viewer,
-        actor,
-        run: resolvedRun,
-        environment,
-        task,
-        errors: configuration.errors,
-      });
-    }
-
-    const outcome = await this._resolveTaskOutcome({
-      viewer,
+    return {
+      ...resolved,
       actor,
-      system,
-      environment,
-      task,
+      viewer,
+      waitingRun,
+      activeRun,
+      versionedContext,
       resolvedCheckResult: versionedContext?.resolvedCheckResult ?? null,
-    });
-    if (outcome.status === 'misconfigured') {
-      if (versionedContext) {
-        return this._clearInvalidVersionedRun({
-          viewer,
-          actor,
-          run,
-          environment,
-          task,
-          outcome,
-          versionedContext,
-        });
-      }
-      return this._clearMisconfiguredWaitingRun({
-        viewer,
-        actor,
-        run: resolvedRun,
-        environment,
-        task,
-        outcome,
-      });
-    }
+      phase: maturityCommitPhase(waitingRun),
+      initiatedBy: 'timed',
+    };
+  }
 
-    const checkResult = plainObjectOrNull(outcome.checkResult) ?? undefined;
-    const plan = await this._terminalSideEffectPlan({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-    });
-    if (plan.status === 'misconfigured') {
-      if (versionedContext) {
-        return this._clearInvalidVersionedRun({
-          viewer,
-          actor,
-          run,
-          environment,
-          task,
-          outcome: plan,
-          versionedContext,
-        });
-      }
-      return this._clearMisconfiguredWaitingRun({
-        viewer,
-        actor,
-        run: resolvedRun,
-        environment,
-        task,
-        outcome: plan,
-      });
-    }
+  _validateMaturedTask({ system, task }) {
+    const configuration = this._validateStartTask(task, system);
+    if (configuration.valid === true) return null;
+    return { kind: 'task-misconfigured-config', details: { errors: configuration.errors } };
+  }
 
-    const { runData, payload } = this._terminalHistoryWrite({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-      plan,
-    });
+  async _writeMaturedTerminalHistory(context) {
+    const { actor, activeRun, versionedContext, outcome, runData, payload } = context;
     if (versionedContext) {
-      return this._persistAndApplyVersionedTerminal({
-        viewer,
-        actor,
-        system,
-        environment,
-        task,
-        outcome,
-        checkResult,
-        plan,
-        runData,
-        payload,
-        activeRun: resolvedRun,
-        interactableRef,
-        versionedContext,
-        phase: maturityCommitPhase(run),
-        initiatedBy: 'timed',
-      });
+      return { run: null, response: await this._persistAndApplyVersionedTerminal(context) };
     }
-    const completedRun = await this.runManager.completeRun(
-      actor,
-      resolvedRun,
-      outcome.status,
-      payload,
-      { terminalRunData: runData }
-    );
-    if (!completedRun) {
+    const run = await this.runManager.completeRun(actor, activeRun, outcome.status, payload, {
+      terminalRunData: runData,
+    });
+    if (!run) {
       throw Object.assign(new Error('Timed gathering terminal history was not written'), {
         code: 'TERMINAL_HISTORY_NOT_WRITTEN',
       });
     }
+    return { run, response: null };
+  }
 
-    const settlement = await this._commitLegacyTerminal({
-      run: completedRun,
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-      interactableRef,
-      phase: maturityCommitPhase(run),
-    });
-    // The reservation has now been converted into the real decrement (or was
-    // never owed, for a failed `onSuccess` task), so the claim is spent.
-    await this._releaseBlindReservation(run);
+  async _commitMaturedTerminal({ run, waitingRun, ...context }) {
+    const settlement = await this._commitLegacyTerminal({ run, ...context });
+    // The claim is now spent, so release it between the commit write and the response.
+    await this._releaseBlindReservation(waitingRun);
+    return settlement;
+  }
 
-    return await this._terminalStart({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      status: outcome.status,
-      run: settlement.run,
-      createdResults: settlement.createdResults,
-      usedTools: plan.usedTools ?? [],
-      checkResult,
-      complications: settlement.complications,
-      initiatedBy: 'timed',
-    });
+  async _refuseMaturedAttempt(kind, context) {
+    const { waitingRun, activeRun, resolved, viewer, actor, versionedContext } = context;
+    if (kind === 'cancelled') {
+      throw gatheringLifecycleError(
+        'A timed gathering outcome cannot be cancelled',
+        'CANCELLED_TIMED_OUTCOME'
+      );
+    }
+    if (kind === 'missing-reference') {
+      return this._cancelMissingReferenceRun({ viewer, actor, run: activeRun, resolved });
+    }
+    const { environment, task, errors, outcome } = context;
+    const cleared = { viewer, actor, environment, task, errors, outcome };
+    return versionedContext
+      ? this._clearInvalidVersionedRun({ ...cleared, run: waitingRun, versionedContext })
+      : this._clearMisconfiguredWaitingRun({ ...cleared, run: activeRun });
   }
 
   /**
@@ -3209,84 +3115,39 @@ export class GatheringEngine {
     interactableRef = null,
     interactive = false,
   }) {
-    const outcome = await this._resolveTaskOutcome({
+    const resolveAttempt = createGatheringAttemptResolution({
+      prepare: passThroughAttempt,
+      validate: noRefusal,
+      resolveOutcome: this._resolveTaskOutcome.bind(this),
+      checkPersistAvailable: this._checkTerminalRunCreation.bind(this),
+      planSideEffects: this._terminalSideEffectPlan.bind(this),
+      composeHistory: this._composeRichTerminalHistory.bind(this),
+      writeTerminalHistory: this._createTerminalRunHistory.bind(this),
+      commit: this._commitLegacyTerminal.bind(this),
+      respond: this._respondTerminalAttempt.bind(this),
+      refuse: this._refuseImmediateAttempt.bind(this),
+    });
+    return resolveAttempt({
       viewer,
       actor,
       system,
       environment,
       task,
+      richAttempt,
+      presentTools,
+      interactableRef,
       interactive,
     });
+  }
 
-    // The player dismissed the interactive roll dialog: a user choice, not a
-    // blocked attempt. Return a quiet, non-notifying result BEFORE any run
-    // creation, side effects, or chat — zero mutation.
-    if (outcome.status === 'cancelled') {
-      return this._cancelledStart({ viewer, actor, environment, task });
-    }
+  _checkTerminalRunCreation() {
+    if (typeof this.runManager?.createTerminalRun === 'function') return null;
+    return { kind: 'run-creation-failed', details: { failureCode: 'MISSING_RUN_MANAGER' } };
+  }
 
-    if (outcome.status === 'misconfigured') {
-      return this._blockedStart({
-        viewer,
-        actor,
-        environment,
-        task,
-        reason: this._blockedReason('TASK_MISCONFIGURED', {
-          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome }),
-        }),
-      });
-    }
-
-    if (typeof this.runManager?.createTerminalRun !== 'function') {
-      return this._blockedStart({
-        viewer,
-        actor,
-        environment,
-        task,
-        reason: this._blockedReason('RUN_CREATION_FAILED', {
-          data: this._waitingRunFailureData({
-            environment,
-            task,
-            viewer,
-            code: 'MISSING_RUN_MANAGER',
-          }),
-        }),
-      });
-    }
-
-    const checkResult = plainObjectOrNull(outcome.checkResult) ?? undefined;
-    const plan = await this._terminalSideEffectPlan({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-      presentTools,
-    });
-    if (plan.status === 'misconfigured') {
-      return this._blockedStart({
-        viewer,
-        actor,
-        environment,
-        task,
-        reason: this._blockedReason('TASK_MISCONFIGURED', {
-          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome: plan }),
-        }),
-      });
-    }
-
-    const { runData, payload } = this._terminalHistoryWrite({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-      plan,
-    });
+  _composeRichTerminalHistory(context) {
+    const { viewer, environment, task, richAttempt, outcome } = context;
+    const { runData, payload } = this._terminalHistoryWrite(context);
     const richPayload = this._richHistoryPayload({
       environment,
       task,
@@ -3296,52 +3157,36 @@ export class GatheringEngine {
     });
     Object.assign(runData, richPayload);
     Object.assign(payload, richPayload);
-    let run;
+    return { runData, payload };
+  }
+
+  async _createTerminalRunHistory(context) {
+    const { actor, outcome, runData, payload } = context;
     try {
-      run = await this.runManager.createTerminalRun(actor, runData, outcome.status, payload);
+      const run = await this.runManager.createTerminalRun(actor, runData, outcome.status, payload);
+      return { run, response: null };
     } catch (error) {
-      return this._blockedStart({
-        viewer,
-        actor,
-        environment,
-        task,
-        reason: this._blockedReason('RUN_CREATION_FAILED', {
-          data: this._waitingRunFailureData({
-            environment,
-            task,
-            viewer,
-            code: stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR',
-          }),
-        }),
-      });
+      // A thrown write refuses; a falsy return passes through to the commit unguarded.
+      return {
+        run: null,
+        response: this._refuseImmediateAttempt('persist-failed', { ...context, error }),
+      };
     }
+  }
 
-    const settlement = await this._commitLegacyTerminal({
-      run,
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      checkResult,
-      presentTools,
-      interactableRef,
-    });
-
-    return await this._terminalStart({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      status: outcome.status,
-      run: settlement.run,
-      createdResults: settlement.createdResults,
-      usedTools: plan.usedTools ?? [],
-      checkResult,
-      complications: settlement.complications,
-    });
+  _refuseImmediateAttempt(kind, { viewer, actor, environment, task, outcome, failureCode, error }) {
+    if (kind === 'cancelled') return this._cancelledStart({ viewer, actor, environment, task });
+    const unwritten = kind === 'run-creation-failed' || kind === 'persist-failed';
+    const code =
+      failureCode || stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR';
+    const reason = unwritten
+      ? this._blockedReason('RUN_CREATION_FAILED', {
+          data: this._waitingRunFailureData({ environment, task, viewer, code }),
+        })
+      : this._blockedReason('TASK_MISCONFIGURED', {
+          data: this._terminalMisconfigurationData({ environment, task, viewer, outcome }),
+        });
+    return this._blockedStart({ viewer, actor, environment, task, reason });
   }
 
   async _resolveTaskOutcome({
@@ -4544,6 +4389,14 @@ export class GatheringEngine {
     });
   }
 
+  async _respondTerminalAttempt({ outcome, plan, ...context }) {
+    return this._terminalStart({
+      ...context,
+      status: outcome.status,
+      usedTools: plan.usedTools ?? [],
+    });
+  }
+
   async _terminalStart({
     viewer,
     actor,
@@ -4616,12 +4469,9 @@ export class GatheringEngine {
     });
 
     // Publish the documented public completion hook(s) after side effects are committed, so
-    // subscribers observe the final state. No-op when no publisher is injected.
-    //
-    // `processWorldTime` fires on EVERY client via Foundry's synced `updateWorldTime` hook, so
-    // timed completions are gated to the primary GM to fire exactly once. `processWorldTime`
-    // gates the whole maturation loop the same way; this is defence in depth, because
-    // `_processMaturedWaitingRun` is also driven directly by tests.
+    // subscribers observe the final state; a no-op when no publisher is injected. A timed
+    // completion is additionally gated to the primary GM, because `processWorldTime` fires on
+    // every client via Foundry's synced `updateWorldTime` hook and must fire exactly once.
     const timedOnNonPrimaryGM = initiatedBy === 'timed' && this.isPrimaryGM() !== true;
     if (!timedOnNonPrimaryGM) {
       this.hookPublisher?.publishAttemptCompleted({

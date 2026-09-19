@@ -40,10 +40,8 @@ src/systems/CraftingSystemManager.js	5878
 src/systems/CraftingSystemManager.js::_normalizeSystem	217
 src/systems/CraftingSystemManager.js::repairItemData	152
 src/systems/CraftingSystemManager.js::updateSystem	132
-src/systems/GatheringEngine.js	6036
+src/systems/GatheringEngine.js	5886
 src/systems/GatheringEngine.js::_postGatheringChatMessage	118
-src/systems/GatheringEngine.js::_processMaturedWaitingRun	188
-src/systems/GatheringEngine.js::_resolveImmediateAttempt	145
 src/systems/GatheringEngine.js::_resolveRoutedFormulaOutcome	101
 src/systems/GatheringEngine.js::_startWaitingAttempt	161
 src/systems/GatheringEngine.js::_versionedGatheringEffects	137
