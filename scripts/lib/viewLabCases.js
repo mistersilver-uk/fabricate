@@ -402,7 +402,10 @@ const BULK_DEFAULTS = Object.freeze({
   kinds: ['player', 'inventory', 'bulk'],
   sourceMatches: [
     /^src\/ui\/svelte\/apps\/inventory\//,
-    /^src\/ui\/svelte\/stores\/inventoryStore/,
+    /^src\/ui\/svelte\/stores\/inventory/,
+    /^src\/ui\/svelte\/stores\/playerResultOrder/,
+    /^src\/ui\/svelte\/util\/salvageYieldRows\.js$/,
+    /^src\/utils\/progressiveResultOrder\.js$/,
   ],
 });
 
@@ -9027,7 +9030,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `ActorSelectTopBar` on the same measurement.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],
@@ -9056,7 +9059,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -9076,7 +9079,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -9100,7 +9103,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
     // The per-stage complication band (issue 1286) is asserted here rather than given its own case,
     // and the reason is mechanical: `SalvageProgressiveBody` passes `complications` on every render
@@ -9133,7 +9138,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   playerCase({
@@ -9156,7 +9163,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   playerCase({
@@ -9175,10 +9184,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     kinds: ['player', 'inventory'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
   }),
   playerCase({
     id: 'player-salvage-misconfigured',
@@ -9200,7 +9206,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   // Every card named below sits on page one of the 25-per-page grid, verified by rendering rather
@@ -9737,6 +9745,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   playerCase({
@@ -9944,6 +9954,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
     // The crafting half of the per-stage complication band (issue 1286), asserted on the frame that
     // already draws it for the same reason `player-salvage` is: `ProgressiveBody` passes
@@ -9976,6 +9988,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   playerCase({
@@ -9996,6 +10010,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   playerCase({
@@ -10016,6 +10032,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/stores\/playerResultOrder/,
+      /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
   playerCase({

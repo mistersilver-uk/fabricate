@@ -13,7 +13,7 @@
 
   ## IT RE-DERIVES NOTHING, and that is a contract rather than a preference
 
-  Every field is published on the entry by `inventoryStore`'s `bulkRunProjection`:
+  Every field is published on the entry by `inventoryBulkActions`'s `bulkRunProjection`:
   `complications` is `[{ resultId, position, resultName, resultDifficulty, id, name,
   description, severity }]`, already filtered to `visibility: 'visible'`, already
   stripped of `when` / `rollCondition` / `effectRoll` / `macroUuid`, and already

@@ -4014,6 +4014,8 @@ The salvage deltas are stated at the end of this section; everything else applie
   Drag is a mouse-only enhancement — HTML5 drag does not fire on touch, so the move buttons are the only touch path and must meet the touch-target size.
 - The announcement names the stage that MOVED, read before the move is applied, and is a single localized string carrying name, position and total (never assembled from fragments).
 - Reorder writes are **debounced** and committed on settle, not per intermediate move, because each write is a replicated document write.
+- The key a debounced reorder write commits the **Player Result Order** under is captured when the reorder is **scheduled**, never re-derived when the write flushes.
+  A subject change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** recipe or participation, silently — the player reorders one subject's stages and another subject's preference moves.
 - If a write **fails**, the rows revert to the last persisted order and the revert is announced through the **same** `aria-live` region.
   A notification alone is insufficient: the writes are optimistic, so the row has already moved and already announced, and a keyboard user reordering by chevron may never see a toast — leaving the player believing an order that was never stored.
 - When the permission is `false` the rows keep their ordinal and difficulty but **drop the grip glyph** (the grip is the affordance signal), use a default cursor, attach **no** drag handlers, and show one muted line explaining that the GM set the order.
@@ -4092,7 +4094,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The award mode is **salvage's own** (`system.salvageCraftingCheck.progressive.awardMode`), authored independently of the recipe's.
   Deriving salvage thresholds from the crafting award mode violates the agreement requirement above invisibly, because both blocks normally exist and are normally authored.
 - The permission is `Component.salvage.allowPlayerResultReorder` (default true; only an explicit `false` pins the authored order), not the recipe's.
-- The player's order is stored under the `salvage:<componentId>` key (see `resolution-modes` §Which user's order is read).
+- The player's order is stored under the `salvage:<systemId>:<componentId>` key (see `resolution-modes` §Which user's order is read).
 - A pending debounced write MUST be **flushed before a salvage run starts**, and a **rejected** write MUST abort the run: an unflushed write is captured stale onto the run record, and a rejected one leaves the player looking at an order that was reverted.
 - Salvage renders **no exclude affordance**: reorder is the whole of the feature.
   That holds for the complication surfaces too: no player progressive surface offers a per-stage exclude toggle, an excluded-results list or a hidden-result note.
@@ -4489,8 +4491,7 @@ The player's route to salvage.
   Each participation salvages against **its own** contributing documents, so the depleted / "None remaining" / disabled-action basis is the selected participation's **own** owned quantity, not the card's cross-system union (a system-B salvage on a divergent-roles card cannot consume documents system B does not back).
   The panel **names the acting system** when the card spans more than one.
   The progressive stage-order preference is keyed per **`(systemId, componentId)`** (`salvage:<systemId>:<componentId>`): component ids are not globally unique (copy-import preserves them), so a component-id-only key collided across systems the moment the collapse surfaced two participations of one card, and the store's write key must match the engine's capture key exactly or the captured order silently reads empty.
-  That key is captured when a reorder is **scheduled**, not re-derived when the debounced write flushes.
-  A selection change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** participation, silently — the player reorders one card's stages and another card's preference moves.
+  That matching obligation is salvage's alone, because crafting reads its order live at resolve time (`resolution-modes` §Which user's order is read); **when** the key is captured is governed for both surfaces by §Progressive Stage List.
 - An **`Info | Salvage`** control appears when the item is salvageable — **including when it is broken**, since brokenness does not gate salvageability.
   When the item is not salvageable, **no tab bar renders at all**: a hidden tab reads as "this isn't salvageable", which is wrong and unfixable by the player.
 - The body dispatches on the pair **`(mode, checkUsable)`** against **`system.salvageCraftingCheck`** — salvage's own check block, NOT `system.craftingCheck`, which is the recipe block.

@@ -217,11 +217,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  // 127/124 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
-  // threshold at 820, and `createFoundryJournalRunAuthority` crossed the 100-line function
-  // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
-  // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
-  // `deleteEmbeddedDocuments` throw and stranded a run.
-  assert.equal(files, 108, 'oversized files');
-  assert.equal(keys.length - files, 116, 'oversized functions');
+  // 107/117 as of issue 1695. `inventoryStore.svelte.js` left the FILE list entirely — splitting
+  // the salvage-execution and bulk-actions sub-stores out of it took it from 1,536 lines to 607 —
+  // while the function list traded its 137-line `salvage` (now four functions, none over 100) for
+  // the two new sub-store factories, which are oversized as factories and nothing else.
+  assert.equal(files, 107, 'oversized files');
+  assert.equal(keys.length - files, 117, 'oversized functions');
 });

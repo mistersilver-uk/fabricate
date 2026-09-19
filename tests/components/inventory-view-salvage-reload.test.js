@@ -31,6 +31,8 @@ const harness = createMountedComponentHarness({
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
+    // The pure yield projection the bulk sub-store reads (issue 1695).
+    'src/ui/svelte/util/salvageYieldRows.js',
     // The REAL store imports these two leaves (unlike the mocked-store suite).
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',
@@ -41,6 +43,11 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/playerResultOrder.svelte.js',
+    // The two sub-stores the browse store composes (issue 1695). An omission HANGS this suite
+    // (# cancelled) rather than failing it, which is why the closure validator names them.
+    'src/ui/svelte/stores/inventoryBulkActions.svelte.js',
+    'src/ui/svelte/stores/inventorySalvageExecution.svelte.js',
     'src/ui/svelte/stores/inventoryStore.svelte.js',
   ],
   compiledModules: [
@@ -136,6 +143,29 @@ function salvageRow() {
   };
 }
 
+/**
+ * The PROGRESSIVE variant of that row (issue 1695). Only a progressive, reorderable stage list
+ * renders the Reset affordance and the reorder live region, and no View Lab case reaches either
+ * state, so the two tests at the end of this file are their only pins.
+ */
+function progressiveSalvageRow() {
+  const base = salvageRow();
+  return {
+    ...base,
+    salvage: {
+      ...base.salvage,
+      mode: 'progressive',
+      checkUsable: true,
+      results: [],
+      awardMode: 'equal',
+      stages: [
+        { id: 's1', componentId: 'c2', name: 'Iron Shard', img: null, difficulty: 2, threshold: 2 },
+        { id: 's2', componentId: 'c3', name: 'Slag', img: null, difficulty: 3, threshold: 5 },
+      ],
+    },
+  };
+}
+
 // A second, unrelated owned item so the listing is never EMPTY after the last copy
 // of the salvaged component leaves it (an empty listing would render the no-items
 // state and hide the inspector entirely). This mirrors reality and the store's own
@@ -163,9 +193,9 @@ function otherRow() {
   };
 }
 
-function makeServices() {
+function makeServices(overrides = {}) {
   // Single copy of the salvage row; salvaging it drops it from the listing.
-  let rows = [salvageRow(), otherRow()];
+  let rows = overrides.rows ?? [salvageRow(), otherRow()];
   const services = {
     getSelectedCraftingActorId: () => 'hero',
     setSelectedCraftingActorId: () => {},
@@ -181,6 +211,7 @@ function makeServices() {
     craftingSources: { load: () => {}, setCraftingActor: () => {}, selectedSourceIds: [] },
     actorBar: { selectedActorId: 'hero' },
     navigateToCraftingRecipe: () => {},
+    ...overrides.services,
   };
   return services;
 }
@@ -393,6 +424,72 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
     assert.ok(
       target.querySelector('[data-inventory-detail="sys:c9"]'),
       'inspecting the clicked one'
+    );
+  });
+
+  // The two order states no View Lab case reaches (issue 1695). A frame can photograph a stage
+  // list, but not the Reset control's enablement or the live region a rejected write writes into,
+  // so each is pinned here by name instead.
+
+  /** Mount over a real store holding the PROGRESSIVE row, with its Salvage tab open. */
+  async function mountWithProgressiveSalvage(services) {
+    services.inventory = createInventoryStore({ services });
+    const target = await harness.mount({ services });
+    await settle();
+    services.inventory.select('sys:c1');
+    await settle();
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
+    await settle();
+    return target;
+  }
+
+  it('Reset is ENABLED only once the rendered order is the player\'s own', async () => {
+    const services = makeServices({ rows: [progressiveSalvageRow(), otherRow()] });
+    const target = await mountWithProgressiveSalvage(services);
+
+    const reset = target.querySelector('[data-inventory-salvage-reorder-reset]');
+    assert.ok(Boolean(reset), 'the reorderable stage list offers Reset');
+    assert.equal(reset.disabled, true, 'disabled — not hidden — while the order is still the GM’s');
+
+    target.querySelector('[data-progressive-stage-move-down]').click();
+    await settle();
+
+    assert.equal(services.inventory.salvageOrderIsCustom, true, 'the store sees a custom order');
+    assert.equal(
+      target.querySelector('[data-inventory-salvage-reorder-reset]').disabled,
+      false,
+      'and the control the player needs to undo it is now pressable'
+    );
+  });
+
+  it('a REJECTED order write announces its revert through the stage list live region', async () => {
+    const services = makeServices({
+      rows: [progressiveSalvageRow(), otherRow()],
+      services: {
+        setProgressiveResultOrder: async () => {
+          throw new Error('setting rejected');
+        },
+        progressiveOrderRevertMessage: () => 'Could not save your order. Restored the last saved order.',
+      },
+    });
+    const target = await mountWithProgressiveSalvage(services);
+
+    target.querySelector('[data-progressive-stage-move-down]').click();
+    await settle();
+    await services.inventory.flushSalvageOrder();
+    await settle();
+
+    assert.equal(
+      target.querySelector('[data-progressive-stage-status]').textContent.trim(),
+      'Could not save your order. Restored the last saved order.',
+      'a keyboard user reordering by chevron never looks at a toast, so the revert lands here'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-progressive-stage]')].map((row) =>
+        row.getAttribute('data-progressive-stage')
+      ),
+      ['s1', 's2'],
+      'and the rows are back in the GM’s authored order'
     );
   });
 
