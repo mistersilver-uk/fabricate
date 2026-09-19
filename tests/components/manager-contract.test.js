@@ -453,6 +453,43 @@ function pushedRecord(node, arrayName) {
   return undefined;
 }
 
+/** Every render site of one component, for the claims that COUNT them or compare two. */
+function renderedNodes(component, name) {
+  return templateNodes(component).filter((node) => node.type === 'Component' && node.name === name);
+}
+
+/** The literal one node gives a prop, whether spelled as text or as a `{…}` expression. */
+function propLiteral(node, name) {
+  const expression = attributeExpression(node, name);
+  if (expression?.type === 'Literal') return expression.value;
+  return attributeValue(node, name);
+}
+
+/** Every static value a template gives one attribute, in render order. */
+function attributeValues(component, name) {
+  return templateNodes(component)
+    .map((node) => attributeValue(node, name))
+    .filter((value) => value !== undefined);
+}
+
+/** The expressions rendered inside the elements carrying one static class. */
+function classRenderedExpressions(component, className) {
+  const found = [];
+  for (const node of templateNodes(component)) {
+    if (attributeValue(node, 'class') !== className) continue;
+    for (const child of node.fragment?.nodes ?? []) {
+      if (child.type === 'ExpressionTag') found.push(child.expression);
+    }
+  }
+  return found;
+}
+
+/** The value one module or component binds to a named `const`, as an AST to ask further of. */
+function declaredConstantValue(file, name) {
+  const parsed = file.endsWith('.svelte') ? componentAstOf(file) : moduleAstOf(file).ast;
+  return namedCodeAst(file.endsWith('.svelte') ? [parsed.instance, parsed.module] : parsed, name);
+}
+
 /** The claims any plain code subtree answers: a module, a class member, or one function body. */
 function claimsOverCode(code) {
   return {
@@ -495,6 +532,11 @@ function claimsForComponent(component) {
       templateNodes(component).some((node) => attributeValue(node, name) === value),
     writes: (name) => attributeNames(component).has(name),
     declaresProp: (name) => declaresProp(component, name),
+    defaults: ([name, value]) => propDefault(component, name) === value,
+    passesValue: ([name, propName, value]) => {
+      const nodes = renderedNodes(component, name);
+      return nodes.length > 0 && nodes.every((node) => propLiteral(node, propName) === value);
+    },
     requiresProp: (name) => requiresProp(component, name),
   };
 }
@@ -604,6 +646,12 @@ const CONTRACT_CLAIMS = Object.freeze({
   keysNo: { ask: 'key', holds: false, says: (v) => `gives no record a ${v} key` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
+  passesValues: {
+    ask: 'passesValue',
+    holds: true,
+    says: ([c, p, v]) => `passes ${p}={${v}} to every <${c}>`,
+  },
+  defaults: { ask: 'defaults', holds: true, says: ([n, v]) => `defaults ${n} to "${v}"` },
   passesPropsNo: { ask: 'propNone', holds: true, says: ([c, p]) => `passes no ${p} to <${c}>` },
   attributes: { ask: 'attribute', holds: true, says: ([a, v]) => `writes ${a}="${v}"` },
   attributesNo: { ask: 'attribute', holds: false, says: ([a, v]) => `writes no ${a}="${v}"` },
@@ -643,6 +691,16 @@ const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
+const MODIFIER_LIBRARY_ROW = 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte';
+const SCOPED_VALIDATION_TAB = 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte';
+const TOOL_EDIT = 'src/ui/svelte/apps/manager/ToolEditView.svelte';
+const TOOL_BREAKAGE = 'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte';
+const TOOL_EDITOR_TABS = 'src/ui/svelte/apps/manager/tools/ToolEditorTabs.svelte';
+const TOOL_INHERIT_CARD = 'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte';
+const TOOL_REQUIREMENTS = 'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte';
+// The system-scope band that replaced the retired Overview tab (issue 1373).
+const TOOL_SYSTEM_SCOPE = 'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte';
+const TOOL_VALIDATION = 'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte';
 // The GM Knowledge surface (issue 785). `KnowledgeView` and the reusable `ArmedDangerButton` sit
 // at the manager root; the rows and the pure projection live under `knowledge/`.
 const KNOWLEDGE_VIEW = 'src/ui/svelte/apps/manager/KnowledgeView.svelte';
@@ -2600,70 +2658,237 @@ describe('CraftingSystemManager source contract', () => {
   // NOTE: status-toggle contract on environmentEditSource removed when the editor
   // was placeholder'd out pending redesign.
 
-  it('wires the Tools library and focused editor through root-owned draft callbacks', () => {
-    assert.ok(
-      rootSource.includes("import ToolsBrowserView from './ToolsBrowserView.svelte';"),
-      'root should import ToolsBrowserView'
-    );
-    for (const snippet of [
-      "currentView === 'tools'",
-      "currentView === 'tool-edit'",
+  // The Tools library and the focused editor. What the library DRAWS — the rows, the pager, the
+  // per-system counts, the selection, the three tabs, the absent creation surface and the absent
+  // source drop zone, the dirty guard and the armed removal — is driven by
+  // `tests/components/manager-tools-mounted.js`. What stays is the wiring behind it, including
+  // the two callbacks that are deliberately NOT here.
+  defineStructureContract('wires the Tools library and focused editor', MANAGER_ROOT, {
+    imports: ['./ToolsBrowserView.svelte', './ToolEditView.svelte'],
+    compares: ['tools', 'tool-edit'],
+    names: [
       'focusedToolDraft',
       'focusedToolValidation',
       'openToolEditor',
       'selectLibraryTool',
       'backToToolsBrowser',
       'saveSelectedToolDraft',
-      // `deleteSelectedLibraryTool` IS GONE.
-      'removeFocusedToolFromSystem',
       // The per-section inherit switch.
       'setFocusedToolSectionInherited',
       'confirmToolsRouteExit',
-      // `store.createToolDraft?.` IS GONE FROM THIS LIST.
-      'store?.openToolDraft',
-      'store?.saveToolDraft',
-      // `store?.deleteToolDraft` GOES WITH THE HEADER BUTTON THAT CALLED IT. It deleted this
+      'toolsNavCount',
+      'createWorldToolFromItemDrop',
+      'adoptWorldToolIntoSystem',
+    ],
+    reads: [
+      'store.openToolDraft',
+      'store.saveToolDraft',
+      // `store.deleteToolDraft` GOES WITH THE HEADER BUTTON THAT CALLED IT. It deleted this
       // system's in-system record alone, leaving the world membership record behind as a ghost
       // nothing can read; `removeToolFromSystem` is the pair of writes that actually undoes an
       // adoption, and it is what the removal callout reaches (issue 1373).
-      'store?.removeToolFromSystem',
-      'store?.setToolSectionInherited',
-      'toolsNavCount',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
-    }
-    // TOOL CREATION IS A WORLD-SCOPE WRITE NOW. All four halves are pinned.
-    for (const snippet of [
-      'createWorldToolFromItemDrop',
-      'services?.resolveToolSource',
-      'store?.worldScope?.tool?.createEntity',
-      'onCreateFromItemDrop={createWorldToolFromItemDrop}',
-      "openWorldScopedEntry('world-tool-entry', entityId)",
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
-    }
-    // AND THE SYSTEM ROUTE NO LONGER CARRIES ONE. The two screens had the drop zone exactly
+      'store.removeToolFromSystem',
+      'store.setToolSectionInherited',
+      // TOOL CREATION IS A WORLD-SCOPE WRITE NOW.
+      'services.resolveToolSource',
+      'store.worldScope.tool.createEntity',
+    ],
+    passesProps: [
+      ['WorldToolCataloguePage', 'onCreateFromItemDrop'],
+      ['ToolBrowserInspector', 'onAddToSystem'],
+      ['ToolBrowserInspector', 'onEditWorldTool'],
+      // TASK 4: the editor behind `Edit rules` offers the route the rules LIST already advertises.
+      ['ToolEditView', 'onEditWorldTool'],
+    ],
+    spellsExactly: ['world-tool-entry'],
+    // AND THE SYSTEM ROUTE CARRIES NO CREATION DROP. The two screens had the drop zone exactly
     // inverted against the design, so this is the half that proves the move rather than a copy.
-    assert.ok(
-      !rootSource.includes('onCreateToolDrop'),
-      'the system Tool Rules route passes no creation drop callback'
-    );
-    // AND ADOPTION IS A NAMED HANDLER.
-    for (const snippet of [
-      'async function adoptWorldToolIntoSystem(entityId)',
-      'onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}',
-      'return selectLibraryTool(entityId);',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
+    namesNo: ['onCreateToolDrop', 'deleteSelectedLibraryTool'],
+    readsNo: ['store.createToolDraft', 'store.deleteToolDraft'],
+  });
+
+  // Adoption is a NAMED handler that selects what it adopted, rather than leaving the GM on a row
+  // that has silently changed cohort.
+  defineStructureContract(
+    'selects the Tool it has just adopted into the system',
+    { file: MANAGER_ROOT, fn: 'adoptWorldToolIntoSystem' },
+    { callsWith: [['selectLibraryTool', 'entityId']] }
+  );
+
+  // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio's
+  // entry is DRIVEN by `tests/components/manager-rail-mounted.js`, which presses it and reads the
+  // route, and asserts the badge is absent at zero; what a mounted case cannot see is which
+  // derivation each span renders.
+  it('renders each rail count as the derived number inside the shared count span', () => {
+    const rendered = classRenderedExpressions(componentAstOf(MANAGER_ROOT), 'manager-nav-count');
+    const read = rendered.flatMap((expression) => [
+      ...memberPaths(expression),
+      ...identifierNames(expression),
+    ]);
+    for (const count of ['gatheringNavCounts.total', 'toolsNavCount']) {
+      assert.ok(read.includes(count), `the rail renders ${count} as a bare count numeral`);
     }
-    assert.ok(
-      /onclick=\{\(\) => setView\('tools'\)\}/.test(rootSource),
-      "root should wire a top-level Tools nav button to setView('tools')"
+  });
+
+  defineStructureContract('renders the requirements tab from the focused editor', TOOL_EDIT, {
+    renders: ['ToolRequirementsTab'],
+    passesProps: [['ToolRequirementsTab', 'modifierOptions']],
+    writes: ['data-tool-editor-world-tool'],
+    names: ['onEditWorldTool'],
+    // NO BARE `Delete` IN THE SYSTEM HEADER.
+    spellsNo: ['data-tool-editor-delete'],
+  });
+
+  // ── THE BONUS TAKES ITS VALUE FROM THE WORLD LIBRARY (issue 1373, maintainer round 3) ──
+  // The tab used to render a free-text `RollDataExpressionInput` labelled `Bonus expression`,
+  // which the design has no counterpart for at either scope: `proto:2353`-`2369` and
+  // `proto:2886`-`2905` both draw a single-select `World modifiers` list, and `proto:4753` sets
+  // `bonus` to the chosen entry's expression. The persisted shape is untouched; what went away is
+  // the ability to TYPE one. The two absent eyebrows are the headings the design merged into the
+  // one sentence above the gate pair.
+  defineStructureContract('takes the bonus from the world modifier library', TOOL_REQUIREMENTS, {
+    renders: ['ModifierLibraryRow', 'SelectionCheckbox', 'ToolInheritCard'],
+    spells: ['manager-tool-prerequisite-list'],
+    spellsExactly: ['data-tool-bonus-modifier', 'data-tool-prerequisite-row'],
+    passesValues: [['SelectionCheckbox', 'wrapper', 'contents']],
+    namesNo: [
+      'ProviderExpressionInput',
+      'RollDataExpressionInput',
+      'ChecklistCardRow',
+      'legendVisible',
+    ],
+    rendersNo: ['ChecklistCardRow'],
+    spellsNo: ['WhichPrerequisites'],
+  });
+
+  it('draws BOTH lists on that tab as the shared modifier row, one of them opted in', () => {
+    const requirements = componentAstOf(TOOL_REQUIREMENTS);
+    const rows = renderedNodes(requirements, 'ModifierLibraryRow');
+    assert.equal(rows.length, 2, 'the tab draws the shared row twice — prerequisites and bonus');
+    // AND ONLY ONE OPTS IN. The bonus list one section below and the Checks Studio one screen
+    // away both pass NEITHER, which is what makes the row's defaults load-bearing.
+    const optedIn = rows.filter(
+      (node) => propLiteral(node, 'controlPlacement') ?? propLiteral(node, 'textLayout')
     );
+    assert.equal(optedIn.length, 1, 'only ONE opts in — the bonus list keeps the shipped face');
+    const [prerequisite] = optedIn;
+    assert.equal(propLiteral(prerequisite, 'controlPlacement'), 'leading', '`proto:2331`');
+    assert.equal(propLiteral(prerequisite, 'textLayout'), 'stacked', '`proto:2333`');
     assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{toolsNavCount}</span>'),
-      'root should render a Tools nav count chip'
+      literalStrings(prerequisite).includes('data-tool-prerequisite-row'),
+      'and it is the PREREQUISITE list, not the bonus list, that took them'
     );
+    // The gate pair keeps its option-card group; the BONUS list must not grow a second one.
+    for (const group of renderedNodes(requirements, 'RadioCardGroup')) {
+      assert.ok(
+        !literalStrings(group).some((literal) => literal.includes('tool-bonus-modifier')),
+        'the bonus list renders rows, not option cards'
+      );
+    }
+  });
+
+  // The names are the row's own vocabulary: a caller-named variant is the failure this ruling
+  // rejects by name, so it is asserted rather than left to review.
+  defineStructureContract('declares the row two variants of its own', MODIFIER_LIBRARY_ROW, {
+    defaults: [
+      // The shipped trailing edge and the one-line text, so today's callers are unmoved.
+      ['controlPlacement', 'trailing'],
+      ['textLayout', 'inline'],
+    ],
+    spellsExactlyNo: ['prerequisite', 'bonus', 'checks', 'catalogue'],
+  });
+
+  // BOTH CALLERS MUST PASS THE ROSTER. A prop declared and not passed renders an empty library
+  // that reads as "this world has none" — and it also subscribes the whole spread bundle, because
+  // Svelte evaluates a spread only on a key MISS.
+  defineStructureContract('forwards the roster from the world Tool entry too', WORLD_TOOL_ENTRY, {
+    passesProps: [['ToolRequirementsTab', 'modifierOptions']],
+    // ONE ACTION ON THE TILE, which is what the design draws (issue 1373's parity round). The
+    // Copy that sat beside Unlink is gone with the raw uuid line it copied: an id is not a fact
+    // this screen states anywhere else, and the third line displaced the hint that says what
+    // dropping onto the tile does.
+    renders: ['ItemDropZone'],
+    spells: ['SourceDropHint'],
+    writesNo: ['copyLabel', 'subline'],
+    spellsNo: ['data-tool-source-replace'],
+  });
+
+  it('passes the world modifier roster to BOTH Tool requirement scopes', () => {
+    const scopes = templateNodes(componentAstOf(MANAGER_ROOT)).filter(
+      (node) => attributeExpression(node, 'modifierOptions')?.name === 'selectedSystemModifiers'
+    );
+    assert.equal(scopes.length, 2, 'the focused system editor and the world Tool entry');
+  });
+
+  // ── EVERY BEHAVIOUR SECTION IS A CARD. This used to require a `manager-tool-section-heading`
+  // block — an unenclosed `<h3>` with a glyph and a hint, sitting on the page background above
+  // loose controls. The design encloses each section in its own bordered, filled card whose head
+  // states the section, whether this system inherits the world Tool's answer or overrides it,
+  // what the world's answer is, and the switch between the two.
+  defineStructureContract('draws breakage as inherit-aware cards', TOOL_BREAKAGE, {
+    renders: ['ToolInheritCard'],
+    writes: ['data-tool-remove-from-system'],
+    spells: ['StopUsingHereHint'],
+    // `Always fires` is GONE: the design uses that slot for the inheritance state.
+    spellsNo: ['manager-tool-section-heading', 'AlwaysFires', 'BreakageKicker'],
+  });
+
+  it('splits the four world-default sections two and two across the tabs', () => {
+    assert.deepEqual(
+      attributeValues(componentAstOf(TOOL_BREAKAGE), 'section'),
+      ['breakage', 'onBreak'],
+      'Breakage owns exactly the two world-default sections it authors'
+    );
+    assert.deepEqual(
+      attributeValues(componentAstOf(TOOL_REQUIREMENTS), 'section'),
+      ['prerequisites', 'bonus'],
+      'and Requirements owns the other two'
+    );
+  });
+
+  // THE SWITCH IS THE SHIPPED PRIMITIVE, not a second hand-rolled one.
+  defineStructureContract('reuses the shared scoped inherit row', TOOL_INHERIT_CARD, {
+    imports: ['../scoped/InheritRow.svelte'],
+    passesValues: [['InheritRow', 'stateChip', false]],
+  });
+
+  // ── THE LINKED-ITEM CARD IS NOT AT SYSTEM SCOPE, and the per-system display-label override
+  // names itself as an override in the screen's own idiom rather than in a help sentence.
+  defineStructureContract('keeps the system band free of source linking', TOOL_SYSTEM_SCOPE, {
+    renders: ['ToolInheritCard'],
+    writes: ['data-tool-label'],
+    rendersNo: ['ItemDropZone'],
+    namesNo: ['onSourceDrop', 'onUnlinkSource', 'onCopySourceUuid'],
+  });
+
+  // THERE IS NO OVERVIEW TAB AT SYSTEM SCOPE AT ALL, and the declaration form is the `EditorTabs`
+  // primitive's (issue 1038).
+  defineStructureContract('defaults the system tab strip to Breakage', TOOL_EDITOR_TABS, {
+    defaults: [['activeTab', 'breakage']],
+    spellsExactlyNo: ['overview'],
+  });
+
+  it('declares exactly three system tabs, in the shipped order', () => {
+    assert.deepEqual(
+      propertyValues(declaredConstantValue(TOOL_EDITOR_TABS, 'TABS'), 'id'),
+      ['breakage', 'requirements', 'validation'],
+      'Breakage, Requirements and Validation, and no fourth appended past them'
+    );
+  });
+
+  // Validation reuses the shared scoped shell, and that shell really does render the recipe-style
+  // surface: asserting only the shell would pass on a shell that had dropped it.
+  defineStructureContract('reuses the shared scoped validation shell', TOOL_VALIDATION, {
+    renders: ['ScopedValidationTab'],
+  });
+
+  defineStructureContract(
+    'and that shell renders the recipe-style editor validation surface',
+    SCOPED_VALIDATION_TAB,
+    { renders: ['EditorValidationSurface'] }
+  );
+
+  it('states the Tools copy the rail, the editor and the world field read', () => {
     assert.ok(
       lang.FABRICATE.Admin.Manager.Tools && typeof lang.FABRICATE.Admin.Manager.Tools === 'object',
       'lang should expose a FABRICATE.Admin.Manager.Tools block'
@@ -2673,86 +2898,8 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Add, 'Add tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.NavigationDirty.SaveAll, 'Save All');
-    assert.ok(
-      rootSource.includes("import ToolEditView from './ToolEditView.svelte';"),
-      'root should import the focused Tool editor'
-    );
-    assert.ok(
-      toolEditSource.includes('<ToolRequirementsTab'),
-      'focused editor should render its requirements tab'
-    );
-    assert.ok(
-      !toolRequirementsSource.includes('ProviderExpressionInput'),
-      'Tool requirements should use shared prerequisites rather than provider selection'
-    );
-    assert.ok(
-      toolRequirementsSource.includes('manager-tool-prerequisite-list'),
-      'Tool requirements should expose the shared prerequisite picker'
-    );
-    // ── THE BONUS TAKES ITS VALUE FROM THE WORLD LIBRARY (issue 1373, maintainer round 3) ──
-    // The tab used to render a free-text `RollDataExpressionInput` labelled `Bonus expression`,
-    // which the design has no counterpart for at either scope: `proto:2353`-`2369` and
-    // `proto:2886`-`2905` both draw a single-select `World modifiers` list, and `proto:4753`
-    // sets `bonus` to the chosen entry's expression. The persisted shape is untouched; what
-    // went away is the ability to TYPE one.
-    assert.ok(
-      !toolRequirementsSource.includes('RollDataExpressionInput'),
-      'Tool requirements should not offer a raw bonus-expression field'
-    );
-    assert.ok(
-      toolRequirementsSource.includes('data-tool-bonus-modifier'),
-      'Tool requirements should select the bonus from the world modifier library'
-    );
-    // ── AND THE LIBRARY IS DRAWN AS ROWS.
-    assert.ok(
-      toolRequirementsSource.includes('<ModifierLibraryRow'),
-      'the bonus list should render the shared modifier row, not option cards'
-    );
-    assert.ok(
-      !/<RadioCardGroup[^>]*?tool-bonus-modifier/s.test(toolRequirementsSource),
-      'the bonus list should render no option-card group'
-    );
-
-    // ── AND SO IS THE PREREQUISITE LIST DIRECTLY ABOVE IT (issue 1373, maintainer round 5) ─
-    assert.equal(
-      (toolRequirementsSource.match(/<ModifierLibraryRow/g) || []).length,
-      2,
-      'BOTH lists on this tab draw the shared modifier row — the prerequisites and the bonus'
-    );
-    assert.ok(
-      toolRequirementsSource.includes("'data-tool-prerequisite-row': option.id"),
-      'each prerequisite row names the entry it stands for, so a frame can select one'
-    );
-    // The IMPORT and the ELEMENT, not the name.
-    assert.ok(
-      !/import ChecklistCardRow|<ChecklistCardRow/.test(toolRequirementsSource),
-      'the bespoke checklist row is gone from the tab, not merely unused beside the shared one'
-    );
-    assert.ok(
-      !existsSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/ChecklistCardRow.svelte')),
-      'and the orphaned component is REMOVED — its only caller was this list, and a component ' +
-        'left standing with no caller is how a fourth row comes back by copy'
-    );
-    // THE TRAILING CONTROL IS A REAL CHECKBOX, through the manager's one selection primitive.
-    assert.ok(
-      toolRequirementsSource.includes('<SelectionCheckbox'),
-      'the prerequisite row trails the shared selection checkbox'
-    );
-    assert.ok(
-      /<SelectionCheckbox[^>]*wrapper="contents"/s.test(toolRequirementsSource),
-      'in `contents` mode, because the row host is already a <label> and labels may not nest'
-    );
-
-    // ── TWO HEADINGS THE DESIGN DOES NOT DRAW (issue 1373, maintainer round 5) ────────────
-    assert.ok(
-      !toolRequirementsSource.includes('WhichPrerequisites'),
-      'no `WHICH PREREQUISITES` eyebrow: the design heads the list with nothing'
-    );
-    assert.ok(
-      !toolRequirementsSource.includes('legendVisible'),
-      'and no `WHEN PREREQUISITES FAIL` eyebrow: the gate pair is introduced by the sentence ' +
-        'above it, so un-hiding its legend would print the heading the design merged away'
-    );
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.BackToToolRules, 'Back to Tool Rules');
+    assert.equal(lang.FABRICATE.Admin.Manager.Tools.SaveRules, 'Save rules');
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.WhichPrerequisites,
       undefined,
@@ -2762,54 +2909,6 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Tools.Editor.RequiredAll,
       'All selected prerequisites are required (AND). When a character fails them:',
       '`proto:2334` states the AND rule and introduces the gate pair in ONE sentence'
-    );
-    // ── THE ROW'S TWO VARIANTS ARE DECLARED.
-    const modifierRowSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte'),
-      'utf8'
-    );
-    assert.match(
-      modifierRowSource,
-      /controlPlacement = 'trailing'/,
-      "the control slot defaults to the shipped trailing edge, so today's callers are unmoved"
-    );
-    assert.match(
-      modifierRowSource,
-      /textLayout = 'inline'/,
-      'and the text defaults to one line, for the same reason'
-    );
-    // The names are the row's own vocabulary. A caller-named variant is the failure this ruling
-    // rejects by name, so it is asserted rather than left to review.
-    for (const callerName of ['prerequisite', 'bonus', 'checks', 'catalogue']) {
-      assert.equal(
-        new RegExp(`variant\\s*=\\s*'${callerName}'|'${callerName}'\\s*=>`, 'i').test(
-          modifierRowSource
-        ),
-        false,
-        `the row must not name a variant after its caller (${callerName})`
-      );
-    }
-    // AND THE PREREQUISITE LIST IS THE ONE THAT OPTS IN. The bonus list one section below and
-    // the Checks Studio one screen away both pass NEITHER, which is what makes the defaults
-    // load-bearing rather than decorative.
-    const modifierRowTags = toolRequirementsSource.match(/<ModifierLibraryRow[^>]*>/g) || [];
-    assert.equal(modifierRowTags.length, 2, 'the tab draws the shared row twice');
-    const optedIn = modifierRowTags.filter((tag) => /controlPlacement|textLayout/.test(tag));
-    assert.equal(
-      optedIn.length,
-      1,
-      'and only ONE of the two opts in — the bonus list keeps the shipped face'
-    );
-    assert.match(optedIn[0], /controlPlacement="leading"/, '`proto:2331` puts the checkbox first');
-    assert.match(
-      optedIn[0],
-      /textLayout="stacked"/,
-      '`proto:2333` sets the name over the expression'
-    );
-    assert.match(
-      optedIn[0],
-      /data-tool-prerequisite-row/,
-      'and it is the PREREQUISITE list, not the bonus list, that took them'
     );
     // The gate group keeps its accessible name — the heading is hidden, not deleted.
     assert.equal(
@@ -2824,155 +2923,13 @@ describe('CraftingSystemManager source contract', () => {
         'Rules and resources.',
       'the two absences on this tab read the same way, route included'
     );
-    // AND BOTH CALLERS MUST PASS THE ROSTER. A prop declared and not passed renders an empty
-    // library that reads as "this world has none" — and it also subscribes the whole spread
-    // bundle, because Svelte evaluates a spread only on a key MISS.
-    for (const [name, source] of [
-      ['ToolEditView', toolEditSource],
-      ['WorldToolEntryPage', worldToolEntrySource],
-    ]) {
-      assert.ok(
-        /\{modifierOptions\}/.test(source),
-        `${name} should forward modifierOptions to the requirements tab`
-      );
-    }
-    assert.equal(
-      (rootSource.match(/modifierOptions=\{selectedSystemModifiers\}/g) || []).length,
-      2,
-      'the manager root should pass the world modifier roster to BOTH Tool requirement scopes'
-    );
-    // ── EVERY BEHAVIOUR SECTION IS A CARD.
-    // This used to require a `manager-tool-section-heading` block — an unenclosed `<h3>` with a
-    // glyph and a hint, sitting on the page background above loose controls. The design encloses
-    // each section in its own bordered, filled card whose head states the section, whether this
-    // system inherits the world Tool's answer or overrides it, what the world's answer is, and
-    // the switch between the two. `ToolInheritCard` is that card and both tabs are its callers.
-    assert.ok(
-      !toolBreakageSource.includes('manager-tool-section-heading'),
-      'Breakage must not restore the bare page-background section heading'
-    );
-    for (const [label, source] of [
-      ['Breakage', toolBreakageSource],
-      ['Requirements', toolRequirementsSource],
-    ]) {
-      assert.ok(
-        source.includes('<ToolInheritCard'),
-        `${label} must draw its sections as inherit-aware cards`
-      );
-    }
-    assert.deepEqual(
-      [...toolBreakageSource.matchAll(/section="(\w+)"/g)].map((match) => match[1]),
-      ['breakage', 'onBreak'],
-      'Breakage owns exactly the two world-default sections it authors'
-    );
-    assert.deepEqual(
-      [...toolRequirementsSource.matchAll(/section="(\w+)"/g)].map((match) => match[1]),
-      ['prerequisites', 'bonus'],
-      'and Requirements owns the other two'
-    );
-    // THE SWITCH IS THE SHIPPED PRIMITIVE.
-    assert.ok(
-      toolInheritCardSource.includes("import InheritRow from '../scoped/InheritRow.svelte';") &&
-        toolInheritCardSource.includes('stateChip={false}'),
-      'the card reuses the shared scoped inherit row rather than hand-rolling a second switch'
-    );
-    // AND `Always fires` IS GONE. The design uses that slot for the inheritance state.
-    assert.ok(
-      !toolBreakageSource.includes('AlwaysFires'),
-      'the on-break legend badge must not survive the card conversion'
-    );
-    assert.ok(
-      !toolBreakageSource.includes('BreakageKicker'),
-      'Breakage should not restore the redundant BREAKAGE kicker'
-    );
-    // ── THE LINKED-ITEM CARD IS NOT AT SYSTEM SCOPE.
-    assert.ok(
-      !toolSystemScopeSource.includes('<ItemDropZone'),
-      'the system-scope band must not carry a source drop zone'
-    );
-    assert.ok(
-      !toolSystemScopeSource.includes('onSourceDrop') &&
-        !toolSystemScopeSource.includes('onUnlinkSource') &&
-        !toolSystemScopeSource.includes('onCopySourceUuid'),
-      'nor any of the three source-link callbacks'
-    );
-    // THERE IS NO OVERVIEW TAB AT SYSTEM SCOPE AT ALL. The tab strip is three tabs.
-    assert.ok(
-      !toolEditorTabsSource.includes("'overview'"),
-      'the system tab strip must not declare an Overview tab'
-    );
-    // THE DECLARATION FORM IS THE `EditorTabs` PRIMITIVE'S (issue 1038).
-    assert.match(
-      toolEditorTabsSource,
-      /const TABS = \[\s*\{\s*id: 'breakage'[\s\S]*?id: 'requirements'[\s\S]*?id: 'validation'/,
-      'and must declare Breakage, Requirements and Validation, in that order'
-    );
-    assert.equal(
-      (toolEditorTabsSource.match(/^\s*id: '/gm) || []).length,
-      3,
-      'and exactly three, so a fourth cannot be appended past the ordering match above'
-    );
-    assert.ok(
-      toolEditorTabsSource.includes("activeTab = 'breakage'"),
-      'and must default to Breakage rather than a tab that no longer exists'
-    );
-    // NO BARE `Delete` IN THE SYSTEM HEADER.
-    assert.ok(
-      !toolEditSource.includes('data-tool-editor-delete'),
-      'the system header must not carry a bare Delete'
-    );
-    assert.ok(
-      toolBreakageSource.includes('data-tool-remove-from-system') &&
-        toolBreakageSource.includes('StopUsingHereHint'),
-      'and the Breakage tab closes with the explained remove-from-system callout'
-    );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.StopUsingHereHint,
       'Removes the rules in {system} only. The world Tool and every other system are untouched.'
     );
-    // THE HEADER STATES SCOPE AND SAVES RULES.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.HeaderSystemScope,
       'Rules in {system} · identity comes from the world Tool'
-    );
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.BackToToolRules, 'Back to Tool Rules');
-    assert.equal(lang.FABRICATE.Admin.Manager.Tools.SaveRules, 'Save rules');
-    assert.ok(
-      worldToolEntrySource.includes('<ItemDropZone'),
-      'the world Tool entry reuses the shared drag-only Item drop zone'
-    );
-    // ONE ACTION ON THE TILE, which is what the design draws (issue 1373's parity round). The
-    // Copy that sat beside Unlink is gone with the raw uuid line it copied: an id is not a fact
-    // this screen states anywhere else, and the third line displaced the hint that says what
-    // dropping onto the tile does.
-    assert.ok(
-      !worldToolEntrySource.includes('copyLabel='),
-      'the tile offers one button, not a Copy beside the Unlink'
-    );
-    assert.ok(
-      !worldToolEntrySource.includes('subline='),
-      'and no raw uuid line under the two the design draws'
-    );
-    assert.ok(
-      worldToolEntrySource.includes('SourceDropHint'),
-      'and explains that dropping an Item replaces the linked source'
-    );
-    assert.ok(
-      !worldToolEntrySource.includes('data-tool-source-replace'),
-      'without reviving the removed source picker'
-    );
-    // THE SYSTEM LABEL FIELD SURVIVES, and names itself as an OVERRIDE of the world value.
-    assert.ok(
-      toolSystemScopeSource.includes('data-tool-label'),
-      'the per-system display-label override still ships'
-    );
-    // AND IT SAYS SO IN THE SCREEN'S OWN IDIOM RATHER THAN IN A HELP SENTENCE (issue 1373). The
-    // card is a `ToolInheritCard` now: blank IS the inheriting state, so the pill, the
-    // `World default: <name>` line, the globe row and the switch carry the whole claim, and the
-    // sentence beneath is a caption rather than the only place the override is stated.
-    assert.ok(
-      toolSystemScopeSource.includes('<ToolInheritCard'),
-      'the label card is the same inherit card every other overridable fact here renders through'
     );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.LabelFallback,
@@ -2990,30 +2947,13 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelUnlinkedHint,
       'No Item is linked, so this record has no name to fall back on.'
     );
-    // TASK 4: the editor behind `Edit rules` offers the route the rules LIST already advertises.
+  });
+
+  it('removes the orphaned checklist row rather than leaving it standing', () => {
     assert.ok(
-      toolEditSource.includes('data-tool-editor-world-tool') &&
-        toolEditSource.includes('onEditWorldTool'),
-      'the focused Tool editor offers a route out to the world Tool'
-    );
-    assert.ok(
-      rootSource.includes(
-        "onEditWorldTool={(entityId) => openWorldScopedEntry('world-tool-entry', entityId)}"
-      ),
-      'and the root wires it to the same navigation the rules inspector takes'
-    );
-    assert.ok(
-      toolValidationSource.includes('<ScopedValidationTab'),
-      'Validation should reuse the shared scoped-entity validation shell'
-    );
-    // And that shell really does render the recipe-style surface. Asserting only the shell
-    // would pass on a shell that had dropped it, which is the whole point of the original.
-    assert.ok(
-      readFileSync(
-        resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte'),
-        'utf8'
-      ).includes('<EditorValidationSurface'),
-      'the shared scoped validation shell should reuse the recipe-style editor validation surface'
+      !existsSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/ChecklistCardRow.svelte')),
+      'its only caller was the prerequisite list, and a component left standing with no caller ' +
+        'is how a fourth row comes back by copy'
     );
   });
 
