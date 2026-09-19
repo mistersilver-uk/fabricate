@@ -10,7 +10,7 @@ src/canvas/linkedVisuals	64
 src/canvas/regions	331
 src/config	435
 src/integrations	20
-src/migration	1341
+src/migration	1353
 src/models	460
 src/models/match	66
 src/systems	25586
@@ -49,14 +49,14 @@ src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	327
 src/ui/svelte/components	1444
 src/ui/svelte/stores	4526
-src/ui/svelte/util	1243
+src/ui/svelte/util	1239
 src/utils	944
 styles	1042
-tests	19568
+tests	19589
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
-tests/components	14955
+tests/components	14956
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	20
