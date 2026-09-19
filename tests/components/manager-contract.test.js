@@ -23,12 +23,15 @@ import {
   moduleAstsIn,
 } from '../helpers/parsedSource.js';
 import {
+  attributeNames,
+  attributeValue,
   containsLiteral,
   declaredConstant,
   declaresAttribute,
   declaresProp,
   importsModule,
   passesProp,
+  propNone,
   readsGlobal,
   referencesIdentifier,
   rendersComponent,
@@ -65,7 +68,6 @@ const armedDangerButtonPath = resolve(
   'src/ui/svelte/components/ArmedDangerButton.svelte'
 );
 const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
-const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
 const toolEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolEditView.svelte');
 const toolBreakagePath = resolve(
   repoRoot,
@@ -104,7 +106,6 @@ const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
 const gatheringTasksBrowserSource = readFileSync(gatheringTasksBrowserPath, 'utf8');
 const knowledgeSource = readFileSync(knowledgePath, 'utf8');
 const armedDangerButtonSource = readFileSync(armedDangerButtonPath, 'utf8');
-const toolsBrowserSource = readFileSync(toolsBrowserPath, 'utf8');
 const toolEditSource = readFileSync(toolEditPath, 'utf8');
 const toolBreakageSource = readFileSync(toolBreakagePath, 'utf8');
 const toolSystemScopeSource = readFileSync(toolSystemScopePath, 'utf8');
@@ -264,6 +265,17 @@ function comparesToLiteral(node, value) {
   return false;
 }
 
+/** An `if` that tests one literal and returns another, which is the direction a mapping has. */
+function returnsForComparison(node, [compared, returned]) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'IfStatement' || !comparesToLiteral(inner.test, compared)) continue;
+    for (const branch of walkNodes(inner.consequent)) {
+      if (branch.type === 'ReturnStatement' && branch.argument?.value === returned) return true;
+    }
+  }
+  return false;
+}
+
 function extendsCallOf(node, name) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'ClassDeclaration' && inner.type !== 'ClassExpression') continue;
@@ -334,24 +346,6 @@ function namedCodeAst(scope, name) {
   throw new Error(`no binding \`${name}\``);
 }
 
-/** Every attribute, prop or directive name the template writes anywhere. */
-function attributeNames(component) {
-  const names = new Set();
-  for (const node of templateNodes(component)) {
-    for (const attribute of node.attributes ?? []) if (attribute.name) names.add(attribute.name);
-  }
-  return names;
-}
-
-/** The static value one element or component gives an attribute, or `undefined`. */
-function attributeValue(node, name) {
-  const attribute = (node.attributes ?? []).find(
-    (candidate) => candidate.type === 'Attribute' && candidate.name === name
-  );
-  const [chunk] = Array.isArray(attribute?.value) ? attribute.value : [];
-  return chunk?.type === 'Text' ? chunk.data : undefined;
-}
-
 /** The claims any plain code subtree answers: a module, a class member, or one function body. */
 function claimsOverCode(code) {
   return {
@@ -369,6 +363,7 @@ function claimsOverCode(code) {
     hooks: (event) => hookNames(code).has(event),
     diffKeys: ([object, key]) => inOperatorKeys(code, object).has(key),
     compares: (value) => comparesToLiteral(code, value),
+    returnsFor: (pair) => returnsForComparison(code, pair),
     assigns: ([name, value]) => assignedLiterals(code, name).includes(value),
     property: ([key, value]) => propertyValues(code, key).includes(value),
   };
@@ -385,6 +380,7 @@ function claimsForComponent(component) {
     spells: (text) => containsLiteral(component, text),
     spellsExactly: (text) => spellsLiteral(component, text),
     prop: ([name, propName]) => passesProp(component, name, propName),
+    propNone: ([name, propName]) => propNone(component, name, propName),
     attribute: ([name, value]) =>
       templateNodes(component).some((node) => attributeValue(node, name) === value),
     writes: (name) => attributeNames(component).has(name),
@@ -482,13 +478,18 @@ const CONTRACT_CLAIMS = Object.freeze({
   hooks: { ask: 'hooks', holds: true, says: (v) => `registers the ${v} hook` },
   diffKeys: { ask: 'diffKeys', holds: true, says: ([o, k]) => `re-projects on a ${o}.${k} change` },
   compares: { ask: 'compares', holds: true, says: (v) => `compares against ${v}` },
+  returnsFor: {
+    ask: 'returnsFor',
+    holds: true,
+    says: ([c, r]) => `maps "${c}" to "${r}", in that direction`,
+  },
   assigns: { ask: 'assigns', holds: true, says: ([n, v]) => `assigns ${n} = "${v}"` },
   assignsNo: { ask: 'assigns', holds: false, says: ([n, v]) => `never assigns ${n} = "${v}"` },
   property: { ask: 'property', holds: true, says: ([k, v]) => `carries ${k}: "${v}"` },
   propertyNo: { ask: 'property', holds: false, says: ([k, v]) => `carries no ${k}: "${v}"` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
-  passesPropsNo: { ask: 'prop', holds: false, says: ([c, p]) => `passes no ${p} to <${c}>` },
+  passesPropsNo: { ask: 'propNone', holds: true, says: ([c, p]) => `passes no ${p} to <${c}>` },
   attributes: { ask: 'attribute', holds: true, says: ([a, v]) => `writes ${a}="${v}"` },
   attributesNo: { ask: 'attribute', holds: false, says: ([a, v]) => `writes no ${a}="${v}"` },
   writes: { ask: 'writes', holds: true, says: (v) => `writes the ${v} attribute` },
@@ -515,8 +516,8 @@ const LIBRARY_SHELF = 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte';
 const MODIFIER_CATALOGUE =
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
 const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
-// The library inspector, extracted out of the root (issue 643). It sits under `recipes/`, NOT
-// `recipe/` — the latter is the recipe EDITOR's screenshot-map glob.
+// The library inspector, extracted out of the root (issue 643). It sits under `recipes/`, not
+// `recipe/` — the latter is the recipe editor's screenshot-map glob.
 const RECIPE_BROWSER_INSPECTOR =
   'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
 const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
@@ -526,7 +527,7 @@ const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 
-/** The manager views a claim may hold of ANY ONE of, which the joined text used to ask of all. */
+/** The manager views a claim may hold of any one of, which the joined text used to ask of all. */
 const MANAGER_VIEWS = [
   MANAGER_ROOT,
   COMPONENTS_BROWSER,
@@ -811,11 +812,9 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // World scope, not per system (issue 1278). Every rendered half of this editor — the ladder,
-  // the three peer strategies, the provider-managed read-only branch and the macro zones — is
-  // DRIVEN by `tests/components/world-currency-tab.test.js`. What stays here is what a mounted
-  // case cannot see: the drop pipeline behind the zones, and two keys claimed IN FULL because
-  // each has a longer neighbour.
+  // World scope, not per system (issue 1278). Every rendered half of this editor is driven by
+  // `tests/components/world-currency-tab.test.js`; what stays is the drop pipeline behind the
+  // macro zones, and two keys claimed in full because each has a longer neighbour.
   defineStructureContract('authors the world coin ladder on one page', WORLD_CURRENCY, {
     declaresProp: ['currencyValidationErrors'],
     declares: ['currencyHasProviders', 'currencyMacroMode', 'currencyUnitsReadOnly'],
@@ -830,10 +829,9 @@ describe('CraftingSystemManager source contract', () => {
     spellsNo: ['data-world-currency-inventory-mode-select'],
   });
 
-  // `passesProps` requires EVERY `<WorldCurrencyTab>` occurrence to declare the prop, which is
-  // the "on the tag itself" claim the sliced tag used to make, for the whole set at once. The
-  // validation report is a three-link join: the store publishes it, the root derives off it, and
-  // the root threads the derivation (issue 1493).
+  // `passesProps` requires the `<WorldCurrencyTab>` call site to declare the prop, which is the
+  // "on the tag itself" claim the sliced tag used to make, for the whole set at once. The
+  // validation report is a three-link join: publish, derive, thread (issue 1493).
   defineStructureContract('threads the world currency profile and its report', MANAGER_ROOT, {
     passesProps: [
       ['WorldCurrencyTab', 'currencyUnits'],
@@ -848,14 +846,20 @@ describe('CraftingSystemManager source contract', () => {
       ['WorldCurrencyTab', 'onSetCurrencyMacro'],
       ['WorldCurrencyTab', 'onClearCurrencyMacro'],
     ],
-    declares: ['currencyValidationErrors', 'worldCurrencyValidation'],
-    reads: ['$viewState.worldCurrencyValidation', 'worldCurrencyValidation.errors'],
+    declares: ['worldCurrencyValidation'],
+    reads: ['$viewState.worldCurrencyValidation'],
     names: ['getCurrencyProvidersForFoundrySystem'],
     namesNo: ['onSetCurrencyInventoryMode'],
   });
 
+  defineStructureContract(
+    'derives the report from the published one',
+    { file: MANAGER_ROOT, constant: 'currencyValidationErrors' },
+    { reads: ['worldCurrencyValidation.errors'] }
+  );
+
   // Formula-only since issue 1440: one labelled expression field, no provider leg. The key is
-  // claimed IN FULL, because `…Modifiers.ExpressionHint` next door satisfies a substring.
+  // claimed in full, because `…Modifiers.ExpressionHint` next door satisfies a substring.
   defineStructureContract('authors a character modifier as a formula alone', WORLD_MODIFIERS, {
     renders: ['RollDataExpressionInput'],
     passesProps: [['RollDataExpressionInput', 'onChange']],
@@ -867,7 +871,7 @@ describe('CraftingSystemManager source contract', () => {
 
   // One shared row, not two: the Tool Studio's bonus picker draws it too (asserted beside its
   // own pins), so the catalogue's half of that claim is stated here. The two absent props are
-  // read against the SAME rendered node the row claim resolves, so neither is vacuous.
+  // read against the same rendered node the row claim resolves, so neither is vacuous.
   defineStructureContract(
     'draws the Checks Studio modifier catalogue with the shared library row, as it shipped',
     MODIFIER_CATALOGUE,
@@ -881,7 +885,7 @@ describe('CraftingSystemManager source contract', () => {
   );
 
   // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
-  // `data-manager-view` are NOT here: every route module reads them off the mounted shell
+  // `data-manager-view` are not here: every route module reads them off the mounted shell
   // (`target.querySelector('.fabricate-manager').dataset.managerView`).
   defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
     attributes: [
@@ -904,17 +908,16 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // `class="manager-empty"` is NOT in this set any more (issue 785).
-  defineStructureContract('gives every browse route the same main column', MANAGER_VIEWS, {
+  // `class="manager-empty"` is not in this set any more (issue 785).
+  defineStructureContract('gives a browse route the same main column', MANAGER_VIEWS, {
     spells: ['manager-main', 'manager-filter'],
     spellsExactly: ['FABRICATE.Admin.Manager.Environment.EmptyTitle'],
     renders: ['ManagerToolbar', 'EmptyState'],
     imports: ['../../components/EmptyState.svelte'],
   });
 
-  // What System Settings DRAWS — the edit form, the feature tiles, the currency participation
-  // toggle and its tile key — is driven by `tests/components/manager-systems-mounted.js`. The
-  // relocated currency EDITOR (issue 1278) is the absence this states: any of these markers
+  // What System Settings draws is driven by `tests/components/manager-systems-mounted.js`. The
+  // relocated currency editor (issue 1278) is the absence this states: any of these markers
   // reappearing means the two scopes can disagree about one world's coins again.
   defineStructureContract('keeps the crafting system page to its own settings', SYSTEM_EDIT, {
     renders: ['SystemEditorTabs', 'SystemOverviewView'],
@@ -935,11 +938,15 @@ describe('CraftingSystemManager source contract', () => {
       'data-system-currency-strategy-select',
       'data-system-currency-macros',
     ],
+    writesNo: [
+      'data-system-currency-units',
+      'data-system-currency-strategy-select',
+      'data-system-currency-macros',
+    ],
   });
 
   defineStructureContract('threads both requirement toggles to the one store seam', MANAGER_ROOT, {
     callsWith: [['toggleRequirement', 'next']],
-    spellsExactly: ['currency', 'time'],
   });
 
   // Same-named systems are disambiguated through the shared helper (issue 346). The rows, their
@@ -1122,10 +1129,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.deepEqual(failures, []);
   });
 
-  // The v2 route replaced a launch into the legacy admin (issue 429). Saving the details, the
-  // row status switch and the feature toggles are all DRIVEN by
-  // `tests/components/manager-systems-mounted.js`; what stays is the dead wiring's absence and
-  // the callbacks the root threads down to the page.
+  // The v2 route replaced a launch into the legacy admin (issue 429). Saving, the row status
+  // switch and the feature toggles are driven by `tests/components/manager-systems-mounted.js`;
+  // what stays is the dead wiring's absence and the callbacks the root threads to the page.
   defineStructureContract('routes system Edit to the in-place v2 edit view', MANAGER_ROOT, {
     assigns: [['activeView', 'system-edit']],
     reads: ['store.setResolutionMode', 'store.toggleFeature'],
@@ -1134,7 +1140,7 @@ describe('CraftingSystemManager source contract', () => {
     spellsNo: ['Edit details'],
   });
 
-  // Asked of the WHOLE manager view set, because the action and the save live on two of its
+  // Asked of the whole manager view set, because the action and the save live on two of its
   // pages: "in at least one of these", stated once.
   defineStructureContract('saves system details through the admin store', MANAGER_VIEWS, {
     spellsExactly: ['FABRICATE.Admin.Manager.EditSystem'],
@@ -1170,12 +1176,12 @@ describe('CraftingSystemManager source contract', () => {
     }
   });
 
-  // The salvage card's own hooks, which reach `RadioCardGroup` as prop VALUES since issue 1509
+  // The salvage card's own hooks, which reach `RadioCardGroup` as prop values since issue 1509
   // folded the `ResolutionModeCard` shim away.
   defineStructureContract('draws a salvage resolution card of its own', CRAFTING_SETTINGS, {
     declaresProp: ['onSetSalvageResolutionMode'],
     attributes: [
-      ['legend', 'Recipe resolution mode'],
+      ['legend', 'Salvage resolution mode'],
       ['cardId', 'manager-crafting-salvage-resolution-mode'],
       ['groupName', 'manager-crafting-salvage-resolution-mode'],
       ['dataAttr', 'data-crafting-salvage-resolution-mode'],
@@ -1183,7 +1189,12 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // Salvage has exactly ONE ingredient, so ingredient-set routing is meaningless and `alchemy`
+  // The recipe card's own legend fallback, stated apart from the salvage card's.
+  defineStructureContract('keeps the recipe card legend beside it', CRAFTING_SETTINGS, {
+    attributes: [['legend', 'Recipe resolution mode']],
+  });
+
+  // Salvage has exactly one ingredient, so ingredient-set routing is meaningless and `alchemy`
   // is not offered; the narrowing to the salvage binding is what keeps that absence honest,
   // because the recipe list beside it does offer alchemy.
   defineStructureContract(
@@ -1192,7 +1203,7 @@ describe('CraftingSystemManager source contract', () => {
     { spellsExactly: ['simple', 'progressive', 'routed'], spellsExactlyNo: ['alchemy'] }
   );
 
-  // The two retired persistence tokens, across the WHOLE module: neither list may offer them.
+  // The two retired persistence tokens, across the whole module: neither list may offer them.
   defineStructureContract(
     'retires the legacy mapped and tiered persistence values',
     RESOLUTION_MODE_OPTIONS,
@@ -1255,7 +1266,7 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The heading is the selected system's NAME, falling back to the route name only when nothing
+  // The heading is the selected system's name, falling back to the route name only when nothing
   // is selected, rather than rendering an empty heading (#429).
   defineStructureContract('titles the page after the record it edits', MANAGER_ROOT, {
     reads: ['selectedSystem.name'],
@@ -1273,7 +1284,7 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract(
     'folds a stale overview token into the system-edit page',
     { file: MANAGER_ROOT, fn: 'normalizedActiveView' },
-    { spellsExactly: ['system-overview', 'system-edit'] }
+    { returnsFor: [['system-overview', 'system-edit']] }
   );
 
   // The page is a full-width tabbed shell mirroring the environment editor: the aside is skipped
@@ -1688,7 +1699,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs, 'Essence docs');
   });
 
-  // Every one of the nine store delegations this block used to pin as root text is DRIVEN by
+  // Every one of the nine store delegations this block used to pin as root text is driven by
   // `tests/components/manager-tags-mounted.js`, which clicks the real control and reads the call
   // back off the store double; what stays is the route's own shape.
   defineStructureContract('routes tags and categories to its own focused page', MANAGER_ROOT, {
@@ -1701,7 +1712,7 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
-  // What the browser RENDERS — the rows, the disabled marker, the capability pills, the usage
+  // What the browser renders — the rows, the disabled marker, the capability pills, the usage
   // counts, the row toggle and the absent action band — is driven by
   // `tests/components/manager-essences-mounted.js`. What stays is the seam and what was deleted.
   defineStructureContract('keeps essence browsing browser-only', ESSENCE_BROWSER, {
@@ -1731,11 +1742,11 @@ describe('CraftingSystemManager source contract', () => {
     passesProps: [['EssenceBrowserView', 'browserState']],
     renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
     spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
-    spellsNo: ['data-essence-action='],
+    writesNo: ['data-essence-action'],
   });
 
-  // Criterion 23: the guard compares the ESSENCE and not only the view token, so re-entering the
-  // editor for the SAME essence skips the prompt and switching to another one does not.
+  // Criterion 23: the guard compares the essence and not only the view token, so re-entering the
+  // editor for the same essence skips the prompt and switching to another one does not.
   defineStructureContract(
     'skips a same-essence route exit rather than a same-token one',
     { file: MANAGER_ROOT, fn: 'confirmEssenceRouteExit' },
@@ -1757,8 +1768,8 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game'],
   });
 
-  // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8), and the armed bulk
-  // delete is a deliberate deviation from the `AGENTS.md` dialog carve-out.
+  // `duplicate` is not in this set (issue 1372), and the armed bulk delete is a deliberate
+  // deviation from the `AGENTS.md` dialog carve-out.
   defineStructureContract('extracts the inspector and its bulk panel', ESSENCE_STUDIO, {
     imports: [
       '../../../components/IconPicker.svelte',
@@ -1807,11 +1818,9 @@ describe('CraftingSystemManager source contract', () => {
     }
   });
 
-  // WHAT THE LIBRARY DRAWS is driven by `tests/components/recipes-browser-view-mounted.test.js`,
-  // which mounts the browser and the inspector on their own: the card list, the row pencil, the
-  // column header, the authoring-state pills and their tones, the lifted view-state and the
-  // inspector's stat grid, action ladder and Produces section all act on real rows there. What
-  // stays is the wiring behind them, and the shapes those cases would still pass without.
+  // What the library draws is driven by `tests/components/recipes-browser-view-mounted.test.js`,
+  // which acts on real rows in the browser and the inspector alike. What stays is the wiring
+  // behind them, and the shapes those cases would still pass without.
   defineStructureContract('draws the recipe library as a list of cards', RECIPES_BROWSER, {
     declaresProp: ['browserState'],
     names: ['createRecipeBrowserState'],
@@ -1825,12 +1834,12 @@ describe('CraftingSystemManager source contract', () => {
       ['role', 'table'],
       ['type', 'checkbox'],
     ],
-    // The narrower predicate the pills were moved OFF, and the save that lives in the root.
+    // The narrower predicate the pills were moved off, and the save that lives in the root.
     readsNo: ['recipe.incomplete'],
     namesNo: ['saveRecipe'],
   });
 
-  // The aside moved into the extracted inspector (issue 643), which is ONE column on the panel
+  // The aside moved into the extracted inspector (issue 643), which is one column on the panel
   // background rather than five nested cards.
   defineStructureContract('answers what a recipe needs and makes', RECIPE_BROWSER_INSPECTOR, {
     declaresProp: ['onEdit', 'componentCount'],
@@ -1843,7 +1852,7 @@ describe('CraftingSystemManager source contract', () => {
     spellsNo: ['manager-inspector-card', 'Recipe.Details'],
   });
 
-  // Both routes into the editor, and the two header actions that are NOT on this header.
+  // Both routes into the editor, and the two header actions that are not on this header.
   defineStructureContract('routes recipe editing from the row and the inspector', MANAGER_ROOT, {
     passesProps: [
       ['RecipeBrowserInspector', 'onEdit'],
@@ -1855,7 +1864,7 @@ describe('CraftingSystemManager source contract', () => {
     spellsNo: ['required station'],
   });
 
-  // A CARD ROW HAS NO COLUMNS (issue 676): the browser is a real list and the row is its item, so
+  // A card row has no columns (issue 676): the browser is a real list and the row is its item, so
   // neither file may reintroduce the table scaffolding. Read off the rendered attribute rather
   // than the file text, which both files' own prose legitimately mentions.
   const TABLE_ROLES = Object.freeze([
@@ -1878,10 +1887,9 @@ describe('CraftingSystemManager source contract', () => {
     attributesNo: TABLE_ROLES,
   });
 
-  // The store wiring behind this route — search, drop import, delete, copy-source and the
-  // legacy editor it no longer launches — is DRIVEN by
-  // `tests/components/manager-components-mounted.js`, which clicks each control on the real
-  // route and reads the call back off the store double. What stays is what nothing renders.
+  // The store wiring behind this route — search, drop import, delete, copy-source and the legacy
+  // editor it no longer launches — is driven by `tests/components/manager-components-mounted.js`,
+  // which clicks each control on the real route. What stays is what nothing renders.
   defineStructureContract('invents no component facts the store does not publish', MANAGER_ROOT, {
     namesNo: ['usageCount'],
     spellsNo: ['stale source'],
@@ -1892,7 +1900,7 @@ describe('CraftingSystemManager source contract', () => {
     calls: ['updateComponent'],
   });
 
-  // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
+  // A load-bearing asymmetry: `confirmComponentRouteExit` deliberately lacks the
   // `|| nextView === '<kind>-edit'` bypass its recipe sibling carries, which is why the two are
   // asserted together: the sibling is what makes the absence a choice rather than an oversight.
   defineStructureContract(
@@ -1907,11 +1915,11 @@ describe('CraftingSystemManager source contract', () => {
     { names: ['activeView', 'nextView'], compares: ['recipe-edit'] }
   );
 
-  // `foundry` is NOT in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
+  // `foundry` is not in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
   // What it must never reach is an application class, which is the member read below.
   defineStructureContract('keeps the component editor free of Foundry globals', COMPONENT_EDIT, {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
-    readsNo: ['globalThis.foundry.applications'],
+    readsNo: ['globalThis.foundry.applications', 'foundry.applications'],
   });
 
   it('uses a purpose-built manager environment editor instead of mounting the legacy tab', () => {

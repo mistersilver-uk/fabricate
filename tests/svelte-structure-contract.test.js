@@ -22,6 +22,8 @@ import {
   referencesIdentifier as referencesIdentifierOf,
 } from './helpers/moduleAst.js';
 import {
+  attributeNames,
+  attributeValue,
   carriesSpread,
   containsLiteral,
   declaredConstant,
@@ -32,6 +34,7 @@ import {
   parseComponent,
   parseComponentScope,
   passesProp,
+  propNone,
   readsGlobal,
   referencesIdentifier,
   requiresProp,
@@ -109,6 +112,27 @@ test('passesProp requires every occurrence to declare it, and is false when none
 test('passesProp is false when only some occurrences declare the prop', () => {
   const partial = parseComponent('<div><Chip tone="a" /><Chip /></div>');
   assert.equal(passesProp(partial, 'Chip', 'tone'), false);
+});
+
+test('propNone denies the partial case that negating passesProp would accept', () => {
+  const partial = parseComponent('<div><Chip tone="a" /><Chip /></div>');
+  assert.equal(passesProp(partial, 'Chip', 'tone'), false, 'not every occurrence declares it');
+  assert.equal(propNone(partial, 'Chip', 'tone'), false, 'but one does, so "passes no" is false');
+  assert.equal(propNone(parseComponent('<div><Chip /></div>'), 'Chip', 'tone'), true);
+  assert.equal(propNone(ast, 'Callout', 'tone'), false, 'an unrendered component is not a contract');
+});
+
+test('attributeValue reads a static value only, and attributeNames lists directives too', () => {
+  const card = parseComponent('<div><Chip tone="warn" label={name} bind:open /></div>');
+  let chip;
+  walkElements(card.fragment, (candidate) => {
+    if (candidate.type === 'Component') chip = candidate;
+  });
+  assert.equal(attributeValue(chip, 'tone'), 'warn');
+  assert.equal(attributeValue(chip, 'label'), undefined, 'an expression has no static value');
+  assert.equal(attributeValue(chip, 'absent'), undefined);
+  assert.deepStrictEqual([...attributeNames(card)].sort(), ['label', 'open', 'tone']);
+  assert.equal(attributeNames(parseComponent('<div />')).has('class'), false);
 });
 
 test('declaresProp and requiresProp separate a defaulted prop from one with no fallback', () => {

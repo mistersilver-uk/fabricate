@@ -351,8 +351,24 @@ export function registerTagsCases() {
       .click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-vocabulary-confirm="reagent"]'), null);
+    assert.ok(!target.querySelector('[data-vocabulary-confirm="reagent"]'));
     assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
+
+    // Confirming it does cascade, under the component kind's own store action.
+    target.querySelector('[aria-label="Remove component category Reagent"]').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-vocabulary-confirm="reagent"] .manager-button.is-danger').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some((call) => call[0] === 'removeComponentCategory' && call[1] === 'Reagent'),
+      'the confirmed removal reaches removeComponentCategory with the authored label'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'removeCategory'),
+      'and never through the recipe vocabulary'
+    );
   });
 
   it('counts the reserved General bucket in the tab badge, the glance tile and the entry chip alike (issue 878)', async () => {
@@ -509,7 +525,7 @@ export function registerTagsCases() {
     );
   });
 
-  // The COMPONENT vocabulary has its own icon seam (issue 676): the two tabs must not write
+  // The component vocabulary has its own icon seam (issue 676): the two tabs must not write
   // through one another's store action.
   it('commits a component-category icon through the component seam alone', async () => {
     const calls = [];

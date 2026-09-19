@@ -73,7 +73,7 @@ const UNITS = Object.freeze([
 
 /**
  * The same ladder with gold broken down, which is what the sub-unit controls need (issue 1691).
- * Copper is the third rung: the Add sub-unit builder renders only while an ELIGIBLE unit is left.
+ * Copper is the third rung: the Add sub-unit builder renders only while an eligible unit is left.
  */
 const NESTED_UNITS = Object.freeze([
   {
