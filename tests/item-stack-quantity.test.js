@@ -176,8 +176,8 @@ const SITE_MAPPING = [
     anchors: [/hasStackQuantity\(source, path\)/],
   },
   {
-    site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable',
-    file: 'src/systems/CraftingEngine.js',
+    site: 'salvagePipeline.selectedQuantityItems + salvage totalAvailable',
+    file: 'src/systems/salvagePipeline.js',
     accessor: 'readStackQuantity',
     sites: 2,
     // Neither is a delete-on-underrun site any more: the salvage consume's capacity read moved to
