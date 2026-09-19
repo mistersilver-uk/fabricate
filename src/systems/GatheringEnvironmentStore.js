@@ -21,6 +21,8 @@ import { resolvedComponentsFor } from './scopedEntityReads.js';
 const VALID_SELECTION_MODES = new Set(['targeted', 'blind']);
 const VALID_COMPOSITION_MODES = new Set(['automatic', 'manual']);
 const VALID_RISK_LEVELS = new Set(['safe', 'hazardous', 'unsafe', 'extreme']);
+/** The two id lists that make up an environment's realm membership. */
+const REALM_MEMBERSHIP_KEYS = Object.freeze(['includedRealmIds', 'excludedRealmIds']);
 
 export const GATHERING_FAILURE_KEYWORDS = Object.freeze([
   'f',
@@ -80,7 +82,10 @@ export class GatheringEnvironmentValidationError extends Error {
  * lists), so a targeted/blind environment is only valid when it has at least one
  * such library task source. Validation failures throw before persistence,
  * leaving callers' draft state intact; UI layers map error strings to inline
- * field targets and summary links.
+ * field targets and summary links. Realm membership is the one field a save REWRITES rather
+ * than rejects: environments persist as a single world list, so a realm id the record already
+ * carried and the world library has lost is pruned rather than allowed to make every
+ * environment in the world unsaveable (issue 1848).
  */
 export class GatheringEnvironmentStore {
   constructor({
@@ -91,6 +96,7 @@ export class GatheringEnvironmentStore {
     travelStore = null,
     randomID = null,
     runCleanup = null,
+    warn = console.warn,
   } = {}) {
     this.getSetting = getSetting;
     this.setSetting = setSetting;
@@ -99,6 +105,7 @@ export class GatheringEnvironmentStore {
     this.travelStore = travelStore;
     this.randomID = randomID || (() => foundry.utils.randomID());
     this.runCleanup = runCleanup;
+    this.warn = warn;
     this.environments = [];
     this.loaded = false;
   }
@@ -139,9 +146,10 @@ export class GatheringEnvironmentStore {
     return this._persistEnvironmentList(environments);
   }
 
-  async _persistEnvironmentList(environments) {
+  async _persistEnvironmentList(environments, { baselineById = null } = {}) {
     const original = Array.isArray(environments) ? cloneJson(environments) : [];
     const normalized = this._normalizeEnvironmentList(original);
+    this._pruneStaleRealmMembership(normalized, { baselineById });
     const errors = this._validateAll(normalized, original);
     if (errors.length > 0) {
       throw new GatheringEnvironmentValidationError(errors);
@@ -184,12 +192,19 @@ export class GatheringEnvironmentStore {
       id: environmentId,
     };
     const environment = this._normalizeEnvironment(merged);
-    const errors = this._validateEnvironment(environment, merged);
+    // Validate a copy with the persisted record's own stale realm ids already pruned: a manager
+    // patch re-sends the whole record, so the patch mentioning an id cannot be what marks it as
+    // newly introduced. The persist below re-prunes and reports across the whole list.
+    const errors = this._validateEnvironment(this._withStaleRealmIdsPruned(environment), merged);
     if (errors.length > 0) {
       throw new GatheringEnvironmentValidationError(errors);
     }
-    await this._persistEnvironmentList(replaceAt(this.environments, index, environment));
-    return cloneJson(environment);
+    // Return what was PERSISTED, not what was submitted: the persist may have pruned realm ids
+    // off this record, and a caller handed the submitted copy would re-send them.
+    const persisted = await this._persistEnvironmentList(
+      replaceAt(this.environments, index, environment)
+    );
+    return persisted.find((env) => env.id === environmentId) ?? cloneJson(environment);
   }
 
   async duplicate(environmentId, overrides = {}) {
@@ -203,12 +218,19 @@ export class GatheringEnvironmentStore {
       id: this.randomID(),
       nodeRuntime: {}, // a copy starts with full pools
     });
-    const errors = this._validateEnvironment(duplicate);
+    // A copy has no persisted counterpart under its own id, so its baseline is the record it
+    // was copied FROM: it inherits that record's stale ids, and owns anything `overrides` names.
+    const baselineById = new Map([[duplicate.id, source]]);
+    const errors = this._validateEnvironment(
+      this._withStaleRealmIdsPruned(duplicate, { baselineById })
+    );
     if (errors.length > 0) {
       throw new GatheringEnvironmentValidationError(errors);
     }
-    await this._persistEnvironmentList([...this.environments, duplicate]);
-    return cloneJson(duplicate);
+    const persisted = await this._persistEnvironmentList([...this.environments, duplicate], {
+      baselineById,
+    });
+    return persisted.find((env) => env.id === duplicate.id) ?? cloneJson(duplicate);
   }
 
   async reorder(systemId, orderedEnvironmentIds = []) {
@@ -343,6 +365,66 @@ export class GatheringEnvironmentStore {
     };
   }
 
+  /**
+   * The world realm library as a lookup, or null when it cannot be read at all. Both the
+   * rejection of an unknown realm id and the prune of a stale one are keyed to this same
+   * answer, so a library that is missing neither rejects nor destroys anything.
+   *
+   * @returns {Set<string>|null}
+   */
+  _knownRealmIds() {
+    const worldRealms = this.travelStore?.list?.();
+    if (!Array.isArray(worldRealms)) return null;
+    return new Set(worldRealms.map((realm) => realm?.id).filter(Boolean));
+  }
+
+  /**
+   * Drop realm ids whose realm has left the world library from the records that ALREADY carried
+   * them (issue 1848), so one deleted realm cannot make every environment in the world
+   * unsaveable. An id a write introduces is left in place for `_validateEnvironment` to reject.
+   *
+   * @param {object[]} environments normalized records, pruned in place
+   * @param {{ baselineById?: Map<string, object>|null, notify?: boolean }} [options]
+   * @returns {object[]} the same records
+   */
+  _pruneStaleRealmMembership(environments, { baselineById = null, notify = true } = {}) {
+    const knownRealmIds = this._knownRealmIds();
+    if (!knownRealmIds) return environments;
+
+    const reports = [];
+    for (const environment of environments) {
+      const baseline = this._membershipBaseline(environment.id, baselineById);
+      const dropped = baseline ? pruneRealmMembership(environment, baseline, knownRealmIds) : [];
+      if (dropped.length > 0) {
+        reports.push(`"${environment.name || environment.id}" (${dropped.join(', ')})`);
+      }
+    }
+
+    // One report per write, not one per environment: environments persist as a single world
+    // list, so the save that repairs one of them repairs every one of them.
+    if (notify && reports.length > 0) {
+      this.warn(
+        `Fabricate | Dropped gathering environment references to realms no longer in the world library: ${reports.join('; ')}`
+      );
+    }
+    return environments;
+  }
+
+  /** The record a write is measured against: the persisted one, unless the caller names another. */
+  _membershipBaseline(environmentId, baselineById) {
+    if (baselineById?.has(environmentId)) return baselineById.get(environmentId);
+    return this.environments.find((persisted) => persisted.id === environmentId) ?? null;
+  }
+
+  /** A copy of one normalized record with its inherited stale realm ids pruned, silently. */
+  _withStaleRealmIdsPruned(environment, { baselineById = null } = {}) {
+    const [pruned] = this._pruneStaleRealmMembership([cloneJson(environment)], {
+      baselineById,
+      notify: false,
+    });
+    return pruned;
+  }
+
   _validateAll(environments, originals = environments) {
     return environments.flatMap((environment, index) =>
       this._validateEnvironment(
@@ -377,9 +459,8 @@ export class GatheringEnvironmentStore {
     // rather than the owning system's copy. That makes it strictly more resolvable than it
     // was: an environment citing a realm another system happened to author was previously
     // invalid-but-inert, and is now simply valid.
-    const worldRealms = this.travelStore?.list?.();
-    if (Array.isArray(worldRealms)) {
-      const realmIds = new Set(worldRealms.map((realm) => realm?.id).filter(Boolean));
+    const realmIds = this._knownRealmIds();
+    if (realmIds) {
       for (const realmId of normalized.includedRealmIds) {
         if (!realmIds.has(realmId)) {
           errors.push(
@@ -616,6 +697,26 @@ function normalizeBlindSelection(data = null) {
   const weights = data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {};
   if (Object.keys(weights).length === 0) return null;
   return { weights };
+}
+
+/**
+ * Drop from `environment` every realm id that `baseline` already carried and the world library
+ * no longer has; an id `baseline` did not carry is left for validation to reject.
+ *
+ * @returns {string[]} the dropped ids
+ */
+function pruneRealmMembership(environment, baseline, knownRealmIds) {
+  const dropped = new Set();
+  for (const key of REALM_MEMBERSHIP_KEYS) {
+    const inherited = new Set(normalizeIdList(baseline[key]));
+    const kept = [];
+    for (const realmId of environment[key]) {
+      if (knownRealmIds.has(realmId) || !inherited.has(realmId)) kept.push(realmId);
+      else dropped.add(realmId);
+    }
+    environment[key] = kept;
+  }
+  return [...dropped];
 }
 
 function replaceAt(array, index, value) {

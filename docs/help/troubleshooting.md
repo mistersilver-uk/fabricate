@@ -705,6 +705,44 @@ The message covers the whole section rather than one tab of it, so every tab bel
 
 ---
 
+## Environments Will Not Save After a Realm Was Deleted
+
+**Symptom:** After deleting a gathering realm, every gathering environment save fails with an error saying the environment references an unknown realm.
+Environments you never edited fail too, so no environment in the world can be saved.
+
+**Cause:**
+
+Fabricate 1.9.6 and earlier removed the realm from the world realm library but left its id on every environment that listed it.
+Environments are stored as one world list, and a single id that names no realm made the whole list invalid, so every environment save was rejected rather than only the saves of environments that cited the deleted realm.
+
+**Fix:** Update to 1.9.7 or later.
+The next successful environment save removes the stale realm ids from every environment carrying one, and logs once what it removed.
+An environment left with no realm ids is no longer restricted to a realm; it is not disabled or deleted.
+
+From 1.9.7 on, deleting a realm removes it from the realm membership of every environment that listed it as part of the delete, so the problem cannot recur.
+A party whose current-realm override named the deleted realm still shows it as **Unknown realm**; clear that override from the party card.
+
+**See also:** [Gathering Realms & Travel]({% link world/travel/realms.md %}) covers realm deletion and what it does to referencing environments.
+
+---
+
+## Importing a System With Realm-Gated Environments Fails
+
+**Symptom:** Importing a crafting system whose gathering environments are restricted to realms fails with an error saying an environment references an unknown realm.
+The same bundle imports cleanly back into the world it was exported from.
+
+**Cause:**
+
+Fabricate 1.9.6 and earlier wrote the imported environments before the realms those environments name.
+Environments are checked against the world realm library as they are written, so the check ran while the realms were still waiting to arrive and rejected the whole import.
+
+**Fix:** Update to 1.9.7 or later, which brings the realm library in before the environments that name it, and import the bundle again.
+Realms the destination world already has keep their own definitions; only realms it does not have are added.
+
+**See also:** [Import & Export]({% link crafting-systems/import-export.md %}) covers what a system bundle carries.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

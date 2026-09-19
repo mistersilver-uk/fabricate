@@ -699,8 +699,8 @@ export class CompendiumImporter {
 
   /**
    * Import the gathering-authoring bundle for the (possibly freshly-created)
-   * system: rebind container ids, resolve/report references, persist environments
-   * via replace-by-system-id (F1), and merge the gatheringConfig slice.
+   * system: rebind container ids, resolve/report references, merge the world realm library,
+   * persist environments via replace-by-system-id (F1), and merge the gatheringConfig slice.
    * @private
    */
   async _importGatheringAuthoring(packData, system, recipesData, summary) {
@@ -754,10 +754,15 @@ export class CompendiumImporter {
     // validates them against whatever the destination world already had. That ordering was
     // latent until issue 1315 closed the gate's mode-blind `enabledTaskIds` guard, which had
     // been answering "yes" for automatic environments without consulting the library at all.
+    // The realm library FIRST: an imported environment gates on realms by id, and the
+    // environment store validates those ids against the world library on every write, so
+    // persisting the environments first rejects the whole import of a realm-gated system into a
+    // world that does not yet have those places (issue 1848).
+    await this._persistTravelConfig(resolved.travelConfig);
+    await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistGatheringConfig(system.id, resolvedConfig);
     await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistCurrencyConfig(packData.currencyConfig);
-    await this._persistTravelConfig(resolved.travelConfig);
   }
 
   /**

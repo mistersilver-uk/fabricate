@@ -1,11 +1,32 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { get } from 'svelte/store';
 
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 
 function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+// Realm membership helpers, shared by the environment-store fake and the realm-delete cascade.
+function realmMembership(environment) {
+  return [
+    ...(Array.isArray(environment?.includedRealmIds) ? environment.includedRealmIds : []),
+    ...(Array.isArray(environment?.excludedRealmIds) ? environment.excludedRealmIds : [])
+  ];
+}
+
+function withoutRealm(environment, realmId) {
+  const stripped = clone(environment);
+  if (Array.isArray(stripped.includedRealmIds)) {
+    stripped.includedRealmIds = stripped.includedRealmIds.filter(id => id !== realmId);
+  }
+  if (Array.isArray(stripped.excludedRealmIds)) {
+    stripped.excludedRealmIds = stripped.excludedRealmIds.filter(id => id !== realmId);
+  }
+  return stripped;
 }
 
 function makeSystem(overrides = {}) {
@@ -55,6 +76,8 @@ function createServices({
   const system = makeSystem();
   // The WORLD realm library, standing in for the `travelConfig` setting.
   const realmRecords = clone(realms);
+  // The world environment list, mutable so a realm delete can cascade into it (issue 1848).
+  const environmentRecords = clone(environments);
   const systemManager = {
     getSystems: () => (hasSystems ? [system] : []),
     getSystem: (id) => (id === system.id ? system : null),
@@ -67,7 +90,8 @@ function createServices({
   const calls = {
     create: [], update: [], delete: [], addMember: [], removeMember: [],
     moveMember: [], setTravelActor: [], setEnabled: [], setOverride: [], clearOverride: [],
-    realmCreate: [], realmUpdate: [], realmDelete: [], realmSettings: [], realmSceneLink: []
+    realmCreate: [], realmUpdate: [], realmDelete: [], realmSettings: [], realmSceneLink: [],
+    environmentUpdate: []
   };
   const confirmCalls = [];
   const markerMoveHandlers = [];
@@ -151,6 +175,20 @@ function createServices({
     }
   };
 
+  // Backed by the mutable world list so a write is observable by the next read, which is what
+  // the realm-delete cascade and the membership toggle are measured against (issue 1848).
+  const environmentStore = {
+    listBySystem: async () => clone(environmentRecords),
+    list: () => clone(environmentRecords),
+    update: async (id, patch) => {
+      calls.environmentUpdate.push({ id, patch: clone(patch) });
+      const index = environmentRecords.findIndex(e => e.id === id);
+      if (index < 0) return null;
+      environmentRecords[index] = { ...environmentRecords[index], ...clone(patch) };
+      return clone(environmentRecords[index]);
+    }
+  };
+
   // World-scope surface (issue 1282): not one method takes a crafting system id, and a map link
   // move is ONE `setSceneRegionLink` write rather than an `update()` per realm.
   const realmBehaviour = { revealMode: 'manual', modifierVisibility: 'visible' };
@@ -170,7 +208,24 @@ function createServices({
       }
       return clone(realmRecords);
     },
-    delete: async (id, collaborators) => { calls.realmDelete.push({ id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } }); const index = realmRecords.findIndex(r => r.id === id); if (index !== -1) realmRecords.splice(index, 1); return { deleted: { id }, referencedBy: { environments: [], partyOverrides: [] } }; },
+    // GatheringRealmStore.delete cascades: every citing environment loses the realm from its
+    // membership BEFORE the realm leaves the library, and the delete never blocks (issue 1848).
+    // This fake deliberately models the per-environment `update` fallback seam; the real store
+    // takes the single `save(list)` path, which tests/gathering-realm-store.test.js pins.
+    delete: async (id, collaborators) => {
+      calls.realmDelete.push({ id, collaborators: { hasEnv: !!collaborators?.environmentStore, hasParty: !!collaborators?.partyStore } });
+      const citing = environmentRecords.filter(e => realmMembership(e).includes(id));
+      for (const environment of citing) {
+        await collaborators?.environmentStore?.update?.(environment.id, withoutRealm(environment, id));
+      }
+      const index = realmRecords.findIndex(r => r.id === id);
+      if (index !== -1) realmRecords.splice(index, 1);
+      return {
+        deleted: { id },
+        referencedBy: { environments: citing.map(e => e.id), partyOverrides: [] },
+        repaired: { environments: citing.length }
+      };
+    },
     getRealmSettings: () => clone(realmBehaviour),
     updateRealmSettings: async (patch) => { calls.realmSettings.push(clone(patch)); Object.assign(realmBehaviour, patch); return clone(realmBehaviour); }
   };
@@ -207,7 +262,7 @@ function createServices({
     setSetting: async (key, value) => { settings[key] = value; },
     getCraftingSystemManager: () => systemManager,
     getRecipeManager: () => recipeManager,
-    getGatheringEnvironmentStore: () => ({ listBySystem: async () => clone(environments), list: () => clone(environments) }),
+    getGatheringEnvironmentStore: () => environmentStore,
     getGatheringPartyStore: () => partyStore,
     getGatheringRealmStore: () => realmStore,
     getGatheringLocationService: () => locationService,
@@ -226,7 +281,7 @@ function createServices({
     getModuleVersion: () => 'test'
   };
 
-  return { services, calls, confirmCalls, partyRecords, realmRecords, system, markerMoveHandlers, autoRegionIds };
+  return { services, calls, confirmCalls, partyRecords, realmRecords, environmentRecords, system, markerMoveHandlers, autoRegionIds };
 }
 
 async function flush() {
@@ -673,6 +728,88 @@ describe('adminStore travel section', () => {
     assert.ok(!confirmCalls[0].title.includes('&#39;'), 'the title must not carry an HTML entity');
     assert.ok(confirmCalls[0].content.includes('&#39;'), 'the HTML content stays escaped');
     store.destroy();
+  });
+
+  // Issue 1848: deleting a realm used to leave the manager holding the pre-delete environment
+  // list, so the Realms tab, the environments browser and any open draft went on citing an id
+  // that named no realm — and the next environment save re-sent it, which the environment
+  // store rejected for the WHOLE world list. The delete must re-read and strip.
+  it('deleteRealm re-reads environments and strips the deleted realm from an open draft', async () => {
+    const { services, calls } = createServices({
+      realms: [
+        { id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] },
+        { id: 'r2', name: 'Ashen', enabled: true, secret: false, biomes: [] }
+      ],
+      environments: [
+        { id: 'e1', craftingSystemId: 'system-a', name: 'Grove', includedRealmIds: ['r1', 'r2'], excludedRealmIds: [] },
+        { id: 'e2', craftingSystemId: 'system-a', name: 'Glade', includedRealmIds: ['r1'], excludedRealmIds: ['r1'] }
+      ]
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+    await store.selectEnvironment('e1');
+    // An OPEN, DIRTY draft: the one state a re-read deliberately preserves, and therefore the
+    // one that carries the stale id forward unless it is stripped explicitly.
+    store.updateEnvironmentDraft({ name: 'Grove renamed' });
+    assert.deepEqual(get(store.viewState).environmentDraft.includedRealmIds, ['r1', 'r2']);
+
+    await store.deleteRealm('r1');
+    await flush();
+
+    const state = get(store.viewState);
+    const cited = state.environments.flatMap(environment => realmMembership(environment));
+    assert.ok(!cited.includes('r1'), 'no projected environment still cites the deleted realm');
+    assert.deepEqual(state.environmentDraft.includedRealmIds, ['r2'], 'the draft drops the deleted realm');
+    assert.equal(state.environmentDraft.name, 'Grove renamed', 'the GM edit survives the strip');
+    assert.equal(state.environmentDraftDirty, true, 'stripping an invalid id does not discard the draft');
+
+    // The membership toggle builds its payload from the projection, so a stale projection is
+    // what re-introduced the deleted id on the next write.
+    await store.setEnvironmentRealmMembership('e2', 'r2', true);
+    await flush();
+    const forwarded = calls.environmentUpdate.at(-1);
+    assert.equal(forwarded.id, 'e2');
+    assert.deepEqual(forwarded.patch.includedRealmIds, ['r2']);
+    assert.deepEqual(forwarded.patch.excludedRealmIds, []);
+    store.destroy();
+  });
+
+  // The confirm copy is the only place the GM learns what the delete does to their environments,
+  // so both the localized string and the hard-coded fallback must say it (issue 1848).
+  it('deleteRealm confirm copy states the environment cascade, localized and in fallback', async () => {
+    const lang = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8'));
+    const expected =
+      'It is still referenced by 1 environment(s) and 0 party override(s). ' +
+      'It will be removed from those environments; any that listed only this realm will no longer ' +
+      'be restricted to a realm. Party overrides keep the stale id and show it as "Unknown realm" ' +
+      'until you clear them.';
+    const fixture = {
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }],
+      environments: [{ id: 'e1', craftingSystemId: 'system-a', name: 'Grove', includedRealmIds: ['r1'] }]
+    };
+
+    const localized = createServices(fixture);
+    localized.services.localize = (key, data = {}) => {
+      const value = key.split('.').reduce((node, part) => (node == null ? undefined : node[part]), lang);
+      return typeof value === 'string'
+        ? Object.entries(data).reduce((m, [n, v]) => m.replaceAll(`{${n}}`, String(v)), value)
+        : undefined;
+    };
+    const localizedStore = createAdminStore(localized.services);
+    await flush();
+    await localizedStore.deleteRealm('r1');
+    assert.ok(localized.confirmCalls[0].content.includes(expected), 'lang/en.json states the cascade');
+    localizedStore.destroy();
+
+    const fallback = createServices(fixture);
+    const passthrough = fallback.services.localize;
+    fallback.services.localize = (key, data) =>
+      key === 'FABRICATE.Admin.Manager.Travel.Realms.DeleteReferenced' ? undefined : passthrough(key, data);
+    const fallbackStore = createAdminStore(fallback.services);
+    await flush();
+    await fallbackStore.deleteRealm('r1');
+    assert.ok(fallback.confirmCalls[0].content.includes(expected), 'the hard-coded fallback says the same');
+    fallbackStore.destroy();
   });
 
   it('surfaces stale member/travel-actor/override-region references for repair', async () => {

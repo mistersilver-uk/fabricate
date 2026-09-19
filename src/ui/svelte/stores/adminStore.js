@@ -3418,7 +3418,7 @@ export function createAdminStore(services) {
                   environments: references.environments.length,
                   parties: references.parties.length,
                 }) ||
-                `It is still referenced by ${references.environments.length} environment(s) and ${references.parties.length} party override(s).`
+                `It is still referenced by ${references.environments.length} environment(s) and ${references.parties.length} party override(s). It will be removed from those environments; any that listed only this realm will no longer be restricted to a realm. Party overrides keep the stale id and show it as "Unknown realm" until you clear them.`
               }</p>`
             : '';
         const confirmed = await services.confirmDialog?.({
@@ -3441,7 +3441,6 @@ export function createAdminStore(services) {
             environmentStore: _getEnvironmentStore(),
             partyStore: getPartyStore(),
           });
-          return true;
         } catch (error) {
           applyError(error);
           return false;
@@ -3449,6 +3448,18 @@ export function createAdminStore(services) {
           travelSaving.set(false);
           patch();
         }
+        // The delete cascades into the world environment list, so the travel-section
+        // `patch()` alone is not enough: without a re-read the Environments tab, the realm
+        // membership editor and a clean draft all keep citing an id that names no realm,
+        // and the next environment save re-sends it (issue 1848). The delete has already
+        // succeeded, so a failing re-read is logged rather than reported as a failed delete.
+        try {
+          await refresh();
+        } catch (error) {
+          console.warn('Fabricate | Failed to refresh after deleting a realm', error);
+        }
+        _stripRealmFromEnvironmentDraft(realmId);
+        return true;
       },
     };
 
@@ -8188,6 +8199,37 @@ export function createAdminStore(services) {
       _patchEnvironmentViewState();
       return false;
     }
+  }
+
+  // A deleted realm id is definitionally invalid rather than a GM edit, so it leaves an open
+  // draft too — dirty drafts survive the post-delete re-read, and a clean one is re-seeded from
+  // a record the cascade may have failed to rewrite. Stripping both the draft and its persisted
+  // baseline is what stops a later save re-introducing the id (issue 1848).
+  function _stripRealmFromEnvironmentDraft(realmId) {
+    const realm = String(realmId ?? '');
+    if (!realm) return;
+    const draft = _withoutRealmMembership(get(environmentDraft), realm);
+    const persisted = _withoutRealmMembership(get(persistedEnvironmentDraft), realm);
+    if (!draft && !persisted) return;
+    if (draft) environmentDraft.set(draft);
+    if (persisted) persistedEnvironmentDraft.set(persisted);
+    _patchEnvironmentViewState();
+  }
+
+  // The record with `realmId` gone from both membership lists, or null when it cites neither.
+  function _withoutRealmMembership(record, realmId) {
+    if (!record || typeof record !== 'object') return null;
+    const included = Array.isArray(record.includedRealmIds) ? record.includedRealmIds : [];
+    const excluded = Array.isArray(record.excludedRealmIds) ? record.excludedRealmIds : [];
+    if (!included.includes(realmId) && !excluded.includes(realmId)) return null;
+    const next = _clonePlain(record);
+    if (Array.isArray(record.includedRealmIds)) {
+      next.includedRealmIds = included.filter((id) => id !== realmId);
+    }
+    if (Array.isArray(record.excludedRealmIds)) {
+      next.excludedRealmIds = excluded.filter((id) => id !== realmId);
+    }
+    return next;
   }
 
   // --- Feature toggles ---
