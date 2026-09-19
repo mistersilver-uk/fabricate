@@ -4,7 +4,6 @@
 import { getMatchHandler } from '../models/match/matchTypes.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 
-/** Nothing to report. */
 function noIssues() {
   return { valid: true, errors: [], issues: [] };
 }

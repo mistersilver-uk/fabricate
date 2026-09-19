@@ -87,7 +87,8 @@ test('chosenOptionByGroup reads satisfied groups by running index across a missi
     { id: 'g-tin', options: [tinChoice] },
   ];
   const selection = {
-    // Emitted in resolution order, which is not author order: the essence group resolves last.
+    // One entry per non-missing group, in group order, so the running index must skip the missing
+    // group without consuming an entry.
     selectedIngredients: [essenceChoice, ironChoice, tinChoice],
     missingGroups: [{ group: groups[1], ingredient: groups[1].options[1], need: 2, have: 0 }],
   };
