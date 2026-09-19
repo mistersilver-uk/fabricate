@@ -78,6 +78,7 @@ An independent caller is any other file under `src/` that imports the component 
 A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than an oversight, and so a later reader can re-test the count rather than re-derive it.
 That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
 `tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
+`environment/GatheringModifierEditor.svelte` is the worked example of that register doing its job: issue 1707 wrote the twice-authored gathering modifier panel once, the gathering task and gathering event inspector leaves became its two independent callers, and it left the register by entering the set as a manager-only row that names no library entry, because no specimen specifies a condition-and-character modifier editor.
 
 Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
 "Re-test the count" is what the clause above asks for and what nothing did: the register's caller claims were prose for as long as it existed, and prose is not resolved by anything.
@@ -1668,6 +1669,8 @@ An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
 `openspec/specs/ui-integration/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
 The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
+The gathering drop and gathering-event inspector track is a declared repurposing of that third track: it is an editor, and issue 1707 gave the departure a file name in `environment/GatheringModifierEditor.svelte` and `environment/GatheringTaskInspector.svelte`.
+The departure predates the extraction and is neither widened nor narrowed by it, and the read-only convention stands as the default for every other rail.
 
 A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with identity and a single primary action, then progress, then requirements.
 The player window carries NO premium signal in any state, and a player-side chooser is a read-only mirror of the GM's authored group.
