@@ -1,8 +1,7 @@
 /**
- * Every retained `CraftingSystemManager` crafting-check member must FORWARD to
- * `src/systems/normalize/craftingCheck.js`, not merely exist (issue 1698). Six of the fifteen have
- * no call site left in the repository, and stubbing three of them to `return null` leaves every
- * covering suite green, so existence proves nothing and this suite compares results instead.
+ * Every retained `CraftingSystemManager` crafting-check member must forward to
+ * `src/systems/normalize/craftingCheck.js` (issue 1698): six have no call site left and stubbing
+ * three to `return null` leaves every covering suite green, so this suite compares results.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -36,10 +35,9 @@ const matrixTrigger = scenario('triggerMatrixOnEverySubCheck').simple.checkBreak
 const SHORT_CIRCUITED = Symbol('short-circuited');
 
 /**
- * One row per retained member: the arguments it is called with, and per argument an ALTERNATIVE
- * value that must change the result. The alternative is what makes the equality assertion able to
- * catch a dropped, transposed or hard-coded argument — an argument the input does not make
- * material would let all three through.
+ * One row per retained member and branch: the arguments it is called with, and per argument an
+ * alternative value that must change the result, without which the equality assertion could not
+ * catch that argument being dropped, transposed or hard-coded.
  */
 const DELEGATES = [
   {

@@ -1,8 +1,6 @@
 /**
  * The crafting-check normalization corpus (issue 1698): the inputs the equivalence pin and the
- * delegate-forwarding proof both run over, so the two suites share one source of truth. Authored
- * directly because no repository fixture carries a legacy check block; the legacy shapes are
- * copied in as data from the sample system `scripts/foundry/create-mythwright-dnd5e.js` builds.
+ * delegate-forwarding proof both run over, so the two suites share one source of truth.
  */
 
 /** The system-level library the known-basis scenarios prune `defaultModifierIds` against. */
@@ -112,7 +110,7 @@ function simpleTiers() {
 }
 
 /**
- * A fully-authored modern check. BOTH routed outcome lists are populated whichever `type` is set,
+ * A fully-authored modern check. Both routed outcome lists are populated whichever `type` is set,
  * so a dropped `kind` argument at either `.map()` call reds. The trigger matrix has its own
  * scenario; this one carries a short authored list so the golden does not repeat it eight times.
  */
@@ -312,7 +310,9 @@ export function modifierSelectionScenarios() {
   ];
 }
 
-/** The system wrapper the `_normalizeSystem` pass drives, carrying the legacy modifier library. */
+/** The system wrapper the `_normalizeSystem` pass drives, carrying the legacy modifier library.
+ * It supplies `id` and every modifier id, so the chokepoint's own mint sites never fire and its
+ * pass consumes the same ids as the delegate pass the equivalence suite compares it against. */
 export function corpusSystem(check) {
   return {
     id: 'sys-crafting-check-corpus',

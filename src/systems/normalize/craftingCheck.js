@@ -1,7 +1,7 @@
 /**
  * The crafting-check, trigger and crit normalizers (issue 1698): free pure functions the
  * `CraftingSystemManager` delegates to, so the crafting, salvage and gathering checks keep
- * sharing ONE derivation. INTERNAL to that aggregate — a private continuation of the
+ * sharing one derivation. Internal to that aggregate — a private continuation of the
  * `_normalizeSystem` chokepoint, reached only through the manager, so nothing else imports it.
  */
 import { parsePlainDiceGroups, parseDiceGroups } from '../../utils/craftingCheckExpression.js';
