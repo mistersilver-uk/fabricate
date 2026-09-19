@@ -347,7 +347,7 @@ const EXPECTED = {
   // stage row already commits in component-studio-font-size.test.js: the two rows are
   // the same surface and SHARE their CSS rules, so a divergence here means the sharing
   // broke, not that this row wants its own scale.
-  'stage-grip': 11.2, // 0.7rem — the shared ordered list's grip glyph (issue 1512)
+  'stage-grip': 14, // 14px — the shared ordered list's grip glyph, at the specimen's figure (issue 1512)
   'stage-ordinal': 10, // 10px mono — the list's ordinal badge, at the specimen's figure
   'stage-picker': 13.12, // 0.82rem — the picker trigger, as salvage's measures
   'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
@@ -461,8 +461,11 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
     // And every OTHER role, generally (issue 1010). This is what turns a stale fixture
     // class or an unpaired scoped component into a failure rather than a plausible-looking
     // number: a rule that stopped applying lands the role on Foundry's app base.
+    // The grip is the one studio role whose declared figure IS 14px: the specimen draws its
+    // grip at 14 and the list's rocker and ordinal ship in px (issue 1512), so the guard cannot
+    // tell the rule from the base here and the pin above carries it instead.
     for (const [role, px] of Object.entries(measured)) {
-      if (role === 'bleed-baseline') continue;
+      if (role === 'bleed-baseline' || role === 'stage-grip') continue;
       assert.notEqual(
         px,
         14,

@@ -433,9 +433,9 @@ const EXPECTED = {
   // again from 0.72rem: it now MATCHES `stage-dc`, so the read-only fact and the control
   // that changes it read as one pair rather than a number with a speck beside it.
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
-  // The rocker and the grip are the list's controls too: 9px for the chevron, 0.7rem for the grip.
+  // The rocker and the grip are the list's controls too: 9px for the chevron, 14px for the grip — the specimen draws its grip at 14px and the rocker and ordinal ship in px, so a rem grip alone would rescale under Foundry's font-size setting.
   'stage-move': 9,
-  'stage-grip': 11.2,
+  'stage-grip': 14,
   // The editor's tag pill converged on the shared `Chip` (issue 772), so it MOVED from
   // 11.2 (its own 0.7rem, near-exact against the prototype's 11px pill) to the one chip
   // scale it now shares with every other chip on this screen. That is the declared cost of
@@ -523,8 +523,10 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     }
 
     // Every studio role except the deliberate baseline must be free of the bleed.
+    // The grip is the one studio role whose declared figure IS 14px (the specimen's, issue
+    // 1512), so the guard cannot tell its rule from the base and the pin above carries it.
     for (const [role, box] of Object.entries(measured)) {
-      if (role === 'bleed-baseline') continue;
+      if (role === 'bleed-baseline' || role === 'stage-grip') continue;
       assert.notEqual(
         box.fontSize,
         14,
