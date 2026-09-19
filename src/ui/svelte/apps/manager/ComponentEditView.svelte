@@ -1592,10 +1592,10 @@
          suite. NOT a `<select>`: the native control can show the NAME but never the IMAGE, and the
          popover is portaled to `.fabricate-manager` so it escapes the panel's `overflow: hidden`.
          No "clear" entry, matching `RecipeResultItemRow`: the row's × removes it properly. -->
-        <!-- `data-add-salvage-group` rides this button ONLY while there is no backing group,
+        <!-- `data-add-salvage-group` rides this button only while there is no backing group,
              because in that state this IS the add-group control: it takes a progressive component
              from zero groups to one, which the normalizer's clamp requires before `enabled` can
-             ever be true. ONE definition, rendered as the list's footer while there are stages and
+             ever be true. One definition, rendered as the list's footer while there are stages and
              under the empty message otherwise (issue 1512). -->
         {#snippet salvageStageAdder()}
           <ManagerButton
@@ -1791,14 +1791,14 @@
                   >
                 </span>
                 <!-- The ordered salvage stage list is the shared one (issue 1512): the grip, the
-                     ordinal badge, the rocker, the drag source and the announcement are all the
-                     list's. Every control it draws is an `IconButton`, so each carries
+                     ordinal badge, the rocker, the delete, the drag source and the announcement are
+                     all the list's. Every control it draws is an `IconButton`, so each carries
                      `type="button"` — this is the one converted site inside a `<form>`, where a
                      control without it submits the draft on a keyboard move. The complication band
-                     is the list's body because it is full-bleed, and `alwaysOpen` renders it on
-                     every stage with no disclosure. The row keeps its own remove, because
-                     `data-remove-salvage-result` is the hook the mounted suite addresses a stage
-                     by. -->
+                     is the list's body because it is full-bleed, and `has-band` is what stops a
+                     stage with no complication drawing an empty padded one. `removeData` keeps
+                     `data-remove-salvage-result`, the hook the mounted suite addresses a stage by,
+                     and its `disabled: saving`. -->
                 {#if salvageStages.length > 0}
                   <SortableList
                     items={salvageStages}
@@ -1807,21 +1807,34 @@
                     alwaysOpen
                     reorderable={!saving}
                     onReorder={(from, to) => moveSalvageStage(from, to)}
-                    rowClass={() => 'manager-salvage-stage-row'}
+                    removable
+                    onRemove={(result) => removeSalvageStage(result.id)}
+                    rowClass={(result) =>
+                      salvageComplicationsFor(result.componentId).length > 0
+                        ? 'manager-salvage-stage-row has-band'
+                        : 'manager-salvage-stage-row'}
                     rowData={(result) => ({
                       'data-salvage-result': result.id,
                       'data-salvage-stage': String(salvageStages.indexOf(result) + 1),
+                    })}
+                    removeData={() => ({
+                      'data-remove-salvage-result': '',
+                      ariaLabel: text(
+                        'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
+                        'Remove result'
+                      ),
+                      disabled: saving,
                     })}
                   >
                     {#snippet row(result)}
                       {@render salvageComponentPicker(salvageStageGroup.id, result)}
 
-                      <!-- NO QUANTITY HERE (issue 676): progressive awards one entry at a time, so
+                      <!-- No quantity here (issue 676): progressive awards one entry at a time, so
                            "two of X" is authored by listing X twice.
                            `CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1` on
                            every awarded progressive entry, so this hides nothing awardable. -->
 
-                      <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own editor
+                      <!-- Read-only: `difficulty` belongs to the result component, whose own editor
                            owns its save lifecycle. The "Edit" link is the way to change it. -->
                       <span
                         class="manager-salvage-result-difficulty"
@@ -1830,7 +1843,7 @@
                         ) === null
                           ? ''
                           : String(salvageResultDifficulty(result.componentId))}
-                        ><!-- The fallback must MATCH the lang value, or the two disagree and the
+                        ><!-- The fallback must match the lang value, or the two disagree and the
                            fallback describes a string nobody sees: `DifficultyUnset` resolves to
                            "No difficulty". The recipe stage row reads the same. -->
                         {salvageResultDifficulty(result.componentId) === null
@@ -1869,26 +1882,12 @@
                           <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
                         </button>
                       {/if}
-
-                      <IconButton
-                        class="is-danger"
-                        size={24}
-                        ariaLabel={text(
-                          'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
-                          'Remove result'
-                        )}
-                        data-remove-salvage-result=""
-                        onclick={() => removeSalvageStage(result.id)}
-                        disabled={saving}
-                      >
-                        <i class="fas fa-xmark" aria-hidden="true"></i>
-                      </IconButton>
                     {/snippet}
                     {#snippet body(result)}
                       {@const stageComplications = salvageComplicationsFor(result.componentId)}
-                      <!-- THE READ-ONLY COMPLICATION STRIP (issue 1286), the list's body and
+                      <!-- The read-only complication strip (issue 1286), the list's body and
                            therefore full-bleed, as the Recipe Studio draws the same band: row and
-                           band are ONE card, with the band's `border-top` as the divider. This
+                           band are one card, with the band's `border-top` as the divider. This
                            OVERRIDES the Component Studio prototype on a maintainer ruling. The
                            `:has()` rules that bought the shape by hand are gone with the
                            hand-rolled row (issue 1512). `role="presentation"` stays: the band
@@ -1904,7 +1903,7 @@
                             <span class="manager-salvage-stage-complications-title"
                               >{stripTitle(stageComplications.length, result.componentId)}</span
                             >
-                            <!-- The ONLY route to changing any of this: a complication belongs to
+                            <!-- The only route to changing any of this: a complication belongs to
                                  the referenced component, whose own editor owns its save lifecycle.
                                  Its label names complications, so it differs from the row's Edit
                                  link. -->

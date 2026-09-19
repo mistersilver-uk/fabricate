@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `expanded` | boolean | `false` | Whether the controlled region is open. |
   | `controls` | element id | `''` | The region this discloses. Required for `aria-controls` to mean anything. |
-  | `label` | pre-localized string | `''` | The accessible name. It names the ROW, not the action — "Trigger 1: on a natural 1" reads correctly under both states, because `aria-expanded` supplies the rest. Emitted only when non-empty (issue 1512): an empty `aria-label` is a label of nothing, and it overrides the name the element would otherwise take from its content. |
+  | `label` | pre-localized string | `''` | The accessible name. It names the row, not the action — "Trigger 1: on a natural 1" reads correctly under both states, because `aria-expanded` supplies the rest. Emitted only when non-empty (issue 1512): an empty `aria-label` is a label of nothing, and it overrides the name the element would otherwise take from its content. |
   | `side` / `disabled` / `dataAttr` / `dataValue` | `'trailing'` \| `'leading'` / boolean / strings | `'trailing'` / `false` / `''` | Which way the collapsed chevron points, whether the `<button>` is disabled, and an optional test/screenshot hook. |
   | `onToggle()` | function | no-op | The caller owns `expanded`. |
 

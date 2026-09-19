@@ -84,6 +84,18 @@
     return match?.name || text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
   }
 
+  // The band's content, decided here because the same filter decides whether the row draws a body
+  // at all (issue 1512): `alwaysOpen` renders the body snippet for every row, so a stage whose
+  // component authors no crafting complication would otherwise draw an empty padded box. The
+  // unredacted authored list off the projection the difficulty badge reads, filtered to crafting
+  // because a salvage-only complication says nothing about a recipe stage.
+  function stageComplicationsFor(item) {
+    const match = (componentOptions || []).find((option) => option.id === item?.componentId);
+    return Array.isArray(match?.complications)
+      ? match.complications.filter((complication) => complication?.activities?.crafting === true)
+      : [];
+  }
+
   // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
   // routes by the system crafting-check outcome.
   const isIngredientRouting = $derived(routingProvider === 'ingredientSet');
@@ -269,17 +281,28 @@
   {:else}
     {#if progressive}
       <!-- Progressive is an ordered list, so it is the shared one (issue 1512). The band is the
-           list's body rather than part of the row's content, because it is full-bleed; `alwaysOpen`
-           renders it on every row with no disclosure, since a stage's band is not something a GM
-           opens. The row keeps its own × rather than the list's `removable`, because
-           `data-recipe-remove="result-item"` is the hook the mounted suites address a stage by. -->
+           list's body rather than part of the row's content, because it is full-bleed, and
+           `alwaysOpen` renders it with no disclosure since a stage's band is not something a GM
+           opens. The delete is the list's own, so it trails the rocker as the specimen states;
+           `removeData` keeps `data-recipe-remove="result-item"`, the hook the mounted suites and
+           the smoke harness address a stage's delete by. -->
       <SortableList
         items={results}
         itemLabel={componentNameFor}
         numbered
         alwaysOpen
+        removable
         onReorder={(from, to) => reorderItem(from, to)}
-        rowClass={() => 'manager-recipe-stage-row'}
+        onRemove={(item) => removeItem(results.indexOf(item))}
+        removeData={() => ({
+          'data-recipe-remove': 'result-item',
+          ariaLabel: text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item'),
+          title: text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item'),
+        })}
+        rowClass={(item) =>
+          stageComplicationsFor(item).length > 0
+            ? 'manager-recipe-stage-row has-band'
+            : 'manager-recipe-stage-row'}
         rowData={() => ({ 'data-recipe-result-row': '' })}
       >
         {#snippet row(item, index)}
@@ -289,11 +312,13 @@
             {progressive}
             {onOpenComponent}
             onChange={(nextItem) => updateItem(index, nextItem)}
-            onRemove={() => removeItem(index)}
           />
         {/snippet}
         {#snippet body(item)}
-          <RecipeStageComplicationBand {componentOptions} componentId={item?.componentId || ''} />
+          <RecipeStageComplicationBand
+            complications={stageComplicationsFor(item)}
+            componentId={item?.componentId || ''}
+          />
         {/snippet}
         {#snippet footer()}
           <li class="manager-recipe-ingredient-set-add">{@render resultAdder()}</li>

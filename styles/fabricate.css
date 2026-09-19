@@ -2142,8 +2142,7 @@
   width: 158px;
 }
 
-/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's 34px `.manager-icon-button`. */
-.fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
+/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's 34px `.manager-icon-button`. The tier row's own delete left this rule at issue 1512 — it is `SortableList`'s 24px `is-danger` icon button now. */
 .fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
   appearance: none;
   -webkit-appearance: none;
@@ -15267,7 +15266,7 @@
 .fabricate-manager .manager-environment-comp {
   --fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
 
-  /* The column strip's LEAD track is the shared list's own cluster (issue 1512): the 22px ordinal badge, and with reorder on the 24px grip and the line's 12px gap before it. The strip's gap supplies the 12px after the badge, so neither figure is repeated. */
+  /* The column strip's lead track is the shared list's own cluster (issue 1512): the 22px ordinal badge, and with reorder on the 24px grip and the line's 12px gap before it. The strip's gap supplies the 12px after the badge, so neither figure is repeated. */
   --fab-env-comp-lead: 22px;
   --fab-env-comp-lead-ranked: 58px;
 
@@ -15363,12 +15362,23 @@
   border-color: var(--fab-warning);
 }
 
+/* The same two states on the `SortableList`-drawn Included row, whose family class is its own
+   (issue 1512): the primitive owns the row's box, so only the state paint is restated here. */
+.fabricate-manager .manager-environment-comp-entry.is-selected {
+  border-color: var(--fab-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-accent);
+}
+
+.fabricate-manager .manager-environment-comp-entry.is-unavailable {
+  border-color: var(--fab-warning);
+}
+
 .fabricate-manager .manager-environment-comp-row.is-excluded,
 .fabricate-manager .manager-environment-comp-row.is-diagnostic {
   opacity: 0.85;
 }
 
-/* A real `<button>` as of issue 1512, so it carries the same Foundry reset the five row identity buttons share above: core's `button` rule pins a height, a border, a fill and a centred content box, and every one of those would re-shape this row. `min-height` is the 38px thumbnail, which is what drove the row's height as a `<div>`. */
+/* A `<button>` (issue 1512), so it needs core's `button` reset neutralised: that rule pins a height, a border, a fill and a centred content box. `min-height` is the 38px thumbnail. */
 .fabricate-manager .manager-environment-comp-task {
   appearance: none;
   -webkit-appearance: none;
@@ -20616,18 +20626,18 @@
   }
 }
 
-/* ══ issue 1512 — the ordered row, `fabricate-sortable-list` ══ `components/SortableList.svelte`'s own family, in the global sheet rather than a scoped block because a Svelte-scoped rule is injected unlayered against this sheet's `layer(modules)` import and out-ranks it at any specificity. It portals nothing, so one root is the whole requirement. The geometry is the `<SortableList>` specimen's — row padding 12 / radius 9 / `--fab-bg-1` / gap 12, a 22x22 r6 ordinal badge after the grip, and every control a 24x24 `IconButton` — and the four surfaces that move onto it each carry a section-16 ruled row. */
+/* `components/SortableList.svelte`'s family (issue 1512), in the global sheet because a Svelte-scoped rule is injected unlayered against this sheet's `layer(modules)` import and out-ranks it at any specificity. The geometry is the `<SortableList>` specimen's. */
 .fabricate-sortable-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--fab-space-chip);
   min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` is what stops the strip squaring off outside the radius. skin census (issue 1523): an UNPINNED carrier of the border/radius/fill tuple. It arrives as one because the `<SortableList>` specimen states that tuple as the ordered row's box, not because a shared class was refused: nothing reads this selector by name, so it adopts `.fab-field-skin` whenever that class ships and its per-adoption blocker walk is done. */
+/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. skin census (issue 1523): an unpinned carrier of the border/radius/fill tuple — nothing reads this selector by name, so it adopts `.fab-field-skin` once that class ships and its blocker walk is done. */
 .fabricate-sortable-list-row {
   display: flex;
   flex-direction: column;
@@ -20655,16 +20665,16 @@
   flex: 0 0 auto;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
-  padding: 12px;
+  padding: var(--fab-space-3);
 }
 
 .fabricate-sortable-list-content {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 12px;
+  gap: var(--fab-space-3);
   min-width: 0;
 }
 
@@ -20699,7 +20709,7 @@
 }
 
 .fabricate-sortable-list-grip i {
-  font-size: 0.7rem;
+  font-size: 14px;
 }
 
 .fabricate-sortable-list-row.is-dragging .fabricate-icon-button.fabricate-sortable-list-grip {
@@ -20711,7 +20721,15 @@
 .fabricate-sortable-list-rocker {
   display: grid;
   flex: 0 0 auto;
-  gap: 2px;
+  gap: var(--fab-space-2xs);
+}
+
+/* Bare, like the grip beside it: the rocker is a pair of chevrons in the trailing cluster, not two
+   filled chips. Compounded on the composed root for the same reason the grip's rule is. */
+.fabricate-icon-button.fabricate-sortable-list-move {
+  border-color: transparent;
+  color: var(--fab-text-subtle);
+  background: transparent;
 }
 
 .fabricate-sortable-list-move i {
@@ -20726,9 +20744,19 @@
 .fabricate-sortable-list-body {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 0 12px 12px;
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
 }
 
 .fabricate-sortable-list-body[hidden] {
+  display: none;
+}
+
+/* A stage whose component authors no crafting complication renders nothing into the band, so its
+   body box is dropped rather than drawing 12px of dead height on every row of an always-open list
+   (issue 1512). Keyed on the callers' own family classes: a bare `:not(.has-band)` would hide the
+   editing body of every other caller, which is a body the caller always fills. */
+.fabricate-sortable-list-row.manager-recipe-stage-row:not(.has-band) .fabricate-sortable-list-body,
+.fabricate-sortable-list-row.manager-salvage-stage-row:not(.has-band)
+  .fabricate-sortable-list-body {
   display: none;
 }

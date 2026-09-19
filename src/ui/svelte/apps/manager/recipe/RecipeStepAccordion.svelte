@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The recipe-step adapter over `components/SortableList.svelte` (issue 1512). What survives here is
-  what is genuinely about a step — its name and description, its duration control and its delete
-  button — rendered through the list's `row` snippet; the geometry, the reorder affordances, the
+  what is genuinely about a step — its name and description and its duration control — rendered
+  through the list's `row` snippet; the geometry, the reorder affordances, the delete, the
   disclosure and the accordion state are the shared list's.
 
   Reordering is overview-only: with `reorderable` the list draws the grip and the rocker and wires
@@ -20,7 +20,6 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { formatTimeRequirement } from '../../../util/recipeDuration.js';
   import RecipeDurationEditor from './RecipeDurationEditor.svelte';
-  import IconButton from '../../../components/IconButton.svelte';
   import SortableList from '../../../components/SortableList.svelte';
 
   let {
@@ -60,11 +59,18 @@
   items={steps}
   itemLabel={stepLabel}
   numbered
+  removable
   {reorderable}
   {alwaysOpen}
   expandable={!alwaysOpen}
   onReorder={(from, to) => onReorderSteps(from, to)}
+  onRemove={(step) => onDeleteStep(step.id)}
   rowData={(step) => ({ 'data-recipe-step-id': step.id })}
+  removeData={(step) => ({
+    'data-recipe-step-delete': step.id,
+    ariaLabel: text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step'),
+    title: text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step'),
+  })}
   {body}
   {footer}
 >
@@ -99,14 +105,5 @@
         </Chip>
       {/if}
     </div>
-    <IconButton
-      class="is-danger"
-      size={24}
-      data-recipe-step-delete={step.id}
-      ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
-      title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
-      onclick={() => onDeleteStep(step.id)}
-      ><i class="fas fa-trash" aria-hidden="true"></i></IconButton
-    >
   {/snippet}
 </SortableList>

@@ -7,12 +7,8 @@
   the SAME `.manager-checks-tier-*` contract as `CraftingCheckEditor`; the column-header row goes
   with the table, one text field and one number needing none once labelled.
 
-  One affordance is overturned (maintainer ruling, 2026-09-18): issue 1096 recorded a deliberate
-  refusal of the chevron rocker, on the reading that the prototype draws one affordance. The design
-  system's specimen states both affordances always, and the maintainer ruled for the specimen — so
-  the row renders through `SortableList` (issue 1512) and gains the numbered badge, the rocker and
-  the polite announcement it had none of. Both the ruling and the decision it reverses are recorded
-  in the library's section 16.
+  The row renders through `SortableList` (issue 1512), which draws the numbered badge, the rocker,
+  the delete and the polite announcement; the library's section 16 carries the ruling.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -45,6 +41,11 @@
   // Named once: the row's micro label, the stepper's accessible name and the shared adjunct
   // strings' `{label}` slot all read it.
   const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC'));
+
+  // Named once: the card's heading and the list's own `aria-label` are the same sentence.
+  const tiersTitle = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe difficulty tiers')
+  );
 
   function addTier() {
     onChange([...list, { id: newId(), name: '', dc: Number(defaultDc) || 0 }]);
@@ -82,7 +83,7 @@
 <div class="manager-checks-card-head">
   <div>
     <h3 class="manager-checks-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe difficulty tiers')}
+      {tiersTitle}
     </h3>
     <p class="manager-checks-card-description">
       {anchorsBands
@@ -113,10 +114,17 @@
     <SortableList
       items={list}
       itemLabel={tierName}
+      ariaLabel={tiersTitle}
       numbered
+      removable
       onReorder={(from, to) => moveTier(from, to)}
+      onRemove={(tier) => removeTier(tier.id)}
       rowClass={() => 'manager-checks-tier-row'}
       rowData={(tier) => ({ 'data-tier-row': tier.id })}
+      removeData={() => ({
+        'data-remove-tier': '',
+        title: text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveTier', 'Remove tier'),
+      })}
     >
       {#snippet row(tier)}
         <input
@@ -126,7 +134,7 @@
           value={tier.name || ''}
           oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
         />
-        <!-- The number is labelled in the ROW rather than in a column header, so the row stays
+        <!-- The number is labelled in the row rather than in a column header, so the row stays
              self-describing with no header row above it. `aria-hidden`, because the stepper already
              carries the same word as its own accessible name. -->
         <span class="manager-checks-tier-unit" aria-hidden="true">{dcLabel}</span>
@@ -144,17 +152,6 @@
             onChange={(dc) => updateTier(tier.id, { dc })}
           />
         </div>
-        <!-- NOT the list's own `removable`: `data-remove-tier` is the hook every mounted driver
-             removes a tier by, and the list's remove writes its own. -->
-        <ManagerButton
-          role="danger"
-          class="manager-checks-tier-remove"
-          data-remove-tier
-          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveTier', 'Remove tier')}
-          onclick={() => removeTier(tier.id)}
-        >
-          <i class="fas fa-trash" aria-hidden="true"></i>
-        </ManagerButton>
       {/snippet}
       {#snippet footer()}
         <li class="manager-checks-tier-add">{@render addTierButton()}</li>

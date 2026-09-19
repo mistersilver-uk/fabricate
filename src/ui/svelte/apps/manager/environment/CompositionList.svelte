@@ -193,8 +193,7 @@
     };
   }
 
-  // No move verbs (issue 1512): the list draws a visible rocker on every ordered row, so the
-  // menu's two hidden copies of the same act were the ones a reader could not see the range of.
+  // No move verbs (issue 1512): the list draws a visible rocker on every ordered row.
   function includedMenuItems() {
     const items = [];
     items.push(openSourceItem());
@@ -287,10 +286,9 @@
     return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
   }
 
-  // The caller's per-record state, carried onto the row element the primitive owns (issue 1512).
-  // `has-rank-controls` goes with it: the list's `reorderable` decides whether a row is ranked.
-  // The caller's own family class leads, because a state rule keyed on the primitive's row class
-  // behind an application root is the app-rooting the rooting requirement refuses.
+  // The caller's per-record state, on the row element the primitive owns (issue 1512), under the
+  // caller's own family class: a state rule keyed on the primitive's row class behind an
+  // application root is the app-rooting the rooting requirement refuses.
   function includedRowClasses(entry) {
     return [
       'manager-environment-comp-entry',

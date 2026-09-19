@@ -13,11 +13,10 @@
   `openspec/specs/ui-integration/spec.md` → "Progressive UI" and its `### Requirements`
   requirement 16 state both, including why neither is edited in place.
 
-  The read-only complication band left this file at issue 1512: it is
-  `RecipeStageComplicationBand.svelte`, rendered as the shared list's body, which is what makes it
-  full-bleed. The `display: contents` wrapper and the `leadingControls` / `reorderControls`
-  snippets went with it, because `SortableList` draws the grip, the ordinal and the rocker itself.
-  What is left here is one result item and nothing about ordering it.
+  A progressive row is a `SortableList` row (issue 1512), so the list draws the grip, the ordinal,
+  the rocker and the delete around this content; the complication band is
+  `RecipeStageComplicationBand.svelte`, rendered as the list's body, which is what makes it
+  full-bleed. The × below is therefore the flat row's only.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -86,7 +85,7 @@
                with the name as loose text beside it; that split meant the same picker had two
                anatomies depending on a mode the picker itself has nothing to do with. The
                trigger sizes to the name's length, so it never grows into the trailing cluster.
-               `manager-recipe-stage-trigger` remains as the STAGE-row marker only — the
+               `manager-recipe-stage-trigger` remains as the stage-row marker only — the
                trigger anatomy no longer depends on it. -->
       <SearchablePopover
         options={componentPickerOptions}
@@ -124,7 +123,7 @@
     {#if progressive}
       <!-- READ-ONLY `DC n`, then a SEPARATE "Edit ↗" — the salvage stage row's shape
                (issue 676). It was a "DIFFICULTY" micro-label plus one combined
-               `Difficulty 4 ↗` chip, which made a read-only FACT look like the control that
+               `Difficulty 4 ↗` chip, which made a read-only fact look like the control that
                changes it. `component.difficulty` has four consumers and the component
                editor's Difficulty card owns its save/discard lifecycle, so the fact is
                read-only here and the link is the only route to changing it. The DC always
@@ -182,15 +181,18 @@
       />
     {/if}
 
-    <!-- A subtle × (§C7), never a loud red fa-minus. -->
-    <button
-      type="button"
-      data-keyboard-focus="true"
-      class="manager-recipe-result-remove manager-recipe-option-remove"
-      data-recipe-remove="result-item"
-      aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
-      title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
-      onclick={() => onRemove()}><i class="fas fa-times" aria-hidden="true"></i></button
-    >
+    {#if !progressive}
+      <!-- A subtle × (§C7), never a loud red fa-minus. A progressive row's delete is the list's
+           own, so it trails the rocker instead of preceding it (issue 1512). -->
+      <button
+        type="button"
+        data-keyboard-focus="true"
+        class="manager-recipe-result-remove manager-recipe-option-remove"
+        data-recipe-remove="result-item"
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
+        title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
+        onclick={() => onRemove()}><i class="fas fa-times" aria-hidden="true"></i></button
+      >
+    {/if}
   </div>
 </div>

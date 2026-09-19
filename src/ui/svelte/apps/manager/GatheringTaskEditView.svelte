@@ -2388,9 +2388,10 @@
                     class="manager-drop-cell manager-drop-component-cell"
                     data-gathering-task-drop-component-cell
                   >
-                    <!-- The row's keyboard path, in BOTH branches (issue 1512): a new drop row is
+                    <!-- The row's keyboard path, in both branches (issue 1512): a new drop row is
                          born empty, so leaving that branch a `<div>` would have made every new row
-                         keyboard-unselectable. -->
+                         keyboard-unselectable. The empty branch names itself from the drop-zone
+                         prompt and clears nothing, there being nothing to clear. -->
                     <button
                       type="button"
                       class={`manager-gathering-task-identity ${
@@ -2399,7 +2400,12 @@
                           : 'manager-drop-empty-component is-empty'
                       }`}
                       data-keyboard-focus="true"
-                      aria-label={componentLabel(row)}
+                      aria-label={row.componentId || row.itemUuid
+                        ? componentLabel(row)
+                        : text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign',
+                            'Create or assign'
+                          )}
                       title={row.componentId || row.itemUuid
                         ? text(
                             'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
@@ -2411,8 +2417,12 @@
                         onSelectDrop(row.id);
                       }}
                       onkeydown={(event) => event.stopPropagation()}
-                      onmousedown={(event) => onDropComponentMouseDown(row.id, event)}
-                      oncontextmenu={(event) => onClearDropComponent(row.id, event)}
+                      onmousedown={row.componentId || row.itemUuid
+                        ? (event) => onDropComponentMouseDown(row.id, event)
+                        : undefined}
+                      oncontextmenu={row.componentId || row.itemUuid
+                        ? (event) => onClearDropComponent(row.id, event)
+                        : undefined}
                     >
                       {#if row.componentId || row.itemUuid}
                         <img
