@@ -25,6 +25,7 @@ import {
 import {
   attributeNames,
   attributeValue,
+  carriesSpread,
   containsLiteral,
   declaredConstant,
   declaresAttribute,
@@ -38,6 +39,7 @@ import {
   requiresProp,
   spellsLiteral,
 } from '../helpers/svelteStructureContract.js';
+import { declaredManagerClasses } from '../helpers/manager/managerStylesheet.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -346,6 +348,89 @@ function namedCodeAst(scope, name) {
   throw new Error(`no binding \`${name}\``);
 }
 
+/** The expression one element gives a `{…}` attribute, or `undefined` for a static one. */
+function attributeExpression(node, name) {
+  const attribute = (node.attributes ?? []).find(
+    (candidate) => candidate.type === 'Attribute' && candidate.name === name
+  );
+  return attribute?.value?.type === 'ExpressionTag' ? attribute.value.expression : undefined;
+}
+
+/** The first static value any template node gives an attribute — one of two shipped spellings. */
+function attributeLiteral(component, name) {
+  for (const node of templateNodes(component)) {
+    const value = attributeValue(node, name);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+/** The literal a subtree binds to one name, whether as a `const` or as a prop default. */
+function constantLiteral(node, name) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'VariableDeclarator' || inner.id?.name !== name) continue;
+    if (inner.init?.type === 'Literal') return inner.init.value;
+  }
+  return undefined;
+}
+
+/** The default one component declares for a prop, which is where a class stem is stated. */
+function propDefault(component, name) {
+  for (const node of walkNodes(component)) {
+    if (node.type !== 'VariableDeclarator' || calledName(node.init) !== '$props') continue;
+    for (const property of node.id?.properties ?? []) {
+      if (property.key?.name !== name || property.value?.right?.type !== 'Literal') continue;
+      return property.value.right.value;
+    }
+  }
+  return undefined;
+}
+
+/** The chunks a template literal appends straight to `${name}`, hyphen dropped. */
+function templateSuffixes(component, name) {
+  const suffixes = [];
+  for (const node of walkNodes(component)) {
+    if (node.type !== 'TemplateLiteral') continue;
+    node.expressions.forEach((expression, index) => {
+      if (expression?.type !== 'Identifier' || expression.name !== name) return;
+      const [, suffix] = /^-([a-z-]+)/.exec(node.quasis[index + 1]?.value?.raw ?? '') ?? [];
+      if (suffix) suffixes.push(suffix);
+    });
+  }
+  return suffixes;
+}
+
+/** The literal a subtree compares the named binding against — what a route branch tests. */
+function comparedLiteral(node, name) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'BinaryExpression') continue;
+    const sides = [inner.left, inner.right];
+    if (!sides.some((side) => side?.type === 'Identifier' && side.name === name)) continue;
+    const literal = sides.find((side) => side?.type === 'Literal');
+    if (literal) return literal.value;
+  }
+  return undefined;
+}
+
+/** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
+function returnedTextArguments(node) {
+  const call = node?.type === 'ReturnStatement' ? node.argument : undefined;
+  if (calledName(call) !== 'text') return [];
+  const [key, fallback] = call.arguments.map((argument) =>
+    argument?.type === 'Literal' ? argument.value : undefined
+  );
+  return typeof key === 'string' && typeof fallback === 'string' ? [key, fallback] : [];
+}
+
+/** Every object-literal key a subtree writes, for the claims about a key rather than its value. */
+function propertyKeys(node) {
+  const keys = new Set();
+  for (const inner of walkNodes(node)) {
+    if (inner.type === 'Property' && inner.key?.name) keys.add(inner.key.name);
+  }
+  return keys;
+}
+
 /** The claims any plain code subtree answers: a module, a class member, or one function body. */
 function claimsOverCode(code) {
   return {
@@ -366,6 +451,7 @@ function claimsOverCode(code) {
     returnsFor: (pair) => returnsForComparison(code, pair),
     assigns: ([name, value]) => assignedLiterals(code, name).includes(value),
     property: ([key, value]) => propertyValues(code, key).includes(value),
+    key: (name) => propertyKeys(code).has(name),
   };
 }
 
@@ -487,6 +573,8 @@ const CONTRACT_CLAIMS = Object.freeze({
   assignsNo: { ask: 'assigns', holds: false, says: ([n, v]) => `never assigns ${n} = "${v}"` },
   property: { ask: 'property', holds: true, says: ([k, v]) => `carries ${k}: "${v}"` },
   propertyNo: { ask: 'property', holds: false, says: ([k, v]) => `carries no ${k}: "${v}"` },
+  keys: { ask: 'key', holds: true, says: (v) => `gives some record a ${v} key` },
+  keysNo: { ask: 'key', holds: false, says: (v) => `gives no record a ${v} key` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
   passesPropsNo: { ask: 'propNone', holds: true, says: ([c, p]) => `passes no ${p} to <${c}>` },
@@ -526,6 +614,8 @@ const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
+// The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
+const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
 
 /** The manager views a claim may hold of any one of, which the joined text used to ask of all. */
 const MANAGER_VIEWS = [
@@ -3218,23 +3308,11 @@ describe('CraftingSystemManager source contract', () => {
 
 /** The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357). */
 describe('world scoped-entity source contract (issue 1362)', () => {
-  const scopedDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped');
-  const previewSource = readFileSync(resolve(scopedDir, 'ScopedEntityPreview.svelte'), 'utf8');
-  const toolPreviewSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte'),
-    'utf8'
-  );
-  const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-  const viewTitleSource = classMemberSource(
-    rootSource,
-    'function viewTitle() {',
-    'the manager root'
-  );
-
-  // Every class the manager stylesheet declares a rule for.
-  const declaredManagerClasses = new Set(
-    [...fabricateCss.matchAll(/\.fabricate-manager\s+\.([a-z0-9-]+)/g)].map((match) => match[1])
-  );
+  const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
+  const SCOPED_PREVIEW = `${SCOPED_DIR}/ScopedEntityPreview.svelte`;
+  // The Tool rail's stem is its own prop default now.
+  const TOOL_PREVIEW = 'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
+  const declaredClasses = declaredManagerClasses();
 
   /**
    * The SEVEN class names `ScopedEntityPreview` renders for a given stem.
@@ -3243,34 +3321,37 @@ describe('world scoped-entity source contract (issue 1362)', () => {
    * @returns {string[]}
    */
   function renderedPreviewClasses(stem) {
-    const suffixes = [...previewSource.matchAll(/\$\{classPrefix\}-([a-z-]+)/g)].map(
-      (match) => match[1]
-    );
+    const suffixes = templateSuffixes(componentAstOf(SCOPED_PREVIEW), 'classPrefix');
     return [stem, ...new Set(suffixes.map((suffix) => `${stem}-${suffix}`))];
   }
 
+  defineStructureContract(
+    'renders the shared rail under the placement-free default stem',
+    WORLD_TOOL_ENTRY,
+    { attributes: [['classPrefix', 'manager-scoped-preview']] }
+  );
+
   it('declares a rule for every class the preview shell renders, for BOTH stems', () => {
+    const preview = componentAstOf(SCOPED_PREVIEW);
     assert.ok(
-      previewSource.includes('<aside class={classPrefix}'),
+      templateNodes(preview).some(
+        (node) =>
+          node.name === 'aside' && attributeExpression(node, 'class')?.name === 'classPrefix'
+      ),
       'the shell renders the bare stem as a class, which the derivation below depends on'
     );
-    const defaultStem = previewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
-    // THE TOOL RAIL'S STEM IS ITS OWN PROP DEFAULT NOW.
-    const toolStem = toolPreviewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
+    const defaultStem = propDefault(preview, 'classPrefix');
+    const toolStem = propDefault(componentAstOf(TOOL_PREVIEW), 'classPrefix');
     assert.equal(defaultStem, 'manager-scoped-preview');
     assert.equal(toolStem, 'manager-tool-preview');
-    assert.ok(
-      worldToolEntrySource.includes('classPrefix="manager-scoped-preview"'),
-      'the world Tool entry renders the shared rail under the placement-free default stem'
-    );
 
     // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet.
     assert.ok(
-      declaredManagerClasses.size > 200,
+      declaredClasses.size > 200,
       'the stylesheet scan found almost nothing, so it cannot be trusted to find an omission'
     );
     assert.equal(
-      declaredManagerClasses.has('manager-scoped-preview-not-a-real-region'),
+      declaredClasses.has('manager-scoped-preview-not-a-real-region'),
       false,
       'the lookup can answer no, so the assertions below are measurements'
     );
@@ -3285,7 +3366,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       );
       for (const className of classes) {
         assert.ok(
-          declaredManagerClasses.has(className),
+          declaredClasses.has(className),
           `\`styles/fabricate.css\` declares no rule for \`.${className}\`. The shell's docblock ` +
             'says both stems are declared there and this is the only thing that checks it: a ' +
             'renamed region leaves the six editors PRs 6a-c and 7 build rendering unstyled, and ' +
@@ -3302,12 +3383,36 @@ describe('world scoped-entity source contract (issue 1362)', () => {
    */
   function scopedTitlesFromRoot() {
     const titles = new Map();
-    const pattern =
-      /if \(currentView === '(world-[a-z-]+)'\)\s*\n\s*return text\('([^']+)', '([^']*)'\);/g;
-    for (const match of viewTitleSource.matchAll(pattern)) {
-      titles.set(match[1], { key: match[2], fallback: match[3] });
+    const viewTitle = namedCodeAst(componentAstOf(MANAGER_ROOT).instance, 'viewTitle');
+    for (const node of walkNodes(viewTitle)) {
+      if (node.type !== 'IfStatement') continue;
+      const view = comparedLiteral(node.test, 'currentView');
+      const [key, fallback] = returnedTextArguments(node.consequent);
+      if (String(view).startsWith('world-') && key !== undefined) titles.set(view, { key, fallback });
     }
     return titles;
+  }
+
+  /**
+   * The four facts `scopedEntryRoutes.js` records per entry route, in declaration order.
+   *
+   * @param {string} file
+   * @returns {Array<{entryView: string, entityType: string, catalogueView: string, catalogueTitleKey: string, catalogueTitleFallback: string}>}
+   */
+  function declaredEntryRoutes(file) {
+    const routes = [];
+    for (const node of walkNodes(moduleAstOf(file).ast)) {
+      if (node.type !== 'Property' || !/^world-[a-z-]+-entry$/.test(node.key?.value ?? '')) continue;
+      const fact = (key) => propertyValues(node.value, key)[0];
+      routes.push({
+        entryView: node.key.value,
+        entityType: fact('entityType'),
+        catalogueView: fact('catalogueView'),
+        catalogueTitleKey: fact('catalogueTitleKey'),
+        catalogueTitleFallback: fact('catalogueTitleFallback'),
+      });
+    }
+    return routes;
   }
 
   it('gives each of the seven placeholder pages a DISTINCT triple that matches its route', () => {
@@ -3326,9 +3431,6 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     // below to fewer than seven and reds a lane that did everything right — and reading only the
     // second would do the same to the four that have not been replaced yet. The swap detector has
     // to survive the transition it exists to police, so it resolves either.
-    const declared = (source, attribute, constant) =>
-      source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1] ??
-      source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1];
     // THE SEVEN PAGES, AND THE THREE `WorldComponentEntry*` CHILDREN THAT ARE NOT PAGES (issue
     // 1371, parity round 4). The world Component entry was rebuilt to the reference as four
     // files; each child renders a CARD or the rail, declares no route identity and carries no
@@ -3339,7 +3441,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       'WorldComponentEntrySourceCard.svelte',
       'WorldComponentEntrySystemsCard.svelte',
     ]);
-    const pages = readdirSync(scopedDir)
+    const pages = readdirSync(resolve(repoRoot, SCOPED_DIR))
       .filter(
         (entry) =>
           entry.startsWith('World') &&
@@ -3347,19 +3449,21 @@ describe('world scoped-entity source contract (issue 1362)', () => {
           !SCOPED_ENTRY_CHILDREN.has(entry)
       )
       .map((entry) => {
-        const source = readFileSync(resolve(scopedDir, entry), 'utf8');
+        const page = componentAstOf(`${SCOPED_DIR}/${entry}`);
+        const declared = (attribute, constant) =>
+          constantLiteral(page, constant) ?? attributeLiteral(page, attribute);
         return {
           file: entry,
-          pageId: declared(source, 'pageId', 'PAGE_ID'),
-          icon: declared(source, 'icon', 'PAGE_ICON'),
-          titleKey: declared(source, 'titleKey', 'TITLE_KEY'),
-          titleFallback: declared(source, 'titleFallback', 'TITLE_FALLBACK'),
+          pageId: declared('pageId', 'PAGE_ID'),
+          icon: declared('icon', 'PAGE_ICON'),
+          titleKey: declared('titleKey', 'TITLE_KEY'),
+          titleFallback: declared('titleFallback', 'TITLE_FALLBACK'),
         };
       });
-    // NON-VACUITY, because the regex pair above is exactly the thing that can silently answer
-    // `undefined` for every page after a rename: a set of seven `undefined`s has size one, which
-    // the distinctness assertions below would catch, but a set of seven MISSING title fallbacks
-    // would not — nothing else reads that field.
+    // NON-VACUITY, because the pair of readings above is exactly the thing that can silently
+    // answer `undefined` for every page after a rename: a set of seven `undefined`s has size one,
+    // which the distinctness assertions below would catch, but a set of seven MISSING title
+    // fallbacks would not — nothing else reads that field.
     for (const page of pages) {
       for (const field of ['pageId', 'icon', 'titleKey', 'titleFallback']) {
         assert.equal(
@@ -3405,26 +3509,22 @@ describe('world scoped-entity source contract (issue 1362)', () => {
 
   it('roots each entry route at its own catalogue, under that catalogue title key', () => {
     const titles = scopedTitlesFromRoot();
-    const entryRoutesSource = readFileSync(resolve(scopedDir, 'scopedEntryRoutes.js'), 'utf8');
-    const declared = [
-      ...entryRoutesSource.matchAll(
-        /'(world-[a-z-]+-entry)': Object\.freeze\(\{\s*entityType: '([a-z]+)',\s*catalogueView: '([a-z-]+)',\s*catalogueTitleKey: '([^']+)',\s*catalogueTitleFallback: '([^']+)',/g
-      ),
-    ];
+    const declared = declaredEntryRoutes(`${SCOPED_DIR}/scopedEntryRoutes.js`);
     assert.deepEqual(
-      declared.map((match) => match[1]),
+      declared.map((route) => route.entryView),
       ['world-component-entry', 'world-essence-entry', 'world-tool-entry'],
       'three entry routes, one per scoped entity type'
     );
-    for (const match of declared) {
-      const [, entryView, entityType, catalogueView, catalogueKey, catalogueFallback] = match;
+    for (const route of declared) {
+      const { entryView, entityType, catalogueView, catalogueTitleKey, catalogueTitleFallback } =
+        route;
       assert.ok(titles.has(entryView), `${entryView} is one of the seven titled routes`);
       const catalogue = titles.get(catalogueView);
       assert.ok(Boolean(catalogue), `${entryView} returns to \`${catalogueView}\`, a real route`);
       // The middle crumb names the catalogue with the SAME string the catalogue own header
       // uses. Two copies of one lang key is exactly the mirror this suite exists to hold.
-      assert.equal(catalogueKey, catalogue.key, `${entryView} catalogue crumb key`);
-      assert.equal(catalogueFallback, catalogue.fallback, `${entryView} catalogue crumb copy`);
+      assert.equal(catalogueTitleKey, catalogue.key, `${entryView} catalogue crumb key`);
+      assert.equal(catalogueTitleFallback, catalogue.fallback, `${entryView} catalogue crumb copy`);
       assert.ok(
         catalogueView.startsWith(`world-${entityType.slice(0, 4)}`),
         `${entryView} must return to the catalogue of its OWN entity type`
@@ -3432,15 +3532,24 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     }
   });
 
+  // The crumb is shell chrome, and `### GM World Scoped Entity Routes` requirement 7 closes the
+  // shell to PRs 6a, 6b and 6c - so an entry editor, released to full width and therefore
+  // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
-    // The crumb is shell chrome, and `### GM World Scoped Entity Routes` requirement 7 closes
-    // the shell to PRs 6a, 6b and 6c - so an entry editor, released to full width and therefore
-    // rendering no inspector, would have had no way back at all if this were left to them.
-    assert.match(
-      rootSource,
-      /\{#if worldScopedEntryRoute\}[\s\S]{0,900}?data-breadcrumb-world-scoped-catalogue=\{worldScopedEntryRoute\.catalogueView\}[\s\S]{0,400}?onclick=\{\(\) => setView\(worldScopedEntryRoute\.catalogueView\)\}/,
-      'the entry trail draws an intermediate catalogue crumb, and it navigates'
+    const root = componentAstOf(MANAGER_ROOT);
+    const crumbs = templateNodes(root).filter((node) =>
+      declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
     );
+    assert.equal(crumbs.length, 1, 'the entry trail draws ONE intermediate catalogue crumb');
+    const [crumb] = crumbs;
+    assert.equal(crumb.name, 'button', 'and it is a real button, not a static crumb');
+    const navigation = attributeExpression(crumb, 'onclick');
+    assert.ok(callNames(navigation).has('setView'), 'the crumb navigates');
+    assert.ok(
+      memberPaths(navigation).includes('worldScopedEntryRoute.catalogueView'),
+      'to the catalogue the entry route records, rather than to a second copy of that mapping'
+    );
+
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through
     // the confirm-discard gate, and resolves the name out of the published world corpus.
@@ -3449,18 +3558,18 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       ['WorldEssenceCataloguePage', 'world-essence-entry'],
       ['WorldToolCataloguePage', 'world-tool-entry'],
     ]) {
-      assert.match(
-        rootSource,
-        new RegExp(
-          `<${catalogue}\\s*\\n\\s*\\{\\.\\.\\.[a-zA-Z]+ScopeProps\\}\\s*\\n\\s*onOpenEntry=\\{\\(entityId\\) => openWorldScopedEntry\\('${entry}', entityId\\)\\}`
-        ),
-        `${catalogue} is wired with both seams PR 6a builds its catalogue on`
-      );
+      const page = templateNodes(root).find((node) => node.name === catalogue);
+      assert.ok(Boolean(page), `${catalogue} is rendered by the shell`);
+      assert.ok(carriesSpread(page), `${catalogue} takes the shared scope props`);
+      const open = attributeExpression(page, 'onOpenEntry');
+      assert.ok(callNames(open).has('openWorldScopedEntry'), `${catalogue} opens an entry route`);
+      assert.ok(literalStrings(open).includes(entry), `${catalogue} opens \`${entry}\``);
     }
-    assert.match(
-      rootSource,
-      /function openWorldScopedEntry\(view, entityId\) \{[\s\S]{0,500}?confirmRouteExit\(view\)/,
-      'and it routes through the same confirm-discard gate every other navigation passes'
-    );
   });
+
+  defineStructureContract(
+    'and routes that open through the same confirm-discard gate every navigation passes',
+    { file: MANAGER_ROOT, fn: 'openWorldScopedEntry' },
+    { callsWith: [['confirmRouteExit', 'view']] }
+  );
 });
