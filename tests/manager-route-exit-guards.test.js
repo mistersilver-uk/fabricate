@@ -1,7 +1,7 @@
 /**
- * The manager's route-exit guard table and its driver (issue 1705). The mounted suites pin ten of
- * the thirteen rows through the real shell; this file pins the table — its order, its
- * short-circuit, its three skip shapes, its per-row default, and its synchronous answer.
+ * The manager's route-exit guard table and its driver (issue 1705). The mounted suites pin every
+ * row through the real shell; this file pins the table — its order, its short-circuit, its three
+ * skip shapes, its per-row default, and its synchronous answer.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -300,8 +300,15 @@ describe('the prompt each row raises', () => {
   });
 });
 
-describe('the rows no mounted suite reaches dirty', () => {
-  const uncovered = ['world-tool-entry', 'world-component-entry', 'component-edit'];
+describe('the rows whose cancel no mounted suite reaches', () => {
+  // `manager-world-scope-mounted.js` and `manager-components-mounted.js` drive these four rows'
+  // save and discard; the cancel that keeps the GM on the editor is pinned only here.
+  const partlyCovered = [
+    'world-essence-entry',
+    'world-tool-entry',
+    'world-component-entry',
+    'component-edit',
+  ];
 
   /** The save/discard/cancel triple, for a row whose dirty path nothing else exercises. */
   function tripleFor(view, action) {
@@ -323,7 +330,7 @@ describe('the rows no mounted suite reaches dirty', () => {
     return { calls, answer: confirmRouteExitGuards(rows, 'systems') };
   }
 
-  for (const view of uncovered) {
+  for (const view of partlyCovered) {
     it(`saves, discards and cancels a dirty ${view} exit`, () => {
       const saved = tripleFor(view, 'save');
       assert.equal(saved.answer, true, 'a saved exit proceeds');
