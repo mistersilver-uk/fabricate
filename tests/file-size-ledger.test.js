@@ -219,7 +219,7 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   const files = keys.filter((key) => !key.includes('::')).length;
   // 106/117 as of issue 1672. `src/models/IngredientSet.js` left the FILE list when the solver
   // moved behind `createIngredientSolver`, taking it from 815 lines to under the threshold.
-  // 107/117 as of issue 1695. `inventoryStore.svelte.js` left the FILE list entirely — splitting
+  // 106/117 as of issue 1695. `inventoryStore.svelte.js` left the FILE list entirely — splitting
   // the salvage-execution and bulk-actions sub-stores out of it took it from 1,536 lines to 607 —
   // while the function list traded its 137-line `salvage` (now four functions, none over 100) for
   // the two new sub-store factories, which are oversized as factories and nothing else.
