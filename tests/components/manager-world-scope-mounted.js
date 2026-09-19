@@ -24,6 +24,7 @@ import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import {
   labCaseSelector,
   managerComponents,
+  parseUuidDouble,
   settle,
   settleBetweenTests,
   settleRouteExit,
@@ -2101,26 +2102,7 @@ export function registerWorldScopeCases() {
           ...(previousFoundry ?? {}),
           utils: {
             ...(previousFoundry?.utils ?? {}),
-            // A DOUBLE THAT MATCHES CORE'S EDGE SEMANTICS, NOT JUST ITS HAPPY PATH.
-            parseUuid: (uuid) => {
-              if (typeof uuid !== 'string') return null;
-              const parts = uuid.split('.');
-              //  3. A SINGLE SEGMENT IS NOT MALFORMED TO CORE. Real `parseUuid('nonsense')`
-              //     answers a well-formed result with `embedded: []` — an unresolvable primary
-              //     id is not a parse failure — so a stub that nulled it was STRICTER than core
-              //     in the direction that manufactures a refusal production does not make. That
-              //     is the same false-pass shape as (1) with the sign flipped: a stub tighter
-              //     than core proves a gate that is not there.
-              if (parts.length < 2) return { embedded: [] };
-              // The pack triple — `Compendium`, scope, pack — comes off first when present.
-              if (parts[0] === 'Compendium') parts.splice(0, 3);
-              // Then the PRIMARY document's own `<Type>.<id>` pair.
-              parts.splice(0, 2);
-              // Whatever remains is embedded, in `<Type>, <id>` order. An odd remainder is
-              // malformed, and core answers `null` for it rather than half-reading it.
-              if (parts.length % 2 !== 0) return null;
-              return { embedded: parts };
-            },
+            parseUuid: parseUuidDouble,
           },
         };
         // THE ONE CALLER THAT ASKS FOR NO PARSER AT ALL gets `foundry.utils` WITHOUT the key,

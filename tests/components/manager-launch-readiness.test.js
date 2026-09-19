@@ -141,7 +141,7 @@ test('the shipped show() prefers the replay-safe whenReady() promise (guards dri
     appSource.includes('game?.fabricate?.whenReady'),
     'show() should consult the replay-safe readiness promise'
   );
-  // The Hook remains only as a fallback (also asserted by the manager contract suite).
+  // The Hook remains only as a fallback, and this file is now its only assertion.
   assert.ok(
     appSource.includes("hooks.once('fabricate.ready', openWhenReady)"),
     'the one-shot Hook is retained as a fallback'

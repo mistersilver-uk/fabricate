@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   captureCloseOrdering,
+  captureUserHookHandlers,
   withFabricateLifecycleReplay,
 } from '../helpers/extension-composition-harness.js';
 
@@ -94,7 +95,7 @@ test('the production manager closes a mounted companion before ApplicationV2 rem
  * @param {object} [options.closeOptions] Options passed to `close()`.
  * @returns {Promise<{lifecycle: Array, asked: string[]}>} What happened, and whether the
  */
-async function closeWithCompanionGuard({ guard, closeOptions }) {
+async function closeWithCompanionGuard({ guard, coreGuard, closeOptions }) {
   const asked = [];
   const lifecycle = await captureCloseOrdering({
     modulePath: '/src/ui/SvelteCraftingSystemManagerApp.svelte.js',
@@ -103,6 +104,12 @@ async function closeWithCompanionGuard({ guard, closeOptions }) {
     closeOptions,
     prepareApp: (app) => {
       app._unregisterUserHooks = () => {};
+      if (coreGuard) {
+        app._confirmDiscardDirtyToolDraft = () => {
+          asked.push('tool');
+          return coreGuard();
+        };
+      }
       if (!guard) return;
       app._confirmDowntimeCompanionNavigation = () => {
         asked.push('asked');
@@ -152,4 +159,92 @@ test('a forced close never consults the companion, however dirty it is', async (
     ['companion-dispose', true],
     ['application-close', { force: true }, true],
   ]);
+});
+
+/**
+ * Core's own guards can SAVE, so a save landing for a close the companion then refused would have
+ * written world data for a window that stayed open. The companion is therefore asked FIRST.
+ */
+test('asks the companion before the Core guards that can save, and a veto writes nothing', async () => {
+  const { lifecycle, asked } = await closeWithCompanionGuard({
+    guard: () => false,
+    coreGuard: () => true,
+    closeOptions: {},
+  });
+
+  assert.deepEqual(asked, ['asked'], 'the companion answers first, and its veto ends the close');
+  assert.deepEqual(lifecycle, [], 'so the Core guard never runs and the window stays up');
+});
+
+test('reaches the Core guards once the companion allows, still in that order', async () => {
+  const { lifecycle, asked } = await closeWithCompanionGuard({
+    guard: () => true,
+    coreGuard: () => true,
+    closeOptions: {},
+  });
+
+  assert.deepEqual(asked, ['asked', 'tool'], 'companion first, then the Core draft guard');
+  assert.deepEqual(lifecycle, [
+    ['companion-dispose', true],
+    ['application-close', {}, true],
+  ]);
+});
+
+const KNOWLEDGE_STORE_METHODS = Object.freeze([
+  'refreshAccessRosters',
+  'markLearnedRecipeIndexStale',
+  'scheduleKnowledgeRefresh',
+]);
+
+const MANAGER_APP = {
+  modulePath: '/src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+  exportName: 'SvelteCraftingSystemManagerApp',
+};
+
+/**
+ * The polarity and the binding of the Knowledge hook set, which the source contract can only state
+ * as presence: an inverted guard, or a hook bound to the wrong handler, passes that and fails here.
+ */
+test('the production Knowledge hooks refresh for a world actor item, and for nothing else', async () => {
+  const { handlersFor, drainCalls } = await captureUserHookHandlers({
+    ...MANAGER_APP,
+    storeMethods: KNOWLEDGE_STORE_METHODS,
+  });
+
+  const itemHandlers = handlersFor('updateItem');
+  assert.equal(itemHandlers.length, 1, 'one handler owns the owned-item hooks');
+  const [onOwnedItem] = itemHandlers;
+
+  onOwnedItem({ parent: { documentName: 'Actor' } });
+  assert.deepEqual(
+    drainCalls(),
+    ['scheduleKnowledgeRefresh'],
+    "a world actor's item is the only write that refreshes Knowledge"
+  );
+
+  onOwnedItem({ parent: { documentName: 'Actor' }, pack: 'world.recipes' });
+  assert.deepEqual(drainCalls(), [], 'a compendium actor could never change the projection');
+
+  onOwnedItem({ parent: { documentName: 'Item' } });
+  assert.deepEqual(drainCalls(), [], 'and neither could an item embedded in anything but an Actor');
+});
+
+test('the production Actor CRUD hooks reproject the rosters, the index and Knowledge together', async () => {
+  const { handlersFor, drainCalls } = await captureUserHookHandlers({
+    ...MANAGER_APP,
+    storeMethods: KNOWLEDGE_STORE_METHODS,
+  });
+
+  const [onActorCreate] = handlersFor('createActor');
+  onActorCreate({});
+  assert.deepEqual(
+    drainCalls(),
+    ['refreshAccessRosters', 'markLearnedRecipeIndexStale', 'scheduleKnowledgeRefresh'],
+    'an imported Actor carries its items in with no createItem hook, so all three run'
+  );
+  assert.equal(
+    handlersFor('deleteActor')[0],
+    onActorCreate,
+    'and the delete side is bound to the same handler'
+  );
 });

@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { flushSync, tick } from 'svelte';
 
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { installFoundryUtilsEnv } from '../helpers/foundryEnv.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   MANAGER_ROOT,
@@ -16,12 +17,36 @@ import {
   compileManagerTree,
   importCompiledComponent,
 } from '../helpers/manager/managerCompile.js';
-import { identityLocalize } from '../helpers/manager/managerLocalization.js';
+import { identityLocalize, shippedString } from '../helpers/manager/managerLocalization.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 let tempRoot;
 let preparing;
+
+/**
+ * Core's `parseUuid` edge semantics rather than its happy path: a double stricter or looser than
+ * core manufactures a refusal, or a resolution, that production never makes.
+ *
+ * @returns {object|null} `null` for a non-string uuid and for a malformed embedded chain.
+ */
+export function parseUuidDouble(uuid) {
+  if (typeof uuid !== 'string') return null;
+  const parts = uuid.split('.');
+  const identity = {
+    collection: parts[0] ?? null,
+    documentId: parts.at(-1) ?? null,
+    id: parts.at(-1) ?? null,
+  };
+  // A single segment is not malformed to core: an unresolvable primary id is not a parse failure.
+  if (parts.length < 2) return { ...identity, embedded: [] };
+  // The `Compendium`/scope/pack triple first when present, then the primary `<Type>.<id>` pair.
+  if (parts[0] === 'Compendium') parts.splice(0, 3);
+  parts.splice(0, 2);
+  // An odd remainder core answers `null` for rather than half-reading it.
+  if (parts.length % 2 !== 0) return null;
+  return { ...identity, embedded: parts };
+}
 
 async function prepareManagerSuite() {
   setupDOM();
@@ -33,6 +58,11 @@ async function prepareManagerSuite() {
       format: (key) => key,
     },
   };
+  // The shared installer leaves `game` alone. Without it the root's `newStepId` and
+  // `isEmbeddedItemUuid` take their undefined-parser fallbacks silently, and the second calls
+  // every uuid embedded.
+  installFoundryUtilsEnv();
+  globalThis.foundry.utils.parseUuid = parseUuidDouble;
   tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-manager-'));
   const dependencyRoot = existsSync(resolve(repoRoot, 'node_modules'))
     ? resolve(repoRoot, 'node_modules')
@@ -85,6 +115,9 @@ export function disposeManagerSuite() {
   rmSync(tempRoot, { recursive: true, force: true });
   teardownDOM();
   delete globalThis.game;
+  delete globalThis.foundry;
+  delete globalThis.ui;
+  delete globalThis.fromUuid;
 }
 
 /** Restore the localizer and yield, after each route module has torn its own mount down. */
@@ -103,6 +136,29 @@ export async function settleBetweenTests() {
   // suite has stacked up hundreds of trees. Without this line the file needs >2 GB of heap;
   // with it the whole suite runs green under `--max-old-space-size=768`.
   await new Promise((settled) => setImmediate(settled));
+}
+
+/** One rendered hook, as a call rather than another query-and-assert pair (issue 1691). */
+export function assertHook(container, hook, message) {
+  assert.ok(Boolean(container.querySelector(hook)), message ?? `the route renders ${hook}`);
+}
+
+export function assertNoHook(container, hook, message) {
+  assert.ok(!container.querySelector(hook), message ?? `the route must not render ${hook}`);
+}
+
+/**
+ * Needs `useShippedLocalization()`: the harness otherwise localizes a key to itself. This proves
+ * the shipped copy reaches the DOM, not the key that fetched it — `text(key, fallback)` renders
+ * the same copy under a renamed key, so the key is claimed by a `spellsExactly` contract row.
+ */
+export function assertShippedString(container, key, message) {
+  const expected = shippedString(key);
+  assert.notEqual(expected, key, `lang/en.json defines no ${key}`);
+  assert.ok(
+    container.textContent.includes(expected),
+    message ?? `the route renders the shipped copy for ${key}`
+  );
 }
 
 // The selectors are READ FROM THE REGISTRY rather than restated.

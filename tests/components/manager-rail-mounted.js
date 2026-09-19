@@ -9,7 +9,13 @@ import { useShippedLocalization } from '../helpers/manager/managerLocalization.j
 import { createStore, downtimeProvider } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  assertHook,
+  assertNoHook,
+  assertShippedString,
+  managerComponents,
+  settleBetweenTests,
+} from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -52,6 +58,61 @@ export function registerRailCases() {
     await settleBetweenTests();
   });
 
+
+  // What issue 1185 took off the titlebar is asserted by its absence: each would return silently.
+  it('renders the titlebar and its resolution status, without the chrome issue 1185 removed', () => {
+    useShippedLocalization();
+    mountManager();
+
+    assertHook(target, '.manager-titlebar[data-manager-titlebar]');
+    assertHook(target, '[data-manager-titlebar-status]', 'the titlebar reports the resolution');
+    assert.ok(
+      target.querySelector('[data-manager-titlebar-status]').getAttribute('title')?.length > 0,
+      'and names that status in its tooltip as well as its text'
+    );
+    for (const gone of [
+      '.manager-titlebar-icon',
+      '.manager-titlebar-product',
+      '.manager-route-icon',
+      '[data-manager-route-icon]',
+      '[data-manager-titlebar-system]',
+    ]) {
+      assertNoHook(target, gone, `${gone} was removed from the page header and must stay gone`);
+    }
+  });
+
+  it('labels the rail section, in shipped copy', () => {
+    useShippedLocalization();
+    mountManager();
+
+    assertHook(target, '.manager-rail-title[data-manager-rail-section]');
+    assertShippedString(target, 'FABRICATE.Admin.Manager.Nav.SectionLabel');
+  });
+
+  // The record-count vehicle draws numerals, so a `Soon` inside one reads as a quantity.
+  it('draws rail counts as bare numerals and the placeholder as a plain Soon span', () => {
+    useShippedLocalization();
+    // Graph is the only planned view, and it is behind the experimental gate.
+    mountManager([], { experimentalFeaturesEnabled: true });
+
+    const counts = [...target.querySelectorAll('.manager-nav-count')];
+    assert.ok(counts.length > 0, 'the rail draws at least one record count');
+    assert.ok(
+      counts.every((count) => !count.classList.contains('manager-chip')),
+      'no rail count may borrow the content chip'
+    );
+    assert.ok(
+      counts.every((count) => /^\d+$/.test(count.textContent.trim())),
+      'every rail count is a bare numeral'
+    );
+    const planned = target.querySelector('.manager-nav-planned');
+    assert.ok(Boolean(planned), 'the disabled placeholder keeps its own quiet trailing span');
+    assert.equal(planned.textContent.trim(), 'Soon');
+    assert.ok(
+      !planned.classList.contains('manager-nav-count'),
+      'and it must not return to the record-count vehicle'
+    );
+  });
 
   it('renders the three-region systems shell with selected inspector data', () => {
     target = document.createElement('div');

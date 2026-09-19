@@ -1,36 +1,45 @@
 /**
- * Structural questions about a Svelte component, answered from its AST instead of from its text
- * (issue 1658), so a rename, an import reorder or an extraction does not break a test that never
- * cared how the component was written. `tests/svelte-structure-contract.test.js` pins the two
- * paragraphs below, so condense them only together with that test.
+ * Structural questions about a Svelte component, answered from its AST rather than its text
+ * (issue 1658). `tests/svelte-structure-contract.test.js` pins the two paragraphs below, so
+ * condense them only together with that test.
  *
  * Do not add a string `includes` on component source to a test. That is the shape
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
  *
- * The residue they deliberately do not address: exact JS expression text, a receiver that is a
- * loop variable rather than a literal, i18n key strings, and `.js`/`.mjs` targets.
+ * The residue they deliberately do not address: exact JS expression text, and a receiver that is a
+ * loop variable rather than a literal. An i18n key is a literal `spellsLiteral` answers, and a
+ * `.js`/`.mjs` target is answered by the sibling predicates in `moduleAst.js` (issue 1691).
  */
 import { parse } from 'svelte/compiler';
+import { parseForESLint } from 'svelte-eslint-parser';
 
-import { walkNodes } from './moduleAst.js';
+import {
+  calledName,
+  declaredConstant as declaresConstant,
+  importedModules as importedModuleSpecifiers,
+  lazilyImportedModules,
+  literalStrings,
+  referencesIdentifier as namesIdentifier,
+  walkNodes,
+} from './moduleAst.js';
 import { attributeNamed, walkElements } from './svelteTemplateScan.js';
 
 /** Directives that genuinely bind a prop; `class:`, `style:`, `use:`, `on:` and friends do not. */
 const PROP_DIRECTIVES = Object.freeze(new Set(['BindDirective']));
 
-/** Declaration nodes that name a module the component depends on. */
-const SPECIFIER_TYPES = Object.freeze([
-  'ImportDeclaration',
-  'ExportNamedDeclaration',
-  'ExportAllDeclaration',
-]);
-
-/** Keys that make the tree cyclic or carry no child nodes. */
-const SKIPPED_KEYS = Object.freeze(['parent', 'loc', 'range']);
-
-/** Parse one component's source into the AST the predicates below read. */
 export function parseComponent(source) {
   return parse(String(source ?? ''), { modern: true });
+}
+
+/** The other vocabulary: the scope-resolved parse `parseComponent` does not produce. */
+export function parseComponentScope(source) {
+  return parseForESLint(String(source ?? ''), {
+    filePath: 'probe.svelte',
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    loc: true,
+    range: true,
+  });
 }
 
 function collect(ast, predicate) {
@@ -57,7 +66,7 @@ export function renderedElements(ast) {
     start: node.start,
     tag: node.name.toLowerCase(),
   }));
-  // `walkElements` visits only RegularElement and Component, so a dynamic tag needs its own pass.
+  // `walkElements` visits RegularElement and Component only, so a dynamic tag needs its own pass.
   const dynamic = [];
   for (const node of walkNodes(ast.fragment ?? ast)) {
     if (node.type !== 'SvelteElement') continue;
@@ -88,10 +97,7 @@ export function declaresAttribute(node, name, { directives = true } = {}) {
   );
 }
 
-/**
- * Whether every occurrence of `componentName` declares `propName`. False when the component is not
- * rendered at all, so a caller cannot read a vacuous true as a satisfied contract.
- */
+/** False when the component is not rendered, so a vacuous true cannot read as a contract. */
 export function passesProp(ast, componentName, propName) {
   const occurrences = collect(
     ast,
@@ -101,35 +107,104 @@ export function passesProp(ast, componentName, propName) {
   return occurrences.every((node) => declaresAttribute(node, propName));
 }
 
-/**
- * Every module specifier the component depends on: both script blocks, static and dynamic imports,
- * and re-exports.
- */
-export function importedModules(ast) {
-  const specifiers = [];
-  const visit = (node) => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) {
-      for (const child of node) visit(child);
-      return;
+/** The props a component destructures from `$props()`, and those it declares with no default. */
+function declaredProps(ast) {
+  const declared = new Set();
+  const required = new Set();
+  for (const node of walkNodes(ast)) {
+    if (node.type !== 'VariableDeclarator' || calledName(node.init) !== '$props') continue;
+    for (const property of node.id?.properties ?? []) {
+      const name = property.key?.name ?? property.value?.left?.name ?? property.value?.name;
+      if (!name) continue;
+      declared.add(name);
+      if (property.value?.type !== 'AssignmentPattern') required.add(name);
     }
-    if (SPECIFIER_TYPES.includes(node.type) && node.source?.value) {
-      specifiers.push(node.source.value);
-    }
-    if (node.type === 'ImportExpression' && node.source?.type === 'Literal') {
-      specifiers.push(node.source.value);
-    }
-    for (const [key, value] of Object.entries(node)) {
-      if (SKIPPED_KEYS.includes(key)) continue;
-      if (value && typeof value === 'object') visit(value);
-    }
-  };
-  visit(ast.instance?.content?.body ?? []);
-  visit(ast.module?.content?.body ?? []);
-  return specifiers;
+  }
+  return { declared, required };
 }
 
-/** Whether the component imports or re-exports the given module specifier. */
+export function declaresProp(ast, name) {
+  return declaredProps(ast).declared.has(name);
+}
+
+/** Declared with no default, so an unthreaded caller fails loudly rather than taking a fallback. */
+export function requiresProp(ast, name) {
+  return declaredProps(ast).required.has(name);
+}
+
+function scriptBodies(ast) {
+  return [ast.instance?.content?.body ?? [], ast.module?.content?.body ?? []];
+}
+
+function codeParts(ast) {
+  return [...scriptBodies(ast), ast.fragment ?? {}];
+}
+
+/** Both script blocks, static and dynamic imports, and re-exports. */
+export function importedModules(ast) {
+  return scriptBodies(ast).flatMap((body) => [
+    ...importedModuleSpecifiers(body),
+    ...lazilyImportedModules(body),
+  ]);
+}
+
 export function importsModule(ast, specifier) {
   return importedModules(ast).includes(specifier);
+}
+
+export function declaredConstant(ast, name) {
+  return codeParts(ast).some((part) => declaresConstant(part, name));
+}
+
+export function referencesIdentifier(ast, name) {
+  return codeParts(ast).some((part) => namesIdentifier(part, name));
+}
+
+export function spelledLiterals(ast) {
+  const found = [];
+  for (const part of codeParts(ast)) {
+    found.push(...literalStrings(part));
+    for (const node of walkNodes(part)) {
+      if (node.type === 'Text' && typeof node.data === 'string') found.push(node.data);
+    }
+  }
+  return found;
+}
+
+/** A substring match; for a whole i18n key ask `spellsLiteral`, which a neighbour cannot satisfy. */
+export function containsLiteral(ast, text) {
+  return spelledLiterals(ast).some((literal) => literal.includes(String(text)));
+}
+
+export function spellsLiteral(ast, text) {
+  return spelledLiterals(ast).includes(String(text));
+}
+
+const GLOBAL_HOSTS = Object.freeze(new Set(['globalThis', 'window', 'self']));
+
+function memberName(node) {
+  if (!node.computed) return node.property?.type === 'Identifier' ? node.property.name : undefined;
+  return node.property?.type === 'Literal' && typeof node.property.value === 'string'
+    ? node.property.value
+    : undefined;
+}
+
+/**
+ * Both legs are required: a free reference (`game.user`) and a member read off a free host
+ * (`globalThis.game.user`). Scope resolution is what denies a local `const game` and an `obj.game`.
+ */
+export function readsGlobal({ ast, scopeManager }, name) {
+  const free = scopeManager?.globalScope?.through ?? [];
+  if (free.some((reference) => reference.identifier?.name === name)) return true;
+  const hosts = new Set(
+    free
+      .filter((reference) => GLOBAL_HOSTS.has(reference.identifier?.name))
+      .map((reference) => reference.identifier)
+  );
+  for (const node of walkNodes(ast)) {
+    if (node.type === 'MemberExpression' && hosts.has(node.object) && memberName(node) === name) {
+      return true;
+    }
+  }
+  return false;
 }

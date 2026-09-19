@@ -5,6 +5,30 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { classMemberSource, moduleFunctionSource } from '../helpers/boundedSource.js';
+import {
+  calledName,
+  declaredConstant as declaredConstantOf,
+  identifierNames,
+  importsModule as importsModuleOf,
+  importsModuleLazily,
+  literalStrings,
+  referencesIdentifier as referencesIdentifierOf,
+  walkNodes,
+} from '../helpers/moduleAst.js';
+import { componentAstOf, componentScopeOf, moduleAstOf } from '../helpers/parsedSource.js';
+import {
+  containsLiteral,
+  declaredConstant,
+  declaresAttribute,
+  declaresProp,
+  importsModule,
+  passesProp,
+  readsGlobal,
+  referencesIdentifier,
+  rendersComponent,
+  requiresProp,
+  spellsLiteral,
+} from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -112,7 +136,6 @@ const craftingModifierCataloguePath = resolve(
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
 );
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
-const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
@@ -172,19 +195,6 @@ const worldToolEntrySource = readFileSync(
   'utf8'
 );
 const appSource = readFileSync(appPath, 'utf8');
-const hostSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'),
-  'utf8'
-);
-const managerExtensionsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/managerExtensions.js'),
-  'utf8'
-);
-const previewProviderSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js'),
-  'utf8'
-);
-const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 const managerSource = [
@@ -248,324 +258,445 @@ function sourceName(filePath) {
   return filePath.replace(`${repoRoot}\\`, '').replace(`${repoRoot}/`, '');
 }
 
+// A structural claim is a ROW in a `defineStructureContract` table, never another
+// parse-and-assert pair: the repeated pair is the shape the duplication gate fails (issue 1691).
+
+function classMemberAst(ast, name) {
+  for (const node of walkNodes(ast)) {
+    if (node.type === 'MethodDefinition' && node.key?.name === name) return node;
+  }
+  throw new Error(`no class member \`${name}\``);
+}
+
+/** Every element or component node in a template, for the claims that COUNT render sites. */
+function templateNodes(component) {
+  const nodes = [];
+  for (const node of walkNodes(component.fragment)) {
+    if (node.type === 'RegularElement' || node.type === 'Component') nodes.push(node);
+  }
+  return nodes;
+}
+
+function propertyAst(node, name) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type === 'Property' && inner.key?.name === name) return inner.value;
+  }
+  throw new Error(`no property \`${name}\``);
+}
+
+/** Every `a.b.c` chain a subtree reads, optional links flattened, `this` spelled out. */
+function memberPaths(node) {
+  const paths = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'MemberExpression' || inner.computed) continue;
+    const parts = [];
+    let cursor = inner;
+    while (cursor?.type === 'MemberExpression' && !cursor.computed) {
+      parts.unshift(cursor.property?.name);
+      cursor = cursor.object;
+    }
+    if (cursor?.type === 'Identifier') parts.unshift(cursor.name);
+    else if (cursor?.type === 'ThisExpression') parts.unshift('this');
+    else continue;
+    if (parts.every(Boolean)) paths.push(parts.join('.'));
+  }
+  return paths;
+}
+
+function callNames(node) {
+  const names = new Set();
+  for (const inner of walkNodes(node)) {
+    const called = calledName(inner);
+    if (called) names.add(called);
+  }
+  return names;
+}
+
+/** Directly, or through a mapped list. */
+function hookNames(node) {
+  const events = new Set();
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'CallExpression') continue;
+    if (registersAHook(inner)) {
+      const [event] = inner.arguments;
+      if (event?.type === 'Literal' && typeof event.value === 'string') events.add(event.value);
+    }
+    // A mapped list names its events; the registration itself carries only the loop variable.
+    const source = inner.callee?.object;
+    if (calledName(inner) !== 'map' || source?.type !== 'ArrayExpression') continue;
+    if ([...walkNodes(inner.arguments[0] ?? {})].some(registersAHook)) {
+      for (const literal of literalStrings(source)) events.add(literal);
+    }
+  }
+  return events;
+}
+
+function registersAHook(node) {
+  if (node?.type !== 'CallExpression') return false;
+  const called = calledName(node);
+  const bus = node.callee?.object?.name;
+  return (called === 'on' || called === 'once') && (bus === 'Hooks' || bus === 'hooks');
+}
+
+/** The keys a subtree tests with `in` against the named object. */
+function inOperatorKeys(node, objectName) {
+  const keys = new Set();
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'BinaryExpression' || inner.operator !== 'in') continue;
+    if (inner.right?.name !== objectName) continue;
+    if (inner.left?.type === 'Literal') keys.add(String(inner.left.value));
+  }
+  return keys;
+}
+
+function comparesToLiteral(node, value) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'BinaryExpression') continue;
+    if ([inner.left, inner.right].some((side) => side?.type === 'Literal' && side.value === value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function extendsCallOf(node, name) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'ClassDeclaration' && inner.type !== 'ClassExpression') continue;
+    if (calledName(inner.superClass) === name) return true;
+  }
+  return false;
+}
+
+function exportedNames(node) {
+  const names = new Set();
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'ExportNamedDeclaration') continue;
+    for (const declarator of inner.declaration?.declarations ?? []) {
+      if (declarator.id?.name) names.add(declarator.id.name);
+    }
+    if (inner.declaration?.id?.name) names.add(inner.declaration.id.name);
+    for (const specifier of inner.specifiers ?? []) {
+      if (specifier.exported?.name) names.add(specifier.exported.name);
+    }
+  }
+  return names;
+}
+
+function callsWithArgument(node, [name, argument]) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'CallExpression' || calledName(inner) !== name) continue;
+    if (inner.arguments.some((value) => identifierNames(value).has(argument))) return true;
+  }
+  return false;
+}
+
+/**
+ * A repo-relative path, optionally narrowed to one class member and one of its properties — the
+ * AST equivalent of the bounded text slice it replaces — with the claims its kind can answer.
+ */
+function structureOf(target) {
+  const { file, member, property } = typeof target === 'string' ? { file: target } : target;
+  if (file.endsWith('.svelte')) {
+    const component = componentAstOf(file);
+    const scope = componentScopeOf(file);
+    return {
+      renders: (name) => rendersComponent(component, name),
+      imports: (specifier) => importsModule(component, specifier),
+      declares: (name) => declaredConstant(component, name),
+      names: (name) => referencesIdentifier(component, name),
+      spells: (text) => containsLiteral(component, text),
+      spellsExactly: (text) => spellsLiteral(component, text),
+      global: (name) => readsGlobal(scope, name),
+      prop: ([name, propName]) => passesProp(component, name, propName),
+      reads: (path) => memberPaths(component).includes(path),
+      calls: (name) => callNames(component).has(name),
+      callsWith: (pair) => callsWithArgument(component, pair),
+      compares: (value) => comparesToLiteral(component, value),
+      declaresProp: (name) => declaresProp(component, name),
+      requiresProp: (name) => requiresProp(component, name),
+    };
+  }
+  const { ast } = moduleAstOf(file);
+  let code = member ? classMemberAst(ast, member) : ast;
+  if (property) code = propertyAst(code, property);
+  return {
+    imports: (specifier) => importsModuleOf(code, specifier),
+    importsLazily: (specifier) => importsModuleLazily(code, specifier),
+    declares: (name) => declaredConstantOf(code, name),
+    names: (name) => referencesIdentifierOf(code, name),
+    spells: (text) => literalStrings(code).some((literal) => literal.includes(text)),
+    spellsExactly: (text) => literalStrings(code).includes(text),
+    reads: (path) => memberPaths(code).includes(path),
+    calls: (name) => callNames(code).has(name),
+    callsWith: (pair) => callsWithArgument(code, pair),
+    extendsCall: (name) => extendsCallOf(code, name),
+    exports: (name) => exportedNames(code).has(name),
+    hooks: (event) => hookNames(code).has(event),
+    diffKeys: ([object, key]) => inOperatorKeys(code, object).has(key),
+    compares: (value) => comparesToLiteral(code, value),
+  };
+}
+
+/** Each claim a contract row may make: the question to ask, and the answer it must get. */
+const CONTRACT_CLAIMS = Object.freeze({
+  renders: { ask: 'renders', holds: true, says: (v) => `renders <${v}>` },
+  rendersNo: { ask: 'renders', holds: false, says: (v) => `no longer renders <${v}>` },
+  imports: { ask: 'imports', holds: true, says: (v) => `imports ${v}` },
+  importsNo: { ask: 'imports', holds: false, says: (v) => `no longer imports ${v}` },
+  importsLazily: { ask: 'importsLazily', holds: true, says: (v) => `imports ${v} lazily` },
+  declares: { ask: 'declares', holds: true, says: (v) => `declares const ${v}` },
+  names: { ask: 'names', holds: true, says: (v) => `names ${v}` },
+  namesNo: { ask: 'names', holds: false, says: (v) => `no longer names ${v}` },
+  spells: { ask: 'spells', holds: true, says: (v) => `spells "${v}"` },
+  spellsNo: { ask: 'spells', holds: false, says: (v) => `no longer spells "${v}"` },
+  spellsExactly: { ask: 'spellsExactly', holds: true, says: (v) => `spells "${v}" in full` },
+  reads: { ask: 'reads', holds: true, says: (v) => `reads ${v}` },
+  readsNo: { ask: 'reads', holds: false, says: (v) => `never reads ${v}` },
+  calls: { ask: 'calls', holds: true, says: (v) => `calls ${v}()` },
+  callsNo: { ask: 'calls', holds: false, says: (v) => `never calls ${v}()` },
+  callsWith: { ask: 'callsWith', holds: true, says: ([f, a]) => `calls ${f}() with ${a}` },
+  declaresProp: { ask: 'declaresProp', holds: true, says: (v) => `declares the ${v} prop` },
+  requiresProp: {
+    ask: 'requiresProp',
+    holds: true,
+    says: (v) => `declares ${v} with no fallback, so an unthreaded caller fails loudly`,
+  },
+  exports: { ask: 'exports', holds: true, says: (v) => `exports ${v}` },
+  extendsCall: { ask: 'extendsCall', holds: true, says: (v) => `extends ${v}()` },
+  hooks: { ask: 'hooks', holds: true, says: (v) => `registers the ${v} hook` },
+  diffKeys: { ask: 'diffKeys', holds: true, says: ([o, k]) => `re-projects on a ${o}.${k} change` },
+  compares: { ask: 'compares', holds: true, says: (v) => `compares against ${v}` },
+  comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
+  passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
+  readsNoGlobal: { ask: 'global', holds: false, says: (v) => `reads no ${v} global directly` },
+});
+
+const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
+const MAIN = 'src/main.js';
+const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
+const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
+const DOWNTIME_PREVIEW_PROVIDER =
+  'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
+
+/** One target, one contract test; every converted structural pin is one row of `claims`. */
+function defineStructureContract(title, target, claims) {
+  it(title, () => {
+    const subject = structureOf(target);
+    const label =
+      typeof target === 'string'
+        ? target
+        : [target.file, target.member, target.property].filter(Boolean).join(' > ');
+    for (const [kind, rows] of Object.entries(claims)) {
+      const claim = CONTRACT_CLAIMS[kind];
+      assert.equal(typeof subject[claim.ask], 'function', `${label} cannot answer "${kind}"`);
+      for (const row of rows) {
+        assert.equal(subject[claim.ask](row), claim.holds, `${label} ${claim.says(row)}`);
+      }
+    }
+  });
+}
+
 describe('CraftingSystemManager source contract', () => {
-  it('injects the exact page-session manager extension registry into the Svelte root', () => {
-    assert.ok(appSource.includes("import { managerExtensions } from './managerExtensions.js';"));
-    assert.ok(appSource.includes('managerExtensions,'));
-    assert.ok(
-      rootSource.includes(
-        'let { store, services = null, managerExtensions = null, playerExtensions = null } = $props()'
+  defineStructureContract(
+    'injects the exact page-session manager extension registry into the Svelte root',
+    APP_SHELL,
+    { imports: ['./managerExtensions.js'] }
+  );
+
+  defineStructureContract(
+    'hands that registry to the root beside the player one',
+    { file: APP_SHELL, member: '_prepareSvelteProps' },
+    { names: ['managerExtensions', 'playerExtensions'] }
+  );
+
+  defineStructureContract(
+    'takes both registries as props and renders the Downtime host',
+    MANAGER_ROOT,
+    {
+      declaresProp: ['store', 'services', 'managerExtensions', 'playerExtensions'],
+      renders: ['WorldDowntimeExtensionHost'],
+    }
+  );
+
+  // The rail renders the active tab set while the host is unmounted, so the shell owns the live
+  // provider and the host takes it as a prop.
+  defineStructureContract('keeps one owner of the active Downtime provider', MANAGER_ROOT, {
+    callsWith: [['subscribe', 'WORLD_DOWNTIME_SURFACE_ID']],
+  });
+
+  defineStructureContract('leaves the Downtime host subscribing to nothing', DOWNTIME_HOST, {
+    callsNo: ['subscribe'],
+    callsWith: [['onProviderFault', 'activeProvider']],
+  });
+
+  defineStructureContract(
+    'never enumerates the tab ids the registry will accept',
+    MANAGER_EXTENSIONS,
+    { namesNo: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
+  );
+
+  defineStructureContract(
+    "publishes Core's preview tab ids beside its copy",
+    DOWNTIME_PREVIEW_PROVIDER,
+    { exports: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
+  );
+
+  // Root owns the rail label id, stated once; the host derives no id of its own (issue 1213).
+  defineStructureContract(
+    'owns the rail label id and threads it into the Downtime host',
+    MANAGER_ROOT,
+    {
+      declares: ['downtimeNavLabelId'],
+      spells: ['manager-downtime-nav-label-'],
+      passesProps: [['WorldDowntimeExtensionHost', 'navLabelId']],
+    }
+  );
+
+  // Required, with no default: a default would be the hand-maintained mirror this prop avoids —
+  // a second copy of Root's literal, agreeing today and undetectable the day it stops.
+  defineStructureContract(
+    'names its region from the prop and carries no copy of the literal',
+    DOWNTIME_HOST,
+    { requiresProp: ['navLabelId'], spellsNo: ['manager-downtime-nav'] }
+  );
+
+  // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
+  // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
+  it('renders the Downtime badge at exactly two sites', () => {
+    const sites = templateNodes(componentAstOf(MANAGER_ROOT))
+      .filter((node) =>
+        (node.attributes ?? []).some((attribute) =>
+          String(attribute.name ?? '').startsWith('data-world-downtime-badge')
+        )
       )
-    );
-    assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
-  });
-  it('keeps one owner of the active Downtime provider, and it is the shell', () => {
-    // The rail renders the active tab set while the host is UNMOUNTED.
-    assert.ok(
-      rootSource.includes('managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID'),
-      'the shell subscribes to the surface it renders'
-    );
-    assert.ok(
-      !hostSource.includes('.subscribe('),
-      'the Downtime host takes the live provider as a prop and subscribes to nothing'
-    );
-    assert.ok(
-      hostSource.includes('onProviderFault(activeProvider)'),
-      'a mount fault is reported UP to the shell rather than healed locally'
-    );
-    // Core's own tab id list is content, not contract: nothing on the seam may read it.
-    assert.ok(
-      !managerExtensionsSource.includes('CORE_DOWNTIME_PREVIEW_TAB_IDS'),
-      'the registry never enumerates the tab ids it will accept'
-    );
-    assert.ok(
-      previewProviderSource.includes('export const CORE_DOWNTIME_PREVIEW_TAB_IDS'),
-      "Core's preview tab ids live beside the copy and icons they index"
-    );
-  });
-  // The cross-component handoff that names the companion panel (issue 1213). Root owns the id
-  // and threads it down; the host consumes it. Every claim here was ungated at review, and the
-  // host's DEFAULT was itself the hand-maintained mirror its own comment forbids — a second
-  // copy of Root's literal, agreeing today and undetectable the day it stops. Deleting the
-  // thread-through at the call site survived the entire suite.
-  it('threads the rail label id into the Downtime host rather than mirroring the literal', () => {
-    assert.ok(
-      rootSource.includes(
-        'const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;'
-      ),
-      'Root owns the rail label id, stated once'
-    );
-    assert.ok(
-      rootSource.includes('navLabelId={downtimeNavLabelId}'),
-      'and passes it to the host — without this the panel region has no name at all'
-    );
-    assert.ok(
-      hostSource.includes('aria-labelledby={navLabelId(tab.id)}'),
-      'the host names its region from the prop and derives no id of its own'
-    );
-    // REQUIRED, with no default. The host must not be able to answer the question itself.
-    assert.match(
-      hostSource,
-      /^\s{4}navLabelId,\s*$/m,
-      'navLabelId is declared with no fallback, so an unthreaded host fails loudly'
-    );
-    assert.ok(
-      !hostSource.includes('manager-downtime-nav'),
-      'and the host carries no copy of Root literal in any form'
-    );
-    // The region takes the SCREEN name.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-label" id={downtimeNavLabelId(item.id)}'),
-      'the id lands on the visible label element'
-    );
-    assert.match(
-      rootSource,
-      /aria-label=\{downtimeCoreFallback\s*\?\s*undefined\s*:\s*downtimeTabText\(item, 'accessibleName'\)\}/,
-      'and the sub-item consumes accessibleName in provider mode, so the seam does not require a field it discards'
-    );
-  });
-  // AC-15 — the mode guard on both badge render sites (issue 1302).
-  it('keeps both Downtime badge render sites inside the provider-mode branch', () => {
-    // The SUB-ITEM badge, opening immediately inside the mode guard. Asserted as adjacency
-    // rather than as "the file contains both strings", which any two unrelated lines satisfy.
-    assert.match(
-      rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{@const badge = downtimeSubitemBadge\(item\)\}\s*\{#if badge\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
-      'the sub-item badge renders inside `downtimeCoreFallback === false`, not beside it'
-    );
-    // The ROLLUP, the same way.
-    assert.match(
-      rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{#if downtimeNavRollupVisible\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
-      'and so does the parent rollup'
-    );
-    // BOTH, and only those two. A third site added outside a guard would satisfy every
-    // assertion above and render a companion's count over Core's gold upsell.
+      .map((node) => node.name);
     assert.equal(
-      rootSource.split('data-world-downtime-badge').length - 1,
+      sites.length,
       2,
-      'there are exactly two badge render sites, and the two matched above are them'
-    );
-
-    // The two DERIVATIONS behind those sites are guarded as well.
-    assert.ok(
-      rootSource.includes(
-        'return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);'
-      ),
-      'the resolved sub-item badge is null in core-fallback, whatever the store holds'
-    );
-    assert.match(
-      rootSource,
-      /downtimeCoreFallback \? 0 : navTabBadgeTotal\(downtimeTabs, downtimeNavTabBadges\)/,
-      'and the rollup total is zero there, so the composed parent name cannot appear either'
-    );
-    assert.match(
-      rootSource,
-      /const downtimeNavRollupVisible = \$derived\(\s*!downtimeCoreFallback &&/,
-      'the rollup’s own visibility opens on the mode, before either of its other terms'
-    );
-  });
-  it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
-    const closeStart = appSource.indexOf('async close(options) {');
-    const closeEnd = appSource.indexOf('  static show()', closeStart);
-    const closeSource = appSource.slice(closeStart, closeEnd);
-    const dispose = closeSource.indexOf('disposeDowntimeProviderBeforeRemoval?.()');
-    const superClose = closeSource.indexOf('return super.close(options);');
-    assert.ok(dispose >= 0, 'the production manager close invokes the root disposal bridge');
-    assert.ok(superClose > dispose, 'the bridge runs before ApplicationV2 removes the Svelte target');
-    assert.match(
-      closeSource,
-      /disposeDowntimeProviderBeforeRemoval\?\.\(\);[\s\S]*?return super\.close\(options\);/,
-      'the real manager close keeps disposal and ApplicationV2 close in one ordered composition'
-    );
-  });
-  it('self-registers as the sole crafting system manager app', () => {
-    assert.ok(
-      appSource.includes('extends SvelteApplicationMixin('),
-      'manager app should be a standalone ApplicationV2 shell with no legacy base class'
-    );
-    assert.ok(
-      !appSource.includes('SvelteRecipeManagerApp'),
-      'manager app should not reference the removed legacy manager class'
-    );
-    assert.ok(
-      appSource.includes('registerCraftingSystemManagerApp(SvelteCraftingSystemManagerApp)'),
-      'manager app should self-register with the manager registry'
-    );
-    assert.ok(
-      !appSource.includes('openCurrentAdmin'),
-      'manager app should not expose a legacy admin launch service'
-    );
-    assert.ok(
-      appSource.includes('height: 940'),
-      'manager app should open tall enough for gathering task drag/drop'
-    );
-    assert.ok(
-      !mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
-      'legacy manager side-effect import should be removed'
-    );
-    // Issue 150: the GM-only manager subtree is deferred to a lazy chunk.
-    assert.ok(
-      !mainSource.includes("import './ui/SvelteCraftingSystemManagerApp.svelte.js';"),
-      'manager static side-effect import should be removed so it lands in a lazy chunk'
-    );
-    assert.ok(
-      mainSource.includes("import('./ui/SvelteCraftingSystemManagerApp.svelte.js')"),
-      'manager app should be pulled in via a dynamic import for the lazy chunk'
-    );
-    assert.ok(
-      mainSource.includes('loadCraftingSystemManagerAppClass'),
-      'main.js should expose the memoized async manager loader'
+      `the sub-item badge and the parent rollup, and nothing else (found ${sites.join(', ')})`
     );
   });
 
-  // The access rosters are the manager's only Foundry user/ownership surface.
-  it('derives the access rosters from the non-GM roster, never by testing a GM', () => {
-    // `Document#testUserPermission` short-circuits EVERY GM (Assistant included, since
-    // `User#isGM` is `hasRole(ASSISTANT)`) to OWNER, so GMs must be filtered FIRST.
-    assert.ok(
-      appSource.includes('game.users?.players'),
-      'uses the canonical Foundry non-GM roster'
-    );
-    assert.ok(appSource.includes('_playerUsers()'), 'both rosters go through the one GM filter');
-    assert.equal(
-      appSource.includes('actor.isOwner'),
-      false,
-      'never uses the game.user-scoped Actor#isOwner (always true on a GM client)'
-    );
-    // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
-    const fallback = appSource.slice(
-      appSource.indexOf('_playerUsers() {'),
-      appSource.indexOf('_userRoleLabel(role) {')
-    );
-    assert.ok(
-      fallback.includes("hasRole('PLAYER')") && fallback.includes('USER_ROLES?.PLAYER'),
-      'the fallback applies the same role floor as the canonical roster'
-    );
-    // Everything this labels comes from the GM-free roster.
-    const roleLabel = appSource.slice(appSource.indexOf('_userRoleLabel(role) {'));
-    assert.equal(
-      roleLabel.slice(0, roleLabel.indexOf('_userColor')).includes('RoleGamemaster'),
-      false,
-      'a GM never reaches the role label — the roster excludes them'
-    );
+  // The companion is disposed before ApplicationV2 removes its Svelte target; that ordering is
+  // asserted against the real class by `tests/components/manager-extension-composition.test.js`.
+
+  // The window height is owned by `scripts/lib/foundryChromeSpec.js` and deep-equalled against the
+  // real `DEFAULT_OPTIONS` by `tests/view-lab-app-options-parity.test.js`.
+  defineStructureContract('self-registers as the sole crafting system manager app', APP_SHELL, {
+    extendsCall: ['SvelteApplicationMixin'],
+    callsWith: [['registerCraftingSystemManagerApp', 'SvelteCraftingSystemManagerApp']],
+    namesNo: [
+      'SvelteRecipeManagerApp',
+      'openCurrentAdmin',
+      'onEditSystem',
+      'LAST_MANAGED_CRAFTING_SYSTEM',
+    ],
   });
 
-  it('models "who plays this character" as a SET, with the whole-table case explicit', () => {
-    assert.ok(
-      appSource.includes("actor.testUserPermission?.(user, 'OWNER')"),
-      'OWNER holders control the actor'
-    );
-    assert.ok(appSource.includes('user.character.id === actor.id'), 'the assigned player too');
-    assert.ok(appSource.includes('controlledBy'), 'the union is exposed as a set');
-    assert.ok(
-      appSource.includes('sharedWithAllPlayers'),
-      'ownership.default >= OWNER reaches the whole table'
-    );
-    assert.ok(appSource.includes('actor.ownership?.default'), 'reads the default ownership level');
-    assert.equal(appSource.includes('playedBy'), false, 'no lossy singular playedBy field');
+  // Deferred to its own chunk (issue 150): the static import matters by its absence.
+  defineStructureContract('defers the GM-only manager subtree to a lazy chunk', MAIN, {
+    importsNo: [
+      './ui/SvelteRecipeManagerApp.svelte.js',
+      './ui/SvelteCraftingSystemManagerApp.svelte.js',
+    ],
+    importsLazily: ['./ui/SvelteCraftingSystemManagerApp.svelte.js'],
+    names: ['loadCraftingSystemManagerAppClass'],
   });
 
-  it('resolves granted character ids over EVERY world actor, not the PC-filtered roster', () => {
-    // The runtime predicate applies no type filter.
-    assert.ok(appSource.includes('getAccessCharacterActors:'), 'exposes the unfiltered roster');
-    const unfiltered = appSource.slice(
-      appSource.indexOf('getAccessCharacterActors:'),
-      appSource.indexOf('getWorldItemOptions:')
-    );
-    assert.equal(
-      unfiltered.includes('isPlayerCharacterActor'),
-      false,
-      'the access roster applies no player-character type filter'
-    );
+  // `Document#testUserPermission` short-circuits every GM to OWNER, so GMs are filtered first. No
+  // other file states that `Users#players` is the roster this reads, so it stays asserted here.
+  defineStructureContract('derives the access rosters from the non-GM roster', APP_SHELL, {
+    reads: ['game.users.players'],
+    calls: ['_playerUsers'],
+    readsNo: ['actor.isOwner'],
+    namesNo: ['playedBy'],
   });
 
-  it('forwards Tool Item services from the internal service set into prepared Svelte props', () => {
-    const buildServicesStart = appSource.indexOf('  _buildServices() {');
-    const preparePropsStart = appSource.indexOf('  _prepareSvelteProps(context) {');
-    const preparePropsEnd = appSource.indexOf('\n  // Foundry', preparePropsStart);
-    const buildServicesSource = appSource.slice(buildServicesStart, preparePropsStart);
-    const preparePropsSource = appSource.slice(preparePropsStart, preparePropsEnd);
-    const preparedServicesSource = preparePropsSource.slice(
-      preparePropsSource.indexOf('      services: {')
-    );
+  // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
+  defineStructureContract(
+    'falls back to the same role floor the canonical roster applies',
+    { file: APP_SHELL, member: '_playerUsers' },
+    { calls: ['hasRole'], spells: ['PLAYER'], reads: ['globalThis.CONST.USER_ROLES.PLAYER'] }
+  );
 
-    assert.ok(
-      buildServicesSource.includes('getWorldItemOptions: () =>') &&
-        buildServicesSource.includes(
-          'resolveToolSource: (uuid) => resolveItemSourceSnapshot(uuid)'
-        ),
-      'the internal service set should define the world Item projection and Tool source resolver'
-    );
-    assert.ok(
-      preparedServicesSource.includes('getWorldItemOptions: this._services.getWorldItemOptions,'),
-      'prepared Svelte props should forward world Item options into the root services'
-    );
-    assert.ok(
-      preparedServicesSource.includes('resolveToolSource: this._services.resolveToolSource,'),
-      'prepared Svelte props should forward Tool Item drop resolution into the root services'
-    );
-  });
+  defineStructureContract(
+    'labels only the roles a grantable user can hold',
+    { file: APP_SHELL, member: '_userRoleLabel' },
+    { spells: ['USER.RolePlayer'], spellsNo: ['RoleGamemaster'] }
+  );
 
-  it('hands the world VOCABULARY store to the manager, which nothing else can see', () => {
-    // THE FIFTH WIRING EDIT OF ISSUE 1392.
-    const services = appSource.slice(
-      appSource.indexOf('  _buildServices() {'),
-      appSource.indexOf('  _prepareSvelteProps(context) {')
-    );
-    assert.ok(services.length > 0, 'located _buildServices');
-    assert.ok(
-      services.includes('getComponentScopeStore: () =>'),
-      'the slice reaches the world-store block, so the assertion below is a measurement'
-    );
-    assert.ok(
-      services.includes(
-        'getVocabularyScopeStore: () => game?.fabricate?.getVocabularyScopeStore?.() ?? null,'
-      ),
-      'the manager must resolve the world vocabulary store through `game.fabricate`, under the ' +
-        'accessor name the adminStore read and write legs already call'
-    );
-  });
+  defineStructureContract(
+    'models "who plays this character" as a SET, with the whole-table case explicit',
+    { file: APP_SHELL, member: '_describeAccessActor' },
+    {
+      reads: ['actor.testUserPermission', 'user.character.id', 'actor.ownership.default'],
+      names: ['controlledBy', 'sharedWithAllPlayers'],
+      spells: ['OWNER'],
+    }
+  );
 
-  it('key-filters the noisy updateActor hook so an HP tick does not reproject', () => {
-    assert.ok(appSource.includes("Hooks.on('updateActor'"), 'actor updates are hooked');
-    assert.ok(
-      appSource.includes("'ownership' in diff || 'name' in diff || 'img' in diff"),
-      'only ownership / name / img reproject the rosters'
-    );
-    assert.ok(appSource.includes("'createActor'"), 'actor creation reprojects');
-    assert.ok(appSource.includes("'deleteActor'"), 'actor deletion reprojects');
-    assert.ok(
-      appSource.includes('refreshAccessRosters'),
-      'reprojects both rosters, not just users'
-    );
-  });
+  defineStructureContract(
+    'resolves granted character ids over every world actor',
+    { file: APP_SHELL, member: '_buildServices', property: 'getAccessCharacterActors' },
+    { namesNo: ['isPlayerCharacterActor'] }
+  );
 
-  it('guards manager startup against unready Fabricate services', () => {
-    assert.ok(
-      appSource.includes('isFabricateReady'),
-      'manager app should expose readiness through services'
-    );
-    assert.ok(
-      appSource.includes('onFabricateReady'),
-      'manager app should expose a ready callback service'
-    );
-    assert.ok(
-      appSource.includes("hooks.once('fabricate.ready'"),
-      'ready callback should listen at the Foundry edge'
-    );
-    assert.ok(
-      appSource.includes('_pendingReadyOpen'),
-      'v2 app should prevent duplicate deferred opens'
-    );
-    assert.ok(
-      appSource.includes('StartupPending'),
-      'v2 app should notify when startup defers the window open'
-    );
-    assert.ok(
-      appSource.includes("hooks.once('fabricate.ready', openWhenReady)"),
-      'v2 app should defer direct opens until fabricate.ready'
-    );
+  defineStructureContract(
+    'defines the world Item projection in the service set',
+    { file: APP_SHELL, member: '_buildServices' },
+    { names: ['getWorldItemOptions'] }
+  );
+
+  defineStructureContract(
+    'resolves a Tool source through the uuid seam, not the world roster',
+    { file: APP_SHELL, member: '_buildServices', property: 'resolveToolSource' },
+    { calls: ['resolveItemSourceSnapshot'] }
+  );
+
+  defineStructureContract(
+    'forwards Tool Item services from the internal service set into prepared Svelte props',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
+    { reads: ['this._services.getWorldItemOptions', 'this._services.resolveToolSource'] }
+  );
+
+  // Under the accessor name the adminStore's read and write legs already call (issue 1392).
+  defineStructureContract(
+    'hands the world VOCABULARY store to the manager, which nothing else can see',
+    { file: APP_SHELL, member: '_buildServices', property: 'getVocabularyScopeStore' },
+    { reads: ['game.fabricate.getVocabularyScopeStore'] }
+  );
+
+  // `updateActor` fires on every HP tick, so only the three keys that move a roster reproject it.
+  defineStructureContract(
+    'key-filters the noisy updateActor hook so an HP tick does not reproject',
+    { file: APP_SHELL, member: '_registerUserHooks' },
+    {
+      hooks: ['updateActor', 'createActor', 'deleteActor'],
+      diffKeys: [
+        ['diff', 'ownership'],
+        ['diff', 'name'],
+        ['diff', 'img'],
+      ],
+      calls: ['refreshAccessRosters'],
+    }
+  );
+
+  // The `fabricate.ready` one-shot is asserted byte-identically, and its deferred open replayed,
+  // by `tests/components/manager-launch-readiness.test.js`.
+  defineStructureContract(
+    'guards manager startup against unready Fabricate services',
+    { file: APP_SHELL, member: '_buildServices' },
+    { names: ['isFabricateReady', 'onFabricateReady'] }
+  );
+
+  defineStructureContract(
+    'defers a direct open, once, until Fabricate reports ready',
+    { file: APP_SHELL, member: 'show' },
+    { names: ['_pendingReadyOpen'], spells: ['StartupPending'] }
+  );
+
+  it('loads the systems browser behind that guard', () => {
     assert.ok(
       systemsBrowserSource.includes('systemsLoading'),
       'systems browser should receive loading state'
@@ -581,78 +712,20 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Issue 643 established the manager titlebar; issue 1185 reassigned its gold badge.
-  it('renders a titlebar carrying the premium signal and the system resolution', () => {
-    for (const snippet of [
-      'class="manager-titlebar"',
-      'data-manager-titlebar',
-      'class="manager-titlebar-badge"',
-      'data-manager-titlebar-premium',
-      '{#if premiumInstalled}',
-      "text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')",
-      'data-manager-titlebar-status',
-      '{titlebarStatusLabel()}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root titlebar should include ${snippet}`);
-    }
-    // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
-    assert.equal(
-      rootSource.includes('manager-titlebar-icon'),
-      false,
-      'the duplicated titlebar app icon should be removed'
-    );
-    assert.equal(
-      rootSource.includes('manager-titlebar-product'),
-      false,
-      'the duplicated "Crafting Systems" titlebar label should be removed'
-    );
-    // Issue 1185: the Downtime route briefly led the page header with a 42px glyph tile from
-    // the prototype. No other Manager route has one, so it is gone — and with it the third
-    // header child that broke `justify-content: space-between`.
-    assert.equal(
-      rootSource.includes('manager-route-icon'),
-      false,
-      'no route may lead the page header with an identity tile of its own'
-    );
-    assert.equal(
-      rootSource.includes('data-manager-route-icon'),
-      false,
-      'and its marker attribute goes with it'
-    );
-    // Issue 1185: the system name badge is gone in BOTH states.
-    assert.equal(
-      rootSource.includes('data-manager-titlebar-system'),
-      false,
-      'the redundant crafting-system titlebar badge should be removed'
-    );
-    assert.equal(
-      rootSource.includes('Titlebar.SystemBadge'),
-      false,
-      'and its accessible-name key with it'
-    );
+  // What the titlebar renders is mounted; here are the derivation behind it and the
+  // route-conditional negative the rail case cannot reach (issue 1185).
+  defineStructureContract('drives the titlebar premium signal off the whole surface set', MANAGER_ROOT, {
+    declares: ['premiumInstalled'],
+    calls: ['subscribeSurfaceIds', 'routedOutcomeTierCount'],
+    compares: ['routedByCheck'],
+    spellsNo: ['Mythwright', 'mythwright', 'manager-route-icon'],
+  });
+
+  it('states the titlebar copy the premium mark and the outcome-tier label read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.Titlebar.SystemBadge,
       undefined,
       'the orphaned SystemBadge string should be deleted from lang/en.json, not left behind'
-    );
-    assert.equal(
-      /mythwright/i.test(rootSource),
-      false,
-      '"Mythwright" is a prototype theme name and must never be hard-coded into the chrome'
-    );
-    // The premium badge is driven by the REGISTRY, not by Core's Downtime route.
-    assert.ok(
-      rootSource.includes('const premiumInstalled = $derived(registeredSurfaceIds.length > 0)'),
-      'the titlebar premium signal should read the whole registered surface set'
-    );
-    assert.ok(
-      rootSource.includes('managerExtensions.subscribeSurfaceIds('),
-      'and should stay live through the registry surface-set subscription'
-    );
-    assert.equal(
-      /premiumInstalled[^\n]*downtime/i.test(rootSource),
-      false,
-      'the premium signal must not be keyed on the Core downtime surface id'
     );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Titlebar.Premium,
@@ -664,54 +737,18 @@ describe('CraftingSystemManager source contract', () => {
       'Fabricate Premium is installed and connected',
       'and the accessible name and tooltip that explain it'
     );
-    // The status line reports the SYSTEM's resolution mode.
-    assert.ok(
-      rootSource.includes(
-        "selectedSystem?.resolutionMode === 'routedByCheck'\n      ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)"
-      ),
-      'the titlebar outcome-tier count should only be resolved for a routed-by-check system'
-    );
-    assert.ok(
-      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers === 'outcome tiers',
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers,
+      'outcome tiers',
       'lang should expose the pluralized outcome-tier label the titlebar formats'
     );
   });
 
-  it('renders the rail section label and bare mono count numerals without elevating the dead Graph row', () => {
-    assert.ok(
-      rootSource.includes('class="manager-rail-title"'),
-      'the rail should carry an uppercase section label'
-    );
-    assert.ok(
-      rootSource.includes('data-manager-rail-section'),
-      'the rail section label should be addressable'
-    );
-    assert.ok(
-      lang.FABRICATE.Admin.Manager.Nav.SectionLabel === 'GM management',
+  it('localizes the rail section label', () => {
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Nav.SectionLabel,
+      'GM management',
       'the rail section label should be localized'
-    );
-    // A rail count is a BARE NUMERAL.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
-      'a rail count should render as a bare numeral, not a chip'
-    );
-    assert.equal(
-      rootSource.includes('manager-nav-count manager-chip'),
-      false,
-      'no rail count should borrow the content chip'
-    );
-    assert.ok(
-      rootSource.includes(
-        "<span class=\"manager-nav-planned\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
-      ),
-      'the disabled placeholder should keep its plain Soon span, not gain a chip'
-    );
-    assert.equal(
-      rootSource.includes(
-        "<span class=\"manager-nav-count\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
-      ),
-      false,
-      'and it must not return to the record-count vehicle, which draws numerals'
     );
   });
 
@@ -1175,18 +1212,24 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('keeps presentational Svelte free of direct Foundry globals', () => {
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\b/.test(rootSource),
-      'root should not directly reference Foundry globals'
-    );
+  // `foundry` is deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`
+  // and `.agents/docs/foundry-and-architecture.md` requires it keep doing so.
+  defineStructureContract('keeps presentational Svelte free of direct Foundry globals', MANAGER_ROOT, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
+  defineStructureContract('uses manager localization keys rather than hard-coded copy', MANAGER_ROOT, {
+    // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted cases
+    // render this copy, which `text(key, fallback)` still produces under a renamed key.
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.Title',
+      'FABRICATE.Admin.Manager.Soon',
+      'FABRICATE.Admin.Manager.Titlebar.Premium',
+    ],
+    spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
   });
 
   it('uses localized manager copy keys', () => {
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Title'),
-      'root should use manager localization keys'
-    );
     assert.ok(lang.FABRICATE.Admin.Manager, 'English localization should define manager copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Title, 'Crafting systems');
     // `Nav.Components`, `Nav.Tools` and `Component.Title` are GONE (issue 1362). The three
@@ -1300,8 +1343,6 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint,
       'Browse reusable events before attaching them to environments.'
     );
-    assert.equal(rootSource.includes('EncountersPlaceholderTitle'), false);
-    assert.equal(rootSource.includes('EncountersPlaceholderHint'), false);
   });
 
   it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
@@ -1408,18 +1449,6 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(
       !managerSource.includes("storeKey: 'outcomeRouting'"),
       'system edit should not reintroduce the legacy outcome routing toggle'
-    );
-    assert.ok(
-      !appSource.includes('onEditSystem'),
-      'v2 wrapper should not provide a row edit service for this action'
-    );
-    assert.ok(
-      !appSource.includes('openCurrentAdmin'),
-      'v2 wrapper should not retain a legacy admin fallback service'
-    );
-    assert.ok(
-      !appSource.includes('LAST_MANAGED_CRAFTING_SYSTEM'),
-      'v2 row edit should not seed and launch the current admin'
     );
   });
 
@@ -2376,11 +2405,25 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('wires production essence dirty confirmation and manager app close guard', () => {
-    assert.ok(
-      /confirmDiscardEssenceDraft:\s*\(\)\s*=>\s*confirmDialog/.test(appSource),
-      'v2 app should provide a production discard confirmation service'
-    );
+  defineStructureContract(
+    'wires the production essence discard confirmation through the dialog seam',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'confirmDiscardEssenceDraft' },
+    { calls: ['confirmDialog'] }
+  );
+
+  defineStructureContract(
+    'guards the manager window close on the essence draft, except under a forced teardown',
+    { file: APP_SHELL, member: 'close' },
+    { names: ['canCloseEssence'], reads: ['options.force'] }
+  );
+
+  defineStructureContract(
+    'accepts the route dirty guard the essence editor registers',
+    { file: APP_SHELL, member: '_prepareSvelteProps' },
+    { names: ['registerEssenceDirtyGuard'] }
+  );
+
+  it('states the essence discard copy the confirmation reads', () => {
     for (const key of [
       'DiscardDirtyTitle',
       'DiscardDirtyContent',
@@ -2393,52 +2436,6 @@ describe('CraftingSystemManager source contract', () => {
         `en.json should define Essence.${key}`
       );
     }
-    assert.ok(
-      appSource.includes('registerEssenceDirtyGuard'),
-      'v2 app should accept the route dirty guard'
-    );
-    assert.ok(appSource.includes('async close(options)'), 'v2 app should guard window close');
-    assert.ok(
-      appSource.includes('canCloseEssence === false'),
-      'v2 app close should stay open when discard is declined'
-    );
-    assert.ok(
-      appSource.includes('if (!options?.force)'),
-      'v2 app close should bypass interactive dirty guards during forced lifecycle teardown'
-    );
-  });
-
-  /** THE HALF OF THE COMPATIBILITY GUARANTEE THAT IS NOT BEHAVIOURAL. */
-  it('costs a companion that registers no navigation guard nothing on either exit path', () => {
-    assert.ok(
-      appSource.includes(
-        'if (canCloseCompanion !== undefined && (await canCloseCompanion) === false) return this;'
-      ),
-      'the window close skips its await entirely when there is no companion guard to ask'
-    );
-    const closeStart = appSource.indexOf('async close(options) {');
-    const forceGate = appSource.indexOf('if (!options?.force) {', closeStart);
-    const companionAsk = appSource.indexOf('_confirmDowntimeCompanionNavigation?.()', closeStart);
-    const toolAsk = appSource.indexOf('_confirmDiscardDirtyToolDraft?.()', closeStart);
-    assert.ok(forceGate > closeStart, 'the close still gates every interactive guard on force');
-    assert.ok(
-      companionAsk > forceGate,
-      'the companion guard sits INSIDE the force gate, so a forced teardown never asks it'
-    );
-    assert.ok(
-      companionAsk < toolAsk,
-      'and is asked before the Core guards that can save, so a veto writes nothing'
-    );
-    assert.ok(
-      rootSource.includes(
-        'if (companion === undefined) return finishRouteExit(nextView, nextRouteId);'
-      ),
-      'the route exit returns its original result untouched when there is nothing to ask'
-    );
-    assert.ok(
-      rootSource.includes("confirmRouteExit('world-downtime', tabId)"),
-      'a Downtime tab switch states its destination tab, so the guard can tell it from a re-entry'
-    );
   });
 
   it('keeps the recipes browser browser-only and wired to existing callbacks', () => {
@@ -3555,17 +3552,16 @@ describe('CraftingSystemManager source contract', () => {
       ).includes('<EditorValidationSurface'),
       'the shared scoped validation shell should reuse the recipe-style editor validation surface'
     );
-    assert.ok(
-      appSource.includes('const clipboard = game?.clipboard;') &&
-        appSource.includes('await clipboard.copyPlainText(text);'),
-      'Manager UUID copies should use the Foundry V13 clipboard service'
-    );
-    assert.equal(
-      appSource.includes('navigator.clipboard') ||
-        appSource.includes('foundry.utils.copyPlainText'),
-      false,
-      'Manager UUID copies should not bypass the Foundry clipboard service'
-    );
+  });
+
+  defineStructureContract(
+    'copies a UUID through the Foundry clipboard service',
+    { file: APP_SHELL, member: '_buildServices' },
+    { reads: ['game.clipboard'], calls: ['copyPlainText'] }
+  );
+
+  defineStructureContract('never bypasses the Foundry clipboard service anywhere in the shell', APP_SHELL, {
+    readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
   });
 
   // The GM Knowledge surface (issue 785). Everything asserted here is a wiring
@@ -3685,155 +3681,98 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The Knowledge SEAM (issue 785). Every rule here is invisible at unit level and
-  // silent at runtime if it regresses: dropping `reprojectKnowledge` from the item
-  // handler leaves a learn/expend/delete on another client unrendered, inverting the
-  // `doc?.pack` guard re-projects the whole world for a compendium write, flattening a
-  // `[hook, id]` tuple leaks the listener across every manager reopen, and removing an
-  // `isGM` gate hands a player a GM mutation.
-  it('registers the Knowledge hook set as tuples, filters it, and GM-gates every mutation', () => {
-    // Only actor-owned, NON-compendium items can change the projection. `Document#pack`
-    // falls back to `this.parent?.pack`, so an Item embedded in a compendium Actor is
-    // readable straight off the embedded doc.
-    assert.ok(
-      appSource.includes("if (doc?.parent?.documentName !== 'Actor') return;"),
-      'the item handler drops a world/compendium-root item'
-    );
-    assert.ok(
-      appSource.includes('if (doc?.pack) return;'),
-      'the item handler drops an item embedded in a COMPENDIUM actor'
-    );
-    // `updateActor` is key-filtered because it is noisy (every HP tick fires it);
-    // learned recipes, usage counts and learn counts all live under `flags`.
-    assert.ok(
-      appSource.includes("if ('flags' in diff) {"),
-      "updateActor re-projects knowledge only on a 'flags' diff"
-    );
-    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open.
-    assert.ok(
-      appSource.includes(
-        'const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();'
-      ),
-      'the actor hooks mark the learned-recipe index stale rather than rebuilding it'
-    );
-    assert.ok(
-      appSource.includes('markLearnerIndexStale();\n        reprojectKnowledge();'),
-      'and the flags branch does both'
-    );
-    // Parent CRUD is load-bearing, not belt-and-braces.
-    assert.ok(
-      appSource.includes(
-        "...['createActor', 'deleteActor'].map((hook) => [hook, Hooks.on(hook, reprojectOnActorCrud)])"
-      ),
-      'createActor/deleteActor route through the knowledge reprojection too'
-    );
-    assert.ok(
-      appSource.includes('const reprojectKnowledge = () =>') &&
-        appSource.includes('scheduleKnowledgeRefresh'),
-      'the knowledge reprojection coalesces through the store scheduler'
-    );
-    for (const hook of ['createItem', 'updateItem', 'deleteItem']) {
-      assert.ok(appSource.includes(`'${hook}'`), `${hook} is registered`);
+  // The Knowledge seam (issue 785). Every rule here is invisible at unit level and silent at
+  // runtime if it regresses: dropping `reprojectKnowledge` from the item handler leaves a
+  // learn/expend/delete on another client unrendered, flattening a `[hook, id]` tuple leaks the
+  // listener across every manager reopen, and removing an `isGM` gate hands a player a GM
+  // mutation. What this file cannot state is which way each guard runs and which handler a hook
+  // is bound to; `tests/components/manager-extension-composition.test.js` drives the real class
+  // against a recording `Hooks` and admin store for that.
+  // `Document#pack` falls back to `this.parent?.pack`, so a compendium-actor item is readable off
+  // the embedded doc; and `scheduleKnowledgeRefresh` no-ops unless the Knowledge surface is open.
+  defineStructureContract(
+    'registers the Knowledge hook set, filtered to what can change the projection',
+    { file: APP_SHELL, member: '_registerUserHooks' },
+    {
+      hooks: ['createItem', 'updateItem', 'deleteItem', 'createActor', 'deleteActor'],
+      diffKeys: [['diff', 'flags']],
+      reads: ['doc.parent.documentName', 'doc.pack'],
+      calls: ['markLearnedRecipeIndexStale', 'scheduleKnowledgeRefresh'],
+      compares: ['Actor'],
     }
+  );
 
-    // EVERY `_userHooks` entry is an `[hookName, id]` tuple.
-    const hooksBlock = appSource.slice(
-      appSource.indexOf('this._userHooks = ['),
-      appSource.indexOf('_unregisterUserHooks() {')
+  it('registers every user hook as an [hookName, id] tuple, and unregisters by the same shape', () => {
+    const registerHooks = classMemberAst(moduleAstOf(APP_SHELL).ast, '_registerUserHooks');
+    const nodes = [...walkNodes(registerHooks)];
+    const registrations = nodes.filter(registersAHook);
+    const tuples = nodes.filter(
+      (node) =>
+        node.type === 'ArrayExpression' &&
+        node.elements.length === 2 &&
+        registersAHook(node.elements[1])
     );
-    assert.ok(hooksBlock.length > 0, 'the hook registration block is locatable');
-    const flatHooks = hooksBlock.replaceAll(/\s+/g, ' ');
-    const registrations = flatHooks.match(/Hooks\.on\(/g) || [];
-    const tuples = flatHooks.match(/\[ ?(?:hook|'[a-zA-Z]+') ?, ?Hooks\.on\(/g) || [];
     assert.ok(registrations.length >= 4, 'the user hooks are registered here');
     assert.equal(
       tuples.length,
       registrations.length,
-      'every Hooks.on id is registered inside a [hookName, id] tuple'
+      'every Hooks.on id is registered inside a [hookName, id] tuple — a bare id makes the ' +
+        'unregister side destructure undefined and leak the listener across every manager reopen'
     );
-    assert.ok(
-      appSource.includes('for (const [hook, id] of this._userHooks)'),
-      'the unregister side destructures the tuple'
+    const unregister = classMemberAst(moduleAstOf(APP_SHELL).ast, '_unregisterUserHooks');
+    const destructured = [...walkNodes(unregister)].some(
+      (node) =>
+        node.type === 'ForOfStatement' &&
+        node.left?.declarations?.[0]?.id?.type === 'ArrayPattern' &&
+        node.left.declarations[0].id.elements.length === 2
     );
-
-    // The GM gate is `isGM`, NOT `activeGM`: this is a single-client.
-    assert.ok(
-      appSource.includes('if (game.user?.isGM !== true)') &&
-        appSource.includes('KNOWLEDGE_MESSAGES.gmOnly'),
-      'the knowledge gate denies a non-GM with the GM-only message'
-    );
-    assert.equal(
-      /activeGM/.test(appSource.slice(appSource.indexOf('_knowledgeActor('))),
-      false,
-      'the Knowledge seam must never gate on activeGM'
-    );
-    // All four mutating methods reach that gate — directly.
-    for (const method of [
-      '_expendRecipeItemUse({',
-      '_deleteOwnedRecipeItem({',
-      '_eraseLearnedRecipe({',
-      '_resetActorKnowledge({',
-    ]) {
-      const start = appSource.indexOf(`async ${method}`);
-      assert.ok(start > 0, `${method} exists`);
-      const body = appSource.slice(start, start + 700);
-      assert.match(
-        body,
-        /this\._knowledge(Actor|Target)\(/,
-        `${method} resolves through the GM-gated helper`
-      );
-      assert.ok(body.includes('if (denied) return denied;'), `${method} returns the denial`);
-    }
-    assert.ok(
-      appSource.includes('const { actor, denied } = this._knowledgeActor(actorId);'),
-      '_knowledgeTarget itself runs the GM gate before any document lookup'
-    );
-
-    // The Foundry-free mutation bodies live in the collaborator.
-    assert.ok(
-      appSource.includes(
-        "} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"
-      ),
-      'the seam delegates its mutations to the plain-JS collaborator'
-    );
-    for (const call of [
-      'await expendOwnedRecipeItemUse({',
-      'await deleteOwnedRecipeItemCopy({',
-      'await eraseLearnedRecipeEntry({',
-      'await resetActorKnowledgeState({',
-    ]) {
-      assert.ok(appSource.includes(call), `the seam calls ${call}`);
-    }
-
-    // The roster is player characters only — the same predicate the Access roster uses.
-    // ANTI-PIN (issue 1024). The old assertion pinned the exact
-    // `game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'`
-    // reach-around this change deletes. Replacing it with a positive
-    // `includes('isPlayerCharacterActor(actor)')` would be a tautology that survives a
-    // WRONG import — so instead assert the hardcoded literal is ABSENT (provably red
-    // before this change, at both the Access and Knowledge rosters) plus the import.
-    assert.equal(
-      appSource.includes("actor?.type === 'character'"),
-      false,
-      'the manager app must not re-hardcode the dnd5e/pf2e player-character actor type'
-    );
-    assert.equal(
-      appSource.includes("actor.type === 'character'"),
-      false,
-      'nor the unchained spelling of it'
-    );
-    assert.equal(
-      appSource.includes('game.fabricate?.isPlayerCharacterActor'),
-      false,
-      'the predicate is not published on game.fabricate, so no site may reach for it there'
-    );
-    assert.ok(
-      appSource.includes(
-        "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
-      ),
-      'the manager app imports the shared, GM-configurable player-character predicate'
-    );
+    assert.ok(destructured, 'the unregister side destructures the tuple');
   });
+
+  defineStructureContract(
+    'gates the Knowledge seam on isGM and denies a non-GM with the GM-only message',
+    { file: APP_SHELL, member: '_knowledgeActor' },
+    { reads: ['game.user.isGM', 'KNOWLEDGE_MESSAGES.gmOnly'] }
+  );
+
+  defineStructureContract(
+    'runs that gate before any document lookup on the item target too',
+    { file: APP_SHELL, member: '_knowledgeTarget' },
+    { calls: ['_knowledgeActor'] }
+  );
+
+  // Without the third column, the gated resolver, a row says the mutation is delegated but not
+  // that anything gates it.
+  const KNOWLEDGE_MUTATIONS = Object.freeze([
+    ['_expendRecipeItemUse', 'expendOwnedRecipeItemUse', '_knowledgeTarget'],
+    ['_deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy', '_knowledgeTarget'],
+    ['_eraseLearnedRecipe', 'eraseLearnedRecipeEntry', '_knowledgeActor'],
+    ['_resetActorKnowledge', 'resetActorKnowledgeState', '_knowledgeActor'],
+  ]);
+
+  for (const [method, mutation, gate] of KNOWLEDGE_MUTATIONS) {
+    defineStructureContract(
+      `${method} resolves through the GM-gated helper and delegates its mutation`,
+      { file: APP_SHELL, member: method },
+      { calls: [mutation, gate], names: ['denied'] }
+    );
+  }
+
+  // An anti-pin (issue 1024): a positive `isPlayerCharacterActor` claim is a tautology that
+  // survives the wrong import, so the claim is that the hardcoded actor type is absent, plus the
+  // import.
+  defineStructureContract(
+    'reaches the player-character roster through the shared, GM-configurable predicate', APP_SHELL,
+    {
+      imports: [
+        './svelte/apps/manager/knowledge/knowledgeMutations.js',
+        '../config/playerCharacterTypes.js',
+      ],
+      comparesNo: ['character'],
+      readsNo: ['game.fabricate.isPlayerCharacterActor'],
+      namesNo: ['activeGM'],
+    }
+  );
 
   // The learned-row ALLOWLIST (issue 1289). `_collectKnowledgeLearnedEntries` builds every
   // learned row as a hand-written object literal, so a field that literal does not name never
@@ -3897,80 +3836,45 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('wires a collapsible left rail persisted via the manager setting seam', () => {
-    assert.ok(
-      rootSource.includes(
-        "let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);"
-      ),
-      'rail collapsed state should initialize from the persisted managerRailCollapsed client setting'
+  // `railCollapsed` is the stored preference; the body renders `railCollapsedDisplay`, so the
+  // Downtime rail lock forces the sidebar open without un-collapsing every other route. The
+  // rendered half is mounted through `assertRailLockedOpen` and `assertRailLockSurvivesPresses`.
+  defineStructureContract('wires a collapsible left rail persisted via the manager setting seam', MANAGER_ROOT, {
+    spells: [
+      'managerRailCollapsed',
+      'FABRICATE.Admin.Manager.Nav.CollapseRail',
+      'FABRICATE.Admin.Manager.Nav.ExpandRail',
+    ],
+    reads: ['services.getSetting', 'services.setSetting'],
+    names: ['toggleManagerRail'],
+    declares: ['railCollapsedDisplay'],
+  });
+
+  // Counted, not merely present (issue 1213 review): a mounted case renders one of the two sites,
+  // so the branch it does not reach would lose the lock silently.
+  it('writes the rail toggle twice, and both sites carry the same state attributes', () => {
+    const sites = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
+      declaresAttribute(node, 'data-manager-rail-toggle', { directives: false })
     );
-    assert.ok(
-      rootSource.includes('function toggleManagerRail()'),
-      'root should expose a rail toggle handler'
-    );
-    assert.ok(
-      rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
-      'toggling the rail should persist managerRailCollapsed through the setSetting seam'
-    );
-    // The DISPLAY value, never the stored one (issue 1213). `railCollapsed` is the GM's
-    // persisted client preference and stays authoritative for what is written back; what the
-    // body renders is `railCollapsed && !railLockedOpen`, so the Downtime rail lock can force
-    // the sidebar open without permanently un-collapsing the rail on every other route.
-    assert.ok(
-      rootSource.includes(
-        "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}"
-      ),
-      'manager-body should bind the is-rail-collapsed modifier from the displayed rail state'
-    );
-    assert.ok(
-      rootSource.includes(
-        'const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);'
-      ),
-      'and the displayed state must be DERIVED, never written back over the stored preference'
-    );
-    assert.ok(
-      rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
-      'the scope-card header should render the shared collapse/expand control'
-    );
-    // COUNTED, not merely present (issue 1213 review). The control is written TWICE.
-    // `(?<![-\w])` because `aria-disabled={railLockedOpen}` CONTAINS `disabled={railLockedOpen}`,
-    // so a plain substring count reports four sites for two and reads as a pass.
-    const occurrences = (attribute) =>
-      rootSource.match(new RegExp(`(?<![-\\w])${attribute.replace(/[{}]/g, '\\$&')}`, 'g'))
-        ?.length ?? 0;
-    const railToggleSites = occurrences('data-manager-rail-toggle');
-    assert.equal(railToggleSites, 2, 'the scope card renders the rail toggle once per branch');
-    for (const attribute of [
-      'aria-pressed={railCollapsedDisplay}',
-      'aria-label={railToggleLabel}',
-      'title={railToggleTitle}',
-      'disabled={railLockedOpen}',
-      'aria-disabled={railLockedOpen}',
-    ]) {
-      assert.equal(
-        occurrences(attribute),
-        railToggleSites,
+    assert.equal(sites.length, 2, 'the scope card renders the rail toggle once per branch');
+    for (const attribute of ['aria-pressed', 'aria-label', 'title', 'disabled', 'aria-disabled']) {
+      assert.ok(
+        sites.every((node) => declaresAttribute(node, attribute, { directives: false })),
         `every rail-toggle site must carry ${attribute}, not just the one a mounted case renders`
       );
     }
-    assert.match(
-      rootSource,
-      /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
-      'and the handler early-returns, so a programmatic call obeys the lock too'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail') &&
-        rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandRail'),
-      'rail toggle labels should be localized for both states'
-    );
+  });
+
+  it('localizes the rail toggle for both states', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseRail, 'Collapse navigation rail');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandRail, 'Expand navigation rail');
-    assert.ok(
-      appSource.includes('getSetting: this._services.getSetting,') &&
-        appSource.includes('setSetting: this._services.setSetting,'),
-      'manager app should expose the setting seam to the Svelte component services'
-    );
   });
+
+  defineStructureContract(
+    'exposes the setting seam to the Svelte component services',
+    { file: APP_SHELL, member: '_prepareSvelteProps', property: 'services' },
+    { reads: ['this._services.getSetting', 'this._services.setSetting'] }
+  );
 });
 
 /** The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357). */
