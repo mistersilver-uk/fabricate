@@ -8,8 +8,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
-import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from '../src/migration/MigrationRunner.js';
+import {
+  compareSemver,
+  getHighestRegisteredMigrationVersion,
+  MIGRATION_DEFERRAL_REASONS,
+  MigrationRunner,
+} from '../src/migration/MigrationRunner.js';
+import { MIGRATIONS } from '../src/migration/migrationRegistry.js';
 import { WRITEBACK_LEGS } from '../src/migration/migrationWritebackLegs.js';
+import { SEALED_MIGRATIONS } from '../src/migration/sealedMigrationRegistry.js';
 
 /** A migration replacing exactly the named payload keys, each with a distinct new value. */
 function changeOnly(...keys) {
@@ -184,4 +191,61 @@ test('a rejecting version bump defers the pass rather than escaping run()', asyn
 
   assert.equal(summary.deferred, true, 'the rejection did not escape run()');
   assert.equal(summary.deferredReason, MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED);
+});
+
+const SEALED_BOUNDARY = '1.17.0';
+const CURRENT_MIGRATIONS = MIGRATIONS.slice(SEALED_MIGRATIONS.length);
+
+test('the registry holds 44 entries with unique versions and labels, strictly ascending', () => {
+  assert.equal(MIGRATIONS.length, 44);
+  assert.equal(new Set(MIGRATIONS.map((m) => m.version)).size, 44, 'unique versions');
+  assert.equal(new Set(MIGRATIONS.map((m) => m.label)).size, 44, 'unique labels');
+  for (const [index, migration] of MIGRATIONS.entries()) {
+    assert.equal(typeof migration.migrate, 'function', `${migration.version} is runnable`);
+    if (index === 0) continue;
+    assert.equal(
+      compareSemver(MIGRATIONS[index - 1].version, migration.version),
+      -1,
+      `${migration.version} follows ${MIGRATIONS[index - 1].version}`
+    );
+  }
+  assert.equal(getHighestRegisteredMigrationVersion(), '1.34.0');
+});
+
+test('the sealed half is the head of the registry, entry by entry and by identity', () => {
+  assert.equal(SEALED_MIGRATIONS.length, 27);
+  assert.equal(CURRENT_MIGRATIONS.length, 17);
+  for (const [index, migration] of SEALED_MIGRATIONS.entries()) {
+    // Identity, not deep equality: a re-literalled or cloned entry is a second copy to maintain.
+    assert.equal(MIGRATIONS[index], migration, `sealed entry ${index} is the registry's own`);
+  }
+});
+
+test('the sealed half is exactly the entries at or below 1.17.0, on the closed entry shape', () => {
+  for (const migration of SEALED_MIGRATIONS) {
+    assert.ok(
+      compareSemver(migration.version, SEALED_BOUNDARY) <= 0,
+      `${migration.version} is at or below the boundary`
+    );
+    assert.deepEqual(
+      Object.keys(migration).sort(),
+      ['label', 'migrate', 'version'],
+      `${migration.version} carries no metadata beyond the sealed shape`
+    );
+  }
+  for (const migration of CURRENT_MIGRATIONS) {
+    assert.ok(
+      compareSemver(migration.version, SEALED_BOUNDARY) > 0,
+      `${migration.version} is above the boundary`
+    );
+    assert.equal(typeof migration.downgradeTo, 'string', `${migration.version} names a downgrade`);
+  }
+  assert.equal(SEALED_MIGRATIONS.at(-1).version, SEALED_BOUNDARY, 'the boundary entry');
+  assert.equal(CURRENT_MIGRATIONS[0].version, '1.18.0', 'the first entry past the boundary');
+});
+
+test('both registry arrays are frozen, and their entries are not', () => {
+  assert.equal(Object.isFrozen(MIGRATIONS), true);
+  assert.equal(Object.isFrozen(SEALED_MIGRATIONS), true);
+  assert.equal(Object.isFrozen(MIGRATIONS[0]), false, 'entries are left as they were');
 });
