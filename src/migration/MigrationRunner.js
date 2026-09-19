@@ -52,10 +52,12 @@ import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { migrateWorldScopeEntities } from './migrateWorldScopeEntities.js';
 import { isFatalMigrationError } from './migrationErrors.js';
 import { DOWNGRADE_ADVICE } from './migrationRecoveryPrompt.js';
+import { WRITEBACK_LEGS } from './migrationWritebackLegs.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
 
-// --- Semver comparison (no npm dependency) ---------------------------------
+/** The two corpus legs are read one at a time, each with its own containment and GM sentence. */
+const LEG_BY_KEY = new Map(WRITEBACK_LEGS.map((leg) => [leg.key, leg]));
 
 /**
  * Compare two semver strings numerically. Exported because the Valid Id Basis must answer "is
@@ -130,8 +132,6 @@ function _normalizeModifierCollisionEntry(entry) {
   if (!Number.isFinite(collisions) || collisions <= 0) return null;
   return { system: String(entry.system ?? ''), collisions: Math.trunc(collisions) };
 }
-
-// --- Migration registry ----------------------------------------------------
 
 const MIGRATIONS = [
   {
@@ -753,8 +753,6 @@ function emptyPassSummary(overrides = {}) {
   };
 }
 
-// --- MigrationRunner -------------------------------------------------------
-
 export class MigrationRunner {
   /**
    * `promptRecovery` is an optional seam invoked with the abort context; `migrations` overrides the
@@ -805,12 +803,19 @@ export class MigrationRunner {
       return emptyPassSummary();
     }
 
-    let rawRecipes;
+    const io = {
+      getSetting: (key) => this._getSetting(key),
+      setSetting: (key, value) => this._setSetting(key, value),
+      recipeCorpus: this._recipeCorpus,
+      craftingSystemCorpus: this._craftingSystemCorpus,
+    };
+
+    const raw = {};
     try {
       // Contained because an escaping rejection is INVISIBLE: the hook dispatcher's try/catch is
       // synchronous, so a rejection out of the module's async `ready` callback fires no error hook
       // and no notification, leaves the readiness promise unsettled and the module with no managers.
-      rawRecipes = await this._recipeCorpus.loadAll();
+      raw.recipes = await LEG_BY_KEY.get('recipes').read(io);
     } catch (error) {
       console.error(
         'Fabricate | Migrations deferred: the recipe corpus could not be read, so no migration ran and nothing was saved.',
@@ -822,10 +827,9 @@ export class MigrationRunner {
         deferredError: error,
       });
     }
-    let rawSystems;
     try {
       // Contained for the same reason the recipe read is.
-      rawSystems = await this._craftingSystemCorpus.loadAll();
+      raw.systems = await LEG_BY_KEY.get('systems').read(io);
     } catch (error) {
       console.error(
         'Fabricate | Migrations deferred: the crafting system corpus could not be read, so no migration ran and nothing was saved.',
@@ -837,47 +841,19 @@ export class MigrationRunner {
         deferredError: error,
       });
     }
-    const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
-    const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
-    const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
-    const rawCurrencyConfig = this._getSetting(SETTING_KEYS.CURRENCY_CONFIG) ?? {};
-    const rawTravelConfig = this._getSetting(SETTING_KEYS.TRAVEL_CONFIG) ?? {};
-    const rawCharacterLibraries = this._getSetting(SETTING_KEYS.CHARACTER_LIBRARIES) ?? {};
-    const rawComponentScope = this._getSetting(SETTING_KEYS.COMPONENT_SCOPE) ?? {};
-    const rawEssenceScope = this._getSetting(SETTING_KEYS.ESSENCE_SCOPE) ?? {};
-    const rawToolScope = this._getSetting(SETTING_KEYS.TOOL_SCOPE) ?? {};
-    const rawWorldScopeRekeyMap = this._getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
-    const rawWorldEssenceMergeMap = this._getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    // One uninterrupted synchronous block: `ClientSettings#get` reads live storage, so an inbound
+    // `updateSetting` can land between two awaited reads but never between two synchronous ones.
+    for (const leg of WRITEBACK_LEGS) {
+      if (leg.key in raw) continue;
+      raw[leg.key] = leg.read(io);
+    }
 
-    const originalRecipesJson = JSON.stringify(rawRecipes);
-    const originalSystemsJson = JSON.stringify(rawSystems);
-    const originalGatheringConfigJson = JSON.stringify(rawGatheringConfig);
-    const originalEnvironmentsJson = JSON.stringify(rawEnvironments);
-    const originalGatheringPartiesJson = JSON.stringify(rawGatheringParties);
-    const originalCurrencyConfigJson = JSON.stringify(rawCurrencyConfig);
-    const originalTravelConfigJson = JSON.stringify(rawTravelConfig);
-    const originalCharacterLibrariesJson = JSON.stringify(rawCharacterLibraries);
-    const originalComponentScopeJson = JSON.stringify(rawComponentScope);
-    const originalEssenceScopeJson = JSON.stringify(rawEssenceScope);
-    const originalToolScopeJson = JSON.stringify(rawToolScope);
-    const originalWorldScopeRekeyMapJson = JSON.stringify(rawWorldScopeRekeyMap);
-    const originalWorldEssenceMergeMapJson = JSON.stringify(rawWorldEssenceMergeMap);
-
-    let data = {
-      recipes: rawRecipes,
-      systems: rawSystems,
-      gatheringConfig: rawGatheringConfig,
-      environments: rawEnvironments,
-      gatheringParties: rawGatheringParties,
-      currencyConfig: rawCurrencyConfig,
-      travelConfig: rawTravelConfig,
-      characterLibraries: rawCharacterLibraries,
-      componentScope: rawComponentScope,
-      essenceScope: rawEssenceScope,
-      toolScope: rawToolScope,
-      worldScopeRekeyMap: rawWorldScopeRekeyMap,
-      worldEssenceMergeMap: rawWorldEssenceMergeMap,
-    };
+    const snapshots = {};
+    let data = {};
+    for (const leg of WRITEBACK_LEGS) {
+      data[leg.key] = raw[leg.key];
+      snapshots[leg.key] = JSON.stringify(raw[leg.key]);
+    }
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
     let unifiedRegionSystems = [];
@@ -1005,97 +981,25 @@ export class MigrationRunner {
     }
     delete data._worldEssenceMergeReport;
 
-    const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
-    const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
-    const gatheringConfigChanged =
-      JSON.stringify(data.gatheringConfig) !== originalGatheringConfigJson;
-    const environmentsChanged = JSON.stringify(data.environments) !== originalEnvironmentsJson;
-    const gatheringPartiesChanged =
-      JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
-    const currencyConfigChanged =
-      JSON.stringify(data.currencyConfig) !== originalCurrencyConfigJson;
-    const travelConfigChanged = JSON.stringify(data.travelConfig) !== originalTravelConfigJson;
-    const characterLibrariesChanged =
-      JSON.stringify(data.characterLibraries) !== originalCharacterLibrariesJson;
-    const componentScopeChanged =
-      JSON.stringify(data.componentScope) !== originalComponentScopeJson;
-    const essenceScopeChanged = JSON.stringify(data.essenceScope) !== originalEssenceScopeJson;
-    const toolScopeChanged = JSON.stringify(data.toolScope) !== originalToolScopeJson;
-    const worldScopeRekeyMapChanged =
-      JSON.stringify(data.worldScopeRekeyMap) !== originalWorldScopeRekeyMapJson;
-    const worldEssenceMergeMapChanged =
-      JSON.stringify(data.worldEssenceMergeMap) !== originalWorldEssenceMergeMapJson;
+    const changedKeys = new Set();
+    for (const leg of WRITEBACK_LEGS) {
+      if (JSON.stringify(data[leg.key]) !== snapshots[leg.key]) changedKeys.add(leg.key);
+    }
 
-    // WRITEBACK ORDER IS PINNED, not incidental: `destructive-changes-and-migrations/spec.md`
-    // § Startup Migration Flow items 13 to 15 own the order and each rule's failure mode. The two
-    // map legs sit OUTSIDE both shipped try/catch blocks, so they carry their own containment.
-    if (worldScopeRekeyMapChanged) {
+    // The table's order is the writeback order `destructive-changes-and-migrations/spec.md`
+    // § Startup Migration Flow pins. Every leg and the version bump carry their own containment,
+    // because a rejection would otherwise propagate out of `run()` past a caller with no `catch`.
+    for (const leg of WRITEBACK_LEGS) {
+      if (!changedKeys.has(leg.key)) continue;
       try {
-        await this._setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, data.worldScopeRekeyMap);
-      } catch (error) {
-        return this._deferOnWriteFailure(error);
-      }
-    }
-    // A setting of its own rather than an essence leg on the `1.30.0` map, whose `REKEYABLE_ENTITY_
-    // TYPES` list cannot be widened without newly refusing a pair. Its tombstone leg is why a tear
-    // that dropped it would let a later `+ New essence` reissue a retired id.
-    if (worldEssenceMergeMapChanged) {
-      try {
-        await this._setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, data.worldEssenceMergeMap);
-      } catch (error) {
-        return this._deferOnWriteFailure(error);
-      }
-    }
-    if (recipesChanged) {
-      try {
-        await this._recipeCorpus.createOrUpdateAll(data.recipes);
+        await leg.write(data[leg.key], io);
       } catch (error) {
         return this._deferOnWriteFailure(error);
       }
     }
     try {
-      // Destination before source, per the spec's writeback rule.
-      if (currencyConfigChanged) {
-        await this._setSetting(SETTING_KEYS.CURRENCY_CONFIG, data.currencyConfig);
-      }
-      // `gatheringParties` is NOT ordered against the systems write: its collapse is a transform of
-      // parties into themselves and takes nothing from the systems, so a tear either side of it is
-      // equally recoverable.
-      if (travelConfigChanged) {
-        await this._setSetting(SETTING_KEYS.TRAVEL_CONFIG, data.travelConfig);
-      }
-      if (characterLibrariesChanged) {
-        await this._setSetting(SETTING_KEYS.CHARACTER_LIBRARIES, data.characterLibraries);
-      }
-      // The three world-scope entity settings follow the same destination-before-source rule.
-      // Unlike the three lifts above a re-run WOULD still recover — the persisted re-key map is what
-      // makes that true — but the ordering keeps the recovery cheap and the rule uniform.
-      if (componentScopeChanged) {
-        await this._setSetting(SETTING_KEYS.COMPONENT_SCOPE, data.componentScope);
-      }
-      if (essenceScopeChanged) {
-        await this._setSetting(SETTING_KEYS.ESSENCE_SCOPE, data.essenceScope);
-      }
-      if (toolScopeChanged) {
-        await this._setSetting(SETTING_KEYS.TOOL_SCOPE, data.toolScope);
-      }
-      if (systemsChanged) {
-        await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
-      }
-      if (gatheringConfigChanged) {
-        await this._setSetting(SETTING_KEYS.GATHERING_CONFIG, data.gatheringConfig);
-      }
-      if (environmentsChanged) {
-        await this._setSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS, data.environments);
-      }
-      if (gatheringPartiesChanged) {
-        await this._setSetting(SETTING_KEYS.GATHERING_PARTIES, data.gatheringParties);
-      }
-
       await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
     } catch (error) {
-      // The remaining six legs and the version bump share one containment and one disposition: a
-      // rejection would otherwise propagate out of `run()` past a caller with no `catch`.
       return this._deferOnWriteFailure(error);
     }
 

@@ -7,8 +7,8 @@ src/main.js::_runMigrations	145
 src/main.js::bindFabricateGlobal	136
 src/main.js::createCraftingJournalOperations	269
 src/main.js::initialize	394
-src/migration/MigrationRunner.js	1180
-src/migration/MigrationRunner.js::run	321
+src/migration/MigrationRunner.js	1084
+src/migration/MigrationRunner.js::run	227
 src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	123
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	117
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	247
