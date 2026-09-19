@@ -229,8 +229,9 @@ export class GatheringRealmStore {
 
   /**
    * Remove `realmId` from every environment's realm membership, in ONE list write where the
-   * seam offers one. Returns the number of environments actually written; a failure is logged
-   * and reported as zero, because the deletion must not be held hostage to the repair.
+   * seam offers one. Returns the number of environments actually written; a failure never
+   * aborts the deletion, only logs it — reported as zero when the list write itself fails, or
+   * as however many landed before a per-environment fallback failed partway through.
    *
    * @returns {Promise<number>}
    */

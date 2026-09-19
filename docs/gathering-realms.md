@@ -203,7 +203,7 @@ An empty (or absent) list means "no rule":
 {: .note }
 > Included realms are chosen in the environment editor's multi-realm selector (toggle on).
 > The biome and exclusion rules are authored through the API or by system import and export.
-> Saving checks that the chosen realms exist on the owning crafting system.
+> Saving checks that the chosen realms exist in the world realm library.
 > These rules gate **location availability** only.
 > The old single free-text region on an environment is **inert**.
 > It is not a composition or availability input and is no longer shown in the editor.
