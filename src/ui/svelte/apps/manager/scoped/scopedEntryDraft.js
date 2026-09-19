@@ -15,7 +15,7 @@ function sameValue(left, right) {
 }
 
 /** A promise-ish, by the one property every caller here awaits; a store action may be sync. */
-function isThenable(value) {
+export function isThenable(value) {
   return typeof value?.then === 'function';
 }
 
