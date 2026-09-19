@@ -251,6 +251,12 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // 126 after merging origin/main, which condensed 38 component headers and took Chip and
   // IconButton back under the .svelte threshold -- two of this branch's entries removed by
   // someone else's work rather than by ours.
-  assert.equal(files, 126, 'oversized files');
+  // 127 after the 1.9.7 hotfix (#1848): `src/systems/GatheringEnvironmentStore.js` crossed at
+  // 858 when a save learned to prune a stale realm id the persisted record already carried
+  // instead of rejecting every environment write. Recorded as debt rather than absorbed, because
+  // the change shipped from the hotfix line and a restructure there widens a `fix:`-only
+  // release; the remedy is to lift the realm-membership baseline and prune helpers into their
+  // own module, tracked on #1858.
+  assert.equal(files, 127, 'oversized files');
   assert.equal(keys.length - files, 124, 'oversized functions');
 });

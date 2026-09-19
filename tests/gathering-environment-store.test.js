@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { GatheringEnvironmentStore, GatheringEnvironmentValidationError } from '../src/systems/GatheringEnvironmentStore.js';
+import { environmentHasLocationRules } from '../src/systems/gatheringLocation.js';
 
 function makeMemoryStore({
   saved = [],
@@ -13,8 +14,11 @@ function makeMemoryStore({
   ],
   ids = ['env-new', 'task-new', 'env-copy', 'task-copy-1', 'task-copy-2'],
   // Realms are WORLD scope since issue 1282, so realm-reference validation resolves against
-  // one library rather than the owning system's copy.
+  // one library rather than the owning system's copy. `realms` is handed to the store BY
+  // REFERENCE so a test can delete a realm mid-run, exactly as a realm delete does; pass
+  // `travelStore: null` for a world whose library cannot be read at all.
   realms = [],
+  travelStore,
   runCleanup = null
 } = {}) {
   const settings = new Map([
@@ -22,6 +26,7 @@ function makeMemoryStore({
     [SETTING_KEYS.GATHERING_CONFIG, gatheringConfig]
   ]);
   const writes = [];
+  const warnings = [];
   const nextIds = [...ids];
   const store = new GatheringEnvironmentStore({
     getSetting: key => settings.get(key),
@@ -31,7 +36,8 @@ function makeMemoryStore({
       return value;
     },
     getSystems: () => systems,
-    travelStore: { list: () => realms },
+    travelStore: travelStore === undefined ? { list: () => realms } : travelStore,
+    warn: (message) => warnings.push(message),
     randomID: () => {
       const next = nextIds.shift();
       if (!next) throw new Error('test ID queue exhausted');
@@ -40,7 +46,7 @@ function makeMemoryStore({
     runCleanup
   });
 
-  return { store, settings, writes };
+  return { store, settings, writes, warnings, realms };
 }
 
 function routedTask(overrides = {}) {
@@ -491,7 +497,7 @@ test('normalizes the four location availability id lists; legacy region/biomes p
   assert.deepEqual(created.biomes, ['forest']);
 });
 
-test('save-time validation rejects an includedRealmId not present on the owning system', async () => {
+test('create rejects an includedRealmId that names no realm in the world library', async () => {
   const { store } = makeMemoryStore({
     realms: [{ id: 'known' }],
     ids: ['env-bad', 'task-bad']
@@ -507,13 +513,233 @@ test('save-time validation rejects an includedRealmId not present on the owning 
 });
 
 test('load never throws on a stale includedRealmId (validation is save-time only)', () => {
-  const { store } = makeMemoryStore({
+  // T15. Reading is not repairing: the prune belongs to a save, so a world that is merely
+  // opened is never rewritten behind the GM's back.
+  const { store, writes } = makeMemoryStore({
     saved: [environment({ id: 'env-stale', includedRealmIds: ['gone'] })],
     realms: [{ id: 'known' }]
   });
   // load() normalizes without validating; no throw, stale id preserved.
   const loaded = store.load();
   assert.deepEqual(loaded.find(e => e.id === 'env-stale').includedRealmIds, ['gone']);
+  assert.equal(writes.length, 0, 'load reads; it never persists a prune');
+});
+
+// ---------------------------------------------------------------------------
+// Pruning a realm id whose realm has left the world library (issue 1848)
+//
+// The reported defect: deleting a realm left every environment citing it with an id that
+// names nothing, and because environments persist as ONE world list validated in full on
+// every write, that made every environment in the world unsaveable — including the save that
+// would have repaired it. A stale id the persisted record ALREADY carried is therefore pruned
+// rather than rejected; an id a write INTRODUCES is still rejected.
+// ---------------------------------------------------------------------------
+
+function staleWorld(overrides = {}) {
+  return makeMemoryStore({
+    saved: [
+      environment({ id: 'env-mine', name: 'Old Mine', includedRealmIds: ['gone', 'known'] }),
+      environment({ id: 'env-cave', name: 'Deep Cave', includedRealmIds: ['gone'] })
+    ],
+    realms: [{ id: 'known' }],
+    ids: [],
+    ...overrides
+  });
+}
+
+test('a stale realm id is pruned from EVERY environment by the save that repairs one of them', async () => {
+  // T6. The reporter's world: two environments gated on a realm the GM deleted, and an edit to
+  // one of them that would not save. It saves, and the whole world is repaired in that write.
+  const { store, warnings } = staleWorld();
+  store.load();
+
+  const updated = await store.update('env-cave', {
+    ...environment({ id: 'env-cave', name: 'Deep Cave', includedRealmIds: ['gone'] }),
+    enabledTaskIds: ['lib-task', 'lib-task-2']
+  });
+
+  assert.deepEqual(updated.enabledTaskIds, ['lib-task', 'lib-task-2'], 'the GM edit landed');
+  assert.deepEqual(updated.includedRealmIds, []);
+  assert.deepEqual(
+    store.list().map(env => env.includedRealmIds),
+    [['known'], []],
+    'the untouched environment is repaired too, and its surviving realm is kept'
+  );
+  assert.equal(warnings.length, 1, 'one write, one report — not one line per environment');
+  assert.match(warnings[0], /Old Mine/);
+  assert.match(warnings[0], /Deep Cave/);
+  assert.match(warnings[0], /gone/);
+});
+
+test('an update that INTRODUCES an unknown realm id is still rejected, and writes nothing', async () => {
+  // T7. Pruning must not become a licence to author a reference to a place that does not exist.
+  const { store, writes } = staleWorld();
+  store.load();
+
+  await assert.rejects(
+    () => store.update('env-mine', { includedRealmIds: ['known', 'brand-new'] }),
+    /unknown realm "brand-new"/
+  );
+  assert.equal(writes.length, 0, 'a rejected save leaves the world exactly as it was');
+  assert.deepEqual(store.get('env-mine').includedRealmIds, ['gone', 'known']);
+});
+
+test('a full-record patch re-sending the record’s OWN stale id does not count as introducing it', async () => {
+  // T8. Every manager write sends the whole record back, so "the patch mentions the id" cannot
+  // be what distinguishes a new reference from an inherited one — the persisted record is.
+  const { store } = staleWorld();
+  store.load();
+  const whole = store.get('env-mine');
+
+  const saved = await store.update('env-mine', { ...whole, name: 'Renamed Mine' });
+
+  assert.equal(saved.name, 'Renamed Mine');
+  assert.deepEqual(saved.includedRealmIds, ['known']);
+});
+
+test('create owns every id it names; duplicate inherits its source’s and owns its overrides', async () => {
+  // T9. A record with no persisted counterpart has no inherited membership to forgive.
+  const { store } = staleWorld({ ids: ['env-new', 'env-copy', 'env-copy-2', 'env-copy-3'] });
+  store.load();
+
+  await assert.rejects(
+    () => store.create(environment({ id: undefined, name: 'Fresh', includedRealmIds: ['gone'] })),
+    /unknown realm "gone"/
+  );
+
+  // Before any persist has pruned the source: an override re-sending the source's own stale id
+  // is indistinguishable from inheritance, so it is pruned rather than rejected.
+  const resent = await store.duplicate('env-mine', { includedRealmIds: ['gone', 'known'] });
+  assert.deepEqual(resent.includedRealmIds, ['known'], 'a re-sent inherited stale id is pruned');
+
+  const copy = await store.duplicate('env-mine', { name: 'Copy of the Mine' });
+  assert.deepEqual(copy.includedRealmIds, ['known'], 'the inherited stale id is pruned, not fatal');
+
+  await assert.rejects(
+    () => store.duplicate('env-mine', { includedRealmIds: ['known', 'elsewhere'] }),
+    /unknown realm "elsewhere"/,
+    'an override naming an id the source never carried is a new reference, so it is rejected'
+  );
+});
+
+test('a list-level save still rejects a record with no persisted counterpart that names an unknown realm', async () => {
+  // The prune's blast radius, pinned. A whole-list save is how an IMPORT lands, so a baseline
+  // rule that forgave every stale id would silently strip an imported environment's realm gate
+  // instead of reporting that the world lacks the place it names.
+  const { store, writes } = staleWorld();
+  store.load();
+
+  await assert.rejects(
+    () =>
+      store.save([
+        ...store.list(),
+        environment({ id: 'env-imported', name: 'Imported', includedRealmIds: ['gone'] })
+      ]),
+    /unknown realm "gone"/
+  );
+  assert.equal(writes.length, 0, 'a record the world has never seen owns every id it names');
+});
+
+test('delete, reorder and cleanupByCraftingSystem all succeed on a world carrying stale ids', async () => {
+  // T10. Every one of these rewrites the whole list, so before the prune every one of them
+  // failed on a world with a deleted realm.
+  const { store } = staleWorld();
+  store.load();
+
+  assert.equal(await store.delete('env-cave'), true);
+  assert.deepEqual(store.list().map(env => env.id), ['env-mine']);
+
+  const reordered = await store.reorder('system-a', ['env-mine']);
+  assert.deepEqual(reordered.map(env => env.id), ['env-mine']);
+  assert.deepEqual(store.get('env-mine').includedRealmIds, ['known']);
+
+  assert.equal(await store.cleanupByCraftingSystem('system-a'), true);
+  assert.deepEqual(store.list(), []);
+});
+
+test('an excludedRealmId is pruned on exactly the same terms as an included one', async () => {
+  // T11. Both lists are realm membership; a realm that is gone cannot exclude anything either.
+  const { store } = makeMemoryStore({
+    saved: [environment({ id: 'env-x', name: 'Barrens', excludedRealmIds: ['gone', 'known'] })],
+    realms: [{ id: 'known' }],
+    ids: []
+  });
+  store.load();
+
+  const saved = await store.update('env-x', { name: 'Barrens Renamed' });
+  assert.deepEqual(saved.excludedRealmIds, ['known']);
+
+  await assert.rejects(
+    () => store.update('env-x', { excludedRealmIds: ['known', 'nowhere'] }),
+    /excludedRealmIds references unknown realm "nowhere"/
+  );
+});
+
+test('an environment whose last realm id is pruned is simply no longer realm-gated', async () => {
+  // T12. The prune must never delete or disable the environment: it stops being restricted to
+  // a place, which is the only honest reading of a world whose GM removed that place.
+  const { store } = makeMemoryStore({
+    saved: [environment({ id: 'env-only', name: 'Only Gate', includedRealmIds: ['gone'] })],
+    realms: [{ id: 'known' }],
+    ids: []
+  });
+  store.load();
+
+  const saved = await store.update('env-only', { name: 'Only Gate' });
+  assert.equal(saved.enabled, true, 'still enabled');
+  assert.equal(
+    environmentHasLocationRules(store.get('env-only')),
+    false,
+    'ungated, not deleted and not disabled'
+  );
+});
+
+test('a world whose realm library cannot be read prunes nothing and rejects nothing', async () => {
+  // T13. The prune is keyed to the SAME resolved library the validation uses. With no library
+  // there is no evidence that an id is stale, and destroying references on no evidence is worse
+  // than carrying them.
+  const { store } = makeMemoryStore({
+    saved: [environment({ id: 'env-mine', name: 'Old Mine', includedRealmIds: ['gone'] })],
+    travelStore: null,
+    ids: []
+  });
+  store.load();
+
+  const saved = await store.update('env-mine', { name: 'Still Mine' });
+  assert.deepEqual(saved.includedRealmIds, ['gone'], 'unresolvable is not the same as stale');
+  await assert.doesNotReject(
+    () => store.update('env-mine', { includedRealmIds: ['gone', 'brand-new'] }),
+    'with no library there is no evidence to reject on either'
+  );
+});
+
+test('an EMPTY realm library is a readable one, so it still prunes', async () => {
+  // T14. The GM deleted their last realm. An empty array is an answer; `undefined` is not.
+  const { store, warnings } = makeMemoryStore({
+    saved: [environment({ id: 'env-mine', name: 'Old Mine', includedRealmIds: ['gone'] })],
+    realms: [],
+    ids: []
+  });
+  store.load();
+
+  const saved = await store.update('env-mine', { name: 'Still Mine' });
+  assert.deepEqual(saved.includedRealmIds, []);
+  assert.equal(warnings.length, 1);
+});
+
+test('deleting a realm mid-session leaves the very next environment save able to repair it', async () => {
+  // The end-to-end shape of the bug, driven through the fixture's live realm library.
+  const { store, realms } = makeMemoryStore({
+    saved: [environment({ id: 'env-mine', name: 'Old Mine', includedRealmIds: ['doomed'] })],
+    realms: [{ id: 'doomed' }],
+    ids: []
+  });
+  store.load();
+  realms.length = 0;
+
+  const saved = await store.update('env-mine', { enabledTaskIds: ['lib-task', 'lib-task-2'] });
+  assert.deepEqual(saved.includedRealmIds, []);
+  assert.deepEqual(saved.enabledTaskIds, ['lib-task', 'lib-task-2']);
 });
 
 // ---------------------------------------------------------------------------

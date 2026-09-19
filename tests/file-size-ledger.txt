@@ -22,7 +22,7 @@ src/models/Recipe.js::_validate	126
 src/models/Recipe.js::constructor	107
 src/systems/AlchemyListingBuilder.js::buildListing	120
 src/systems/BulkSalvageService.js	816
-src/systems/CompendiumImporter.js	1542
+src/systems/CompendiumImporter.js	1546
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
 src/systems/CompendiumImporter.js::importFromPackData	291
 src/systems/CraftingEngine.js	9969
@@ -64,6 +64,7 @@ src/systems/GatheringEngine.js::_versionedGatheringEffects	137
 src/systems/GatheringEngine.js::constructor#2	147
 src/systems/GatheringEngine.js::executeVersionedStage	105
 src/systems/GatheringEngine.js::startAttempt	289
+src/systems/GatheringEnvironmentStore.js	858
 src/systems/GatheringListingBuilder.js	1074
 src/systems/GatheringListingBuilder.js::_buildEnvironmentListing	225
 src/systems/GatheringListingBuilder.js::listForActor	108
@@ -223,9 +224,9 @@ src/ui/svelte/components/SearchablePopover.svelte	1052
 src/ui/svelte/stores/actorBarStore.svelte.js::createActorBarStore	205
 src/ui/svelte/stores/adminComponentRowProjection.js::_createItemCard	131
 src/ui/svelte/stores/adminRecipeRowProjection.js	889
-src/ui/svelte/stores/adminStore.js	12147
-src/ui/svelte/stores/adminStore.js::createAdminStore	10316
-src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection	582
+src/ui/svelte/stores/adminStore.js	12189
+src/ui/svelte/stores/adminStore.js::createAdminStore	10358
+src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection	593
 src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildState	213
 src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	349
 src/ui/svelte/stores/adminStore.js::createAdminStore>updateEnvironmentDraft	131

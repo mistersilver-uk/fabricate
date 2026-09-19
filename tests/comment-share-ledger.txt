@@ -12,7 +12,7 @@ src/integrations	185
 src/migration	6571
 src/models	1655
 src/models/match	144
-src/systems	33367
+src/systems	33425
 src/ui	2519
 src/ui/svelte	52
 src/ui/svelte/actions	263
@@ -45,11 +45,11 @@ src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	1852
 src/ui/svelte/apps/manager/world	352
 src/ui/svelte/components	2513
-src/ui/svelte/stores	6973
+src/ui/svelte/stores	6983
 src/ui/svelte/util	3463
 src/utils	7546
 styles	7499
-tests	40807
+tests	40875
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292
@@ -60,10 +60,10 @@ tests/fixtures/manager-select	51
 tests/fixtures/overlay-host	98
 tests/fixtures/player-select	35
 tests/fixtures/searchable-popover	26
-tests/helpers	9711
+tests/helpers	9717
 tests/helpers/scale	1649
 tests/journal	210
-tests/stores	2724
+tests/stores	2742
 tests/systems	623
 tests/util	618
 tests/view-lab	749
