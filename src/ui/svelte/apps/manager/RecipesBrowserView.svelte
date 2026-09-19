@@ -28,12 +28,7 @@
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
-  import {
-    describeRecipeSelection,
-    pruneRecipeSelection,
-    setRecipeSelection,
-    toggleRecipeSelection,
-  } from '../../../model/recipeBulkEditModel.js';
+  import { createBulkSelection } from './bulkSelection.svelte.js';
   import {
     RECIPE_SORT_KEYS,
     buildRecipeBrowserModel,
@@ -86,9 +81,9 @@
     ui.categoryFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
-    // The bulk selection is scoped to the selected system, so a switch clears it and the root
-    // discards the staged draft when the count reaches zero (issue 1010).
-    ui.bulkSelectedRecipeIds = new Set();
+    // The bulk selection is scoped to the selected system, so a switch resets it SILENTLY and
+    // the root discards the staged draft when the count reaches zero (issue 1010).
+    selection.reset();
     ui.systemId = selectedSystemId;
   });
 
@@ -143,18 +138,19 @@
   // grouping on, a COLLAPSED group renders no rows at all, so a naive page list would let the
   // tri-state box select rows the GM cannot see. `filteredIds` is the whole filtered set, which
   // the results link reaches and the page box deliberately cannot.
-  const bulkSelectedIds = $derived(ui.bulkSelectedRecipeIds ?? new Set());
   const filteredIds = $derived(model.filtered.map((recipe) => recipe.id));
   const pageIds = $derived(
     model.groups.filter(isGroupRendered).flatMap((group) => group.recipes.map((r) => r.id))
   );
-  const selectionSummary = $derived(
-    describeRecipeSelection({
-      pageIds,
-      filteredIds,
-      selectedIds: bulkSelectedIds,
-    })
-  );
+  const selection = createBulkSelection({
+    state: () => ui,
+    key: 'bulkSelectedRecipeIds',
+    filteredIds: () => filteredIds,
+    pageIds: () => pageIds,
+    onCleared: () => onSelectionCleared?.(),
+  });
+  const bulkSelectedIds = $derived(selection.selectedIds);
+  const selectionSummary = $derived(selection.summary);
 
   // The SAME condition the markup renders a group's rows under, read once so the two can never
   // drift: an ungrouped run is always rendered, a grouped one only while expanded.
@@ -164,39 +160,12 @@
   }
 
   // A delete, an unlink or a store refresh must never leave a phantom id in the count or in an
-  // `Apply`. Only assigned when something actually dropped — the pruned set is a subset, so equal
-  // sizes mean an identical set — so this cannot loop.
+  // `Apply`. The early return keeps the effect from subscribing to the corpus while nothing is
+  // selected.
   $effect(() => {
-    const current = ui.bulkSelectedRecipeIds ?? new Set();
-    if (current.size === 0) return;
-    const pruned = pruneRecipeSelection(
-      current,
-      (recipes || []).map((recipe) => recipe.id)
-    );
-    if (pruned.size !== current.size) ui.bulkSelectedRecipeIds = pruned;
+    if (selection.selectedIds.size === 0) return;
+    selection.prune((recipes || []).map((recipe) => recipe.id));
   });
-
-  // Every mutation assigns a NEW Set rather than mutating in place: the reactive unit is
-  // `ui.bulkSelectedRecipeIds`, not the Set, so an in-place mutation compiles, runs, and silently
-  // stops the bound lifted state propagating back to the manager root.
-  function toggleRecipeBulkSelected(id) {
-    ui.bulkSelectedRecipeIds = toggleRecipeSelection(bulkSelectedIds, id);
-  }
-
-  function setPageSelected(on) {
-    ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, pageIds, on);
-  }
-
-  function selectAllResults() {
-    ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, filteredIds, true);
-  }
-
-  // The write is FIRST, so the owner's callback runs with Svelte's flush already ahead of the
-  // focus hop it schedules.
-  function clearBulkSelection() {
-    ui.bulkSelectedRecipeIds = new Set();
-    onSelectionCleared?.();
-  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -615,9 +584,9 @@
       count={selectionSummary.count}
       showSelectAllResults={selectionSummary.showSelectAllResults}
       selectAllResultsCount={selectionSummary.selectAllResultsCount}
-      onTogglePage={(on) => setPageSelected(on)}
-      onSelectAllResults={selectAllResults}
-      onClear={clearBulkSelection}
+      onTogglePage={selection.setPageSelected}
+      onSelectAllResults={selection.selectAllResults}
+      onClear={selection.clear}
     />
   </ManagerToolbar>
 
@@ -843,7 +812,7 @@
                           { name: recipe.name }
                         )}
                         data-recipe-select={recipe.id}
-                        onChange={() => toggleRecipeBulkSelected(recipe.id)}
+                        onChange={() => selection.toggle(recipe.id)}
                       />
                     </div>
                   </li>

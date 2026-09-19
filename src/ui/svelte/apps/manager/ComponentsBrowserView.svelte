@@ -11,12 +11,7 @@
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import {
-    describeComponentSelection,
-    pruneComponentSelection,
-    setComponentSelection,
-    toggleComponentSelection,
-  } from '../../../model/componentBulkEditModel.js';
+  import { createBulkSelection } from './bulkSelection.svelte.js';
   import {
     COMPONENT_DEFAULT_PAGE_SIZE,
     COMPONENT_ESSENCE_FILTER_ANY,
@@ -84,9 +79,9 @@
     ui.categoryFilter = 'all';
     ui.essenceFilter = 'all';
     ui.pageIndex = 0;
-    // The bulk selection is scoped to the selected system, so a switch clears it and the root
-    // discards the staged draft when the count reaches zero (issue 772).
-    ui.bulkSelectedComponentIds = new Set();
+    // The bulk selection is scoped to the selected system, so a switch resets it SILENTLY and
+    // the root discards the staged draft when the count reaches zero (issue 772).
+    selection.reset();
     ui.systemId = selectedSystemId;
   });
 
@@ -228,32 +223,28 @@
   );
 
   // Bulk selection (issue 772). `pageIds` is the set of RENDERED MEMBER row ids: ghost rows carry no
-  // selection box, because `pruneComponentSelection` drops every id the system has no component for.
-  const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
+  // selection box, because the prune below drops every id the system has no component for.
   const filteredIds = $derived(filteredComponents.map((item) => item.id));
   const pageIds = $derived(
     ui.groupByCategory
       ? groups.flatMap((group) => group.components.map((item) => item.id))
       : page.components.map((item) => item.id)
   );
-  const selectionSummary = $derived(
-    describeComponentSelection({
-      pageIds,
-      filteredIds,
-      selectedIds: bulkSelectedIds,
-    })
-  );
+  const selection = createBulkSelection({
+    state: () => ui,
+    key: 'bulkSelectedComponentIds',
+    filteredIds: () => filteredIds,
+    pageIds: () => pageIds,
+    onCleared: () => onSelectionCleared?.(),
+  });
+  const bulkSelectedIds = $derived(selection.selectedIds);
+  const selectionSummary = $derived(selection.summary);
 
   // A delete, unlink or store refresh must never leave a phantom id in the count or in an `Apply`.
-  // Assigned only when something dropped — the pruned set is a subset — so this cannot loop.
+  // The early return keeps the effect from subscribing to the corpus while nothing is selected.
   $effect(() => {
-    const current = ui.bulkSelectedComponentIds ?? new Set();
-    if (current.size === 0) return;
-    const pruned = pruneComponentSelection(
-      current,
-      (itemCards || []).map((item) => item.id)
-    );
-    if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
+    if (selection.selectedIds.size === 0) return;
+    selection.prune((itemCards || []).map((item) => item.id));
   });
 
   // NOT lifted: the "nothing is selected, pick the first row" guard names one mount's auto-selection
@@ -276,27 +267,6 @@
     autoSelectedComponentId = firstId;
     onSelectComponent(firstId);
   });
-
-  // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted state
-  // propagates back to the manager root.
-  function toggleComponentBulkSelected(id) {
-    ui.bulkSelectedComponentIds = toggleComponentSelection(bulkSelectedIds, id);
-  }
-
-  function setPageSelected(on) {
-    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, pageIds, on);
-  }
-
-  function selectAllResults() {
-    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, filteredIds, true);
-  }
-
-  // The write is FIRST, so the owner's callback runs with Svelte's flush already ahead of the
-  // focus hop it schedules.
-  function clearBulkSelection() {
-    ui.bulkSelectedComponentIds = new Set();
-    onSelectionCleared?.();
-  }
 
   const sortOptions = $derived(
     COMPONENT_SORT_KEYS.map((key) => ({
@@ -444,7 +414,7 @@
       ),
       onSelect: onSelectComponent,
       onEdit: onEditComponent,
-      onToggleSelect: toggleComponentBulkSelected,
+      onToggleSelect: selection.toggle,
     };
   }
 
@@ -661,9 +631,9 @@
           'FABRICATE.Admin.Manager.Component.BulkInInspector',
           'Bulk actions are in the inspector →'
         )}
-        onTogglePage={(on) => setPageSelected(on)}
-        onSelectAllResults={selectAllResults}
-        onClear={clearBulkSelection}
+        onTogglePage={selection.setPageSelected}
+        onSelectAllResults={selection.selectAllResults}
+        onClear={selection.clear}
       />
       <span class="manager-component-filter-divider" aria-hidden="true"></span>
       <div class="manager-component-filter-field">

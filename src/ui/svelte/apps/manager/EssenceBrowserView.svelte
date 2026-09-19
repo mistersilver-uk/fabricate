@@ -2,7 +2,7 @@
   The GM essence library (issue 1036): toolbar, selection bar, rows or cards, pager, with the shell's
   own `.manager-inspector` column carrying `EssenceBrowserInspector` or, while a bulk selection
   exists, `EssenceBulkEditPanel`. It is the third studio to get this shape and it borrows rather than
-  re-derives — `essenceBrowserModel.js`, `bulkSelectionModel.js` through `essenceBulkEditModel.js`,
+  re-derives — `essenceBrowserModel.js`, the shared selection wiring in `./bulkSelection.svelte.js`,
   `BulkSelectionToolbar` and `Pagination`.
 
   Invariants:
@@ -28,12 +28,7 @@
     createEssenceBrowserState,
     describeActiveEssenceFilters,
   } from '../../../model/essenceBrowserModel.js';
-  import {
-    describeEssenceSelection,
-    pruneEssenceSelection,
-    setEssenceSelection,
-    toggleEssenceSelection,
-  } from '../../../model/essenceBulkEditModel.js';
+  import { createBulkSelection } from './bulkSelection.svelte.js';
   import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
@@ -80,7 +75,7 @@
     ui.searchTerm = '';
     ui.sourceFilter = 'all';
     ui.pageIndex = 0;
-    ui.bulkSelectedEssenceIds = new Set();
+    selection.reset();
     ui.systemId = selectedSystemId;
     // The membership axis names THIS system's records, so it cannot survive a system switch for
     // the same reason the source filter cannot.
@@ -282,49 +277,23 @@
   // Bulk selection. `pageIds` is the set of RENDERED ids and `filteredIds` the whole filtered
   // set: the tri-state page box acts on what the GM can see, and `Select all {N} results` is the
   // only route to a row the page control cannot reach.
-  const bulkSelectedIds = $derived(ui.bulkSelectedEssenceIds ?? new Set());
-  const selectionSummary = $derived(
-    describeEssenceSelection({
-      pageIds: model.pageIds,
-      filteredIds: model.filteredIds,
-      selectedIds: bulkSelectedIds,
-    })
-  );
+  const selection = createBulkSelection({
+    state: () => ui,
+    key: 'bulkSelectedEssenceIds',
+    filteredIds: () => model.filteredIds,
+    pageIds: () => model.pageIds,
+    onCleared: () => onSelectionCleared?.(),
+  });
+  const bulkSelectedIds = $derived(selection.selectedIds);
+  const selectionSummary = $derived(selection.summary);
 
   // A delete, a system refresh or a filter change must never leave a phantom id in the count or
-  // in an Apply. Only assigned when something actually dropped — the pruned set is a subset, so
-  // equal sizes mean an identical set — so this cannot loop.
+  // in an Apply. The early return keeps the effect from subscribing to the corpus while nothing
+  // is selected.
   $effect(() => {
-    const current = ui.bulkSelectedEssenceIds ?? new Set();
-    if (current.size === 0) return;
-    const pruned = pruneEssenceSelection(
-      current,
-      (essenceCards || []).map((essence) => essence.id)
-    );
-    if (pruned.size !== current.size) ui.bulkSelectedEssenceIds = pruned;
+    if (selection.selectedIds.size === 0) return;
+    selection.prune((essenceCards || []).map((essence) => essence.id));
   });
-
-  // Every mutation assigns a NEW Set. The reactive unit is `ui.bulkSelectedEssenceIds`, not the
-  // Set, so an in-place mutation compiles, runs, and silently stops the bound lifted state
-  // propagating back to the manager root.
-  function toggleBulkSelected(id) {
-    ui.bulkSelectedEssenceIds = toggleEssenceSelection(bulkSelectedIds, id);
-  }
-
-  function setPageSelected(on) {
-    ui.bulkSelectedEssenceIds = setEssenceSelection(bulkSelectedIds, model.pageIds, on);
-  }
-
-  function selectAllResults() {
-    ui.bulkSelectedEssenceIds = setEssenceSelection(bulkSelectedIds, model.filteredIds, true);
-  }
-
-  // The write comes FIRST, so the owner's callback runs with Svelte's flush already queued ahead
-  // of the focus hop it schedules.
-  function clearBulkSelection() {
-    ui.bulkSelectedEssenceIds = new Set();
-    onSelectionCleared?.();
-  }
 
   const viewModeOptions = $derived(
     ESSENCE_VIEW_MODE_SEGMENTS.map((segment) => ({
@@ -534,9 +503,9 @@
       count={selectionSummary.count}
       showSelectAllResults={selectionSummary.showSelectAllResults}
       selectAllResultsCount={selectionSummary.selectAllResultsCount}
-      onTogglePage={(on) => setPageSelected(on)}
-      onSelectAllResults={selectAllResults}
-      onClear={clearBulkSelection}
+      onTogglePage={selection.setPageSelected}
+      onSelectAllResults={selection.selectAllResults}
+      onClear={selection.clear}
     />
   </ManagerToolbar>
 
@@ -601,7 +570,7 @@
         onSelect={(id) => onSelectEssence(id)}
         onEdit={(id) => onEditEssence(id)}
         onToggleEnabled={(id, enabled) => onToggleEssenceEnabled(id, enabled)}
-        onToggleBulkSelected={(id) => toggleBulkSelected(id)}
+        onToggleBulkSelected={(id) => selection.toggle(id)}
         onAddToSystem={(id) => actions?.addToSystem?.(id, activeSystemId)}
       />
     {/snippet}
