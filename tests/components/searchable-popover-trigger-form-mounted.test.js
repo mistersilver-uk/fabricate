@@ -181,9 +181,12 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     );
     assert.match(
       popover,
-      /trigger: triggerElement \?\? pickerRoot,/,
-      'and `anchoredPopover` must be handed THAT state: `triggerButton` is the FORM prop now, ' +
-        'so anchoring on it would hand the action an options object or null'
+      /anchor=\{triggerElement \?\? pickerRoot\}/,
+      'and THAT state must be what the panel is anchored on: `triggerButton` is the FORM prop ' +
+        'now, so anchoring on it would hand the action an options object or null. The panel half ' +
+        'of the same chain — `anchoredPopover`\'s `trigger` being exactly this anchor — is pinned ' +
+        'in `searchable-popover-source-contract.test.js`, which reads both files without adding a ' +
+        'source-pin site'
     );
     assert.match(
       button,
