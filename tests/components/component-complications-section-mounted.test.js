@@ -76,6 +76,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',

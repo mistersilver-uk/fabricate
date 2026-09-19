@@ -51,6 +51,7 @@ const harness = createMountedComponentHarness({
     // Rendered by `SearchablePopover`'s `triggerButton` form (issue 1371).
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     ICON_PICKER,
   ],
   componentPath: ICON_PICKER,

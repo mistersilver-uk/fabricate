@@ -921,7 +921,7 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     /** THE SELECTED FACE `multiple` OWES ITS ROWS, AND WHY THIS CLAUSE IS NOT MOUNTED. */
     it('paints a fill and an edge on every multi-selected row, keyed on `aria-multiselectable`', () => {
       const { css } = scopedComponentCss(
-        resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte')
+        resolve(repoRoot, 'src/ui/svelte/components/SearchablePopoverPanel.svelte')
       );
       const flat = css.replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\s+/gu, ' ');
       const rules = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map(([, selector, body]) => ({

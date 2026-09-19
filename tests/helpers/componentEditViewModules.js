@@ -77,6 +77,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // Rendered by the salvage block.
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   // The salvage result quantity + the progressive DC are the shared Stepper (issue 676).
   // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite hangs.
   'src/ui/svelte/components/Stepper.svelte',

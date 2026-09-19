@@ -1243,7 +1243,7 @@ test('no suite drives a converted select by an inline open-then-click of its own
 
 test('the option list a capture producer clicks is rooted where the portal puts it', () => {
   const primitive = readFileSync('src/ui/svelte/components/Select.svelte', 'utf8');
-  const popover = readFileSync('src/ui/svelte/components/SearchablePopover.svelte', 'utf8');
+  const popover = readFileSync('src/ui/svelte/components/SearchablePopoverPanel.svelte', 'utf8');
   // Name-level, like the Checks guard below: the VALUES are option identities that vary per
   // world, and the names are what a rename would take away.
   assert.ok(
@@ -1253,7 +1253,8 @@ test('the option list a capture producer clicks is rooted where the portal puts 
   );
   assert.ok(
     popover.includes('data-popover-option'),
-    '`SearchablePopover.svelte` no longer writes `data-popover-option`, so the identity handle ' +
+    '`SearchablePopoverPanel.svelte` no longer writes `data-popover-option`, so the identity ' +
+      'handle ' +
       'every converted driver clicks by is on no row at all'
   );
 

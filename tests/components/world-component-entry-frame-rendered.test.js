@@ -56,6 +56,7 @@ const compiledExtras = [
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
 ];
 const compiledModules = [...SCOPED_SHARED_COMPILED_MODULES, componentPath, ...compiledExtras];

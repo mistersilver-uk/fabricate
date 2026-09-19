@@ -197,7 +197,8 @@ export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte'
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
 // THE APP'S ONE SELECT, plus `Field` (its labelled-form wrapper) and the popover closure above —
@@ -208,7 +209,8 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte'
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS
