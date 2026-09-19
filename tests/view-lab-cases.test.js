@@ -327,7 +327,7 @@ const GATHERING_INSPECTOR_RAIL_PATH =
   'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
 
 test('every case claiming a gathering/travel leaf also claims the rail that renders it', () => {
-  // A case that claims a leaf but not the rail asks for no photograph when the rail's OWN branch
+  // A case that claims a leaf but not the rail asks for no photograph when the rail's own branch
   // chain breaks — the defect phase 3's post-implementation review found (issue 1707 phase 3).
   const drifted = VIEW_LAB_CASES.filter(
     (viewCase) =>
