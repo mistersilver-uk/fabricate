@@ -238,6 +238,37 @@ const REFUSALS = [
   },
 ];
 
+/** The journal a plain craft with no check, no tools and no currency commits. */
+const SIMPLE_SUCCESS_JOURNAL = [
+  ['run.findActiveRunForRecipe', 'Actor:Crafter', 'recipe-probe'],
+  ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
+  ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r pending/pending]'],
+  ['item.update', 'Item:wood', { 'system.quantity': 3 }],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
+  ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
+  ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
+  ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
+  ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
+  ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully crafted Probe Recipe' }],
+];
+
+/** The mode-validation settlement: consumption per policy, and a receipt with no `createdResults`. */
+const MODE_VALIDATION_JOURNAL = [
+  ['run.findActiveRunForRecipe', 'Actor:Crafter', 'recipe-probe'],
+  ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
+  ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r pending/pending]'],
+  ['item.update', 'Item:wood', { 'system.quantity': 3 }],
+  ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
+  ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check result does not satisfy current resolution mode requirements', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check result does not satisfy current resolution mode requirements', data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [] }, {}],
+  ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.FailureReason: Crafting check result does not satisfy current resolution mode requirements FABRICATE.Chat.ConsumedOnFailure 2× wood' }],
+  ['returned', { success: false, results: null, message: 'Crafting check result does not satisfy current resolution mode requirements' }],
+];
+
 const SCENARIOS = [
   {
     name: 'simple success',
@@ -246,21 +277,23 @@ const SCENARIOS = [
       await world.craft();
       return world.journal.entries;
     },
-    journal: [
-      ['run.findActiveRunForRecipe', 'Actor:Crafter', 'recipe-probe'],
-      ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
-      ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r pending/pending]'],
-      ['item.update', 'Item:wood', { 'system.quantity': 3 }],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
-      ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
-      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
-      ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
-      ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully crafted Probe Recipe' }],
-    ],
+    journal: SIMPLE_SUCCESS_JOURNAL,
+  },
+  {
+    name: 'a per-group option override picks the stocked option at the craftability gate',
+    async run() {
+      const world = craftProbe({
+        optionGroups: {
+          'group-1': {
+            defaultOptionId: 'option-a',
+            options: { 'option-a': 'birch', 'option-b': 'wood' },
+          },
+        },
+      });
+      await world.craft(null, { ingredientOptionOverrides: { 'group-1': 'option-b' } });
+      return world.journal.entries;
+    },
+    journal: SIMPLE_SUCCESS_JOURNAL,
   },
   {
     name: 'simple failure with consumeIngredientsOnFail off',
@@ -533,18 +566,27 @@ const SCENARIOS = [
       await world.craft();
       return world.journal.entries;
     },
-    journal: [
-      ['run.findActiveRunForRecipe', 'Actor:Crafter', 'recipe-probe'],
-      ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
-      ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r pending/pending]'],
-      ['item.update', 'Item:wood', { 'system.quantity': 3 }],
-      ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
-      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check result does not satisfy current resolution mode requirements', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check result does not satisfy current resolution mode requirements', data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [] }, {}],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.FailureReason: Crafting check result does not satisfy current resolution mode requirements FABRICATE.Chat.ConsumedOnFailure 2× wood' }],
-      ['returned', { success: false, results: null, message: 'Crafting check result does not satisfy current resolution mode requirements' }],
-    ],
+    journal: MODE_VALIDATION_JOURNAL,
+  },
+  {
+    name: 'mode validation settles before the pre-consumption result-group gate',
+    async run() {
+      const world = craftProbe({
+        resolutionService: probeResolutionService({
+          validateCheckResult: false,
+          resolveResultGroups: () => ({
+            groups: [],
+            meta: {
+              disposition: 'unrouted-tier',
+              error: 'No result group is routed for this outcome',
+            },
+          }),
+        }),
+      });
+      await world.craft();
+      return world.journal.entries;
+    },
+    journal: MODE_VALIDATION_JOURNAL,
   },
   {
     name: 'misconfigured check aborts with zero mutation',

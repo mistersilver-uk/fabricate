@@ -399,15 +399,38 @@ function probeIngredientSet(id, ingredients, currencySpends, shortAllocation) {
   };
 }
 
-function probeRecipeManager({ tools = [], canCraft = true, missing = null }) {
+/**
+ * The per-group ingredient option the craftability gate resolves through `optionOverrides` (issue
+ * 552): each option names the one component that funds it, so an unstocked choice reports missing.
+ */
+function optionGroupShortfall(actors, optionGroups, optionOverrides) {
+  for (const [groupId, group] of Object.entries(optionGroups)) {
+    const componentId = group.options[optionOverrides?.[groupId] ?? group.defaultOptionId];
+    const stocked = actors.some((actor) =>
+      (actor.items || []).some((item) => item.componentId === componentId)
+    );
+    if (stocked) continue;
+    const ingredient = {
+      match: { type: 'component', componentId },
+      getDescription: () => `1x ${componentId}`,
+    };
+    return { ingredients: [{ ingredient, have: 0, need: 1 }], essences: [], tools: [] };
+  }
+  return null;
+}
+
+function probeRecipeManager({ tools = [], canCraft = true, missing = null, optionGroups = null }) {
   return {
     // The satisfiable set is the step's own, so a collapsed chain resolves step 2 against step 2.
-    canCraft(_actors, executionRecipe) {
-      if (!canCraft) {
+    canCraft(actors, executionRecipe, options = {}) {
+      const shortfall = optionGroups
+        ? optionGroupShortfall(actors, optionGroups, options.optionOverrides)
+        : null;
+      if (!canCraft || shortfall) {
         return {
           canCraft: false,
           satisfiableSet: null,
-          missing: missing || { ingredients: [], essences: [], tools: [] },
+          missing: shortfall || missing || { ingredients: [], essences: [], tools: [] },
         };
       }
       return {
