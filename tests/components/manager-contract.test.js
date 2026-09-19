@@ -130,11 +130,6 @@ const toolValidationPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte'
 );
-// The Checks Studio's own modifier catalogue, read here for ONE reason.
-const craftingModifierCataloguePath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
-);
 const appPath = resolve(repoRoot, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
@@ -157,10 +152,6 @@ const essenceStudioSources = readdirSync(essenceStudioDir)
 const essenceStudioSource = essenceStudioSources.join('\n');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
-const worldModifiersSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte'),
-  'utf8'
-);
 const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
 const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
 const resolutionModeOptionsSource = readFileSync(resolutionModeOptionsPath, 'utf8');
@@ -188,7 +179,6 @@ const toolEditorTabsSource = readFileSync(
 );
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
 const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
-const craftingModifierCatalogueSource = readFileSync(craftingModifierCataloguePath, 'utf8');
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
 const worldToolEntrySource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte'),
@@ -468,6 +458,7 @@ const CONTRACT_CLAIMS = Object.freeze({
   compares: { ask: 'compares', holds: true, says: (v) => `compares against ${v}` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
+  passesPropsNo: { ask: 'prop', holds: false, says: ([c, p]) => `passes no ${p} to <${c}>` },
   readsNoGlobal: { ask: 'global', holds: false, says: (v) => `reads no ${v} global directly` },
 });
 
@@ -478,6 +469,9 @@ const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensio
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
+const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
+const MODIFIER_CATALOGUE =
+  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
 
 /** One target, one contract test; every converted structural pin is one row of `claims`. */
 function defineStructureContract(title, target, claims) {
@@ -752,6 +746,32 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  // Formula-only since issue 1440: one labelled expression field, no provider leg. The key is
+  // claimed IN FULL, because `…Modifiers.ExpressionHint` next door satisfies a substring.
+  defineStructureContract('authors a character modifier as a formula alone', WORLD_MODIFIERS, {
+    renders: ['RollDataExpressionInput'],
+    passesProps: [['RollDataExpressionInput', 'onChange']],
+    calls: ['onUpdate'],
+    spellsExactly: ['FABRICATE.Admin.Manager.Modifiers.Expression'],
+    namesNo: ['ProviderExpressionInput', 'characterModifierProviderLabel'],
+    spellsNo: ['manager-character-modifier-provider'],
+  });
+
+  // One shared row, not two: the Tool Studio's bonus picker draws it too (asserted beside its
+  // own pins), so the catalogue's half of that claim is stated here. The two absent props are
+  // read against the SAME rendered node the row claim resolves, so neither is vacuous.
+  defineStructureContract(
+    'draws the Checks Studio modifier catalogue with the shared library row, as it shipped',
+    MODIFIER_CATALOGUE,
+    {
+      renders: ['ModifierLibraryRow'],
+      passesPropsNo: [
+        ['ModifierLibraryRow', 'controlPlacement'],
+        ['ModifierLibraryRow', 'textLayout'],
+      ],
+    }
+  );
+
   it('renders the manager shell with Systems and Recipes browser structures', () => {
     for (const snippet of [
       'class="fabricate-manager"',
@@ -808,27 +828,6 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // The modifier editor is formula-only: one labelled expression field.
-    assert.ok(
-      !worldModifiersSource.includes('ProviderExpressionInput'),
-      'modifier editor should not import the deleted provider/expression component'
-    );
-    assert.ok(
-      !worldModifiersSource.includes('characterModifierProviderLabel'),
-      'modifier editor should not render a provider label'
-    );
-    assert.ok(
-      !worldModifiersSource.includes('manager-character-modifier-provider'),
-      'modifier summary should not render a provider chip'
-    );
-    assert.ok(
-      /onUpdate\(entry\.id, \{ expression \}\)/.test(worldModifiersSource),
-      'modifier editor should bind the expression field through RollDataExpressionInput'
-    );
-    assert.ok(
-      worldModifiersSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
-      'modifier editor should keep the localized Expression label'
-    );
     // --- World > Currency (issue 1278) --------------------------------------------------
     // The ladder, spend strategy, provider and macro set are WORLD scope: a world runs one
     // ruleset, so there is one way actors store coins and two crafting systems cannot
@@ -3235,11 +3234,6 @@ describe('CraftingSystemManager source contract', () => {
       'the bonus list should render the shared modifier row, not option cards'
     );
     assert.ok(
-      craftingModifierCatalogueSource.includes('<ModifierLibraryRow'),
-      'the Checks Studio catalogue should render the SAME shared row, so there is one row and ' +
-        'not two'
-    );
-    assert.ok(
       !/<RadioCardGroup[^>]*?tool-bonus-modifier/s.test(toolRequirementsSource),
       'the bonus list should render no option-card group'
     );
@@ -3342,12 +3336,6 @@ describe('CraftingSystemManager source contract', () => {
       /data-tool-prerequisite-row/,
       'and it is the PREREQUISITE list, not the bonus list, that took them'
     );
-    assert.equal(
-      /controlPlacement|textLayout/.test(craftingModifierCatalogueSource),
-      false,
-      'the Checks Studio caller is untouched: it passes neither prop and renders as it shipped'
-    );
-
     // The gate group keeps its accessible name — the heading is hidden, not deleted.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.GateMode,
