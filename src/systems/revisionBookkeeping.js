@@ -55,7 +55,7 @@ export class RevisionBookkeeping {
   }
 
   /** Advance the `facts:<domain>:<systemId>` token of every named pair. An omitted or an
-   * EXPLICITLY empty `domains` both advance every fact scope of every named system, because in
+   * explicitly empty `domains` both advance every fact scope of every named system, because in
    * neither case can a fact class be ruled out. */
   advanceFactScopes(domains, ...systemIds) {
     const advanced =
@@ -68,7 +68,7 @@ export class RevisionBookkeeping {
 
   /** Advance the fact scopes of every record a reload delta reports changed, returning the systems
    * it touched. It records nothing: a replicated change is announced from the delta rather than
-   * from the pending set, so recording it would widen the next LOCAL announcement. */
+   * from the pending set, so recording it would widen the next local announcement. */
   advanceChangedRecords(delta) {
     const touched = new Set();
     for (const [recordId, entry] of delta.perRecord) {
@@ -79,7 +79,7 @@ export class RevisionBookkeeping {
     return touched;
   }
 
-  /** Attribute a LOCAL mutation: advance its fact scopes and hold it for the next announcement. */
+  /** Attribute a local mutation: advance its fact scopes and hold it for the next announcement. */
   attributeChange(domains, ...systemIds) {
     this.advanceFactScopes(domains, ...systemIds);
     this._pending.record(domains, ...systemIds);
@@ -105,7 +105,7 @@ export class RevisionBookkeeping {
     return delta;
   }
 
-  /** The invalidation scopes of the most recent REPLICATED change. A `reordered` delta yields
+  /** The invalidation scopes of the most recent replicated change. A `reordered` delta yields
    * none, which every consumer routes broadly; an entry naming no owner yields one null-owner
    * scope rather than vanishing. */
   consumeReplicatedChangeScopes() {
@@ -121,7 +121,7 @@ export class RevisionBookkeeping {
     return scopes;
   }
 
-  /** The domains a REPLACEMENT of one stored record belongs to, read off the fields that moved
+  /** The domains a replacement of one stored record belongs to, read off the fields that moved
    * through the same comparison a reload runs, so a local edit and its replicated copy agree. */
   domainsForEdit(previous, next) {
     if (!previous || !next) return [...ALL_INVALIDATION_DOMAINS];

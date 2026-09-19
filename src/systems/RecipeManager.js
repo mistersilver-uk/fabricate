@@ -73,7 +73,7 @@ function projectRecipe(recipe) {
   return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
 }
 
-/** The systems one reload-delta entry belongs to. A recipe MOVED between systems names both,
+/** The systems one reload-delta entry belongs to. A recipe moved between systems names both,
  * because a consumer watching the system it left must also stop trusting its cache. */
 function ownersOfRecipeEntry(entry) {
   return [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(

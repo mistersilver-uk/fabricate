@@ -49,7 +49,7 @@ describe('read and the entity scopes', () => {
 
   it('advances the entity scope and every named system, skipping a nullish id', () => {
     const ledger = bookkeeping();
-    const candidates = [ENTITY, 'thing:a', 'thing:b', 'thing:c'];
+    const candidates = [ENTITY, 'thing:a', 'thing:b', 'thing:c', 'thing:null', 'thing:undefined'];
 
     assert.deepEqual(
       advancedBy(ledger, candidates, () => ledger.advanceEntityScopes('a', null, 'b', undefined)),
@@ -289,6 +289,12 @@ describe('domainsForEdit', () => {
     assert.deepEqual(ledger.domainsForEdit(stored, { ...stored, name: 'Renamed' }), [
       'domain:name',
     ]);
+  });
+
+  it('falls back to every domain when the comparison can pair no record by id', () => {
+    const ledger = bookkeeping();
+
+    assert.deepEqual(ledger.domainsForEdit({ name: 'Stored' }, { name: 'Renamed' }), DOMAINS);
   });
 
   it('names nothing when the edit changed nothing the projection carries', () => {

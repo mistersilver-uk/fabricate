@@ -2112,7 +2112,7 @@ export class CraftingSystemManager {
     return this._bookkeeping.consumeReloadDelta();
   }
 
-  /** A crafting system IS the record, so its id is the scope owner directly. Consumed by
+  /** A crafting system is the record, so its id is the scope owner directly. Consumed by
    * `settingChangeBridge.js` on every client. */
   consumeReplicatedChangeScopes() {
     return this._bookkeeping.consumeReplicatedChangeScopes();

@@ -74,7 +74,8 @@ async function onHookBus(work) {
   try {
     await work(calls);
   } finally {
-    globalThis.Hooks = previous;
+    if (previous === undefined) delete globalThis.Hooks;
+    else globalThis.Hooks = previous;
   }
   return calls;
 }
@@ -85,7 +86,7 @@ const announcements = (calls) =>
 /** A recipe no fixture holds, born disabled so the alchemy signature gate is not the subject. */
 const newRecipe = () => persistedRecipe('r-new', SYS_A, `${SYS_A}-c0`, { enabled: false });
 
-/** A repository seam whose replicated snapshot a test can WITHDRAW between two reloads. */
+/** A repository seam whose replicated snapshot a test can withdraw between two reloads. */
 function withdrawable(records) {
   const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
   return seam;
