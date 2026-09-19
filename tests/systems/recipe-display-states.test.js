@@ -18,6 +18,26 @@ import {
   shoppingIngredientKey,
 } from '../../src/systems/recipeDisplayStates.js';
 
+// Foundry globals required to load RecipeManager.js, which composes this module's seam bag.
+globalThis.foundry = {
+  utils: {
+    randomID: () => `rid-${Math.random()}`,
+    getProperty: (obj, path) =>
+      String(path || '')
+        .split('.')
+        .reduce((value, key) => value?.[key], obj),
+  },
+};
+globalThis.game = {
+  user: { isGM: true },
+  actors: [],
+  fabricate: {},
+  settings: { get: () => undefined, set: async () => undefined },
+};
+globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
+
+const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
+
 /** The literal `FALLBACK_COMPONENT_IMG` in `RecipeManager.js` and `GENERIC_ITEM_IMG` here share. */
 const BAG_IMG = 'icons/svg/item-bag.svg';
 const COIN_IMG = 'icons/svg/coins.svg';
@@ -370,7 +390,7 @@ test('an essence group with no pool at all falls back to the missing-group verdi
   );
 });
 
-test('a group with no authored name and nothing to describe is labelled Alternatives', () => {
+test('the Alternatives fallback is a defensive default for a duck-typed option set, unreachable through a real IngredientGroup', () => {
   const deps = makeDeps();
   const options = [{ quantity: 1 }, { quantity: 1 }];
   const groups = [{ id: 'g-1', options }];
@@ -643,4 +663,52 @@ test('the shopping merge key separates a price from a quantity', () => {
   assert.equal(shoppingIngredientKey({ isCurrency: true, description: '100 gp' }), 'currency:100 gp');
   assert.equal(shoppingIngredientKey({ isEssence: true, description: '2x Fire' }), 'essence:2x Fire');
   assert.equal(shoppingIngredientKey({ name: 'Herb' }), 'desc:Herb');
+});
+
+test('the manager component fallback still composes with this module no-image sentinel', () => {
+  // `FALLBACK_COMPONENT_IMG` lives in `RecipeManager.js` and `GENERIC_ITEM_IMG` here; the two
+  // literals must stay equal, so the composition is asserted rather than the spelling.
+  const manager = new RecipeManager();
+  manager._getComponent = () => null;
+  const visual = manager._resolveIngredientVisual(RECIPE, componentOption('c-ghost'));
+  assert.equal(visual.img, null, 'an unresolvable component draws its glyph, never a bag icon');
+});
+
+test('the shopping requirement reports its essence rows and its tool rows', () => {
+  const manager = new RecipeManager();
+  manager._getSystemFeatures = () => ({ enableEssences: true, enableTags: true });
+  manager._getSystemComponents = () => [];
+  manager._getComponent = () => null;
+  manager._accumulateEssences = () => ({ 'e-fire': 1 });
+  manager._resolveEssenceDefinition = (_recipe, type) => ({ id: type, name: 'Fire' });
+  manager.getToolsForSet = () => [{ id: 't-1' }];
+  manager.resolveToolStates = () => [{ componentId: 'c-anvil', name: 'Anvil', available: false }];
+  const recipe = {
+    ...RECIPE,
+    ingredientSets: [{ id: 's-1', essences: { 'e-fire': 3 }, ingredientGroups: [] }],
+  };
+
+  const result = manager.evaluateShoppingRequirement([{ items: [] }], recipe);
+  assert.deepEqual(
+    result.essenceStates.map((e) => [e.type, e.need, e.have, e.satisfied]),
+    [['e-fire', 3, 1, false]],
+    'the legacy essence map reaches the shopping list through the features seam'
+  );
+  assert.deepEqual(result.toolStates, [
+    { componentId: 'c-anvil', name: 'Anvil', available: false },
+  ]);
+});
+
+test('a display seam resolves against the recipe it is handed, not a pre-resolved one', () => {
+  const manager = new RecipeManager();
+  const units = {
+    'r-a': [{ id: 'u', abbreviation: 'AA', value: 1, isBase: true }],
+    'r-b': [{ id: 'u', abbreviation: 'BB', value: 1, isBase: true }],
+  };
+  manager._resolveNormalizedCurrencyUnits = (recipe) => units[recipe.id] ?? [];
+  const option = currencyOption('u', 2);
+  const first = manager._resolveGroupDescription({ id: 'r-a' }, option, [option]);
+  const second = manager._resolveGroupDescription({ id: 'r-b' }, option, [option]);
+  assert.notEqual(first, second, 'a bag entry closing over the first recipe makes `recipe` inert');
+  assert.match(second, /BB/);
 });
