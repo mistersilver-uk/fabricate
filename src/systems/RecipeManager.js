@@ -10,7 +10,6 @@ import {
   findMatchingComponent,
   resolveItemEssences,
 } from '../utils/essenceResolver.js';
-import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { diceEngine } from '../utils/rollFormulaRollability.js';
 import {
   itemResolvesToComponent,
@@ -33,6 +32,13 @@ import { readStackQuantity } from './itemStackQuantity.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import {
+  validateEnabledEssenceReferences,
+  validateEssenceReferences,
+  validateRecipeForActivation,
+  validateRecipeForPersistence,
+  validateTagPlaceholders,
+} from './recipeValidation.js';
 import { RevisionBookkeeping } from './revisionBookkeeping.js';
 import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
 import {
@@ -100,6 +106,18 @@ function buildDefaultRecipeRepository({ corpus }) {
     serialize: (recipe) => recipe.toJSON(),
     scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
   });
+}
+
+/** The seams `recipeValidation` resolves through. Only the two checks that cannot leave the class
+ * are injected: the resolution-mode service read, and the retained signature-report cache. */
+function validationSeams(manager) {
+  return {
+    system: (systemId) => manager._systemManager()?.getSystem(systemId) ?? null,
+    essencesOfSystem: (system) => resolvedEssencesFor(system),
+    roll: diceEngine(),
+    resolutionMode: (recipe, options) => manager._validateResolutionMode(recipe, options),
+    signatures: (recipe) => manager._validateSignatures(recipe),
+  };
 }
 
 /** Manages recipe storage, retrieval, and CRUD operations */
@@ -2179,58 +2197,16 @@ export class RecipeManager {
     return recipes.map((r) => r.toJSON());
   }
 
-  /** Validation required to *persist* a recipe: structural and completeness integrity plus
-   * essence, tag-placeholder and resolution-mode checks. Signature uniqueness is excluded — a
-   * conflict never blocks persistence, only activation. `Roll` reaches `Result.validate` from
-   * here, so a rolled amount that can never award anything is refused at the write. */
+  /** Validation required to persist a recipe. `requireComplete: false` validates an incomplete
+   * shell's structure only, and the default is the reason the second argument must be forwarded. */
   _validateRecipeForPersistence(recipe, { requireComplete = true } = {}) {
-    const injected = { Roll: diceEngine() };
-    const baseValidation = requireComplete
-      ? recipe.validate(injected)
-      : recipe.validateStructure(injected);
-    // Structured issues in the same order as the raw error strings, carrying a stable `code` plus
-    // id-free params so the UI can localize them; a string-only validator rides UNCODED (issue 595).
-    const issues = [];
-    const pushPlain = (list) => {
-      for (const message of list || []) issues.push({ code: null, params: {}, message });
-    };
-    const pushValidation = (validation) => {
-      if (Array.isArray(validation?.issues)) issues.push(...validation.issues);
-      else pushPlain(validation?.errors);
-    };
-    pushValidation(baseValidation);
-    pushValidation(this._validateEssenceReferences(recipe));
-    pushValidation(this._validateTagPlaceholders(recipe));
-    pushValidation(this._validateResolutionMode(recipe, { requireComplete }));
-
-    const errors = issues.map((issue) => issue.message);
-    return {
-      valid: errors.length === 0,
-      errors,
-      issues,
-    };
+    return validateRecipeForPersistence(recipe, validationSeams(this), { requireComplete });
   }
 
-  /** Full validity required to *activate* a recipe: completeness, every persistence check and
-   * signature uniqueness. `issues` mirrors `errors` with a stable `code` (issue 550). */
+  /** Full validity required to activate a recipe: every persistence check, signature uniqueness
+   * and the disabled-essence blocker. */
   _validateRecipeForActivation(recipe) {
-    const persistence = this._validateRecipeForPersistence(recipe, { requireComplete: true });
-    const errors = [...persistence.errors];
-    // Coded issues run in parallel with the raw strings so a UI caller can localize them (550).
-    const issues = [...persistence.issues];
-    const signatureValidation = this._validateSignatures(recipe);
-    errors.push(...signatureValidation.errors);
-    issues.push(...(signatureValidation.issues || []));
-    // A DISABLED essence blocks activation only (issue 1036) — never persistence.
-    const disabledEssenceValidation = this._validateEnabledEssenceReferences(recipe);
-    errors.push(...disabledEssenceValidation.errors);
-    issues.push(...disabledEssenceValidation.issues);
-
-    return {
-      valid: errors.length === 0,
-      errors,
-      issues,
-    };
+    return validateRecipeForActivation(recipe, validationSeams(this));
   }
 
   /** The ingredient-signature conflicts a candidate would participate in, as coded, id-free issues
@@ -2313,155 +2289,16 @@ export class RecipeManager {
     return disabled;
   }
 
-  /** The crafting system whose essence definitions a recipe's references are validated against, or
-   * `null` when essences do not apply. Shared by the persistence and activation validators so
-   * the two cannot disagree about when `features.essences` takes them out of play. */
-  _resolveEssenceValidationSystem(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return null;
-
-    const systemManager = this._systemManager();
-    const system = systemManager?.getSystem(systemId);
-    if (!system) return null;
-
-    const features = system.features || {};
-    const essencesEnabled = features.essences === true || system.enableEssences === true;
-    return essencesEnabled ? system : null;
-  }
-
-  /** Every essence reference a recipe makes, in validation order: recipe- and step-level sets,
-   * and within each set both the legacy per-set `essences` map and first-class essence group
-   * OPTIONS (issue 649). One walk serves both essence validators. */
-  _collectEssenceReferences(recipe) {
-    const allSets = [
-      ...(recipe?.ingredientSets || []),
-      ...(recipe?.steps || []).flatMap((step) => step?.ingredientSets || []),
-    ];
-    const references = [];
-    for (const [setIndex, set] of allSets.entries()) {
-      const setLabel =
-        typeof set?.name === 'string' && set.name.trim() ? set.name.trim() : String(setIndex + 1);
-      for (const [essenceId, quantity] of Object.entries(set.essences || {})) {
-        references.push({ setLabel, essenceId, quantity });
-      }
-      for (const group of set.ingredientGroups || []) {
-        for (const option of group?.options || []) {
-          if (option?.match?.type !== 'essence') continue;
-          references.push({
-            setLabel,
-            essenceId: String(option.match.essenceId || '').trim(),
-            quantity: option.match.amount,
-          });
-        }
-      }
-    }
-    return references;
-  }
-
-  /** An essence's display NAME from the system's definitions (issue 595). An UNKNOWN essence has
-   * no definition and therefore no name, so its message omits it entirely. */
-  _essenceNameMap(definitions) {
-    return new Map(
-      definitions
-        .filter((def) => typeof def?.name === 'string' && def.name.trim())
-        .map((def) => [def.id, def.name.trim()])
-    );
-  }
-
   /** Validate ingredient-set essence requirements against the crafting system's essence
    * definitions. */
   _validateEssenceReferences(recipe) {
-    const system = this._resolveEssenceValidationSystem(recipe);
-    if (!system) {
-      return { valid: true, errors: [], issues: [] };
-    }
-
-    const definitions = resolvedEssencesFor(system);
-    const validEssenceIds = new Set(definitions.map((def) => def.id));
-    const essenceNames = this._essenceNameMap(definitions);
-
-    const issues = [];
-
-    // Report a non-positive-quantity essence, preferring the named message when the
-    // essence resolves to a definition (issue 595 — never surface the raw id).
-    const pushBadQuantity = (setLabel, essenceId) => {
-      const essenceName = essenceNames.get(essenceId);
-      issues.push(
-        essenceName
-          ? buildRecipeActivationIssue('ingredientSetEssenceQuantityNamed', {
-              set: setLabel,
-              essence: essenceName,
-            })
-          : buildRecipeActivationIssue('ingredientSetEssenceQuantity', { set: setLabel })
-      );
-    };
-
-    for (const { setLabel, essenceId, quantity } of this._collectEssenceReferences(recipe)) {
-      if (!validEssenceIds.has(essenceId)) {
-        issues.push(buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel }));
-      }
-      const num = Number(quantity);
-      if (!Number.isFinite(num) || num <= 0) {
-        pushBadQuantity(setLabel, essenceId);
-      }
-    }
-
-    return {
-      valid: issues.length === 0,
-      errors: issues.map((issue) => issue.message),
-      issues,
-    };
+    return validateEssenceReferences(recipe, validationSeams(this));
   }
 
-  /**
-   * ACTIVATION-only blocker: a recipe may not be ENABLED while it requires a DISABLED essence
-   * (issue 1036). The placement is load-bearing, because a persistence-level blocker would abort
-   * `CraftingSystemManager.deleteEssence` mid-cascade with the essence maps already mutated in
-   * memory and nothing persisted. A recipe may therefore still be SAVED while it requires a
-   * disabled essence; disabling one does not retro-disable an already-enabled recipe, because
-   * the gate fires only on a `false -> true` transition.
-   */
+  /** Activation-only blocker: a recipe may not be enabled while it requires a disabled essence
+   * (issue 1036). Never a persistence blocker, or an essence delete would abort mid-cascade. */
   _validateEnabledEssenceReferences(recipe) {
-    const system = this._resolveEssenceValidationSystem(recipe);
-    if (!system) {
-      return { valid: true, errors: [], issues: [] };
-    }
-
-    const definitions = resolvedEssencesFor(system);
-    // Only a DEFINED essence can be disabled; an unknown id is `_validateEssenceReferences`'s
-    // business and is already reported there, so it is not reported twice here.
-    const disabled = new Map(
-      definitions
-        .filter((def) => def?.enabled === false)
-        .map((def) => [def.id, String(def.name || def.id)])
-    );
-    if (disabled.size === 0) {
-      return { valid: true, errors: [], issues: [] };
-    }
-
-    const issues = [];
-    const reported = new Set();
-    for (const { setLabel, essenceId } of this._collectEssenceReferences(recipe)) {
-      const essenceName = disabled.get(essenceId);
-      if (!essenceName) continue;
-      // One issue per (set, essence) pair: a set naming the same essence in both its
-      // legacy map and a group option is ONE authoring fact, not two.
-      const signature = JSON.stringify([setLabel, essenceId]);
-      if (reported.has(signature)) continue;
-      reported.add(signature);
-      issues.push(
-        buildRecipeActivationIssue('ingredientSetDisabledEssence', {
-          set: setLabel,
-          essence: essenceName,
-        })
-      );
-    }
-
-    return {
-      valid: issues.length === 0,
-      errors: issues.map((issue) => issue.message),
-      issues,
-    };
+    return validateEnabledEssenceReferences(recipe, validationSeams(this));
   }
 
   _validateResolutionMode(recipe, { requireComplete = true } = {}) {
@@ -2473,68 +2310,7 @@ export class RecipeManager {
   }
 
   _validateTagPlaceholders(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) {
-      return { valid: true, errors: [], issues: [] };
-    }
-
-    const systemManager = this._systemManager();
-    const system = systemManager?.getSystem(systemId);
-    if (!system) {
-      return { valid: true, errors: [], issues: [] };
-    }
-
-    const validTags = new Set(
-      [
-        ...(system.itemTags || []).map((tag) => String(tag || '').trim()),
-        ...(system.tags || []).map((tag) => String(tag || '').trim()),
-      ].filter(Boolean)
-    );
-
-    const issues = [];
-    const steps =
-      typeof recipe.getExecutionSteps === 'function'
-        ? recipe.getExecutionSteps()
-        : [{ id: 'implicit', ingredientSets: recipe.ingredientSets || [] }];
-    for (const step of steps) {
-      for (const ingredientSet of step.ingredientSets || []) {
-        const groups =
-          Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
-            ? ingredientSet.ingredientGroups
-            : (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
-
-        for (const [groupIndex, group] of groups.entries()) {
-          // Name the group by author-name or 1-based position, never its id (595).
-          const groupLabel =
-            typeof group?.name === 'string' && group.name.trim()
-              ? group.name.trim()
-              : String(groupIndex + 1);
-          for (const option of group.options || []) {
-            const match = option.match || null;
-            if (getMatchHandler(match).type !== 'tags') continue;
-            const tagIds = Array.isArray(match.tags) ? match.tags : [];
-
-            for (const tagId of tagIds) {
-              const normalized = String(tagId || '').trim();
-              if (!normalized) continue;
-              if (validTags.has(normalized)) continue;
-              issues.push(
-                buildRecipeActivationIssue('ingredientGroupUnknownTag', {
-                  group: groupLabel,
-                  tag: normalized,
-                })
-              );
-            }
-          }
-        }
-      }
-    }
-
-    return {
-      valid: issues.length === 0,
-      errors: issues.map((issue) => issue.message),
-      issues,
-    };
+    return validateTagPlaceholders(recipe, validationSeams(this));
   }
 
   /** Reconcile the actor flags a recipe mutation orphaned, through the shared gate (issue 1226,
