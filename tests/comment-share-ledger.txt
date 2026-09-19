@@ -13,8 +13,8 @@ src/integrations	20
 src/migration	1353
 src/models	460
 src/models/match	66
-src/systems	25580
-src/systems/normalize	226
+src/systems	25510
+src/systems/normalize	308
 src/ui	1109
 src/ui/model	414
 src/ui/presenters	3486
@@ -69,7 +69,7 @@ tests/helpers/manager	307
 tests/helpers/scale	622
 tests/journal	157
 tests/stores	1551
-tests/systems	371
+tests/systems	387
 tests/util	379
 tests/view-lab	413
 tests/view-lab/foundry	269

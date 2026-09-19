@@ -11,16 +11,10 @@ import {
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
-import { normalizeQuantityFormula } from '../models/Result.js';
 import { Tool } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
-import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
-import {
-  normalizeComponentCategory,
-  normalizeCustomComponentCategories,
-} from '../utils/componentCategories.js';
-import { authoredComplications } from '../utils/componentComplications.js';
+import { normalizeCustomComponentCategories } from '../utils/componentCategories.js';
 import {
   advanceDefinitionRevision,
   findById,
@@ -73,6 +67,7 @@ import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidation
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
+import { normalizeComponent } from './normalize/components.js';
 import {
   convertDiceCritsToTriggers,
   convertNatSteppingToTriggers,
@@ -103,6 +98,15 @@ import {
   normalizeRecipeItemDefinition,
   normalizeRecipeItemDefinitions,
 } from './normalize/recipeItems.js';
+import {
+  normalizeCurrencyRequirement,
+  normalizeSalvage,
+  normalizeSalvageResult,
+  normalizeSalvageResultGroup,
+  normalizeTimeRequirement,
+  normalizeToolIds,
+  salvageNormalizationContext,
+} from './normalize/salvage.js';
 import {
   normalizeAlchemyConfig,
   normalizeCurrencyConfig,
@@ -925,267 +929,36 @@ export class CraftingSystemManager {
     return [...fallbackSet];
   }
 
-  /** Normalize a managed component. The salvage context (issue 764) is threaded through an options
-   * bag so `_normalizeSalvage` can apply the Simple-mode group-count clamp; a bare call leaves
-   * salvage groups untouched. A legacy positional `validEssenceIds` Set is still accepted. */
-  _normalizeComponent(item = {}, options = {}) {
-    // Back-compat: a few call paths and tests still pass a bare `validEssenceIds` Set as
-    // the second positional argument. A Set is never a valid options bag, so treat it as
-    // the essence-ids and run with no salvage context (no clamp).
-    const opts = options instanceof Set ? { validEssenceIds: options } : options || {};
-    const { validEssenceIds = null, salvageResolutionMode, salvageSimpleCheckHasFormula } = opts;
-    const difficulty = Number(item.difficulty);
-    // New-name-first, legacy-name-tolerant (issue 560): the pre-#560 shape used
-    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`; accept both and emit the new names
-    // so a not-yet-1.16.0-migrated component is never stripped on save.
-    const originItemUuid =
-      item.originItemUuid ||
-      item.registeredItemUuid ||
-      item.sourceItemUuid ||
-      item.sourceUuid ||
-      null;
-    const registeredItemUuid =
-      item.registeredItemUuid ||
-      item.originItemUuid ||
-      item.sourceUuid ||
-      item.sourceItemUuid ||
-      null;
-    const primaryRefs = new Set(
-      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
-    );
-    const rawAliasItemUuids = Array.isArray(item.aliasItemUuids)
-      ? item.aliasItemUuids
-      : Array.isArray(item.fallbackItemIds)
-        ? item.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((id) => typeof id === 'string')
-              .map((id) => id.trim())
-              .filter((id) => id && !primaryRefs.has(id))
-          ),
-        ]
-      : [];
-    return {
-      id: item.id || foundry.utils.randomID(),
-      name: item.name || 'Unnamed Item',
-      img: item.img || 'icons/svg/item-bag.svg',
-      description: this._normalizeComponentDescription(item.description),
-      originItemUuid,
-      // Transitional alias for current UI/engine references.
-      registeredItemUuid,
-      aliasItemUuids,
-      tier: item.tier || null,
-      // Single-valued grouping axis (issue 676). Defaults to the reserved `general`
-      // bucket — there is no "uncategorized" state — which is how every EXISTING
-      // component acquires a category with no migration. Distinct from `tags`, which
-      // is many-valued and does a different job.
-      category: normalizeComponentCategory(item.category),
-      tags: Array.isArray(item.tags) ? item.tags : [],
-      essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
-      difficulty:
-        Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
-      // Progressive component complications (issue 1286) sit TOP-LEVEL and deliberately NOT under
-      // `salvage`: a complication fires for a component's part in progressive crafting, salvage OR
-      // gathering, while `salvage` is only valid when `features.salvage` is true. The attach is
-      // absence-preserving, so a component that authored none needs no migration.
-      ...authoredComplications(item.complications),
-      // Salvage config is always normalized and preserved on the component so the
-      // `features.salvage` toggle is non-destructive: turning salvage off hides and
-      // skips it (UI/validation/runtime gate on the flag) but never deletes authored
-      // salvage; toggling back on restores it.
-      salvage: this._normalizeSalvage(item.salvage, {
-        salvageResolutionMode,
-        salvageSimpleCheckHasFormula,
-      }),
-    };
+  _normalizeComponent(item, options) {
+    return normalizeComponent(item, options);
   }
 
-  /** Derive the salvage-normalization context (issue 764) from an owning crafting system.
-   * `salvageSimpleCheckHasFormula` reads `salvageCraftingCheck.simple.rollFormula` SPECIFICALLY —
-   * the only slot the Simple engine consults — never an OR across the three slots. Tolerant of a
-   * raw, pre-normalized system. */
-  _salvageNormalizationContext(system = {}) {
-    const raw = system?.salvageResolutionMode;
-    const token = raw === 'tiered' ? 'routed' : raw; // legacy alias
-    const salvageResolutionMode = ['simple', 'routed', 'progressive'].includes(token)
-      ? token
-      : 'simple';
-    const formula = system?.salvageCraftingCheck?.simple?.rollFormula;
-    const salvageSimpleCheckHasFormula = typeof formula === 'string' && formula.trim() !== '';
-    return { salvageResolutionMode, salvageSimpleCheckHasFormula };
+  _salvageNormalizationContext(system) {
+    return salvageNormalizationContext(system);
   }
 
-  /** Normalize a component's salvage config. In Simple salvage mode this enforces the group-count
-   * invariant (issue 764) via a SUCCESS-FIRST retain-one clamp: one success group at
-   * `resultGroups[0]`, which the engine awards ON SUCCESS via `slice(0, 1)` with no role filter,
-   * plus at most one reserved `role: 'failure'` group. The ordering is load-bearing, because the
-   * FAILURE branch must select BY ROLE or a failed check would award the success output. */
   _normalizeSalvage(salvage = {}, options = {}) {
-    if (!salvage || typeof salvage !== 'object') {
-      return {
-        enabled: false,
-        // Default TRUE (issue 651), matching the `Recipe.allowPlayerResultReorder`
-        // default. This non-object path returns its own literal, so the default has to
-        // be stated on BOTH return paths or a component with no salvage config renders
-        // the GM toggle off against a default-on spec.
-        allowPlayerResultReorder: true,
-        ingredientQuantity: 1,
-        toolIds: [],
-        resultGroups: [],
-        dcOverride: null,
-        // `checkModifierIds` is deliberately ABSENT from this literal, not `[]`: an empty
-        // array is an AUTHORED pick of zero, and a component with no salvage config at all
-        // has authored nothing. Seeding one here would silently give every such component a
-        // pick of zero modifiers under `bySubject`. See the attach in the main return.
-      };
-    }
-
-    const rawQty = Number(salvage.ingredientQuantity);
-    const ingredientQuantity = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
-
-    // A set override replaces the system-level salvage default DC; null uses it. null/''/undefined
-    // are guarded explicitly so re-normalizing a null stays null (`Number(null)` is a spurious 0).
-    const dcOverride = (() => {
-      const raw = salvage.dcOverride;
-      if ([null, undefined, ''].includes(raw)) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? Math.trunc(n) : null;
-    })();
-
-    // HOISTED DELIBERATELY (issue 676). `enabled` is the first key of the literal
-    // below and `resultGroups` used to be computed ~10 lines later, so clamping
-    // `enabled` in place against the groups would read an uninitialized local.
-    const normalizedGroups = Array.isArray(salvage.resultGroups)
-      ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
-      : [];
-
-    // Simple-mode SUCCESS-FIRST retain-one clamp (issue 764). Routed, progressive and the
-    // no-context default keep every group and the lower-bound-only `enabled` rule.
-    const { salvageResolutionMode, salvageSimpleCheckHasFormula } = options;
-    let resultGroups = normalizedGroups;
-    let enabled = salvage.enabled === true && normalizedGroups.length > 0;
-    if (salvageResolutionMode === 'simple') {
-      const successGroup = normalizedGroups.find((g) => g.role !== 'failure');
-      const failureGroup = normalizedGroups.find((g) => g.role === 'failure');
-      const clamped = [];
-      // Success group ALWAYS at index 0 — the engine's SUCCESS award is `slice(0, 1)` with no role
-      // filter, so a failure-first input is re-ordered here. Unchanged by issue 1098, whose
-      // failure award selects BY ROLE precisely so this guarantee stays the only thing relied on.
-      if (successGroup) clamped.push(successGroup);
-      // Reserved failure group tolerated ONLY with an authored Simple check formula.
-      if (failureGroup && salvageSimpleCheckHasFormula === true) clamped.push(failureGroup);
-      resultGroups = clamped;
-      // A Simple config with no success group cannot be enabled: the success branch's
-      // `slice(0, 1)` would otherwise award a lone `role: 'failure'` group on a PASSED check.
-      enabled = salvage.enabled === true && successGroup != null;
-    }
-
-    return {
-      // Requirement 5 (`data-models` → Component) is ENFORCED HERE, not by any UI control (issue
-      // 676): the normalizer is the single chokepoint EVERY writer passes, and a control that
-      // merely refuses to ENABLE a zero-group component cannot stop one BECOMING zero-group.
-      enabled,
-      // GM-authored policy: may a player reorder this salvage's progressive result
-      // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
-      // the 1.17.0 migration does not seed it.
-      allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
-      ingredientQuantity,
-      dcOverride,
-      // Preserve migrated salvage tool references so they are not orphaned on the
-      // next system save. Coerced to trimmed, non-empty, deduped id strings.
-      toolIds: this._normalizeToolIds(salvage.toolIds),
-      resultGroups,
-      // This component's own check-modifier pick (issue 1095), consulted only under `bySubject`.
-      // Attached ONLY when authored, keyed on `Array.isArray` AT ENTRY: an authored EMPTY array is
-      // a real pick of zero, distinct from an absent one which inherits the check default. It is
-      // deliberately NOT keyed on the post-filter length.
-      ...authoredCheckModifierIds(salvage.checkModifierIds),
-      ...(salvage.outcomeRouting &&
-        typeof salvage.outcomeRouting === 'object' && {
-          outcomeRouting: { ...salvage.outcomeRouting },
-        }),
-      ...(salvage.timeRequirement &&
-        typeof salvage.timeRequirement === 'object' && {
-          timeRequirement: this._normalizeTimeRequirement(salvage.timeRequirement),
-        }),
-      ...(salvage.currencyRequirement &&
-        typeof salvage.currencyRequirement === 'object' && {
-          currencyRequirement: this._normalizeCurrencyRequirement(salvage.currencyRequirement),
-        }),
-    };
+    return normalizeSalvage(salvage, options);
   }
 
-  /** Normalize an array of library tool id strings to trimmed, non-empty, deduped strings,
-   * tolerating non-array or nullish input. */
   _normalizeToolIds(toolIds) {
-    if (!Array.isArray(toolIds)) return [];
-    const seen = new Set();
-    const out = [];
-    for (const raw of toolIds) {
-      const id = String(raw ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      out.push(id);
-    }
-    return out;
+    return normalizeToolIds(toolIds);
   }
 
   _normalizeSalvageResult(result) {
-    if (!result || typeof result !== 'object') return null;
-    const compId = result.componentId || result.systemItemId;
-    const quantityFormula = normalizeQuantityFormula(result.quantityFormula);
-    return {
-      id: result.id || foundry.utils.randomID(),
-      componentId: compId || null,
-      systemItemId: compId || null, // transitional alias
-      quantity:
-        Number.isFinite(Number(result.quantity)) && Number(result.quantity) >= 1
-          ? Number(result.quantity)
-          : 1,
-      // Absence is the fixed-amount state, so `''` and whitespace collapse to it (issue 1645).
-      ...(quantityFormula && { quantityFormula }),
-      propertyMacroUuid: result.propertyMacroUuid || null,
-    };
+    return normalizeSalvageResult(result);
   }
 
   _normalizeSalvageResultGroup(group) {
-    if (!group || typeof group !== 'object') return null;
-    const results = Array.isArray(group.results)
-      ? group.results.map((r) => this._normalizeSalvageResult(r)).filter(Boolean)
-      : [];
-    return {
-      id: group.id || foundry.utils.randomID(),
-      name: String(group.name || '').trim() || 'Result Group',
-      // Preserve a reserved `role: 'failure'` group (issue 764). The editor never AUTHORS this
-      // role, but import, copy-mode and migration can carry one, and the Simple-mode clamp
-      // distinguishes success groups by it. Only the reserved value is emitted.
-      ...(group.role === 'failure' && { role: 'failure' }),
-      results,
-    };
+    return normalizeSalvageResultGroup(group);
   }
 
   _normalizeTimeRequirement(time) {
-    if (!time || typeof time !== 'object') return {};
-    const result = {};
-    for (const key of ['minutes', 'hours', 'days', 'months', 'years']) {
-      const val = Number(time[key]);
-      if (Number.isFinite(val) && val > 0) {
-        result[key] = val;
-      }
-    }
-    return result;
+    return normalizeTimeRequirement(time);
   }
 
   _normalizeCurrencyRequirement(currency) {
-    if (!currency || typeof currency !== 'object') return {};
-    const amount = Number(currency.amount);
-    return {
-      unit: String(currency.unit || '').trim() || 'gp',
-      amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
-    };
+    return normalizeCurrencyRequirement(currency);
   }
 
   /** Persist a crafting-system mutation through the definition repository (issue 1089).
