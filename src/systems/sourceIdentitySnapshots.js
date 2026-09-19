@@ -1,8 +1,7 @@
 /**
  * Source-identity SNAPSHOTS (issue 1699): the enricher-backed description resolver and the three
- * per-kind source snapshots, extracted from `CraftingSystemManager`. Every collaborator arrives in
- * `io`, which the manager's delegate rebuilds per call, so a suite patching the manager member a
- * seam is backed by still intercepts it. Nothing here reads a Foundry global.
+ * per-kind source snapshots, extracted from `CraftingSystemManager`. Every collaborator arrives in `io`,
+ * rebuilt per call, so a patch to the manager member is still observed. Nothing here reads a Foundry global.
  */
 
 /** The ordered description fields a Foundry Item may carry, most specific first. Shared by
@@ -47,6 +46,7 @@ export async function extractSourceDescription(io, source = null) {
   return '';
 }
 
+/** Build a component's source display snapshot: resolves refs and description through `io`, falling back to `fallbackItem` when unresolved. */
 export async function buildComponentSourceSnapshot(
   io,
   itemUuid,
@@ -74,6 +74,8 @@ export async function buildComponentSourceSnapshot(
   };
 }
 
+/** Build a recipe-item definition's source display snapshot, the same reference union a
+ * component records: resolves refs and description through `io`, falling back to `fallbackDefinition`. */
 export async function buildRecipeItemSourceSnapshot(
   io,
   itemUuid,

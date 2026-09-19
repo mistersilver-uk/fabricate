@@ -1,9 +1,7 @@
 /**
- * Source-identity STAMPING and REPAIR (issue 1699): the durable-flag writes, the three one-shot
- * auto-stamps and the GM "Repair Item Data" pass, extracted from `CraftingSystemManager`. Every
- * collaborator arrives in `io`, which the manager's delegate rebuilds per call, so an instance
- * patch applied after construction is still observed. Nothing here reads a Foundry global — the
- * world item, pack and actor collections and the uuid resolver all arrive as thunks.
+ * Source-identity STAMPING and REPAIR (issue 1699): the durable-flag writes, the three one-shot auto-stamps
+ * and the GM "Repair Item Data" pass, extracted from `CraftingSystemManager`. Every collaborator arrives in
+ * `io`, rebuilt per call, so an instance patch is still observed. Nothing here reads a Foundry global.
  */
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import {
@@ -48,9 +46,9 @@ async function writeSourceIdentity(source, flagKey, id) {
 
 /**
  * Persist a transferable durable identity (`flags.fabricate.<flagKey>`) on a registered source
- * WORLD item, so any future inventory copy inherits it and resolves to this registration even
- * when Foundry's transitive `_stats.duplicateSource` points at a template. KIND-GENERIC, and a
- * no-op for compendium, locked or non-Item sources, whose copies still resolve via source UUIDs.
+ * WORLD item, so a future inventory copy inherits it even when Foundry's transitive
+ * `_stats.duplicateSource` points at a template. KIND-GENERIC, and a no-op for a non-Item
+ * source or any pack-resident source, whatever its lock state, whose copies resolve via uuid.
  *
  * The clone-gate is safe HERE, and only here and in world/pack source repair, because a
  * registered SOURCE carrying `duplicateSource` is a genuine sidebar-Duplicate. It must NEVER
@@ -136,8 +134,8 @@ async function autoStampSources(io, { flagKeyFor, entriesOf, uuidOf }) {
  * source Item. A shared source registered in BOTH system A and system B is stamped once per owning
  * system, so it carries both leaves. Sources only: owned copies are covered by future drags and by
  * the manual repair, and the legacy scalar is NOT stripped, remaining the transitional fallback for
- * pre-upgrade owned copies. This arm reads `originItemUuid` ALONE — deliberately unlike the other
- * two — so a definition carrying only a registered uuid is never stamped.
+ * pre-upgrade owned copies. This arm reads `originItemUuid` alone, deliberately unlike the other
+ * two, so a definition carrying only a registered uuid is never stamped.
  */
 export async function autoStampRecipeItemSources(io) {
   return autoStampSources(io, {
@@ -460,7 +458,7 @@ async function refreshDefinitionDescriptions(io, summary) {
 function buildRepairKinds(io) {
   const kinds = [];
   for (const system of io.getSystems()) {
-    // A dotted (unsafe) system id cannot serve as a `roles` map key, so the WHOLE system is
+    // A dotted (unsafe) system id cannot serve as a `roles` map key, so the whole system is
     // skipped — tools and recipe items included, because all three key derivations gate on the
     // same id check. Its definitions still resolve via raw refs. Fresh ids are validated at
     // creation/import.
@@ -481,7 +479,7 @@ function buildRepairKinds(io) {
     const toolFlagKey = io.toolRoleFlagKey(system.id);
     if (toolFlagKey) {
       // DELIBERATELY NOT REPOINTED at issue 1370, for the same reason as the component kind
-      // above. A tool with no source refs is filtered OUT, unlike the other two kinds.
+      // above. A tool with no source refs is filtered out, unlike the other two kinds.
       kinds.push({
         bucket: 'tools',
         flagKey: toolFlagKey,

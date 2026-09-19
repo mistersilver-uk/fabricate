@@ -820,7 +820,7 @@ export class CraftingSystemManager {
     return descriptionTextCandidate(value, seen);
   }
 
-  /** The snapshot cluster's collaborators (issue 1699), rebuilt on EVERY call: several suites
+  /** The snapshot cluster's collaborators (issue 1699), rebuilt on every call: several suites
    * patch `_enrichToHtml`, `_buildComponentSourceSnapshot` or `_resolveImportedComponentSourceData`
    * on an already-constructed instance, and a bag captured once would never see them. */
   _sourceSnapshotCollaborators() {
@@ -2421,9 +2421,9 @@ export class CraftingSystemManager {
     return leftRefs.length === rightRefs.length && leftRefs.every((ref) => rightRefs.includes(ref));
   }
 
-  /** The stamping and repair cluster's collaborators (issue 1699), rebuilt on EVERY call: the
+  /** The stamping and repair cluster's collaborators (issue 1699), rebuilt on every call: the
    * suites assign `save`, `_notifySystemsChanged`, `globalThis.game` and `globalThis.fromUuid`
-   * AFTER construction and patch the flag-key derivations on the instance, so a bag captured once
+   * after construction and patch the flag-key derivations on the instance, so a bag captured once
    * would never see them. The world collections arrive as thunks, which is what keeps the service
    * free of Foundry globals. */
   _sourceIdentityCollaborators() {
@@ -2477,7 +2477,7 @@ export class CraftingSystemManager {
     );
   }
 
-  /** GM maintenance ("Repair Item Data"): the GM gate stays HERE, ahead of the bag, so the
+  /** GM maintenance ("Repair Item Data"): the GM gate stays here, ahead of the bag, so the
    * permission failure is still the manager's. */
   async repairItemData({ includeCompendiums = true } = {}) {
     this._assertGM('repair item data');
