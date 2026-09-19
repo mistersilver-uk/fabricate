@@ -164,6 +164,68 @@ function flaggedPackSourceWorld() {
   return { resolve: { [PACK_UUID]: source }, fixtures: { source } };
 }
 
+/** An owned copy whose name matches a recipe-item definition only after case folding —
+ * `normalizeMatchName` (`SourceIdentityService.js:209-213`) lowercases before comparing. */
+function caseFoldedRepointWorld() {
+  const copy = makeDocument({
+    uuid: 'Actor.hero.Item.scroll',
+    name: 'SCROLL OF EMBERS',
+    duplicateSource: 'Item.scroll-sparks',
+  });
+  return {
+    systems: [
+      makeSystem({
+        id: 'sys1',
+        recipeItemDefinitions: [
+          {
+            id: 'ri-sparks',
+            name: 'Scroll of Sparks',
+            originItemUuid: 'Item.scroll-sparks',
+            aliasItemUuids: [],
+          },
+          {
+            id: 'ri-embers',
+            name: 'Scroll of Embers',
+            originItemUuid: 'Item.scroll-embers',
+            aliasItemUuids: [],
+          },
+        ],
+      }),
+    ],
+    actors: [makeActor([copy])],
+    fixtures: { copy },
+  };
+}
+
+/** A token-flagged actor owning one matchable copy — the repair walk's actor loop names no
+ * discriminator on `actor?.isToken`, so a synthetic/unlinked token actor is scanned exactly like
+ * any other (`SourceIdentityService.js:550-551`, `:594`). */
+function tokenActorWorld() {
+  const owned = makeDocument({
+    uuid: 'Actor.token-hero.Item.ore',
+    name: 'Raw Ore',
+    compendiumSource: 'Item.ore-src',
+  });
+  return {
+    systems: [
+      makeSystem({
+        id: 'sys1',
+        components: [
+          {
+            id: 'comp-ore',
+            name: 'Ore',
+            aliasItemUuids: [],
+            originItemUuid: 'Item.ore-src',
+            registeredItemUuid: 'Item.ore-src',
+          },
+        ],
+      }),
+    ],
+    actors: [{ ...makeActor([owned]), isToken: true }],
+    fixtures: { owned },
+  };
+}
+
 /** A definition-shaped fallback, so the unresolved-source arm of each builder is distinguishable. */
 const FALLBACK_DEFINITION = { name: 'Fallback Definition', img: 'icons/def.webp', description: 'd' };
 
@@ -504,6 +566,33 @@ describe('the collaborator bags are late-bound', () => {
       Object.defineProperty(globalThis, 'game', descriptor);
     }
   });
+
+  it('observes `_toolRoleFlagKey` and `_recipeItemRoleFlagKey` patched after construction', async () => {
+    const harness = createHarness(repairWorld());
+    harness.manager._toolRoleFlagKey = () => null;
+    harness.manager._recipeItemRoleFlagKey = () => null;
+    const summary = await harness.manager.repairItemData();
+    assert.deepStrictEqual(summary.tools, { stamped: 0, stripped: 0, cleared: 0 });
+    assert.deepStrictEqual(summary.recipeItems, { stamped: 0, stripped: 0, cleared: 0 });
+    assert.equal(summary.stamped, 1, 'only the component kind resolved through the un-patched key');
+  });
+
+  it('observes `_primeEnricherCache` patched after construction', async () => {
+    const harness = createHarness(repairWorld());
+    let primed = false;
+    harness.manager._primeEnricherCache = async () => {
+      primed = true;
+    };
+    await harness.manager.repairItemData();
+    assert.equal(primed, true, 'the patched primeEnricherCache collaborator was used');
+  });
+
+  it('observes the systems map patched after construction', async () => {
+    const harness = createHarness(repairWorld());
+    harness.manager.systems = new Map();
+    const summary = await harness.manager.repairItemData();
+    assert.equal(summary.stamped, 0, 'an emptied systems map after construction leaves nothing to repair');
+  });
 });
 
 describe('the GM gate and the deleted members', () => {
@@ -569,5 +658,27 @@ describe('the guards close before a write', () => {
       [],
       'the compendium guard (SourceIdentityService.js:83) must refuse an unsetFlag write'
     );
+  });
+});
+
+describe('two more surviving mutants, killed without a src/ change', () => {
+  it('re-points an owned copy whose name matches only after case folding', async () => {
+    const harness = createHarness(caseFoldedRepointWorld());
+    const summary = await harness.manager.repairItemData();
+    assert.equal(
+      summary.repointed,
+      1,
+      'normalizeMatchName lowercases before comparing (SourceIdentityService.js:209-213)'
+    );
+    assert.equal(
+      harness.fixtures.copy.flags.fabricate.fabricate.roles.sys1.recipeItemDefinitionId,
+      'ri-embers'
+    );
+  });
+
+  it('does not skip a token-flagged actor while scanning owned copies', async () => {
+    const harness = createHarness(tokenActorWorld());
+    const summary = await harness.manager.repairItemData();
+    assert.equal(summary.stamped, 1, "the token actor's owned copy is scanned like any other");
   });
 });
