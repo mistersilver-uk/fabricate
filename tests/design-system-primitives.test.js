@@ -117,6 +117,10 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
+  // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
+  // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
+  'src/ui/svelte/components/RowDisclosure.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
@@ -133,6 +137,10 @@ const EXPECTED_OVERRIDE_KEYS = [
   // list is compared against `Object.keys(...).sort()` and `'B'` < `'u'`.
   'src/ui/svelte/components/SlotRow.svelte',
   'src/ui/svelte/components/SlotTile.svelte',
+  // Issue 1512: the product's ONE ordered list. It never enters `PRIMITIVES_WITH_NO_FRAME` at all,
+  // because it arrives with three named frames — the surfaces whose row geometry moved — rather
+  // than with the representative pair, which would publish two frames that do not contain it.
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StageCard.svelte',
   'src/ui/svelte/components/StageNav.svelte',
   'src/ui/svelte/components/StatBox.svelte',
@@ -189,7 +197,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
   'src/ui/svelte/components/Pagination.svelte',
-  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
 ];
 
@@ -207,8 +214,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 59, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 61, 'the shipped primitive set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 15, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

@@ -631,38 +631,32 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
 });
 
 describe('the progressive reorder announcement', () => {
+  // Both halves moved into the shared ordered list at issue 1512, and both are asserted where they
+  // live now: `tests/sortable-list-source-contract.test.js` holds the read-the-name-first ordering
+  // against `SortableList.svelte`, and `tests/components/sortable-list-mounted.test.js` reads the
+  // sentence out of the rendered live region. What this surface still owns is the array move.
   const cardSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte'),
     'utf8'
   );
-  const moveItem = cardSource.slice(
-    cardSource.indexOf('function moveItem('),
-    cardSource.indexOf('// Routing provider:')
-  );
 
-  it('reads the moved result NAME before the reorder, not after', () => {
-    // `reorderItem` emits the reordered group. Once the parent round-trips the new prop,
-    // `results[index]` is the item that swapped INTO that slot — so a name read after the
-    // move announces the wrong result.
-    const nameRead = moveItem.indexOf('componentNameFor(results[index])');
-    const reorder = moveItem.indexOf('reorderItem(index, target)');
-    assert.ok(nameRead > -1 && reorder > -1);
-    assert.ok(nameRead < reorder, 'the name is captured before the array moves under it');
-    assert.ok(moveItem.indexOf('const total = results.length') < reorder, 'so is the total');
+  it('hands the shared list the move and keeps no announcement of its own', () => {
+    assert.ok(
+      cardSource.includes('onReorder={(from, to) => reorderItem(from, to)}'),
+      'the list calls this surface with the two indices'
+    );
+    for (const retired of ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount', 'announcement']) {
+      assert.equal(
+        cardSource.includes(retired),
+        false,
+        `${retired} belonged to this card's own copy of the announcement and is gone`
+      );
+    }
   });
 
   it('announces through ONE localized key with placeholders, not a concatenation', () => {
-    // "…MovedToPosition… {n} …OfCount… {n}" hard-codes English word order into the
-    // component; a translator cannot reorder a sentence assembled from fragments.
-    assert.ok(moveItem.includes('ResultMoveAnnouncement'), 'one key carries the whole sentence');
-    for (const fragment of ['MovedToPosition', 'OfCount']) {
-      assert.equal(
-        cardSource.includes(fragment),
-        false,
-        `${fragment} was a sentence fragment and is gone`
-      );
-    }
-    const announcement = lang.FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement;
+    // The shared helper's key, which every ordered list in the product now announces through.
+    const announcement = lang.FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement;
     for (const token of ['{name}', '{position}', '{total}']) {
       assert.ok(announcement.includes(token), `the key takes ${token}`);
     }

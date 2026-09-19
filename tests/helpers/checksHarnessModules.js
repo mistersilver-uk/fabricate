@@ -116,6 +116,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // The product's ONE ordered list (issue 1512), which the difficulty-tier card renders, and the
+  // icon button it draws every one of its controls through.
+  'src/ui/svelte/components/SortableList.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).

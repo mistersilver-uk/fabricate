@@ -309,7 +309,8 @@ describe('environment composition editor structure', () => {
         'region, because the script above it names the role in prose explaining the conversion'
     );
     assert.ok(/const showEventRankControls = \$derived\(\s*kind === 'event' && eventSelectionMode === 'highestRankedDrop'\s*\)/.test(listSource), 'event rank controls are gated by the highest-ranked system rule');
-    assert.ok(listSource.includes('draggable={showEventRankControls ? true : undefined}'), 'reorder drag is enabled only when event rank controls are active');
+    // The drag half is a RENDERED fact as of issue 1512 — the shared list's own `draggable` and its
+    // grip — so `environment-composition-list-mounted.test.js` asserts it and this pin is retired.
     assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
   });
 

@@ -259,6 +259,33 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-environment-edit-blind-weights-narrow',
+    label: 'Manager — Environment edit blind task weights at the declared floor',
+    // The composition list's AFTER frame (issue 1512): the column strip's lead track is the shared
+    // list's own cluster, so every label has to sit over the column it names at the narrow
+    // container as well as at the default one.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+    ],
+    expectView: 'environment-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-record-id] .manager-environment-comp-cells',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-environment-edit-automatic-force-add',
     label: 'Manager — Environment edit automatic Force add',
     reaches: 'beyond',

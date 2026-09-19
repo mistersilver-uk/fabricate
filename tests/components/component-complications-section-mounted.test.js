@@ -1047,8 +1047,10 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
     'utf8'
   );
-  const recipeResultRowSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte'),
+  // The Recipe Studio's band left `RecipeResultItemRow.svelte` at issue 1512: it is the shared
+  // ordered list's BODY now, and `RecipeStageComplicationBand.svelte` is where that call site lives.
+  const recipeStageBandSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte'),
     'utf8'
   );
 
@@ -1080,7 +1082,7 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     // both strips exactly as they were.
     for (const [name, source] of [
       ['the Component Studio salvage strip', componentEditViewSource],
-      ['the Recipe Studio stage strip', recipeResultRowSource],
+      ['the Recipe Studio stage strip', recipeStageBandSource],
     ]) {
       assert.match(
         source,

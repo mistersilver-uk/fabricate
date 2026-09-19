@@ -105,6 +105,8 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // The product's ONE ordered list (issue 1512): the progressive salvage stage list renders it.
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
   // THE PART D REBUILD'S FOUR NEW LEAVES (issue 1371, parity round 4).
   'src/ui/svelte/components/EditorTabs.svelte',
