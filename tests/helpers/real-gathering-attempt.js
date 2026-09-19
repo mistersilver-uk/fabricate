@@ -53,10 +53,42 @@ function writePath(object, path, value) {
   return object;
 }
 
-/** Wire the production engine to its real collaborators, doubling only the world around it. */
-function buildEngine({ system, store, actor, viewer, runManager, publications, now, createResultCreator, rollD100 }) {
-  const rich = new GatheringRichStateService({ environmentStore: store, rollD100, nowWorldTime: () => now });
-  return new GatheringEngine({
+/**
+ * Wrap real {@link GatheringRunManager} terminal-writing methods so a caller can inspect the
+ * exact arguments each received, without changing behaviour — every wrapper still delegates
+ * through to the original. Also appends one `stageJournal` entry per call, in call order, so a
+ * caller can assert ordering against other stage markers (`respond`, `reservation-released`).
+ */
+function recordRunManagerCalls(runManager, calls, stageJournal) {
+  const wrap = (name, toSnapshot) => {
+    const original = runManager[name].bind(runManager);
+    runManager[name] = async (...args) => {
+      calls[name].push(toSnapshot(...args));
+      stageJournal.push({ stage: name });
+      return original(...args);
+    };
+  };
+  wrap('createTerminalRun', (actor, runData, status, payload, options) => ({ actor, runData, status, payload, options }));
+  wrap('completeRun', (actor, run, status, payload, options) => ({ actor, run, status, payload, options }));
+  wrap('settleHistory', (actor, runId, payload) => ({ actor, runId, payload }));
+  wrap('cancelRun', (actor, runId, options) => ({ actor, runId, options }));
+  wrap('clearActiveRun', (actor, runId, options) => ({ actor, runId, options }));
+}
+
+/**
+ * Wire the production engine to its real collaborators, doubling only the world around it.
+ *
+ * `engine._terminalStart` is wrapped to append a `respond` stage marker (issue 1700's stage-9),
+ * and `blindRunStore` is a minimal double — not {@link GatheringBlindRunStore}'s real
+ * reservation-count semantics, only enough to prove when a run's provisional claim is released
+ * relative to commit and respond, via a `reservation-released` marker.
+ */
+function buildEngine({
+  system, store, actor, viewer, runManager, publications, nowWorldTime, createResultCreator, rollD100,
+  isPrimaryGM = () => true, toolBreakage = null, stageJournal,
+}) {
+  const rich = new GatheringRichStateService({ environmentStore: store, rollD100, nowWorldTime });
+  const engine = new GatheringEngine({
     environmentStore: store,
     runManager,
     // `revealTask`/`listRevealedTaskIds` are bound so the reveal POLICY really runs: without
@@ -69,24 +101,47 @@ function buildEngine({ system, store, actor, viewer, runManager, publications, n
     getSelectableActors: () => [actor],
     isActorSelectable: () => true,
     isGamePaused: () => false,
-    isPrimaryGM: () => true,
+    isPrimaryGM,
     getRunViewer: () => viewer,
     evaluator: { evaluateVisibility: async () => ({ visible: true }) },
     sceneAccess: { canAttempt: () => ({ allowed: true }) },
     toolAvailability: { check: () => ({ available: true, missing: [], failedRequirements: [] }) },
+    toolBreakage,
     resultCreator: createResultCreator({ getSystem: () => system }),
     hookPublisher: { publishAttemptCompleted: (payload) => publications.push(payload) },
-    nowWorldTime: () => now,
+    nowWorldTime,
     localize: (key) => key,
   });
+  const originalTerminalStart = engine._terminalStart.bind(engine);
+  engine._terminalStart = async (...args) => {
+    stageJournal.push({ stage: 'respond' });
+    return originalTerminalStart(...args);
+  };
+  engine.blindRunStore = {
+    get: () => true,
+    release: async () => {
+      stageJournal.push({ stage: 'reservation-released' });
+      return { released: true };
+    },
+  };
+  return engine;
 }
 
 /**
  * Execute one gathering attempt, reload it from serialized flags and project it.
  *
+ * `matureWorldTime`, when set, advances the shared clock past a `timeRequirement`-bearing
+ * task's start and drives the waiting run to completion through the real maturity entry each
+ * lifecycle uses in production — `processWorldTime` for a legacy run, `executeVersionedStage`
+ * for a versioned one — rather than through `startAttempt`/`startVersionedRun` alone. Its result
+ * is returned as `maturedResult`; a persistence throw on that path is caught the same as a
+ * throw from the start call, into `error`.
+ *
  * @param {object} options Composed `system`/`environment`, acting `viewer`, d100 `rolls`,
- *   `sources` backing `fromUuidSync`, and the versioned `resolvedCheckResult`.
- * @returns {Promise<object>} Response/error, the reloaded record and a `project` seam.
+ *   `sources` backing `fromUuidSync`, the versioned `resolvedCheckResult`, and the maturity,
+ *   primary-GM and tool-breakage seams above.
+ * @returns {Promise<object>} Response/error, maturity and call-instrumentation data, the
+ *   reloaded record and a `project` seam.
  */
 export async function runRealGatheringAttempt({
   system,
@@ -102,6 +157,16 @@ export async function runRealGatheringAttempt({
   resolvedCheckResult = null,
   rollTotal = 18,
   worldTime = 100,
+  matureWorldTime = null,
+  // Runs once, between start and maturity, only when `matureWorldTime` is set — the seam a
+  // cell drives state drift through (e.g. deleting the task the waiting run points at) that a
+  // single start-to-maturity call cannot otherwise reach.
+  beforeMature = null,
+  // Runs once, before `startAttempt`/`startVersionedRun` — the seam a cell reaches the run
+  // manager itself through, e.g. removing `createTerminalRun` to pin the immediate refusal.
+  beforeStart = null,
+  isPrimaryGM = () => true,
+  toolBreakage = null,
 } = {}) {
   const { GatheringRunManager } = await import('../../src/systems/GatheringRunManager.js');
   const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
@@ -111,8 +176,12 @@ export async function runRealGatheringAttempt({
   const queue = [...rolls];
   const publications = [];
   const chat = [];
+  const stageJournal = [];
+  const runManagerCalls = {
+    createTerminalRun: [], completeRun: [], settleHistory: [], cancelRun: [], clearActiveRun: [],
+  };
   let sequence = 0;
-  const now = worldTime;
+  let now = worldTime;
   const store = { list: () => [environment], get: (id) => (id === environment.id ? environment : null) };
   const runManager = new GatheringRunManager({
     randomID: () => `run-${++sequence}`,
@@ -120,8 +189,12 @@ export async function runRealGatheringAttempt({
     getUserId: () => viewer.id,
     getActors: () => [actor],
   });
+  recordRunManagerCalls(runManager, runManagerCalls, stageJournal);
   try {
-    globalThis.game = { user: viewer, users: new Map([[viewer.id, viewer]]), actors: [actor], time: { worldTime: now } };
+    globalThis.game = {
+      user: viewer, users: new Map([[viewer.id, viewer]]), actors: [actor], time: { worldTime: now },
+      settings: { get: () => 'publicroll' },
+    };
     globalThis.foundry = {
       utils: {
         randomID: () => `fid-${++sequence}`,
@@ -133,20 +206,34 @@ export async function runRealGatheringAttempt({
     globalThis.fromUuidSync = (uuid) => sources[uuid] ?? null;
     globalThis.ChatMessage = { getSpeaker: () => ({ actor: actor.id }), create: async (data) => chat.push(data) };
     stubRoll(rollTotal, [{ number: 1, faces: 20, total: rollTotal }]);
-    const engine = buildEngine({ system, store, actor, viewer, runManager, publications, now,
+    const engine = buildEngine({ system, store, actor, viewer, runManager, publications, nowWorldTime: () => now,
       createResultCreator: createGatheringResultCreator,
-      rollD100: () => queue.shift() ?? 1 });
+      rollD100: () => queue.shift() ?? 1,
+      isPrimaryGM, toolBreakage, stageJournal });
     engine.installVersionedRunAuthority({
       consumeExecutionGrant: async (_grant, context) => ({ operationId: `operation-${context.requestId}`, resolvedCheckResult }),
     });
+    if (typeof beforeStart === 'function') await beforeStart({ runManager, engine });
     const args = { actor, viewer, environmentId: environment.id, taskId, requestId: 'start', executionGrant: 'grant' };
     let response = null;
     let error = null;
+    let maturedResult;
     try {
       response = versioned ? await engine.startVersionedRun(args) : await engine.startAttempt(args);
-      const waiting = runManager.getActiveRuns(actor)[0];
-      if (versioned && waiting) {
-        response = await engine.executeVersionedStage({ actor, runId: waiting.id, expectedRevision: waiting.runRevision, requestId: 'execute', executionGrant: 'grant' });
+      if (matureWorldTime != null) {
+        now = matureWorldTime;
+        if (typeof beforeMature === 'function') await beforeMature({ environment, task: environment.tasks.find((candidate) => candidate.id === taskId) ?? null, actor, runManager, engine });
+        if (versioned) {
+          const waiting = runManager.getActiveRuns(actor)[0];
+          maturedResult = await engine.executeVersionedStage({ actor, runId: waiting.id, expectedRevision: waiting.runRevision, requestId: 'mature', executionGrant: 'grant' });
+        } else {
+          maturedResult = await engine.processWorldTime(now);
+        }
+      } else {
+        const waiting = runManager.getActiveRuns(actor)[0];
+        if (versioned && waiting) {
+          response = await engine.executeVersionedStage({ actor, runId: waiting.id, expectedRevision: waiting.runRevision, requestId: 'execute', executionGrant: 'grant' });
+        }
       }
     } catch (failure) {
       error = { code: failure.code, message: failure.message };
@@ -156,9 +243,12 @@ export async function runRealGatheringAttempt({
     return {
       actor,
       response,
+      maturedResult,
       error,
       chat,
       publications,
+      stageJournal,
+      runManagerCalls,
       history: fresh.getRunHistory(actor),
       record: fresh.getRunHistory(actor)[0],
       project: ({ projectionViewer = viewer, ...builder } = {}) =>
@@ -187,7 +277,9 @@ export async function runRealGatheringAttempt({
  * Compose the system/environment/task trio {@link runRealGatheringAttempt} executes.
  *
  * @param {object} [options] Resolution `mode`, authored rows/groups, resolved `components`,
- * environment `selectionMode` and the system's `failureResultPolicy`.
+ * environment `selectionMode`, the system's `failureResultPolicy` and the task's
+ * `timeRequirement` — null resolves immediately; set, it waits and matures (see
+ * {@link runRealGatheringAttempt}'s `matureWorldTime`).
  */
 export function gatheringFixture({
   mode = 'd100',
@@ -199,6 +291,7 @@ export function gatheringFixture({
   chatOutput = false,
   taskName = 'Forage',
   taskImg = null,
+  timeRequirement = null,
 } = {}) {
   const task = {
     id: 'task-fixture',
@@ -207,7 +300,7 @@ export function gatheringFixture({
     enabled: true,
     resolutionMode: mode,
     toolIds: [],
-    timeRequirement: null,
+    timeRequirement,
     resultGroups,
     dropRows,
   };
