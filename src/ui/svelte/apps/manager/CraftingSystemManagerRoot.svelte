@@ -155,7 +155,11 @@
   // The shipped two-step destructive control, for the world Tool entry's header `Delete` (issue
   // 1373).
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
-  import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
+  import {
+    buildRouteExitGuards,
+    confirmRouteExitGuards,
+    runRouteExitGuard,
+  } from './routeExitGuards.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -2486,20 +2490,6 @@
     }
   }
 
-  /** The world tool entry editor's route-exit prompt. */
-  function confirmWorldToolEntryRouteExit(nextView, nextRouteId = '') {
-    if (activeView !== 'world-tool-entry') return true;
-    if (nextView === 'world-tool-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
-      return true;
-    }
-    return confirmScopedEntryExit({
-      dirty: worldToolEntryHandle?.isDirty() === true,
-      confirm: () => store?.confirmDiscardDirtyToolEntryDraft?.(),
-      save: () => saveWorldToolEntry(),
-      discard: () => worldToolEntryHandle?.discard?.(),
-    });
-  }
-
   /** THE WORLD COMPONENT ENTRY EDITOR'S DRAFT (issue 1371). */
   let worldComponentEntryHandle = null;
   let worldComponentEntryDirty = $state(false);
@@ -2557,20 +2547,6 @@
     }
   }
 
-  /** The world component entry editor's route-exit prompt. */
-  function confirmWorldComponentEntryRouteExit(nextView, nextRouteId = '') {
-    if (activeView !== 'world-component-entry') return true;
-    if (nextView === 'world-component-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
-      return true;
-    }
-    return confirmScopedEntryExit({
-      dirty: worldComponentEntryHandle?.isDirty() === true,
-      confirm: () => store?.confirmDiscardDirtyComponentDraft?.(),
-      save: () => saveWorldComponentEntry(),
-      discard: () => worldComponentEntryHandle?.discard?.(),
-    });
-  }
-
   /** Flush the world essence entry editor's buffered edit. */
   async function saveWorldEssenceEntry() {
     if (!worldEssenceEntryHandle) return false;
@@ -2580,20 +2556,6 @@
     } finally {
       worldEssenceEntrySaving = false;
     }
-  }
-
-  /** The world essence entry editor's route-exit prompt. */
-  function confirmWorldEssenceEntryRouteExit(nextView, nextRouteId = '') {
-    if (activeView !== 'world-essence-entry') return true;
-    if (nextView === 'world-essence-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
-      return true;
-    }
-    return confirmScopedEntryExit({
-      dirty: worldEssenceEntryHandle?.isDirty() === true,
-      confirm: () => store?.confirmDiscardDirtyEssenceDraft?.(),
-      save: () => saveWorldEssenceEntry(),
-      discard: () => worldEssenceEntryHandle?.discard?.(),
-    });
   }
 
   // Open an entry route ON a world entity.
@@ -3664,12 +3626,16 @@
   });
 
   $effect(() => {
-    services?.registerEssenceDirtyGuard?.(() => confirmEssenceRouteExit('close'));
+    services?.registerEssenceDirtyGuard?.(() =>
+      runRouteExitGuard(routeExitGuardFor('essence-edit'), 'close')
+    );
     return () => services?.registerEssenceDirtyGuard?.(null);
   });
 
   $effect(() => {
-    services?.registerToolDirtyGuard?.(() => confirmToolsRouteExit('close'));
+    services?.registerToolDirtyGuard?.(() =>
+      runRouteExitGuard(routeExitGuardFor('tool-edit'), 'close')
+    );
     return () => services?.registerToolDirtyGuard?.(null);
   });
 
@@ -4414,86 +4380,8 @@
     return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
   }
 
-  async function finishEnvironmentRouteExit(action) {
-    if (action === 'cancel' || action === false) return false;
-    if (action === 'save') {
-      const result = await store.saveEnvironmentDraft?.();
-      return !(result && result.ok === false);
-    }
-    await store.cancelEnvironmentDraft?.();
-    return true;
-  }
-
-  async function finishEssenceRouteExit(action) {
-    if (action === 'cancel' || action === false) return false;
-    if (action === 'save') {
-      if (!essenceEditDraft || essenceEditDraft.validName !== true) return false;
-      const result = await saveEssenceEdit(essenceEditDraft.id || null, essenceEditDraft.updates);
-      return result !== false;
-    }
-    // DISCARD.
-    essenceEditDirty = false;
-    essenceEditDraft = null;
-    store.cancelEssenceDraft?.();
-    return true;
-  }
-
-  // Apply the three-way discard choice for the identity sub-form and answer whether navigation may
-  // proceed (`true`) or must stay put (`false`).
-  async function finishSystemDetailsRouteExit(action) {
-    if (action === 'cancel' || action === false) return false;
-    if (action === 'save') {
-      const result = await store.saveSystemDetails?.(
-        systemDetailsDraft.name,
-        systemDetailsDraft.description
-      );
-      return result !== false;
-    }
-    // Discard: clear the dirty flag and bump the reseed nonce so `SystemEditView` reverts its local
-    // inputs to the persisted values, then let navigation proceed.
-    systemDetailsDirty = false;
-    systemDetailsReseedNonce += 1;
-    return true;
-  }
-
-  async function finishRecipeRouteExit(action) {
-    if (action === 'cancel' || action === false) return false;
-    if (action === 'save') {
-      const result = await saveRecipeDraft();
-      return result !== false;
-    }
-    // Discard: roll the draft back to the last-persisted baseline so the dirty
-    // flag clears, then let the caller proceed with navigation.
-    recipeDraft = cloneRecipeDraft(recipeDraftBaseline);
-    return true;
-  }
-
-  async function finishRecipeItemRouteExit(action) {
-    if (action === 'cancel' || action === false) return false;
-    if (action === 'save') {
-      const result = await saveRecipeItemDraft();
-      return result !== false;
-    }
-    // Discard: roll the draft back to the last-persisted baseline so the dirty
-    // flag clears, then let the caller proceed with navigation.
-    recipeItemDraft = cloneRecipeItemDraft(recipeItemDraftBaseline);
-    recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(recipeItemDraftBaseline);
-    return true;
-  }
-
-  async function finishComponentRouteExit(action) {
-    if (action === 'cancel' || action === false) return false;
-    if (action === 'save') {
-      if (!componentEditDraft || !componentEditDraft.id) return false;
-      const result = await saveComponentEdit(componentEditDraft.id, componentEditDraft.updates);
-      return result !== false;
-    }
-    componentEditDirty = false;
-    componentEditDraft = null;
-    return true;
-  }
-
-  async function finishGatheringTaskRouteExit(action, nextView) {
+  // The gathering finishers also run on the CLEAN path: both answers clear the draft and move on.
+  const finishGatheringTaskExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
       const saved = await saveGatheringTaskDraft();
@@ -4502,9 +4390,9 @@
     clearGatheringTaskDraft();
     if (nextView) activeView = nextView;
     return true;
-  }
+  };
 
-  async function finishGatheringEventRouteExit(action, nextView) {
+  const finishGatheringEventExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
       const saved = await saveGatheringEventDraft();
@@ -4513,57 +4401,215 @@
     clearGatheringEventDraft();
     if (nextView) activeView = nextView;
     return true;
+  };
+
+  // `subject` is the identity of what the caller is navigating TO, for the routes whose view token
+  // does not change when the subject does. `activeView` holds one token, so no two rows can be
+  // active at once, which is why the order between them is immaterial.
+  const routeExitGuards = buildRouteExitGuards({
+    'world-essence-entry': {
+      active: () => activeView === 'world-essence-entry',
+      subject: () => worldScopedEntryId,
+      isDirty: () => worldEssenceEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyEssenceDraft?.(),
+      save: () => saveWorldEssenceEntry(),
+      discard: () => worldEssenceEntryHandle?.discard?.(),
+    },
+    'world-tool-entry': {
+      active: () => activeView === 'world-tool-entry',
+      subject: () => worldScopedEntryId,
+      isDirty: () => worldToolEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyToolEntryDraft?.(),
+      save: () => saveWorldToolEntry(),
+      discard: () => worldToolEntryHandle?.discard?.(),
+    },
+    'world-component-entry': {
+      active: () => activeView === 'world-component-entry',
+      subject: () => worldScopedEntryId,
+      isDirty: () => worldComponentEntryHandle?.isDirty() === true,
+      confirm: () => store?.confirmDiscardDirtyComponentDraft?.(),
+      save: () => saveWorldComponentEntry(),
+      discard: () => worldComponentEntryHandle?.discard?.(),
+    },
+    'environment-edit': {
+      active: () => activeView === 'environment-edit',
+      isDirty: () => $viewState.environmentDraftDirty === true,
+      confirm: () => store.confirmDiscardDirtyEnvironmentDraft?.(),
+      finish: async (action) => {
+        if (action === 'cancel' || action === false) return false;
+        if (action === 'save') {
+          const result = await store.saveEnvironmentDraft?.();
+          return !(result && result.ok === false);
+        }
+        await store.cancelEnvironmentDraft?.();
+        return true;
+      },
+    },
+    // Criterion 23 (issue 1036): the guard compares the ESSENCE, not only the view token.
+    'essence-edit': {
+      active: () => activeView === 'essence-edit',
+      subject: () => selectedEssenceId,
+      isDirty: () => essenceEditDirty === true,
+      confirm: () => store.confirmDiscardDirtyEssenceDraft?.(),
+      finish: async (action) => {
+        if (action === 'cancel' || action === false) return false;
+        if (action === 'save') {
+          if (!essenceEditDraft || essenceEditDraft.validName !== true) return false;
+          const saved = await saveEssenceEdit(
+            essenceEditDraft.id || null,
+            essenceEditDraft.updates
+          );
+          return saved !== false;
+        }
+        essenceEditDirty = false;
+        essenceEditDraft = null;
+        store.cancelEssenceDraft?.();
+        return true;
+      },
+    },
+    'recipe-edit': {
+      active: () => activeView === 'recipe-edit',
+      isDirty: () => recipeEditDirty === true,
+      confirm: () => store.confirmDiscardDirtyRecipeDraft?.(),
+      finish: async (action) => {
+        if (action === 'cancel' || action === false) return false;
+        if (action === 'save') {
+          const saved = await saveRecipeDraft();
+          return saved !== false;
+        }
+        // Discard: roll the draft back to the last-persisted baseline so the dirty flag clears.
+        recipeDraft = cloneRecipeDraft(recipeDraftBaseline);
+        return true;
+      },
+    },
+    'recipe-item-edit': {
+      active: () => activeView === 'recipe-item-edit',
+      isDirty: () => recipeItemEditDirty === true,
+      confirm: () => store.confirmDiscardDirtyRecipeItemDraft?.(),
+      finish: async (action) => {
+        if (action === 'cancel' || action === false) return false;
+        if (action === 'save') {
+          const saved = await saveRecipeItemDraft();
+          return saved !== false;
+        }
+        recipeItemDraft = cloneRecipeItemDraft(recipeItemDraftBaseline);
+        recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(recipeItemDraftBaseline);
+        return true;
+      },
+    },
+    'component-edit': {
+      active: () => activeView === 'component-edit',
+      isDirty: () => componentEditCombinedDirty === true,
+      confirm: () => store.confirmDiscardDirtyComponentDraft?.(),
+      finish: async (action) => {
+        if (action === 'cancel' || action === false) return false;
+        if (action === 'save') {
+          if (!componentEditDraft || !componentEditDraft.id) return false;
+          const saved = await saveComponentEdit(componentEditDraft.id, componentEditDraft.updates);
+          return saved !== false;
+        }
+        componentEditDirty = false;
+        componentEditDraft = null;
+        return true;
+      },
+    },
+    'gathering-task-edit': {
+      active: () => activeView === 'gathering-task-edit',
+      isDirty: () => gatheringTaskDraftDirty,
+      whenClean: (nextView) => finishGatheringTaskExit(true, nextView),
+      confirm: () => store.confirmDiscardDirtyGatheringTaskDraft?.(),
+      finish: finishGatheringTaskExit,
+    },
+    'gathering-event-edit': {
+      active: () => activeView === 'gathering-event-edit',
+      isDirty: () => gatheringEventDraftDirty,
+      whenClean: (nextView) => finishGatheringEventExit(true, nextView),
+      confirm: () => store.confirmDiscardDirtyGatheringEventDraft?.(),
+      finish: finishGatheringEventExit,
+    },
+    'tool-edit': {
+      active: () => activeView === 'tool-edit',
+      subject: () => String(focusedToolDraft?.id || ''),
+      isDirty: () => $viewState.toolDraftDirty === true,
+      whenClean: () => {
+        store?.cancelToolsDraft?.();
+        return true;
+      },
+      confirm: () =>
+        services?.confirmDirtyToolsNavigation
+          ? services.confirmDirtyToolsNavigation({ toolId: String(focusedToolDraft?.id || '') })
+          : store?.confirmDiscardDirtyToolsDraft?.(),
+      finish: async (action) => {
+        if (action === 'save') {
+          const saved = await store?.saveToolDraft?.();
+          if (saved === false) {
+            surfaceToolsSaveValidationError();
+            return false;
+          }
+          store?.cancelToolsDraft?.();
+          return true;
+        }
+        if (action === 'discard' || action === true) {
+          store?.discardToolDraft?.();
+          store?.cancelToolsDraft?.();
+          return true;
+        }
+        return false;
+      },
+    },
+    // The Checks Studio's route-exit prompt (issue 1096); its route is a FAMILY of tabs.
+    checks: {
+      active: () => isChecksRoute,
+      family: (nextView) => isChecksView(nextView),
+      isDirty: () => checksDirty,
+      confirm: () =>
+        store?.confirmDiscardDirtyChecksDraft?.(
+          checksDirtyActivities.map((activity) =>
+            text(
+              `FABRICATE.Admin.Manager.Checks.Tabs.${activity[0].toUpperCase()}${activity.slice(1)}`,
+              activity
+            )
+          )
+        ),
+      finish: async (action) => {
+        // Navigation is gated on the SAVE, as the essence and system-details guards gate theirs.
+        if (action === 'save') return await saveChecks();
+        if (action === 'discard' || action === true) {
+          discardChecksDrafts();
+          return true;
+        }
+        return false;
+      },
+    },
+    'system-edit': {
+      active: () => activeView === 'system-edit',
+      isDirty: () => systemDetailsDirty === true,
+      confirm: () => store.confirmDiscardDirtySystemDetailsDraft?.(),
+      finish: async (action) => {
+        if (action === 'cancel' || action === false) return false;
+        if (action === 'save') {
+          const saved = await store.saveSystemDetails?.(
+            systemDetailsDraft.name,
+            systemDetailsDraft.description
+          );
+          return saved !== false;
+        }
+        // Discard: bump the reseed nonce so `SystemEditView` reverts its inputs to the persisted
+        // values.
+        systemDetailsDirty = false;
+        systemDetailsReseedNonce += 1;
+        return true;
+      },
+    },
+  });
+
+  function routeExitGuardFor(view) {
+    return routeExitGuards.find((row) => row.view === view);
   }
 
-  function confirmGatheringEventRouteExit(nextView) {
-    if (activeView !== 'gathering-event-edit') return true;
-    if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true, nextView);
-    const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
-    if (isPromise(confirmed))
-      return confirmed.then((action) => finishGatheringEventRouteExit(action, nextView));
-    return finishGatheringEventRouteExit(confirmed, nextView);
-  }
-
-  function confirmComponentRouteExit(_nextView) {
-    if (activeView !== 'component-edit') return true;
-    if (componentEditCombinedDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishComponentRouteExit);
-    return finishComponentRouteExit(confirmed);
-  }
-
-  function confirmEnvironmentRouteExit(nextView) {
-    if (activeView !== 'environment-edit' || nextView === 'environment-edit') return true;
-    if ($viewState.environmentDraftDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyEnvironmentDraft?.();
-    if (isPromise(confirmed)) return confirmed.then(finishEnvironmentRouteExit);
-    return finishEnvironmentRouteExit(confirmed);
-  }
-
-  // The SAME-VIEW SKIP (issue 1036, criterion 23), comparing the ESSENCE and not only the view
-  // token.
-  function confirmEssenceRouteExit(nextView, nextEssenceId = '') {
-    if (activeView !== 'essence-edit') return true;
-    if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)
-      return true;
-    if (essenceEditDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
-    return finishEssenceRouteExit(confirmed);
-  }
-
+  // Asked with no destination: the row's same-view skip is what the caller below has ruled out.
   function runSystemDetailsDiscardPrompt() {
-    const confirmed = store.confirmDiscardDirtySystemDetailsDraft?.() ?? 'cancel';
-    if (isPromise(confirmed)) return confirmed.then(finishSystemDetailsRouteExit);
-    return finishSystemDetailsRouteExit(confirmed);
-  }
-
-  // Same-view navigation keeps the identity form mounted on the SAME system, so the lifted draft
-  // survives and must NOT prompt.
-  function confirmSystemDetailsRouteExit(nextView) {
-    if (activeView !== 'system-edit' || nextView === 'system-edit') return true;
-    if (systemDetailsDirty !== true) return true;
-    return runSystemDetailsDiscardPrompt();
+    return runRouteExitGuard(routeExitGuardFor('system-edit'), '');
   }
 
   // Scope-select swaps the SYSTEM while keeping the view token, so the same-view skip above would
@@ -4572,94 +4618,6 @@
     if (activeView !== 'system-edit') return true;
     if (systemId === selectedSystemId || systemDetailsDirty !== true) return true;
     return runSystemDetailsDiscardPrompt();
-  }
-
-  function confirmRecipeRouteExit(nextView) {
-    if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;
-    if (recipeEditDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyRecipeDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishRecipeRouteExit);
-    return finishRecipeRouteExit(confirmed);
-  }
-
-  function confirmRecipeItemRouteExit(nextView) {
-    if (activeView !== 'recipe-item-edit' || nextView === 'recipe-item-edit') return true;
-    if (recipeItemEditDirty !== true) return true;
-    const confirmed = store.confirmDiscardDirtyRecipeItemDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishRecipeItemRouteExit);
-    return finishRecipeItemRouteExit(confirmed);
-  }
-
-  function confirmGatheringTaskRouteExit(nextView) {
-    if (activeView !== 'gathering-task-edit') return true;
-    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true, nextView);
-    const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
-    if (isPromise(confirmed))
-      return confirmed.then((action) => finishGatheringTaskRouteExit(action, nextView));
-    return finishGatheringTaskRouteExit(confirmed, nextView);
-  }
-
-  // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the routes whose
-  // view token does not change when the subject does.
-  function confirmRouteExitGuards(nextView, nextRouteId = '') {
-    // THE WORLD SCOPED-ENTRY EDITORS ARE ASKED FIRST, and the order is immaterial rather than
-    // arbitrary: every guard below is gated on an `activeView` that a world route cannot also be.
-    const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit(nextView, nextRouteId);
-    if (isPromise(worldEntryConfirmed)) {
-      return worldEntryConfirmed.then((value) =>
-        value === false ? false : confirmWorldToolEntryExitThenRest(nextView, nextRouteId)
-      );
-    }
-    if (worldEntryConfirmed === false) return false;
-    return confirmWorldToolEntryExitThenRest(nextView, nextRouteId);
-  }
-
-  function confirmWorldToolEntryExitThenRest(nextView, nextRouteId = '') {
-    const toolEntryConfirmed = confirmWorldToolEntryRouteExit(nextView, nextRouteId);
-    if (isPromise(toolEntryConfirmed)) {
-      return toolEntryConfirmed.then((value) =>
-        value === false ? false : confirmWorldComponentEntryExitThenRest(nextView, nextRouteId)
-      );
-    }
-    if (toolEntryConfirmed === false) return false;
-    return confirmWorldComponentEntryExitThenRest(nextView, nextRouteId);
-  }
-
-  // THE THIRD ENTRY EDITOR IN THE SAME CHAIN (issue 1371).
-  function confirmWorldComponentEntryExitThenRest(nextView, nextRouteId = '') {
-    const componentEntryConfirmed = confirmWorldComponentEntryRouteExit(nextView, nextRouteId);
-    if (isPromise(componentEntryConfirmed)) {
-      return componentEntryConfirmed.then((value) =>
-        value === false ? false : continueRouteExitAfterWorldEntry(nextView, nextRouteId)
-      );
-    }
-    if (componentEntryConfirmed === false) return false;
-    return continueRouteExitAfterWorldEntry(nextView, nextRouteId);
-  }
-
-  function continueRouteExitAfterWorldEntry(nextView, nextRouteId = '') {
-    const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
-    if (isPromise(environmentConfirmed)) {
-      return environmentConfirmed.then((value) => {
-        if (value === false) return false;
-        const essenceResult = confirmEssenceRouteExit(nextView, nextRouteId);
-        if (isPromise(essenceResult)) {
-          return essenceResult.then((essenceValue) =>
-            essenceValue === false ? false : continueRouteExitAfterEssence(nextView)
-          );
-        }
-        return essenceResult === false ? false : continueRouteExitAfterEssence(nextView);
-      });
-    }
-    if (environmentConfirmed === false) return false;
-    const essenceResult = confirmEssenceRouteExit(nextView, nextRouteId);
-    if (isPromise(essenceResult)) {
-      return essenceResult.then((value) =>
-        value === false ? false : continueRouteExitAfterEssence(nextView)
-      );
-    }
-    if (essenceResult === false) return false;
-    return continueRouteExitAfterEssence(nextView);
   }
 
   /**
@@ -4677,7 +4635,7 @@
 
   /** Core's own route-exit cascade, plus the Downtime host disposal that follows it. */
   function finishRouteExit(nextView, nextRouteId) {
-    const result = confirmRouteExitGuards(nextView, nextRouteId);
+    const result = confirmRouteExitGuards(routeExitGuards, nextView, nextRouteId);
     if (activeView !== 'world-downtime' || nextView === 'world-downtime') return result;
 
     // Keep the original route-guard promise identity.
@@ -4702,84 +4660,6 @@
     return companion === false ? false : finishRouteExit(nextView, nextRouteId);
   }
 
-  function continueRouteExitAfterEssence(nextView) {
-    const recipeResult = confirmRecipeRouteExit(nextView);
-    if (isPromise(recipeResult)) {
-      return recipeResult.then((value) =>
-        value === false ? false : continueRouteExitAfterRecipe(nextView)
-      );
-    }
-    if (recipeResult === false) return false;
-    return continueRouteExitAfterRecipe(nextView);
-  }
-
-  function continueRouteExitAfterRecipe(nextView) {
-    const recipeItemResult = confirmRecipeItemRouteExit(nextView);
-    if (isPromise(recipeItemResult)) {
-      return recipeItemResult.then((value) =>
-        value === false ? false : continueRouteExitAfterRecipeItem(nextView)
-      );
-    }
-    if (recipeItemResult === false) return false;
-    return continueRouteExitAfterRecipeItem(nextView);
-  }
-
-  function continueRouteExitAfterRecipeItem(nextView) {
-    const componentResult = confirmComponentRouteExit(nextView);
-    if (isPromise(componentResult)) {
-      return componentResult.then((value) =>
-        value === false ? false : continueRouteExitAfterComponent(nextView)
-      );
-    }
-    if (componentResult === false) return false;
-    return continueRouteExitAfterComponent(nextView);
-  }
-
-  function continueRouteExitAfterComponent(nextView) {
-    const taskResult = confirmGatheringTaskRouteExit(nextView);
-    if (isPromise(taskResult)) {
-      return taskResult.then((value) =>
-        value === false ? false : continueRouteExitAfterTask(nextView)
-      );
-    }
-    if (taskResult === false) return false;
-    return continueRouteExitAfterTask(nextView);
-  }
-
-  function continueRouteExitAfterTask(nextView) {
-    const eventResult = confirmGatheringEventRouteExit(nextView);
-    if (isPromise(eventResult)) {
-      return eventResult.then((value) =>
-        value === false ? false : continueRouteExitAfterTools(nextView)
-      );
-    }
-    if (eventResult === false) return false;
-    return continueRouteExitAfterTools(nextView);
-  }
-
-  // Tail of the route-exit cascade: tools, then system-details.
-  function continueRouteExitAfterTools(nextView) {
-    const toolsResult = confirmToolsRouteExit(nextView);
-    if (isPromise(toolsResult)) {
-      return toolsResult.then((value) =>
-        value === false ? false : continueRouteExitAfterChecks(nextView)
-      );
-    }
-    if (toolsResult === false) return false;
-    return continueRouteExitAfterChecks(nextView);
-  }
-
-  function continueRouteExitAfterChecks(nextView) {
-    const checksResult = confirmChecksRouteExit(nextView);
-    if (isPromise(checksResult)) {
-      return checksResult.then((value) =>
-        value === false ? false : confirmSystemDetailsRouteExit(nextView)
-      );
-    }
-    if (checksResult === false) return false;
-    return confirmSystemDetailsRouteExit(nextView);
-  }
-
   /** Reset every check draft to its last saved baseline. */
   function discardChecksDrafts() {
     alchemyCheckModeDraft = alchemyCheckModeBaseline;
@@ -4796,71 +4676,10 @@
     gatheringRoutedDraft = cloneRoutedCheck(gatheringRoutedBaseline);
   }
 
-  async function finishChecksRouteExit(action) {
-    if (action === 'save') {
-      // Navigation is gated on the SAVE, exactly as the essence and system-details guards gate
-      // theirs.
-      return await saveChecks();
-    }
-    if (action === 'discard' || action === true) {
-      discardChecksDrafts();
-      return true;
-    }
-    return false;
-  }
-
-  /** The Checks Studio's route-exit prompt (issue 1096). */
-  function confirmChecksRouteExit(nextView) {
-    if (!isChecksRoute || isChecksView(nextView)) return true;
-    if (!checksDirty) return true;
-    const names = checksDirtyActivities.map((activity) =>
-      text(
-        `FABRICATE.Admin.Manager.Checks.Tabs.${activity[0].toUpperCase()}${activity.slice(1)}`,
-        activity
-      )
-    );
-    const confirmation = store?.confirmDiscardDirtyChecksDraft?.(names);
-    if (isPromise(confirmation)) return confirmation.then(finishChecksRouteExit);
-    return finishChecksRouteExit(confirmation);
-  }
-
   function surfaceToolsSaveValidationError() {
     toolEditorActiveTab = 'validation';
     toolValidationFocusNonce += 1;
     notifyWarn(localize('FABRICATE.Admin.Manager.Tools.SaveBlockedInvalid'));
-  }
-
-  async function finishToolsRouteExit(action) {
-    if (action === 'save') {
-      const saved = await store?.saveToolDraft?.();
-      if (saved === false) {
-        surfaceToolsSaveValidationError();
-        return false;
-      }
-      store?.cancelToolsDraft?.();
-      return true;
-    }
-    if (action === 'discard' || action === true) {
-      store?.discardToolDraft?.();
-      store?.cancelToolsDraft?.();
-      return true;
-    }
-    return false;
-  }
-
-  function confirmToolsRouteExit(nextView, nextToolId = '') {
-    if (activeView !== 'tool-edit') return true;
-    const currentToolId = String(focusedToolDraft?.id || '');
-    if (nextView === 'tool-edit' && nextToolId && nextToolId === currentToolId) return true;
-    if ($viewState.toolDraftDirty !== true) {
-      store?.cancelToolsDraft?.();
-      return true;
-    }
-    const confirmation = services?.confirmDirtyToolsNavigation
-      ? services.confirmDirtyToolsNavigation({ toolId: currentToolId })
-      : store?.confirmDiscardDirtyToolsDraft?.();
-    if (isPromise(confirmation)) return confirmation.then(finishToolsRouteExit);
-    return finishToolsRouteExit(confirmation);
   }
 
   function setView(view) {
@@ -7109,7 +6928,7 @@
     const id = String(toolId || '');
     if (!id) return false;
     if (currentView === 'tool-edit' && String(focusedToolDraft?.id || '') === id) return true;
-    afterTruthyResult(confirmToolsRouteExit('tool-edit', id), () => {
+    afterTruthyResult(runRouteExitGuard(routeExitGuardFor('tool-edit'), 'tool-edit', id), () => {
       if (store?.openToolDraft?.(id, selectedSystemId) === false) return;
       enterToolEditor();
     });
