@@ -25,13 +25,10 @@ import {
   DEFAULT_INTERACTABLE_IMG,
   canControlActor,
   dropPoint,
-  eventToken,
   firstInteractableBehavior,
   gridSizeFrom,
   iconTextureFor,
-  ownsToken,
   regionRectangleFor,
-  sceneTokenDocs,
   screenCenterToScene,
   shouldPromptForEnter,
   tokenInsideRegion,
@@ -44,19 +41,22 @@ import {
 } from './interactableResolution.js';
 import { INTERACTABLE_SOCKET } from './interactableSocket.js';
 import {
+  interactHere,
+  onRegionEnter as raiseEnterPrompt,
+  onRegionExit as dismissExitPrompt,
+  promptForTokenInsideRegion as promptInsideRegion,
+  repromptAfterClose,
+} from './regionEnterPrompt.js';
+import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
-  selectRepromptTokenDoc,
 } from './regionHitTest.js';
 import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
-import { shouldPromptOnEnter } from './regions/interactableRegionActivation.js';
 import {
   buildInteractableBehaviorSystem,
-  readInteractableBehaviorSystem,
   isInteractableRegionBehavior,
   buildLinkedVisualFlags,
 } from './regions/interactableRegionFlags.js';
-import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
 
 /** Client keybinding id for the "interact here" re-trigger. */
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
@@ -67,6 +67,25 @@ const INTERACT_KEYBINDING = 'fabricateInteractHere';
  * `game`, `canvas`, `ui.notifications` or `game.time` exist, so a captured value is permanently
  * undefined in production and no test that installs its fakes first can see it.
  */
+function promptCollaborators(manager) {
+  return {
+    getPromptAppClass: () => manager._getPromptAppClass?.(),
+    currentUser: () => globalThis.game?.user,
+    currentUserId: () => globalThis.game?.user?.id ?? null,
+    viewedScene: () => globalThis.canvas?.scene,
+    getScene: (sceneId) => globalThis.game?.scenes?.get?.(String(sceneId)),
+    controlledTokens: () => globalThis.canvas?.tokens?.controlled ?? [],
+    requestActivation: (behavior, ctx) => manager._requestActivation(behavior, ctx),
+    behaviorsContainingToken: (token) =>
+      interactableBehaviorsContainingToken({
+        scene: globalThis.canvas?.scene,
+        token,
+        isInteractableBehavior: isInteractableRegionBehavior,
+      }),
+    promptForTokenInsideRegion: (token) => manager._promptForTokenInsideRegion(token),
+  };
+}
+
 function grantCollaborators(manager) {
   return {
     getAppClass: () => manager._getAppClass?.(),
@@ -104,6 +123,7 @@ class InteractableManager {
     this._regionEnvironmentIdsAtPoint = regionHitTest;
     this._promptDropEnvironment = promptEnvironment;
     this._grantDeps = grantCollaborators(this);
+    this._promptDeps = promptCollaborators(this);
     // Bind hook bodies once so they can be added/removed by identity.
     this._onDrop = this._onDrop.bind(this);
     this._onControlToken = this._onControlToken.bind(this);
@@ -377,50 +397,14 @@ class InteractableManager {
 
   // --- Activation: region enter / exit ---------------------------------------
 
-  /**
-   * `tokenEnter` seam, on every client. Prompts per {@link _shouldPromptForEnter} when the
-   * behaviour is `regionEnter`-triggered and currently visible.
-   */
+  /** `tokenEnter` seam, on every client: raise the Interact prompt where it belongs. */
   onRegionEnter(event, behavior) {
-    const system = readInteractableBehaviorSystem(behavior);
-    if (!system) return;
-    if (system.activation?.trigger !== 'regionEnter') return;
-
-    const token = eventToken(event);
-    if (!this._shouldPromptForEnter(event, token)) return;
-
-    // Gate the PROMPT on VISIBILITY, not eligibility: a LOCKED interactable still prompts, and
-    // Interact routes the localized denial. Only DISABLED or HIDDEN suppresses it.
-    if (!shouldPromptOnEnter(system)) return;
-
-    const ref = identifyRegionBehaviorRef(behavior);
-    if (!ref) return;
-    const actorId = token?.actor?.id ?? token?.actorId ?? null;
-
-    const PromptApp = this._getPromptAppClass?.();
-    void PromptApp?.show?.({
-      behaviorRef: `${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`,
-      name: system.name || '',
-      promptText: system.presentation?.promptText ?? null,
-      onInteract: () =>
-        this._requestActivation(behavior, {
-          actorId,
-          userId: globalThis.game?.user?.id ?? null,
-          activationSource: 'regionEnter',
-        }),
-    });
+    raiseEnterPrompt(event, behavior, this._promptDeps);
   }
 
-  /**
-   * `tokenExit` seam: dismiss UNCONDITIONALLY. `PromptApp.dismiss(ref)` is ref-matched and a no-op
-   * elsewhere, so the showing clients drop it however the token left — the stale-prompt case where
-   * a GM staged a player's token and the player walks out.
-   */
-  onRegionExit(_event, behavior) {
-    const ref = identifyRegionBehaviorRef(behavior);
-    if (!ref) return;
-    const PromptApp = this._getPromptAppClass?.();
-    void PromptApp?.dismiss?.(`${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`);
+  /** `tokenExit` seam: dismiss by ref on every client, however the token left. */
+  onRegionExit(event, behavior) {
+    dismissExitPrompt(event, behavior, this._promptDeps);
   }
 
   /** `controlToken` re-trigger for a token already inside, which `tokenEnter` never fires for. */
@@ -429,47 +413,16 @@ class InteractableManager {
     this._promptForTokenInsideRegion(tokenPlaceable);
   }
 
-  /** Keybinding "interact here": prompt for the controlled token's eligible region. */
   _interactHere() {
-    const controlled = globalThis.canvas?.tokens?.controlled ?? [];
-    const token = (Array.isArray(controlled) ? controlled : [])[0] ?? null;
-    if (!token) return;
-    this._promptForTokenInsideRegion(token);
+    interactHere(this._promptDeps);
   }
 
-  /** Shared re-trigger body: {@link onRegionEnter} driven by control rather than a region event. */
   _promptForTokenInsideRegion(tokenPlaceable) {
-    const tokenDoc = tokenPlaceable?.document ?? tokenPlaceable;
-    if (!tokenDoc) return;
-    if (!ownsToken(tokenDoc, { isGM: globalThis.game?.user?.isGM === true })) return;
-    const scene = globalThis.canvas?.scene;
-    const matches = interactableBehaviorsContainingToken({
-      scene,
-      token: tokenPlaceable,
-      isInteractableBehavior: isInteractableRegionBehavior,
-    });
-    for (const { behavior } of matches) {
-      const system = readInteractableBehaviorSystem(behavior);
-      if (!system || system.activation?.trigger !== 'regionEnter') continue;
-      // VISIBILITY gate, as in onRegionEnter: a locked interactable still re-prompts.
-      if (!shouldPromptOnEnter(system)) continue;
-      const ref = identifyRegionBehaviorRef(behavior);
-      if (!ref) continue;
-      const actorId = tokenDoc?.actor?.id ?? tokenDoc?.actorId ?? null;
-      const PromptApp = this._getPromptAppClass?.();
-      void PromptApp?.show?.({
-        behaviorRef: `${ref.sceneId}.${ref.regionId}.${ref.behaviorId}`,
-        name: system.name || '',
-        promptText: system.presentation?.promptText ?? null,
-        onInteract: () =>
-          this._requestActivation(behavior, {
-            actorId,
-            userId: globalThis.game?.user?.id ?? null,
-            activationSource: 'regionEnter',
-          }),
-      });
-      return; // one prompt at a time.
-    }
+    promptInsideRegion(tokenPlaceable, this._promptDeps);
+  }
+
+  _repromptAfterInteractableClose(args = {}) {
+    repromptAfterClose(args, this._promptDeps);
   }
 
   // --- Activation: request / validate-grant / open ---------------------------
@@ -484,34 +437,6 @@ class InteractableManager {
 
   openGrant(payload) {
     openGrantLocally(payload, this._grantDeps);
-  }
-
-  /**
-   * Re-raise the prompt after a gathering session closes, iff the token is still inside (issue
-   * 332), through {@link _promptForTokenInsideRegion}. No-throw: a close-handler error must never
-   * break the app close.
-   */
-  _repromptAfterInteractableClose({ ref, actorId } = {}) {
-    try {
-      if (!ref || typeof ref !== 'object') return;
-      const sceneId = ref.sceneId ?? null;
-      if (!sceneId || !actorId) return;
-      const scene =
-        globalThis.game?.scenes?.get?.(String(sceneId)) ??
-        (String(globalThis.canvas?.scene?.id ?? '') === String(sceneId)
-          ? globalThis.canvas?.scene
-          : null);
-      // Only re-prompt for the scene being viewed; the toast and hit-test target the active canvas.
-      if (!scene || String(globalThis.canvas?.scene?.id ?? '') !== String(scene.id ?? sceneId)) {
-        return;
-      }
-      const tokenDoc = selectRepromptTokenDoc(sceneTokenDocs(scene), actorId);
-      if (!tokenDoc) return;
-      // Prefer the live placeable for its canvas centre; the document still resolves one.
-      this._promptForTokenInsideRegion(tokenDoc.object ?? tokenDoc);
-    } catch {
-      // Defensive: never let a re-prompt failure break the window close.
-    }
   }
 
   /** Local-user body for `interactableActivationDenied`: warn WHY. No-throw. */
