@@ -53,7 +53,7 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1239
 src/utils	944
 styles	1054
-tests	19934
+tests	19942
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
@@ -64,7 +64,7 @@ tests/fixtures/manager-select	25
 tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
-tests/helpers	4337
+tests/helpers	4382
 tests/helpers/manager	307
 tests/helpers/scale	622
 tests/journal	157
