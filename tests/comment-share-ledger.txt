@@ -13,7 +13,7 @@ src/integrations	20
 src/migration	1353
 src/models	460
 src/models/match	66
-src/systems	25622
+src/systems	25649
 src/ui	1109
 src/ui/model	414
 src/ui/presenters	3486
@@ -52,7 +52,7 @@ src/ui/svelte/stores	4526
 src/ui/svelte/util	1218
 src/utils	944
 styles	1042
-tests	19616
+tests	19618
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
@@ -68,7 +68,7 @@ tests/helpers/manager	300
 tests/helpers/scale	622
 tests/journal	157
 tests/stores	1529
-tests/systems	328
+tests/systems	357
 tests/util	379
 tests/view-lab	413
 tests/view-lab/foundry	269

@@ -52,8 +52,8 @@ src/systems/GatheringRichStateService.js::composeEnvironment	119
 src/systems/GatheringRichStateService.js::previewDropBreakdown	125
 src/systems/GatheringRichStateService.js::resolveD100Attempt	106
 src/systems/GatheringRunManager.js	950
-src/systems/RecipeManager.js	2577
-src/systems/RecipeManager.js::evaluateCraftability	245
+src/systems/RecipeManager.js	1764
+src/systems/RecipeManager.js::evaluateCraftability	234
 src/systems/RecipeVisibilityService.js	2559
 src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	141
 src/systems/ResolutionModeService.js	1023
