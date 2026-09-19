@@ -217,12 +217,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  // 106/117 as of issue 1672. `src/models/IngredientSet.js` left the FILE list when the solver
-  // moved behind `createIngredientSolver`, taking it from 815 lines to under the threshold.
-  // 106/117 as of issue 1695. `inventoryStore.svelte.js` left the FILE list entirely — splitting
-  // the salvage-execution and bulk-actions sub-stores out of it took it from 1,536 lines to 607 —
-  // while the function list traded its 137-line `salvage` (now four functions, none over 100) for
-  // the two new sub-store factories, which are oversized as factories and nothing else.
-  assert.equal(files, 106, 'oversized files');
-  assert.equal(keys.length - files, 117, 'oversized functions');
+  // 105/116 as of issue 1704, which split `src/canvas/InteractableManager.js` into four pure
+  // modules behind a composing manager: the file fell from 901 lines to under the 800-line
+  // threshold and `_spawnInteractableRegion` fell from 107 lines to under the 100-line one, so
+  // both rows left the ledger and no successor crossed either threshold.
+  assert.equal(files, 105, 'oversized files');
+  assert.equal(keys.length - files, 116, 'oversized functions');
 });
