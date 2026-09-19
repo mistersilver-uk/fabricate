@@ -77,10 +77,6 @@ const componentsBrowserPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
 );
-const componentRowPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/components/ComponentRow.svelte'
-);
 const environmentEditPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'
@@ -160,7 +156,6 @@ const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
 const recipeBrowserInspectorSource = readFileSync(recipeBrowserInspectorPath, 'utf8');
 const componentEditSource = readFileSync(componentEditPath, 'utf8');
 const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
-const componentRowSource = readFileSync(componentRowPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
@@ -380,35 +375,26 @@ function callsWithArgument(node, [name, argument]) {
   return false;
 }
 
-/**
- * A repo-relative path, optionally narrowed to one class member and one of its properties — the
- * AST equivalent of the bounded text slice it replaces — with the claims its kind can answer.
- */
-function structureOf(target) {
-  const { file, member, property } = typeof target === 'string' ? { file: target } : target;
-  if (file.endsWith('.svelte')) {
-    const component = componentAstOf(file);
-    const scope = componentScopeOf(file);
-    return {
-      renders: (name) => rendersComponent(component, name),
-      imports: (specifier) => importsModule(component, specifier),
-      declares: (name) => declaredConstant(component, name),
-      names: (name) => referencesIdentifier(component, name),
-      spells: (text) => containsLiteral(component, text),
-      spellsExactly: (text) => spellsLiteral(component, text),
-      global: (name) => readsGlobal(scope, name),
-      prop: ([name, propName]) => passesProp(component, name, propName),
-      reads: (path) => memberPaths(component).includes(path),
-      calls: (name) => callNames(component).has(name),
-      callsWith: (pair) => callsWithArgument(component, pair),
-      compares: (value) => comparesToLiteral(component, value),
-      declaresProp: (name) => declaresProp(component, name),
-      requiresProp: (name) => requiresProp(component, name),
-    };
+/** One named function out of a component's instance script, declared or assigned to a binding. */
+function componentFunctionAst(ast, name) {
+  for (const node of walkNodes(ast.instance ?? {})) {
+    if (node.type === 'FunctionDeclaration' && node.id?.name === name) return node;
+    if (node.type === 'VariableDeclarator' && node.id?.name === name && node.init) return node.init;
   }
-  const { ast } = moduleAstOf(file);
-  let code = member ? classMemberAst(ast, member) : ast;
-  if (property) code = propertyAst(code, property);
+  throw new Error(`no function \`${name}\``);
+}
+
+/** The static value one element or component gives an attribute, or `undefined`. */
+function attributeValue(node, name) {
+  const attribute = (node.attributes ?? []).find(
+    (candidate) => candidate.type === 'Attribute' && candidate.name === name
+  );
+  const [chunk] = Array.isArray(attribute?.value) ? attribute.value : [];
+  return chunk?.type === 'Text' ? chunk.data : undefined;
+}
+
+/** The claims any plain code subtree answers: a module, a class member, or one function body. */
+function claimsOverCode(code) {
   return {
     imports: (specifier) => importsModuleOf(code, specifier),
     importsLazily: (specifier) => importsModuleLazily(code, specifier),
@@ -425,6 +411,39 @@ function structureOf(target) {
     diffKeys: ([object, key]) => inOperatorKeys(code, object).has(key),
     compares: (value) => comparesToLiteral(code, value),
   };
+}
+
+/**
+ * A repo-relative path, optionally narrowed to one class member and one of its properties, or to
+ * one function of a component — the AST equivalent of the bounded text slice it replaces — with
+ * the claims its kind can answer.
+ */
+function structureOf(target) {
+  const { file, member, property, fn } = typeof target === 'string' ? { file: target } : target;
+  if (file.endsWith('.svelte')) {
+    const component = componentAstOf(file);
+    if (fn) return claimsOverCode(componentFunctionAst(component, fn));
+    const scope = componentScopeOf(file);
+    return {
+      ...claimsOverCode(component),
+      renders: (name) => rendersComponent(component, name),
+      imports: (specifier) => importsModule(component, specifier),
+      declares: (name) => declaredConstant(component, name),
+      names: (name) => referencesIdentifier(component, name),
+      spells: (text) => containsLiteral(component, text),
+      spellsExactly: (text) => spellsLiteral(component, text),
+      global: (name) => readsGlobal(scope, name),
+      prop: ([name, propName]) => passesProp(component, name, propName),
+      attribute: ([name, value]) =>
+        templateNodes(component).some((node) => attributeValue(node, name) === value),
+      declaresProp: (name) => declaresProp(component, name),
+      requiresProp: (name) => requiresProp(component, name),
+    };
+  }
+  const { ast } = moduleAstOf(file);
+  let code = member ? classMemberAst(ast, member) : ast;
+  if (property) code = propertyAst(code, property);
+  return claimsOverCode(code);
 }
 
 /** Each claim a contract row may make: the question to ask, and the answer it must get. */
@@ -459,6 +478,8 @@ const CONTRACT_CLAIMS = Object.freeze({
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
   passesPropsNo: { ask: 'prop', holds: false, says: ([c, p]) => `passes no ${p} to <${c}>` },
+  attributes: { ask: 'attribute', holds: true, says: ([a, v]) => `writes ${a}="${v}"` },
+  attributesNo: { ask: 'attribute', holds: false, says: ([a, v]) => `writes no ${a}="${v}"` },
   readsNoGlobal: { ask: 'global', holds: false, says: (v) => `reads no ${v} global directly` },
 });
 
@@ -469,6 +490,9 @@ const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensio
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
+const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
+const COMPONENT_ROW = 'src/ui/svelte/apps/manager/components/ComponentRow.svelte';
+const COMPONENT_EDIT = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
@@ -848,23 +872,6 @@ describe('CraftingSystemManager source contract', () => {
       '<EmptyState',
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
-    }
-    // `class={componentTableClass}` is GONE (issue 676).
-    for (const snippet of ['class="manager-component-drop-zone"', 'ComponentRow']) {
-      assert.ok(
-        componentsBrowserSource.includes(snippet),
-        `ComponentsBrowserView should include ${snippet}`
-      );
-    }
-    for (const snippet of ['manager-component-row', 'class="manager-component-identity"']) {
-      assert.ok(componentRowSource.includes(snippet), `ComponentRow should include ${snippet}`);
-    }
-    // The dropped table scaffolding must not creep back in either file.
-    for (const snippet of ['role="table"', 'role="row"', 'role="columnheader"', 'role="cell"']) {
-      assert.ok(
-        !componentsBrowserSource.includes(snippet) && !componentRowSource.includes(snippet),
-        `the component browser must not reintroduce ${snippet}`
-      );
     }
     for (const snippet of [
       'manager-system-edit-form',
@@ -2260,81 +2267,63 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('keeps the components browser browser-only and wired to existing component callbacks', () => {
-    for (const snippet of [
-      'store.setItemSearch?.',
-      'services?.onDropItem?.(data)',
-      'store.deleteComponent?.(itemId)',
-      'services?.onCopySourceUuid?.(uuid)',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should wire ${snippet}`);
-    }
-    assert.ok(
-      rootSource.includes('activeView = view'),
-      'components should use the selected-system route state'
-    );
-    assert.ok(
-      !rootSource.includes('usageCount ='),
-      'components browser should not invent usage counts'
-    );
-    assert.ok(
-      !rootSource.includes('stale source'),
-      'components browser should not invent source freshness labels'
-    );
+  // A CARD ROW HAS NO COLUMNS (issue 676): the browser is a real list and the row is its item, so
+  // neither file may reintroduce the table scaffolding. Read off the rendered attribute rather
+  // than the file text, which both files' own prose legitimately mentions.
+  const TABLE_ROLES = Object.freeze([
+    ['role', 'table'],
+    ['role', 'row'],
+    ['role', 'columnheader'],
+    ['role', 'cell'],
+  ]);
+
+  defineStructureContract('draws the component library as a list of rows', COMPONENTS_BROWSER, {
+    renders: ['ComponentRow'],
+    attributes: [['role', 'list']],
+    attributesNo: TABLE_ROLES,
   });
 
-  it('AC14: confirmComponentRouteExit retains NO component-edit bypass (issue 676)', () => {
-    // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
-    // `|| nextView === '<kind>-edit'` bypass its recipe and environment siblings carry
-    // (`confirmRecipeRouteExit`: `if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;`).
-    const guard = rootSource.slice(
-      rootSource.indexOf('function confirmComponentRouteExit'),
-      rootSource.indexOf('function confirmEnvironmentRouteExit')
-    );
-    assert.ok(guard.length > 0, 'expected to locate confirmComponentRouteExit');
-    assert.ok(
-      guard.includes("if (activeView !== 'component-edit') return true;"),
-      'the component route guard should short-circuit only on the ACTIVE view'
-    );
-    assert.ok(
-      !guard.includes("nextView === 'component-edit'"),
-      'the component route guard must NOT gain the recipe/environment nextView bypass'
-    );
-    // The sibling that DOES carry it.
-    assert.ok(
-      rootSource.includes(
-        "if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;"
-      ),
-      'the recipe sibling still carries the bypass this one deliberately omits'
-    );
+  // The `<li>` needs no explicit `listitem`; the anchor that keeps the negatives honest is the
+  // row's own class, which is what the mounted browser cases query it by.
+  defineStructureContract('draws a component row as one of that list', COMPONENT_ROW, {
+    attributes: [['class', 'manager-component-row']],
+    attributesNo: TABLE_ROLES,
   });
 
-  it('routes the components row Edit action through the in-manager component-edit view', () => {
-    assert.ok(
-      rootSource.includes("activeView = 'component-edit'"),
-      'editComponent should set the activeView to the in-manager component-edit route'
-    );
-    assert.ok(
-      rootSource.includes('import ComponentEditView'),
-      'root should import the ComponentEditView'
-    );
-    assert.ok(
-      rootSource.includes('store.updateComponent?.'),
-      'root should persist component-edit saves through the admin-store updateComponent action'
-    );
-    assert.ok(
-      !rootSource.includes('services?.onEditComponent?.'),
-      'manager row Edit should no longer launch the legacy component editor'
-    );
-    const componentEditScript = componentEditSource.split('</script>')[0] || componentEditSource;
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\.[a-zA-Z]/.test(componentEditScript),
-      'ComponentEditView script should not reference Foundry globals directly'
-    );
-    assert.ok(
-      !componentEditSource.includes('foundry.applications'),
-      'ComponentEditView should not import Foundry application classes'
-    );
+  // The store wiring behind this route — search, drop import, delete, copy-source and the
+  // legacy editor it no longer launches — is DRIVEN by
+  // `tests/components/manager-components-mounted.js`, which clicks each control on the real
+  // route and reads the call back off the store double. What stays is what nothing renders.
+  defineStructureContract('invents no component facts the store does not publish', MANAGER_ROOT, {
+    namesNo: ['usageCount'],
+    spellsNo: ['stale source'],
+  });
+
+  defineStructureContract('edits a component in place rather than in the legacy app', MANAGER_ROOT, {
+    imports: ['./ComponentEditView.svelte'],
+    calls: ['updateComponent'],
+  });
+
+  // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
+  // `|| nextView === '<kind>-edit'` bypass its recipe sibling carries, which is why the two are
+  // asserted together: the sibling is what makes the absence a choice rather than an oversight.
+  defineStructureContract(
+    'AC14: the component route guard keeps NO component-edit bypass (issue 676)',
+    { file: MANAGER_ROOT, fn: 'confirmComponentRouteExit' },
+    { names: ['activeView'], compares: ['component-edit'], namesNo: ['nextView'] }
+  );
+
+  defineStructureContract(
+    'and the recipe sibling still carries the bypass it omits',
+    { file: MANAGER_ROOT, fn: 'confirmRecipeRouteExit' },
+    { names: ['activeView', 'nextView'], compares: ['recipe-edit'] }
+  );
+
+  // `foundry` is NOT in the global set: the editor reaches `globalThis.foundry.utils.randomID`.
+  // What it must never reach is an application class, which is the member read below.
+  defineStructureContract('keeps the component editor free of Foundry globals', COMPONENT_EDIT, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+    readsNo: ['globalThis.foundry.applications'],
   });
 
   it('uses a purpose-built manager environment editor instead of mounting the legacy tab', () => {
