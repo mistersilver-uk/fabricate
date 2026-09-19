@@ -1838,9 +1838,9 @@
                           >
 
                           {#if result.componentId}
-                            <!-- Opens the referenced YIELD component's editor. The navigation is
-                          guarded (`confirmComponentRouteExit` has no component-edit bypass), so a
-                          dirty draft prompts rather than being discarded. -->
+                            <!-- Opens the referenced yield component's editor. The navigation is
+                          guarded (the `component-edit` row of `ROUTE_EXIT_GUARDS` waives no
+                          navigation), so a dirty draft prompts rather than being discarded. -->
                             <button
                               type="button"
                               class="manager-salvage-stage-edit"

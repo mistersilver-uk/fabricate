@@ -4380,7 +4380,7 @@
     return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
   }
 
-  // The gathering finishers also run on the CLEAN path: both answers clear the draft and move on.
+  // The gathering finishers also run on the clean path: both answers clear the draft and move on.
   const finishGatheringTaskExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
@@ -4403,7 +4403,7 @@
     return true;
   };
 
-  // `subject` is the identity of what the caller is navigating TO, for the routes whose view token
+  // `subject` is the identity of what the caller is navigating to, for the routes whose view token
   // does not change when the subject does. `activeView` holds one token, so no two rows can be
   // active at once, which is why the order between them is immaterial.
   const routeExitGuards = buildRouteExitGuards({
@@ -4445,7 +4445,7 @@
         return true;
       },
     },
-    // Criterion 23 (issue 1036): the guard compares the ESSENCE, not only the view token.
+    // Criterion 23 (issue 1036): the guard compares the essence, not only the view token.
     'essence-edit': {
       active: () => activeView === 'essence-edit',
       subject: () => selectedEssenceId,
@@ -4557,7 +4557,7 @@
         return false;
       },
     },
-    // The Checks Studio's route-exit prompt (issue 1096); its route is a FAMILY of tabs.
+    // The Checks Studio's route-exit prompt (issue 1096); its route is a family of tabs.
     checks: {
       active: () => isChecksRoute,
       family: (nextView) => isChecksView(nextView),
@@ -4572,7 +4572,7 @@
           )
         ),
       finish: async (action) => {
-        // Navigation is gated on the SAVE, as the essence and system-details guards gate theirs.
+        // Navigation is gated on the save, as the essence and system-details guards gate theirs.
         if (action === 'save') return await saveChecks();
         if (action === 'discard' || action === true) {
           discardChecksDrafts();
@@ -5817,8 +5817,7 @@
 
   function cancelEssenceEdit() {
     afterTruthyResult(confirmRouteExit('essences'), () => {
-      // A CLEAN draft never reaches `finishEssenceRouteExit`, so its `cancelEssenceDraft` call does
-      // not run for it.
+      // A clean draft never reaches the essence row's finisher, so this is its only such call.
       store.cancelEssenceDraft?.();
       activeView = canShowEssences ? 'essences' : 'systems';
     });

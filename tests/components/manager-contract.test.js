@@ -2409,7 +2409,7 @@ describe('CraftingSystemManager source contract', () => {
     readsNo: ['store.createToolDraft', 'store.deleteToolDraft'],
   });
 
-  // The editor's own route-exit guard, which compares the TOOL and not only the view token, so
+  // The editor's own route-exit guard, which compares the tool and not only the view token, so
   // opening another tool from the library prompts and re-opening the focused one does not.
   defineStructureContract(
     'and guards the focused tool editor on the tool rather than the view token',
