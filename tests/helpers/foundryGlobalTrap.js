@@ -3,6 +3,7 @@
 const TRAPPED_GLOBALS = Object.freeze([
   'game',
   'canvas',
+  'foundry',
   'ui',
   'Hooks',
   'CONFIG',

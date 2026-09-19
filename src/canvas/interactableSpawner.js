@@ -69,7 +69,7 @@ export async function spawnGatheringTask(
   }
 
   return deps.spawnInteractableRegion(
-    buildRegionSpawnRequest({ classification, point, environmentId, visualMode }, deps)
+    deps.buildRegionSpawnRequest({ classification, point, environmentId, visualMode })
   );
 }
 

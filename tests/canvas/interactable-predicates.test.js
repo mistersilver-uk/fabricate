@@ -23,15 +23,10 @@ import {
   viewCenterFrom,
 } from '../../src/canvas/interactablePredicates.js';
 import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
+import { placedBehavior } from '../helpers/interactableFixtures.js';
 
 function sealed(name, body) {
   test(name, () => underFoundryGlobalTrap('interactablePredicates', body));
-}
-
-function placed(tokens) {
-  const scene = { id: 'scene-1', tokens: { contents: tokens } };
-  const region = { id: 'region-1', parent: scene };
-  return { behavior: { id: 'beh-1', parent: region }, region, scene };
 }
 
 function insideToken({ actorId = 'a1', inside = true } = {}) {
@@ -113,18 +108,22 @@ sealed('scene token documents tolerate the collection, iterable and array shapes
 });
 
 sealed('containment admits an unlocatable actor and any token inside, and denies the rest', () => {
-  const none = placed([insideToken({ actorId: 'someone-else', inside: false })]);
-  assert.equal(tokenInsideRegion({ behavior: none.behavior, actorId: 'a1' }), true);
+  const none = placedBehavior({
+    tokens: [insideToken({ actorId: 'someone-else', inside: false })],
+  });
+  assert.equal(tokenInsideRegion({ behavior: none, actorId: 'a1' }), true);
 
-  const mixed = placed([insideToken({ inside: false }), insideToken({ inside: true })]);
-  assert.equal(tokenInsideRegion({ behavior: mixed.behavior, actorId: 'a1' }), true);
+  const mixed = placedBehavior({
+    tokens: [insideToken({ inside: false }), insideToken({ inside: true })],
+  });
+  assert.equal(tokenInsideRegion({ behavior: mixed, actorId: 'a1' }), true);
 
-  const outside = placed([insideToken({ inside: false })]);
-  assert.equal(tokenInsideRegion({ behavior: outside.behavior, actorId: 'a1' }), false);
+  const outside = placedBehavior({ tokens: [insideToken({ inside: false })] });
+  assert.equal(tokenInsideRegion({ behavior: outside, actorId: 'a1' }), false);
 
-  const indeterminate = placed([{ actorId: 'a1' }]);
+  const indeterminate = placedBehavior({ tokens: [{ actorId: 'a1' }] });
   assert.equal(
-    tokenInsideRegion({ behavior: indeterminate.behavior, actorId: 'a1' }),
+    tokenInsideRegion({ behavior: indeterminate, actorId: 'a1' }),
     true,
     'no signal answers ⇒ admit'
   );

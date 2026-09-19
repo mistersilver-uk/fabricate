@@ -68,6 +68,7 @@ function spawnCollaborators(manager) {
     },
     deleteRegion: (regionDoc) => regionDoc?.delete?.(),
     updateBehavior: (behavior, update) => behavior.update(update),
+    buildRegionSpawnRequest: (...args) => manager._buildRegionSpawnRequest(...args),
     gridSize: () => manager._gridSize(),
     iconTexture: (classification) => manager._resolveIconTexture(classification),
     resolutionDeps: () => manager._resolutionDeps(),
