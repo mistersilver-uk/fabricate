@@ -28,7 +28,7 @@ function changeOnly(...keys) {
 }
 
 /**
- * A world whose every setting holds a DISTINCT non-empty value, and a runner over it recording each
+ * A world whose every setting holds a distinct non-empty value, and a runner over it recording each
  * `setSetting` key in order. The distinct seeds are what make a swapped snapshot visible: every
  * existing fixture starts these legs at the same empty value, so a swap reads clean there.
  */
@@ -40,7 +40,7 @@ function makeWorld(migrations) {
     written.push(key);
     store.set(key, value);
   };
-  return { runner: new MigrationRunner({ getSetting, setSetting, migrations }), written };
+  return { runner: new MigrationRunner({ getSetting, setSetting, migrations }), written, store };
 }
 
 /**
@@ -64,10 +64,15 @@ async function writeKeyOf(leg) {
 /**
  * The writeback order with the clause fixing each position, all of them in
  * `destructive-changes-and-migrations/spec.md` § Migration Policy. Positions 12 and 13 are free,
- * and `gatheringParties` is deliberately NOT ordered against the systems write.
+ * and `gatheringParties` is deliberately not ordered against the systems write.
  */
 const ANNOTATED_WRITEBACK_ORDER = [
-  ['worldScopeRekeyMap', '§ Startup Migration Flow item 13: the ONE leg written ahead of recipes'],
+  [
+    'worldScopeRekeyMap',
+    '§ World-Scope Entity Migration requirement 10 and § Migration Registry: the FIRST leg of the ' +
+      'writeback, the 1.30.0 pass\u2019s durable decision record (#1829 tracks the stale ' +
+      '§ Startup Migration Flow phrasing that still calls it the only leg ahead of recipes)',
+  ],
   [
     'worldEssenceMergeMap',
     '§ Equivalent World Essence Merge requirement 10: the SECOND leg, immediately after ' +
@@ -106,12 +111,15 @@ const ANNOTATED_WRITEBACK_ORDER = [
   ],
 ];
 
-test('table shape: the leg table carries the writeback order, position by position', () => {
+test('table shape: the leg table carries the writeback order, position by position', async () => {
   assert.deepEqual(
     WRITEBACK_LEGS.map((leg) => leg.key),
     ANNOTATED_WRITEBACK_ORDER.map(([key]) => key),
     'the annotated order above is the contract; a leg moved in the table moves without its clause'
   );
+  const writeKeys = [];
+  for (const leg of WRITEBACK_LEGS) writeKeys.push(await writeKeyOf(leg));
+  assert.equal(new Set(writeKeys).size, WRITEBACK_LEGS.length, 'no two legs share a setting key');
 });
 
 test('behavioural: a pass changing every leg writes them in table order, the bump last', async () => {
@@ -170,10 +178,16 @@ for (const leg of WRITEBACK_LEGS) {
 
     await world.runner.run();
 
+    const settingKey = await writeKeyOf(leg);
     assert.deepEqual(
       world.written,
-      [await writeKeyOf(leg), SETTING_KEYS.MIGRATION_VERSION],
+      [settingKey, SETTING_KEYS.MIGRATION_VERSION],
       'a leg compared against another leg snapshot writes a setting nothing changed'
+    );
+    assert.deepEqual(
+      world.store.get(settingKey),
+      { changed: leg.key },
+      'the leg wrote its own payload, not a neighbour\u2019s'
     );
   });
 }
@@ -248,4 +262,48 @@ test('both registry arrays are frozen, and their entries are not', () => {
   assert.equal(Object.isFrozen(MIGRATIONS), true);
   assert.equal(Object.isFrozen(SEALED_MIGRATIONS), true);
   assert.equal(Object.isFrozen(MIGRATIONS[0]), false, 'entries are left as they were');
+});
+
+
+test('the setting reads run in one uninterrupted synchronous block', async () => {
+  let microtaskRan = false;
+  let interrupted = false;
+  let reads = 0;
+  const getSetting = (key) => {
+    if (key === SETTING_KEYS.MIGRATION_VERSION) return '0.0.0';
+    reads += 1;
+    if (reads === 1) {
+      queueMicrotask(() => {
+        microtaskRan = true;
+      });
+    } else if (microtaskRan) interrupted = true;
+    return null;
+  };
+  const noCorpus = () => ({ loadAll: async () => [], createOrUpdateAll: async () => {} });
+  await new MigrationRunner({
+    getSetting,
+    setSetting: async () => {},
+    recipeCorpus: noCorpus(),
+    craftingSystemCorpus: noCorpus(),
+    migrations: [{ version: '9.9.9', label: 'x', migrate: () => ({}) }],
+  }).run();
+  assert.equal(reads, 11, 'eleven setting-backed legs were read');
+  assert.equal(interrupted, false, 'an await landed between two setting reads');
+});
+
+test('an empty default is fresh per pass, so one pass cannot poison the next', async () => {
+  const make = (migrate) =>
+    new MigrationRunner({
+      getSetting: () => null,
+      setSetting: async () => {},
+      migrations: [{ version: '9.9.9', label: 'l', migrate }],
+    });
+  await make((data) => {
+    data.gatheringConfig.poisoned = true;
+  }).run();
+  let captured = null;
+  await make((data) => {
+    captured = { ...data };
+  }).run();
+  assert.deepEqual(captured.gatheringConfig, {}, 'a previous pass poisoned the shared default');
 });
