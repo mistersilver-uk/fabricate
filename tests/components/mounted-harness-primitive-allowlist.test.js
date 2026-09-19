@@ -430,26 +430,28 @@ const CO_LOCATED_PICKER_MODULES = Object.freeze([
 
 test('a roster naming one of the picker’s two leaf modules names the other', () => {
   // Anchored on the opening quote, so a relative import specifier — the unit tests' own
-  // `'../../src/ui/svelte/util/listboxNavigation.js'` — is not read as a roster entry.
-  const [navigation, optionModel] = CO_LOCATED_PICKER_MODULES.map((path) => `'${path}'`);
+  // `'../../src/ui/svelte/util/listboxNavigation.js'` — is not read as a roster entry. Symmetric by
+  // construction: either leaf named alone counts the roster and is checked against the full set.
+  const quoted = CO_LOCATED_PICKER_MODULES.map((path) => `'${path}'`);
   const gaps = [];
   let rosters = 0;
   for (const file of repoPathsUnder('tests', '.js')) {
     const source = readRepoFile(file);
-    if (!source.includes(navigation)) continue;
+    const named = quoted.filter((entry) => source.includes(entry));
+    if (named.length === 0) continue;
     rosters += 1;
-    if (!source.includes(optionModel)) gaps.push(file);
+    if (named.length !== quoted.length) gaps.push(file);
   }
 
   assert.ok(
     rosters >= 30,
-    `only ${rosters} files name the picker's cursor module as a roster entry, so this clause has ` +
+    `only ${rosters} files name a picker leaf module as a roster entry, so this clause has ` +
       'lost most of its domain and would pass over an almost empty set'
   );
   assert.deepEqual(
     gaps,
     [],
-    'these rosters name one of the picker`s two leaf modules and not the other, so a suite that ' +
+    'these rosters name one of the picker’s two leaf modules and not the other, so a suite that ' +
       `opens a picker hangs (# cancelled) instead of failing:\n- ${gaps.join('\n- ')}`
   );
 });

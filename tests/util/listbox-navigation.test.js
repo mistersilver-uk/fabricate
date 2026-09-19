@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 
 import {
   activeOptionId,
+  caretOwnsKey,
   nextActiveIndex,
+  openingKeyOwns,
   typeAheadCursor,
 } from '../../src/ui/svelte/util/listboxNavigation.js';
 
@@ -430,6 +432,69 @@ describe('listbox navigation: the cursor arithmetic', () => {
       const rows = [0, 1, 2].map((index) => activeOptionId('c3', index));
       assert.deepEqual(rows, ['c3-option-0', 'c3-option-1', 'c3-option-2']);
       assert.equal(activeOptionId('c3', nextActiveIndex(-1, 3, 'End')), 'c3-option-2');
+    });
+  });
+
+  describe('openingKeyOwns', () => {
+    it('is not a closed holder’s to open when a modifier owns the key instead', () => {
+      for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey']) {
+        assert.equal(openingKeyOwns({ key: 'ArrowDown', [modifier]: true }), null, modifier);
+      }
+    });
+
+    it('opens plain on the four opening keys, moving no cursor', () => {
+      assert.deepEqual(openingKeyOwns({ key: 'Home' }), { altOpen: false });
+      assert.deepEqual(openingKeyOwns({ key: 'End' }), { altOpen: false });
+      assert.deepEqual(openingKeyOwns({ key: 'ArrowDown' }), { altOpen: false });
+      assert.deepEqual(openingKeyOwns({ key: 'ArrowUp' }), { altOpen: false });
+    });
+
+    it('opens WITHOUT moving the cursor on alt+ArrowDown only', () => {
+      assert.deepEqual(openingKeyOwns({ key: 'ArrowDown', altKey: true }), { altOpen: true });
+      assert.equal(openingKeyOwns({ key: 'ArrowUp', altKey: true }), null);
+      assert.equal(openingKeyOwns({ key: 'Home', altKey: true }), null);
+    });
+
+    it('is not a closed holder’s for a key outside the opening set', () => {
+      assert.equal(openingKeyOwns({ key: 'ArrowRight' }), null);
+      assert.equal(openingKeyOwns({ key: 'a' }), null);
+    });
+  });
+
+  describe('caretOwnsKey', () => {
+    const event = (key, selectionStart, selectionEnd, value = 'abcdef') => ({
+      key,
+      target: { selectionStart, selectionEnd, value },
+    });
+
+    it('is not the caret’s without a text selection to read', () => {
+      assert.equal(caretOwnsKey({ key: 'Home', target: {} }), false);
+      assert.equal(caretOwnsKey({ key: 'Home', target: { selectionStart: '0' } }), false);
+    });
+
+    it('is not the caret’s for a key it does not own', () => {
+      assert.equal(caretOwnsKey(event('ArrowDown', 3, 3)), false);
+      assert.equal(caretOwnsKey(event('a', 3, 3)), false);
+    });
+
+    it('owns any of its keys while a range is selected', () => {
+      for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+        assert.equal(caretOwnsKey(event(key, 1, 4)), true, key);
+      }
+    });
+
+    it('owns the start keys only short of the field’s own start', () => {
+      assert.equal(caretOwnsKey(event('ArrowLeft', 0, 0)), false);
+      assert.equal(caretOwnsKey(event('Home', 0, 0)), false);
+      assert.equal(caretOwnsKey(event('ArrowLeft', 2, 2)), true);
+      assert.equal(caretOwnsKey(event('Home', 2, 2)), true);
+    });
+
+    it('owns the end keys only short of the field’s own end', () => {
+      assert.equal(caretOwnsKey(event('ArrowRight', 6, 6)), false);
+      assert.equal(caretOwnsKey(event('End', 6, 6)), false);
+      assert.equal(caretOwnsKey(event('ArrowRight', 2, 2)), true);
+      assert.equal(caretOwnsKey(event('End', 2, 2)), true);
     });
   });
 });

@@ -169,7 +169,7 @@ describe('picker option model: the list arithmetic', () => {
   });
 
   describe('filteredCountLabel', () => {
-    it('substitutes both placeholders in the caller`s own template', () => {
+    it('substitutes both placeholders in the caller’s own template', () => {
       assert.equal(filteredCountLabel('{matched} of {total}', 3, 12), '3 of 12');
       assert.equal(filteredCountLabel('{total} total, {matched} shown', 0, 5), '5 total, 0 shown');
       assert.equal(filteredCountLabel('no placeholders', 3, 12), 'no placeholders');

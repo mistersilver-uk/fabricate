@@ -43,7 +43,7 @@
   - THE FOCUS MODEL, the key map, the caret-edge rules, the type-ahead and the flat-order option ids
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
     arithmetic is `util/listboxNavigation.js`'s and `util/pickerOptionModel.js`'s, and
-    `searchable-popover-keyboard-mounted.test.js` (40 cases) and `-capabilities-mounted` (27) pin
+    `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin
     what each key does. The option ids carry a per-instance prefix, because two pickers on one
     screen indexing from 0 would make `aria-activedescendant` ambiguous.
   - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —

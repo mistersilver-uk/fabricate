@@ -7,7 +7,7 @@
 
 const UNGROUPED_BUCKET_ID = '__ungrouped';
 
-/** The default filter: a case-insensitive substring of the row's rendered label. */
+/** The default filter: rows whose label contains the query, which arrives already trimmed and lower-cased (see `normalizedSearch`). */
 export function labelSubstringFilter(options, query) {
   if (!query) return options;
   return options.filter((option) =>
@@ -19,9 +19,8 @@ export function labelSubstringFilter(options, query) {
 
 /**
  * The rows bucketed in declared-group order, each carrying the flat-order `offset` its first row
- * sits at; unknown-group and ungrouped rows land last in one unlabelled bucket and an emptied
- * bucket disappears. No declared group answers with no buckets: the ungrouped shape renders
- * differently, so one bucket of everything would be a different panel rather than a tidier answer.
+ * sits at; unknown-group and ungrouped rows land last in one unlabelled bucket, and an emptied
+ * bucket disappears, and no declared group answers with no buckets.
  */
 export function groupedOptionBuckets(options, groups) {
   const declared = Array.isArray(groups) ? groups.filter((group) => group?.id) : [];
@@ -51,7 +50,7 @@ export function renderedOptionOrder(buckets, options) {
   return buckets.length > 0 ? buckets.flatMap((bucket) => bucket.options) : options;
 }
 
-/** The stamp a cursor position is recorded against; it moves whenever the rows can have. */
+/** The stamp a cursor position is recorded against; it moves whenever the rows can have changed. */
 export function optionListGeneration({ open, query, options }) {
   return [
     open ? 'open' : 'closed',
@@ -78,10 +77,7 @@ export function filteredCountLabel(template, matched, total) {
   return String(template).replace('{matched}', String(matched)).replace('{total}', String(total));
 }
 
-/**
- * The two emptinesses are different facts: a list holding nothing takes the caller's own hint and
- * the detail under it, and a list the query emptied takes the no-matches line with no detail.
- */
+/** A list holding nothing takes the caller's hint and detail; a list the query emptied takes the no-matches line and no detail. */
 export function pickerEmptiness({ total, matched, noMatchesText, emptyHint, emptyDetail }) {
   const filteredToNothing = total > 0 && matched === 0;
   return {
