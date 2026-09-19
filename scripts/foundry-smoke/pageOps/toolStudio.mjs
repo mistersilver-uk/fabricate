@@ -7,9 +7,9 @@ import { assertPointerTarget } from './pageLifecycle.mjs';
 
 /** Open a requirement-rail slot's chooser only if it is not already open (issue 917). */
 export async function ensureSlotOpen(slotLocator) {
-  await slotLocator.waitFor({ state: 'visible', timeout: 8_000 });
-  if (await slotLocator.getAttribute('aria-expanded') === 'true') return;
-  await slotLocator.click({ timeout: 5_000 });
+  await slotLocator.waitFor({ state: 'visible', timeout: 8000 });
+  if ((await slotLocator.getAttribute('aria-expanded')) === 'true') return;
+  await slotLocator.click({ timeout: 5000 });
 }
 
 export function assertSingleToolMutation(report, expectedMethod, label) {
@@ -40,7 +40,9 @@ export async function beginToolStoreMutationProbe(page, methodNames) {
       if (persistentBoundary) {
         const original = systemManager?.[persistentBoundary];
         if (typeof original !== 'function') {
-          throw new Error(`Tool mutation probe could not wrap systemManager.${persistentBoundary}`);
+          throw new TypeError(
+            `Tool mutation probe could not wrap systemManager.${persistentBoundary}`
+          );
         }
         systemManager[persistentBoundary] = function (...args) {
           calls.push({
@@ -71,14 +73,17 @@ export async function beginToolStoreMutationProbe(page, methodNames) {
         }
         calls.push({
           method,
-          args: [{
-            toolId: String(state?.toolDraft?.id || ''),
-            dirty: state?.toolDraftDirty === true,
-          }],
+          args: [
+            {
+              toolId: String(state?.toolDraft?.id || ''),
+              dirty: state?.toolDraftDirty === true,
+            },
+          ],
         });
       });
       restorations.push(unsubscribe);
     }
+    // eslint-disable-next-line unicorn/no-global-object-property-assignment -- a page handle the walk re-assigns and deletes; defineProperty would freeze it.
     globalThis.__fabricateToolMutationProbe = { calls, restorations };
   }, methodNames);
 }
@@ -105,7 +110,13 @@ export async function withSingleToolStoreMutation(page, method, label, action, a
   assertSingleToolMutation(report, method, label);
 }
 
-export async function withSingleToolDraftTransition(page, expectedToolId, label, action, assertEffect) {
+export async function withSingleToolDraftTransition(
+  page,
+  expectedToolId,
+  label,
+  action,
+  assertEffect
+) {
   await page.evaluate(() => {
     const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
     if (!store?.viewState?.subscribe) {
@@ -126,6 +137,7 @@ export async function withSingleToolDraftTransition(page, expectedToolId, label,
         dirty: state?.toolDraftDirty === true,
       });
     });
+    // eslint-disable-next-line unicorn/no-global-object-property-assignment -- a page handle the walk re-assigns and deletes; defineProperty would freeze it.
     globalThis.__fabricateToolDraftTransitionProbe = { transitions, unsubscribe };
   });
   let report;
@@ -141,18 +153,21 @@ export async function withSingleToolDraftTransition(page, expectedToolId, label,
       return { transitions: probe.transitions };
     });
   }
-  const distinctTransitions = report.transitions.filter((transition, index, transitions) => (
-    index === 0
-    || transition.toolId !== transitions[index - 1].toolId
-    || transition.dirty !== transitions[index - 1].dirty
-  ));
+  const distinctTransitions = report.transitions.filter(
+    (transition, index, transitions) =>
+      index === 0 ||
+      transition.toolId !== transitions[index - 1].toolId ||
+      transition.dirty !== transitions[index - 1].dirty
+  );
   const matching = distinctTransitions.filter(({ toolId }) => toolId === String(expectedToolId));
   if (distinctTransitions.length !== 1 || matching.length !== 1) {
     throw new Error(
-      `${label} must publish exactly one distinct Tool draft transition for ${expectedToolId}: ${JSON.stringify({
-        ...report,
-        distinctTransitions,
-      })}`
+      `${label} must publish exactly one distinct Tool draft transition for ${expectedToolId}: ${JSON.stringify(
+        {
+          ...report,
+          distinctTransitions,
+        }
+      )}`
     );
   }
 }
@@ -160,7 +175,7 @@ export async function withSingleToolDraftTransition(page, expectedToolId, label,
 export async function clickToolTabAndAssertEffect(page, editor, name, label) {
   const target = editor.locator(`#tool-tab-${name}`);
   await assertPointerTarget(page, target, `#tool-tab-${name}`, label);
-  if (await target.getAttribute('aria-selected') !== 'false') {
+  if ((await target.getAttribute('aria-selected')) !== 'false') {
     throw new Error(`${label} must begin on a different Tool tab`);
   }
   await target.evaluate((element) => {
@@ -172,7 +187,9 @@ export async function clickToolTabAndAssertEffect(page, editor, name, label) {
     element.__fabricateToolTabProbe = { observer, transitions };
   });
   await target.click();
-  await editor.locator(`[data-tool-editor-panel="${name}"]`).waitFor({ state: 'visible', timeout: 5_000 });
+  await editor
+    .locator(`[data-tool-editor-panel="${name}"]`)
+    .waitFor({ state: 'visible', timeout: 5000 });
   const effect = await target.evaluate((element) => {
     const probe = element.__fabricateToolTabProbe;
     probe?.observer?.disconnect();
@@ -186,11 +203,13 @@ export async function clickToolTabAndAssertEffect(page, editor, name, label) {
     };
   });
   if (
-    effect.selected !== 1
-    || effect.expectedSelected !== 'true'
-    || effect.selectedTransitions !== 1
+    effect.selected !== 1 ||
+    effect.expectedSelected !== 'true' ||
+    effect.selectedTransitions !== 1
   ) {
-    throw new Error(`${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`);
+    throw new Error(
+      `${label} did not transition exactly once to ${name}: ${JSON.stringify(effect)}`
+    );
   }
 }
 
@@ -203,10 +222,10 @@ export async function toggleToolControlAndRestore(page, locator, label) {
     `${label} apply`,
     () => locator.click(),
     async () => {
-      if (await locator.isChecked() === before) {
+      if ((await locator.isChecked()) === before) {
         throw new Error(`${label} did not apply its observable toggle effect`);
       }
-    },
+    }
   );
   await withSingleToolStoreMutation(
     page,
@@ -214,10 +233,10 @@ export async function toggleToolControlAndRestore(page, locator, label) {
     `${label} restore`,
     () => locator.click(),
     async () => {
-      if (await locator.isChecked() !== before) {
+      if ((await locator.isChecked()) !== before) {
         throw new Error(`${label} did not restore its original persisted state`);
       }
-    },
+    }
   );
 }
 
@@ -225,7 +244,7 @@ export async function selectOptionAndAssertSingleChange(
   locator,
   value,
   label,
-  { expectRetainedValue = true } = {},
+  { expectRetainedValue = true } = {}
 ) {
   await locator.evaluate((element) => {
     element.__fabricateSelectChangeCount = 0;
@@ -246,12 +265,14 @@ export async function selectOptionAndAssertSingleChange(
     return report;
   });
   if (effect.changes !== 1 || (expectRetainedValue && effect.value !== value)) {
-    throw new Error(`${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`);
+    throw new Error(
+      `${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`
+    );
   }
 }
 
 export async function saveToolStudioDraftIfDirty(editor) {
-  if (await editor.locator('[data-tool-editor-dirty]').count() === 0) return;
+  if ((await editor.locator('[data-tool-editor-dirty]').count()) === 0) return;
   await editor.locator('[data-tool-editor-save]').click();
   await editor.locator('[data-tool-editor-dirty]').waitFor({
     state: 'detached',
@@ -260,11 +281,11 @@ export async function saveToolStudioDraftIfDirty(editor) {
 }
 
 export async function assertSavedToolStudioCapture(editor, label) {
-  if (await editor.locator('[data-tool-editor-dirty]').count() > 0) {
+  if ((await editor.locator('[data-tool-editor-dirty]').count()) > 0) {
     throw new Error(`${label} must capture a saved Tool draft`);
   }
   const save = editor.locator('[data-tool-editor-save]');
-  if (await save.count() !== 1 || !await save.isDisabled()) {
+  if ((await save.count()) !== 1 || !(await save.isDisabled())) {
     throw new Error(`${label} must expose the recipe-parity clean state with Save tool disabled`);
   }
 }
@@ -283,7 +304,9 @@ export async function assertDisabledToolOnBreakFieldset(fieldset) {
     matchesDisabled: element.matches(':disabled'),
   }));
   if (!fieldsetState.disabled || !fieldsetState.matchesDisabled) {
-    throw new Error(`Check-driven immune fieldset did not expose native disabled state: ${JSON.stringify(fieldsetState)}`);
+    throw new Error(
+      `Check-driven immune fieldset did not expose native disabled state: ${JSON.stringify(fieldsetState)}`
+    );
   }
   const controls = fieldset.locator('button, input, select, textarea');
   const controlCount = await controls.count();
@@ -357,9 +380,12 @@ export async function assertToolStudioHorizontalScroll(page, label) {
 
 export async function resetToolStudioHorizontalScroll(page, label = 'Tool Studio') {
   await readToolStudioHorizontalScroll(page, { reset: true });
-  await page.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  }));
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      })
+  );
   await assertToolStudioHorizontalScroll(page, `${label} horizontal reset`);
 }
 
@@ -377,13 +403,17 @@ export async function resetToolStudioScroll(page) {
     }
   }, selectors);
   await resetToolStudioHorizontalScroll(page);
-  const scroll = await page.evaluate((targets) => targets.flatMap((selector) => (
-    Array.from(document.querySelectorAll(selector), (element, index) => ({
-      selector,
-      index,
-      scrollTop: element.scrollTop,
-    }))
-  )), selectors);
+  const scroll = await page.evaluate(
+    (targets) =>
+      targets.flatMap((selector) =>
+        Array.from(document.querySelectorAll(selector), (element, index) => ({
+          selector,
+          index,
+          scrollTop: element.scrollTop,
+        }))
+      ),
+    selectors
+  );
   const unsettled = scroll.filter(({ scrollTop }) => scrollTop !== 0);
   if (unsettled.length > 0) {
     throw new Error(`Tool Studio vertical scroll reset failed: ${JSON.stringify(unsettled)}`);
@@ -396,7 +426,9 @@ export async function scrollToolEditorPanelToReveal(page, editor, selector, labe
   const fixedBefore = await editor.evaluate(() => {
     const read = (selector) => {
       const rect = document.querySelector(selector)?.getBoundingClientRect();
-      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+      return rect
+        ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+        : null;
     };
     return {
       header: read('[data-tool-editor-header]'),
@@ -404,10 +436,12 @@ export async function scrollToolEditorPanelToReveal(page, editor, selector, labe
       preview: read('[data-tool-behavior-preview]'),
     };
   });
-  await target.evaluate((element) => element.scrollIntoView({
-    block: 'center',
-    inline: 'nearest',
-  }));
+  await target.evaluate((element) =>
+    element.scrollIntoView({
+      block: 'center',
+      inline: 'nearest',
+    })
+  );
   await resetToolStudioHorizontalScroll(page, label);
   const report = await panel.evaluate((element, targetSelector) => {
     const targetElement = element.querySelector(targetSelector);
@@ -417,16 +451,21 @@ export async function scrollToolEditorPanelToReveal(page, editor, selector, labe
     return {
       scrollTop: element.scrollTop,
       targetVisible: targetRect.top >= panelRect.top && targetRect.bottom <= panelRect.bottom,
-      targetContained: targetRect.left >= panelRect.left - 1 && targetRect.right <= panelRect.right + 1,
+      targetContained:
+        targetRect.left >= panelRect.left - 1 && targetRect.right <= panelRect.right + 1,
     };
   }, selector);
   if (!report || report.scrollTop <= 0 || !report.targetVisible || !report.targetContained) {
-    throw new Error(`${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`);
+    throw new Error(
+      `${label} stress control was not visibly scrolled into the editor pane: ${JSON.stringify(report)}`
+    );
   }
   const fixedAfter = await editor.evaluate(() => {
     const read = (selector) => {
       const rect = document.querySelector(selector)?.getBoundingClientRect();
-      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : null;
+      return rect
+        ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+        : null;
     };
     return {
       header: read('[data-tool-editor-header]'),
@@ -438,8 +477,8 @@ export async function scrollToolEditorPanelToReveal(page, editor, selector, labe
     for (const edge of ['left', 'right', 'top', 'bottom']) {
       if (Math.abs((fixedBefore[key]?.[edge] ?? 0) - (fixedAfter[key]?.[edge] ?? 0)) > 1) {
         throw new Error(
-          `${label} moved fixed ${key} context while revealing stress content: `
-          + `${JSON.stringify({ fixedBefore, fixedAfter })}`
+          `${label} moved fixed ${key} context while revealing stress content: ` +
+            JSON.stringify({ fixedBefore, fixedAfter })
         );
       }
     }
@@ -528,9 +567,10 @@ export async function readToolStudioLayout(page) {
     return {
       manager: readRect('.fabricate-manager'),
       body: readRect('.fabricate-manager .manager-body'),
-      main: readRect('[data-tool-edit-view]')?.width > 0
-        ? readRect('.fabricate-manager .manager-main')
-        : readRect('.fabricate-manager .manager-body'),
+      main:
+        readRect('[data-tool-edit-view]')?.width > 0
+          ? readRect('.fabricate-manager .manager-main')
+          : readRect('.fabricate-manager .manager-body'),
       inspector: readRect('.fabricate-manager .manager-inspector'),
       libraryRow: readRect('.fabricate-manager [data-manager-tool-id]'),
       editorHeader: readRect('[data-tool-editor-header]'),
@@ -549,12 +589,13 @@ export async function readToolStudioLayout(page) {
             width: rect.width,
             height: rect.height,
           };
-        },
+        }
       ),
       tabsOverflow: readHorizontalOverflow('.manager-tool-editor-tabs'),
-      composition: readRect('.manager-tool-edit-composition')?.width > 0
-        ? readRect('.manager-tool-edit-composition')
-        : readRect('.fabricate-manager .manager-body'),
+      composition:
+        readRect('.manager-tool-edit-composition')?.width > 0
+          ? readRect('.manager-tool-edit-composition')
+          : readRect('.fabricate-manager .manager-body'),
       editorPanel: readRect('[data-tool-editor-panel]'),
       firstSection: readRect('[data-tool-editor-panel] > *'),
       preview: readRect('[data-tool-behavior-preview]'),
@@ -568,14 +609,18 @@ export async function readToolStudioLayout(page) {
       panelOverflow: readOverflow('[data-tool-editor-panel]'),
       previewOverflow: readOverflow('[data-tool-behavior-preview]'),
       headerCount: document.querySelectorAll('[data-tool-editor-header]').length,
-      genericTitleCount: document.querySelectorAll('.manager-heading > .manager-title, .manager-heading > .manager-subtitle').length,
+      genericTitleCount: document.querySelectorAll(
+        '.manager-heading > .manager-title, .manager-heading > .manager-subtitle'
+      ).length,
     };
   });
 }
 
 export function assertHorizontalContainment(parent, child, label) {
   if (!parent || !child || child.left < parent.left - 1 || child.right > parent.right + 1) {
-    throw new Error(`${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`);
+    throw new Error(
+      `${label} escapes horizontal containment: ${JSON.stringify({ parent, child })}`
+    );
   }
 }
 
@@ -585,11 +630,7 @@ export function assertToolStudioTabContainment(report) {
     throw new Error(`Tool editor must render three measurable tabs: ${JSON.stringify(report)}`);
   }
   const overflow = report.tabsOverflow;
-  if (
-    !overflow
-    || overflow.scrollLeft !== 0
-    || overflow.scrollWidth > overflow.clientWidth + 1
-  ) {
+  if (!overflow || overflow.scrollLeft !== 0 || overflow.scrollWidth > overflow.clientWidth + 1) {
     throw new Error(`Tool editor tabs remain horizontally scrollable: ${JSON.stringify(overflow)}`);
   }
   for (const tab of report.tabButtons) {
@@ -616,7 +657,9 @@ export async function assertToolStudioLibraryLayout(page) {
   assertHorizontalContainment(report.body, report.inspector, 'Tool library inspector');
   assertHorizontalContainment(report.main, report.libraryRow, 'Tool library row');
   if (!report.inspector || report.inspector.width < 330 || report.inspector.width > 342) {
-    throw new Error(`Tool library inspector is not the complete 340px rail: ${JSON.stringify(report.inspector)}`);
+    throw new Error(
+      `Tool library inspector is not the complete 340px rail: ${JSON.stringify(report.inspector)}`
+    );
   }
   assertToolStudioTypography(report, [
     ['libraryNameType', 14, 'Tool library name'],
@@ -627,7 +670,9 @@ export async function assertToolStudioLibraryLayout(page) {
 export async function assertToolStudioEditorLayout(page, { stacked = false } = {}) {
   const report = await readToolStudioLayout(page);
   if (report.headerCount !== 1 || report.genericTitleCount !== 0) {
-    throw new Error(`Tool editor identity chrome drifted: ${JSON.stringify({ headerCount: report.headerCount, genericTitleCount: report.genericTitleCount })}`);
+    throw new Error(
+      `Tool editor identity chrome drifted: ${JSON.stringify({ headerCount: report.headerCount, genericTitleCount: report.genericTitleCount })}`
+    );
   }
   for (const [parent, child, label] of [
     [report.main, report.editorHeader, 'Tool editor header'],
@@ -647,18 +692,29 @@ export async function assertToolStudioEditorLayout(page, { stacked = false } = {
   ]);
   if (!stacked) {
     if (!report.preview || report.preview.width < 338 || report.preview.width > 342) {
-      throw new Error(`Tool preview is not the complete 340px rail: ${JSON.stringify(report.preview)}`);
+      throw new Error(
+        `Tool preview is not the complete 340px rail: ${JSON.stringify(report.preview)}`
+      );
     }
-    if (report.preview.top < report.composition.top - 1 || report.preview.bottom > report.composition.bottom + 1) {
-      throw new Error(`Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`);
+    if (
+      report.preview.top < report.composition.top - 1 ||
+      report.preview.bottom > report.composition.bottom + 1
+    ) {
+      throw new Error(
+        `Tool preview escapes wide vertical containment: ${JSON.stringify(report.preview)}`
+      );
     }
     return;
   }
   if (report.preview.height <= 0 || report.preview.top < report.editorPanel.top) {
-    throw new Error(`Tool preview is clipped or precedes the editor in stacked reading order: ${JSON.stringify(report.preview)}`);
+    throw new Error(
+      `Tool preview is clipped or precedes the editor in stacked reading order: ${JSON.stringify(report.preview)}`
+    );
   }
   if (report.bodyOverflow?.overflowY !== 'auto') {
-    throw new Error(`Tool stacked body does not own scrolling: ${JSON.stringify(report.bodyOverflow)}`);
+    throw new Error(
+      `Tool stacked body does not own scrolling: ${JSON.stringify(report.bodyOverflow)}`
+    );
   }
   for (const [key, label] of [
     ['mainOverflow', 'main'],
@@ -666,7 +722,9 @@ export async function assertToolStudioEditorLayout(page, { stacked = false } = {
     ['previewOverflow', 'preview'],
   ]) {
     if (['auto', 'scroll'].includes(report[key]?.overflowY)) {
-      throw new Error(`Tool stacked ${label} unexpectedly owns nested scrolling: ${JSON.stringify(report[key])}`);
+      throw new Error(
+        `Tool stacked ${label} unexpectedly owns nested scrolling: ${JSON.stringify(report[key])}`
+      );
     }
   }
 }

@@ -13,7 +13,7 @@ export const RC_SCREENSHOT_BUDGET = new Set([
   'fabricate-app-shell',
   'fabricate-journal',
   'post-craft',
-  'crafter-post-craft-inventory'
+  'crafter-post-craft-inventory',
 ]);
 
 // The scoped `screenshots` profile target set (issue #826).
@@ -22,15 +22,29 @@ export function readScreenshotTargetLabels(argv = process.argv.slice(2), env = p
   let csv = '';
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === FLAG) { csv = argv[i + 1] ?? ''; break; }
-    if (arg.startsWith(`${FLAG}=`)) { csv = arg.slice(FLAG.length + 1); break; }
+    if (arg === FLAG) {
+      csv = argv[i + 1] ?? '';
+      break;
+    }
+    if (arg.startsWith(`${FLAG}=`)) {
+      csv = arg.slice(FLAG.length + 1);
+      break;
+    }
   }
   if (!csv) csv = env.FOUNDRY_SCREENSHOT_TARGET_LABELS ?? '';
-  return new Set(csv.split(/[\s,]+/).map(label => label.trim()).filter(Boolean));
+  return new Set(
+    csv
+      .split(/[\s,]+/)
+      .map((label) => label.trim())
+      .filter(Boolean)
+  );
 }
 
 /** Read the extra console-error waiver patterns for this run. */
-export function readAllowedConsoleErrorPatternsCsv(argv = process.argv.slice(2), env = process.env) {
+export function readAllowedConsoleErrorPatternsCsv(
+  argv = process.argv.slice(2),
+  env = process.env
+) {
   const FLAG = '--allowed-console-error-patterns';
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -53,13 +67,14 @@ export function resolveSmokeProfileFlags(argv = process.argv.slice(2), env = pro
   const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
   const SCREENSHOT_TARGET_LABELS = readScreenshotTargetLabels(argv, env);
   // Scoping is active only under `screenshots` AND when a non-empty target set was supplied.
-  const SCREENSHOT_SCOPING_ACTIVE = SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
+  const SCREENSHOT_SCOPING_ACTIVE =
+    SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
   // R2 (#750): the two 7-theme sweeps (`captureManagerThemes` + `captureAlchemyThemes`) produce 14
   // `*-theme-<id>` frames that nothing asserts and that `scripts/ui-pr-screenshot-evidence.mjs`
   // VIEW_RECIPES deliberately does not map.
   const CAPTURE_THEME_SWEEPS =
-    ['1', 'true', 'yes'].includes(String(env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase())
-    || argv.includes('--themes');
+    ['1', 'true', 'yes'].includes(String(env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase()) ||
+    argv.includes('--themes');
   return {
     RAW_SMOKE_PROFILE,
     SMOKE_PROFILE,
@@ -68,6 +83,6 @@ export function resolveSmokeProfileFlags(argv = process.argv.slice(2), env = pro
     RUN_FULL_ONLY_GATHERING_STATES,
     SCREENSHOT_TARGET_LABELS,
     SCREENSHOT_SCOPING_ACTIVE,
-    CAPTURE_THEME_SWEEPS
+    CAPTURE_THEME_SWEEPS,
   };
 }

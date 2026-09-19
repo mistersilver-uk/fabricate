@@ -7,7 +7,10 @@
 export const SMOKE_SCENARIOS = Object.freeze([]);
 
 function flattenScenarioIds(scenarios) {
-  return scenarios.flatMap((scenario) => [scenario.id, ...flattenScenarioIds(scenario.children ?? [])]);
+  return scenarios.flatMap((scenario) => [
+    scenario.id,
+    ...flattenScenarioIds(scenario.children ?? []),
+  ]);
 }
 
 export const SMOKE_SCENARIO_IDS = Object.freeze(flattenScenarioIds(SMOKE_SCENARIOS));

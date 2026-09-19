@@ -5,7 +5,12 @@
  */
 
 import { join } from 'node:path';
-import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from '../lib/screenshotCaptureMap.js';
+
+import {
+  isPhaseNeededForTargets,
+  isD0SectionNeededForTargets,
+} from '../lib/screenshotCaptureMap.js';
+
 import { RC_SCREENSHOT_BUDGET } from './profile.mjs';
 
 export function createSmokeContext({
@@ -19,7 +24,7 @@ export function createSmokeContext({
   screenshotRunIdentity,
   consoleErrors,
   waivedConsoleErrors,
-  consoleLog
+  consoleLog,
 }) {
   const { SMOKE_PROFILE, SCREENSHOT_SCOPING_ACTIVE, SCREENSHOT_TARGET_LABELS } = profile;
 
@@ -52,7 +57,7 @@ export function createSmokeContext({
     viewTimings.push({
       label,
       phase: currentPhase?.name ?? 'unknown',
-      durationMs: Math.round(now - lastViewMarkAt)
+      durationMs: Math.round(now - lastViewMarkAt),
     });
     lastViewMarkAt = now;
   }
@@ -75,7 +80,7 @@ export function createSmokeContext({
     phaseTimings.push({
       phase: currentPhase.name,
       startedAt: currentPhase.startedAt,
-      durationMs: Math.round(performance.now() - currentPhase.t0)
+      durationMs: Math.round(performance.now() - currentPhase.t0),
     });
     currentPhase = null;
   }
@@ -147,7 +152,7 @@ export function createSmokeContext({
       executionFixtures: null,
       alchemyFixtures: null,
       d0RequiredCapturesComplete: false,
-      d0TeardownTolerated: false
-    }
+      d0TeardownTolerated: false,
+    },
   };
 }
