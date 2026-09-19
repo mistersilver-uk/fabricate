@@ -8,7 +8,7 @@
  * studio, not two literal runs of near-identical `it()` bodies. That is a duplication
  * decision as much as a design one: SonarCloud's new-code duplication gate counts
  * `tests/**` and `sonar.cpd.exclusions` is inert under Automatic Analysis, so a second
- * hand-copied run of these seven cases — same fixtures, same assertion prose, different
+ * hand-copied run of these eight cases — same fixtures, same assertion prose, different
  * selector prefix — is exactly the block the gate refuses.
  *
  * Everything a studio differs on is a PARAMETER: the `data-*` hook prefix, the row class
@@ -54,7 +54,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
  */
 const compareIds = (a, b) => a.localeCompare(b);
 
-/** Register the seven multi-select cases against one studio. */
+/** Register the eight multi-select cases against one studio. */
 export function describeBrowserBulkSelection(studio) {
   const { harness, prefix, rowClass, rowIdKey, selectionKey, rowsProp } = studio;
 
@@ -62,6 +62,7 @@ export function describeBrowserBulkSelection(studio) {
   const pageBoxSelector = `[data-${prefix}-select-all-page]`;
   const countSelector = `[data-${prefix}-selection-count]`;
   const resultsSelector = `[data-${prefix}-select-all-results]`;
+  const clearSelector = `[data-${prefix}-clear-selection]`;
 
   /** The ids of the rows currently rendered with a ticked selection box. */
   const bulkSelectedIds = (root) =>
@@ -255,6 +256,42 @@ export function describeBrowserBulkSelection(studio) {
         shared[selectionKey].size,
         0,
         'the selection names rows the new system does not have'
+      );
+    });
+
+    // The two emptyings write the SAME field and differ only in whether they speak. Without this
+    // case a system switch that announced "Selection cleared." with a focus hop would pass
+    // everything: the case above reads the Set's size and no other mount supplies the callback.
+    it('announces the toolbar Clear, and a crafting-system switch silently', async () => {
+      const cleared = [];
+      const shared = studio.createBrowserState();
+      const rows = studio.makeFlatRows(3);
+      const extra = {
+        selectedSystemId: 'sys-1',
+        browserState: shared,
+        onSelectionCleared: () => cleared.push('cleared'),
+      };
+
+      // Seeded before the mount, as the sibling system-switch case seeds it: the lifted object a
+      // test passes is a plain one, so the view reads it at first render rather than tracking it.
+      shared[selectionKey] = new Set([studio.flatId(1), studio.flatId(2)]);
+      const root = await harness.mount(studio.props(rows, extra));
+      assert.match(selectionCountText(root), /2 selected/, 'the control: two rows are selected');
+
+      root.querySelector(clearSelector).click();
+      flushSync();
+      assert.equal(shared[selectionKey].size, 0, 'Clear empties the selection');
+      assert.deepEqual(cleared, ['cleared'], 'and tells the owner exactly once, so it can announce');
+
+      shared[selectionKey] = new Set([studio.flatId(1)]);
+      harness.remount();
+      await harness.mount(studio.props(rows, { ...extra, selectedSystemId: 'sys-2' }));
+
+      assert.equal(shared[selectionKey].size, 0, 'a system switch empties the same field');
+      assert.deepEqual(
+        cleared,
+        ['cleared'],
+        'but says nothing: a switch is not an emptying the GM performed, so no focus hops'
       );
     });
   });

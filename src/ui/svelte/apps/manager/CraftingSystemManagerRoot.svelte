@@ -161,6 +161,7 @@
     confirmRouteExitGuards,
     runRouteExitGuard,
   } from './routeExitGuards.js';
+  import { createBulkSelectionOwner } from './bulkSelection.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -1944,20 +1945,21 @@
   const canSaveEssenceEdit = $derived(
     essenceEditDirty === true && essenceEditDraft?.validName === true && essenceEditSaving !== true
   );
-  // ── The essence bulk selection (issue 1036) ────────────────────────────────────── Read straight
-  // off the LIFTED browser state, which `EssenceBrowserView` binds.
-  const essenceBulkSelectedIds = $derived(essenceBrowserState.bulkSelectedEssenceIds ?? new Set());
-  const essenceBulkSelectionCount = $derived(essenceBulkSelectedIds.size);
-  // The PROJECTED rows, not the ids: the delete-impact statement unions carrier IDENTITIES
-  // (`componentUsageItems` and `recipeUsageIds`), which live on the projection.
-  const essenceBulkSelectedRows = $derived(
-    essenceCards.filter((essence) => essenceBulkSelectedIds.has(essence.id))
-  );
+  // ── The essence bulk selection (issue 1036) ────────────────────────────────────── Owned by the
+  // shared composable over the LIFTED browser state, which `EssenceBrowserView` binds. `rows` is
+  // the PROJECTION, not the ids: the delete-impact statement unions carrier IDENTITIES
+  // (`componentUsageItems` and `recipeUsageIds`), which live on it.
+  const essenceBulk = createBulkSelectionOwner({
+    state: () => essenceBrowserState,
+    key: 'bulkSelectedEssenceIds',
+    rows: () => essenceCards,
+    announce: (message) =>
+      announceBulkSelectionEmptied('essences', message ?? selectionClearedAnnouncement()),
+  });
   // Discard the staged draft when the selection empties — a clear, a system switch, a prune that
   // removed the last id, or a successful apply.
   $effect(() => {
-    const selectedIds = essenceBulkSelectedIds;
-    if (selectedIds.size === 0) essenceBulkDraft = createEssenceBulkDraft();
+    if (essenceBulk.count === 0) essenceBulkDraft = createEssenceBulkDraft();
     essenceBulkDeleteArmed = false;
   });
   const canSaveComponentEdit = $derived(
@@ -2009,21 +2011,21 @@
   const componentEditCombinedDirty = $derived(
     componentEditDirty === true || componentDifficultyDirty === true
   );
-  // ── The bulk selection (issue 772) ─────────────────────────────────────────────── Read straight
-  // off the LIFTED browser state, which `ComponentsBrowserView` binds.
-  const componentBulkSelectedIds = $derived(
-    componentBrowserState.bulkSelectedComponentIds ?? new Set()
-  );
-  const componentBulkSelectionCount = $derived(componentBulkSelectedIds.size);
-  const componentBulkSelectedCards = $derived(
-    itemCards.filter((item) => componentBulkSelectedIds.has(item.id))
-  );
+  // ── The bulk selection (issue 772) ─────────────────────────────────────────────── Owned by the
+  // shared composable over the LIFTED browser state, which `ComponentsBrowserView` binds.
+  const componentBulk = createBulkSelectionOwner({
+    state: () => componentBrowserState,
+    key: 'bulkSelectedComponentIds',
+    rows: () => itemCards,
+    announce: (message) =>
+      announceBulkSelectionEmptied('components', message ?? selectionClearedAnnouncement()),
+  });
   const componentBulkCategoryOptions = $derived(
     componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
   );
   // What deleting the current selection would do (issue 1129).
   const componentBulkDeleteImpact = $derived(
-    store.describeComponentDelete?.(componentBulkSelectedIds) ?? {
+    store.describeComponentDelete?.(componentBulk.ids) ?? {
       deletable: 0,
       deletableIds: [],
       recipesRewritten: 0,
@@ -2033,27 +2035,28 @@
   // Discard the staged draft when the selection empties — a clear, a system switch, a prune that
   // removed the last id, or a successful apply.
   $effect(() => {
-    const selectedIds = componentBulkSelectedIds;
-    if (selectedIds.size === 0) componentBulkDraft = createComponentBulkDraft();
+    if (componentBulk.count === 0) componentBulkDraft = createComponentBulkDraft();
     componentBulkDeleteArmed = false;
   });
-  // ── The recipe bulk selection (issue 1010) ─────────────────────────────────────── Read straight
-  // off the LIFTED browser state, which `RecipesBrowserView` binds.
-  const recipeBulkSelectedIds = $derived(recipeBrowserState.bulkSelectedRecipeIds ?? new Set());
-  const recipeBulkSelectionCount = $derived(recipeBulkSelectedIds.size);
-  // The PROJECTED rows, not the ids: the blocked-enable forecast reads `enableBlocked` and
-  // `enabled`, both of which live on the projection the browser renders.
-  const recipeBulkSelectedRows = $derived(
-    ($viewState.recipes || []).filter((recipe) => recipeBulkSelectedIds.has(recipe.id))
-  );
+  // ── The recipe bulk selection (issue 1010) ─────────────────────────────────────── Owned by the
+  // shared composable over the LIFTED browser state, which `RecipesBrowserView` binds. `rows` is
+  // the PROJECTION, not the ids: the blocked-enable forecast reads `enableBlocked` and `enabled`,
+  // both of which live on the projection the browser renders.
+  const recipeBulk = createBulkSelectionOwner({
+    state: () => recipeBrowserState,
+    key: 'bulkSelectedRecipeIds',
+    rows: () => $viewState.recipes || [],
+    announce: (message) =>
+      announceBulkSelectionEmptied('recipes', message ?? selectionClearedAnnouncement()),
+  });
   // The SAME predicate the row's `Can't enable` pill reads, so the panel's count and the pilled
   // rows are one set by construction rather than by convention.
   const recipeBulkBlockedCount = $derived(
-    countBlockedRecipeEnables(recipeBulkSelectedRows, recipeBulkDraft?.status)
+    countBlockedRecipeEnables(recipeBulk.rows, recipeBulkDraft?.status)
   );
   // How many of the SELECTED recipes each recipe book holds — the `holds n of {total}` figure the
   // bulk panel's book picker states.
-  const recipeBulkBookMembership = $derived(countRecipeBookMembership(recipeBulkSelectedRows));
+  const recipeBulkBookMembership = $derived(countRecipeBookMembership(recipeBulk.rows));
   // The axis gate reuses the EXISTING `recipeCheckTierOptions` derived rather than re-resolving the
   // tier list.
   const recipeBulkCheckTierAxis = $derived(
@@ -2072,7 +2075,7 @@
   const recipeBulkDeleteImpact = $derived.by(() => {
     void $viewState;
     return (
-      store.describeRecipeDelete?.(recipeBulkSelectedIds) ?? {
+      store.describeRecipeDelete?.(recipeBulk.ids) ?? {
         deletable: 0,
         deletableIds: [],
         recipeItemsAffected: 0,
@@ -2085,11 +2088,11 @@
   // Discard the staged draft whenever the selection empties — a clear, a system switch, a prune
   // that removed the last id, or a successful apply.
   $effect(() => {
-    if (recipeBulkSelectionCount === 0) recipeBulkDraft = createRecipeBulkDraft();
+    if (recipeBulk.count === 0) recipeBulkDraft = createRecipeBulkDraft();
   });
   // DISARM the delete whenever the selection changes at all.
   $effect(() => {
-    void recipeBulkSelectedIds;
+    void recipeBulk.ids;
     recipeBulkDeleteArmed = false;
   });
   const environmentList = $derived($viewState.environments || []);
@@ -5405,16 +5408,9 @@
     componentBulkDraft = next || createComponentBulkDraft();
   }
 
-  // Clearing the selection is the documented escape from a mode that hides unlink, delete and
-  // copy-source-UUID.
-  function clearComponentBulkSelection(message = selectionClearedAnnouncement()) {
-    componentBrowserState.bulkSelectedComponentIds = new Set();
-    announceBulkSelectionEmptied('components', message);
-  }
-
   async function applyComponentBulkEdit() {
     if (componentBulkApplying) return false;
-    const ids = componentBulkSelectedIds;
+    const ids = componentBulk.ids;
     if (ids.size === 0) return false;
     // An unstaged axis is never sent.
     const edit = toBulkComponentEdit(componentBulkDraft);
@@ -5431,7 +5427,7 @@
       const message = componentBulkAppliedMessage(count);
       // One `save()` and one `refresh()` happened inside the store action, so the rows are already
       // re-rendering.
-      clearComponentBulkSelection(message);
+      componentBulk.clear(message);
       notifyInfo(message);
       return true;
     } finally {
@@ -5480,7 +5476,7 @@
         return false;
       }
       const message = componentBulkDeletedMessage(result);
-      clearComponentBulkSelection(message);
+      componentBulk.clear(message);
       notifyInfo(message);
       return true;
     } catch (err) {
@@ -5518,13 +5514,6 @@
   // the block above.
   function stageRecipeBulkDraft(next) {
     recipeBulkDraft = next || createRecipeBulkDraft();
-  }
-
-  // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate and
-  // Delete.
-  function clearRecipeBulkSelection(message = selectionClearedAnnouncement()) {
-    recipeBrowserState.bulkSelectedRecipeIds = new Set();
-    announceBulkSelectionEmptied('recipes', message);
   }
 
   // Singular / plural over one count, so the three post-apply sentences below do not each
@@ -5665,7 +5654,7 @@
         return false;
       }
       const message = recipeBulkDeletedMessage(result);
-      clearRecipeBulkSelection(message);
+      recipeBulk.clear(message);
       notifyInfo(message);
       return true;
     } catch (err) {
@@ -5719,7 +5708,7 @@
 
   async function applyRecipeBulkEdit() {
     if (recipeBulkApplying) return false;
-    const ids = recipeBulkSelectedIds;
+    const ids = recipeBulk.ids;
     if (ids.size === 0) return false;
     // An unstaged axis is never sent.
     const edit = toBulkRecipeEdit(recipeBulkDraft);
@@ -5733,7 +5722,7 @@
       // One save and one refresh happened inside the store action, so the rows are already
       // re-rendering.
       const message = recipeBulkAppliedMessage(result);
-      clearRecipeBulkSelection(message);
+      recipeBulk.clear(message);
       notifyInfo(message);
       return true;
     } finally {
@@ -5873,15 +5862,9 @@
     essenceBulkDraft = next || createEssenceBulkDraft();
   }
 
-  // The third twin of `clearComponentBulkSelection`, announcement and focus hop included.
-  function clearEssenceBulkSelection(message = selectionClearedAnnouncement()) {
-    essenceBrowserState.bulkSelectedEssenceIds = new Set();
-    announceBulkSelectionEmptied('essences', message);
-  }
-
   async function applyEssenceBulkEdit() {
     if (essenceBulkApplying) return false;
-    const ids = essenceBulkSelectedIds;
+    const ids = essenceBulk.ids;
     if (ids.size === 0) return false;
     // An unstaged axis is never sent.
     const edit = toBulkEssenceEdit(essenceBulkDraft);
@@ -5891,7 +5874,7 @@
       const result = await store.applyEssenceBulkEdit?.(ids, edit);
       if (!result) return false;
       const message = essenceBulkAppliedMessage(Number(result.updated) || 0);
-      clearEssenceBulkSelection(message);
+      essenceBulk.clear(message);
       notifyInfo(message);
       return true;
     } finally {
@@ -5936,7 +5919,7 @@
         return false;
       }
       const message = essenceBulkDeletedMessage(result);
-      clearEssenceBulkSelection(message);
+      essenceBulk.clear(message);
       notifyInfo(message);
       return true;
     } catch (err) {
@@ -10414,8 +10397,7 @@
         onSelectEssence={selectEssence}
         onEditEssence={editEssence}
         onToggleEssenceEnabled={toggleEssenceEnabled}
-        onSelectionCleared={() =>
-          announceBulkSelectionEmptied('essences', selectionClearedAnnouncement())}
+        onSelectionCleared={() => essenceBulk.announceCleared()}
         bind:browserState={essenceBrowserState}
       />
     {:else if currentView === 'essence-edit' && selectedSystem}
@@ -10530,8 +10512,7 @@
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
         onOpenWorldEntry={(route, entityId) => openWorldScopedEntry(route, entityId)}
-        onSelectionCleared={() =>
-          announceBulkSelectionEmptied('components', selectionClearedAnnouncement())}
+        onSelectionCleared={() => componentBulk.announceCleared()}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
@@ -10662,8 +10643,7 @@
         onEditRecipe={(id) => editRecipe(id)}
         onToggleEnabled={(id, enabled, options) => toggleRecipeEnabled(id, enabled, options)}
         onToggleLocked={(id, locked) => store.toggleRecipeLocked?.(id, locked)}
-        onSelectionCleared={() =>
-          announceBulkSelectionEmptied('recipes', selectionClearedAnnouncement())}
+        onSelectionCleared={() => recipeBulk.announceCleared()}
       />
     {:else if currentView === 'system-edit' && selectedSystem}
       <main
@@ -13074,17 +13054,17 @@
               inherited={inspectedEssenceInherited}
               sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
             />
-          {:else if currentView === 'essences' && essenceBulkSelectionCount > 0}
+          {:else if currentView === 'essences' && essenceBulk.count > 0}
             <EssenceBulkEditPanel
-              count={essenceBulkSelectionCount}
-              selectedRows={essenceBulkSelectedRows}
+              count={essenceBulk.count}
+              selectedRows={essenceBulk.rows}
               draft={essenceBulkDraft}
               applying={essenceBulkApplying}
               deleting={essenceBulkDeleting}
               deleteArmed={essenceBulkDeleteArmed}
               deleteOutcome={essenceBulkDeleteOutcome}
               onDraftChange={(next) => stageEssenceBulkDraft(next)}
-              onClearSelection={() => clearEssenceBulkSelection()}
+              onClearSelection={() => essenceBulk.clear()}
               onApply={() => applyEssenceBulkEdit()}
               onArmDelete={() => armEssenceBulkDelete()}
               onDisarmDelete={() => (essenceBulkDeleteArmed = false)}
@@ -13222,16 +13202,16 @@
           The bulk panel REPLACES the single-component inspector while the selection is non-empty
            (issue 772) — the prototype's `bulkOn` / `bulkOff` swap, at its `> 0` threshold.
         -->
-          {#if componentBulkSelectionCount > 0}
+          {#if componentBulk.count > 0}
             <ComponentBulkEditPanel
-              count={componentBulkSelectionCount}
+              count={componentBulk.count}
               systemName={selectedSystem?.name || ''}
               categoryOptions={componentBulkCategoryOptions}
               tags={selectedSystem?.itemTags || []}
               showEssences={selectedSystem?.features?.essences === true}
               essenceDefinitions={selectedSystem?.essenceDefinitions || []}
               showProgressiveDifficulty={componentDifficultyAxisProgressive}
-              selectedCards={componentBulkSelectedCards}
+              selectedCards={componentBulk.rows}
               draft={componentBulkDraft}
               applying={componentBulkApplying}
               deleting={componentBulkDeleting}
@@ -13239,7 +13219,7 @@
               deleteImpact={componentBulkDeleteImpact}
               deleteOutcome={componentBulkDeleteOutcome}
               onDraftChange={(next) => stageComponentBulkDraft(next)}
-              onClearSelection={() => clearComponentBulkSelection()}
+              onClearSelection={() => componentBulk.clear()}
               onApply={() => applyComponentBulkEdit()}
               onArmDelete={() => armComponentBulkDelete()}
               onDisarmDelete={() => (componentBulkDeleteArmed = false)}
@@ -13367,9 +13347,9 @@
           The bulk panel REPLACES the single-recipe inspector while the selection is non-empty
            (issue 1010), at the same `> 0` threshold the Component Studio uses.
         -->
-          {#if recipeBulkSelectionCount > 0}
+          {#if recipeBulk.count > 0}
             <RecipeBulkEditPanel
-              count={recipeBulkSelectionCount}
+              count={recipeBulk.count}
               categoryOptions={recipeBulkCategoryOptions}
               checkTierAxis={recipeBulkCheckTierAxis}
               checkTierOptions={recipeCheckTierOptions}
@@ -13383,7 +13363,7 @@
               deleteImpact={recipeBulkDeleteImpact}
               deleteOutcome={recipeBulkDeleteOutcome}
               onDraftChange={(next) => stageRecipeBulkDraft(next)}
-              onClearSelection={() => clearRecipeBulkSelection()}
+              onClearSelection={() => recipeBulk.clear()}
               onApply={() => applyRecipeBulkEdit()}
               onArmDelete={() => armRecipeBulkDelete()}
               onDisarmDelete={() => (recipeBulkDeleteArmed = false)}

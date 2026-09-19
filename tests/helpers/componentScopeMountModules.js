@@ -321,6 +321,9 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
         'src/utils/bulkSelectionModel.js',
       ],
+      // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than
+      // copied; copied verbatim it throws `ReferenceError: $state is not defined`.
+      runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
       compiledModules,
       componentPath,
     }),
