@@ -720,7 +720,7 @@ describe('the deliberate exclusions are unchanged', () => {
   });
 
   it('the durable-identity restamp still reads the in-system arrays', () => {
-    const source = read('src/systems/CraftingSystemManager.js');
+    const source = read('src/systems/SourceIdentityService.js');
     assert.ok(source.includes("bucket: 'components',"), 'non-vacuity: the restamp kinds exist');
     assert.ok(source.includes('definitions: system.components || [],'));
     assert.ok(source.includes('definitions: (system.tools || []).filter('));
