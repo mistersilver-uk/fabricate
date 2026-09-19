@@ -22,8 +22,10 @@ import {
   referencesIdentifier as referencesIdentifierOf,
 } from './helpers/moduleAst.js';
 import {
+  attributeExpression,
   attributeNames,
   attributeValue,
+  boundDirectives,
   carriesSpread,
   containsLiteral,
   declaredConstant,
@@ -34,6 +36,7 @@ import {
   parseComponent,
   parseComponentScope,
   passesProp,
+  propDefault,
   propNone,
   readsGlobal,
   referencesIdentifier,
@@ -157,6 +160,35 @@ test('declaresAttribute sees a directive as well as a plain attribute', () => {
   assert.equal(declaresAttribute(node, 'id'), true);
   assert.equal(declaresAttribute(node, 'value'), true);
   assert.equal(declaresAttribute(node, 'name'), false);
+});
+
+test('attributeExpression reads the expression form only, and denies the static one', () => {
+  const card = parseComponent('<div><Chip onclick={close} tone="warn" /></div>');
+  let chip;
+  walkElements(card.fragment, (candidate) => {
+    if (candidate.type === 'Component') chip = candidate;
+  });
+  assert.equal(attributeExpression(chip, 'onclick')?.name, 'close');
+  assert.equal(attributeExpression(chip, 'tone'), undefined, 'a static value is not an expression');
+  assert.equal(attributeExpression(chip, 'absent'), undefined);
+});
+
+test('boundDirectives lists bind: targets and nothing else a directive spells', () => {
+  const bound = parseComponent(
+    '<div><input bind:value={name} /><Chip class:tone={true} onclick={close} bind:this={el} /></div>'
+  );
+  assert.deepStrictEqual([...boundDirectives(bound)].sort(), ['this', 'value']);
+  assert.equal(boundDirectives(parseComponent('<div />')).has('value'), false);
+});
+
+test('propDefault answers the literal default, and undefined for anything else', () => {
+  const props = parseComponent(
+    "<script>let { classPrefix = 'manager-scoped-preview', rows = [], store } = $props();</script><div />"
+  );
+  assert.equal(propDefault(props, 'classPrefix'), 'manager-scoped-preview');
+  assert.equal(propDefault(props, 'rows'), undefined, 'a non-literal default is not a stated value');
+  assert.equal(propDefault(props, 'store'), undefined, 'and a required prop declares none');
+  assert.equal(propDefault(props, 'absent'), undefined);
 });
 
 test('importedModules and importsModule read the instance script', () => {
