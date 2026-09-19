@@ -779,6 +779,7 @@ type TravelConfig = {
 3. Normalization is total and non-throwing, always emitting all three keys.
 4. **Realm `id`s are stable and are never rewritten**, because environments (`includedRealmIds` / `excludedRealmIds`), party overrides (`currentRealmOverride.realmIds`) and the actor discovery flag all store realm ids, so a dropped or re-keyed realm orphans every reference to it.
    Every reconciliation of two libraries is therefore keyed by `id` and is reference-preserving: the `1.27.0` migration UNIONS realms by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+   A GM-driven realm delete now cascades into environment realm membership (see `destructive-changes-and-migrations`); a merge or migration has no such cascade, which is why neither may ever drop or re-key an id.
 5. The store publishes its cache BEFORE awaiting the write.
    Callers read-modify-write, so a second edit starting while the first write is in flight would otherwise read the pre-first-edit config and clobber it.
    The per-system store this replaced was safe by construction because the system manager writes its map before its own await, so publishing late here would be a regression rather than a new limitation.

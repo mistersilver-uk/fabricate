@@ -1848,6 +1848,10 @@ Shipped capabilities:
 - The route embeds the canonical **realm authoring surface** using a realm list + detail layout: the list creates/selects/deletes realms; the detail pane edits the selected realm's name, description, image, enabled, secret, and biomes (chosen from the system biome vocabulary).
   Edits merge-patch over the existing record so unedited fields (sort, sceneMappings, modifiers) round-trip untouched.
   Delete is destructive and routes through the confirm dialog with referenced-by evidence (a deliberate change from the prior immediate-delete quick list).
+  Deleting a realm removes it from the realm membership (`includedRealmIds` and `excludedRealmIds`) of every environment that cited it, in the same operation and before the realm itself is removed, and the confirm copy states that consequence — including that an environment left with no realms is no longer realm-gated — alongside the referenced-by counts.
+  The delete still never blocks: if the membership rewrite cannot be persisted the realm is removed anyway, and the next environment save prunes what is left.
+  After the delete the manager re-reads the environment list and strips the deleted id from any open environment draft, so no later save re-introduces it.
+  Party overrides are not rewritten; a stale override id stays as repair evidence because the party card exposes a control to clear it.
 - This realm authoring is the source of the realms an environment can be assigned to via its `includedRealmIds` multi-select; the multi-realm data is authored here, not in the environments browser.
   The legacy environments-browser "Region" filter has been removed.
 - Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control, associated with that control by `aria-describedby` and announced through `role="alert"`.

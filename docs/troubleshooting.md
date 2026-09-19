@@ -642,6 +642,27 @@ The message covers the whole section rather than one tab of it, so every tab bel
 
 ---
 
+## Environments Will Not Save After a Realm Was Deleted
+
+**Symptom:** After deleting a gathering realm, every gathering environment save fails with an error saying the environment references an unknown realm.
+Environments you never edited fail too, so no environment in the world can be saved.
+
+**Cause:**
+
+Versions up to 1.9.6 removed the realm from the world realm library but left its id on every environment that listed it.
+Environments are stored as one world list, and a single id that names no realm made the whole list invalid, so every environment save was rejected rather than only the saves of environments that cited the deleted realm.
+
+**Fix:** Update to 1.9.7 or later.
+The next successful environment save removes the stale realm ids from every environment carrying one, and logs once what it removed.
+An environment left with no realm ids is no longer restricted to a realm; it is not disabled or deleted.
+
+From 1.9.7 on, deleting a realm removes it from the realm membership of every environment that listed it as part of the delete, so the problem cannot recur.
+A party whose current-realm override named the deleted realm still shows it as **Unknown realm**; clear that override from the party card.
+
+**See also:** [Gathering Realms & Travel]({% link gathering-realms.md %}) covers realm deletion and what it does to referencing environments.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

@@ -103,6 +103,16 @@ It has both a single-essence and a SET form, and the two perform the same cascad
 10. Alchemy signature uniqueness is reconciled once after the cascade, because stripping essences collapses signatures and can create collisions that did not exist before.
 11. No run clean-up applies: a crafting run records component ingredients and a resolved-essence snapshot, neither of which is invalidated by the definition's removal.
 
+### Realm Deletion Cascade
+
+Deleting a realm that environments reference is a confirmed destructive record rewrite, not a silent orphaning.
+
+1. Deletion is WARNED, not BLOCKED: the confirm dialog reports how many environments cite the realm and how many party overrides name it, and the GM may always proceed.
+2. Every environment citing the realm has it stripped from `includedRealmIds` and `excludedRealmIds` before the realm leaves the world library, so no environment is left naming a realm that no longer exists.
+3. The strip persists as the SINGLE environment-list write that precedes the realm write, never one write per environment; a per-environment fallback exists only for a seam that offers no list write.
+4. A failure to rewrite the environments must not abort the deletion: the realm is still removed, the failure is logged, and the environment store prunes the remaining stale ids on the next environment save.
+5. `currentRealmOverride.realmIds` is deliberately NOT pruned: a stale override id resolves to no current realm rather than gating anything, and the party card surfaces a control to clear it, so it stays as repair evidence.
+
 ### Disable Multi-step Feature
 
 Disabling `features.multiStepRecipes` is a **non-destructive collapse**, not a destructive migration and not an information-hiding gate.
