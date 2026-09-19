@@ -55,6 +55,9 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTasksBrowserView)\.svelte$/,
+      // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
+      // moved out of the root: without this the leaf publishes environment-editor frames instead.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -459,6 +462,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // The facts this case exists to show are computed and rendered here.
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      // And drawn by the leaf they moved into (issue 1707 phase 2).
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -485,6 +490,7 @@ export const CASES = Object.freeze([
       // This is the only frame that draws the event half of the shared modifier panel, and neither
       // pattern above reaches `environment/` (issue 1707).
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -514,6 +520,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
     ],
   }),
 ]);
