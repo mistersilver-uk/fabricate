@@ -54,7 +54,7 @@ src/utils	944
 styles	1042
 tests	19646
 tests/actions	85
-tests/canvas	409
+tests/canvas	414
 tests/canvas/regions	210
 tests/components	15022
 tests/fixtures	34
