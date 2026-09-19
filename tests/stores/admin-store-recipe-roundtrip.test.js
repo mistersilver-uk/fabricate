@@ -7,6 +7,8 @@ import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
+import { createServices as createSharedServices } from '../helpers/adminStoreServices.js';
+
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 const { RecipeManager } = await import('../../src/systems/RecipeManager.js');
 const { Recipe } = await import('../../src/models/Recipe.js');
@@ -240,23 +242,10 @@ function createSystem() {
 }
 
 function createServices(recipeManager) {
-  const systems = [createSystem()];
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => ({
-      getSystems: () => systems,
-      getSystem: (id) => systems.find((system) => system.id === id) || null,
-      getItems: (id) => systems.find((system) => system.id === id)?.items || [],
-    }),
+  return createSharedServices(createSystem(), [], [], {
     getRecipeManager: () => recipeManager,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
     getAccessCharacterActors: () => [],
-    localize: (key) => key,
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
-  };
+  });
 }
 
 // The root's draft mechanics, verbatim: `cloneRecipeDraft` is a JSON deep clone of the PROJECTED

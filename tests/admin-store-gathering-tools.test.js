@@ -7,6 +7,7 @@ import { SETTING_KEYS } from '../src/config/settings.js';
 import { Tool } from '../src/models/Tool.js';
 import { createToolScopeStore } from '../src/systems/worldScopeStores.js';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { createServices as createSharedServices } from './helpers/adminStoreServices.js';
 
 let generatedToolId = 0;
 
@@ -117,33 +118,15 @@ function createMockServices(overrides = {}) {
     deleteItem: async () => {},
   };
 
-  const mockRecipeManager = {
-    getRecipes: () => [],
-    getRecipe: () => null,
-    createRecipe: async () => ({}),
-    updateRecipe: async () => {},
-    deleteRecipe: async () => {},
-    importRecipes: async () => {},
-    exportRecipes: () => [],
-  };
-
-  const base = {
-    getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => {
-      store[key] = value;
-    },
+  const base = createSharedServices(systems[0], [], [], {
+    settings: store,
     getCraftingSystemManager: () => mockSystemManager,
-    getRecipeManager: () => mockRecipeManager,
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     copyToClipboard: async () => {},
     openRecipeEditor: () => {},
     renderImportDialog: async () => {},
-  };
+  });
 
   const merged = { ...base, ...overrides };
   merged._store = store;

@@ -3,9 +3,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { createServices as createSharedServices } from './helpers/adminStoreServices.js';
 
 function createServices() {
-  const store = {};
   const system = {
     id: 'sys1',
     name: 'System One',
@@ -30,6 +30,7 @@ function createServices() {
     img: 'icons/svg/item-bag.svg',
     description: '',
     category,
+    craftingSystemId: system.id,
     steps: [],
     ingredientSets,
     resultGroups: [],
@@ -74,34 +75,22 @@ function createServices() {
       return system;
     },
   };
-  const recipeManager = {
-    getRecipes: () => recipes,
-    getRecipe: (id) => recipes.find((r) => r.id === id) || null,
+  return createSharedServices(system, recipes, [], {
+    settings: {},
     updateRecipe: async (id, updates = {}) => {
       recipeWrites.push([id, updates]);
       const recipe = recipes.find((r) => r.id === id);
       if (recipe) Object.assign(recipe, updates);
       return recipe;
     },
-  };
-  return {
-    getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => {
-      store[key] = value;
-    },
     getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => recipeManager,
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getFoundrySystemId: () => 'dnd5e',
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     _system: system,
     _itemWrites: itemWrites,
     _recipeWrites: recipeWrites,
-  };
+  });
 }
 
 async function storeFor() {

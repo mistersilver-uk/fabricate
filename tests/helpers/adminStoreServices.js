@@ -46,13 +46,76 @@ export function makeSystem(overrides = {}) {
   };
 }
 
+/**
+ * `getSetting`/`setSetting` over a caller-owned record. Without one the fixture's defaults hold
+ * (`lastManagedCraftingSystem` -> `sys1`); with one the record is the only source, so a suite that
+ * seeds nothing starts with no selected system.
+ */
+function settingAccessors(settings) {
+  if (!settings) {
+    return {
+      getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
+      setSetting: async () => {},
+    };
+  }
+  return {
+    getSetting: (key) => settings[key] ?? '',
+    setSetting: async (key, value) => {
+      settings[key] = value;
+    },
+  };
+}
+
+/** System writes that mutate `system` and log `{ kind, id, updates }` into the caller's array. */
+function systemWriteMethods(system, systemWrites) {
+  return {
+    updateSystem: async (id, updates = {}) => {
+      systemWrites.push({ kind: 'updateSystem', id, updates });
+      if (id !== system.id) return null;
+      Object.assign(system, updates);
+      return system;
+    },
+  };
+}
+
+/** Capturing dialog/localization/notification hooks, each wired only when its sink is supplied. */
+function dialogAccessors({ confirmations, localizations, notifications, confirm } = {}) {
+  return {
+    ...(confirmations && {
+      confirmDialog: async (config) => {
+        confirmations.push(config);
+        return confirm !== false;
+      },
+    }),
+    ...(localizations && {
+      localize: (key, data) => {
+        localizations.push({ key, data });
+        return key;
+      },
+    }),
+    ...(notifications && {
+      notify: {
+        info: (message) => notifications.info.push(String(message)),
+        warn: (message) => notifications.warn.push(String(message)),
+        error: (message) => notifications.error.push(String(message)),
+      },
+    }),
+  };
+}
+
+/**
+ * The shared services double. `updateRecipe`, `settings`, `systemWrites` and `dialogCapture` are
+ * consumed here and reach the managers; every other `overrides` key lands on the services object
+ * only, so a suite that needs a different manager passes `overrides.getCraftingSystemManager`.
+ */
 export function createServices(system, recipes = [], capture = [], overrides = {}) {
-  const { updateRecipe, ...serviceOverrides } = overrides;
+  const { updateRecipe, settings, systemWrites, dialogCapture, ...serviceOverrides } = overrides;
   const systems = [system];
   const systemManager = {
     getSystems: () => systems,
     getSystem: (id) => systems.find((s) => s.id === id) || null,
-    getItems: () => [],
+    getItems: () => system.items || [],
+    ...(systemWrites ? systemWriteMethods(system, systemWrites) : {}),
     updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
       capture.push({ systemId, recipeItemId, patch });
       const definition = (system.recipeItemDefinitions || []).find((d) => d.id === recipeItemId);
@@ -74,8 +137,7 @@ export function createServices(system, recipes = [], capture = [], overrides = {
       }),
   };
   return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
+    ...settingAccessors(settings),
     getCraftingSystemManager: () => systemManager,
     getRecipeManager: () => recipeManager,
     getScriptMacros: () => [],
@@ -88,6 +150,7 @@ export function createServices(system, recipes = [], capture = [], overrides = {
     },
     localize: (key) => key,
     notify: { info: () => {}, warn: () => {}, error: () => {} },
+    ...(dialogCapture ? dialogAccessors(dialogCapture) : {}),
     ...serviceOverrides,
   };
 }

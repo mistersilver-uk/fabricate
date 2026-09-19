@@ -1,4 +1,5 @@
 /** Shared essence builders and the Foundry-ish engine harness for the issue-1036 essence suites. */
+import { createServices } from './adminStoreServices.js';
 
 /** One essence definition in the exact shape `_normalizeEssenceDefinition` emits. */
 export function makeEssence(overrides = {}) {
@@ -229,39 +230,12 @@ export function makeEssenceStoreHarness(options = {}) {
     },
   };
 
-  const services = {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
+  // The shared admin-services fixture, with the essence write primitives above composed over it:
+  // those four are the subject of these suites, the rest is the same boilerplate every suite uses.
+  const services = createServices(system, recipes, [], {
     getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => ({
-      getRecipes: (filter) =>
-        filter?.craftingSystemId
-          ? recipes.filter((recipe) => recipe.craftingSystemId === filter.craftingSystemId)
-          : recipes,
-      getRecipe: (id) => recipes.find((recipe) => recipe.id === id) || null,
-      updateRecipe: async () => {},
-    }),
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
-    // Keys are returned verbatim, which is what makes "is this string localized?" visible in an
-    // assertion: a hardcoded English sentence cannot be mistaken for a key.
-    localize: (key, data) => {
-      localizations.push({ key, data });
-      return key;
-    },
-    // Captures each call so a suite can assert a confirm was asked for, while keeping the
-    // boolean return the confirm/decline suites rely on.
-    confirmDialog: async (config) => {
-      confirmations.push(config);
-      return options.confirm !== false;
-    },
-    notify: {
-      info: (message) => notifications.info.push(String(message)),
-      warn: (message) => notifications.warn.push(String(message)),
-      error: (message) => notifications.error.push(String(message)),
-    },
-  };
+    dialogCapture: { confirmations, localizations, notifications, confirm: options.confirm },
+  });
 
   return {
     services,
