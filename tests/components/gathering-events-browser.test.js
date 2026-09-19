@@ -176,9 +176,8 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
-    // One fact, asked once: the filter is the shell's `gatheringEventReferencingEnvironments`, and
-    // reading `enabledEventIds` is that function's body — pinning both was the same fact twice
-    // (issue 1707 phase 2, which is what added the second source read above).
+    // `enabledEventIds` is the filter's own body, not proof it reaches the leaf: that forward is
+    // asserted by DOM in `manager-gathering-mounted.js` (issue 1707 phase 2 review).
     assert.ok(rootSource.includes('enabledEventIds'), 'usage should be derived from enabledEventIds');
     const events = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.equal(events.UsedInEnvironmentsCard, 'Used in environments');

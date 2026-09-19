@@ -239,11 +239,6 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // the same commit. Re-measured rather than subtracted: 75 components outside `components/` clear
 // the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
 // already states.
-// 47 -> 48 (issue 1707 phase 2): `environment/GatheringModifierEditor.svelte` ARRIVED by
-// crossing the two-caller bar, which is the de-duplication acting rather than a new component —
-// `GatheringTaskInspector` and `GatheringEventInspector` are the two leaves that own its two
-// subjects, and before this phase the root was its single caller. Measured: 2 importers, both
-// inside the one gathering inspector column, so it is one feature's panel and not a vocabulary
-// candidate; the adjudication (promote, or a `notAPrimitive` row with this measurement) belongs
-// to the design-system pass, and the row records that nobody has made it yet.
+// 47 -> 48 (issue 1707 phase 2): `GatheringModifierEditor.svelte` arrived with 2 importers (the
+// task/event leaves); the promote-or-`notAPrimitive` call is deferred to the design-system pass.
 export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;

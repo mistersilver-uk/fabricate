@@ -1506,10 +1506,8 @@ function createStore(calls = [], options = {}) {
       calls.push(['updateGatheringVocabularyValue', ...args]),
     deleteGatheringVocabularyValue: (...args) =>
       calls.push(['deleteGatheringVocabularyValue', ...args]),
-    // The ten Gathering Rules selects and the two drop-limit steppers had no handler here at all
-    // before issue 1707 phase 2, so every rule write optional-chained to `undefined` and nothing
-    // could act on that column. It republishes the aggregate so a rule that reveals a stepper
-    // (`limitedDrops`) can be acted on in turn.
+    // Issue 1707 phase 2: the ten Gathering Rules selects and two drop-limit steppers had no
+    // handler here, so no write could act on that column; this republishes the aggregate.
     updateGatheringRules: (systemId, updates = {}) => {
       calls.push(['updateGatheringRules', systemId, updates]);
       viewState.update((state) => {

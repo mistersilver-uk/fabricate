@@ -45,7 +45,7 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     const usageIdx = taskInspectorSource.indexOf('data-task-environment-usage');
     assert.ok(dropsIdx >= 0, 'drops summary attribute should exist');
     assert.ok(usageIdx > dropsIdx, 'environment usage should appear after the drops summary');
-    // The card pin above already fixes the tile class; this test owns the ORDER of the two cards,
+    // The card pin above already fixes the tile class; this test owns the order of the two cards,
     // and pinning the class twice in one file was one fact in two places (issue 1707 phase 2).
   });
 

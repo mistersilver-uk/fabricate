@@ -81,6 +81,9 @@ export function registerGatheringCases() {
         enabled: true,
         biomes: ['forest'],
         dangerLevel: 'deadly',
+        // Unrelated to the active-environment count below: it drives the "used in
+        // environments" card instead (issue 1707 phase 2 review).
+        enabledEventIds: ['event-storm-omen'],
       },
       {
         id: 'env-thorn-b',
@@ -134,6 +137,17 @@ export function registerGatheringCases() {
       timeOfDay: [],
       dangerTags: ['deadly'],
     };
+    // Unreferenced by any environment: the counterpart empty state for the same card.
+    const gatheringEventFactUnreferencedEvent = {
+      id: 'event-clear-skies',
+      name: 'Clear Skies',
+      enabled: true,
+      dropRate: 15,
+      biomes: [],
+      weather: [],
+      timeOfDay: [],
+      dangerTags: [],
+    };
 
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -141,7 +155,7 @@ export function registerGatheringCases() {
       target,
       props: {
         store: createStore(calls, {
-          gatheringLibraryEvents: [gatheringEventFactEvent],
+          gatheringLibraryEvents: [gatheringEventFactEvent, gatheringEventFactUnreferencedEvent],
           gatheringEventFactEnvironments,
           gatheringEventFactWeather: 'heavy-rain',
         }),
@@ -170,6 +184,18 @@ export function registerGatheringCases() {
       '2',
       'the event fact should count only the environments the shared seam composes: matching ' +
         'biome AND danger AND current conditions, scoped to enabled environments in this system'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-event-environment-usage-chips]')),
+      'Storm Omen is referenced by Stormlit Thicket, so its card renders chips'
+    );
+
+    target.querySelector('[data-gathering-event-id="event-clear-skies"] .manager-gathering-event-identity').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector('[data-event-environment-usage-empty]')),
+      'Clear Skies is unreferenced, so the same card renders the empty state'
     );
   });
 

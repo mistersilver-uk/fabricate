@@ -61,7 +61,9 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         '../../../model/componentBulkEditModel.js',
         // DRAGGED IN BY ISSUE 1509's FILE MOVE, on exactly the `Chip` precedent recorded below.
         '../../components/ArmedDangerButton.svelte',
-        '../../components/ChanceSlider.svelte',
+        // `ChanceSlider.svelte` LEFT this list in issue 1707 phase 2: the drop-rate slider that
+        // imported it moved into `environment/GatheringTaskInspector.svelte`, so the gateway no
+        // longer imports it directly.
         // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new dependency.
         '../../components/Chip.svelte',
         // Moved by issue 1710's file move, and it is neither a screen nor a new dependency.

@@ -18,6 +18,8 @@ import { managerComponents, settleBetweenTests } from './manager-mounted-shared.
 let Component;
 let EnvironmentEditViewComponent;
 let GatheringModifierEditorComponent;
+let GatheringTaskInspectorComponent;
+let GatheringEventInspectorComponent;
 let mounted;
 let target;
 
@@ -89,6 +91,8 @@ export function registerEnvironmentsCases() {
       Component,
       EnvironmentEditViewComponent,
       GatheringModifierEditorComponent,
+      GatheringTaskInspectorComponent,
+      GatheringEventInspectorComponent,
     } = await managerComponents());
   });
 
@@ -124,6 +128,10 @@ export function registerEnvironmentsCases() {
 
     const card = target.querySelector('.manager-inspector [data-gathering-inspector-rules]');
     assert.ok(Boolean(card), 'the settings tab renders the Gathering Rules card in the inspector');
+    assert.ok(
+      Boolean(card.querySelector('.manager-rule-copy')),
+      'each rule row stacks its description beside the icon'
+    );
     const scope = card.querySelector('#manager-gathering-rule-reveal-scope');
     scope.value = 'party';
     scope.dispatchEvent(new Event('change', { bubbles: true }));
@@ -347,6 +355,23 @@ export function registerEnvironmentsCases() {
       taskBiomeFact.querySelector('.manager-fact-label'),
       'a user-defined biome count should keep its contextual label'
     );
+    assert.ok(
+      Boolean(target.querySelector('[data-task-environment-usage-chips]')),
+      'Gather Moon Herbs is referenced by env-forest, so its card renders chips'
+    );
+
+    // Prospect Crystal Veins is referenced by no environment, so selecting it flips the same
+    // card to its empty state (issue 1707 phase 2 review).
+    target.querySelector('[data-gathering-task-id="task-cavern"] .manager-gathering-task-identity').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector('[data-task-environment-usage-empty]')),
+      'Prospect Crystal Veins is unreferenced, so its card renders the empty state'
+    );
+    target.querySelector('[data-gathering-task-id="task-herbs"] .manager-gathering-task-identity').click();
+    await tick();
+    flushSync();
 
     const taskSearch = target.querySelector('[data-gathering-tasks-browser] input[type="search"]');
     taskSearch.value = 'crystal';
@@ -3019,6 +3044,58 @@ export function registerEnvironmentsCases() {
       );
     });
   }
+
+  // The forward crosses TWO boundaries now (leaf -> panel); pin it at the leaf too, not only at
+  // the panel the loop above mounts directly (issue 1707 phase 2 review).
+  it('opens the drop panel upwards through GatheringTaskInspector, the leaf that owns it', async () => {
+    const shell = modifierEditorShell('drop', []);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(GatheringTaskInspectorComponent, {
+      target,
+      props: {
+        ...shell.props,
+        editing: true,
+        task: { id: 'task-1' },
+        editingTask: { resolutionMode: 'd100' },
+        selectedDrop: { id: 'drop-1' },
+        characterModifierSearchOpenUp: true,
+        // Forwarded on to the panel via `bind:`; a leaf-level bindable with no fallback of its
+        // own needs an entry value, or the panel's own `$bindable(null)` fallback throws.
+        characterModifierSearchAnchor: null,
+        characterModifierSearchTerm: '',
+      },
+    });
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('.manager-character-modifier-add-suggestions.is-above')),
+      'the task leaf must forward characterModifierSearchOpenUp to the shared panel'
+    );
+  });
+
+  it('opens the event panel upwards through GatheringEventInspector, the leaf that owns it', async () => {
+    const shell = modifierEditorShell('event', []);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(GatheringEventInspectorComponent, {
+      target,
+      props: {
+        ...shell.props,
+        editing: true,
+        editingEvent: { id: 'event-1' },
+        characterModifierSearchOpenUp: true,
+        characterModifierSearchAnchor: null,
+        characterModifierSearchTerm: '',
+      },
+    });
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('.manager-character-modifier-add-suggestions.is-above')),
+      'the event leaf must forward characterModifierSearchOpenUp to the shared panel'
+    );
+  });
 
   // The coloured box, the signed value input, its `%` adornment and the Arrow stepper moved into
   // the shared panel, so they are asserted where they render rather than re-pinned as root text.

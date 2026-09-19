@@ -65,7 +65,7 @@ tests/components/journal-source.test.js	64
 tests/components/knowledge-view-mounted.test.js	7
 tests/components/manager-browse-views-are-lists.test.js	10
 tests/components/manager-button-cascade-inventory.test.js	5
-tests/components/manager-contract.test.js	470
+tests/components/manager-contract.test.js	248
 tests/components/manager-control-rungs.test.js	7
 tests/components/manager-launch-readiness.test.js	9
 tests/components/manager-layout-downtime-fixtures.js	4
