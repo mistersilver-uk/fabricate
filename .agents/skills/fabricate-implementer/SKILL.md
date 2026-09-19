@@ -41,7 +41,7 @@ If implementation forces a justified departure from the proposed delta, note it 
 5. Load `javascript-structural-design` when the change reshapes dependencies, constructors, module boundaries, or test seams.
 6. Implement the minimum change that satisfies the plan.
 7. For UI changes, state the rendered criteria, required capture states, and what each recommended screenshot must demonstrate.
-When the state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs`, implement an in-scope capture state only when the assigned paths include the harness.
+When the state is not reachable by the existing capture walk in `scripts/foundry-smoke/scenarios/`, implement an in-scope capture state only when the assigned paths include the harness.
 8. Return screenshot and smoke-test recommendations to the workflow driver.
 Do not generate, collect, publish, upload, or clean screenshot evidence from the lane, and do not update S3 or a PR.
 If capture appears impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
@@ -119,8 +119,8 @@ The workflow driver owns that run and separates harness infrastructure failures 
 - For image-card UI, use representative fixture data so at least one screenshot proves the linked image path as well as fallback behavior; when no linked-image fixture exists, name that gap explicitly in the handoff.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster image paths directly when previews need imagery; do not invent SVG preview art or hard-code external URLs.
 - Capture states co-evolve with the surfaces they capture.
-Renaming or restructuring any surface referenced by the `scripts/foundry-test-run.mjs` selectors or the `scripts/ui-pr-screenshot-evidence.mjs` view map requires updating the selector, the map, and its pinning test (`tests/ui-pr-screenshot-evidence.test.js`) in the same branch — the map is a hand-maintained mirror guarded by that test, so a stale entry fails at test time, not compile time.
-- When adding a capture to `scripts/foundry-test-run.mjs`, `waitFor` a stable container/section/tab marker (e.g. `[data-recipe-tab="results"] [data-recipe-section]`), not deep leaf content (`[data-recipe-result-item]`).
+Renaming or restructuring any surface referenced by the `scripts/foundry-smoke/` selectors or the `scripts/ui-pr-screenshot-evidence.mjs` view map requires updating the selector, the map, and its pinning test (`tests/ui-pr-screenshot-evidence.test.js`) in the same branch — the map is a hand-maintained mirror guarded by that test, so a stale entry fails at test time, not compile time.
+- When adding a capture to the walk (one module per section under `scripts/foundry-smoke/scenarios/`), `waitFor` a stable container/section/tab marker (e.g. `[data-recipe-tab="results"] [data-recipe-section]`), not deep leaf content (`[data-recipe-result-item]`).
 An over-specific wait that times out fails the whole phase and can cascade into an unrelated-looking later-phase failure — one root cause reported as `N step(s) failed`.
 When the driver supplies a failed smoke result, diagnose the first failing step before treating later failures as separate breakages.
 - Record what each driver-supplied screenshot proves and explicitly name any remaining fixture gap.

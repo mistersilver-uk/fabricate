@@ -631,7 +631,8 @@ node scripts/foundry-test-down.mjs --clean
 ```
 
 Scripts live in `scripts/foundry-test-*.mjs`.
-The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).
+`scripts/foundry-test-run.mjs` is the runner: it boots the browser, builds the run context, drives the scenario registry and runs the cleanup from its `finally`.
+The walk itself lives in `scripts/foundry-smoke/`: `registry.mjs` lists the scenarios in walk order, `runScenarios.mjs` drives them, `scenarios/` holds one module per walk section, `pageOps/` holds the page primitives they share, and `profile.mjs`, `context.mjs` and `cleanup.mjs` hold the run-scoped state.
 
 ### Smoke arms: which Foundry generation boots
 
@@ -818,7 +819,7 @@ When `npm run screenshots:ui` refuses a run on any of these, it prints which of 
 
 ### Known drift pattern: Phase D0 selectors
 
-`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-test-run.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.
+`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-smoke/pageOps/pageLifecycle.mjs` and the env-edit checks in `scripts/foundry-smoke/scenarios/` pin many selectors by class, child index (`.nth(N)`), and visible button text.
 When the manager UI evolves, these go stale silently — the harness only fails when the next smoke run hits the broken locator.
 
 Hit list seen historically:
@@ -830,7 +831,7 @@ Hit list seen historically:
 - `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from a retired combined Travel view.
 World > Parties renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed.
 
-**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done.
+**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-smoke/` for the changed classes / text BEFORE declaring the change done.
 Prefer running `npm run test:foundry` locally at least once on UI-touching PRs.
 If the harness asserts on something the new markup no longer has, update the harness in the same PR.
 
