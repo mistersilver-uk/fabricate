@@ -27,14 +27,64 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    count: 32,
+    count: 9,
     why:
-      'deferred: root convergence pending. Thirty-two hand-rolled cards — the gathering task, ' +
-      'drop, event and travel inspectors, the drop and modifier editors, and the systems ' +
-      'feature panels — are held out of the sweep because the converging 12k-line root is the ' +
-      'wrong place to land its tail. They are 40% of the whole census, the highest ' +
-      'concentration in this programme. Pinned by count so a later root pass that converts ' +
-      'some of the 32 fails here instead of leaving a fraction of a deferral nobody is tracking.',
+      'deferred: root convergence pending. Nine hand-rolled cards remain — the tags at-a-glance ' +
+      'card, the four systems feature panels, and the four the inspector rail still draws around ' +
+      'its own branches — and they are held out of the sweep because the converging root is the ' +
+      'wrong place to land its tail. The count was 32 until issue 1707 wrote the twice-authored ' +
+      'modifier panel once (two cards de-duplicated, not converted), and 28 until its phase 2 ' +
+      'moved nineteen more into the four rows below with the branches that drew them. Pinned by ' +
+      'count so a later root pass that converts some of the nine fails here instead of leaving a ' +
+      'fraction of a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
+    count: 3,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the gathering event branch ' +
+      'without converting a card — the event identity, details and environment-usage cards — so ' +
+      'the deferral is unchanged in substance and this screen is now small enough for a ' +
+      'conversion lane to take on its own. Pinned by count so a later partial pass fails here ' +
+      'rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    count: 2,
+    why:
+      'deferred with a named reason: issue 1707 RELOCATED these two without converting either — ' +
+      'the condition-modifier card and the character-modifier card of the panel it wrote once — ' +
+      'so the deferral is unchanged in substance and the file is now small enough for a ' +
+      'conversion lane to take this screen on its own. Pinned by count so a later partial pass ' +
+      'fails here rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte',
+    count: 1,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the Gathering Rules card ' +
+      'without converting it, and it is the whole card this file draws. Pinned by count so a ' +
+      'later partial pass fails here rather than silently reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+    count: 7,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the gathering task branch ' +
+      'without converting a card — the task identity, details, drops-summary and ' +
+      'environment-usage cards while browsing, and the drop header, values and no-drops cards ' +
+      'while editing. Pinned by count so a later partial pass fails here rather than silently ' +
+      'reducing a deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/world/TravelInspector.svelte',
+    count: 8,
+    why:
+      'deferred with a named reason: issue 1707 phase 2 relocated the travel branch without ' +
+      'converting a card — the realm name, environments and parties cards on the realms tab, and ' +
+      'the region identity, link and two party cards on the map tab, plus the outer card both ' +
+      'tabs share. Pinned by count so a later partial pass fails here rather than silently ' +
+      'reducing a deferral nobody is tracking.',
   }),
 ]);
 

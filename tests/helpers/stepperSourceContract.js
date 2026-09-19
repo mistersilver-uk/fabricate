@@ -207,10 +207,32 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
 export const CHARACTER_MODIFIER_BOUNDS_PATH =
   'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
 
-/** The two update functions the shared bounds row is wired to, one per scope. */
+/** The shared panel that renders the bounds row, once, for BOTH scopes (issue 1707). */
+export const CHARACTER_MODIFIER_PANEL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
+
+/** The two update functions the shared panel is wired to, one per scope. */
 export const CHARACTER_MODIFIER_BOUNDS_SCOPES = Object.freeze([
   'onUpdateDropCharacterModifier',
   'onUpdateEventCharacterModifier',
+]);
+
+/**
+ * The two leaves that render the shared panel since issue 1707 phase 2, each with the root tag
+ * that renders it and the scope its chain has to carry. The wiring spans two tags now: the drop
+ * side binds its row id inside its leaf, the event side forwards the root's function through.
+ */
+export const CHARACTER_MODIFIER_PANEL_LEAVES = Object.freeze([
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+    rootTag: 'GatheringTaskInspector',
+    scope: 'onUpdateDropCharacterModifier',
+  }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
+    rootTag: 'GatheringEventInspector',
+    scope: 'onUpdateEventCharacterModifier',
+  }),
 ]);
 
 /** D1a's two tables, as the fixture for the unset-value split (V10). */

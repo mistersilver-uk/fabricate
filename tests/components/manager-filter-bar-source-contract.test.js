@@ -10,19 +10,19 @@ const FIELD_PATH = 'src/ui/svelte/components/ManagerSearchField.svelte';
 /** The bar has NO allowlist, and the empty array is the claim rather than an omission. */
 const RAW_TOOLBAR_ALLOWLIST = Object.freeze([]);
 
-/** The three `.manager-search` sites that are NOT this primitive, with their EXACT counts. */
+/** The two `.manager-search` sites that are not this primitive, with their exact counts. */
 const RAW_SEARCH_ALLOWLIST = Object.freeze([
   Object.freeze({
-    path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    sites: 2,
+    path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    sites: 1,
     why:
-      'Two character-modifier COMBOBOXES (`:14006` and `:14415`, re-measured at issue 1508) — ' +
-      'near-identical duplicates of one another, one on the gathering drop inspector and one on ' +
-      'the event inspector. Each ' +
-      'renders a `.manager-tag-suggestions` list inside the label and takes ' +
-      '`bind:this` on it for popover positioning, which a component tag cannot supply. A root ' +
-      'de-duplication that merged the two would legitimately take this pin to 1 rather than ' +
-      'reading as a regression.',
+      'one character-modifier combobox. The root held two — near-identical duplicates of one ' +
+      'another, one on the gathering drop inspector and one on the event inspector — and this row ' +
+      'said a root de-duplication that merged them would legitimately take the pin to 1 rather ' +
+      'than read as a regression. Issue 1707 did exactly that: the panel is written once and ' +
+      'rendered at both subjects, so the second was de-duplicated rather than converted. It still ' +
+      'renders a `.manager-tag-suggestions` list inside the label and takes `bind:this` on it for ' +
+      'popover positioning, which a component tag cannot supply.',
   }),
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',

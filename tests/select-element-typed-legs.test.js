@@ -134,6 +134,12 @@ function possibleHosts(leg) {
 
   const hosts = new Set(scored[0].owners);
   for (const owner of scored[0].owners) {
+    // The owner's OWN directly rendered children are inside its DOM subtree too: a descendant
+    // combinator reaches a `<select>` a child component renders just as it reaches one written
+    // inline (issue 1707 phase 2, where the drop editor's `<select>` moved one file down).
+    for (const child of IMPORT_GRAPH.importsOf(owner)) {
+      if (child.endsWith('.svelte')) hosts.add(child);
+    }
     if (!ACCEPTS_CHILDREN.get(owner)) continue;
     for (const importer of IMPORT_GRAPH.importersOf(owner)) hosts.add(importer);
   }

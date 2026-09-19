@@ -55,6 +55,9 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTasksBrowserView)\.svelte$/,
+      // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
+      // moved out of the root: without this the leaf publishes environment-editor frames instead.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -459,6 +462,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // The facts this case exists to show are computed and rendered here.
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      // And drawn by the leaf they moved into (issue 1707 phase 2).
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -482,6 +487,40 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      // This is the only frame that draws the event half of the shared modifier panel, and neither
+      // pattern above reaches `environment/` (issue 1707).
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-drop-modifiers-normal',
+    label: 'Manager — Gathering task drop modifiers normal',
+    // Beyond the smoke: its walk never selects a drop, so no existing frame draws this column.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // The rail's gathering group is a submenu, so the task library is two clicks; the drop row is
+    // the third, and the drop panel is the aside's third track.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-drop-id="hb-slowbloom-drop"]' },
+      { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    // The drop half of the shared modifier panel, which no other case in the registry reaches.
+    expectSelector:
+      '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
     ],
   }),
 ]);

@@ -619,6 +619,10 @@ const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.s
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
 const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
 // The reward and event limit counts are one shared component (issue 1050).
+const GATHERING_RULES_INSPECTOR =
+  'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte';
+const GATHERING_TASK_INSPECTOR =
+  'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte';
 const GATHERING_RULE_STEPPER =
   'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte';
 const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
@@ -1972,8 +1976,10 @@ describe('CraftingSystemManager source contract', () => {
   // Global conditions and vocabularies are authored from the gathering workspace browser (settings
   // tab); library task/event authoring and rules live on their own routes, so those store actions
   // are invoked by root-owned functions rather than passed into the composition editor.
+  // The rules card and its limit steppers moved into `environment/GatheringRulesInspector.svelte`
+  // (issue 1707 phase 2), so the root renders the rules leaf rather than the stepper itself.
   defineStructureContract('wires the Manager gathering libraries and global conditions', MANAGER_ROOT, {
-    renders: ['GatheringRuleLimitStepper'],
+    renders: ['GatheringRulesInspector'],
     passesProps: [
       ['EnvironmentsBrowserView', 'gatheringConfig'],
       ['EnvironmentsBrowserView', 'onUpdateGatheringConditions'],
@@ -1996,11 +2002,18 @@ describe('CraftingSystemManager source contract', () => {
     ],
     names: ['updateSelectedGatheringRules', 'selectedGatheringConditionShortcuts'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
+    // `data-gathering-inspector-rules` is the rules leaf's own hook now (issue 1707 phase 2) and
+    // `manager-environments-mounted.js` pins it through the DOM.
     writes: [
-      'data-gathering-inspector-rules',
       'data-systems-gathering-conditions',
       'data-systems-gathering-condition',
     ],
+  });
+
+  // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
+  // its copy, its event-specific drop label and its two limit steppers are that leaf's own.
+  defineStructureContract('draws the gathering rules inspector', GATHERING_RULES_INSPECTOR, {
+    writes: ['data-gathering-inspector-rules'],
     spellsExactly: [
       'manager-rule-copy',
       'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
@@ -2085,8 +2098,10 @@ describe('CraftingSystemManager source contract', () => {
   // What the library, its inspector and the focused editor draw and do — rows, drop rules,
   // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
   // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
+  // The drop inspector's slider moved into `environment/GatheringTaskInspector.svelte` (issue 1707
+  // phase 2), so the root renders the task leaf rather than the slider itself.
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
-    renders: ['GatheringTaskEditView', 'ChanceSlider'],
+    renders: ['GatheringTaskEditView', 'GatheringTaskInspector'],
     names: [
       'selectedGatheringTaskId',
       'selectGatheringTask',
@@ -2117,13 +2132,6 @@ describe('CraftingSystemManager source contract', () => {
       ['GatheringTaskEditView', 'itemCards'],
       ['GatheringTaskEditView', 'resolutionMode'],
     ],
-    writes: [
-      'data-gathering-task-inspector',
-      'data-gathering-task-drop-inspector',
-      'data-gathering-drop-inspector-rate',
-      'data-gathering-drop-inspector-count',
-    ],
-    spellsExactly: ['manager-drop-editor-actions', 'manager-drop-editor-values'],
     // Issue 883: the inspector's slider is `ChanceSlider`. The track/fill structure and the
     // input/blur/keydown trio it hand-rolled must be gone from the root, not merely unused — a
     // surviving copy is what the next divergence gets written against.
@@ -2132,6 +2140,19 @@ describe('CraftingSystemManager source contract', () => {
     // The selected drop inspector renders no component selector, and no second duplicate action.
     readsNo: ['selectedGatheringDrop.componentId'],
     callsWithNo: [['duplicateGatheringTask', 'selectedGatheringTask']],
+  });
+
+  // The task and drop inspector markup moved into `environment/GatheringTaskInspector.svelte`
+  // (issue 1707 phase 2): its hooks and the drop editor's classes are that leaf's own.
+  defineStructureContract('draws the gathering task inspector and its drop editor', GATHERING_TASK_INSPECTOR, {
+    writes: [
+      'data-gathering-task-inspector',
+      'data-gathering-task-drop-inspector',
+      'data-gathering-drop-inspector-rate',
+      'data-gathering-drop-inspector-count',
+    ],
+    spellsExactly: ['manager-drop-editor-actions', 'manager-drop-editor-values'],
+    spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
   });
 
   defineStructureContract(

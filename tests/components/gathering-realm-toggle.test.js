@@ -154,10 +154,13 @@ describe('World and Travel navigation', () => {
     );
     assert.ok(managerRootSource.includes('<GatheringRealmsTab realms={worldRealms}'), 'Realms destination');
     assert.ok(managerRootSource.includes('<GatheringMapLinksTab sceneRegions={mapCurrentSceneRegions}'), 'Map destination');
-    // Unlike World > Currency it KEEPS the right-hand inspector.
+    // Unlike World > Currency it keeps the right-hand inspector. Its markup moved into
+    // `world/TravelInspector.svelte` at issue 1707 phase 2, so the fact this route owns is that
+    // the branch renders that leaf and hands it the tab; the card itself is pinned by count in
+    // `inspector-card-source-contract.test.js` and asserted in the DOM by the mounted suite.
     assert.ok(
       managerRootSource.includes(
-        '{:else if isWorldTravelRoute} <section class="fabricate-card manager-inspector-card manager-travel-inspector"'
+        '{:else if isWorldTravelRoute} <TravelInspector travelTab={worldTravelTab}'
       ),
       'the realm/map inspector lives under the new route'
     );

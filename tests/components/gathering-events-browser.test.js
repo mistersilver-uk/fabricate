@@ -9,12 +9,18 @@ const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+// Issue 1707 phase 2 moved the event inspector branch out of the root into this leaf.
+const eventInspectorPath = resolve(
+  repoRoot,
+  'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte'
+);
 const langPath = resolve(repoRoot, 'lang/en.json');
 const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+const eventInspectorSource = readFileSync(eventInspectorPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
@@ -166,11 +172,12 @@ describe('GatheringEventsBrowserView source contract', () => {
   });
 
   it('renders a "Used in environments" inspector card identical to the task one', () => {
-    assert.ok(rootSource.includes('data-event-environment-usage'), 'event inspector should expose the usage card data attribute');
-    assert.ok(rootSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
-    assert.ok(rootSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
-    assert.ok(rootSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
-    assert.ok(rootSource.includes('gatheringEventReferencingEnvironments'), 'inspector should filter environments referencing the event');
+    assert.ok(eventInspectorSource.includes('data-event-environment-usage'), 'event inspector should expose the usage card data attribute');
+    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
+    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
+    assert.ok(eventInspectorSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
+    // `enabledEventIds` is the filter's own body, not proof it reaches the leaf: that forward is
+    // asserted by DOM in `manager-gathering-mounted.js` (issue 1707 phase 2 review).
     assert.ok(rootSource.includes('enabledEventIds'), 'usage should be derived from enabledEventIds');
     const events = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.equal(events.UsedInEnvironmentsCard, 'Used in environments');

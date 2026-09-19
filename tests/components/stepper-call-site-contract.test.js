@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   CHARACTER_MODIFIER_BOUNDS_PATH,
+  CHARACTER_MODIFIER_PANEL_PATH,
+  CHARACTER_MODIFIER_PANEL_LEAVES,
   CHARACTER_MODIFIER_BOUNDS_SCOPES,
   MIGRATED_INPUT_HOOKS,
   MINIMUM_SCANNED_SVELTE_FILES,
@@ -211,18 +213,42 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
   });
 
   it('routes both character-modifier scopes through the one shared bounds row', () => {
-    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max.
+    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max. Since issue
+    // 1707 wrote the modifier panel once, the bounds row has one call site rather than two; phase
+    // 2 then moved the two panel tags out of the root into the task and event leaves, so each
+    // scope's wiring spans that leaf's panel tag and the root's tag for the leaf.
     const root = markup['src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'] ?? '';
-    const rendered = [...root.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
+    const panel = markup[CHARACTER_MODIFIER_PANEL_PATH] ?? '';
+    const rendered = [...panel.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
       (tag) => tag[0]
     );
-    assert.equal(rendered.length, 2, 'one bounds row per character-modifier scope, no more');
+    assert.equal(rendered.length, 1, 'the shared panel renders the bounds row once, no more');
+    const chains = CHARACTER_MODIFIER_PANEL_LEAVES.map((leaf) => {
+      const leafSource = markup[leaf.path] ?? '';
+      const panelTags = [...leafSource.matchAll(/<GatheringModifierEditor\b[\s\S]*?\/>/g)];
+      const rootTags = [...root.matchAll(new RegExp(`<${leaf.rootTag}\\b[\\s\\S]*?\\/>`, 'g'))];
+      return { leaf, panelTags, rootTags };
+    });
+    assert.deepEqual(
+      chains.filter(({ panelTags, rootTags }) => panelTags.length !== 1 || rootTags.length !== 1),
+      [],
+      'each leaf renders the shared panel exactly once and the root renders that leaf exactly once'
+    );
+    assert.deepEqual(
+      chains.filter(({ leaf, panelTags, rootTags }) => {
+        const chain = [...panelTags, ...rootTags].map((tag) => tag[0]).join('\n');
+        const other = CHARACTER_MODIFIER_BOUNDS_SCOPES.find((scope) => scope !== leaf.scope);
+        return !chain.includes(leaf.scope) || chain.includes(other);
+      }).map(({ leaf }) => leaf.path),
+      [],
+      'each chain carries its own scope update function and never the other scope\'s'
+    );
     assert.deepEqual(
       CHARACTER_MODIFIER_BOUNDS_SCOPES.filter(
-        (scope) => rendered.filter((tag) => tag.includes(scope)).length !== 1
+        (scope) => !CHARACTER_MODIFIER_PANEL_LEAVES.some((leaf) => leaf.scope === scope)
       ),
       [],
-      'each scope wires the shared row to exactly one of its own update functions'
+      'both D1a scopes are still named by a leaf that renders the panel'
     );
     // And the component the two of them render really is the one the table entry resolves in,
     // so this cannot pass against some other file with the same tag name.
