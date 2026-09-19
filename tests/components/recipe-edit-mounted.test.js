@@ -5871,6 +5871,11 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       'FABRICATE.Common.General',
       'the sole option is the General fallback'
     );
+    assert.equal(
+      trigger.getAttribute('title'),
+      'No categories defined. Add some under Tags and Categories.',
+      'the disabled trigger still tells the GM where to add one'
+    );
     editHarness.remount();
   });
 

@@ -994,6 +994,23 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
   }
 });
 
+test('kindPickerFixture spells classes Select.svelte still emits, not dead markup', () => {
+  const selectSource = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
+    'utf8'
+  );
+  for (const spelled of ['fabricate-select-trigger', 'fabricate-select-value']) {
+    assert.ok(
+      selectSource.includes(spelled),
+      `${spelled} (from the kind picker fixture) is no longer in Select.svelte's source`
+    );
+  }
+  assert.ok(
+    selectSource.includes('fabricate-select-trigger-') && selectSource.includes('inline'),
+    'the `inline` rung and its trigger-class template are no longer in Select.svelte'
+  );
+});
+
 test('the Books & Scrolls route names one grid track per section and grows the table', () => {
   // THE PAGER IS A FOURTH CHILD AND THE SHEET NAMES THREE TRACKS.
   assertOneTrackPerGridChild({

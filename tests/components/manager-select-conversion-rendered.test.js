@@ -231,9 +231,25 @@ const CONVERTED_SITES = Object.freeze([
     subject: 'recipe-overview',
     name: 'the recipe category',
     hook: '[data-recipe-category-select]',
+    values: ['Metal', 'Alchemical reagent'],
+    column: true,
+    columnSelector: '.manager-recipe-field',
+  }),
+  Object.freeze({
+    subject: 'recipe-overview',
+    name: 'the recipe minimum success tier',
+    hook: '[data-recipe-field="minSuccessOutcomeId"]',
     values: ['tier-easy', 'tier-legendary'],
     column: true,
     columnSelector: '.manager-recipe-field',
+  }),
+  Object.freeze({
+    subject: 'recipe-overview',
+    name: 'the eligible modifier set',
+    hook: '[data-recipe-field="craftingModifierSet"]',
+    values: ['inherit', 'custom'],
+    column: true,
+    columnSelector: '.manager-recipe-modifier-set-field',
   }),
   // The one 2a site whose row hugs by design: the kind picker states 132px on the picker ROOT and
   // the trigger fills it, so both option words measure the same fixed slot.
