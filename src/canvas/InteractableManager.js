@@ -16,6 +16,22 @@ import { resolveDropEnvironment } from './environmentResolution.js';
 import { buildInteractableDragPayload } from './interactableDragPayload.js';
 import { resolveItemUuidToTool } from './interactableItemResolution.js';
 import {
+  DEFAULT_INTERACTABLE_IMG,
+  canControlActor,
+  dropPoint,
+  eventToken,
+  firstInteractableBehavior,
+  gridSizeFrom,
+  iconTextureFor,
+  ownsToken,
+  regionRectangleFor,
+  sceneTokenDocs,
+  screenCenterToScene,
+  shouldPromptForEnter,
+  tokenInsideRegion,
+  viewCenterFrom,
+} from './interactablePredicates.js';
+import {
   classifyInteractableDrop,
   buildRegionSpawnRequest,
   buildActiveCanvasTool,
@@ -29,7 +45,6 @@ import {
 import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
-  regionContainsTokenDocument,
   selectRepromptTokenDoc,
 } from './regionHitTest.js';
 import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
@@ -47,9 +62,6 @@ import {
   buildLinkedVisualFlags,
 } from './regions/interactableRegionFlags.js';
 import { identifyRegionBehaviorRef } from './regions/interactableRegionNodeAdapter.js';
-
-/** Fallback tile image when no tool/task icon can be resolved. */
-const DEFAULT_INTERACTABLE_IMG = 'icons/svg/item-bag.svg';
 
 /** Client keybinding id for the "interact here" re-trigger. */
 const INTERACT_KEYBINDING = 'fabricateInteractHere';
@@ -112,7 +124,7 @@ class InteractableManager {
   // --- Drop → Region + Behaviour + linked Tile --------------------------------
 
   /** `dropCanvasData`: false suppresses Foundry's drop (GM-only); undefined lets it through. */
-  _onDrop(canvas, data) {
+  _onDrop(_canvas, data) {
     const classification = classifyInteractableDrop(data, this._resolutionDeps());
     if (!classification) return; // not ours — let Foundry handle it.
 
@@ -125,7 +137,7 @@ class InteractableManager {
       return false; // suppress: we recognized it but cannot spawn.
     }
 
-    const point = this._dropPoint(canvas, data);
+    const point = dropPoint(data);
     // The browser's "Region only" action carries `fabricate.visualMode:'none'`; a drag defaults
     // to 'marker'.
     const visualMode = data?.fabricate?.visualMode === 'none' ? 'none' : 'marker';
@@ -244,23 +256,11 @@ class InteractableManager {
     if (!scene?.createEmbeddedDocuments) return null;
 
     const { region, behaviorSystem, tile } = spawnRequest;
-    // The region and its Tile must OVERLAY but ANCHOR DIFFERENTLY (confirmed against live V13
-    // bounds): a Tile renders CENTRED on its stored `x/y`, a Region rectangle TOP-LEFT. So with a
-    // marker the region's top-left is `tile.x - tile.width/2`; `tile.x` shifts it half a tile
-    // down-right. Region-only uses the builder's already-centred shape.
-    const { x, y, width, height } = tile
-      ? {
-          x: Number(tile.x ?? 0) - Number(tile.width ?? this._gridSize()) / 2,
-          y: Number(tile.y ?? 0) - Number(tile.height ?? this._gridSize()) / 2,
-          width: Number(tile.width ?? region.shape?.width ?? this._gridSize()),
-          height: Number(tile.height ?? region.shape?.height ?? this._gridSize()),
-        }
-      : {
-          x: Number(region.shape?.x ?? 0),
-          y: Number(region.shape?.y ?? 0),
-          width: Number(region.shape?.width ?? this._gridSize()),
-          height: Number(region.shape?.height ?? this._gridSize()),
-        };
+    const { x, y, width, height } = regionRectangleFor({
+      tile,
+      region,
+      gridSize: this._gridSize(),
+    });
 
     let regionDoc;
     try {
@@ -283,7 +283,7 @@ class InteractableManager {
       return null;
     }
 
-    const behavior = this._firstInteractableBehavior(regionDoc);
+    const behavior = firstInteractableBehavior(regionDoc);
     const regionUuid = typeof regionDoc?.uuid === 'string' ? regionDoc.uuid : null;
     const behaviorId = behavior?.id ?? behavior?._id ?? null;
 
@@ -346,19 +346,6 @@ class InteractableManager {
     return regionDoc;
   }
 
-  /** The first `fabricate.interactable` behaviour on a freshly-created Region document. */
-  _firstInteractableBehavior(regionDoc) {
-    const behaviors = regionDoc?.behaviors;
-    const list = Array.isArray(behaviors?.contents)
-      ? behaviors.contents
-      : typeof behaviors?.values === 'function'
-        ? [...behaviors.values()]
-        : Array.isArray(behaviors)
-          ? behaviors
-          : [];
-    return list.find((b) => isInteractableRegionBehavior(b)) ?? list[0] ?? null;
-  }
-
   _notifySpawnFailure() {
     globalThis.ui?.notifications?.warn?.(
       globalThis.game?.i18n?.localize?.('FABRICATE.Canvas.Interactable.SpawnFailed') ??
@@ -377,7 +364,7 @@ class InteractableManager {
     if (!system) return;
     if (system.activation?.trigger !== 'regionEnter') return;
 
-    const token = this._eventToken(event);
+    const token = eventToken(event);
     if (!this._shouldPromptForEnter(event, token)) return;
 
     // Gate the PROMPT on VISIBILITY, not eligibility: a LOCKED interactable still prompts, and
@@ -432,7 +419,7 @@ class InteractableManager {
   _promptForTokenInsideRegion(tokenPlaceable) {
     const tokenDoc = tokenPlaceable?.document ?? tokenPlaceable;
     if (!tokenDoc) return;
-    if (!this._ownsToken(tokenDoc)) return;
+    if (!ownsToken(tokenDoc, { isGM: globalThis.game?.user?.isGM === true })) return;
     const scene = globalThis.canvas?.scene;
     const matches = interactableBehaviorsContainingToken({
       scene,
@@ -668,22 +655,13 @@ class InteractableManager {
       if (!scene || String(globalThis.canvas?.scene?.id ?? '') !== String(scene.id ?? sceneId)) {
         return;
       }
-      const tokenDoc = selectRepromptTokenDoc(this._sceneTokenDocs(scene), actorId);
+      const tokenDoc = selectRepromptTokenDoc(sceneTokenDocs(scene), actorId);
       if (!tokenDoc) return;
       // Prefer the live placeable for its canvas centre; the document still resolves one.
       this._promptForTokenInsideRegion(tokenDoc.object ?? tokenDoc);
     } catch {
       // Defensive: never let a re-prompt failure break the window close.
     }
-  }
-
-  /** A scene's token DOCUMENTS, tolerating the V13 collection and array shapes. */
-  _sceneTokenDocs(scene) {
-    const tokens = scene?.tokens;
-    if (Array.isArray(tokens?.contents)) return tokens.contents;
-    if (typeof tokens?.values === 'function') return [...tokens.values()];
-    if (Array.isArray(tokens)) return tokens;
-    return [];
   }
 
   /** Route a DENIAL as grants are routed: notify here when the GM is the requester, else emit. */
@@ -715,49 +693,16 @@ class InteractableManager {
     return region?.behaviors?.get?.(String(behaviorId ?? '')) ?? null;
   }
 
-  _eventToken(event) {
-    return event?.data?.token ?? event?.token ?? null;
-  }
-
-  /**
-   * Which client(s) show the enter prompt: the user who MOVED the token, and a NON-GM player who
-   * OWNS it — so a GM dragging a player's token prompts both. Deliberately NOT the
-   * GM-owns-everything case, which would spam the GM on every autonomous player move.
-   */
   _shouldPromptForEnter(event, token) {
-    const me = globalThis.game?.user;
-    const isMover = !!(event?.user && me && String(event.user.id) === String(me.id));
-    // Non-GM owner: prompt the controlling player even when someone else moved the token.
-    const isOwningPlayer = me?.isGM !== true && this._ownsToken(token);
-    return isMover || isOwningPlayer;
-  }
-
-  /** Does THIS client's user own the token (player owns the actor, or GM)? Tolerates both shapes. */
-  _ownsToken(token) {
-    const doc = token?.document ?? token;
-    if (!doc) return false;
-    if (globalThis.game?.user?.isGM === true) return true;
-    if (typeof doc.isOwner === 'boolean') return doc.isOwner === true;
-    const actor = doc.actor ?? null;
-    if (actor && typeof actor.isOwner === 'boolean') return actor.isOwner === true;
-    if (typeof token?.controlled === 'boolean') return token.controlled === true;
-    return false;
+    return shouldPromptForEnter({ event, token, currentUser: globalThis.game?.user });
   }
 
   _userCanControlActor(userId, actorId) {
     if (!actorId) return false;
-    const actor = globalThis.game?.actors?.get?.(String(actorId));
-    if (!actor) return false;
-    const user = globalThis.game?.users?.get?.(String(userId ?? ''));
-    if (user?.isGM === true) return true;
-    if (typeof actor.testUserPermission === 'function' && user) {
-      try {
-        return actor.testUserPermission(user, 'OWNER') === true;
-      } catch {
-        /* fall through */
-      }
-    }
-    return false;
+    return canControlActor({
+      actor: globalThis.game?.actors?.get?.(String(actorId)) ?? null,
+      user: globalThis.game?.users?.get?.(String(userId ?? '')) ?? null,
+    });
   }
 
   _sourceExists(system) {
@@ -780,77 +725,44 @@ class InteractableManager {
   }
 
   /**
-   * Is the actor's token still inside? This runs on the ACTIVE GM's client for every player
-   * request, so it may execute against a scene — on V14, a scene level — that client is not
-   * viewing, and nothing canvas-rendered may be consulted. It delegates to
-   * {@link regionContainsTokenDocument}, which owns the signal rule (`data-models/spec.md`
-   * § fabricate.interactable Region Behaviour, requirement 6). "Cannot locate ⇒ do not block" and
-   * "any of the actor's tokens inside admits" are both deliberate and pre-existing.
+   * Is the actor's token still inside? Runs on the ACTIVE GM's client for every player request, so
+   * it may execute against a scene that client is not viewing and nothing canvas-rendered may be
+   * consulted (`data-models/spec.md` § fabricate.interactable Region Behaviour, requirement 6).
    */
   _tokenInsideRegion(behavior, actorId, _userId) {
-    const region = behavior?.parent ?? null;
-    const scene = region?.parent ?? null;
-    const tokenDocs = this._sceneTokenDocs(scene).filter(
-      (t) => String(t?.actorId ?? t?.actor?.id ?? '') === String(actorId ?? '')
-    );
-    if (tokenDocs.length === 0) return true; // can't locate — don't block.
-    return tokenDocs.some((tokenDoc) => regionContainsTokenDocument(region, tokenDoc) === true);
+    return tokenInsideRegion({ behavior, actorId });
   }
 
   // --- Foundry-edge helpers (placement) --------------------------------------
 
   _viewCenter() {
-    const stageCenter = globalThis.canvas?.stage ? this._screenCenterToScene() : null;
-    if (stageCenter) return stageCenter;
-    const dims = globalThis.canvas?.scene?.dimensions ?? globalThis.canvas?.dimensions ?? null;
-    if (dims && Number.isFinite(dims.width) && Number.isFinite(dims.height)) {
-      return { x: Number(dims.width) / 2, y: Number(dims.height) / 2 };
-    }
-    return { x: 0, y: 0 };
+    return viewCenterFrom({
+      stageCenter: globalThis.canvas?.stage ? this._screenCenterToScene() : null,
+      dimensions: globalThis.canvas?.scene?.dimensions ?? globalThis.canvas?.dimensions ?? null,
+    });
   }
 
   _screenCenterToScene() {
-    const stage = globalThis.canvas?.stage;
-    const toLocal = stage?.toLocal;
-    const PointClass = globalThis.PIXI?.Point;
-    if (typeof toLocal !== 'function' || typeof PointClass !== 'function') return null;
-    const screenW = Number(globalThis.window?.innerWidth ?? 0);
-    const screenH = Number(globalThis.window?.innerHeight ?? 0);
-    try {
-      const local = toLocal.call(stage, new PointClass(screenW / 2, screenH / 2));
-      if (local && Number.isFinite(local.x) && Number.isFinite(local.y)) {
-        return { x: local.x, y: local.y };
-      }
-    } catch {
-      return null;
-    }
-    return null;
+    return screenCenterToScene({
+      stage: globalThis.canvas?.stage,
+      PointClass: globalThis.PIXI?.Point,
+      width: globalThis.window?.innerWidth ?? 0,
+      height: globalThis.window?.innerHeight ?? 0,
+    });
   }
 
   _resolveIconTexture(classification) {
-    const entry = classification?.entry ?? null;
-    if (classification?.interactableType === 'tool') {
-      const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
-      const system = systemManager?.getSystem?.(classification.systemId);
-      const componentId = entry?.componentId;
-      const component = resolvedComponentsFor(system).find(
-        (c) => String(c?.id ?? '') === String(componentId)
-      );
-      const img = component?.img;
-      if (typeof img === 'string' && img.trim()) return img.trim();
-    }
-    const taskImg = entry?.img;
-    if (typeof taskImg === 'string' && taskImg.trim()) return taskImg.trim();
-    return DEFAULT_INTERACTABLE_IMG;
+    const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
+    const system = systemManager?.getSystem?.(classification?.systemId);
+    return iconTextureFor({ classification, components: resolvedComponentsFor(system) });
   }
 
-  /** The active scene's grid size (one square), falling back to 100. */
   _gridSize() {
-    const size =
-      globalThis.canvas?.scene?.grid?.size ??
-      globalThis.canvas?.grid?.size ??
-      globalThis.canvas?.dimensions?.size;
-    return Number.isFinite(Number(size)) && Number(size) > 0 ? Number(size) : 100;
+    return gridSizeFrom(
+      globalThis.canvas?.scene?.grid?.size,
+      globalThis.canvas?.grid?.size,
+      globalThis.canvas?.dimensions?.size
+    );
   }
 
   _resolutionDeps() {
@@ -879,12 +791,6 @@ class InteractableManager {
     return Array.isArray(tasks) ? tasks : [];
   }
 
-  _dropPoint(canvas, data) {
-    return {
-      x: Number(data?.x ?? 0),
-      y: Number(data?.y ?? 0),
-    };
-  }
   _registered = false;
 }
 
