@@ -84,7 +84,7 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 66;
+export const KNOWN_NATIVE_SELECT_TOTAL = 61;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

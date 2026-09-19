@@ -640,7 +640,15 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const target = await harness.mount(props());
     const field = target.querySelector('[data-salvage-result-component]');
     assert.ok(field, 'the row still exposes its component field');
-    assert.equal(field.querySelector('select'), null, 'the native select is gone');
+    // WHICH APP-DRAWN PICKER, rather than "not a native select" (issue 1510). This editor renders
+    // no native select at all now, so the old `!querySelector('select')` was satisfied by any tree
+    // at all. The two pickers are told apart by what their trigger announces — the searchable
+    // popover a `dialog`, the shared one-of-N `Select` a `listbox` — and only the first can draw a
+    // component's art, which is the whole reason this field is the one it is.
+    assert.ok(
+      !field.querySelector('.fabricate-select-trigger'),
+      'the field is not the shared one-of-N picker, which shows a label and no image'
+    );
     const trigger = field.querySelector('button.manager-salvage-component-trigger');
     assert.ok(trigger, 'the field is a popover trigger');
     assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');

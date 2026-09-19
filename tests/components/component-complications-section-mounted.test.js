@@ -26,6 +26,18 @@ import {
   COMPONENT_EDIT_VIEW_RAW_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+// The trigger clause and the dice-condition comparator are the shared `<Select>` since issue 1510,
+// so their option lists are read off a panel portaled onto the mount target.
+import {
+  assertSelectHasResolvedName,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+const TRIGGER_PICKER = '[data-complication-trigger]';
+const COMPARATOR = '[data-complication-roll-condition-cmp]';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sectionPath = 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte';
@@ -75,6 +87,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    // THE SHARED ONE-OF-N PICKER AND THE FIELD IT COMPOSES (issue 1510). The trigger clause and the
+    // dice-condition comparator render it, and this suite's SECOND harness below spreads the shared
+    // `ComponentEditView` roster — which is why the primitive is declared twice in this file. A
+    // `.svelte` the tree renders but a list omits HANGS its harness (# cancelled), not fails it.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
@@ -573,13 +591,21 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       ],
     });
     await openFirstRow(target);
-    const select = target.querySelector('[data-complication-roll-condition-cmp]');
-    assert.ok(Boolean(select), 'the condition-roll row reveals its comparator');
+    assert.ok(
+      Boolean(target.querySelector(COMPARATOR)),
+      'the condition-roll row reveals its comparator'
+    );
+    assert.equal(
+      assertSelectHasResolvedName(target, COMPARATOR),
+      'Comparison',
+      'and it still announces the name the native control did'
+    );
     assert.deepEqual(
-      [...select.options].map((option) => option.value),
+      selectOptionValues(target, COMPARATOR),
       ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'],
       'a dice total has no boolean or existence reading, and `exists` would always fire'
     );
+    closeSelectPanel(target, COMPARATOR);
   });
 
   /** Open the one row and reveal the dice-condition strip, which renders only while it is ON. */
@@ -656,6 +682,16 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       /--fab-stepper-fill-height:\s*34px/,
       'the Stepper takes the row height from its layout context — 34px, the inputs beside it'
     );
+    // And the converted comparator holds that same 34 (issue 1510), which the `inline` rung's own
+    // 30px would otherwise have taken it to — a four-pixel step in the middle of one sentence.
+    assert.match(
+      blockIn(
+        sectionSource,
+        '.fab-complication-condition-row\n    > :global(.fab-complication-comparator .fabricate-select-trigger)'
+      ),
+      /min-height:\s*34px/,
+      'the picker trigger stands at the height of the fields either side of it'
+    );
   });
 
   it('mutes the trigger clause and makes it UNINTERACTABLE when the system names no triggers', async () => {
@@ -718,7 +754,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.equal(box.checked, true, 'the row shows the persisted value rather than reading unset');
     assert.equal(box.disabled, false, 'and stays operable, so the stale value can be cleared');
     assert.match(
-      target.querySelector('[data-complication-trigger]').textContent,
+      selectTriggerText(target, TRIGGER_PICKER),
       /Trigger no longer exists/,
       'the dangling id is named rather than silently rewritten'
     );
@@ -742,8 +778,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       ],
     });
     await openFirstRow(target);
-    const select = target.querySelector('[data-complication-trigger]');
-    const labels = [...select.options].map((option) => option.textContent.trim());
+    const labels = selectOptionLabels(target, TRIGGER_PICKER);
+    closeSelectPanel(target, TRIGGER_PICKER);
     assert.deepEqual(
       labels.slice(0, 2),
       ['On a natural 1 · Salvage', 'On a natural 1 · Crafting'],
