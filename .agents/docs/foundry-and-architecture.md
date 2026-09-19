@@ -343,6 +343,11 @@ Cite code by symbol name and file path only — for example `_playerListingField
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
 Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md`.
 
+### Extracted normalizer clusters under `src/systems/`
+
+`src/systems/normalize/` is the first subdirectory `src/systems/` has had, and it holds normalizer logic extracted out of `CraftingSystemManager` as free functions, starting with `src/systems/normalize/craftingCheck.js`.
+Each cluster stays private to the `CraftingSystemManager` aggregate: nothing outside `CraftingSystemManager.js` imports it, and callers still reach it only through the manager's own delegate methods.
+
 ### Versioned Journal authority and recovery
 
 `journalRunCommands.js` and `journalRunAuthority.js` in `src/systems/` own version-1 arbitration; an absent lifecycle version alone selects legacy behavior.
