@@ -12,7 +12,7 @@ export const CORPUS_MODIFIERS = Object.freeze([
 ]);
 
 /** The non-vacuousness floors the pin suite asserts, so a gutted corpus cannot read green. */
-export const CORPUS_FLOORS = Object.freeze({ scenarios: 24, modifierSelectionCases: 2 });
+export const CORPUS_FLOORS = Object.freeze({ scenarios: 27, modifierSelectionCases: 2 });
 
 /** A fresh known Valid Id Basis per call, because a caller may mutate the Set it is handed. */
 export function knownModifierBasis() {

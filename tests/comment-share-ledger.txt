@@ -69,7 +69,7 @@ tests/helpers/manager	300
 tests/helpers/scale	622
 tests/journal	157
 tests/stores	1529
-tests/systems	372
+tests/systems	373
 tests/util	379
 tests/view-lab	413
 tests/view-lab/foundry	269
