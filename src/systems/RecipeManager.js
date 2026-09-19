@@ -1029,8 +1029,6 @@ export class RecipeManager {
     });
   }
 
-  /** The dedup key one ingredient state merges under. Kind-qualified, because a component's
-   * `need` is a quantity and a currency option's is a price, and the merge keeps the higher. */
   _shoppingIngredientKey(state) {
     return shoppingIngredientKey(state);
   }
@@ -1154,8 +1152,6 @@ export class RecipeManager {
     };
   }
 
-  /** Derive per-group ingredient display states from the same selection that determined
-   * craftability. `currencyIssue` is resolved once per evaluation by the caller. */
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems, currencyIssue = '') {
     return buildIngredientStates(
       recipe,
@@ -1167,20 +1163,14 @@ export class RecipeManager {
     );
   }
 
-  /** The groups a display state is built for: the authored ingredient groups, or a synthetic
-   * one-option group per legacy flat ingredient. */
   _displayGroups(ingredientSet) {
     return displayGroups(ingredientSet);
   }
 
-  /** A group's tile caption: only the chosen option's description (issue 552), with the OR-join
-   * of every option name retained as the fallback. */
   _resolveGroupDescription(recipe, chosenOption, options) {
     return resolveGroupDescription(recipe, displaySeams(this), chosenOption, options);
   }
 
-  /** Map each group id to the option the resolver chose; a satisfied group reads by running
-   * index, because the resolver appends one entry per non-missing group in group order. */
   _chosenOptionByGroup(ingredientSet, selection) {
     return chosenOptionByGroup(ingredientSet, selection);
   }
@@ -1203,8 +1193,6 @@ export class RecipeManager {
     return typeof reason === 'string' ? reason : '';
   }
 
-  /** Build the player-facing per-group option/stack choices (issue 552). An insufficient option
-   * is included — selectable but `satisfied: false` — matching the resolver. */
   _buildIngredientChoices(
     recipe,
     ingredientSet,
@@ -1226,8 +1214,6 @@ export class RecipeManager {
     );
   }
 
-  /** Resolve the tile presentation for an ingredient. A tag tile shows the img of `consumedItem`,
-   * the item the engine will spend (issue 553), else of any held item matching the tag (551). */
   _resolveIngredientVisual(recipe, ingredient, availableItems = [], consumedItem = null) {
     return resolveIngredientVisual(
       recipe,
@@ -1365,14 +1351,10 @@ export class RecipeManager {
     return resolvedToolsFor(system).find((tool) => tool?.id === toolId) || null;
   }
 
-  /** Check whether a concrete item satisfies a recipe ingredient. `resolveComponent` is the
-   * alchemy-path resolver (issue 578), defaulting to {@link findMatchingComponent}. */
   ingredientMatchesItem(recipe, ingredient, item, resolveComponent) {
     return ingredientMatchesItem(recipe, matchingSeams(this), ingredient, item, resolveComponent);
   }
 
-  /** Whether an owned item satisfies a by-tag ingredient, against the union of the resolved
-   * component's tags and any item-level flag (issue 857). */
   _matchesTagIngredient(recipe, ingredient, item, features, resolveComponent) {
     return tagIngredientMatchesItem(
       recipe,
@@ -1384,19 +1366,14 @@ export class RecipeManager {
     );
   }
 
-  /** Check whether a concrete item satisfies a Tool's presence requirement — the wide,
-   * non-destructive gate (issue 561). */
   toolMatchesItem(recipe, tool, item) {
     return toolMatchesItem(recipe, matchingSeams(this), tool, item);
   }
 
-  /** Whether an owned item may be selected for a Tool's usage or breakage — the narrow
-   * durable-identity gate (issue 561), the destructive counterpart to {@link toolMatchesItem}. */
   toolMatchesItemByIdentity(recipe, tool, item) {
     return toolMatchesItemByIdentity(recipe, matchingSeams(this), tool, item);
   }
 
-  /** The legacy bare-field ingredient path, including the `alternatives` fall-through. */
   _matchesIngredient(ingredient, item, features) {
     return ingredientMatchesItemByFields(ingredient, item, features);
   }
@@ -1643,8 +1620,6 @@ export class RecipeManager {
     return validateRecipeForPersistence(recipe, validationSeams(this), { requireComplete });
   }
 
-  /** Full validity required to activate a recipe: every persistence check, signature uniqueness
-   * and the disabled-essence blocker. */
   _validateRecipeForActivation(recipe) {
     return validateRecipeForActivation(recipe, validationSeams(this));
   }
@@ -1729,14 +1704,10 @@ export class RecipeManager {
     return disabled;
   }
 
-  /** Validate ingredient-set essence requirements against the crafting system's essence
-   * definitions. */
   _validateEssenceReferences(recipe) {
     return validateEssenceReferences(recipe, validationSeams(this));
   }
 
-  /** Activation-only blocker: a recipe may not be enabled while it requires a disabled essence
-   * (issue 1036). Never a persistence blocker, or an essence delete would abort mid-cascade. */
   _validateEnabledEssenceReferences(recipe) {
     return validateEnabledEssenceReferences(recipe, validationSeams(this));
   }
