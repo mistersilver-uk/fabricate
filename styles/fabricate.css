@@ -4855,26 +4855,10 @@
   font-size: 0.64rem;
 }
 
-/* The overview selects (Category, Check tier, Minimum success tier) carry no select class of their own, so without this they rendered Foundry core's default light select chrome (issue 643). */
-
-/* skin census (issue 1523): pinned by tests/components/tool-studio-mounted.test.js (a mounted assertion at `:975`/`:977` closes on `.manager-recipe-field`). */
-.fabricate-manager .manager-recipe-field select {
+/* THE WIDTH THE ELEMENT-TYPED SKIN NO LONGER SUPPLIES (issue 1510). The four overview selects carried no select class of their own, so a whole box was painted here off the wrapper class (issue 643); they are the shared `<Select>` now, the `form` rung paints the box, and `.fabricate-select-trigger` declares no width at all by design — a trigger's box belongs to the row it sits in. Without this the four buttons hug their chosen value, so the cells of the select row would each be a different width and re-flow every time the GM changed one.
+   It lives in the sheet rather than in the caller's own `<style>` because `.manager-recipe-field` has TWO emitters, `recipe/RecipeOverviewTab.svelte` and `tools/ToolBreakageTab.svelte`, so the width is a family declaration rather than one call site's private skin. It carries no skin census marker (issue 1523): the block it replaces was a PINNED carrier of the withdrawn field tuple and this one declares a width alone, so the census falls to fifteen carriers. */
+.fabricate-manager .manager-recipe-field .fabricate-select-trigger {
   width: 100%;
-  min-width: 0;
-  height: 34px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-size: var(--fab-recipe-control-font);
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-recipe-field select:disabled {
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-04);
-  cursor: default;
 }
 
 /* Uppercase micro-label over an unwrapped field (prototype §5.1). */
@@ -9444,19 +9428,16 @@
   color: var(--fab-info);
 }
 
-/* THE KIND SELECT (`proto:2248`), which is what makes the row retypeable in place. */
+/* THE KIND PICKER (`proto:2248`), which is what makes the row retypeable in place. The class rides the shared `<Select>`'s ROOT since issue 1510, so it states the row's slot and nothing else: the `inline` rung paints the 30px box, the 7px corner, the `--fab-bg-2` fill and the type. */
 .fabricate-manager .manager-recipe-option-kind {
   flex: 0 0 auto;
   width: 132px;
-  height: 30px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
+}
+
+/* The trigger fills that slot, and keeps the secondary ink the family's own `--fab-text` would otherwise take from it: the kind word is the row's quietest label, not its subject. */
+.fabricate-manager .manager-recipe-option-kind .fabricate-select-trigger {
+  width: 100%;
   color: var(--fab-text-secondary);
-  background: var(--fab-bg-2);
-  font-size: 0.69rem;
-  font-weight: 500;
-  cursor: pointer;
 }
 
 /* THE NAME FIELD. `min-width: 0` and `flex: 1` because it is the row's ONLY flexible item — every other control states its own size — so it absorbs the row's slack and shrinks rather than forcing a wrap. */

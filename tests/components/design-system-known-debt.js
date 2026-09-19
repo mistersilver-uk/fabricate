@@ -83,15 +83,8 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
 /** A native `<select>` rendered by a Svelte template, keyed `file`. */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
-/**
- * @see KNOWN_NATIVE_SELECT_ELEMENTS
- */
-// #1707: the root's 16 became 12 and `GatheringModifierEditor.svelte` took 2 (71 - 2). The other
-// two were DE-DUPLICATED by writing that panel once, not converted.
-// #1707 phase 2: the root's 12 became 2 and `GatheringRulesInspector.svelte` took 10, so the
-// total is unchanged and only the file count moves, 25 rows to 26. The two the root keeps are its
-// nav scope and the systems-list condition; neither is in an inspector branch.
-export const KNOWN_NATIVE_SELECT_TOTAL = 69;
+/** @see KNOWN_NATIVE_SELECT_ELEMENTS */
+export const KNOWN_NATIVE_SELECT_TOTAL = 66;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
@@ -208,9 +201,7 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * @see KNOWN_FORMLESS_BUTTONS
  */
 // #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
-// #1707: the root's 70 became 60 and `GatheringModifierEditor.svelte` took 5 (225 - 5). The other
-// five were DE-DUPLICATED by writing that panel once, not converted.
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 220;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 225;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */
@@ -239,6 +230,4 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // the same commit. Re-measured rather than subtracted: 75 components outside `components/` clear
 // the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
 // already states.
-// 47 -> 48 (issue 1707 phase 2): `GatheringModifierEditor.svelte` arrived with 2 importers (the
-// task/event leaves); the promote-or-`notAPrimitive` call is deferred to the design-system pass.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;
