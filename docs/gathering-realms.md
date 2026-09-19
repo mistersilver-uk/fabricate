@@ -111,7 +111,9 @@ Realm create, edit, and delete live under **World > Travel > Realms**, as a real
 - **Delete realm** goes through the standard confirmation dialog.
   If environments or party overrides still reference the realm, the confirmation surfaces referenced-by evidence (how many) before you confirm.
   Deletion never blocks.
-  Dangling references become stale repair evidence instead.
+  Deleting the realm also removes it from the realm membership of every environment that listed it, so no environment is left naming a realm that is gone.
+  An environment the delete leaves with no realms is simply no longer restricted to a realm; it is not disabled or deleted.
+  Party overrides are not rewritten: a party that named the deleted realm keeps the id and shows it as **Unknown realm** until you clear the override from its party card, which is what makes the leftover reference visible for repair.
 
 Scene mappings are authored under **World > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
 Realm modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime.
