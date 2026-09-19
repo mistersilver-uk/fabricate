@@ -22,6 +22,7 @@ import {
 const LINK = '@UUID[Compendium.dnd5e.items.Item.pouch]';
 const LINK_NAMES = { 'Compendium.dnd5e.items.Item.pouch': 'Component Pouch' };
 const PACK_UUID = 'Compendium.world.kit.Item.ore';
+const PACK_HAMMER_UUID = 'Compendium.world.kit.Item.hammer';
 
 /** A world with one described world source, used by the four snapshot delegates. */
 function describedSourceWorld() {
@@ -122,6 +123,45 @@ function repairWorld() {
     linkNames: LINK_NAMES,
     fixtures: { worldItem, owned, pick, tome },
   };
+}
+
+/** A tool carrying only an ALIAS reference, no `originItemUuid`/`registeredItemUuid` — the
+ * tools-kind filter at `SourceIdentityService.js:489-491` exists so a ref-less tool never reaches
+ * the repair walk from either the world-source or the owned-copy resolver, even though both
+ * resolvers would otherwise match it through the shared `aliasItemUuids` union. */
+function aliasOnlyToolWorld() {
+  const worldSource = makeDocument({
+    uuid: 'Item.hammer-src',
+    name: 'Hammer',
+    compendiumSource: PACK_HAMMER_UUID,
+  });
+  const owned = makeDocument({
+    uuid: 'Actor.hero.Item.hammer',
+    name: 'Hammer',
+    compendiumSource: PACK_HAMMER_UUID,
+  });
+  return {
+    systems: [
+      makeSystem({
+        id: 'sys1',
+        tools: [{ id: 'tool-hammer', name: 'Hammer', aliasItemUuids: [PACK_HAMMER_UUID] }],
+      }),
+    ],
+    items: [worldSource],
+    actors: [makeActor([owned])],
+    fixtures: { worldSource, owned },
+  };
+}
+
+/** A flagged, resolvable source living in a compendium pack — the guard at
+ * `SourceIdentityService.js:83` exists so `_clearSourceFlag` never issues `unsetFlag` against it. */
+function flaggedPackSourceWorld() {
+  const source = makeDocument({
+    uuid: PACK_UUID,
+    pack: 'world.kit',
+    flags: { fabricate: { fabricate: { roles: { sys1: { componentId: 'comp-ore' } } } } },
+  });
+  return { resolve: { [PACK_UUID]: source }, fixtures: { source } };
 }
 
 /** A definition-shaped fallback, so the unresolved-source arm of each builder is distinguishable. */
@@ -226,6 +266,10 @@ const DELEGATES = [
       {
         world: flaggedSourceWorld,
         args: () => ['Item.ore-src', 'roles.sys1.componentId', 'comp-ore'],
+      },
+      {
+        world: flaggedPackSourceWorld,
+        args: () => [PACK_UUID, 'roles.sys1.componentId', 'comp-ore'],
       },
     ],
   },
@@ -437,5 +481,34 @@ describe('the GM gate and the deleted members', () => {
       '_refreshDefinitionDescriptions',
     ].filter((name) => harness.manager[name] !== undefined);
     assert.deepStrictEqual(survivors, [], 'a deleted member is still reachable on the instance');
+  });
+});
+
+describe('the guards close before a write', () => {
+  it('never reaches an alias-only tool from either resolver', async () => {
+    const harness = createHarness(aliasOnlyToolWorld());
+    const summary = await harness.manager.repairItemData();
+    assert.equal(
+      summary.tools.stamped,
+      0,
+      'the tools-kind filter (SourceIdentityService.js:489-491) keeps a ref-less tool unreachable'
+    );
+    const journals = harness.journals();
+    assert.deepStrictEqual(journals['Item.hammer-src'], [], 'no setFlag write on the world source');
+    assert.deepStrictEqual(
+      journals['Actor.hero.Item.hammer'],
+      [],
+      'no setFlag write on the owned copy'
+    );
+  });
+
+  it('never unsets a flag on a pack-resident resolved source', async () => {
+    const harness = createHarness(flaggedPackSourceWorld());
+    await harness.manager._clearSourceFlag(PACK_UUID, 'roles.sys1.componentId', 'comp-ore');
+    assert.deepStrictEqual(
+      harness.journals()[PACK_UUID],
+      [],
+      'the compendium guard (SourceIdentityService.js:83) must refuse an unsetFlag write'
+    );
   });
 });
