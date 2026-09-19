@@ -296,11 +296,25 @@ const SCENARIOS = [
   },
   {
     // Production's `resolveGroupOverride` discards a non-conforming override (no integer
-    // `optionIndex`) and falls back to index 0, never to the stocked option — proving the double
-    // now matches the contract rather than a bare option-id shape production never accepts.
-    name: 'a non-conforming per-group override shape falls back to the unstocked default and refuses',
+    // `optionIndex`); its callers then walk the group's options in author order and craft with
+    // the first stocked one, so the bare option-id shape production never accepts still succeeds.
+    name: 'a non-conforming per-group override shape is discarded and the stocked option crafts',
     async run() {
       const world = craftProbe({
+        optionGroups: {
+          'group-1': { options: ['birch', 'wood'] },
+        },
+      });
+      await world.craft(null, { ingredientOptionOverrides: { 'group-1': 'option-b' } });
+      return world.journal.entries;
+    },
+    journal: SIMPLE_SUCCESS_JOURNAL,
+  },
+  {
+    name: 'a group with no stocked option reports its first option missing whatever the override',
+    async run() {
+      const world = craftProbe({
+        stock: {},
         optionGroups: {
           'group-1': { options: ['birch', 'wood'] },
         },
