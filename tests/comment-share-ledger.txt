@@ -56,14 +56,14 @@ tests	19509
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
-tests/components	14972
+tests/components	14924
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	20
 tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
-tests/helpers	4101
+tests/helpers	4100
 tests/helpers/manager	290
 tests/helpers/scale	622
 tests/journal	157

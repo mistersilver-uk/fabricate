@@ -1,14 +1,10 @@
 /**
  * Structural questions about a Svelte component, answered from its AST rather than its text
- * (issue 1658). `tests/svelte-structure-contract.test.js` pins the two paragraphs below, so
- * condense them only together with that test.
- *
+ * (issues 1658, 1691), pinned by `tests/svelte-structure-contract.test.js` and edited with it.
  * Do not add a string `includes` on component source to a test. That is the shape
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
- *
- * The residue they deliberately do not address: exact JS expression text, and a receiver that is a
- * loop variable rather than a literal. An i18n key is a literal `spellsLiteral` answers, and a
- * `.js`/`.mjs` target is answered by the sibling predicates in `moduleAst.js` (issue 1691).
+ * The residue they deliberately do not address: exact JS expression text, and a receiver that
+ * is a loop variable rather than a literal; a `.js` target is answered by `moduleAst.js`.
  */
 import { parse } from 'svelte/compiler';
 import { parseForESLint } from 'svelte-eslint-parser';
@@ -97,14 +93,37 @@ export function declaresAttribute(node, name, { directives = true } = {}) {
   );
 }
 
+function componentOccurrences(ast, componentName) {
+  return collect(ast, (node) => node.type === 'Component' && node.name === componentName);
+}
+
 /** False when the component is not rendered, so a vacuous true cannot read as a contract. */
 export function passesProp(ast, componentName, propName) {
-  const occurrences = collect(
-    ast,
-    (node) => node.type === 'Component' && node.name === componentName
-  );
+  const occurrences = componentOccurrences(ast, componentName);
   if (occurrences.length === 0) return false;
   return occurrences.every((node) => declaresAttribute(node, propName));
+}
+
+/** "No occurrence declares it", which negating `passesProp` would weaken to "not every one does". */
+export function propNone(ast, componentName, propName) {
+  const occurrences = componentOccurrences(ast, componentName);
+  return occurrences.length > 0 && occurrences.every((node) => !declaresAttribute(node, propName));
+}
+
+/** Every attribute, prop or directive name the template writes anywhere. */
+export function attributeNames(ast) {
+  const names = new Set();
+  for (const node of collect(ast, () => true)) {
+    for (const attribute of node.attributes ?? []) if (attribute.name) names.add(attribute.name);
+  }
+  return names;
+}
+
+/** The static value one element or component gives an attribute, or `undefined`. */
+export function attributeValue(element, name) {
+  const attribute = attributeNamed(element, name);
+  const [chunk] = Array.isArray(attribute?.value) ? attribute.value : [];
+  return chunk?.type === 'Text' ? chunk.data : undefined;
 }
 
 /** The props a component destructures from `$props()`, and those it declares with no default. */

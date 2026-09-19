@@ -8,6 +8,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import {
   assertSelectHasResolvedName,
+  chooseSelectOption,
   closeSelectPanel,
   selectOptionLabels,
   selectOptionValues,
@@ -69,6 +70,44 @@ const UNITS = Object.freeze([
   { id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp', contains: [] },
   { id: 'sp', label: 'Silver', abbreviation: 'sp', actorPath: 'system.currency.sp', contains: [] }
 ]);
+
+/**
+ * The same ladder with gold broken down, which is what the sub-unit controls need (issue 1691).
+ * Copper is the third rung: the Add sub-unit builder renders only while an eligible unit is left.
+ */
+const NESTED_UNITS = Object.freeze([
+  {
+    ...UNITS[0],
+    denomination: 100,
+    contains: [{ unitId: 'sp', amount: 10 }]
+  },
+  { ...UNITS[1], denomination: 10 },
+  {
+    id: 'cp',
+    label: 'Copper',
+    abbreviation: 'cp',
+    actorPath: 'system.currency.cp',
+    denomination: 1,
+    contains: []
+  }
+]);
+
+const PROVIDERS = Object.freeze([{ id: 'dnd5e-inventory', label: 'D&D 5e actor inventory' }]);
+
+const hook = (root, selector) => root.querySelector(selector);
+
+function assertHooks(root, selectors, present) {
+  for (const selector of selectors) {
+    assert.equal(Boolean(hook(root, selector)), present, `${selector} rendered=${present}`);
+  }
+}
+
+/** Open one unit's editor, which is where the whole per-unit ladder lives. */
+async function expandUnit(root, unitId) {
+  hook(root, `[data-world-currency-unit-expand="${unitId}"]`).dispatchEvent(clickEvent());
+  await flushRender();
+  return root;
+}
 
 before(() => harness.setup());
 after(() => harness.teardown());
@@ -136,6 +175,215 @@ describe('World > Currency tab (mounted)', () => {
       button.textContent.includes('Seed presets')
     );
     assert.equal(seedOn.disabled, false);
+  });
+
+  // ── The default actorProperty ladder (issue 1691, converted from the source contract) ──
+  it('offers the two header actions and writes them to the world seam', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencyPresetsSupported: true,
+      onAddCurrencyUnit: async () => {
+        calls.push('add');
+        return null;
+      },
+      onSeedCurrencyPresets: async () => calls.push('seed')
+    });
+
+    assert.ok(hook(root, '.manager-currency-unit-card'), 'the ladder is one edit card');
+    hook(root, '[data-add-currency-unit]').dispatchEvent(clickEvent());
+    hook(root, '[data-seed-currency-presets]').dispatchEvent(clickEvent());
+    await flushRender();
+
+    assert.deepEqual(calls, ['add', 'seed']);
+  });
+
+  it('collapses a unit to a summary row and expands it into the sub-unit ladder', async () => {
+    const root = await harness.mount({ currencyUnits: NESTED_UNITS });
+
+    assert.ok(hook(root, '.manager-character-modifier-summary'), 'a closed unit is a summary row');
+    assertHooks(root, ['.manager-currency-subunit-builder', '[data-world-currency-subunit]'], false);
+
+    await expandUnit(root, 'gp');
+
+    assertHooks(
+      root,
+      [
+        '.manager-currency-subunit-builder',
+        '.manager-currency-subunit-section',
+        '[data-world-currency-subunit="sp"]',
+        '.manager-currency-subunit-amount'
+      ],
+      true
+    );
+    assert.equal(
+      root.querySelectorAll('[data-world-currency-subunit]').length,
+      1,
+      'one chip per contained unit, and none from any other branch'
+    );
+  });
+
+  it('edits and removes a sub-unit through the world sub-unit actions', async () => {
+    const updates = [];
+    const deletes = [];
+    const root = await harness.mount({
+      currencyUnits: NESTED_UNITS,
+      onUpdateCurrencySubUnit: async (...args) => updates.push(args),
+      onDeleteCurrencySubUnit: async (...args) => deletes.push(args)
+    });
+    await expandUnit(root, 'gp');
+
+    const amount = hook(root, '.manager-currency-subunit-amount');
+    amount.value = '25';
+    amount.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(updates, [['gp', 'sp', '25']], 'the amount edit names the pair it changes');
+
+    hook(root, '[data-world-currency-subunit="sp"] [data-chip-remove]').dispatchEvent(
+      clickEvent()
+    );
+    await flushRender();
+    assert.deepEqual(deletes, [['gp', 'sp']], 'and removing the chip unlinks the same pair');
+  });
+
+  // ── The three peer spend strategies (issue 1278) ──
+  it('offers the three peer spend strategies and reports the chosen one', async () => {
+    const chosen = [];
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      onSetCurrencySpendStrategy: async (next) => chosen.push(next)
+    });
+    const strategy = '[data-world-currency-strategy-select]';
+
+    assert.deepEqual(selectOptionValues(root, strategy), [
+      'actorProperty',
+      'actorInventory',
+      'macro'
+    ]);
+    closeSelectPanel(root, strategy);
+    chooseSelectOption(root, strategy, 'macro');
+    await flushRender();
+
+    assert.deepEqual(chosen, ['macro'], 'the shared Select hands the caller its own typed value');
+    assertHooks(root, ['[data-world-currency-inventory-mode-select]'], false);
+  });
+
+  it('reflects the selected strategy in the one shared hint', async () => {
+    const onProperty = await harness.mount({ currencyUnits: UNITS });
+    const property = hook(onProperty, '[data-world-currency-strategy-hint]').textContent;
+
+    harness.remount();
+    const onMacro = await harness.mount({ currencyUnits: UNITS, currencySpendStrategy: 'macro' });
+
+    assert.notEqual(
+      hook(onMacro, '[data-world-currency-strategy-hint]').textContent.trim(),
+      property.trim(),
+      'the hint changes with the strategy rather than restating one fixed line'
+    );
+  });
+
+  it('steers a provider-less world to macro without wiping its ladder', async () => {
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencySpendStrategy: 'actorInventory',
+      currencyProviderOptions: []
+    });
+
+    assertHooks(root, ['[data-world-currency-no-provider]', '[data-world-currency-unit="gp"]'], true);
+    assertHooks(root, ['[data-world-currency-provider-select]'], false);
+  });
+
+  it('hands the provider the ladder, read-only, and takes the editing affordances away', async () => {
+    const chosen = [];
+    const root = await harness.mount({
+      currencyUnits: NESTED_UNITS,
+      currencySpendStrategy: 'actorInventory',
+      currencyProviderId: 'dnd5e-inventory',
+      currencyProviderOptions: PROVIDERS,
+      onSetCurrencyProvider: async (next) => chosen.push(next)
+    });
+
+    assertHooks(
+      root,
+      [
+        '[data-world-currency-provider-managed]',
+        '.manager-currency-provider-managed-callout',
+        '.manager-currency-provider-managed-summary',
+        '.manager-currency-readonly-fields',
+        '[data-world-currency-readonly-label]',
+        '[data-world-currency-abbreviation]',
+        '[data-world-currency-denomination]'
+      ],
+      true
+    );
+    assertHooks(
+      root,
+      [
+        '[data-add-currency-unit]',
+        '[data-seed-currency-presets]',
+        '[data-world-currency-subunit]',
+        '[data-world-currency-unit-expand="gp"]'
+      ],
+      false
+    );
+
+    chooseSelectOption(root, '[data-world-currency-provider-select]', 'dnd5e-inventory');
+    await flushRender();
+    assert.deepEqual(chosen, ['dnd5e-inventory']);
+  });
+
+  // ── Macro mode (issue 1278): three zones, one row, and no ladder arithmetic ──
+  it('draws the three macro zones side by side, each named for its own field', async () => {
+    const root = await harness.mount({ currencyUnits: UNITS, currencySpendStrategy: 'macro' });
+
+    const zones = root.querySelector('[data-world-currency-macros]');
+    assert.ok(zones, 'the macro card renders');
+    assert.equal(zones.classList.contains('manager-currency-macro-zones'), true);
+    assert.equal(zones.classList.contains('manager-currency-macro-row'), true, 'in a single row');
+
+    const empty = [...root.querySelectorAll('[data-world-currency-macro-dropzone]')];
+    assert.ok(empty.length >= 3, `three macro fields draw a zone each (found ${empty.length})`);
+    for (const zone of empty) {
+      assert.equal(zone.classList.contains('manager-component-source-drop-zone'), true);
+    }
+    const names = empty.map((zone) => zone.getAttribute('aria-label'));
+    assert.equal(new Set(names).size, names.length, `each zone is named for its field: ${names}`);
+  });
+
+  it('unlinks a linked macro from the zone that carries it', async () => {
+    const cleared = [];
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencySpendStrategy: 'macro',
+      currencyMacros: { canAfford: 'Macro.abc', increment: '', decrement: '', balance: '' },
+      onClearCurrencyMacro: async (key) => cleared.push(key)
+    });
+
+    const linked = hook(root, '[data-world-currency-macro="canAfford"]');
+    assert.ok(linked, 'a linked macro replaces its drop zone');
+    linked.querySelector('button').dispatchEvent(clickEvent());
+    await flushRender();
+
+    assert.deepEqual(cleared, ['canAfford'], 'unlinking names the field it clears');
+  });
+
+  it('replaces the per-unit breakdown with a conversion note under the macro strategy', async () => {
+    const root = await harness.mount({
+      currencyUnits: NESTED_UNITS,
+      currencySpendStrategy: 'macro'
+    });
+    await expandUnit(root, 'gp');
+
+    assertHooks(root, ['[data-world-currency-unit-macro-note]'], true);
+    assertHooks(
+      root,
+      [
+        '.manager-currency-subunit-section',
+        '.manager-currency-subunit-builder',
+        '[data-world-currency-subunit]'
+      ],
+      false
+    );
   });
 
   it('announces a reorder through its OWN polite live region', async () => {
