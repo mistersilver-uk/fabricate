@@ -27,6 +27,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import Select from '../../../components/Select.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
@@ -229,7 +230,9 @@
 
   /** The six NUMERIC comparators, filtered off the shared table rather than hand-listed. */
   const comparatorOptions = $derived(
-    PREREQUISITE_OPERATORS.filter((operator) => !isValuelessOperator(operator.id))
+    PREREQUISITE_OPERATORS.filter((operator) => !isValuelessOperator(operator.id)).map(
+      (operator) => ({ value: operator.id, label: `${operator.symbol} · ${operator.label}` })
+    )
   );
 
   /**
@@ -299,6 +302,21 @@
         .map((option) => [option.id, option.label || option.id])
     )
   );
+
+  /** Named triggers, plus a DANGLING authored id, which keeps that clause inert rather than invalid. */
+  function triggerOptionsFor(complication) {
+    const named = triggerOptions.map((option) => ({
+      value: option.id,
+      label: option.activity ? `${option.label} · ${activityLabel(option.activity)}` : option.label,
+    }));
+    const authored = complication.when?.checkTrigger;
+    if (!authored || triggerLabelById.has(authored)) return named;
+    const label = text(
+      'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Unknown',
+      'Trigger no longer exists'
+    );
+    return [...named, { value: authored, label }];
+  }
 
   // Resolve the NAME of every linked macro the picker's own list does not carry — a compendium
   // macro, or a deleted one. The list is consulted first, being synchronous and covering every
@@ -745,36 +763,19 @@
                         next ? triggerOptions[0]?.id || null : null
                       )}
                   >
-                    <select
-                      class="manager-input fab-complication-trigger-select"
+                    <Select
+                      size="inline"
+                      class="fab-complication-trigger-select"
                       value={complication.when?.checkTrigger || ''}
-                      data-complication-trigger
-                      aria-label={text(
+                      options={triggerOptionsFor(complication)}
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Select',
                         'Check trigger'
                       )}
                       disabled={saving}
-                      onchange={(event) =>
-                        setWhen(complication.id, 'checkTrigger', event.currentTarget.value || null)}
-                    >
-                      {#each triggerOptions as option (option.id)}
-                        <option value={option.id}
-                          >{option.label}{option.activity
-                            ? ` · ${activityLabel(option.activity)}`
-                            : ''}</option
-                        >
-                      {/each}
-                      {#if complication.when?.checkTrigger && !triggerLabelById.has(complication.when.checkTrigger)}
-                        <!-- An unresolved id leaves the clause INERT rather than raising a
-                           validation error, so the authored value is kept and named. -->
-                        <option value={complication.when.checkTrigger}
-                          >{text(
-                            'FABRICATE.Admin.Manager.Component.Complications.Condition.CheckTrigger.Unknown',
-                            'Trigger no longer exists'
-                          )}</option
-                        >
-                      {/if}
-                    </select>
+                      triggerData={{ 'data-complication-trigger': '' }}
+                      onChange={(next) => setWhen(complication.id, 'checkTrigger', next || null)}
+                    />
                   </ComplicationEffectRow>
                   {#if triggerClauseUnavailable(complication)}
                     <p class="fab-complication-trigger-hint" data-complication-trigger-hint>
@@ -841,27 +842,19 @@
                     />
                     <!-- The SIX numeric comparators, filtered off the shared prerequisite table by
                          `isValuelessOperator`: an `exists` against a roll total always fires. -->
-                    <select
-                      class="manager-input fab-complication-comparator"
+                    <Select
+                      size="inline"
+                      class="fab-complication-comparator"
                       value={complication.rollCondition?.cmp || ''}
-                      data-complication-roll-condition-cmp
-                      aria-label={text(
+                      options={comparatorOptions}
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Component.Complications.RollCondition.Comparator',
                         'Comparison'
                       )}
                       disabled={saving}
-                      onchange={(event) =>
-                        setNested(
-                          complication.id,
-                          'rollCondition',
-                          'cmp',
-                          event.currentTarget.value
-                        )}
-                    >
-                      {#each comparatorOptions as operator (operator.id)}
-                        <option value={operator.id}>{operator.symbol} · {operator.label}</option>
-                      {/each}
-                    </select>
+                      triggerData={{ 'data-complication-roll-condition-cmp': '' }}
+                      onChange={(next) => setNested(complication.id, 'rollCondition', 'cmp', next)}
+                    />
                     <!-- A SIGNED INTEGER STEPPER, not a bare field. `min`/`max` stay at the
                          primitive's `null` so the field stays signed — a complication firing at a
                          modified `-1` is legitimate authoring, and any bound would be a rule this
@@ -1238,18 +1231,20 @@
     min-width: 0;
   }
 
-  /* An EXPLICIT basis, not `0 0 auto`: under `appearance: base-select` a select is an ordinary
-     flex container and `width: auto` resolves against its containing block rather than to
-     max-content, measured at the strip's full 898px. The width is the six options' measure plus the
-     picker icon, and `flex-shrink: 1` gives ground first, because a truncated "at least" is still
-     readable and a truncated dice expression is not.
-
-     `min-height` matches the free-text baseline rather than inheriting: the select baseline in
-     `styles/fabricate.css` is deliberately PAINT-ONLY, since manager selects run 28/32/36px by
-     context and a global floor would grow all of them. */
-  .fab-complication-comparator {
+  /* THE COMPARATOR'S SLOT, on the picker ROOT since issue 1510, and the box the trigger takes of it.
+     `:global` because the class rides a COMPONENT tag and the trigger is its grandchild, neither of
+     which Svelte stamps a scoping hash on, so the scoped form matches nothing and dies silently. An
+     EXPLICIT basis, not `0 0 auto`: the width is the six options' measure plus the glyph, and
+     `flex-shrink: 1` gives ground first, because a truncated "at least" still reads and a truncated
+     dice expression does not. `min-height` overrides the rung's 30: the row's fields share a 34. */
+  .fab-complication-condition-row > :global(.fab-complication-comparator) {
     flex: 0 1 156px;
     min-width: 0;
+  }
+
+  .fab-complication-condition-row
+    > :global(.fab-complication-comparator .fabricate-select-trigger) {
+    width: 100%;
     min-height: 34px;
   }
 
@@ -1282,9 +1277,14 @@
     line-height: 1.45;
   }
 
-  .fab-complication-trigger-select {
+  /* The trigger picker's SLOT and the trigger's width; `:global` for the reason above. */
+  .fab-complication-trigger :global(.fab-complication-trigger-select) {
     flex: 1 1 220px;
     min-width: 0;
+  }
+
+  .fab-complication-trigger :global(.fab-complication-trigger-select .fabricate-select-trigger) {
+    width: 100%;
   }
 
   .fab-complication-macro-controls {

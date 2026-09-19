@@ -320,6 +320,35 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // Only reachable frame for the open kind panel (issue 1510): the option list renders only while
+  // open, and the portal occludes the closed-state frame behind it. The kind trigger is this
+  // phase's narrowest at 132px, so a panel wider than its trigger shows here.
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-kind-list',
+    label: 'Manager — Recipe edit ingredient kind list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    // The walk stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Crafting',
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-option-kind]' },
+    ],
+    expectView: 'recipe-edit',
+    // Three claims a closed-state frame fails: the panel exists, it is portaled to the application root, and its ticked column reaches the chosen row. The `inline` rung is read off the frame rather than asserted, because that class is built from the `size` prop and no literal of it exists in `src`.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="component"] .fabricate-select-tick',
+    // The panel sits inside the application root rather than clipped by it, and its rows carry the kind words.
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      { container: '.fabricate-select-popover', target: '.fabricate-select-label' },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/recipe\//, ...ANCHORED_POPOVER_SOURCES],
+  }),
   managerCase({
     id: 'manager-recipe-edit-ingredients-cost',
     label: 'Manager — Recipe edit ingredients cost',

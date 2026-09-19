@@ -829,13 +829,15 @@ export function registerComponentsCases() {
     await tick();
     flushSync();
 
-    // One routing select per non-empty outcome name on the routed salvage check.
+    // One routing control per non-empty outcome name on the routed salvage check. The hook rides
+    // the shared picker's trigger button since issue 1510, so the query is unchanged and the
+    // per-row identity it carries is still the outcome's own name.
     const routes = target.querySelectorAll('[data-salvage-routing] [data-salvage-route]');
-    assert.equal(routes.length, 3, 'one routing select per routed outcome tier name');
+    assert.equal(routes.length, 3, 'one routing control per routed outcome tier name');
     assert.deepEqual(
-      Array.from(routes).map((select) => select.dataset.salvageRoute),
+      Array.from(routes).map((trigger) => trigger.dataset.salvageRoute),
       ['Failure', 'Success', 'Critical Success'],
-      'routing selects should be keyed by outcome tier name'
+      'routing controls should be keyed by outcome tier name'
     );
 
     assert.ok(

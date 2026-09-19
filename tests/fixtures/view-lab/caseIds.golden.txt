@@ -99,6 +99,7 @@ manager-recipe-edit-crafting-modifier-inert
 manager-recipe-edit-books-scrolls
 manager-recipe-edit-tools
 manager-recipe-edit-ingredients
+manager-recipe-edit-ingredients-kind-list
 manager-recipe-edit-ingredients-cost
 manager-recipe-edit-tag-picker
 manager-recipe-edit-ingredients-or-menu
@@ -118,6 +119,7 @@ manager-access-recipe-roster-no-match
 manager-components-normal
 manager-components-essence-chips
 manager-component-edit-inheriting
+manager-component-edit-category-list
 manager-component-edit-world-tags
 manager-components-world-cohort
 manager-components-add-from-catalogue

@@ -104,7 +104,6 @@
   "nativeSelectElements": [
     "src/ui/svelte/apps/manager/AccessTabView.svelte | 2",
     "src/ui/svelte/apps/manager/BooksScrollsView.svelte | 3",
-    "src/ui/svelte/apps/manager/ComponentEditView.svelte | 3",
     "src/ui/svelte/apps/manager/ComponentsBrowserView.svelte | 3",
     "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte | 16",
     "src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte | 5",
@@ -119,10 +118,7 @@
     "src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte | 1",
     "src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte | 1",
-    "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | 2",
     "src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte | 3",
-    "src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte | 1",
-    "src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte | 4",
     "src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte | 1",
     "src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte | 1",
     "src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte | 1"

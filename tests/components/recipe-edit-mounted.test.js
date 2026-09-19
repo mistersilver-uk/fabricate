@@ -14,6 +14,16 @@ import {
   flattenToolForRecipeLibrary,
 } from '../helpers/toolDisplayPrecedenceCases.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+// The Overview cells and the ingredient row's kind control are the shared `<Select>` since issue
+// 1510, so choosing a value is an open-then-click on a panel portaled onto the mount target.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -103,7 +113,9 @@ const RAW_MODULES = [
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',
-  // The Overview tab resolves the recipe's category label for its Category select.
+  // The Overview tab resolves the recipe's category label for its Category select, and maps its
+  // four converted cells' option lists beside itself (issue 1510).
+  'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
@@ -126,6 +138,10 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // The shared one-of-N picker (issue 1510). The Overview tab's three select cells and the
+  // ingredient row's kind control render it, and a `.svelte` the tree renders but this list omits
+  // HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   // The Results tab's progressive reorder-permission card (issue 651). A component the
   // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
@@ -411,6 +427,35 @@ async function pickOrOption(target, groupId, addToken) {
   await flushRender();
 }
 
+// The four converted Overview cells and the ingredient row's kind picker, each by its own hook on
+// the trigger (issue 1510).
+const CATEGORY_TRIGGER = '[data-recipe-category-select]';
+const TIER_TRIGGER = '[data-recipe-field="checkTierId"]';
+const MIN_SUCCESS_TRIGGER = '[data-recipe-field="minSuccessOutcomeId"]';
+const MODIFIER_SET_TRIGGER = '[data-recipe-field="craftingModifierSet"]';
+const KIND_TRIGGER = '[data-recipe-option] [data-recipe-option-kind]';
+
+// The three eligible-set labels, keyed by the mode each one publishes.
+const MODIFIER_SET_MODE_BY_LABEL = Object.freeze({
+  'Inherit system default': 'inherit',
+  'Custom set': 'custom',
+  'No modifiers': 'none',
+});
+
+/**
+ * The tri-state's CURRENT MODE, read the way it is now readable (issue 1510): `.value` is inside the
+ * primitive and the trigger publishes the chosen option's LABEL. Mapping the three labels back is
+ * not a weakening — they are the exact pre-conversion `<option>` text, so an assertion reds for the
+ * same reason it did and also catches a copy change `.value` never saw.
+ *
+ * @param {HTMLElement} target The harness mount target.
+ * @returns {string} `inherit`, `custom`, `none`, or the raw trigger text when it is none of them.
+ */
+function modifierSetMode(target) {
+  const shown = selectTriggerText(target, MODIFIER_SET_TRIGGER);
+  return MODIFIER_SET_MODE_BY_LABEL[shown] ?? shown;
+}
+
 describe('RecipeEditView (mounted)', () => {
   before(async () => {
     await editHarness.setup();
@@ -482,19 +527,35 @@ describe('RecipeEditView (mounted)', () => {
     );
     const tierField = target.querySelector('[data-recipe-check-tier]');
     assert.ok(tierField, 'the Check tier dropdown renders for a RI recipe with simple tiers');
-    const select = tierField.querySelector('[data-recipe-field="checkTierId"]');
-    // Default option + the two simple tiers.
-    const values = [...select.querySelectorAll('option')].map((o) => o.value);
-    assert.deepEqual(values, ['', 'tier-easy', 'tier-hard']);
+    assert.ok(
+      tierField.querySelector(TIER_TRIGGER),
+      'the tier trigger carries the row\u2019s own hook'
+    );
+    // THE NAME IS PINNED AGAINST ITS PRE-CONVERSION VALUE (issue 1510).
+    assert.equal(
+      assertSelectHasResolvedName(target, TIER_TRIGGER),
+      'Check tier',
+      'the demoted wrapper still names its trigger, through `aria-labelledby`'
+    );
+    // Default option + the two simple tiers, the blank row on the primitive's own sentinel.
+    assert.deepEqual(selectOptionValues(target, TIER_TRIGGER), [
+      '__unchanged__',
+      'tier-easy',
+      'tier-hard',
+    ]);
+    assert.deepEqual(
+      selectOptionLabels(target, TIER_TRIGGER),
+      ['Default DC', 'Easy (DC 8)', 'Hard (DC 20)'],
+      'every option label is carried verbatim from the `<option>` text it replaced'
+    );
+    closeSelectPanel(target, TIER_TRIGGER);
     // It is the DC-tier control, NOT the routedByCheck-only "Minimum success tier"
     // (minSuccessOutcomeId) control.
-    assert.equal(
-      target.querySelector('[data-recipe-field="minSuccessOutcomeId"]'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-recipe-field="minSuccessOutcomeId"]'),
       'routedByIngredients gets no minimum-success-tier control'
     );
-    select.value = 'tier-hard';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, TIER_TRIGGER, 'tier-hard');
     await flushRender();
     assert.deepEqual(
       patches.at(-1),
@@ -524,11 +585,18 @@ describe('RecipeEditView (mounted)', () => {
       field,
       'the Minimum success tier dropdown renders when the wrapper forwards the options'
     );
-    const select = field.querySelector('[data-recipe-field="minSuccessOutcomeId"]');
-    const values = [...select.querySelectorAll('option')].map((o) => o.value);
-    assert.deepEqual(values, ['', 'tier-b', 'tier-c'], 'default option + the two success tiers');
-    select.value = 'tier-c';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.ok(field.querySelector(MIN_SUCCESS_TRIGGER), 'the trigger carries its own hook');
+    assert.equal(
+      assertSelectHasResolvedName(target, MIN_SUCCESS_TRIGGER),
+      'Minimum success tier',
+      'the demoted wrapper still names its trigger'
+    );
+    assert.deepEqual(
+      selectOptionValues(target, MIN_SUCCESS_TRIGGER),
+      ['__unchanged__', 'tier-b', 'tier-c'],
+      'default option + the two success tiers'
+    );
+    chooseSelectOption(target, MIN_SUCCESS_TRIGGER, 'tier-c');
     await flushRender();
     assert.deepEqual(
       patches.at(-1),
@@ -683,26 +751,41 @@ describe('RecipeEditView (mounted)', () => {
         onUpdateRecipe: (patch) => patches.push(patch),
       })
     );
-    const setSelect = target.querySelector('[data-recipe-field="craftingModifierSet"]');
-    assert.ok(Boolean(setSelect), 'the tri-state select lives INSIDE the picker cell');
-    assert.deepEqual(
-      [...setSelect.querySelectorAll('option')].map((option) => option.value),
-      ['inherit', 'custom', 'none']
+    assert.ok(
+      Boolean(target.querySelector(MODIFIER_SET_TRIGGER)),
+      'the tri-state picker lives INSIDE the picker cell'
     );
-    assert.equal(setSelect.value, 'custom', 'a non-empty authored set reads back as Custom set');
+    // The WCAG 2.5.3 name this cell keeps rather than re-pointing at its shared caption.
+    assert.equal(
+      assertSelectHasResolvedName(target, MODIFIER_SET_TRIGGER),
+      'Eligible modifiers source',
+      'the one demoted wrapper here whose control keeps its own `aria-label`'
+    );
+    assert.deepEqual(selectOptionValues(target, MODIFIER_SET_TRIGGER), [
+      'inherit',
+      'custom',
+      'none',
+    ]);
+    assert.deepEqual(
+      selectOptionLabels(target, MODIFIER_SET_TRIGGER),
+      ['Inherit system default', 'Custom set', 'No modifiers'],
+      'the three labels are carried verbatim from the `<option>` text they replaced'
+    );
+    closeSelectPanel(target, MODIFIER_SET_TRIGGER);
+    assert.equal(
+      modifierSetMode(target),
+      'custom',
+      'a non-empty authored set reads back as Custom set'
+    );
 
-    setSelect.value = 'none';
-    setSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushRender();
+    await pickModifierSetMode(target, 'none');
     assert.deepEqual(
       patches.at(-1),
       { craftingModifier: { modifierIds: [] } },
       'No modifiers authors an EMPTY array — nothing is added to the roll, not inherit'
     );
 
-    setSelect.value = 'inherit';
-    setSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushRender();
+    await pickModifierSetMode(target, 'inherit');
     assert.deepEqual(
       patches.at(-1),
       { craftingModifier: null },
@@ -717,8 +800,11 @@ describe('RecipeEditView (mounted)', () => {
         recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
       })
     );
-    const setSelect = target.querySelector('[data-recipe-field="craftingModifierSet"]');
-    assert.equal(setSelect.value, 'none', 'Array.isArray, not length, discriminates the tri-state');
+    assert.equal(
+      modifierSetMode(target),
+      'none',
+      'Array.isArray, not length, discriminates the tri-state'
+    );
     assert.ok(
       !target.querySelector('[data-recipe-crafting-modifier-inherited]'),
       'an authored empty set is not "inheriting the system default set"'
@@ -734,11 +820,9 @@ describe('RecipeEditView (mounted)', () => {
       ...overrides,
     });
 
-  /** Pick an option on the tri-state select the way a GM does, and report the patch. */
+  /** Pick an option on the tri-state picker the way a GM does, and report the patch. */
   async function pickModifierSetMode(target, mode) {
-    const select = target.querySelector('[data-recipe-field="craftingModifierSet"]');
-    select.value = mode;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, MODIFIER_SET_TRIGGER, mode);
     await flushRender();
   }
 
@@ -748,7 +832,7 @@ describe('RecipeEditView (mounted)', () => {
       emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
     );
     assert.equal(
-      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      modifierSetMode(target),
       'inherit',
       'pre-condition: a recipe with no override inherits'
     );
@@ -765,7 +849,7 @@ describe('RecipeEditView (mounted)', () => {
     // so the select is rewritten and the assertion cannot pass on the typed value.
     await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
     assert.equal(
-      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      modifierSetMode(target),
       'custom',
       'the control must not reject the GM’s choice by snapping back to No modifiers'
     );
@@ -796,7 +880,7 @@ describe('RecipeEditView (mounted)', () => {
         recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
       });
       assert.equal(
-        target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+        modifierSetMode(target),
         'custom',
         `picking ${released} left the select stale — it was never rewritten, so the pin is still held`
       );
@@ -804,7 +888,7 @@ describe('RecipeEditView (mounted)', () => {
         recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
       });
       assert.equal(
-        target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+        modifierSetMode(target),
         'none',
         `picking ${released} drops the pin, so an empty authored set reads as No modifiers again`
       );
@@ -825,7 +909,7 @@ describe('RecipeEditView (mounted)', () => {
       recipe: { ...RECIPE, name: 'Renamed mid-edit', craftingModifier: { modifierIds: [] } },
     });
     assert.equal(
-      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      modifierSetMode(target),
       'custom',
       'a same-id draft patch must not clear the pin — every patch is a new object'
     );
@@ -834,7 +918,7 @@ describe('RecipeEditView (mounted)', () => {
       recipe: { ...RECIPE, id: 'r2', craftingModifier: { modifierIds: [] } },
     });
     assert.equal(
-      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      modifierSetMode(target),
       'none',
       'a different recipe gets its own reading, not the previous one’s local intent'
     );
@@ -3826,9 +3910,10 @@ describe('RecipeEditView (mounted)', () => {
         },
       }
     );
-    const kindWords = [...target.querySelectorAll('[data-recipe-option-kind] option')].map(
-      (option) => option.textContent.trim()
-    );
+    // The four kind words the row offers, read off its OPEN panel (issue 1510): the vocabulary
+    // lives in a portaled list rather than in `<option>` children of the trigger.
+    const kindWords = selectOptionLabels(target, KIND_TRIGGER);
+    closeSelectPanel(target, KIND_TRIGGER);
 
     await openOrMenu(target, 'grp-1');
     const popover = document.querySelector('.manager-recipe-or-popover');
@@ -4380,11 +4465,22 @@ describe('RecipeEditView (mounted)', () => {
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       { props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS } }
     );
-    const kind = target.querySelector('[data-recipe-option] select[data-recipe-option-kind]');
-    assert.ok(kind, 'every row carries a real <select> for its kind');
-    assert.equal(kind.value, 'component', 'it reads back the row current kind');
-    kind.value = 'tags';
-    kind.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    assert.ok(
+      target.querySelector(KIND_TRIGGER),
+      'every row carries a one-of-N picker for its kind'
+    );
+    // The kind word is what the trigger publishes; the value lives inside the primitive.
+    assert.equal(
+      selectTriggerText(target, KIND_TRIGGER),
+      'Component',
+      'it reads back the row current kind'
+    );
+    assert.equal(
+      assertSelectHasResolvedName(target, KIND_TRIGGER),
+      'Requirement kind',
+      'the bare call site keeps its own `aria-label` verbatim'
+    );
+    chooseSelectOption(target, KIND_TRIGGER, 'tags');
     await flushRender();
     assert.equal(patches.length, 1, 'changing the kind patches the recipe');
     assert.deepEqual(
@@ -4663,10 +4759,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.match(chosen.textContent, /Life/, 'the authored disabled essence still names itself');
     // And the kind select still says what the row IS, though `Essence` would be offered anyway.
-    assert.equal(
-      target.querySelector('[data-recipe-option] [data-recipe-option-kind]').value,
-      'essence'
-    );
+    assert.equal(selectTriggerText(target, KIND_TRIGGER), 'Essence');
 
     // And it is still CLEARABLE: the option can be removed outright.
     target
@@ -5765,12 +5858,24 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
   // --- category (moved to Overview, threaded through RecipeEditView) ------------
   it('disables the category selector and shows only General when no categories exist', async () => {
     const target = await editHarness.mount(identityProps({ categories: [] }));
-    const select = target.querySelector('[data-recipe-category-select]');
-    assert.ok(select, 'category selector renders on Overview');
-    assert.equal(select.disabled, true, 'selector is disabled with no custom categories');
-    const options = [...select.querySelectorAll('option')];
-    assert.equal(options.length, 1, 'only one option present');
-    assert.equal(options[0].value, 'general', 'the sole option is the General fallback');
+    const trigger = target.querySelector(CATEGORY_TRIGGER);
+    assert.ok(trigger, 'category selector renders on Overview');
+    // The element-level `disabled` maps to the primitive's `disabled` prop, which reaches the
+    // trigger BUTTON, so the state is read off the button rather than off a `<select>`.
+    assert.equal(trigger.disabled, true, 'selector is disabled with no custom categories');
+    // Disabled or not, the trigger shows the sole offer. `getRecipeCategoryLabel` routes the
+    // General fallback through `localize` and this harness's stub returns the key, so the assertion
+    // is on the key, exactly as the pre-conversion one was on the VALUE.
+    assert.equal(
+      selectTriggerText(target, CATEGORY_TRIGGER),
+      'FABRICATE.Common.General',
+      'the sole option is the General fallback'
+    );
+    assert.equal(
+      trigger.getAttribute('title'),
+      'No categories defined. Add some under Tags and Categories.',
+      'the disabled trigger still tells the GM where to add one'
+    );
     editHarness.remount();
   });
 
@@ -5781,15 +5886,33 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
         categories: ['Potions', 'Weapons'],
       })
     );
-    const select = target.querySelector('[data-recipe-category-select]');
-    assert.equal(select.disabled, false, 'selector is interactive with custom categories');
-    const values = [...select.querySelectorAll('option')].map((o) => o.value);
+    assert.equal(
+      target.querySelector(CATEGORY_TRIGGER).disabled,
+      false,
+      'selector is interactive with custom categories'
+    );
     assert.deepEqual(
-      values,
+      selectOptionValues(target, CATEGORY_TRIGGER),
       ['general', 'Potions', 'Weapons'],
       'General precedes the custom categories'
     );
-    assert.equal(select.value, 'Potions', 'reflects the recipe category');
+    closeSelectPanel(target, CATEGORY_TRIGGER);
+    assert.equal(
+      selectTriggerText(target, CATEGORY_TRIGGER),
+      'Potions',
+      'reflects the recipe category'
+    );
+    assert.equal(
+      assertSelectHasResolvedName(target, CATEGORY_TRIGGER),
+      'Category',
+      'the demoted wrapper still names its trigger, through `aria-labelledby`'
+    );
+    // The tooltip rides `triggerTitle`: `triggerData` cannot carry one (issue 1510).
+    assert.equal(
+      target.querySelector(CATEGORY_TRIGGER).getAttribute('title'),
+      'Select recipe category',
+      'the enabled-state tooltip survived the conversion'
+    );
     editHarness.remount();
   });
 
@@ -5802,9 +5925,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
         onSetCategory: (category) => chosen.push(category),
       })
     );
-    const select = target.querySelector('[data-recipe-category-select]');
-    select.value = 'Potions';
-    select.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    chooseSelectOption(target, CATEGORY_TRIGGER, 'Potions');
     await flushRender();
     assert.deepEqual(chosen, ['Potions'], 'onSetCategory receives the selected category');
     editHarness.remount();
