@@ -12,30 +12,13 @@ import {
   spawnInteractableRegion,
 } from '../../src/canvas/interactableSpawner.js';
 import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
+import {
+  taskClassification as taskDrop,
+  toolClassification as toolDrop,
+} from '../helpers/interactableFixtures.js';
 
 function sealed(name, body) {
   test(name, () => underFoundryGlobalTrap('interactableSpawner', body));
-}
-
-function toolDrop(overrides = {}) {
-  return {
-    interactableType: 'tool',
-    systemId: 'sysA',
-    referenceId: 'tool-1',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    entry: { id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' },
-    ...overrides,
-  };
-}
-
-function taskDrop() {
-  return {
-    interactableType: 'gatheringTask',
-    systemId: 'sysA',
-    referenceId: 'task-9',
-    sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
-    entry: { id: 'task-9', name: 'Chop Wood' },
-  };
 }
 
 const FOREST = Object.freeze({ id: 'env-forest', name: 'Forest' });
@@ -72,6 +55,7 @@ function collaborators(overrides = {}) {
     updateBehavior: (behavior, update) => calls.updates.push({ behavior, update }),
     gridSize: () => 100,
     iconTexture: () => 'icons/tools/axe.webp',
+    buildRegionSpawnRequest: (args) => buildRegionSpawnRequest(args, deps),
     resolutionDeps: () => ({ getTask: () => ({ id: 'task-9', defaultEnvironmentId: null }) }),
     listEnvironments: () => [],
     regionEnvironmentIdsAtPoint: (args) => {

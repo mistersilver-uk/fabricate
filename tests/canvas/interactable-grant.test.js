@@ -15,39 +15,13 @@ import {
   validateAndGrant,
 } from '../../src/canvas/interactableGrant.js';
 import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
+import {
+  interactableSystem as behaviorSystem,
+  placedBehavior,
+} from '../helpers/interactableFixtures.js';
 
 function sealed(name, body) {
   test(name, () => underFoundryGlobalTrap('interactableGrant', body));
-}
-
-function behaviorSystem(overrides = {}) {
-  return {
-    interactableType: 'tool',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    systemId: 'sysA',
-    toolId: 'tool-1',
-    taskId: null,
-    environmentId: null,
-    name: 'Forge Anvil',
-    presentation: { promptText: null, hidden: false },
-    linkedVisual: { uuid: null, documentName: null, mode: 'marker', missingPolicy: 'warn' },
-    node: null,
-    state: {
-      enabled: true,
-      consumed: false,
-      locked: false,
-      uses: { max: null, used: 0 },
-      cooldown: { seconds: null, lastUsedWorldTime: null },
-    },
-    activation: { trigger: 'regionEnter', audience: 'players' },
-    ...overrides,
-  };
-}
-
-function placedBehavior(system) {
-  const scene = { id: 'scene-1' };
-  const region = { id: 'region-1', parent: scene };
-  return { id: 'beh-1', type: 'fabricate.interactable', system, parent: region };
 }
 
 function activationRequest(overrides = {}) {
@@ -74,7 +48,7 @@ function collaborators(overrides = {}) {
         return Promise.resolve();
       },
     }),
-    resolveBehavior: () => placedBehavior(behaviorSystem()),
+    resolveBehavior: () => placedBehavior({ system: behaviorSystem() }),
     emit: (payload) => calls.emitted.push(payload),
     isActiveGM: () => false,
     hasActiveGM: () => true,
@@ -102,7 +76,7 @@ function collaborators(overrides = {}) {
 sealed('the active GM validates locally and never emits', () => {
   const { deps, calls } = collaborators({ isActiveGM: () => true });
 
-  requestActivation(placedBehavior(behaviorSystem()), { actorId: 'a1', userId: 'gm-1' }, deps);
+  requestActivation(placedBehavior({ system: behaviorSystem() }), { actorId: 'a1', userId: 'gm-1' }, deps);
 
   assert.equal(calls.emitted.length, 0);
   assert.equal(calls.granted.length, 1, 'the injected thunk is used, so a patched method wins');
@@ -117,7 +91,7 @@ sealed('the active GM validates locally and never emits', () => {
 sealed('a player emits the request and defaults its userId and source', () => {
   const { deps, calls } = collaborators({ currentUserId: () => 'u-1' });
 
-  requestActivation(placedBehavior(behaviorSystem()), { actorId: 'a1' }, deps);
+  requestActivation(placedBehavior({ system: behaviorSystem() }), { actorId: 'a1' }, deps);
 
   assert.equal(calls.emitted.length, 1);
   assert.equal(calls.emitted[0].userId, 'u-1');
@@ -129,7 +103,7 @@ sealed('a player emits the request and defaults its userId and source', () => {
 sealed('with no active GM the request warns and is dropped', () => {
   const { deps, calls } = collaborators({ hasActiveGM: () => false });
 
-  requestActivation(placedBehavior(behaviorSystem()), { actorId: 'a1' }, deps);
+  requestActivation(placedBehavior({ system: behaviorSystem() }), { actorId: 'a1' }, deps);
 
   assert.equal(calls.emitted.length, 0);
   assert.deepEqual(calls.warned, ['FABRICATE.Canvas.Interactable.NoActiveGM']);
@@ -138,7 +112,7 @@ sealed('with no active GM the request warns and is dropped', () => {
 sealed('an unlocalizable warning still says something', () => {
   const { deps, calls } = collaborators({ hasActiveGM: () => false, localize: () => undefined });
 
-  requestActivation(placedBehavior(behaviorSystem()), {}, deps);
+  requestActivation(placedBehavior({ system: behaviorSystem() }), {}, deps);
 
   assert.deepEqual(calls.warned, ['A GM must be online to gather here.']);
 });
@@ -213,7 +187,7 @@ sealed('each validation collaborator is consulted and routes its own denial reas
     [{ canControlActor: () => false }, 'CANNOT_CONTROL_ACTOR'],
     [{ tokenInside: () => false }, 'TOKEN_NOT_INSIDE'],
     [{ sourceExists: () => false }, 'SOURCE_MISSING'],
-    [{ worldTime: () => 120, resolveBehavior: () => placedBehavior(cooling()) }, 'COOLDOWN'],
+    [{ worldTime: () => 120, resolveBehavior: () => placedBehavior({ system: cooling() }) }, 'COOLDOWN'],
   ];
   for (const [overrides, reason] of cases) {
     const { deps, calls } = collaborators(overrides);
@@ -225,7 +199,7 @@ sealed('each validation collaborator is consulted and routes its own denial reas
 
   const elapsed = collaborators({
     worldTime: () => 200,
-    resolveBehavior: () => placedBehavior(cooling()),
+    resolveBehavior: () => placedBehavior({ system: cooling() }),
   });
   assert.equal(await validateAndGrant(activationRequest(), elapsed.deps), true);
 });
@@ -244,15 +218,15 @@ sealed('the environment check is asked only of a gathering task', async () => {
     collaborators({
       environmentExists,
       resolveBehavior: () =>
-        placedBehavior(
-          behaviorSystem({
+        placedBehavior({
+          system: behaviorSystem({
             interactableType: 'gatheringTask',
             sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
             toolId: null,
             taskId: 'task-9',
             environmentId: 'env-forest',
-          })
-        ),
+          }),
+        }),
     });
 
   const asked = [];

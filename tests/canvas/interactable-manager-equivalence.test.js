@@ -1,14 +1,20 @@
 /**
  * The observable behaviour of `InteractableManager`, pinned before issue 1704 split it into
  * `interactablePredicates`, `interactableGrant`, `regionEnterPrompt` and `interactableSpawner`.
- * This file is byte-identical across that split: a change here means the split changed behaviour.
+ * Every cell here holds against the PRE-split manager too: substitute it and the suite still passes.
  */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { InteractableManager } from '../../src/canvas/InteractableManager.js';
-import { gridScene, tokenDoc } from '../helpers/regionContainmentFakes.js';
+import {
+  interactableSystem as toolSystem,
+  placedBehavior,
+  taskClassification,
+  toolClassification,
+} from '../helpers/interactableFixtures.js';
+import { tokenDoc } from '../helpers/regionContainmentFakes.js';
 
 const RUNTIME_KEYS = ['game', 'Hooks', 'canvas', 'foundry', 'CONFIG', 'ui', 'PIXI', 'window'];
 
@@ -32,30 +38,6 @@ async function settle(turns = 8) {
   for (let index = 0; index < turns; index += 1) await Promise.resolve();
 }
 
-function toolSystem(overrides = {}) {
-  return {
-    interactableType: 'tool',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    systemId: 'sysA',
-    toolId: 'tool-1',
-    taskId: null,
-    environmentId: null,
-    name: 'Forge Anvil',
-    presentation: { promptText: 'Use the forge', hidden: false },
-    linkedVisual: { uuid: null, documentName: null, mode: 'marker', missingPolicy: 'warn' },
-    node: null,
-    state: {
-      enabled: true,
-      consumed: false,
-      locked: false,
-      uses: { max: null, used: 0 },
-      cooldown: { seconds: null, lastUsedWorldTime: null },
-    },
-    activation: { trigger: 'regionEnter', audience: 'players' },
-    ...overrides,
-  };
-}
-
 function taskSystem(overrides = {}) {
   return toolSystem({
     interactableType: 'gatheringTask',
@@ -66,27 +48,6 @@ function taskSystem(overrides = {}) {
     name: 'Chop Wood',
     ...overrides,
   });
-}
-
-function toolClassification(overrides = {}) {
-  return {
-    interactableType: 'tool',
-    systemId: 'sysA',
-    referenceId: 'tool-1',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    entry: { id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' },
-    ...overrides,
-  };
-}
-
-function taskClassification() {
-  return {
-    interactableType: 'gatheringTask',
-    systemId: 'sysA',
-    referenceId: 'task-9',
-    sourceUuid: 'Fabricate.sysA.gatheringTask.task-9',
-    entry: { id: 'task-9', name: 'Chop Wood' },
-  };
 }
 
 function spawnScene(log, { failRegion, failTile, gridSize }) {
@@ -194,15 +155,6 @@ function installRuntime({
   if (tileClassOn === 'foundry') globalThis.foundry = { documents: { TileDocument } };
   if (tileClassOn === 'config') globalThis.CONFIG = { Tile: { documentClass: TileDocument } };
   return log;
-}
-
-function placedBehavior({ system, tokens = [] } = {}) {
-  const scene = gridScene({ id: 'scene-1', tokens });
-  const region = { id: 'region-1', uuid: 'Scene.scene-1.Region.region-1', parent: scene };
-  const behavior = { id: 'beh-1', type: 'fabricate.interactable', system, parent: region };
-  region.behaviors = { get: (id) => (id === 'beh-1' ? behavior : null), contents: [behavior] };
-  scene.regions = { get: (id) => (id === 'region-1' ? region : null), contents: [region] };
-  return behavior;
 }
 
 function grantFixture({

@@ -14,42 +14,13 @@ import {
   repromptAfterClose,
 } from '../../src/canvas/regionEnterPrompt.js';
 import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
+import { interactableSystem, placedBehavior } from '../helpers/interactableFixtures.js';
 
 const PLAYER = Object.freeze({ id: 'u-1', isGM: false });
 const GM = Object.freeze({ id: 'gm-1', isGM: true });
 
 function sealed(name, body) {
   test(name, () => underFoundryGlobalTrap('regionEnterPrompt', body));
-}
-
-function interactableSystem(overrides = {}) {
-  return {
-    interactableType: 'tool',
-    sourceUuid: 'Fabricate.sysA.tool.tool-1',
-    systemId: 'sysA',
-    toolId: 'tool-1',
-    taskId: null,
-    environmentId: null,
-    name: 'Forge Anvil',
-    presentation: { promptText: 'Use the forge', hidden: false },
-    linkedVisual: { uuid: null, documentName: null, mode: 'marker', missingPolicy: 'warn' },
-    node: null,
-    state: {
-      enabled: true,
-      consumed: false,
-      locked: false,
-      uses: { max: null, used: 0 },
-      cooldown: { seconds: null, lastUsedWorldTime: null },
-    },
-    activation: { trigger: 'regionEnter', audience: 'players' },
-    ...overrides,
-  };
-}
-
-function placedBehavior(system = interactableSystem()) {
-  const scene = { id: 'scene-1' };
-  const region = { id: 'region-1', parent: scene };
-  return { id: 'beh-1', type: 'fabricate.interactable', system, parent: region };
 }
 
 function collaborators(overrides = {}) {
@@ -120,16 +91,16 @@ sealed('the enter seam suppresses a foreign behaviour, a non-owner and a conceal
 
   const disabled = interactableSystem();
   disabled.state.enabled = false;
-  onRegionEnter(event, placedBehavior(disabled), deps);
+  onRegionEnter(event, placedBehavior({ system: disabled }), deps);
   const hidden = interactableSystem();
   hidden.presentation.hidden = true;
-  onRegionEnter(event, placedBehavior(hidden), deps);
-  onRegionEnter(event, placedBehavior(interactableSystem({ sourceUuid: '' })), deps);
+  onRegionEnter(event, placedBehavior({ system: hidden }), deps);
+  onRegionEnter(event, placedBehavior({ system: interactableSystem({ sourceUuid: '' }) }), deps);
   assert.equal(calls.shown.length, 1, 'disabled, hidden and unconfigured all suppress');
 
   const locked = interactableSystem();
   locked.state.locked = true;
-  onRegionEnter(event, placedBehavior(locked), deps);
+  onRegionEnter(event, placedBehavior({ system: locked }), deps);
   assert.equal(calls.shown.length, 2, 'a LOCKED interactable still prompts');
 
   onRegionEnter(event, { id: 'beh-1', type: 'fabricate.interactable', system: interactableSystem() }, deps);
@@ -173,7 +144,7 @@ sealed('the in-region re-prompt raises one prompt for the first eligible behavio
   const { deps, calls } = collaborators({
     behaviorsContainingToken: () => [
       { behavior: { id: 'beh-0', type: 'other', system: interactableSystem() } },
-      { behavior: placedBehavior(concealed) },
+      { behavior: placedBehavior({ system: concealed }) },
       { behavior: { id: 'beh-x', type: 'fabricate.interactable', system: interactableSystem() } },
       { behavior: eligible },
       { behavior: placedBehavior() },
