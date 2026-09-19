@@ -101,6 +101,11 @@ function tileDocumentClass(log, failTile) {
   };
 }
 
+/** `game.i18n` is always called as a method; a detached reference is the defect this catches. */
+function assertI18nReceiver(receiver) {
+  if (receiver !== globalThis.game?.i18n) throw new Error('i18n lost its receiver');
+}
+
 function installRuntime({
   isGM = true,
   worldTime = 0,
@@ -138,7 +143,16 @@ function installRuntime({
     socket: {
       emit: (...args) => log.emits.push({ channel: args[0], payload: args[1], argc: args.length }),
     },
-    i18n: { localize: (key) => key, format: (key) => key },
+    i18n: {
+      localize(key) {
+        assertI18nReceiver(this);
+        return key;
+      },
+      format(key) {
+        assertI18nReceiver(this);
+        return key;
+      },
+    },
     actors: { get: () => null },
     scenes: { get: () => null },
     fabricate,
@@ -289,8 +303,9 @@ runtimeTest('a marker drop writes the Region, the linked Tile and the linked-vis
 });
 
 runtimeTest('the tile document class is resolved in-call, so a CONFIG override is honoured', async () => {
-  const log = installRuntime({ tileClassOn: 'config' });
+  const log = installRuntime({ tileClassOn: 'none' });
   const manager = new InteractableManager();
+  globalThis.CONFIG = { Tile: { documentClass: tileDocumentClass(log, false) } };
 
   await manager._spawnInteractableRegion(
     manager._buildRegionSpawnRequest({
@@ -536,6 +551,8 @@ runtimeTest('the enter prompt is gated by mover-or-owner and then by concealment
   globalThis.game.user = { ...GM };
   assert.equal(manager._shouldPromptForEnter({ user: globalThis.game.user }, foreign), true);
   assert.equal(manager._shouldPromptForEnter({ user: other }, owned), false);
+  manager.onRegionEnter({ user: other, data: { token: owned } }, placedBehavior({ system: toolSystem() }));
+  assert.equal(prompts.length, 0, 'currentUser is re-read per call: this client is now a GM');
   globalThis.game.user = { ...PLAYER };
   assert.equal(manager._shouldPromptForEnter({ user: globalThis.game.user }, owned), true);
   assert.equal(manager._shouldPromptForEnter({ user: other }, owned), true);
@@ -1012,6 +1029,10 @@ runtimeTest('the grid size reads scene grid, canvas grid then dimensions, and fa
 
   globalThis.canvas.grid = { size: 60 };
   globalThis.canvas.dimensions = { size: 55 };
+  assert.equal(manager._gridSize(), 70, 'the scene grid outranks the canvas grid and dimensions');
+
+  globalThis.canvas.grid = { size: 60 };
+  globalThis.canvas.dimensions = { size: 55 };
   globalThis.canvas.scene = { id: 'scene-1' };
   assert.equal(manager._gridSize(), 60);
 
@@ -1048,6 +1069,7 @@ runtimeTest('register binds the two canvas hooks once and registers the keybindi
     ['controlToken', 'dropCanvasData']
   );
   assert.equal(manager._registered, true);
+  assert.equal(manager._tokenInsideRegion.length, 3, 'the spec-cited three-parameter signature');
   assert.equal(keybindings.length, 1);
   assert.equal(keybindings[0].namespace, 'fabricate');
   assert.equal(keybindings[0].id, 'fabricateInteractHere');
