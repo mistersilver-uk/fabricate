@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 // The one place the aside/column pairing is asked.
 import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import { openingTagsNamed } from '../helpers/svelteTagScan.js';
+import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -1013,22 +1014,19 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.ok(block.includes('visibilityEffect={recipeVisibilityEffect}'), 'the tab gate is wired');
   });
 
-  it('wires confirmRecipeRouteExit into the route-exit chain via the services discard seam', () => {
-    assert.ok(
-      /function confirmRecipeRouteExit\(/.test(rootSource),
-      'confirmRecipeRouteExit defined'
-    );
-    assert.ok(
-      rootSource.includes('confirmRecipeRouteExit(nextView)'),
-      'recipe route exit is part of the chain'
-    );
+  it('wires the recipe row into the route-exit chain via the services discard seam', () => {
+    const guard = ROUTE_EXIT_GUARDS.find((row) => row.view === 'recipe-edit');
+    assert.ok(Boolean(guard), 'the cascade carries a recipe-edit route-exit guard');
+    assert.equal(guard.skip, 'same-view', 'and waives a same-view re-entry, nothing wider');
     assert.ok(
       rootSource.includes('store.confirmDiscardDirtyRecipeDraft?.()'),
       'recipe route exit confirms through the services discard-dirty seam'
     );
-    const guardStart = rootSource.indexOf('function confirmRecipeRouteExit(');
-    const guardEnd = rootSource.indexOf('\n  }', guardStart);
-    const guardBody = rootSource.slice(guardStart, guardEnd);
+    // Anchored on the row, and asserted to have found it: a slice from `-1` reads the whole file
+    // and would pass whatever the guard said.
+    const guardStart = rootSource.indexOf("'recipe-edit': {");
+    assert.ok(guardStart > -1, 'the manager states the recipe row of the guard table');
+    const guardBody = rootSource.slice(guardStart, rootSource.indexOf('\n    },', guardStart));
     assert.equal(
       guardBody.includes('globalThis.confirm'),
       false,
