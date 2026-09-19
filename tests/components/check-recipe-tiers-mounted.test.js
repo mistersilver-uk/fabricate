@@ -25,6 +25,11 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    // The tier row is the shared ordered list's row as of issue 1512, and the list renders the
+    // icon button and the row disclosure behind it.
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
@@ -50,9 +55,19 @@ function names(emitted) {
   return emitted.at(-1).map((tier) => tier.id);
 }
 
+/**
+ * The grip's hook is the shared list's, not this surface's (issue 1512). `[data-tier-grip]` was this
+ * component's own attribute on its own `<ManagerButton>`; the grip is the list's control now, so it
+ * carries the list's hook. The five hooks this surface still owns — `data-tier-row`,
+ * `data-tier-name`, `data-tier-dc`, `data-remove-tier` and `data-add-tier` — are unchanged.
+ */
+function gripFor(target, tierId) {
+  return target.querySelector(`[data-sortable-grip="${tierId}"]`);
+}
+
 /** A keydown on the grip, as a real one arrives: bubbling, cancellable, and carrying the key. */
 function pressGrip(target, tierId, key) {
-  const grip = target.querySelector(`[data-tier-grip="${tierId}"]`);
+  const grip = gripFor(target, tierId);
   assert.ok(grip, `a grip exists for ${tierId}`);
   grip.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
   return grip;
@@ -61,7 +76,7 @@ function pressGrip(target, tierId, key) {
 describe('the recipe difficulty tier list (issue 1096)', () => {
   it('gives every row a grip, and the grip is a real focusable control', async () => {
     const target = await harness.mount({ tiers: TIERS });
-    const grips = [...target.querySelectorAll('[data-tier-grip]')];
+    const grips = [...target.querySelectorAll('[data-sortable-grip]')];
     assert.equal(grips.length, 3, 'every row carries a handle');
     for (const grip of grips) {
       assert.equal(grip.tagName, 'BUTTON', 'the handle is a real button, not a bare glyph');
@@ -115,6 +130,85 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
     );
     rows[0].dispatchEvent(new globalThis.Event('drop', { bubbles: true, cancelable: true }));
     assert.deepEqual(names(emitted), ['t-hard', 't-easy', 't-mid'], 'the row lands where it was dropped');
+  });
+
+  it('draws the chevron rocker as well as the grip, disabled at the ends', async () => {
+    // Issue 1096's one-affordance decision, overturned by the maintainer: the specimen states both
+    // affordances always, and this is the row that refused the rocker in as many words — so its new
+    // controls are asserted here rather than assumed from the primitive's own suite.
+    const emitted = [];
+    const target = await harness.mount({ tiers: TIERS, onChange: (next) => emitted.push(next) });
+
+    const rows = [...target.querySelectorAll('[data-tier-row]')];
+    assert.equal(rows.length, 3, 'three rows, so the ends and the middle are all represented');
+
+    const up = rows.map((row) => row.querySelector('[data-sortable-move="up"]'));
+    const down = rows.map((row) => row.querySelector('[data-sortable-move="down"]'));
+    assert.ok(
+      up.every(Boolean) && down.every(Boolean),
+      'every row draws both chevrons, in every position'
+    );
+    assert.ok(up[0].disabled, 'the first row cannot move up');
+    assert.ok(down[2].disabled, 'the last row cannot move down');
+    assert.ok(
+      !up[2].disabled && !down[0].disabled,
+      'the chevron that CAN move is live, so the pair reads as a range rather than as chrome'
+    );
+    assert.ok(
+      up.every((button) => button.getAttribute('data-keyboard-focus') === 'true'),
+      'or Foundry keeps its arrow bindings and the canvas pans behind the studio'
+    );
+
+    down[0].click();
+    assert.deepEqual(
+      names(emitted),
+      ['t-mid', 't-easy', 't-hard'],
+      'the rocker moves the row it belongs to'
+    );
+  });
+
+  it('announces a keyboard move through the list, which this row had no region for', async () => {
+    const target = await harness.mount({ tiers: TIERS, onChange: () => {} });
+    pressGrip(target, 't-hard', 'ArrowUp');
+    flushSync();
+    const region = target.querySelector('[data-sortable-list-status]');
+    assert.ok(Boolean(region), 'the list renders a polite live region');
+    assert.equal(region.getAttribute('aria-live'), 'polite');
+    assert.match(
+      region.textContent,
+      /Masterwork/u,
+      'it names the row that moved, read BEFORE the array was round-tripped'
+    );
+  });
+
+  // The adder is the list's own footer, and reachable at zero (issue 1512). Both halves are
+  // asserted because a change satisfying only the first ships an empty state that says "add one"
+  // with nothing to press — so the empty branch's control is CLICKED and its effect read.
+  it('renders the adder as the list footer, and after the empty message at zero', async () => {
+    const populated = await harness.mount({ tiers: TIERS });
+    assert.equal(
+      populated.querySelectorAll('[data-add-tier]').length,
+      1,
+      'the adder is defined ONCE: two definitions render two controls in the populated state'
+    );
+    assert.ok(
+      Boolean(populated.querySelector('[data-add-tier]').closest('.fabricate-sortable-list')),
+      'with tiers, the adder is the list`s last child rather than a sibling of the list'
+    );
+
+    harness.remount();
+    const emitted = [];
+    const empty = await harness.mount({ tiers: [], defaultDc: 9, onChange: (next) => emitted.push(next) });
+    assert.ok(Boolean(empty.querySelector('[data-tiers-empty]')), 'the empty message renders');
+    const emptyAdd = empty.querySelector('[data-add-tier]');
+    assert.ok(Boolean(emptyAdd), 'and the adder is still reachable with no tiers at all');
+    assert.ok(
+      !emptyAdd.closest('.fabricate-sortable-list'),
+      'following the message it now sits under, because there is no list to be a footer of'
+    );
+    emptyAdd.click();
+    assert.equal(emitted.at(-1).length, 1, 'and pressing it adds the first tier');
+    assert.equal(emitted.at(-1)[0].dc, 9, 'seeded from the base DC');
   });
 
   it("states the prototype's title and the sentence for the screen it is on", async () => {

@@ -71,9 +71,11 @@ const FIXTURE = `
              lists, so these roles are pinned to the numbers component-studio-font-size.js
              already commits for the salvage row — the design source — NOT read off this
              markup. If the two ever disagree, the sharing has broken. -->
-        <div class="manager-recipe-result-row is-reorderable">
-          <span class="manager-recipe-stage-grip" data-m="stage-grip"><i class="fas fa-grip-vertical"></i></span>
-          <span class="manager-recipe-stage-ordinal" data-m="stage-ordinal">1</span>
+        <div class="fabricate-sortable-list">
+         <div class="fabricate-sortable-list-row manager-recipe-stage-row">
+          <div class="fabricate-sortable-list-line">
+          <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+          <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
           <div class="manager-recipe-ingredient-option-row">
             <div class="manager-recipe-option-target">
               <div class="manager-recipe-option-component">
@@ -88,11 +90,13 @@ const FIXTURE = `
             <div class="manager-recipe-option-controls">
               <span class="manager-recipe-stage-dc" data-m="stage-dc">DC 12</span>
               <button class="manager-recipe-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
-              <span class="manager-recipe-stage-reorder">
-                <button class="manager-recipe-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
-              </span>
             </div>
           </div>
+          <span class="fabricate-sortable-list-rocker">
+            <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
+          </span>
+          </div>
+         </div>
         </div>
         <!-- The Validation tab's aggregate header (issue 676), rehomed from the deleted
              context rail. Pinned to the rail's OWN committed values — the design source —
@@ -343,13 +347,13 @@ const EXPECTED = {
   // stage row already commits in component-studio-font-size.test.js: the two rows are
   // the same surface and SHARE their CSS rules, so a divergence here means the sharing
   // broke, not that this row wants its own scale.
-  'stage-grip': 11.2, // 0.7rem — shared .manager-salvage-stage-grip rule
-  'stage-ordinal': 10.88, // 0.68rem mono — shared with salvage's order badge
+  'stage-grip': 11.2, // 0.7rem — the shared ordered list's grip glyph (issue 1512)
+  'stage-ordinal': 10, // 10px mono — the list's ordinal badge, at the specimen's figure
   'stage-picker': 13.12, // 0.82rem — the picker trigger, as salvage's measures
   'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   'stage-dc': 13, // 0.8125rem mono 700 — shared read-only DC
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc, as on salvage
-  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph
+  'stage-move': 9, // 9px — the list's rocker chevron glyph
   // ── The Validation tab's aggregate header (issue 676). Every value is the one the
   // deleted RecipeContextRail committed for the same roles; the rehome changed the
   // layout, not the type scale.

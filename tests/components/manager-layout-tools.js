@@ -506,6 +506,12 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
       `the dashed Add control's right (${edges.addTierRight}) must equal the radio-card right (${edges.radioRight})`
     );
 
+    // The rows are the shared ordered list's now (issue 1512), and that list is a `<ul>`: the two
+    // edges above are measured against the card's content box, so a UA list inset would move them
+    // without any rule in the sheet changing.
+    assert.equal(edges.listPaddingLeft, '0px', 'the list contributes no inline padding of its own');
+    assert.equal(edges.listPaddingRight, '0px');
+
     // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await checksRollEdges(page, 'fabricate-card manager-inspector-card');
     assert.notEqual(

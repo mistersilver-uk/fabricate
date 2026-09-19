@@ -1,14 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Shared expandable/collapsible step accordion. Each row's header carries the order pip, the
-  name/description toggle, the time summary chip and a delete button, while the expanded body and
-  an optional trailing "add step" row are the caller's snippets.
+  The recipe-step adapter over `components/SortableList.svelte` (issue 1512). What survives here is
+  what is genuinely about a step — its name and description, its duration control and its delete
+  button — rendered through the list's `row` snippet; the geometry, the reorder affordances, the
+  disclosure and the accordion state are the shared list's.
 
-  Reordering is OVERVIEW-ONLY (`reorderable`); the requirement tabs render the same ordered steps
-  without drag but keep the chips and the delete button, and deleting a step removes the whole
-  step, so the parent confirms. Accordion and drag state are local, so they survive the store
-  refresh that follows every persisted edit. With `onUpdateStep` the header's time chip becomes
-  an editable duration trigger patching `step.timeRequirement`; otherwise it stays read-only.
+  Reordering is overview-only: with `reorderable` the list draws the grip and the rocker and wires
+  `onReorderSteps`, and the requirement tabs pass it false so neither is drawn. Deleting a step
+  removes its ingredients, results and tools too, so the parent confirms.
+
+  The chevron is the only opener (maintainer ruling, 2026-09-09): clicking the step's copy no longer
+  expands it, because a whole-row toggle would nest the row's own grip, rocker and delete in a
+  button. Results and Tools pass `alwaysOpen`, because a single-expand accordion on a tab whose
+  whole subject is the body showed nothing by default. With `onUpdateStep` the row's time chip
+  becomes an editable duration trigger; otherwise it stays a read-only chip.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -16,16 +21,14 @@
   import { formatTimeRequirement } from '../../../util/recipeDuration.js';
   import RecipeDurationEditor from './RecipeDurationEditor.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import SortableList from '../../../components/SortableList.svelte';
 
   let {
     steps = [],
     reorderable = false,
-    // Results and Tools render EVERY step as an always-open card, because a single-expand
-    // accordion showed NOTHING by default there. Overview, a reorder list, keeps collapsing.
     alwaysOpen = false,
-    // Whether the system applies time requirements; when false the editable duration trigger is
-    // hidden and only the read-only chip shows. Defaults true, so read-only callers are
-    // unaffected.
+    // Whether the system applies time requirements (issue 714). When false the editable duration
+    // trigger is hidden and only the read-only chip shows.
     timeRequirementsEnabled = true,
     onReorderSteps = () => {},
     onDeleteStep = () => {},
@@ -33,13 +36,6 @@
     body,
     footer,
   } = $props();
-
-  let expandedStepId = $state('');
-  let dragIndex = $state(-1);
-
-  function isOpen(stepId) {
-    return alwaysOpen || expandedStepId === stepId;
-  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -54,141 +50,63 @@
     return String(step?.description || '').trim();
   }
 
-  function toggleStep(stepId) {
-    expandedStepId = expandedStepId === stepId ? '' : stepId;
-  }
-
-  function onStepKeydown(event, stepId) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      toggleStep(stepId);
-    }
-  }
-
-  function handleDrop(targetIndex) {
-    if (dragIndex >= 0 && dragIndex !== targetIndex) onReorderSteps(dragIndex, targetIndex);
-    dragIndex = -1;
+  /** The list names its controls and its announcement without an index, so the fallback finds one. */
+  function stepLabel(step) {
+    return stepName(step, steps.indexOf(step));
   }
 </script>
 
-<ul class="manager-recipe-steps-list">
-  {#each steps as step, index (step.id)}
-    <li
-      class={`manager-recipe-steps-row ${isOpen(step.id) ? 'is-expanded' : ''} ${alwaysOpen ? 'is-always-open' : ''}`}
-      data-recipe-step-id={step.id}
-      ondragover={reorderable ? (event) => event.preventDefault() : undefined}
-      ondrop={reorderable
-        ? (event) => {
-            event.preventDefault();
-            handleDrop(index);
-          }
-        : undefined}
-    >
-      <!-- Overview only: the HEADER is the drag handle, so a grab inside the expanded body
-           selects text instead of starting a drag. Drag is a mouse-only enhancement; the
-           keyboard path is the nested role="button". -->
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="manager-recipe-steps-row-head"
-        draggable={reorderable ? 'true' : undefined}
-        ondragstart={reorderable
-          ? () => {
-              dragIndex = index;
-            }
-          : undefined}
-        ondragend={reorderable
-          ? () => {
-              dragIndex = -1;
-            }
-          : undefined}
+<SortableList
+  items={steps}
+  itemLabel={stepLabel}
+  numbered
+  {reorderable}
+  {alwaysOpen}
+  expandable={!alwaysOpen}
+  onReorder={(from, to) => onReorderSteps(from, to)}
+  rowData={(step) => ({ 'data-recipe-step-id': step.id })}
+  {body}
+  {footer}
+>
+  {#snippet row(step, index)}
+    <span class="manager-environment-comp-copy">
+      <span class="manager-environment-comp-name">{stepName(step, index)}</span>
+      <span class="manager-environment-comp-sub"
+        >{stepDescription(step) ||
+          text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription',
+            'No description'
+          )}</span
       >
-        <span
-          class={`manager-environment-comp-handle ${reorderable ? '' : 'is-static'}`}
-          title={reorderable
-            ? text('FABRICATE.Admin.Manager.Recipe.DragStep', 'Drag to reorder')
-            : undefined}
+    </span>
+    <div class="manager-recipe-steps-requirements">
+      {#if onUpdateStep && timeRequirementsEnabled}
+        <RecipeDurationEditor
+          timeRequirement={step.timeRequirement || null}
+          onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
+        />
+      {:else}
+        <Chip
+          class={step.timeRequirement ? '' : 'is-empty'}
+          icon="fa-solid fa-clock"
+          data-recipe-step-time={step.id}
         >
-          {#if reorderable}<i class="fas fa-grip-vertical" aria-hidden="true"></i>{/if}
-          <span class="manager-environment-comp-order">{index + 1}</span>
-        </span>
-        {#if alwaysOpen}
-          <!-- Always-open: the header is a static label rather than a toggle. -->
-          <div class="manager-recipe-steps-row-main is-static">
-            <span class="manager-environment-comp-copy">
-              <span class="manager-environment-comp-name">{stepName(step, index)}</span>
-              <span class="manager-environment-comp-sub"
-                >{stepDescription(step) ||
-                  text(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription',
-                    'No description'
-                  )}</span
-              >
-            </span>
-          </div>
-        {:else}
-          <div
-            role="button"
-            tabindex="0"
-            class="manager-recipe-steps-row-main"
-            aria-expanded={expandedStepId === step.id}
-            onclick={() => toggleStep(step.id)}
-            onkeydown={(event) => onStepKeydown(event, step.id)}
+          <span
+            >{step.timeRequirement
+              ? formatTimeRequirement(step.timeRequirement)
+              : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span
           >
-            <span class="manager-environment-comp-copy">
-              <span class="manager-environment-comp-name">{stepName(step, index)}</span>
-              <span class="manager-environment-comp-sub"
-                >{stepDescription(step) ||
-                  text(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription',
-                    'No description'
-                  )}</span
-              >
-            </span>
-            <i
-              class={`fas manager-recipe-steps-chevron ${expandedStepId === step.id ? 'fa-chevron-up' : 'fa-chevron-down'}`}
-              aria-hidden="true"
-            ></i>
-          </div>
-        {/if}
-        <div class="manager-recipe-steps-requirements">
-          {#if onUpdateStep && timeRequirementsEnabled}
-            <RecipeDurationEditor
-              timeRequirement={step.timeRequirement || null}
-              onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
-            />
-          {:else}
-            <Chip
-              class={step.timeRequirement ? '' : 'is-empty'}
-              icon="fa-solid fa-clock"
-              data-recipe-step-time={step.id}
-            >
-              <span
-                >{step.timeRequirement
-                  ? formatTimeRequirement(step.timeRequirement)
-                  : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span
-              >
-            </Chip>
-          {/if}
-        </div>
-        <div class="manager-recipe-steps-row-controls">
-          <IconButton
-            class="is-danger"
-            data-recipe-step-delete={step.id}
-            ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
-            title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
-            onclick={() => onDeleteStep(step.id)}
-            ><i class="fas fa-trash" aria-hidden="true"></i></IconButton
-          >
-        </div>
-      </div>
-
-      {#if isOpen(step.id) && body}
-        <div class="manager-recipe-steps-editor">
-          {@render body(step, index)}
-        </div>
+        </Chip>
       {/if}
-    </li>
-  {/each}
-
-  {#if footer}{@render footer()}{/if}
-</ul>
+    </div>
+    <IconButton
+      class="is-danger"
+      size={24}
+      data-recipe-step-delete={step.id}
+      ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
+      title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
+      onclick={() => onDeleteStep(step.id)}
+      ><i class="fas fa-trash" aria-hidden="true"></i></IconButton
+    >
+  {/snippet}
+</SortableList>

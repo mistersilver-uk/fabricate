@@ -139,7 +139,7 @@ src/ui/svelte/apps/journal/RunDetail.svelte	818
 src/ui/svelte/apps/journal/StepDetails.svelte	569
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	547
-src/ui/svelte/apps/manager/ComponentEditView.svelte	2498
+src/ui/svelte/apps/manager/ComponentEditView.svelte	2434
 src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	862
 src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	13919
 src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte::viewSubtitle	230
@@ -150,7 +150,7 @@ src/ui/svelte/apps/manager/GatheringEconomyView.svelte	837
 src/ui/svelte/apps/manager/GatheringEventEditView.svelte	700
 src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte	584
 src/ui/svelte/apps/manager/GatheringPartiesTab.svelte	502
-src/ui/svelte/apps/manager/GatheringTaskEditView.svelte	2797
+src/ui/svelte/apps/manager/GatheringTaskEditView.svelte	2809
 src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte	561
 src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte	530
 src/ui/svelte/apps/manager/PartyExpandedBody.svelte	563
@@ -160,7 +160,7 @@ src/ui/svelte/apps/manager/RecipeItemEditor.svelte::$derived.by#4	103
 src/ui/svelte/apps/manager/RecipesBrowserView.svelte	870
 src/ui/svelte/apps/manager/SystemEditView.svelte	564
 src/ui/svelte/apps/manager/ToolsBrowserView.svelte	868
-src/ui/svelte/apps/manager/checks/CheckTriggers.svelte	911
+src/ui/svelte/apps/manager/checks/CheckTriggers.svelte	913
 src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte	581
 src/ui/svelte/apps/manager/checks/ChecksView.svelte	1878
 src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte	662
@@ -170,7 +170,7 @@ src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte	1324
 src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte	970
 src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte	546
 src/ui/svelte/apps/manager/downtime/routeChromeChannel.js::createRouteChromeChannel	189
-src/ui/svelte/apps/manager/environment/CompositionList.svelte	812
+src/ui/svelte/apps/manager/environment/CompositionList.svelte	787
 src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte	567
 src/ui/svelte/apps/manager/environment/RecordInspector.svelte	581
 src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte	538

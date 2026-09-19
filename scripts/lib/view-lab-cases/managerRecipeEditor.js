@@ -442,6 +442,78 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipe-edit-step-open',
+    label: 'Manager — Recipe edit step open',
+    // The AFTER frame for the step row's moved geometry (issue 1512): the chevron is the sole opener
+    // now, so this is the only case that reaches an OPEN step row and the only one that proves the
+    // disclosure leads while the rocker trails.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-section="steps"]', scroll: true },
+      { selector: ':nth-match([data-sortable-disclosure], 1)' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row.is-expanded [data-sortable-disclosure][aria-expanded="true"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-step-narrow',
+    label: 'Manager — Recipe edit steps at the declared floor',
+    // The step rows at 1024x640: the row never wraps, so the grip, the badge and the trailing
+    // cluster have to stay on one line at the narrow container.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-section="steps"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-recipe-step-id] [data-sortable-grip]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-narrow',
+    label: 'Manager — Recipe edit progressive results at the declared floor',
+    // Anchored to `hb-r-grind`, the one progressive recipe in the fixture world: the ordered stage
+    // list is a system-mode fact, and this selector is satisfied only by the converted state.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-grind"]' },
+      { selector: '#recipe-tab-results' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-recipe-result-row] [data-sortable-move="down"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipe-edit-results',
     label: 'Manager — Recipe edit results',
     smokeLabels: ['manager-recipe-edit-results'],

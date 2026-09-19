@@ -40,7 +40,9 @@ function rows(table) {
 export const TARGET_LIBRARY_NAMES = rows('libraryTargetNames');
 
 /** @see TARGET_LIBRARY_NAMES */
-export const TARGET_LIBRARY_NAME_TOTAL = 58;
+// Issue 1512 flips two names to `shipped`: the ordered list ships, and the row disclosure it
+// promoted flips by correcting the specimen to the control that shipped (58 - 2).
+export const TARGET_LIBRARY_NAME_TOTAL = 56;
 
 /**
  * Every manifest row whose `status` reads `target`, keyed on the implementation path, measured at
