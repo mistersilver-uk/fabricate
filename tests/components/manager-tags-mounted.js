@@ -454,6 +454,27 @@ export function registerTagsCases() {
     );
   });
 
+  /** Open one vocabulary row's icon picker, search it, and take the first option. */
+  async function chooseRowIcon(rowId, query) {
+    const picker = target.querySelector(`[data-vocabulary-icon-picker="${rowId}"]`);
+    assert.ok(Boolean(picker), `the ${rowId} row renders the shared IconPicker trigger`);
+    picker.querySelector('.essence-icon-picker-trigger').click();
+    await tick();
+    flushSync();
+    const popover = target.querySelector('.essence-icon-picker-popover');
+    assert.ok(Boolean(popover), 'the searchable icon popover opens');
+    const search = popover.querySelector('.essence-icon-picker-search input');
+    assert.ok(Boolean(search), 'the popover leads with a search box');
+    setInputValue(search, query);
+    await tick();
+    flushSync();
+    const option = popover.querySelector('.essence-icon-picker-option');
+    assert.ok(Boolean(option), 'the search narrows the option list');
+    option.click();
+    await tick();
+    flushSync();
+  }
+
   it('picks a per-category icon from the searchable popover and delegates it to the store (issue 878)', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -470,31 +491,12 @@ export function registerTagsCases() {
     await tick();
     flushSync();
 
-    // The row's icon tile IS the shared IconPicker trigger.
-    const picker = target.querySelector('[data-vocabulary-icon-picker="potions"]');
-    assert.ok(picker, 'the custom category row renders an icon picker');
     assert.equal(
       target.querySelector('[data-vocabulary-icon-edit="potions"]'),
       null,
       'the free-text icon-edit strip is gone'
     );
-    picker.querySelector('.essence-icon-picker-trigger').click();
-    await tick();
-    flushSync();
-
-    const popover = target.querySelector('.essence-icon-picker-popover');
-    assert.ok(popover, 'the searchable icon popover opens');
-    const search = popover.querySelector('.essence-icon-picker-search input');
-    assert.ok(search, 'the popover leads with a search box');
-    setInputValue(search, 'vial');
-    await tick();
-    flushSync();
-
-    const option = popover.querySelector('.essence-icon-picker-option');
-    assert.ok(option, 'the search narrows the option list');
-    option.click();
-    await tick();
-    flushSync();
+    await chooseRowIcon('potions', 'vial');
     assert.deepEqual(
       calls.find((call) => call[0] === 'setCategoryIcon'),
       ['setCategoryIcon', 'potions', 'fas fa-vial'],
@@ -504,6 +506,28 @@ export function registerTagsCases() {
       target.querySelector('.essence-icon-picker-popover'),
       null,
       'the popover closes once an icon is chosen'
+    );
+  });
+
+  // The COMPONENT vocabulary has its own icon seam (issue 676): the two tabs must not write
+  // through one another's store action.
+  it('commits a component-category icon through the component seam alone', async () => {
+    const calls = [];
+    await openTagsScreen(calls);
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+
+    await chooseRowIcon('reagent', 'vial');
+
+    assert.deepEqual(
+      calls.find((call) => call[0] === 'setComponentCategoryIcon'),
+      ['setComponentCategoryIcon', 'Reagent', 'fas fa-vial'],
+      'choosing an option commits immediately, under the component action'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'setCategoryIcon'),
+      'and never through the recipe vocabulary'
     );
   });
 

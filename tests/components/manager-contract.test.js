@@ -469,6 +469,7 @@ const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensio
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
+const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 const MODIFIER_CATALOGUE =
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
@@ -2147,59 +2148,17 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs, 'Essence docs');
   });
 
-  it('keeps manager tags and categories route focused and store-wired', () => {
-    assert.ok(
-      rootSource.includes("import TagsCategoriesView from './TagsCategoriesView.svelte';"),
-      'root should import the focused tags/categories page'
-    );
-    assert.ok(
-      rootSource.includes('store.addCategory?.(value, icon)'),
-      'category add should delegate to the admin store with its icon'
-    );
-    assert.ok(
-      rootSource.includes('store.removeCategory?.(category)'),
-      'category remove should delegate to the admin store'
-    );
-    // Per-category icon persistence (issue 689) is a dedicated store seam.
-    assert.ok(
-      rootSource.includes('store.setCategoryIcon?.(name, icon)'),
-      'category icon edits should delegate to the admin store'
-    );
-    // The COMPONENT category vocabulary (issue 676).
-    assert.ok(
-      rootSource.includes('store.addComponentCategory?.(value, icon)'),
-      'component category add should delegate to the admin store with its icon'
-    );
-    assert.ok(
-      rootSource.includes('store.removeComponentCategory?.(category)'),
-      'component category remove should delegate to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.setComponentCategoryIcon?.(name, icon)'),
-      'component category icon edits should delegate to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.addTag?.(value)'),
-      'tag add should delegate to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.removeTag?.(tag)'),
-      'tag remove should delegate to the admin store'
-    );
-    // The destructive delete is now confirmed inline in the focused route (issue 689),
-    // then cascades through the store's remove ops — not an external confirm seam.
-    assert.ok(
-      tagsCategoriesSource.includes('onRemoveCategory'),
-      'focused route should own the vocabulary remove wiring'
-    );
-    assert.ok(
-      tagsCategoriesSource.includes('GeneralReservedFeedback'),
-      'focused route should keep reserved General feedback visible'
-    );
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\b/.test(tagsCategoriesSource),
-      'tags/categories route should not directly reference Foundry globals'
-    );
+  // Every one of the nine store delegations this block used to pin as root text is DRIVEN by
+  // `tests/components/manager-tags-mounted.js`, which clicks the real control and reads the call
+  // back off the store double; what stays is the route's own shape.
+  defineStructureContract('routes tags and categories to its own focused page', MANAGER_ROOT, {
+    imports: ['./TagsCategoriesView.svelte'],
+  });
+
+  defineStructureContract('owns the vocabulary wiring on that page', TAGS_CATEGORIES, {
+    declaresProp: ['onRemoveCategory', 'onRemoveComponentCategory', 'onSetComponentCategoryIcon'],
+    spellsExactly: ['FABRICATE.Admin.Manager.TagsCategories.GeneralReservedFeedback'],
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
   it('keeps manager essence browsing browser-only and source UI feature-gated', () => {
