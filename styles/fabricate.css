@@ -2142,7 +2142,8 @@
   width: 158px;
 }
 
-/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's 34px `.manager-icon-button`. The tier row's own delete left this rule at issue 1512 — it is `SortableList`'s 24px `is-danger` icon button now. */
+/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's 34px `.manager-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
 .fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
   appearance: none;
   -webkit-appearance: none;

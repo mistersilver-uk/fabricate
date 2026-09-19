@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
  * rather than these 111, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,036 `(at-context, selector)` keys, of which 2,925 appear exactly
+ * Unfiltered, the sheet holds 3,037 `(at-context, selector)` keys, of which 2,926 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -30,8 +30,9 @@
  * composition-pip families: 2,567 -> 2,555 rules, 3,051 -> 3,032 keys, 2,938 -> 2,921 singletons,
  * and 207 -> 205 selectors keyed alone. Its review round then adds four rules and one selector list
  * of two — the Included row's `.is-selected` and `.is-unavailable` state paint, the rocker's bare
- * icon-button override and the always-open body gate — and drops one selector from the Checks
- * studio's remove rule, so 2,555 -> 2,559 rules, 3,032 -> 3,036 keys and 2,921 -> 2,925 singletons.
+ * icon-button override and the always-open body gate — so 2,555 -> 2,559 rules, 3,032 -> 3,037 keys
+ * and 2,921 -> 2,926 singletons; the Checks studio's remove rule keeps both its selectors, because
+ * `CraftingCheckEditor.svelte`'s unconverted outcome list still draws `.manager-checks-tier-remove`.
  * None of the five is a repeated selector, so the 111 rows, the 227 appearances and the 205
  * selectors keyed alone are unmoved. Re-derived by running the census twice, not subtracted.
  * ISSUE 1515 PHASE 9 MOVES THE THREE CONTEXTUAL FIGURES AND RE-KEYS ONE REPEATED ROW, and the two
