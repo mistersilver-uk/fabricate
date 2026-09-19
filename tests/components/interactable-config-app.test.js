@@ -1,204 +1,343 @@
 /**
- * String-shape coverage for the rich GM Interactable config panel app + root,
- * mirroring the `interactable-browser-app.test.js` convention (the Svelte
- * components are not compiled in the Node test runner, so we assert their source
- * shape). The non-trivial view logic is covered separately by
- * interactable-config-view.test.js + interactable-config-actions.test.js.
+ * The rich GM Interactable config panel: its shell's structure contract, its root's, and the
+ * behaviour of the three seams whose CONTRACT IS AN ORDER IN TIME rather than a shape (issue 1697
+ * retired this file's source-text pins). The pure view logic lives in
+ * `interactable-config-view.test.js` and `interactable-config-actions.test.js`.
  */
 
-import { describe, it, afterEach } from 'node:test';
+import { describe, it, afterEach, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { registerHooks } from 'node:module';
+import { resolve } from 'node:path';
 
 import { emitInteractableBehaviorWrite } from '../../src/canvas/interactableSocketBridge.js';
-import { planSetEnabled, planSetLocked } from '../../src/canvas/regions/interactableConfigActions.js';
+import {
+  planSetEnabled,
+  planSetLocked,
+} from '../../src/canvas/regions/interactableConfigActions.js';
 import {
   SMOKE_SOURCE,
-  assertLocatorsEmitted,
-  emittingHalfOf,
   prefixedTokensIn,
 } from '../helpers/interactablesSmokeLocators.js';
 import {
   CONFIG_PANEL_CONTRACT,
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
+import { identifierNames } from '../helpers/moduleAst.js';
+import {
+  attributeExpression,
+  carriesSpread,
+  declaresAttribute,
+} from '../helpers/svelteStructureContract.js';
+import {
+  claimsForComponent,
+  constantLiteral,
+  defineStructureContract,
+  renderedNodes,
+  structureOf,
+  templateNodes,
+} from '../helpers/structureContract.js';
+import { repoRoot } from '../helpers/sourceScan.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const appSource = readFileSync(
-  resolve(__dirname, '../../src/ui/InteractableConfigApp.svelte.js'),
-  'utf8'
-);
-const rootSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/apps/InteractableConfigRoot.svelte'),
-  'utf8'
-);
-
+const APP = 'src/ui/InteractableConfigApp.svelte.js';
+const ROOT = 'src/ui/svelte/apps/InteractableConfigRoot.svelte';
 /** The primitives this panel adopted (issue 1520). */
-const noticeSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/components/Notice.svelte'),
-  'utf8'
-);
-const statusToggleSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/components/StatusToggle.svelte'),
-  'utf8'
-);
-const selectSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
-  'utf8'
-);
-const popoverLayoutSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/util/iconPickerPopover.js'),
-  'utf8'
-);
-const sheetSource = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
+const NOTICE = 'src/ui/svelte/components/Notice.svelte';
+const STATUS_TOGGLE = 'src/ui/svelte/components/StatusToggle.svelte';
+const SELECT = 'src/ui/svelte/components/Select.svelte';
+const POPOVER_LAYOUT = 'src/ui/svelte/util/iconPickerPopover.js';
+
+/** `styles/fabricate.css` is the shipped GLOBAL sheet, not `src/` text: it stays a text read. */
+const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+
+/** One mutating seam of the services bag, addressed by name so a claim cannot slide onto another. */
+const seam = (property) => ({ file: APP, member: '_buildServices', property });
 
 describe('InteractableConfigApp shell', () => {
-  it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
-    assert.ok(appSource.includes('SvelteApplicationMixin('), 'uses the SvelteApplicationMixin');
-    assert.ok(appSource.includes('foundry.applications.api.ApplicationV2'), 'extends ApplicationV2');
-    assert.ok(appSource.includes('static SVELTE_COMPONENT = InteractableConfigRoot'), 'mounts the config root');
-    assert.ok(appSource.includes("id: 'fabricate-interactable-config'"), 'stable window id');
+  defineStructureContract('is an ApplicationV2 + SvelteApplicationMixin app', APP, {
+    extendsCall: ['SvelteApplicationMixin'],
+    reads: ['foundry.applications.api.ApplicationV2'],
+    names: ['SVELTE_COMPONENT', 'InteractableConfigRoot', '_instances', 'Map'],
   });
 
-  it('opens against a behaviour ref / document and keeps one instance per ref', () => {
-    assert.ok(appSource.includes('static _instances = new Map()'), 'tracks one instance per ref');
-    assert.ok(appSource.includes('static async show(target = {})'), 'static show(target)');
-    assert.ok(appSource.includes('identifyRegionBehaviorRef(target.document)'), 'accepts a RegionBehavior document');
-    assert.ok(appSource.includes('existing.bringToFront()'), 're-show brings the existing window to front');
+  defineStructureContract(
+    'keyed by a stable window id, at the declared size and area class',
+    { file: APP, record: ['id', 'fabricate-interactable-config'] },
+    {
+      property: [
+        ['id', 'fabricate-interactable-config'],
+        ['tag', 'div'],
+        ['title', 'FABRICATE.Canvas.Interactable.Config.Title'],
+        ['resizable', true],
+        ['width', 480],
+      ],
+      keys: ['classes', 'position', 'window'],
+      spellsExactly: ['fabricate', 'fabricate-interactable-config-app', 'fabricate-app'],
+    }
+  );
+
+  defineStructureContract(
+    'opens against a behaviour ref / document and keeps one instance per ref',
+    { file: APP, member: 'show' },
+    {
+      calls: ['identifyRegionBehaviorRef', 'bringToFront'],
+      reads: ['target.document', 'target.ref', 'existing.rendered', 'InteractableConfigApp._instances'],
+    }
+  );
+
+  defineStructureContract('clears its per-ref instance on close()', { file: APP, member: 'close' }, {
+    reads: ['InteractableConfigApp._instances.delete', 'InteractableConfigApp._instances.get'],
+    callsWith: [['delete', 'key']],
   });
 
-  it('clears its per-ref instance on close() and the _onClose safety net', () => {
-    assert.ok(appSource.includes('InteractableConfigApp._instances.delete(key)'), 'close paths clear the instance map');
-    assert.ok(appSource.includes('async close(options)') && appSource.includes('_onClose(options)'), 'both close paths exist');
+  defineStructureContract(
+    'and on the _onClose safety net',
+    { file: APP, member: '_onClose' },
+    {
+      reads: ['InteractableConfigApp._instances.delete', 'InteractableConfigApp._instances.get'],
+      callsWith: [['delete', 'key']],
+    }
+  );
+
+  defineStructureContract(
+    'routes every write through the active-GM behaviour-update edge (no client mutation)',
+    APP,
+    {
+      names: ['applyInteractableBehaviorUpdate', 'emitInteractableBehaviorWrite'],
+      // The one safe FILE-WIDE negative: this file calls `.update(` on no receiver at all, so the
+      // absence cannot be satisfied by a same-named method on the instance Map.
+      callsNo: ['update'],
+      readsNo: ['behavior.update', 'region.delete', 'globalThis.confirm'],
+    }
+  );
+
+  defineStructureContract(
+    'and wraps the system patch exactly once on the way through',
+    { file: APP, member: '_buildServices', constant: 'writeBehavior' },
+    {
+      calls: ['emitInteractableBehaviorWrite', '_resolveBehavior'],
+      keys: ['system'],
+      names: ['systemPatch'],
+    }
+  );
+
+  defineStructureContract('test-as-player runs the activation pipeline with gmTest', seam('testAsPlayer'), {
+    calls: ['_assertGM', '_resolveBehavior', '_controlledActorId'],
+    reads: ['InteractableManager.instance._requestActivation'],
+    property: [['activationSource', 'gmTest']],
   });
 
-  it('routes every write through the active-GM behaviour-update edge (no client mutation)', () => {
-    // The panel must not call behavior.update(...) directly.
-    assert.ok(appSource.includes('emitInteractableBehaviorWrite(behavior)({ system: systemPatch })'), 'writeBehavior wraps the system patch under { system }');
-    assert.ok(!/behavior\.update\(/.test(appSource), 'no direct behavior.update(...) client mutation');
-    assert.ok(appSource.includes('applyInteractableBehaviorUpdate'), 'relink/recreate route the GM behaviour-update edge');
+  defineStructureContract('jump pans the camera', { file: APP, member: '_panToRegion' }, {
+    calls: ['animatePan', '_shapeCenter'],
+    reads: ['globalThis.canvas.animatePan'],
   });
 
-  it('wires the action seams to their live edges', () => {
-    assert.ok(appSource.includes('_requestActivation?.(behavior, {') && appSource.includes("activationSource: 'gmTest'"), 'test-as-player runs the activation pipeline with gmTest');
-    assert.ok(appSource.includes('canvas?.animatePan?.('), 'jump pans the camera');
-    assert.ok(appSource.includes('relinkVisual(behavior, selected'), 'relink uses the selected visual');
-    assert.ok(appSource.includes('this._controlledVisual()'), 'relink resolves a controlled Tile/Drawing/Token generically');
-    assert.ok(appSource.includes('recreateLinkedTile(behavior'), 'recreate creates a replacement tile');
-    assert.ok(appSource.includes('recreateLinkedDrawing(behavior'), 'create-drawing-marker uses recreateLinkedDrawing');
-    assert.ok(appSource.includes('planClearVisualLink('), 'remove clears the visual link');
-    assert.ok(appSource.includes('planSetEnabled(') && appSource.includes('planSetLocked('), 'enable/lock toggles use the pure planners');
-    assert.ok(appSource.includes('planInteractableDeletion(region'), 'delete decides scope via the pure ownership plan (issue 533)');
-    assert.ok(appSource.includes('executeInteractableDeletion(region, plan)'), 'delete applies the plan (region vs behaviour-only)');
-    assert.ok(!appSource.includes('region.delete?.()'), 'never wholesale-deletes a promoted user region');
-    assert.ok(appSource.includes('applyMissingPolicy('), 'missing-visual recovery reuses applyMissingPolicy');
+  defineStructureContract('relink uses the selected visual, resolved generically', seam('relinkSelected'), {
+    calls: ['_assertGM', 'relinkVisual', '_controlledVisual', '_refresh'],
+    callsWith: [['relinkVisual', 'behavior']],
   });
 
-  it('upgrades a region-only interactable to a linked Tile via the Create-marker seam', () => {
-    assert.ok(appSource.includes('createMarker:'), 'declares the Create-marker service');
-    // The upgrade reuses recreateLinkedTile (GM-routed) and flips the behaviour
-    // back to a visible marker (mode marker, un-hidden) — not a divergent path.
-    assert.ok(appSource.includes("linkedVisual: { mode: 'marker' }"), 'flips linkedVisual.mode back to marker');
-    assert.ok(appSource.includes('presentation: { hidden: false }'), 'un-hides the upgraded interactable');
+  defineStructureContract(
+    'which considers a controlled Tile, Drawing or Token',
+    { file: APP, member: '_controlledVisual' },
+    {
+      reads: [
+        'globalThis.canvas.tiles.controlled',
+        'globalThis.canvas.drawings.controlled',
+        'globalThis.canvas.tokens.controlled',
+      ],
+    }
+  );
+
+  defineStructureContract('recreate creates a replacement tile', seam('createReplacementTile'), {
+    calls: ['_assertGM', 'recreateLinkedTile'],
   });
 
-  it('offers a Create-drawing-marker seam (Phase 4) that flips the behaviour to a visible marker', () => {
-    assert.ok(appSource.includes('createDrawingMarker:'), 'declares the Create-drawing-marker service');
-    assert.ok(appSource.includes('recreateLinkedDrawing(behavior'), 'creates a Drawing via recreateLinkedDrawing (GM-routed)');
-    assert.ok(/createDrawingMarker:[\s\S]*?_assertGM\(\)/.test(appSource), 'GM-guarded');
+  defineStructureContract(
+    'the Create-drawing-marker seam creates a Drawing and flips to a visible marker',
+    seam('createDrawingMarker'),
+    {
+      calls: ['_assertGM', 'recreateLinkedDrawing', 'writeBehavior'],
+      property: [
+        ['mode', 'marker'],
+        ['hidden', false],
+      ],
+      keys: ['linkedVisual', 'presentation'],
+    }
+  );
+
+  defineStructureContract(
+    'and the Create-marker upgrade reuses recreateLinkedTile for the same flip',
+    seam('createMarker'),
+    {
+      calls: ['_assertGM', 'recreateLinkedTile', 'writeBehavior'],
+      property: [
+        ['mode', 'marker'],
+        ['hidden', false],
+      ],
+    }
+  );
+
+  defineStructureContract('remove clears the visual link through a 3-way choice', seam('removeVisualMarker'), {
+    calls: ['_assertGM', 'planClearVisualLink', 'choiceDialog', 'emitInteractableVisualDelete'],
+    property: [
+      ['action', 'unlink'],
+      ['action', 'delete'],
+      ['action', 'cancel'],
+      ['defaultAction', 'unlink'],
+    ],
+    compares: ['cancel', 'delete', 'Token'],
   });
 
-  it('relinks generically (Tile OR Drawing OR Token) via a single Relink-selected seam', () => {
-    assert.ok(appSource.includes('relinkSelected:'), 'declares the generic relinkSelected service');
-    assert.ok(appSource.includes('canvas?.drawings?.controlled'), 'considers a controlled Drawing for relink');
-    assert.ok(appSource.includes('canvas?.tokens?.controlled'), 'considers a controlled Token for relink');
+  defineStructureContract('enable/lock toggles use the pure planners', seam('setEnabled'), {
+    calls: ['_assertGM', 'planSetEnabled', 'writeBehavior', '_reconcileMarkerHidden'],
   });
 
-  it('confirms destructive actions through a 3-way DialogV2 choice (choiceDialog), never globalThis.confirm', () => {
-    assert.ok(appSource.includes('choiceDialog('), 'uses the DialogV2 choice bridge');
-    assert.ok(!appSource.includes('globalThis.confirm('), 'never uses globalThis.confirm');
-    // Remove-visual + delete-interactable both offer a Cancel outcome that does
-    // not mutate (a real 3-way choice, not a yes/no that always clears).
-    assert.ok(appSource.includes("if (choice === 'cancel') return"), 'a cancel outcome aborts without mutating');
-    assert.ok(appSource.includes("action: 'unlink'") && appSource.includes("action: 'delete'"), 'remove-visual offers unlink-only and unlink+delete');
-    assert.ok(appSource.includes("action: 'deleteWithVisual'"), 'delete offers delete + visual');
+  defineStructureContract('and the lock seam its own', seam('setLocked'), {
+    calls: ['_assertGM', 'planSetLocked', 'writeBehavior'],
+    // A locked interactable stays VISIBLE, so this seam must not reconcile the marker.
+    callsNo: ['_reconcileMarkerHidden'],
   });
 
-  it('GM-guards every mutating action seam (defense in depth)', () => {
-    assert.ok(appSource.includes('_assertGM()'), 'declares a GM guard');
-    assert.ok(appSource.includes('game?.user?.isGM === true'), 'guard checks the GM flag');
-    assert.ok(appSource.includes('if (!this._assertGM())'), 'mutating seams short-circuit for non-GMs');
+  defineStructureContract('while the hidden toggle does reconcile it', seam('setHidden'), {
+    calls: ['_assertGM', 'writeBehavior', '_reconcileMarkerHidden'],
+    keys: ['presentation', 'hidden'],
+    compares: [true],
   });
 
-  it('self-registers via the app factory (no static import where avoidable)', () => {
-    assert.ok(appSource.includes('registerInteractableConfigApp(InteractableConfigApp)'), 'registers with the factory');
+  defineStructureContract(
+    'delete decides scope via the pure ownership plan and applies it (issue 533)',
+    seam('deleteInteractable'),
+    {
+      calls: [
+        '_assertGM',
+        'planInteractableDeletion',
+        'executeInteractableDeletion',
+        'choiceDialog',
+        'emitInteractableVisualDelete',
+      ],
+      callsWith: [
+        ['planInteractableDeletion', 'region'],
+        ['executeInteractableDeletion', 'plan'],
+      ],
+      property: [
+        ['action', 'delete'],
+        ['action', 'deleteWithVisual'],
+        ['action', 'cancel'],
+      ],
+      compares: ['cancel', 'deleteWithVisual', 'region', 'Token'],
+    }
+  );
+
+  defineStructureContract(
+    'missing-visual recovery reuses applyMissingPolicy',
+    seam('applyMissingVisualPolicy'),
+    { calls: ['_assertGM', 'applyMissingPolicy', 'recreateLinkedTile', '_refresh'] }
+  );
+
+  defineStructureContract('GM-guards every mutating action seam (defense in depth)', { file: APP, member: '_assertGM' }, {
+    reads: ['globalThis.game.user.isGM'],
+    compares: [true],
   });
 
-  it('configures the source through the pure planner + the GM-routed write seam (issue 342)', () => {
-    // The identity picker reuses the SHARED source enumeration (no third
-    // enumeration) and writes through the existing GM-routed updateBehavior seam
-    // via the pure planConfigureSource (never a partial identity).
-    assert.ok(appSource.includes("from './interactableSourceLibrary.js'"), 'reuses the shared source enumeration');
-    assert.ok(appSource.includes('listSystemOptions(this._sourceDeps())'), 'lists systems from the shared library');
-    assert.ok(appSource.includes('listToolSourceOptions(this._sourceDeps()'), 'lists tools from the shared library');
-    assert.ok(appSource.includes('listTaskSourceOptions(this._sourceDeps()'), 'lists tasks from the shared library');
-    assert.ok(appSource.includes('configureSource:'), 'declares the configureSource service');
-    assert.ok(appSource.includes('planConfigureSource(readInteractableBehaviorSystem(behavior)'), 'uses the pure planner');
-    assert.ok(/configureSource:[\s\S]*?_assertGM\(\)/.test(appSource), 'configureSource is GM-guarded');
-    // The write routes through writeBehavior (the GM-routed seam).
-    assert.ok(/configureSource:[\s\S]*?if \(!patch\) return undefined/.test(appSource), 'no-ops on an incomplete selection (no partial write)');
-    assert.ok(/configureSource:[\s\S]*?writeBehavior\(patch\.system\)/.test(appSource), 'routes the GM behaviour-update seam');
+  defineStructureContract('self-registers via the app factory (no static import where avoidable)', APP, {
+    imports: ['./appFactory.js'],
+    callsWith: [['registerInteractableConfigApp', 'InteractableConfigApp']],
   });
 
-  it('reconciles the linked tile hidden on enable/disable + hidden toggles, but NOT on lock', () => {
-    // setEnabled + setHidden reconcile the marker's player visibility (concealed
-    // ⇒ tile.hidden = true) immediately after the behaviour write; setLocked must
-    // NOT touch tile.hidden (a locked interactable stays visible to players).
-    assert.ok(appSource.includes('_reconcileMarkerHidden()'), 'declares the hidden reconcile helper');
-    assert.ok(appSource.includes('resolveMarkerHidden(system)'), 'uses the pure resolveMarkerHidden decision');
-    assert.ok(appSource.includes('setHidden: (hidden)'), 'declares a dedicated setHidden service that reconciles');
-    // Both setEnabled and setHidden call the reconcile; setLocked does not.
-    const setEnabledBlock = appSource.slice(appSource.indexOf('setEnabled: (enabled)'), appSource.indexOf('setHidden: (hidden)'));
-    assert.ok(setEnabledBlock.includes('_reconcileMarkerHidden()'), 'setEnabled reconciles the tile hidden');
-    const setLockedStart = appSource.indexOf('setLocked: (locked)');
-    const setLockedBlock = appSource.slice(setLockedStart, appSource.indexOf('applyMissingVisualPolicy:', setLockedStart));
-    assert.ok(!setLockedBlock.includes('_reconcileMarkerHidden()'), 'setLocked does NOT reconcile tile hidden (locked stays visible)');
-    // The reconcile routes through the active-GM visual-update edge (not a direct write).
-    assert.ok(/_reconcileMarkerHidden\(\)\s*\{[\s\S]*?emitInteractableVisualUpdate\(/.test(appSource), 'reconcile routes the active-GM visual-update edge');
-    assert.ok(/_reconcileMarkerHidden\(\)\s*\{[\s\S]*?update: \{ hidden: desiredHidden \}/.test(appSource), 'reconcile writes the tile hidden flag');
+  defineStructureContract(
+    'configures the source through the pure planner + the GM-routed write seam (issue 342)',
+    seam('configureSource'),
+    {
+      calls: ['_assertGM', 'planConfigureSource', 'writeBehavior', '_refresh'],
+      reads: ['patch.system'],
+    }
+  );
+
+  defineStructureContract('and lists its options from the shared source enumeration', APP, {
+    imports: ['./interactableSourceLibrary.js'],
   });
+
+  defineStructureContract('systems come from the shared library', seam('listSystems'), {
+    calls: ['listSystemOptions', '_sourceDeps'],
+  });
+
+  defineStructureContract('as do tools', seam('listTools'), {
+    calls: ['listToolSourceOptions', '_sourceDeps'],
+    callsWith: [['listToolSourceOptions', 'systemId']],
+  });
+
+  defineStructureContract('and tasks', seam('listTasks'), {
+    calls: ['listTaskSourceOptions', '_sourceDeps'],
+    callsWith: [['listTaskSourceOptions', 'systemId']],
+  });
+
+  defineStructureContract(
+    'the hidden reconcile routes the active-GM visual-update edge and writes the tile flag',
+    { file: APP, member: '_reconcileMarkerHidden' },
+    {
+      calls: ['resolveMarkerHidden', 'resolveLinkedVisual', 'emitInteractableVisualUpdate'],
+      reads: ['system.linkedVisual.documentName', 'tile.hidden', 'ref.sceneId'],
+      property: [['documentName', 'Tile']],
+      keys: ['hidden', 'update'],
+      names: ['desiredHidden', 'visualUuid'],
+      compares: ['Tile'],
+    }
+  );
 });
 
 describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)', () => {
   afterEach(() => {
     delete globalThis.game;
+    delete globalThis.fromUuidSync;
   });
 
   // Build a fake RegionBehavior wired into a fake scene→region→behaviour graph so
   // `emitInteractableBehaviorWrite` (the App's write seam) resolves + applies it
   // locally as the active GM. `update` records the exact shape it received — the
   // contract the App's `writeBehavior({ system: systemPatch })` wrap depends on.
-  function fakeBehaviorGraph() {
+  function fakeBehaviorGraph({ system = null, onWrite = null } = {}) {
     const updates = [];
     const behavior = {
       id: 'beh1',
       type: 'fabricate.interactable',
-      update: async (data) => { updates.push(data); }
+      system,
+      update: async (data) => {
+        if (onWrite) await onWrite();
+        updates.push(data);
+        if (behavior.system) mergeInto(behavior.system, data.system);
+      },
     };
     const region = { id: 'reg1', behaviors: { get: (id) => (id === 'beh1' ? behavior : null) } };
     const scene = { id: 'scn1', regions: { get: (id) => (id === 'reg1' ? region : null) } };
     behavior.parent = region;
     region.parent = scene;
-    const user = {};
+    const user = { isGM: true };
     globalThis.game = {
       user,
       users: { activeGM: user },
       scenes: { get: (id) => (id === 'scn1' ? scene : null) },
-      socket: { emit: () => { throw new Error('must not emit when active GM'); } }
+      socket: {
+        emit: () => {
+          throw new Error('must not emit when active GM');
+        },
+      },
     };
-    return { behavior, updates };
+    return { behavior, region, scene, updates };
+  }
+
+  /** Apply a behaviour patch the way Foundry would, so a re-read sees post-write state. */
+  function mergeInto(target, patch) {
+    for (const [key, value] of Object.entries(patch ?? {})) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        target[key] = target[key] ?? {};
+        mergeInto(target[key], value);
+      } else {
+        target[key] = value;
+      }
+    }
   }
 
   it('setEnabled composes planSetEnabled → behavior.update({ system: { state: { enabled } } })', async () => {
@@ -218,223 +357,437 @@ describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)',
     await emitInteractableBehaviorWrite(behavior)({ system: patch.system });
     assert.deepEqual(updates, [{ system: { state: { locked: true } } }], 'wrapped under system, not raw state');
   });
+
+  // THE ORDER IS THE CONTRACT, AND NO CONTRACT ROW CAN STATE IT (issue 1697). A row proves the
+  // right functions are named in the right seam; it cannot prove the marker reconcile waits for
+  // the behaviour write to settle and then re-resolves, rather than reading a captured snapshot.
+  // The app class imports a `.svelte` root Node cannot parse, so the module graph is loaded with
+  // that one extension stubbed and Foundry's ApplicationV2 base faked — nothing else is replaced,
+  // and `_buildServices()` is the real composition under test.
+  let InteractableConfigApp;
+
+  before(async () => {
+    registerHooks({
+      load(url, context, nextLoad) {
+        if (!url.endsWith('.svelte')) return nextLoad(url, context);
+        return { format: 'module', source: 'export default null;', shortCircuit: true };
+      },
+    });
+    globalThis.foundry = {
+      applications: { api: { ApplicationV2: class {} } },
+    };
+    ({ InteractableConfigApp } = await import('../../src/ui/InteractableConfigApp.svelte.js'));
+  });
+
+  const TILE_UUID = 'Scene.scn1.Tile.tile1';
+  const REGION_UUID = 'Scene.scn1.Region.reg1';
+
+  function linkedTileGraph() {
+    const log = [];
+    let releaseWrite;
+    const gate = new Promise((done) => {
+      releaseWrite = done;
+    });
+    const system = {
+      interactableType: 'gatheringTask',
+      state: { enabled: true, locked: false },
+      presentation: { hidden: false },
+      linkedVisual: { mode: 'marker', documentName: 'Tile', uuid: TILE_UUID },
+      systemId: 'alchemy',
+      taskId: 'forage',
+    };
+    const graph = fakeBehaviorGraph({
+      system,
+      onWrite: async () => {
+        await gate;
+        log.push({ what: 'behaviour' });
+      },
+    });
+    const tile = {
+      documentName: 'Tile',
+      id: 'tile1',
+      uuid: TILE_UUID,
+      hidden: false,
+      flags: {
+        fabricate: {
+          isInteractableVisual: true,
+          linkedRegionUuid: REGION_UUID,
+          linkedBehaviorId: 'beh1',
+        },
+      },
+      update: async (data) => {
+        log.push({ what: 'tile', data, enabled: system.state.enabled, hidden: system.presentation.hidden });
+        Object.assign(tile, data);
+      },
+    };
+    graph.region.uuid = REGION_UUID;
+    globalThis.fromUuidSync = (uuid) => {
+      if (uuid === TILE_UUID) return tile;
+      if (uuid === REGION_UUID) return graph.region;
+      return null;
+    };
+    const panel = new InteractableConfigApp({
+      ref: { sceneId: 'scn1', regionId: 'reg1', behaviorId: 'beh1' },
+    });
+    return { ...graph, log, tile, system, panel, releaseWrite };
+  }
+
+  for (const [name, drive, reads] of [
+    ['setEnabled', (services) => services.setEnabled(false), { enabled: false, hidden: false }],
+    ['setHidden', (services) => services.setHidden(true), { enabled: true, hidden: true }],
+  ]) {
+    it(`${name} reconciles the linked Tile only after the behaviour write settles, against post-write state`, async () => {
+      const { log, tile, panel, releaseWrite } = linkedTileGraph();
+      const pending = drive(panel._buildServices());
+      await Promise.resolve();
+      assert.deepEqual(log, [], 'nothing reaches the Tile while the behaviour write is in flight');
+
+      releaseWrite();
+      await pending;
+      await new Promise((done) => setTimeout(done, 0));
+
+      assert.deepEqual(
+        log.map((entry) => entry.what),
+        ['behaviour', 'tile'],
+        'the behaviour settles first, then the marker is reconciled'
+      );
+      assert.deepEqual(log[1].data, { hidden: true }, 'a concealed interactable hides its marker');
+      assert.equal(log[1].enabled, reads.enabled, 'the reconcile re-reads the behaviour after the write');
+      assert.equal(log[1].hidden, reads.hidden, 'including the half this seam wrote');
+      assert.equal(tile.hidden, true, 'and the Tile document ends up hidden');
+    });
+  }
+
+  it('setLocked leaves the linked Tile visible, because a locked interactable still shows', async () => {
+    const { log, tile, panel, releaseWrite } = linkedTileGraph();
+    const pending = panel._buildServices().setLocked(true);
+    releaseWrite();
+    await pending;
+    await new Promise((done) => setTimeout(done, 0));
+
+    assert.deepEqual(
+      log.map((entry) => entry.what),
+      ['behaviour'],
+      'locking writes the behaviour and touches no marker'
+    );
+    assert.equal(tile.hidden, false);
+  });
 });
 
 describe('InteractableConfigRoot body', () => {
-  it('renders from the injected services summary (thin view)', () => {
-    assert.ok(rootSource.includes('services?.summarize?.()'), 'reads the summary view model from services');
-    assert.ok(rootSource.includes('services?.resolveSourceLabel?.()'), 'resolves the tool/task label via services');
-    assert.ok(rootSource.includes('services?.resolveEnvironmentLabel?.()'), 'resolves the environment label via services');
+  defineStructureContract('renders from the injected services summary (thin view)', ROOT, {
+    reads: [
+      'services.summarize',
+      'services.resolveSourceLabel',
+      'services.resolveEnvironmentLabel',
+      'snapshot.view',
+      'snapshot.now',
+    ],
   });
 
-  it('writes editable fields through services.updateBehavior (active-GM routed)', () => {
-    assert.ok(rootSource.includes('services?.updateBehavior?.('), 'editable fields route through updateBehavior');
-    assert.ok(rootSource.includes("services?.updateBehavior?.({ presentation: { promptText:"), 'prompt text is editable');
-    assert.ok(rootSource.includes("services?.updateBehavior?.({ activation: { audience }"), 'audience is editable');
-    assert.ok(rootSource.includes("services?.updateBehavior?.({ linkedVisual: { missingPolicy }"), 'missing policy is editable');
+  defineStructureContract(
+    'writes editable fields through services.updateBehavior (active-GM routed)',
+    { file: ROOT, fn: 'commitPrompt' },
+    { reads: ['services.updateBehavior'], keys: ['presentation', 'promptText'] }
+  );
+
+  defineStructureContract(
+    'the audience field the same way',
+    { file: ROOT, fn: 'setAudience' },
+    { reads: ['services.updateBehavior'], keys: ['activation', 'audience'] }
+  );
+
+  defineStructureContract(
+    'and the missing-visual policy',
+    { file: ROOT, fn: 'setMissingPolicy' },
+    { reads: ['services.updateBehavior'], keys: ['linkedVisual', 'missingPolicy'] }
+  );
+
+  defineStructureContract('and the name', { file: ROOT, fn: 'commitName' }, {
+    reads: ['services.updateBehavior'],
+    keys: ['name'],
   });
 
-  it('exposes every action button wired to its services seam', () => {
-    assert.ok(rootSource.includes('services?.testAsPlayer?.()'), 'Test as player');
-    assert.ok(rootSource.includes('services?.jumpToRegion?.()') && rootSource.includes('services?.jumpToVisual?.()'), 'Jump buttons');
-    assert.ok(rootSource.includes('services?.relinkSelected?.()'), 'Relink selected (generic)');
-    assert.ok(rootSource.includes('services?.createReplacementTile?.()'), 'Create replacement tile');
-    assert.ok(rootSource.includes('services?.createDrawingMarker?.()'), 'Create drawing marker');
-    assert.ok(rootSource.includes('services?.removeVisualMarker?.()'), 'Remove visual marker');
-    assert.ok(rootSource.includes('services?.setEnabled?.(!view.state.enabled)'), 'Enable/Disable toggle');
-    assert.ok(rootSource.includes('services?.setLocked?.(!view.state.locked)'), 'Lock/Unlock toggle');
-    assert.ok(rootSource.includes('services?.setHidden?.('), 'Hidden toggle routes through the setHidden service (reconciles the tile)');
-    assert.ok(rootSource.includes('services?.deleteInteractable?.()'), 'Delete');
+  defineStructureContract('exposes every action button wired to its services seam', ROOT, {
+    reads: [
+      'services.testAsPlayer',
+      'services.jumpToRegion',
+      'services.jumpToVisual',
+      'services.relinkSelected',
+      'services.createReplacementTile',
+      'services.createDrawingMarker',
+      'services.createMarker',
+      'services.removeVisualMarker',
+      'services.setEnabled',
+      'services.setLocked',
+      'services.setHidden',
+      'services.deleteInteractable',
+      'view.state.enabled',
+      'view.state.locked',
+    ],
   });
 
-  it('shows the missing-visual recovery affordances behind the missing status', () => {
-    assert.ok(rootSource.includes("visualStatus.severity === 'missing'"), 'gates recovery on the missing status');
-    assert.ok(rootSource.includes('describeVisualStatus('), 'uses the pure visual-status helper');
+  defineStructureContract('gates the recovery affordances on the visual status', ROOT, {
+    calls: ['describeVisualStatus'],
+    reads: ['visualStatus.severity'],
+    compares: ['missing', 'none', 'ok'],
+    spells: [
+      'FABRICATE.Canvas.Interactable.Config.CreateMarker',
+      'FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker',
+      'FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker',
+    ],
   });
 
-  it('offers a Create-marker upgrade for a region-only interactable (status none)', () => {
-    assert.ok(rootSource.includes("visualStatus.severity === 'none'"), 'gates the upgrade on the region-only status');
-    assert.ok(rootSource.includes('services?.createMarker?.()'), 'wires the Create-marker seam');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.CreateMarker'), 'localized Create marker label');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker'), 'localized Create drawing marker label');
-  });
-
-  it('offers Relink + Remove affordances for a resolved (ok) marker', () => {
-    assert.ok(rootSource.includes("visualStatus.severity === 'ok'"), 'gates the resolved-marker actions on the ok status');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker'), 'localized Remove visual marker label');
-  });
-
-  it('localizes every string through the foundry bridge under the Config namespace', () => {
-    assert.ok(rootSource.includes("import { localize }"), 'imports the localize bridge');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.'), 'uses Config-namespaced keys');
-  });
+  defineStructureContract(
+    'localizes every string through the foundry bridge under the Config namespace',
+    ROOT,
+    { imports: ['../util/foundryBridge.js'], names: ['localize'], spells: ['FABRICATE.Canvas.Interactable.Config.'] }
+  );
 
   // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
   it('still emits every data-interactable-* locator the Foundry smoke drives', () => {
-    assertLocatorsEmitted({
-      locators: prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-(?!manager-|browser-)'),
-      rootSource,
-      floor: 9,
-      what: 'config-panel hooks',
-      root: 'the config root',
-    });
+    const locators = prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-(?!manager-|browser-)');
+    assert.ok(
+      locators.length >= 9,
+      `the smoke locates ${locators.length} config-panel hooks, expected at least 9 - ` +
+        'a scan that matches nothing would leave every clause below vacuous'
+    );
+    const subject = structureOf(ROOT);
+    for (const locator of locators) {
+      assert.ok(
+        subject.writes(locator) || subject.spellsExactly(locator),
+        `${locator} is still drawn by the config root - as an attribute it writes, a data bag key ` +
+          'or a declared hook prop, and not merely named in a comment about it'
+      );
+    }
     // The window's own root container.
     assert.ok(SMOKE_SOURCE.includes('.fabricate-interactable-config'), 'the smoke keys on the root container');
-    assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'and the root container is still emitted');
+  });
+
+  defineStructureContract('and the root container is still emitted', ROOT, {
+    attributes: [['class', 'fabricate-interactable-config']],
   });
 
   // AN OPTION PANEL IS NEVER NARROWER THAN THE TRIGGER IT DROPS FROM (issue 1520 review).
-  it('caps its option panels wide enough for a full-width trigger', () => {
-    assert.ok(
-      rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 480'),
-      "the cap is this window's declared width, so it never binds and the trigger decides"
-    );
-    // THE CORPUS IS THE EMITTING HALF.
-    const selects = emittingHalfOf(rootSource).match(/<Select\b[\s\S]*?\/>/g) ?? [];
+  defineStructureContract(
+    'declares the cap as this window`s own width, so it never binds and the trigger decides',
+    ROOT,
+    { declares: ['OPTION_PANEL_MAX_WIDTH'] }
+  );
+
+  it('caps every one of its option panels wide enough for a full-width trigger', () => {
+    const selects = renderedNodes(componentAstOf(ROOT), 'Select');
     assert.equal(selects.length, 8, 'the panel renders eight shared selects');
-    for (const tag of selects) {
-      assert.ok(
-        tag.includes('maxWidth={OPTION_PANEL_MAX_WIDTH}'),
-        `a select opens at the primitive's 340px band under a full-width trigger:\n${tag}`
+    for (const node of selects) {
+      assert.equal(
+        attributeExpression(node, 'maxWidth')?.name,
+        'OPTION_PANEL_MAX_WIDTH',
+        "a select opens at the primitive's 340px band under a full-width trigger"
       );
     }
-    assert.ok(
-      /\.fabricate-select-field \.fabricate-select-trigger\)\s*\{\s*width:\s*100%/.test(rootSource),
-      'the trigger is full width, which is what makes the band too narrow'
-    );
-
-    // The primitive's half, both ends: the band the cap replaces.
-    assert.ok(
-      selectSource.includes('form: Object.freeze({ minWidth: 240, maxWidth: 340 })'),
-      "the form rung's own band is the 340px one this window overrides"
-    );
-    assert.ok(
-      selectSource.includes('maxWidth={maxWidth || band.maxWidth}'),
-      'a caller-supplied cap wins over the rung band'
-    );
-
-    // And the clamp, which is why raising the cap widens the panel instead of fixing it at 480:
-    assert.ok(
-      popoverLayoutSource.includes('clamp(Math.max(triggerWidth, minWidth), minWidth, maxWidth)'),
-      'the panel width tracks the trigger between the two bounds'
-    );
   });
+
+  it('and the cap is 480, this window`s own declared width', () => {
+    const { instance } = componentAstOf(ROOT);
+    assert.equal(constantLiteral(instance.content, 'OPTION_PANEL_MAX_WIDTH'), 480);
+  });
+
+  defineStructureContract(
+    'and the trigger is full width, which is what makes the primitive`s band too narrow',
+    ROOT,
+    {
+      styleDeclares: [
+        [
+          ['fabricate-interactable-config', { global: ['fabricate-select-field', 'fabricate-select-trigger'] }],
+          'width',
+          '100%',
+        ],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'the primitive`s own band is the 340px one this window overrides',
+    { file: SELECT, constant: 'SIZES', property: 'form' },
+    {
+      property: [
+        ['minWidth', 240],
+        ['maxWidth', 340],
+      ],
+    }
+  );
+
+  defineStructureContract('and a caller-supplied cap wins over the rung band', SELECT, {
+    passesProps: [['SearchablePopover', 'maxWidth']],
+    reads: ['band.maxWidth', 'band.minWidth'],
+  });
+
+  defineStructureContract(
+    'the panel width tracks the trigger between the two bounds',
+    POPOVER_LAYOUT,
+    { calls: ['clamp'], reads: ['Math.max', 'Math.min'], names: ['triggerWidth', 'minWidth', 'maxWidth'] }
+  );
 
   // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520).
   it('renders the shared control primitives and keeps only its own layout classes', () => {
-    assertWindowContract({ rootSource, contract: CONFIG_PANEL_CONTRACT });
+    assertWindowContract({ componentFile: ROOT, contract: CONFIG_PANEL_CONTRACT });
   });
 
   // THE LIVE STATE IS A SWITCH WHERE THE LABEL IS A STATE.
-  it('shows the live linked/hidden state on the shared switch (on -> aria-pressed + is-on)', () => {
-    assert.ok(rootSource.includes('on={!isUnlinked}'), 'the task-node switch is on when the node is linked');
-    assert.ok(rootSource.includes('on={view.presentation.hidden}'), 'the hidden switch is on when the interactable is hidden from players');
+  defineStructureContract('shows the live linked/hidden state on the shared switch', ROOT, {
+    passesProps: [['StatusToggle', 'on']],
+    reads: ['view.presentation.hidden'],
+    names: ['isUnlinked'],
+  });
 
-    // The primitive's half: `on` becomes the announcement AND the drawn position. The Foundry
-    // smoke asserts `aria-pressed` on the node-link toggle and the View Lab's configured case
-    // selects on it, so this link is load-bearing well beyond this file.
-    assert.ok(statusToggleSource.includes('aria-pressed={on}'), 'StatusToggle announces `on` as aria-pressed');
-    assert.ok(statusToggleSource.includes('on ? STATE_CLASSES.on : STATE_CLASSES.off'), 'StatusToggle draws `on` as its state class');
-    assert.ok(statusToggleSource.includes("const STATE_CLASSES = Object.freeze({ on: 'is-on', off: 'is-off' })"), 'the state class is is-on/is-off');
+  defineStructureContract(
+    'the primitive announces `on` as aria-pressed and draws it as its state class',
+    STATUS_TOGGLE,
+    {
+      writes: ['aria-pressed'],
+      names: ['STATE_CLASSES'],
+      defaults: [['as', 'button']],
+    }
+  );
 
-    // The sheet's half: the on position is a THEMED accent.
+  defineStructureContract(
+    'and the state class is is-on/is-off',
+    { file: STATUS_TOGGLE, constant: 'STATE_CLASSES' },
+    {
+      property: [
+        ['on', 'is-on'],
+        ['off', 'is-off'],
+      ],
+    }
+  );
+
+  it('paints the on position with the themed accent token', () => {
+    // `styles/fabricate.css` is the shipped global sheet rather than a component's scoped block.
     assert.ok(
       /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
       'the on position is painted with the themed accent token'
     );
   });
 
-  // AND EACH SWITCH REACHES THE `aria-pressed` BRANCH.
-  // (issue 1520 review). `StatusToggle` renders one of three hosts off its `as` prop, and only
-  // the default `button` host writes `aria-pressed`: `as="checkbox"` renders a `<label>` around
-  // a real `<input type="checkbox">` and `as="indicator"` renders a `<span role="img">`, neither
-  // of which announces a pressed state at all. So "the root passes `on`" plus "the primitive CAN
-  // emit `aria-pressed` from `on`" leaves the one step between them unasserted - and the step is
-  // load-bearing: the Foundry smoke reads `aria-pressed` off the node-link control and
-  // `interactables-config-configured` selects on it, so a host change here would fail a capture
-  // WHOLE rather than fail a test.
+  // AND EACH SWITCH REACHES THE `aria-pressed` BRANCH (issue 1520 review). `StatusToggle` renders
+  // one of three hosts off its `as` prop, and only the default `button` host writes
+  // `aria-pressed`: `as="checkbox"` renders a real checkbox and `as="indicator"` a
+  // `<span role="img">`, neither of which announces a pressed state at all.
+  it('and the primitive gives `aria-pressed` the `on` prop itself, not a second flag', () => {
+    const announced = templateNodes(componentAstOf(STATUS_TOGGLE))
+      .map((node) => attributeExpression(node, 'aria-pressed'))
+      .filter(Boolean);
+    assert.equal(announced.length, 1, 'exactly one host announces a pressed state');
+    assert.deepEqual([...identifierNames(announced[0])], ['on'], 'and it announces the `on` prop');
+  });
+
   it('leaves every one of its switches on the default pressable host', () => {
-    const tags = rootSource.match(/<StatusToggle\b[\s\S]*?\/>/g) ?? [];
-    assert.equal(tags.length, 2, 'the panel renders exactly the node-link and hidden switches');
-    for (const tag of tags) {
-      assert.ok(!/\bas=/.test(tag), `a switch declares a host, so it may not announce aria-pressed:\n${tag}`);
-      assert.ok(!/\{\.\.\./.test(tag), `a switch spreads props, which could carry a host:\n${tag}`);
+    const toggles = renderedNodes(componentAstOf(ROOT), 'StatusToggle');
+    assert.equal(toggles.length, 2, 'the panel renders exactly the node-link and hidden switches');
+    for (const node of toggles) {
+      assert.equal(declaresAttribute(node, 'as'), false, 'a switch declaring a host may not announce aria-pressed');
+      assert.equal(carriesSpread(node), false, 'a switch spreading props could carry a host');
     }
-    // The primitive's half of the same statement, so a default flipped there reds here too.
-    assert.ok(statusToggleSource.includes("as = 'button'"), 'the unspecified host is the pressable button');
   });
 
   // THE TWO CONTROLS THAT DECLINED THE CONVERSION.
-  it('keeps Disable and Lock as pressed buttons, with the state on aria-pressed', () => {
-    assert.ok(rootSource.includes('aria-pressed={view.state.enabled === false}'), 'Disable announces pressed while the interactable is disabled');
-    assert.ok(rootSource.includes('aria-pressed={view.state.locked === true}'), 'Lock announces pressed while the interactable is locked');
-    assert.ok(!rootSource.includes('on={view.state.enabled === false}'), 'Disable is not a switch');
-    assert.ok(!rootSource.includes('on={view.state.locked === true}'), 'Lock is not a switch');
+  defineStructureContract('keeps Disable and Lock as pressed buttons, state on aria-pressed', ROOT, {
+    passesProps: [['ManagerButton', 'onclick']],
+    writes: ['aria-pressed'],
+    passesPropsNo: [['ManagerButton', 'on']],
+    styleDeclares: [
+      [
+        ['fab-ic-actions', { global: [['fabricate-button', { attribute: ['aria-pressed', 'true'] }]] }],
+        'border-color',
+        'var(--fab-accent)',
+      ],
+    ],
+  });
 
-    // The pressed state has a VISUAL expression.
-    assert.ok(
-      /\.fab-ic-actions :global\(\.fabricate-button\[aria-pressed='true'\]\)\s*\{[^}]*var\(--fab-accent\)/.test(rootSource),
-      'the pressed state is drawn from the themed accent token, keyed on aria-pressed'
+  defineStructureContract('renders the read-only facts as an inline grid and labels the gate "Status"', ROOT, {
+    spells: ['FABRICATE.Canvas.Interactable.Config.StatusLabel'],
+    spellsNo: ['FABRICATE.Canvas.Interactable.Config.ActivationLabel'],
+    writes: ['has-environment'],
+    elements: ['dt', 'dd'],
+    reads: ['view.interactableType'],
+    compares: ['gatheringTask'],
+    styleDeclares: [
+      [['fab-ic-fact-list'], 'display', 'grid'],
+      [[['fab-ic-fact-list', 'has-environment']], 'grid-template-columns', 'repeat(3, minmax(0, 1fr))'],
+    ],
+  });
+
+  defineStructureContract(
+    'pins the "Needs configuration" identity state + the picker write-through (issue 342)',
+    ROOT,
+    {
+      reads: [
+        'view.unconfigured',
+        'services.listSystems',
+        'services.listTools',
+        'services.listTasks',
+        'services.configureSource',
+      ],
+      writes: ['data-interactable-identity-section'],
+      spells: ['FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'],
+      renders: ['Notice'],
+      passesValues: [
+        ['Notice', 'tone', 'warning'],
+        ['Notice', 'dataAttr', 'data-interactable-needs-config'],
+      ],
+      passesProps: [['Notice', 'title']],
+      // The section-wide accent box left with the banner; nothing puts the class back.
+      writesNo: ['is-unconfigured'],
+    }
+  );
+
+  it('and gates Apply until the selection is complete', () => {
+    const gated = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+      identifierNames(attributeExpression(node, 'disabled') ?? {}).has('canApplyIdentity')
+    );
+    assert.equal(gated.length, 1, 'exactly one button is disabled until the selection completes');
+  });
+
+  it('the section-wide accent box rule is gone, and its absence is asserted rather than assumed', () => {
+    assert.throws(
+      () => structureOf(ROOT).styleDeclares([[['fab-ic-identity', 'is-unconfigured']], 'border-color']),
+      /no scoped rule/,
+      'a CSS claim over an absent selector must fail rather than pass vacuously'
     );
   });
 
-  it('renders the read-only facts as an inline grid and labels the gate "Status"', () => {
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.StatusLabel'), 'uses the Status label key (renamed from Activation)');
-    assert.ok(!rootSource.includes('FABRICATE.Canvas.Interactable.Config.ActivationLabel'), 'no longer references the Activation label key');
-    // Grid layout: 3 columns with the environment fact, 2 without.
-    assert.ok(rootSource.includes("class:has-environment={view.interactableType === 'gatheringTask'}"), 'environment presence toggles the grid columns');
-    assert.ok(/\.fab-ic-fact-list\s*\{[\s\S]*?display:\s*grid/.test(rootSource), 'fact list is a grid (inline columns), not a vertical stack');
-    assert.ok(rootSource.includes('repeat(3, minmax(0, 1fr))'), '3 columns when the environment fact is present');
-    // dt/dd semantics preserved.
-    assert.ok(rootSource.includes('<dt>') && rootSource.includes('<dd>'), 'keeps dt/dd fact semantics');
+  defineStructureContract('the warning tone paints the bar with themed warning tokens', NOTICE, {
+    styleDeclares: [
+      [[['fab-notice', 'is-warning']], 'border-color', 'var(--fab-warning-border)'],
+      [[['fab-notice', 'is-warning']], 'background', 'var(--fab-warning-soft)'],
+    ],
   });
 
-  it('pins the "Needs configuration" identity state + the picker write-through (issue 342)', () => {
-    // A prominent unconfigured state.
-    assert.ok(rootSource.includes('view?.unconfigured === true'), 'reads the unconfigured authority from the view model');
-    assert.ok(rootSource.includes('data-interactable-needs-config'), 'renders the Needs-configuration state');
-    assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle'), 'localized Needs-configuration title');
-    assert.ok(rootSource.includes('data-interactable-identity-section'), 'declares the identity/source section');
-    // The picker reads the shared enumeration through services and writes the
-    // selection back via the configureSource seam.
-    assert.ok(rootSource.includes('services?.listSystems?.()'), 'lists systems via services');
-    assert.ok(rootSource.includes('services?.listTools?.(') && rootSource.includes('services?.listTasks?.('), 'lists tools/tasks via services');
-    assert.ok(rootSource.includes('services?.configureSource?.(selection)'), 'applies the selection through configureSource');
-    // The Apply button is gated so an incomplete selection cannot be submitted.
-    assert.ok(rootSource.includes('disabled={!canApplyIdentity}'), 'Apply is disabled until the selection is complete');
-    // THE PROMINENCE IS THE NOTICE'S WARNING TONE, AND IT IS PAINTED ONCE (issue 1520).
-    // This clause used to read the section's own `.fab-ic-identity.is-unconfigured` accent box.
-    assert.ok(rootSource.includes('tone="warning"'), 'the needs-configuration bar is a warning-toned Notice');
-    assert.ok(rootSource.includes('dataAttr="data-interactable-needs-config"'), 'the hook rides the declared prop, which is the only route Notice offers');
-    assert.ok(
-      /\.fab-notice\.is-warning\s*\{[^}]*var\(--fab-warning-border\)[^}]*var\(--fab-warning-soft\)/.test(noticeSource),
-      'the warning tone paints the bar with themed warning tokens'
-    );
-    assert.ok(
-      /warning:\s*'fas fa-triangle-exclamation'/.test(noticeSource),
-      'the warning tone supplies the same alert glyph the hand-rolled banner drew'
-    );
-    // The negative half is written as the RULE and the DIRECTIVE rather than as the bare token,
-    // because the comment above records why the box left and a bare-token check would be
-    // satisfied by deleting that explanation instead of by re-adding the box.
-    assert.ok(!/\.fab-ic-identity\.is-unconfigured\s*\{/.test(rootSource), 'the section-wide accent box rule is gone');
-    assert.ok(!rootSource.includes('class:is-unconfigured'), 'and nothing puts the class back on the section');
-  });
+  defineStructureContract(
+    'and supplies the same alert glyph the hand-rolled banner drew',
+    { file: NOTICE, constant: 'DEFAULT_ICONS' },
+    { property: [['warning', 'fas fa-triangle-exclamation']] }
+  );
 
-  it('disambiguates same-named systems in the source picker (issue 346)', () => {
-    assert.ok(
-      rootSource.includes("import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js'"),
-      'uses the shared system-disambiguation helper'
-    );
-    assert.ok(rootSource.includes('buildSystemLabelMap(systemOptions)'), 'builds the disambiguated label map');
-    assert.ok(
-      rootSource.includes('systemDisplayLabel(option, systemLabels)'),
-      'renders the disambiguated label in the system picker'
-    );
+  defineStructureContract('disambiguates same-named systems in the source picker (issue 346)', ROOT, {
+    imports: ['../util/systemDisambiguation.js'],
+    callsWith: [
+      ['buildSystemLabelMap', 'systemOptions'],
+      ['systemDisplayLabel', 'systemLabels'],
+    ],
   });
 
   it('rewords the prompt placeholder away from "toast" jargon', () => {
-    assert.ok(!/PromptPlaceholder[^)]*toast/i.test(rootSource), 'no "toast" jargon in the prompt placeholder fallback');
-    assert.ok(rootSource.includes('Shown to players in the interaction prompt'), 'plain-language prompt placeholder fallback');
+    const subject = claimsForComponent(componentAstOf(ROOT));
+    assert.equal(
+      subject.spellsExactly('Shown to players in the interaction prompt'),
+      true,
+      'plain-language prompt placeholder fallback'
+    );
+    assert.equal(
+      subject.spells('toast'),
+      false,
+      'no "toast" jargon anywhere the component can render it'
+    );
   });
 });

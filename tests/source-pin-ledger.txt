@@ -56,7 +56,6 @@ tests/components/gathering-task-editor-summary.test.js	44
 tests/components/gathering-view-actor-bar.test.js	31
 tests/components/icon-picker-layout.test.js	4
 tests/components/interactable-browser-app.test.js	86
-tests/components/interactable-config-app.test.js	141
 tests/components/interactables-manager-app.test.js	57
 tests/components/inventory-view-salvage-reload.test.js	3
 tests/components/inventory-view.test.js	24
@@ -133,7 +132,6 @@ tests/gathering-image-defaults.test.js	8
 tests/helpers/chipTone.js	1
 tests/helpers/essenceFixtures.js	1
 tests/helpers/fabricateFacadeHarness.js	1
-tests/helpers/interactablesWindowContract.js	2
 tests/helpers/manager-button-cascade.js	2
 tests/helpers/manager/managerQueries.js	1
 tests/helpers/primitiveAdoptionContract.js	3

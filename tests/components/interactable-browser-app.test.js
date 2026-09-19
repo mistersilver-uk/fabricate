@@ -272,7 +272,7 @@ describe('InteractableBrowserRoot body', () => {
 
   // THE WINDOW'S STYLING CONTRACT, STATED FORWARD (issue 1520).
   it('renders the shared control primitives and keeps only its own layout classes', () => {
-    assertWindowContract({ rootSource, contract: BROWSER_WINDOW_CONTRACT });
+    assertWindowContract({ componentFile: 'src/ui/svelte/apps/InteractableBrowserRoot.svelte', contract: BROWSER_WINDOW_CONTRACT });
   });
 
   // THE TWO TAB PANELS DECLARE THEIR KEYBOARD FOCUS (issue 1520; the reason restated at review).
