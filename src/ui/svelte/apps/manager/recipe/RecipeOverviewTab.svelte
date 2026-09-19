@@ -498,12 +498,10 @@
   <!-- Select row: Category, then the conditional DC-check + Minimum-success-tier selects that
        only a fixed-type routed check surfaces. -->
   <div class="manager-recipe-overview-selects">
-    <!-- A `<div>` RATHER THAN THE `<label>` THESE THREE ROWS WERE (issue 1510). The control is the
-         shared `<Select>` now — a `<button>` opening a portaled panel dismissed on `mousedown`
-         while open — and a `<label>` FORWARDS a caption click into it, so from the open state the
-         caption's own mousedown dismissed the list and the forwarded click re-opened it. Each
-         micro-label keeps its class, position and copy and names its trigger through
-         `aria-labelledby`, at the cost of no longer being a hit target. -->
+    <!-- A <div>, not a <label>: Select.svelte's host invariant — a caption click would dismiss
+         then re-open the portaled panel. The caption names the trigger with aria-labelledby; the
+         wrapper stays because the micro-label treatment and the cell hooks are the studio's, not
+         the primitive's (issue 1510). -->
     <div class="manager-recipe-field" data-recipe-field-category>
       <span class="manager-recipe-micro-label" id={categoryCaptionId}
         >{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span
@@ -575,13 +573,8 @@
               'Eligible modifiers'
             )}</span
           >
-          <!-- The micro-label above names TWO things — the pill group below, through
-               `aria-labelledby`, and this control, which it used to name by containment — so a
-               screen-reader user could not tell the two apart. The control takes an explicit name
-               starting with the visible label (WCAG 2.5.3 Label in Name) and adding what it
-               chooses: WHERE the eligible set comes from. That is why it is the one demoted
-               wrapper here NOT re-pointed at its caption (issue 1510) — `ariaLabelledBy` would
-               name two controls the same way again, the defect this comment closed. -->
+          <!-- This cell keeps its own `ariaLabel` because the caption also names the pill group
+               (WCAG 2.5.3). -->
           <Select
             value={modifierSetMode}
             options={modifierSetOptions}

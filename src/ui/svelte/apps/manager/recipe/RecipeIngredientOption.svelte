@@ -23,7 +23,7 @@
     2. The resting search border is `--fab-border-strong`, accenting only WHILE TYPING, where an
        accent at rest reads as a field already holding a value.
     3. The plate glyph is 12px, not 11.  4. The suggestion panel is offset 33px.
-    5. The kind picker is on the `inline` rung (issue 1510).  6. The tint is per KIND, not per
+    5. The kind picker is on the `inline` rung, so 11.5px not 11 (issue 1510).  6. The tint is per KIND, not per
        entity — and that last one is NOT a departure from the design, whose own kind table tints
        per kind too.
 
@@ -393,9 +393,8 @@
     <i class={leadIcon}></i>
   </span>
 
-  <!-- A ONE-OF-N PICKER: four mutually exclusive values, no search, no imagery. A native `<select>`
-       until issue 1510, for a reason that expired — `SearchablePopover` owns the listbox key model,
-       so the replacement is not hand-rolled either. The tooltip rides `triggerTitle`. -->
+  <!-- A one-of-N picker: four mutually exclusive values, no search, no imagery.
+       The tooltip rides `triggerTitle`. -->
   <Select
     class="manager-recipe-option-kind"
     size="inline"
