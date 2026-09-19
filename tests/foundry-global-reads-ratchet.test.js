@@ -156,7 +156,7 @@ test('the rule is armed on the domain layer and absent from the sanctioned edges
   );
   assert.equal(await armed('src/main.js'), false, 'the module entry shell is an edge, not debt');
   assert.equal(
-    await armed('src/ui/svelte/util/foundryBridge.js'),
+    await armed('src/ui/svelte/util/foundryHooks.js'),
     false,
     'the bridge exists to make these globals reachable'
   );

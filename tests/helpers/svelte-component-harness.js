@@ -8,6 +8,7 @@ import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
 import { rewriteClientImports } from './rewriteClientImports.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
 
 const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
 
@@ -177,7 +178,7 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
 // The raw `.js` modules + compiled `.svelte` modules a `SearchablePopover`-based picker needs in a
 // mounted test. Shared so picker test files do not each repeat the dependency list verbatim.
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   // The listbox cursor's arithmetic (issue 1503).
   'src/ui/svelte/util/listboxNavigation.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',

@@ -276,10 +276,6 @@ src/ui/svelte/util/autoFillResolver.js	no-unused-vars
 src/ui/svelte/util/componentEditorSave.js	unicorn/no-useless-undefined
 src/ui/svelte/util/dropUtils.js	unicorn/prefer-at
 src/ui/svelte/util/formatDuration.js	unicorn/numeric-separators-style
-src/ui/svelte/util/foundryBridge.js	no-useless-assignment
-src/ui/svelte/util/foundryBridge.js	unicorn/no-useless-fallback-in-spread
-src/ui/svelte/util/foundryBridge.js	unicorn/prefer-optional-catch-binding
-src/ui/svelte/util/foundryBridge.js	unicorn/prefer-split-limit
 src/ui/svelte/util/foundryIconVocabulary.js	unicorn/no-negated-array-predicate
 src/ui/svelte/util/gatheringFormat.js	unicorn/no-negated-condition
 src/ui/svelte/util/importFolderGroups.js	unicorn/prefer-spread

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const ROW_PATH = 'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
@@ -15,7 +16,7 @@ const STEPPER_PATH = 'src/ui/svelte/components/Stepper.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-character-modifier-bounds-row-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js', 'src/ui/svelte/components/stepperLabels.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, 'src/ui/svelte/components/stepperLabels.js'],
   // `Field.svelte` is THE manager's labelled form field (issue 1428).
   compiledModules: ['src/ui/svelte/components/Field.svelte', STEPPER_PATH, ROW_PATH],
   componentPath: ROW_PATH,

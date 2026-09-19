@@ -14,6 +14,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -123,7 +124,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-gathering-bar-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
-    copyModule('src/ui/svelte/util/foundryBridge.js');
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) copyModule(modulePath);
     copyModule('src/gatheringImageDefaults.js');
     copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');

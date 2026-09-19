@@ -15,6 +15,7 @@ import {
 } from '../helpers/componentScopeMountModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -81,7 +82,7 @@ const dropZoneHarness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
   ],
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',

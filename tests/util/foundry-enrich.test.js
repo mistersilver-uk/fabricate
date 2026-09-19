@@ -3,35 +3,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { setupDOM, teardownDOM } from './helpers/svelte-dom.js';
+import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
+import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
 let _idCounter = 0;
-globalThis.foundry = {
-  utils: {
-    randomID: () => `id-${++_idCounter}`,
-    getProperty: (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj) ?? undefined,
-  },
-};
-globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
-globalThis.fromUuid = async () => null;
+installFoundryBridgeEnv({ fromUuid: async () => null });
+globalThis.foundry.utils.randomID = () => `id-${++_idCounter}`;
+globalThis.foundry.utils.getProperty = (obj, path) =>
+  path.split('.').reduce((o, k) => o?.[k], obj) ?? undefined;
 globalThis.game = { user: { isGM: true }, items: [], packs: [], actors: [] };
 
-const { enrichToHtml, primeEnricherCache, resolveItemSourceSnapshot } = await import(
-  '../src/ui/svelte/util/foundryBridge.js'
+const { enrichToHtml, primeEnricherCache } = await import(
+  '../../src/ui/svelte/util/foundryEnrich.js'
 );
-const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+const { resolveItemSourceSnapshot } = await import(
+  '../../src/ui/svelte/util/foundryDocuments.js'
+);
+const { CraftingSystemManager } = await import('../../src/systems/CraftingSystemManager.js');
 const {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,
   makeFakeEnricher,
-} = await import('./helpers/enricherDescriptionFixtures.js');
+} = await import('../helpers/enricherDescriptionFixtures.js');
 
-// 1. The option bag — REAL enrichToHtml, stubbed enrichHTML
-
-/**
- * Install a capturing `enrichHTML` on the V13 accessor path and return the captured
- * calls. The real enricher is never invoked, so this runs headlessly.
- */
+/** Capture `enrichHTML` on the V13 accessor path; the real enricher never runs, so this is headless. */
 function captureEnrichOptions({ onImplementation = true } = {}) {
   const calls = [];
   const stub = async (text, options) => {
@@ -39,12 +34,12 @@ function captureEnrichOptions({ onImplementation = true } = {}) {
     return `<enriched>${text}</enriched>`;
   };
   const TextEditor = onImplementation ? { implementation: { enrichHTML: stub } } : { enrichHTML: stub };
-  globalThis.foundry.applications = { ux: { TextEditor } };
+  globalThis.foundry.applications.ux.TextEditor = TextEditor;
   return calls;
 }
 
 function clearEnrichStub() {
-  delete globalThis.foundry.applications;
+  delete globalThis.foundry.applications.ux.TextEditor;
 }
 
 test('enrichToHtml passes secrets:false EXPLICITLY', async (t) => {
@@ -116,12 +111,7 @@ test('enrichToHtml degrades to the raw text when no enricher is reachable', asyn
   assert.equal(await enrichToHtml(null), '');
 });
 
-// 2. primeEnricherCache — the REAL pack grouping
-
-/**
- * Fake compendium packs plus a `parseUuid` that resolves `Compendium.<packId>.Item.<id>`
- * against them, mirroring what Foundry's own parser yields for a compendium uuid.
- */
+/** Packs plus a `parseUuid` resolving `Compendium.<packId>.Item.<id>`, as Foundry's own parser does. */
 function installFakePacks(packIds, { cachedIds = new Set() } = {}) {
   const packs = new Map();
   for (const packId of packIds) {
@@ -186,8 +176,6 @@ test('primeEnricherCache no-ops safely without Foundry, and stays linear on adve
   assert.ok(elapsedMs < 5000, `priming took ${elapsedMs.toFixed(0)}ms — expected linear`);
 });
 
-// 3. The headline behaviour, bound at the COMPOSITION
-
 const SOURCE_ITEM = Object.freeze({
   documentName: 'Item',
   uuid: 'Compendium.dnd5e.equipment24.Item.supplies',
@@ -240,9 +228,7 @@ test('_buildRecipeItemSourceSnapshot resolves through the same path', async () =
 test('manager drop snapshots use the same enriched plain-text projection as persistence', async (t) => {
   setupDOM();
   const fakeEnricher = makeFakeEnricher();
-  globalThis.foundry.applications = {
-    ux: { TextEditor: { implementation: { enrichHTML: fakeEnricher } } },
-  };
+  globalThis.foundry.applications.ux.TextEditor = { implementation: { enrichHTML: fakeEnricher } };
   globalThis.fromUuid = async (uuid) => (uuid === SOURCE_ITEM.uuid ? SOURCE_ITEM : null);
   t.after(() => {
     teardownDOM();

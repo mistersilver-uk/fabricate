@@ -7,6 +7,7 @@ import {
   createMountedComponentHarness,
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -22,7 +23,7 @@ const BENCH_WITH_ESSENCES = [
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-workbench-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     // The shared notice the last-brew banner composes (issue 1505) plus the tile and the label
     // the bench and the Produces heading draw (issue 1514), as ONE spread. A compiled component

@@ -1,6 +1,8 @@
 /** The dependency manifest the mounted TOOL suites compile against (issue 1373, epic 1357). */
 
 /** The Tool model closure, declared by every mounted tool suite (issue 1119). */
+import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+
 export const TOOL_TREE_RAW_MODULES = Object.freeze([
   'src/config/flags.js',
   'src/models/Ingredient.js',
@@ -14,7 +16,7 @@ export const TOOL_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
   'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/util/overlayHost.js',
   // The one tone map the converted status chips read (issue 1506).
   'src/ui/svelte/util/statusChipTone.js',

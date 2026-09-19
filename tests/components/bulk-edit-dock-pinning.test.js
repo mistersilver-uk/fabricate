@@ -38,6 +38,7 @@ import { chromium } from 'playwright';
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
@@ -63,7 +64,7 @@ const AXIS_ROW_COUNT = 18;
 const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-dock-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   // THE manager's labelled push-button (issue 1118). Apply renders through the primitive
   // now, so it is a static import of the shell and belongs in its closure. This suite is
   // NOT covered by `mounted-harness-primitive-allowlist.test.js`, which gates the

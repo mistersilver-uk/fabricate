@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -94,7 +95,7 @@ describe('RecordInspector available-node stepper', () => {
     ]) {
       writeCompiledSvelte(component);
     }
-    copyModule('src/ui/svelte/util/foundryBridge.js');
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) copyModule(modulePath);
     copyModule('src/gatheringImageDefaults.js');
     // The per-state tone / glyph / copy map (issue 1321).
     // `CompositionStatePill.svelte`'s own `<script>` so the composition-state vocabulary can

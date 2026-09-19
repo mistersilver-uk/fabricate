@@ -7,11 +7,12 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 // The seeded-section list the row set subtracts. Imported so the assertion below is about
 // a NON-EMPTY filter rather than about an empty one that removes nothing.
 import { SCOPED_SEEDED_SECTIONS } from '../../src/ui/svelte/apps/manager/scoped/scopedStudio.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const SCOPED_RAW_MODULES = [
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's

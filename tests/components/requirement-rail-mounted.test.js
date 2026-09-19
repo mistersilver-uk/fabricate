@@ -13,6 +13,7 @@ import {
   makeCurrencyRecipeManager,
   currencyOption,
 } from '../helpers/currencyRequirementFixtures.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const RAIL_PATH = 'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte';
@@ -83,7 +84,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-requirement-rail-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',

@@ -16,6 +16,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -106,9 +107,11 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(reasonsDestination), { recursive: true });
     writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
 
-    const utilDestination = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
-    mkdirSync(dirname(utilDestination), { recursive: true });
-    writeFileSync(utilDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) {
+      const utilDestination = join(tempRoot, modulePath);
+      mkdirSync(dirname(utilDestination), { recursive: true });
+      writeFileSync(utilDestination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
+    }
 
     const imageDefaultsDestination = join(tempRoot, 'src/gatheringImageDefaults.js');
     mkdirSync(dirname(imageDefaultsDestination), { recursive: true });

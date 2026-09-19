@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { COMPONENT_SCOPE_LEAF_MODULES } from '../helpers/componentScopeMountModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -19,7 +20,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // The callout writes the attribution sentence itself.
     ...COMPONENT_SCOPE_LEAF_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',

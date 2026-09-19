@@ -20,6 +20,7 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -112,7 +113,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // `stepperLabels.js` is the shared adjunct-name derivation the view's Steppers import
     // (issue 1050); omitting it leaves the compiled component with an unresolvable import.
     for (const modulePath of [
-      'src/ui/svelte/util/foundryBridge.js',
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
     ]) {
