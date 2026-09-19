@@ -370,6 +370,31 @@ describe('a converted manager trigger keeps the width its native select had (iss
     });
   }
 
+  it('renders two distinct category labels for the recipe category site, not one duplicated', async () => {
+    // The category site's equal-width clause above is vacuous by CSS design — `width: 100%`
+    // fixes both states at the same column regardless of content — so this reads the trigger's
+    // own visible text for each measured state instead of its box.
+    const site = CONVERTED_SITES.find((entry) => entry.hook === '[data-recipe-category-select]');
+    const [firstLabelText, secondLabelText] = await Promise.all(
+      site.values.map(async (value) => {
+        const page = await openFixture(site.subject, value);
+        try {
+          return await page.evaluate(
+            (selector) => document.querySelector(selector)?.textContent.trim() ?? '',
+            site.hook
+          );
+        } finally {
+          await page.close();
+        }
+      })
+    );
+    assert.notEqual(
+      firstLabelText,
+      secondLabelText,
+      'the fixture renders two distinct category labels, not one duplicated'
+    );
+  });
+
   it('holds the add-sub-unit control at its column width across its option labels', async () => {
     // THE SITE THE CONVERSION REGRESSED, and the one `?value=` cannot reach.
     // control renders only inside an EXPANDED currency unit that still has assignable sub-units,

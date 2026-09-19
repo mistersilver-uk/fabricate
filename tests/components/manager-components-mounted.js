@@ -20,6 +20,11 @@ import {
   settleBetweenTests,
   settleRouteExit,
 } from './manager-mounted-shared.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 let Component;
 let mounted;
@@ -850,6 +855,37 @@ export function registerComponentsCases() {
         '[data-salvage-section] [data-salvage-dc-override] [data-salvage-dc-preset]'
       ),
       'routed mode should render the DC-override field'
+    );
+
+    // The routing row's caption names its own outcome (issue 1510), not the generic control label.
+    assert.equal(
+      assertSelectHasResolvedName(target, '[data-salvage-route="Success"]'),
+      'Success',
+      'the Success row resolves its own outcome name'
+    );
+    // `''` (Unrouted) is stamped `__unchanged__` in the DOM — a `data-popover-option` cannot be
+    // empty — so the real group id is whichever value is not that sentinel.
+    const groupId = selectOptionValues(target, '[data-salvage-route="Success"]').find(
+      (value) => value !== '__unchanged__'
+    );
+    assert.ok(groupId, 'the added result group offers a routable value');
+    chooseSelectOption(target, '[data-salvage-route="Success"]', groupId);
+    await tick();
+    flushSync();
+
+    const saveButton = target.querySelector('button[form="manager-component-edit-form"]');
+    saveButton.click();
+    flushSync();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+    const updateCall = calls.find((call) => call[0] === 'updateComponent');
+    assert.ok(updateCall, 'routing the Success outcome should call store.updateComponent');
+    assert.deepEqual(
+      updateCall[2].salvage.outcomeRouting,
+      { Success: groupId },
+      'only the routed outcome is staged, and the other two stay absent'
     );
   });
 

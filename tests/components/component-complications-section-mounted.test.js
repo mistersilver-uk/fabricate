@@ -30,6 +30,7 @@ import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 // so their option lists are read off a panel portaled onto the mount target.
 import {
   assertSelectHasResolvedName,
+  chooseSelectOption,
   closeSelectPanel,
   selectOptionLabels,
   selectOptionValues,
@@ -57,6 +58,14 @@ function blockIn(source, selector) {
   assert.notEqual(start, -1, `expected a \`${selector}\` rule`);
   const end = source.indexOf('}', start);
   return source.slice(start, end);
+}
+
+function selectTagContaining(source, marker) {
+  const markerIndex = source.indexOf(marker);
+  assert.notEqual(markerIndex, -1, `expected \`${marker}\``);
+  const tagStart = source.lastIndexOf('<Select', markerIndex);
+  const tagEnd = source.indexOf('/>', markerIndex);
+  return source.slice(tagStart, tagEnd);
 }
 
 const harness = createMountedComponentHarness({
@@ -87,10 +96,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
-    // THE SHARED ONE-OF-N PICKER AND THE FIELD IT COMPOSES (issue 1510). The trigger clause and the
-    // dice-condition comparator render it, and this suite's SECOND harness below spreads the shared
-    // `ComponentEditView` roster — which is why the primitive is declared twice in this file. A
-    // `.svelte` the tree renders but a list omits HANGS its harness (# cancelled), not fails it.
+    // The trigger clause and the dice-condition comparator render `Select.svelte` (issue 1510); an
+    // unregistered rendered component hangs its harness rather than failing it.
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
@@ -682,15 +689,46 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       /--fab-stepper-fill-height:\s*34px/,
       'the Stepper takes the row height from its layout context — 34px, the inputs beside it'
     );
-    // And the converted comparator holds that same 34 (issue 1510), which the `inline` rung's own
-    // 30px would otherwise have taken it to — a four-pixel step in the middle of one sentence.
+    // And the converted comparator uses the shared `toolbar` rung (issue 1510), which already
+    // stands at 34 — the row's shared height without a per-site override.
     assert.match(
-      blockIn(
-        sectionSource,
-        '.fab-complication-condition-row\n    > :global(.fab-complication-comparator .fabricate-select-trigger)'
-      ),
-      /min-height:\s*34px/,
+      selectTagContaining(sectionSource, 'class="fab-complication-comparator"'),
+      /size="toolbar"/,
       'the picker trigger stands at the height of the fields either side of it'
+    );
+  });
+
+  it('forwards the chosen comparator row as rollCondition.cmp', async () => {
+    const { target, emitted } = await openRollCondition();
+    chooseSelectOption(target, COMPARATOR, 'lte');
+    assert.equal(
+      emitted.at(-1)[0].rollCondition.cmp,
+      'lte',
+      'choosing a comparator row stages the operator, not just renders the six options'
+    );
+  });
+
+  it('forwards the chosen trigger row as when.checkTrigger', async () => {
+    // Persisted ON from the start: the section is a CONTROLLED component (`patch` only calls
+    // `onChange`, never mutates local state), so ticking the checkbox here would stage a value
+    // no re-render ever shows — the picker must already be revealed to be driven.
+    const { target, emitted } = await mountSection({
+      complications: [
+        complication({
+          when: { stageAwarded: false, stagePartial: false, stageMissed: true, checkTrigger: 't1' },
+        }),
+      ],
+      triggerOptions: [
+        { id: 't1', label: 'Trigger One' },
+        { id: 't2', label: 'Trigger Two' },
+      ],
+    });
+    await openFirstRow(target);
+    chooseSelectOption(target, TRIGGER_PICKER, 't2');
+    assert.equal(
+      emitted.at(-1)[0].when.checkTrigger,
+      't2',
+      'choosing a trigger row stages that id, not just the persisted default'
     );
   });
 

@@ -1022,11 +1022,12 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-recipe-field="minSuccessOutcomeId"',
   'data-recipe-field="craftingModifierSet"',
   'data-recipe-option-kind',
-  // ISSUE 1510 PHASE 2, COMMIT 2b — the component studio. Each is spelled BARE, checked rather than
+  // Issue 1510 phase 2, commit 2b — the component studio. Each is spelled bare, checked rather than
   // assumed: `data-component-edit-category` and `data-complication-trigger` are each a prefix of
   // two further hooks, but both of those name a state paragraph and a clause wrapper rather than a
   // control, so no bare entry here bans driving a native control that survives. `data-salvage-route`
-  // carries the outcome NAME as its value, so it has no fixed value to spell.
+  // carries the outcome name as its value, so it has no fixed value to spell; and of the container
+  // hook `data-salvage-routing`, which wraps no native control.
   'data-component-edit-category',
   'data-salvage-route',
   'data-salvage-dc-preset',

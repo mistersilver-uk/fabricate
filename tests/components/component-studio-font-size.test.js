@@ -565,3 +565,20 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     await browser.close();
   }
 });
+
+test('the category fixture spells `-form`, matching the product Select that declares no size', () => {
+  const editViewSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+    'utf8'
+  );
+  const tagStart = editViewSource.indexOf('class="manager-component-category-select"');
+  assert.notEqual(tagStart, -1, 'the category `<Select>` call site moved or was renamed');
+  const openStart = editViewSource.lastIndexOf('<Select', tagStart);
+  const openEnd = editViewSource.indexOf('>', tagStart);
+  const tag = editViewSource.slice(openStart, openEnd);
+  assert.ok(
+    !/\bsize=/.test(tag),
+    'the category `<Select>` must declare no `size`, so it falls to the `form` rung the ' +
+      '`field-select` fixture (12.5px, `-form`) actually measures'
+  );
+});
