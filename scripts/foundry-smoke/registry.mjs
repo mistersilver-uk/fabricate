@@ -11,13 +11,13 @@ import phaseCCraftingSystem from './scenarios/phase-c-crafting-system.mjs';
 export const SMOKE_SCENARIOS = Object.freeze([
   bootAndJoin,
   phaseBActorsItems,
-  phaseCCraftingSystem
+  phaseCCraftingSystem,
 ]);
 
 function flattenScenarioIds(scenarios) {
   return scenarios.flatMap((scenario) => [
     scenario.id,
-    ...flattenScenarioIds(scenario.children ?? [])
+    ...flattenScenarioIds(scenario.children ?? []),
   ]);
 }
 

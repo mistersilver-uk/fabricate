@@ -9,7 +9,7 @@ import {
   createBootReporter,
   getPathname,
   joinWorldSession as joinWorldSessionShared,
-  launchWorld as launchWorldShared
+  launchWorld as launchWorldShared,
 } from '../../lib/foundryBrowserBoot.js';
 import { installNotificationHidingCss } from '../pageOps/pageLifecycle.mjs';
 
@@ -26,8 +26,10 @@ export default {
     // bookkeeping.
     const bootReporter = createBootReporter({
       screenshot,
-      recordStep: (step) => results.steps.push(step),
-      log: (message) => process.stdout.write(message)
+      recordStep: (step) => {
+        results.steps.push(step);
+      },
+      log: (message) => process.stdout.write(message),
     });
     // ── Step 1: Navigate to setup page and handle first-run flows ──────────
     await page.goto(`${FOUNDRY_URL}/setup`, { waitUntil: 'networkidle' });
@@ -43,23 +45,25 @@ export default {
     const postAuthPath = getPathname(page.url());
     const worldAlreadyRunning = postAuthPath === '/join' || postAuthPath === '/game';
 
-    if (!worldAlreadyRunning) {
+    if (worldAlreadyRunning) {
+      process.stdout.write('World already running, skipping setup/launch.\n');
+      results.steps.push(
+        { step: 'setup-ready', passed: true, skipped: true },
+        { step: 'launch-world', passed: true, skipped: true }
+      );
+    } else {
       // ── Step 2: Dismiss first-run dialogs, then launch the world ───────────
       await launchWorldShared(page, {
         worldId: WORLD_ID,
         foundryUrl: FOUNDRY_URL,
-        reporter: bootReporter
+        reporter: bootReporter,
       });
-    } else {
-      process.stdout.write('World already running, skipping setup/launch.\n');
-      results.steps.push({ step: 'setup-ready', passed: true, skipped: true });
-      results.steps.push({ step: 'launch-world', passed: true, skipped: true });
     }
 
     await joinWorldSessionShared(page, {
       userLabel: 'Gamemaster',
       stepName: 'join-session',
-      reporter: bootReporter
+      reporter: bootReporter,
     });
 
     // Hide notification toasts globally — they otherwise overlay screenshots and force a
@@ -69,14 +73,19 @@ export default {
     await screenshot(page, 'world-loaded');
 
     // Wait for Foundry canvas to be ready
-    await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
+    await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, {
+      timeout: 30_000,
+    });
 
     // ── Step 3: Verify/activate Fabricate module ─────────────────────────────
     const fabricateActive = await page.evaluate(() => {
       return game.modules.get('fabricate')?.active === true;
     });
 
-    if (!fabricateActive) {
+    if (fabricateActive) {
+      results.steps.push({ step: 'module-active', passed: true });
+      process.stdout.write('Fabricate module is active.\n');
+    } else {
       process.stdout.write('Fabricate module not active. Activating via Module Management...\n');
       // Enable the module through Foundry's settings API, then reload
       await page.evaluate(async () => {
@@ -91,7 +100,9 @@ export default {
       // Re-apply the notification-hiding CSS after reload (style tags are
       // scoped to the document and are cleared on navigation)
       await installNotificationHidingCss(page);
-      await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, { timeout: 30_000 });
+      await page.waitForFunction(() => typeof game !== 'undefined' && game.ready, {
+        timeout: 30_000,
+      });
 
       const nowActive = await page.evaluate(() => game.modules.get('fabricate')?.active === true);
       if (!nowActive) {
@@ -99,9 +110,6 @@ export default {
       }
       results.steps.push({ step: 'module-activated', passed: true });
       process.stdout.write('Fabricate module activated and loaded.\n');
-    } else {
-      results.steps.push({ step: 'module-active', passed: true });
-      process.stdout.write('Fabricate module is active.\n');
     }
 
     // Wait for Fabricate to be fully ready
@@ -116,5 +124,5 @@ export default {
       if (tour?.activeTour) tour.activeTour.exit();
     });
     await page.waitForTimeout(500);
-  }
+  },
 };
