@@ -38,6 +38,7 @@ import {
   rendersComponent,
   rendersElement,
   requiresProp,
+  spelledLiterals,
   spellsLiteral,
 } from '../helpers/svelteStructureContract.js';
 import { declaredManagerClasses } from '../helpers/manager/managerStylesheet.js';
@@ -622,6 +623,11 @@ const CONTRACT_CLAIMS = Object.freeze({
   calls: { ask: 'calls', holds: true, says: (v) => `calls ${v}()` },
   callsNo: { ask: 'calls', holds: false, says: (v) => `never calls ${v}()` },
   callsWith: { ask: 'callsWith', holds: true, says: ([f, a]) => `calls ${f}() with ${a}` },
+  callsWithNo: {
+    ask: 'callsWith',
+    holds: false,
+    says: ([f, a]) => `never calls ${f}() with ${a}`,
+  },
   declaresProp: { ask: 'declaresProp', holds: true, says: (v) => `declares the ${v} prop` },
   requiresProp: {
     ask: 'requiresProp',
@@ -691,6 +697,10 @@ const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 // The WORLD Tool entry, which took the linked-item card off the system editor (issue 1373).
 const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte';
+const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
+const ENVIRONMENTS_BROWSER = 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
+const GATHERING_TASK_EDIT = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+const GATHERING_TASKS_BROWSER = 'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte';
 const MODIFIER_LIBRARY_ROW = 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte';
 const SCOPED_VALIDATION_TAB = 'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte';
 const TOOL_EDIT = 'src/ui/svelte/apps/manager/ToolEditView.svelte';
@@ -2307,274 +2317,214 @@ describe('CraftingSystemManager source contract', () => {
   // NOTE: FilePicker and scene-drop-zone contracts on environmentEditSource removed
   // when the editor was placeholder'd out pending redesign.
 
-  it('wires Manager Gathering Tasks browser through root-owned selection and store callbacks', () => {
-    for (const snippet of [
+  // The gathering task library, its inspector and the focused editor. What each of these DRAWS
+  // and does — the rows, the drop rules, the component browser, the chance sliders, the paging,
+  // the availability pickers, the Required Tools picker and the toolbar delete — is driven by
+  // `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
+  defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
+    renders: ['GatheringTaskEditView', 'ChanceSlider'],
+    names: [
       'selectedGatheringTaskId',
-      'onSelectGatheringTask={selectGatheringTask}',
-      'onCreateGatheringTask={createGatheringTask}',
-      'onEditGatheringTask={editGatheringTask}',
-      'onDuplicateGatheringTask={duplicateGatheringTask}',
-      'onDeleteGatheringTask={deleteGatheringTask}',
-      'onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}',
-      'store.duplicateGatheringLibraryTask',
-      'data-gathering-task-inspector',
-      'GatheringTaskEditView',
-      '{itemCards}',
-      'data-gathering-task-drop-inspector',
+      'selectGatheringTask',
+      'createGatheringTask',
+      'editGatheringTask',
+      'duplicateGatheringTask',
+      'deleteGatheringTask',
+      'toggleGatheringTaskEnabled',
       'addGatheringDropModifier',
       'updateGatheringDropModifier',
-      'manager-drop-editor-actions',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
+      'gatheringDropRateTierClass',
+      'gatheringDropRateTierColor',
+      'onGatheringDropCountKeydown',
+      'deleteGatheringTaskDraft',
+      'selectedGatheringSystemTools',
+      'addToolReferenceToSelectedTask',
+      'removeToolReferenceFromSelectedTask',
+    ],
+    reads: ['store.duplicateGatheringLibraryTask'],
+    declares: ['itemCards'],
+    passesProps: [
+      ['EnvironmentsBrowserView', 'onSelectGatheringTask'],
+      ['EnvironmentsBrowserView', 'onCreateGatheringTask'],
+      ['EnvironmentsBrowserView', 'onEditGatheringTask'],
+      ['EnvironmentsBrowserView', 'onDuplicateGatheringTask'],
+      ['EnvironmentsBrowserView', 'onDeleteGatheringTask'],
+      ['EnvironmentsBrowserView', 'onToggleGatheringTaskEnabled'],
+      ['GatheringTaskEditView', 'itemCards'],
+      ['GatheringTaskEditView', 'resolutionMode'],
+    ],
+    writes: [
+      'data-gathering-task-inspector',
+      'data-gathering-task-drop-inspector',
+      'data-gathering-drop-inspector-rate',
+      'data-gathering-drop-inspector-count',
+    ],
+    spellsExactly: ['manager-drop-editor-actions', 'manager-drop-editor-values'],
+    // Issue 883: the inspector's slider IS `ChanceSlider`. It used to hand-roll the same
+    // track/fill/range structure and its own input/blur/keydown trio beside it, so the structure
+    // and the handlers must be gone from the root, not merely unused — a surviving copy is what
+    // the next divergence gets written against.
+    spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
+    namesNo: ['onGatheringDropRateInput', 'onGatheringDropRateBlur', 'onGatheringDropRateKeydown'],
+    // The selected drop inspector renders no component selector, and no second duplicate action.
+    readsNo: ['selectedGatheringDrop.componentId'],
+    callsWithNo: [['duplicateGatheringTask', 'selectedGatheringTask']],
+  });
+
+  defineStructureContract(
+    'hosts the task library on the gathering workspace',
+    ENVIRONMENTS_BROWSER,
+    {
+      renders: ['GatheringTasksBrowserView'],
+      passesProps: [
+        ['GatheringTasksBrowserView', 'tasks'],
+        ['GatheringTasksBrowserView', 'selectedTaskId'],
+        ['GatheringTasksBrowserView', 'managedItemOptions'],
+      ],
+      reads: ['selectedGatheringSystemConfig.tasks'],
     }
-    for (const snippet of [
-      'GatheringTasksBrowserView',
-      'tasks={selectedGatheringSystemConfig.tasks || []}',
-      'selectedTaskId',
-      'managedItemOptions',
-    ]) {
-      assert.ok(
-        environmentsBrowserSource.includes(snippet),
-        `environment browser should include ${snippet}`
-      );
-    }
-    for (const snippet of [
-      'data-gathering-tasks-browser',
-      'manager-gathering-tasks-table',
-      'biomeChips(task)',
-      'timeChips(task)',
-      'weatherChips(task)',
-      'rowChips(task)',
-      'data-gathering-task-tags',
-      'onDuplicateTask(selectedSystemId, task.id)',
-      'onDeleteTask(selectedSystemId, task.id)',
-      'onToggleTaskEnabled(selectedSystemId, task.id',
-    ]) {
-      assert.ok(
-        gatheringTasksBrowserSource.includes(snippet),
-        `task browser should include ${snippet}`
-      );
-    }
-    for (const snippet of [
+  );
+
+  defineStructureContract('draws the task library rows and their actions', GATHERING_TASKS_BROWSER, {
+    writes: ['data-gathering-tasks-browser', 'data-gathering-task-tags'],
+    spellsExactly: ['manager-gathering-tasks-table'],
+    calls: ['biomeChips', 'timeChips', 'weatherChips', 'rowChips'],
+    callsWith: [
+      ['onDuplicateTask', 'selectedSystemId'],
+      ['onDeleteTask', 'selectedSystemId'],
+      ['onToggleTaskEnabled', 'selectedSystemId'],
+    ],
+  });
+
+  // The editor is ONE page, not a tab strip, and the drop table is the row itself rather than a
+  // row plus a responsive duplicate of every one of its labels.
+  defineStructureContract('authors a gathering task on one page', GATHERING_TASK_EDIT, {
+    renders: ['ChanceSlider', 'RadioCardGroup'],
+    names: [
+      'pageSize',
+      'showRewardRuleNotice',
+      'dragDrop',
+      'availableConditionOptions',
+      'selectedConditionOptions',
+      'dropRateTierColor',
+    ],
+    calls: [
+      'onClearDropComponent',
+      'onDropComponentMouseDown',
+      'onComponentDragStart',
+      'dropRateTierClass',
+      'onQuantityInput',
+      'onQuantityKeydown',
+      'onPickImagePath',
+      'onAddToolReference',
+      'onRemoveToolReference',
+    ],
+    callsWith: [['onImportDrop', 'rowId']],
+    writes: [
       'data-gathering-task-editor',
-      'class:has-reward-rule-notice={showRewardRuleNotice}',
       'data-gathering-task-core-editor',
       'data-gathering-task-availability',
+      'data-gathering-task-availability-pill',
       'data-gathering-task-component-browser',
       'data-gathering-task-component-grid',
       'data-gathering-component-card',
       'data-gathering-component-name-search',
       'data-gathering-component-tag-search',
-      'manager-selected-tag-pill',
       'data-gathering-task-drops-table',
-      'data-gathering-task-availability-option',
-      'data-gathering-task-availability-pill',
       'data-gathering-task-drop-component-cell',
       'data-gathering-task-drop-chance-cell',
       'data-gathering-task-drop-count',
+      'data-gathering-task-required-tools',
+      'oncontextmenu',
+    ],
+    attributes: [['inputmode', 'numeric']],
+    spells: ['manager-drop-cell', 'manager-drop-component-cell', 'manager-drop-quantity-cell'],
+    spellsExactly: [
+      'manager-selected-tag-pill',
+      'data-gathering-task-availability-option',
       'manager-task-drop-controls',
       'manager-task-drop-footer',
       'manager-task-component-browser-card',
       'manager-task-component-grid',
       'manager-task-component-card-grip',
-      'let pageSize = $state(5)',
-      'manager-drop-cell',
-      'manager-drop-component-cell',
-      'manager-drop-quantity-cell',
+      'manager-task-media-column',
+      'manager-task-required-tools-card',
       'manager-drop-modifier-pill',
       'manager-drop-modifier-list',
       'manager-drop-modifier-overflow',
-      'ChanceSlider',
-      'inputmode="numeric"',
-      "pattern={'[1-9][0-9]{0,2}'}",
-      'onClearDropComponent',
-      'onDropComponentMouseDown',
-      'onComponentDragStart',
-      'FabricateManagedComponent',
-      'dropRateTierClass',
-      'dropRateTierColor',
-      'onQuantityInput',
-      'onQuantityKeydown',
-      'oncontextmenu',
-      'use:dragDrop',
-      'onImportDrop(rowId, data)',
-      'onPickImagePath',
-      'DropChance',
-      'ClearDropComponentHint',
-      'DropQuantityColumn',
-      'DropModifierOverflowHint',
-      'RewardRuleNotice',
-    ]) {
-      assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
+      '[1-9][0-9]{0,2}',
+    ],
+    // The one-page editor's absences: no tab strip, no raw internal id, no duplicate back
+    // control, no native single-select availability, no row-level quick actions, no responsive
+    // label duplicates.
+    namesNo: ['selectedCondition'],
+    attributesNo: [['type', 'checkbox']],
+    spellsExactlyNo: ['FABRICATE.Admin.Manager.Environment.Tasks.TaskId'],
+    writesNo: ['data-gathering-task-drop-actions', 'data-gathering-task-drop-row-number'],
+    spellsNo: [
+      'manager-task-editor-tabs',
+      'Internal ID',
+      'BackToLibrary',
+      'Tasks.SelectDrop',
+      'EditDrop',
+      'manager-labeled-cell manager-drop-component-cell',
+      'manager-labeled-cell manager-drop-rate-cell',
+      'QuantityShortHint',
+    ],
+  });
+
+  // Asserted where it is DECIDED rather than over the whole file: a managed-component drop
+  // resets the row's identity and enables it.
+  defineStructureContract(
+    'resets a drop row identity when a managed component lands on it',
+    { file: GATHERING_TASK_EDIT, fn: 'handleDropZoneDrop' },
+    {
+      compares: ['FabricateManagedComponent'],
+      callsWith: [['onUpdateDrop', 'rowId']],
+      reads: ['data.componentId'],
+      keys: ['componentId', 'itemUuid', 'systemItemId', 'name', 'enabled'],
     }
-    // Asserted as a pattern rather than a snippet in the list above.
-    assert.ok(
-      /onUpdateDrop\(rowId, \{\s*componentId: data\.componentId,\s*itemUuid: '',\s*systemItemId: '',\s*name: '',\s*enabled: true,?\s*\}\)/.test(
-        gatheringTaskEditSource
-      ),
-      'a managed-component drop should reset the row identity and enable it'
+  );
+
+  defineStructureContract('draws one shared chance slider for both scopes', CHANCE_SLIDER, {
+    names: ['handleNumberInput', 'handleNumberBlur', 'handleNumberKeydown', 'handleRangeInput'],
+    declaresProp: ['resolveColor', 'numberLabel', 'rangeLabel'],
+    attributes: [
+      ['type', 'number'],
+      ['type', 'range'],
+    ],
+    spells: ['manager-drop-rate-value', 'manager-drop-rate-percent'],
+    spellsExactly: ['manager-drop-rate-track', 'manager-drop-rate-fill'],
+  });
+
+  it('keeps the gathering task actions key to the header aria label alone', () => {
+    const key = 'FABRICATE.Admin.Manager.Environment.Tasks.Actions';
+    const spelled = spelledLiterals(componentAstOf(MANAGER_ROOT)).filter((text) => text === key);
+    assert.equal(
+      spelled.length,
+      1,
+      'the task inspector keeps no redundant action card heading beside the header label'
     );
-    for (const snippet of [
-      'manager-drop-rate-value',
-      'manager-drop-rate-percent',
-      'manager-drop-rate-track',
-      'manager-drop-rate-fill',
-      'type="number"',
-      'type="range"',
-      'handleNumberInput',
-      'handleNumberBlur',
-      'handleNumberKeydown',
-      'handleRangeInput',
-      'resolveColor',
-      'numberLabel',
-      'rangeLabel',
-    ]) {
-      assert.ok(chanceSliderSource.includes(snippet), `shared chance slider should include ${snippet}`);
-    }
-    for (const snippet of [
-      'manager-drop-editor-values',
-      'data-gathering-drop-inspector-rate',
-      'data-gathering-drop-inspector-count',
-      'gatheringDropRateTierClass',
-      'gatheringDropRateTierColor',
-      'onGatheringDropCountKeydown',
-      'ChanceSlider',
-    ]) {
-      assert.ok(
-        rootSource.includes(snippet),
-        `root should include selected drop inspector ${snippet}`
-      );
-    }
-    // Issue 883: the inspector's slider IS `ChanceSlider`. It used to hand-roll the same
-    // track/fill/range structure and its own input/blur/keydown trio beside it, so the
-    // structure and the handlers must be gone from the root, not merely unused — a
-    // surviving copy is what the next divergence gets written against.
-    for (const dead of [
-      'manager-drop-rate-control',
-      'manager-drop-rate-track',
-      'manager-drop-rate-fill',
-      'onGatheringDropRateInput',
-      'onGatheringDropRateBlur',
-      'onGatheringDropRateKeydown',
-    ]) {
-      assert.equal(
-        rootSource.includes(dead),
-        false,
-        `root should render the drop-rate slider through ChanceSlider, not ${dead}`
-      );
-    }
-    assert.ok(
-      !gatheringTaskEditSource.includes('manager-task-editor-tabs'),
-      'task editor should be a one-page editor without tab navigation'
+  });
+
+  // The destructive role, read off ONE element rather than off two strings that happen to sit
+  // within 200 characters of each other. The class literal the old match keyed on left the file
+  // entirely when this toolbar moved onto `ManagerButton` (issue 1118).
+  it('renders the task delete as one danger ManagerButton wired to the draft delete', () => {
+    const [remove] = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
+      declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
     );
-    assert.ok(
-      gatheringTaskEditSource.includes('TaskIdentity'),
-      'task editor should render a visible task identity heading'
+    assert.ok(Boolean(remove), 'the task editor toolbar still renders its delete control');
+    assert.equal(remove.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(attributeValue(remove, 'role'), 'danger', 'in the destructive role');
+    assert.equal(
+      attributeExpression(remove, 'onclick')?.name,
+      'deleteGatheringTaskDraft',
+      'and the element carrying the hook is the one wired to the draft delete'
     );
-    assert.ok(
-      !/Tasks\.TaskId(?!entity)/.test(gatheringTaskEditSource),
-      'task editor should not render the raw internal task id localization'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('Internal ID'),
-      'task editor should not render the raw internal task id label'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('BackToLibrary'),
-      'task editor should not render a duplicate central back-to-library control'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('type="checkbox"'),
-      'task editor status toggle should use the shared button pattern'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('<select value={selectedCondition'),
-      'task availability should not use native single-select controls'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('function selectedCondition('),
-      'task availability should not collapse arrays to a single selection'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('Tasks.SelectDrop'),
-      'drop rows should not render a row-level edit/select quick action'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('data-gathering-task-drop-actions'),
-      'drop rows should not render row-level duplicate/delete actions'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('data-gathering-task-drop-row-number'),
-      'drop rows should not add a leading row number column'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('EditDrop'),
-      'drop rows should not add an edit quick action'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('manager-labeled-cell manager-drop-component-cell'),
-      'drop component row values should not render responsive duplicate labels'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('manager-labeled-cell manager-drop-rate-cell'),
-      'drop chance row values should not render responsive duplicate labels'
-    );
-    assert.ok(
-      !gatheringTaskEditSource.includes('QuantityShortHint'),
-      'drop quantity row values should not render an extra helper label'
-    );
-    assert.ok(
-      !rootSource.includes('selectedGatheringDrop.componentId ||'),
-      'selected drop inspector should not render a component selector'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('manager-task-media-column'),
-      'task editor should group image and status in the media column'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('availableConditionOptions'),
-      'task editor should filter selected availability options out of menus'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('selectedConditionOptions'),
-      'task editor should render selected availability values as pills'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('StatusOff'),
-      'task editor should use shared Off status copy'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('StatusOn'),
-      'task editor should use shared On status copy'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('manager-task-required-tools-card'),
-      'task editor should render the Required Tools section'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('data-gathering-task-required-tools'),
-      'Required Tools section should expose a stable data hook'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('onAddToolReference'),
-      'task editor should call back to the root for tool-reference additions'
-    );
-    assert.ok(
-      gatheringTaskEditSource.includes('onRemoveToolReference'),
-      'task editor should call back to the root for tool-reference removals'
-    );
-    assert.ok(
-      rootSource.includes('selectedGatheringSystemTools'),
-      'root should derive the per-system tools library for the task editor'
-    );
-    assert.ok(
-      rootSource.includes('addToolReferenceToSelectedTask'),
-      'root should expose an add-tool-reference handler'
-    );
-    assert.ok(
-      rootSource.includes('removeToolReferenceFromSelectedTask'),
-      'root should expose a remove-tool-reference handler'
-    );
+  });
+
+  it('states the gathering task copy the editor, its columns and its rails read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsTitle,
       'Required Tools'
@@ -2609,54 +2559,12 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.TaskId, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.NewLibraryTask, 'New Gathering Task');
     assert.equal(
-      rootSource.match(/FABRICATE\.Admin\.Manager\.Environment\.Tasks\.Actions/g)?.length ?? 0,
-      1,
-      'gathering task actions localization should remain only for the header aria label, not a redundant inspector card'
-    );
-    assert.ok(
-      !rootSource.includes(
-        "<h3 class=\"manager-card-title\">{text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions')}</h3>"
-      ),
-      'gathering task inspector should not keep an action card heading'
-    );
-    assert.ok(
-      !rootSource.includes('duplicateGatheringTask(selectedSystemId, selectedGatheringTask.id)'),
-      'gathering task inspector should not duplicate row-level duplicate actions'
-    );
-    assert.equal(
       lang.FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary,
       'Back to task library'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.CopySuffix, 'Copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.Delete, 'Delete gathering task');
-    assert.ok(
-      rootSource.includes('onclick={deleteGatheringTaskDraft}'),
-      'gathering task editor toolbar should wire the delete button to deleteGatheringTaskDraft'
-    );
-    // The destructive role, read off ONE element rather than off two strings that happen to
-    // sit within 200 characters of each other. `/manager-button is-danger[\s\S]{0,200}
-    // deleteGatheringTaskDraft/` matched a class string in one control and a handler in
-    // another as readily as both in the same one, and the class literal it keyed on left the
-    // file entirely when this toolbar moved onto `ManagerButton` (issue 1118).
-    const deleteTag = /<ManagerButton[^<>]*\bdata-gathering-task-delete\b[^<>]*>/.exec(rootSource);
-    assert.ok(
-      deleteTag,
-      'gathering task editor should render its delete control as a ManagerButton carrying ' +
-        'data-gathering-task-delete'
-    );
-    assert.ok(
-      deleteTag[0].includes('role="danger"'),
-      'gathering task editor delete button should use the danger destructive role'
-    );
-    assert.ok(
-      deleteTag[0].includes('onclick={deleteGatheringTaskDraft}'),
-      'the element carrying data-gathering-task-delete should be the one wired to ' +
-        'deleteGatheringTaskDraft — otherwise the role above is asserted on some other control'
-    );
   });
-
-  // NOTE: status-toggle contract on environmentEditSource removed when the editor
-  // was placeholder'd out pending redesign.
 
   // The Tools library and the focused editor. What the library DRAWS — the rows, the pager, the
   // per-system counts, the selection, the three tabs, the absent creation surface and the absent
