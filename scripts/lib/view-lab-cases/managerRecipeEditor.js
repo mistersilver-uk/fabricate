@@ -320,11 +320,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // The first open-panel frame in the recipe studio (issue 1510), and the only way to photograph a
-  // converted control's own subject: the option list exists only while it is open, and an open
-  // panel cannot double as this tab's closed-state frame because the portal occludes the screen
-  // behind it. The kind picker is the phase's NARROWEST addressable trigger at 132px, so it is also
-  // where a panel wider than its trigger would show.
+  // Only reachable frame for the open kind panel (issue 1510): the option list renders only while
+  // open, and the portal occludes the closed-state frame behind it. The kind trigger is this
+  // phase's narrowest at 132px, so a panel wider than its trigger shows here.
   managerCase({
     id: 'manager-recipe-edit-ingredients-kind-list',
     label: 'Manager — Recipe edit ingredient kind list',
