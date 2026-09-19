@@ -16507,10 +16507,17 @@
   border-color: var(--fab-border-strong);
 }
 
+/* A `<button>` since issue 1512, so core's `button` reset is neutralised here: it pins a height, a fill and a centred content box. No `min-height` is declared — `height: auto` keeps the box the 38px realm icon and this padding already set, and a figure here would invent one. */
 .fabricate-manager .manager-travel-realms-header {
+  appearance: none;
+  -webkit-appearance: none;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--fab-space-2);
+  width: 100%;
+  min-width: 0;
+  height: auto;
   padding: var(--fab-space-3);
   cursor: pointer;
   background: transparent;
@@ -16518,6 +16525,7 @@
   text-align: left;
   color: inherit;
   border-radius: 8px;
+  font: inherit;
 }
 
 .fabricate-manager .manager-travel-realms-header:focus-visible {

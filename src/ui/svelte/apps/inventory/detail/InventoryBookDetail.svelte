@@ -29,6 +29,15 @@
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../../util/recipeItemAccessBadge.js';
+  import {
+    RECIPE_PAGE_SIZES,
+    countRecipePages,
+    learnCapAdmitsWholeBook,
+    matchRecipes,
+    recipePageSizeOptions,
+    recipePageSlice,
+    unlearnedRecipeIds,
+  } from '../../../util/bookRecipeBrowse.js';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
 
@@ -86,37 +95,26 @@
     },
   ]);
 
-  // Knowledge-mode "Read & learn all N recipes" convenience: shown ONLY when the reader
-  // can actually learn everything — no learn limit, or a limit that meets/exceeds the
-  // book size — and there is at least one unlearned recipe.
-  const learnLimited = $derived(item?.caps?.learn?.limitLearning === true);
-  const learnCap = $derived(
-    Number.isFinite(item?.caps?.learn?.learnsAllowed) && item.caps.learn.learnsAllowed > 0
-      ? item.caps.learn.learnsAllowed
-      : null
-  );
-  // Exclude gate-blocked recipes (issue 544) so "Learn all" never sends a recipe
-  // the runtime will refuse (which would halt the batch mid-way).
-  const unlearnedRecipeIds = $derived(
-    bookRecipes
-      .filter((recipe) => !recipe?.learned && !recipe?.learnBlocked)
-      .map((recipe) => recipe.id)
-  );
+  // Knowledge-mode "Read & learn all N recipes" convenience: shown only when the reader can
+  // actually learn everything, and there is at least one unlearned recipe.
+  const learnableIds = $derived(unlearnedRecipeIds(bookRecipes));
   const canLearnAll = $derived(
     learnable &&
       !budgetSpent &&
-      unlearnedRecipeIds.length > 0 &&
-      (!learnLimited || (learnCap != null && learnCap >= recipeTotal))
+      learnableIds.length > 0 &&
+      learnCapAdmitsWholeBook(item?.caps?.learn, recipeTotal)
   );
   function learnAll() {
-    if (learningRecipeId == null && unlearnedRecipeIds.length > 0) onLearnAll?.(unlearnedRecipeIds);
+    if (learningRecipeId == null && learnableIds.length > 0) onLearnAll?.(learnableIds);
   }
   function craftRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
 
+  /** The whole-header disclosure's own name, which the medallion and the title do not supply. */
+  const phraseKey = (open) => `FABRICATE.Common.Disclosure.${open ? 'Collapse' : 'Expand'}`;
+
   // Search appears only once a book teaches more than a page's worth of recipes.
-  const RECIPE_PAGE_SIZES = [6, 9, 12];
   let recipeSearch = $state('');
   let recipePageSize = $state(6);
   let recipePage = $state(0);
@@ -130,27 +128,11 @@
   });
 
   const searchableRecipes = $derived(bookRecipes.length > RECIPE_PAGE_SIZES[0]);
-  const filteredRecipes = $derived.by(() => {
-    const query = recipeSearch.trim().toLowerCase();
-    if (query.length === 0) return bookRecipes;
-    return bookRecipes.filter(
-      (recipe) =>
-        String(recipe?.name ?? '')
-          .toLowerCase()
-          .includes(query) ||
-        String(recipe?.description ?? '')
-          .toLowerCase()
-          .includes(query)
-    );
-  });
-  const recipePageCount = $derived(
-    Math.max(1, Math.ceil(filteredRecipes.length / (recipePageSize > 0 ? recipePageSize : 1)))
+  const filteredRecipes = $derived(matchRecipes(bookRecipes, recipeSearch));
+  const recipePageCount = $derived(countRecipePages(filteredRecipes.length, recipePageSize));
+  const pagedRecipes = $derived(
+    recipePageSlice(filteredRecipes, recipePage, recipePageSize, recipePageCount)
   );
-  const pagedRecipes = $derived.by(() => {
-    const size = recipePageSize > 0 ? recipePageSize : filteredRecipes.length || 1;
-    const clamped = Math.min(Math.max(0, recipePage), recipePageCount - 1);
-    return filteredRecipes.slice(clamped * size, clamped * size + size);
-  });
 
   function canLearn(recipe) {
     return !recipe?.learned && !recipe?.learnBlocked && !budgetSpent;
@@ -170,10 +152,7 @@
   const instanceId = $props.id();
   const pageSizeCaptionId = `${instanceId}-recipe-page-size`;
 
-  const recipePageSizeOptions = RECIPE_PAGE_SIZES.map((size) => ({
-    value: size,
-    label: String(size),
-  }));
+  const pageSizeOptions = recipePageSizeOptions();
 
   // `Select` hands back the caller's OWN typed value, so this arrives as the number the option
   // carried rather than as the string a `<select>`'s `value` gave the old handler to parse.
@@ -195,6 +174,7 @@
          the "Needs:" chips above — not repeated per recipe row. -->
     <button
       type="button"
+      data-keyboard-focus="true"
       class="inventory-detail-learn-btn"
       data-inventory-learn={recipe.id}
       disabled={!canLearn(recipe) || learningRecipeId != null}
@@ -222,6 +202,7 @@
 {#snippet craftControl(recipe)}
   <button
     type="button"
+    data-keyboard-focus="true"
     class="inventory-detail-craft-btn"
     data-inventory-craft={recipe.id}
     onclick={() => craftRecipe(recipe.id)}
@@ -283,6 +264,7 @@
   {#if canLearnAll}
     <button
       type="button"
+      data-keyboard-focus="true"
       class="inventory-detail-read-learn"
       data-inventory-learn-all
       disabled={learningRecipeId != null}
@@ -346,12 +328,19 @@
         <ul class="inventory-detail-accordion" data-inventory-recipe-accordion>
           {#each pagedRecipes as recipe (recipe.id)}
             {@const expanded = expandedRecipeId === recipe.id}
+            {@const bodyId = `fab-book-recipe-body-${recipe.id}`}
+            {@const phraseId = `fab-book-recipe-phrase-${recipe.id}`}
             <li class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
               <div class="inventory-detail-accordion-header">
+                <!-- The whole header is the disclosure (issue 1512): it resolves `aria-controls`
+                     to the body, declares itself focused, and is named by the phrase. -->
                 <button
                   type="button"
+                  data-keyboard-focus="true"
                   class="inventory-detail-accordion-toggle"
                   aria-expanded={expanded}
+                  aria-controls={bodyId}
+                  aria-labelledby={phraseId}
                   onclick={() => toggleRecipe(recipe.id)}
                 >
                   <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
@@ -362,13 +351,20 @@
                     class:fa-chevron-right={!expanded}
                     aria-hidden="true"
                   ></i>
+                  <span class="visually-hidden" id={phraseId}
+                    >{localize(phraseKey(expanded), { name: recipe.name })}</span
+                  >
                 </button>
                 {#if learnable}{@render learnControl(
                     recipe
                   )}{:else if craftable}{@render craftControl(recipe)}{/if}
               </div>
               {#if expanded}
-                <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
+                <div
+                  class="inventory-detail-accordion-body"
+                  id={bodyId}
+                  data-inventory-recipe-body={recipe.id}
+                >
                   {#if recipe.description}
                     <p class="inventory-detail-recipe-desc">{recipe.description}</p>
                   {:else}
@@ -398,7 +394,7 @@
                 size="inline"
                 showTick={false}
                 value={recipePageSize}
-                options={recipePageSizeOptions}
+                options={pageSizeOptions}
                 ariaLabelledBy={pageSizeCaptionId}
                 triggerData={{ 'data-inventory-page-size': '' }}
                 onChange={chooseRecipePageSize}

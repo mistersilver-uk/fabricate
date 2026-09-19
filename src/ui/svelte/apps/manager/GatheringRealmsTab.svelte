@@ -89,11 +89,8 @@
     onSelectRealm(realmId === selectedRealmId ? '' : realmId);
   }
 
-  function onRowKeydown(event, realmId) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    selectRow(realmId);
-  }
+  /** The header's own name: its chips and icon do not supply one. */
+  const phraseKey = (open) => `FABRICATE.Common.Disclosure.${open ? 'Collapse' : 'Expand'}`;
 
   function countLabel(count, oneKey, oneFallback, manyKey, manyFallback) {
     if (count === 1) return text(oneKey, oneFallback);
@@ -156,18 +153,24 @@
     <div class="manager-travel-realms-list" role="list">
       {#each pagedRealms as realm (realm.id)}
         {@const isExpanded = realm.id === selectedRealmId}
+        {@const bodyId = `fab-realm-editor-${realm.id}`}
+        {@const phraseId = `fab-realm-phrase-${realm.id}`}
         <div
           class={`manager-travel-realms-row ${isExpanded ? 'is-expanded is-selected' : ''}`}
           role="listitem"
           data-manager-travel-realm-id={realm.id}
         >
-          <div
+          <!-- The whole header is the disclosure and therefore the button, not a focusable
+               `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
+               `aria-labelledby` keeps the name the phrase, not the name plus two count chips. -->
+          <button
+            type="button"
+            data-keyboard-focus="true"
             class="manager-travel-realms-header"
-            role="button"
-            tabindex="0"
             aria-expanded={isExpanded}
+            aria-controls={bodyId}
+            aria-labelledby={phraseId}
             onclick={() => selectRow(realm.id)}
-            onkeydown={(event) => onRowKeydown(event, realm.id)}
           >
             <div class="manager-travel-realms-left">
               <span class="manager-travel-realms-icon" aria-hidden="true"
@@ -193,10 +196,13 @@
             <span class="manager-travel-realms-chevron" aria-hidden="true">
               <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
             </span>
-          </div>
+            <span class="visually-hidden" id={phraseId}
+              >{localize(phraseKey(isExpanded), { name: realm.name })}</span
+            >
+          </button>
 
           {#if isExpanded}
-            <div class="manager-travel-realms-editor" data-manager-realm-editor>
+            <div class="manager-travel-realms-editor" id={bodyId} data-manager-realm-editor>
               <RealmEnvironmentsEditor
                 {realm}
                 {environments}

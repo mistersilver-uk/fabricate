@@ -67,12 +67,9 @@
     else next.add(id);
     expandedIds = next;
   }
-  function onRowKey(event, id) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      toggle(id);
-    }
-  }
+
+  /** The disclosure's own name, which its visible content does not supply. */
+  const phraseKey = (open) => `FABRICATE.Common.Disclosure.${open ? 'Collapse' : 'Expand'}`;
 </script>
 
 {#if loading}
@@ -117,15 +114,22 @@
 
     <ul class="gathering-task-drops-list">
       {#each drops as drop, index (drop.id ?? index)}
-        {@const isOpen = expandedIds.has(drop.id ?? index)}
+        {@const key = drop.id ?? index}
+        {@const isOpen = expandedIds.has(key)}
+        {@const bodyId = `fab-drop-modifiers-${key}`}
+        {@const phraseId = `fab-drop-phrase-${key}`}
         <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
-          <div
+          <!-- The whole summary is the disclosure and therefore the button, not a focusable
+               `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
+               `aria-labelledby` keeps the name the phrase rather than the copy and the meter. -->
+          <button
+            type="button"
+            data-keyboard-focus="true"
             class="gathering-task-drop-summary"
-            role="button"
-            tabindex="0"
             aria-expanded={isOpen}
-            onclick={() => toggle(drop.id ?? index)}
-            onkeydown={(event) => onRowKey(event, drop.id ?? index)}
+            aria-controls={bodyId}
+            aria-labelledby={phraseId}
+            onclick={() => toggle(key)}
           >
             <Medallion art={drop.img || DEFAULT_DROP_IMG} alt="" size={36} />
             <span class="gathering-task-drop-copy">
@@ -157,10 +161,13 @@
             <span class="gathering-task-drop-chevron" aria-hidden="true">
               <i class={`fas ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
             </span>
-          </div>
+            <span class="visually-hidden" id={phraseId}
+              >{localize(phraseKey(isOpen), { name: drop.name })}</span
+            >
+          </button>
 
           {#if isOpen}
-            <GatheringDropModifiers {drop} />
+            <GatheringDropModifiers {drop} {bodyId} />
           {/if}
         </li>
       {/each}
@@ -225,12 +232,25 @@
     overflow: hidden;
   }
 
+  /* A `<button>` since issue 1512, so core's `button` reset is neutralised: it pins a height, a
+     border, a fill and a centred content box. `height: auto` keeps the medallion's own box. */
   .gathering-task-drop-summary {
+    appearance: none;
+    -webkit-appearance: none;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: var(--fab-space-2);
+    width: 100%;
+    min-width: 0;
+    height: auto;
     padding: var(--fab-space-2);
+    border: 0;
+    text-align: left;
     cursor: pointer;
+    color: inherit;
+    background: transparent;
+    font: inherit;
   }
 
   .gathering-task-drop-summary:focus-visible {
