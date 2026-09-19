@@ -71,7 +71,6 @@ import {
   craftingDataChange,
   domainsForRecord,
   emitCraftingDataChanged,
-  PendingChangeDomains,
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeGatheringRealmSettings } from './gatheringRealms.js';
@@ -83,12 +82,8 @@ import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { resolvedComponentEssencesById } from './resolvedComponentEssences.js';
-import {
-  corpusDelta,
-  patchCorpusInPlace,
-  REVISION_SCOPES,
-  RevisionRegistry,
-} from './revisionTokens.js';
+import { RevisionBookkeeping } from './revisionBookkeeping.js';
+import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -202,16 +197,12 @@ export class CraftingSystemManager {
     this.recipeManager = recipeManager;
     this.systems = new Map();
     this.initialized = false;
-    // The revision-token registry this manager mints from (issue 1076). Per manager, never
-    // a module singleton.
-    this._revisions = new RevisionRegistry();
-    // The unconsumed delta from the most recent `reload()` (issue 1078), read once through
-    // `consumeReloadDelta()`.
-    /** @type {import('./revisionTokens.js').CorpusDelta|null} */
-    this._reloadDelta = null;
-    // The invalidation domains attributed since the last announcement (issue 1078 part B1).
-    // Recorded by `save({domains})`, drained by `_notifySystemsChanged`.
-    this._pendingDomains = new PendingChangeDomains();
+    this._bookkeeping = new RevisionBookkeeping({
+      entityScope: REVISION_SCOPES.systems,
+      systemScopeOf: REVISION_SCOPES.system,
+      domainsForFields: domainsForSystemFields,
+      ownersOf: (systemId) => [systemId],
+    });
     // Shares THIS map rather than mirroring it, hydrating through `_normalizeSystem`. That
     // normalizer is a WHITELIST REBUILD, so the repository must call it rather than carry any
     // approximation of the persisted shape.
@@ -2068,35 +2059,18 @@ export class CraftingSystemManager {
     return [...this.systems.keys()];
   }
 
-  /** Advance the `facts:<domain>:<systemId>` token of every named pair (issue 1078 part B1). An
-   * omitted `domains` set means every domain and an EXPLICIT empty one means unattributable;
-   * both advance every fact scope, because in neither case can a fact class be ruled out. */
   _advanceFactScopes(domains, ...systemIds) {
-    const advanced =
-      Array.isArray(domains) && domains.length > 0 ? domains : ALL_INVALIDATION_DOMAINS;
-    for (const systemId of systemIds) {
-      if (systemId == null) continue;
-      this._revisions.advance(...advanced.map((domain) => REVISION_SCOPES.facts(domain, systemId)));
-    }
+    this._bookkeeping.advanceFactScopes(domains, ...systemIds);
   }
 
-  /** Attribute a LOCAL mutation: advance its fact scopes and record it for
-   * {@link _notifySystemsChanged} to drain into the change signal. */
   _attributeChange(domains, ...systemIds) {
-    this._advanceFactScopes(domains, ...systemIds);
-    this._pendingDomains.record(domains, ...systemIds);
+    this._bookkeeping.attributeChange(domains, ...systemIds);
   }
 
-  /** The domains a REPLACEMENT of one stored system belongs to, read off the fields that moved.
-   * `updateSystem` is the one site whose attribution cannot be a constant — it accepts an
-   * arbitrary patch — so it derives one through the same {@link corpusDelta} the replication
-   * path uses. */
+  /** `updateSystem` is the one attribution site that cannot be a constant: it takes an arbitrary
+   * patch, so it derives its domains from the fields that actually moved. */
   _domainsForSystemEdit(previous, next) {
-    if (!previous || !next) return [...ALL_INVALIDATION_DOMAINS];
-    const delta = corpusDelta([previous], [next]);
-    if (delta.reordered) return [...ALL_INVALIDATION_DOMAINS];
-    const entry = [...delta.perRecord.values()][0];
-    return entry ? domainsForSystemFields(entry.fields) : [];
+    return this._bookkeeping.domainsForEdit(previous, next);
   }
 
   /** Re-read the persisted crafting-systems setting into the in-memory map — the un-guarded,
@@ -2109,16 +2083,14 @@ export class CraftingSystemManager {
     // replicated snapshot to read (see `CraftingDefinitionRepository`), so reloading
     // is a no-op rather than a wrong answer.
     const saved = this._repository.readReplicatedSnapshot();
-    // Every reload replaces the pending delta, including a reload that reads nothing, so a
-    // stale delta can never be consumed after a later one.
-    this._reloadDelta = null;
+    this._bookkeeping.holdReloadDelta(null);
     if (!saved) return false;
     const next = new Map();
     for (const normalized of saved) {
       next.set(normalized.id, normalized);
     }
     const delta = corpusDelta(this.systems.values(), next.values());
-    this._reloadDelta = delta;
+    this._bookkeeping.holdReloadDelta(delta);
     this.initialized = true;
     if (!delta.changed) return false;
 
@@ -2132,53 +2104,27 @@ export class CraftingSystemManager {
 
     patchCorpusInPlace(this.systems, next, delta);
     this._advanceSystemRevision(...delta.perRecord.keys());
-    for (const [systemId, entry] of delta.perRecord) {
-      this._advanceFactScopes(domainsForSystemFields(entry.fields), systemId);
-    }
+    this._bookkeeping.advanceChangedRecords(delta);
     return true;
   }
 
-  /** The delta from the most recent {@link reload}, cleared by this read (issue 1078). One-shot on
-   * purpose: a consumer re-reading a retained delta would invalidate work twice for one change,
-   * and the NEXT reload clears it too, so no stale delta is ever readable. */
   consumeReloadDelta() {
-    const delta = this._reloadDelta;
-    this._reloadDelta = null;
-    return delta;
+    return this._bookkeeping.consumeReloadDelta();
   }
 
-  /** The invalidation scopes of the most recent REPLICATED change, consumed from its delta (issue
-   * 1078 part B1) — the systems-side sibling of
-   * {@link RecipeManager#consumeReplicatedChangeScopes}. A crafting system IS the record, so its
-   * id is the scope owner directly; a `reordered` delta yields NO scopes and routes broadly. */
+  /** A crafting system is the record, so its id is the scope owner directly. Consumed by
+   * `settingChangeBridge.js` on every client. */
   consumeReplicatedChangeScopes() {
-    const delta = this.consumeReloadDelta();
-    if (!delta?.changed || delta.reordered) return [];
-    return [...delta.perRecord].map(([systemId, entry]) => ({
-      systemId,
-      domains: domainsForSystemFields(entry.fields),
-    }));
+    return this._bookkeeping.consumeReplicatedChangeScopes();
   }
 
-  /** The current revision token of one scope (issue 1076) — the read half of the contract in
-   * {@link module:revisionTokens}. Consumers hold a token and compare it with `===`; they never
-   * advance one. */
+  /** The read half of the contract in {@link module:revisionTokens}. */
   revision(scope = REVISION_SCOPES.systems) {
-    return this._revisions.read(scope);
+    return this._bookkeeping.read(scope);
   }
 
-  /**
-   * Advance the crafting-system revision tokens after a mutation.
-   *
-   * @param {...(string|null|undefined)} systemIds The systems this mutation touched.
-   * @returns {void}
-   * @private
-   */
   _advanceSystemRevision(...systemIds) {
-    const scopes = systemIds
-      .filter((systemId) => systemId != null)
-      .map((systemId) => REVISION_SCOPES.system(systemId));
-    this._revisions.advance(REVISION_SCOPES.systems, ...scopes);
+    this._bookkeeping.advanceEntityScopes(...systemIds);
   }
 
   getSystems() {
@@ -3381,7 +3327,7 @@ export class CraftingSystemManager {
   _notifySystemsChanged() {
     globalThis.Hooks?.callAll?.('fabricate.craftingSystemsChanged', this.getSystems());
     emitCraftingDataChanged(
-      craftingDataChange({ source: 'systems', scopes: this._pendingDomains.drain() })
+      craftingDataChange({ source: 'systems', scopes: this._bookkeeping.drainAttribution() })
     );
   }
 

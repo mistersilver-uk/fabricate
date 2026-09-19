@@ -20,11 +20,7 @@ import {
 
 import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
-import {
-  craftingDataChange,
-  emitCraftingDataChanged,
-  PendingChangeDomains,
-} from './craftingDataChange.js';
+import { craftingDataChange, emitCraftingDataChanged } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import {
   buildCurrencyAffordProbe,
@@ -37,12 +33,8 @@ import { readStackQuantity } from './itemStackQuantity.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
-import {
-  corpusDelta,
-  patchCorpusInPlace,
-  REVISION_SCOPES,
-  RevisionRegistry,
-} from './revisionTokens.js';
+import { RevisionBookkeeping } from './revisionBookkeeping.js';
+import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionTokens.js';
 import {
   resolvedComponentsFor,
   resolvedEssencesFor,
@@ -79,6 +71,14 @@ function signatureGuardsMatch(previous, next) {
 /** A recipe in its comparable, persisted form; a plain fixture object stands in for its own. */
 function projectRecipe(recipe) {
   return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+}
+
+/** The systems one reload-delta entry belongs to. A recipe moved between systems names both,
+ * because a consumer watching the system it left must also stop trusting its cache. */
+function ownersOfRecipeEntry(entry) {
+  return [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
+    (systemId) => systemId != null
+  );
 }
 
 /** Why an import skipped a recipe: `invalid`, or `signature-conflict` when EVERY issue is an
@@ -119,19 +119,18 @@ export class RecipeManager {
     this._characterLibrariesStore = characterLibrariesStore;
     this.recipes = new Map();
     this.initialized = false;
-    // The revision-token registry this manager mints from (issue 1076). Per manager, never a
-    // module singleton: two managers in one test process must not share counters.
-    this._revisions = new RevisionRegistry();
+    this._bookkeeping = new RevisionBookkeeping({
+      entityScope: REVISION_SCOPES.recipes,
+      systemScopeOf: REVISION_SCOPES.recipesOfSystem,
+      domainsForFields: domainsForRecipeFields,
+      ownersOf: (_recipeId, entry) => ownersOfRecipeEntry(entry),
+      project: projectRecipe,
+    });
     // The retained cohort, rebuilt lazily. Holds IDS, so only an add/remove/move invalidates it.
     this._cohortCache = null;
     // The retained per-system alchemy signature reports (issue 1074), each with its guard.
     /** @type {Map<string, {guard: object, report: object}>} */
     this._signatureReports = new Map();
-    // The unconsumed delta from the most recent `reload()` (issue 1078).
-    /** @type {import('./revisionTokens.js').CorpusDelta|null} */
-    this._reloadDelta = null;
-    // The invalidation domains attributed since the last announcement (issue 1078 part B1).
-    this._pendingDomains = new PendingChangeDomains();
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
@@ -220,9 +219,7 @@ export class RecipeManager {
     // Optional repository capability: `null` means the backend has no synchronous replicated
     // snapshot, so reloading is a no-op rather than a wrong answer.
     const savedRecipes = this._repository.readReplicatedSnapshot();
-    // Every reload replaces the pending delta, including a reload that reads nothing, so a
-    // stale delta can never be consumed after a later one.
-    this._reloadDelta = null;
+    this._bookkeeping.holdReloadDelta(null);
     if (!savedRecipes) return false;
     return this._adoptCorpus(savedRecipes);
   }
@@ -235,7 +232,7 @@ export class RecipeManager {
       next.set(recipe.id, recipe);
     }
     const delta = corpusDelta(this.recipes.values(), next.values(), { project: projectRecipe });
-    this._reloadDelta = delta;
+    this._bookkeeping.holdReloadDelta(delta);
     this.initialized = true;
     if (!delta.changed) return false;
 
@@ -250,48 +247,20 @@ export class RecipeManager {
       return true;
     }
 
-    const touched = new Set();
-    for (const entry of delta.perRecord.values()) {
-      // A recipe MOVED between systems names both, exactly as `updateRecipe` does.
-      const owners = [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
-        (systemId) => systemId != null
-      );
-      for (const systemId of owners) touched.add(systemId);
-      // The replicated half of the attribution: the delta already names the top-level keys
-      // that moved, so a remote client narrows on exactly what the writer narrowed on.
-      this._advanceFactScopes(domainsForRecipeFields(entry.fields), ...owners);
-    }
+    const touched = this._bookkeeping.advanceChangedRecords(delta);
     patchCorpusInPlace(this.recipes, next, delta);
     // Also drops the cohort index, whose token clause this advance would fail anyway.
     this._advanceRecipeRevision(...touched);
     return true;
   }
 
-  /** The invalidation scopes of the most recent REPLICATED change (issue 1078 part B1). A
-   * `reordered` delta yields NO scopes, which every consumer routes broadly. */
+  /** Consumed by `settingChangeBridge.js` on every client. */
   consumeReplicatedChangeScopes() {
-    const delta = this.consumeReloadDelta();
-    if (!delta?.changed || delta.reordered) return [];
-    const scopes = [];
-    for (const entry of delta.perRecord.values()) {
-      const domains = domainsForRecipeFields(entry.fields);
-      const owners = new Set(
-        [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
-          (systemId) => systemId != null
-        )
-      );
-      if (owners.size === 0) owners.add(null);
-      for (const systemId of owners) scopes.push({ systemId, domains });
-    }
-    return scopes;
+    return this._bookkeeping.consumeReplicatedChangeScopes();
   }
 
-  /** The delta from the most recent {@link reload}, cleared by this read (issue 1078). One-shot:
-   * re-reading a retained delta would invalidate work twice for one change. */
   consumeReloadDelta() {
-    const delta = this._reloadDelta;
-    this._reloadDelta = null;
-    return delta;
+    return this._bookkeeping.consumeReloadDelta();
   }
 
   /** Announce a recipe change: the PUBLISHED legacy hook, then the scoped signal carrying
@@ -304,7 +273,7 @@ export class RecipeManager {
       ...details,
     });
     emitCraftingDataChanged(
-      craftingDataChange({ source: 'recipes', scopes: this._pendingDomains.drain() })
+      craftingDataChange({ source: 'recipes', scopes: this._bookkeeping.drainAttribution() })
     );
   }
 
@@ -519,38 +488,24 @@ export class RecipeManager {
     return this.recipes.get(recipeId) || null;
   }
 
-  /** The current revision token of one scope (issue 1076), per {@link module:revisionTokens}.
-   * Consumers compare with `===` and never advance one. */
+  /** The read half of the contract in {@link module:revisionTokens}. */
   revision(scope = REVISION_SCOPES.recipes) {
-    return this._revisions.read(scope);
+    return this._bookkeeping.read(scope);
   }
 
-  /** Advance the recipe revision tokens and drop the cohort index. A move between systems names
-   * BOTH, because a consumer watching the system the recipe LEFT must also stop trusting it. */
+  /** The cohort drop is defence: {@link RecipeManager#_recipeCohorts}'s token clause already
+   * invalidates the index this advance moves. */
   _advanceRecipeRevision(...systemIds) {
     this._cohortCache = null;
-    const scopes = systemIds
-      .filter((systemId) => systemId != null)
-      .map((systemId) => REVISION_SCOPES.recipesOfSystem(systemId));
-    this._revisions.advance(REVISION_SCOPES.recipes, ...scopes);
+    this._bookkeeping.advanceEntityScopes(...systemIds);
   }
 
-  /** Advance the `facts:<domain>:<systemId>` token of every named pair (issue 1078 part B1). An
-   * omitted or EXPLICITLY empty `domains` set advances EVERY fact scope of every named system. */
   _advanceFactScopes(domains, ...systemIds) {
-    const advanced =
-      Array.isArray(domains) && domains.length > 0 ? domains : ALL_INVALIDATION_DOMAINS;
-    for (const systemId of systemIds) {
-      if (systemId == null) continue;
-      this._revisions.advance(...advanced.map((domain) => REVISION_SCOPES.facts(domain, systemId)));
-    }
+    this._bookkeeping.advanceFactScopes(domains, ...systemIds);
   }
 
-  /** Attribute a LOCAL mutation. Replicated changes are announced by `settingChangeBridge.js`
-   * from the reload delta instead, so recording them here would widen the next announcement. */
   _attributeChange(domains, ...systemIds) {
-    this._advanceFactScopes(domains, ...systemIds);
-    this._pendingDomains.record(domains, ...systemIds);
+    this._bookkeeping.attributeChange(domains, ...systemIds);
   }
 
   /** The ONE mutation-site call: advance the entity revisions AND attribute the change.
@@ -560,20 +515,14 @@ export class RecipeManager {
     this._attributeChange(domains, ...systemIds);
   }
 
-  /** The domains a REPLACEMENT of one stored recipe belongs to. Uses {@link corpusDelta}, the same
-   * comparison `reload()` runs, so a local edit and its replicated copy agree. */
   _domainsForRecipeEdit(previous, next) {
-    if (!previous || !next) return [...ALL_INVALIDATION_DOMAINS];
-    const delta = corpusDelta([previous], [next], { project: projectRecipe });
-    if (delta.reordered) return [...ALL_INVALIDATION_DOMAINS];
-    const entry = [...delta.perRecord.values()][0];
-    return entry ? domainsForRecipeFields(entry.fields) : [];
+    return this._bookkeeping.domainsForEdit(previous, next);
   }
 
   /** The retained `craftingSystemId -> recipe id[]` cohort index (issue 1076). It stores IDS, so
    * only an add, delete or move can invalidate it. */
   _recipeCohorts() {
-    const token = this._revisions.read(REVISION_SCOPES.recipes);
+    const token = this._bookkeeping.read(REVISION_SCOPES.recipes);
     const cached = this._cohortCache;
     const warm =
       cached &&
@@ -620,7 +569,7 @@ export class RecipeManager {
         ? systemManager.getComponentsForSystem(systemId)
         : resolvedComponentsFor(system);
     return {
-      recipesToken: this._revisions.read(REVISION_SCOPES.recipesOfSystem(systemId)),
+      recipesToken: this._bookkeeping.read(REVISION_SCOPES.recipesOfSystem(systemId)),
       systemToken:
         typeof systemManager.revision === 'function'
           ? systemManager.revision(REVISION_SCOPES.system(systemId))

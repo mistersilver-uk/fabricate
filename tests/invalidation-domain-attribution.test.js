@@ -88,7 +88,6 @@ describe('CraftingSystemManager attributes every persistence site', () => {
         'without announcing'
     );
     assert.ok(bodies.get('_notifySystemsChanged').includes('emitCraftingDataChanged'));
-    assert.ok(bodies.get('_notifySystemsChanged').includes('_pendingDomains.drain()'));
   });
 });
 
@@ -136,7 +135,6 @@ describe('RecipeManager attributes every map mutation', () => {
 
   it('drains the attribution in the NOTIFIER', () => {
     assert.ok(bodies.get('_notifyRecipesChanged').includes('emitCraftingDataChanged'));
-    assert.ok(bodies.get('_notifyRecipesChanged').includes('_pendingDomains.drain()'));
     assert.ok(
       !bodies.get('save').includes('emitCraftingDataChanged'),
       'save() records; the notifier announces'

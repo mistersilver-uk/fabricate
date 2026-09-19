@@ -36,7 +36,7 @@ src/systems/CraftingLifecycleExecutor.js::execute	113
 src/systems/CraftingRunManager.js	1195
 src/systems/CraftingSystemExporter.js::prepareForImport	162
 src/systems/CraftingSystemExporter.js::validateImportData	114
-src/systems/CraftingSystemManager.js	5932
+src/systems/CraftingSystemManager.js	5878
 src/systems/CraftingSystemManager.js::_normalizeSystem	217
 src/systems/CraftingSystemManager.js::repairItemData	152
 src/systems/CraftingSystemManager.js::updateSystem	132
@@ -56,7 +56,7 @@ src/systems/GatheringRichStateService.js::composeEnvironment	119
 src/systems/GatheringRichStateService.js::previewDropBreakdown	125
 src/systems/GatheringRichStateService.js::resolveD100Attempt	106
 src/systems/GatheringRunManager.js	950
-src/systems/RecipeManager.js	2628
+src/systems/RecipeManager.js	2577
 src/systems/RecipeManager.js::evaluateCraftability	245
 src/systems/RecipeVisibilityService.js	2559
 src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	141
