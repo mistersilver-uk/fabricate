@@ -39,36 +39,6 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-const essenceBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/EssenceBrowserView.svelte'
-);
-const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte');
-// The GM Essence Studio's own components (issue 1036). They sit under `essences/`.
-const essenceStudioDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/essences');
-const tagsCategoriesPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'
-);
-const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
-// World > Currency (issue 1278): the relocated currency editor.
-const worldCurrencyPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
-);
-const systemsBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/SystemsBrowserView.svelte'
-);
-const recipesBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
-);
-const componentEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte');
-const componentsBrowserPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
-);
 const environmentEditPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'
@@ -127,19 +97,6 @@ const gatheringRuleLimitStepperSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
   'utf8'
 );
-const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
-const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
-const essenceStudioSources = readdirSync(essenceStudioDir)
-  .filter((entry) => entry.endsWith('.svelte') || entry.endsWith('.js'))
-  .map((entry) => readFileSync(resolve(essenceStudioDir, entry), 'utf8'));
-const essenceStudioSource = essenceStudioSources.join('\n');
-const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
-const systemEditSource = readFileSync(systemEditPath, 'utf8');
-const worldCurrencySource = readFileSync(worldCurrencyPath, 'utf8');
-const systemsBrowserSource = readFileSync(systemsBrowserPath, 'utf8');
-const recipesBrowserSource = readFileSync(recipesBrowserPath, 'utf8');
-const componentEditSource = readFileSync(componentEditPath, 'utf8');
-const componentsBrowserSource = readFileSync(componentsBrowserPath, 'utf8');
 const environmentEditSource = readFileSync(environmentEditPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const gatheringTaskEditSource = readFileSync(gatheringTaskEditPath, 'utf8');
@@ -166,24 +123,6 @@ const worldToolEntrySource = readFileSync(
 const appSource = readFileSync(appPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
-const managerSource = [
-  rootSource,
-  essenceBrowserSource,
-  essenceEditSource,
-  essenceStudioSource,
-  tagsCategoriesSource,
-  systemEditSource,
-  systemsBrowserSource,
-  recipesBrowserSource,
-  componentsBrowserSource,
-  componentEditSource,
-  environmentEditSource,
-  environmentsBrowserSource,
-  gatheringTaskEditSource,
-  chanceSliderSource,
-  gatheringTasksBrowserSource,
-  toolsBrowserSource,
-].join('\n');
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
@@ -356,6 +295,36 @@ function callsWithArgument(node, [name, argument]) {
   return false;
 }
 
+/** Every literal a subtree assigns to one binding, which is what a route transition is. */
+function assignedLiterals(node, name) {
+  const values = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'AssignmentExpression' || inner.left?.name !== name) continue;
+    if (inner.right?.type === 'Literal') values.push(inner.right.value);
+  }
+  return values;
+}
+
+/** Every literal value a subtree gives one object-literal key, which is what a table row is. */
+function propertyValues(node, key) {
+  const values = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type === 'Property' && inner.key?.name === key && inner.value?.type === 'Literal') {
+      values.push(inner.value.value);
+    }
+  }
+  return values;
+}
+
+/** The record in a table whose named key carries this literal — the row a claim is about. */
+function recordAst(node, [key, value]) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'ObjectExpression') continue;
+    if (inner.properties.some((entry) => propertyValues(entry, key).includes(value))) return inner;
+  }
+  throw new Error(`no record with ${key} "${value}"`);
+}
+
 /** One named function or binding value out of a subtree — the AST of the slice it replaces. */
 function namedCodeAst(scope, name) {
   for (const node of walkNodes(scope ?? {})) {
@@ -363,6 +332,15 @@ function namedCodeAst(scope, name) {
     if (node.type === 'VariableDeclarator' && node.id?.name === name && node.init) return node.init;
   }
   throw new Error(`no binding \`${name}\``);
+}
+
+/** Every attribute, prop or directive name the template writes anywhere. */
+function attributeNames(component) {
+  const names = new Set();
+  for (const node of templateNodes(component)) {
+    for (const attribute of node.attributes ?? []) if (attribute.name) names.add(attribute.name);
+  }
+  return names;
 }
 
 /** The static value one element or component gives an attribute, or `undefined`. */
@@ -391,6 +369,8 @@ function claimsOverCode(code) {
     hooks: (event) => hookNames(code).has(event),
     diffKeys: ([object, key]) => inOperatorKeys(code, object).has(key),
     compares: (value) => comparesToLiteral(code, value),
+    assigns: ([name, value]) => assignedLiterals(code, name).includes(value),
+    property: ([key, value]) => propertyValues(code, key).includes(value),
   };
 }
 
@@ -407,6 +387,7 @@ function claimsForComponent(component) {
     prop: ([name, propName]) => passesProp(component, name, propName),
     attribute: ([name, value]) =>
       templateNodes(component).some((node) => attributeValue(node, name) === value),
+    writes: (name) => attributeNames(component).has(name),
     declaresProp: (name) => declaresProp(component, name),
     requiresProp: (name) => requiresProp(component, name),
   };
@@ -439,17 +420,24 @@ function structureOf(target) {
       ...moduleAstsIn(target.dir).map(({ ast }) => claimsOverCode(ast)),
     ]);
   }
-  const { file, member, property, fn, constant } =
+  const { file, member, property, fn, constant, record } =
     typeof target === 'string' ? { file: target } : target;
+  const binding = fn ?? constant;
   if (file.endsWith('.svelte')) {
     const component = componentAstOf(file);
-    if (fn) return claimsOverCode(namedCodeAst(component.instance, fn));
-    const scope = componentScopeOf(file);
-    return { ...claimsForComponent(component), global: (name) => readsGlobal(scope, name) };
+    if (!binding && !record) {
+      const scope = componentScopeOf(file);
+      return { ...claimsForComponent(component), global: (name) => readsGlobal(scope, name) };
+    }
+    const scoped = binding
+      ? namedCodeAst([component.instance, component.module], binding)
+      : component;
+    return claimsOverCode(record ? recordAst(scoped, record) : scoped);
   }
   const { ast } = moduleAstOf(file);
   let code = member ? classMemberAst(ast, member) : ast;
-  if (constant) code = namedCodeAst(code, constant);
+  if (binding) code = namedCodeAst(code, binding);
+  if (record) code = recordAst(code, record);
   if (property) code = propertyAst(code, property);
   return claimsOverCode(code);
 }
@@ -459,7 +447,8 @@ function labelOf(target) {
   if (Array.isArray(target)) return `any of ${target.length} manager views`;
   if (typeof target === 'string') return target;
   if (target.dir) return `any of ${target.dir}`;
-  const parts = [target.file, target.member, target.constant, target.property, target.fn];
+  const { file, member, constant, property, fn, record } = target;
+  const parts = [file, member, constant ?? fn, record?.join('='), property];
   return parts.filter(Boolean).join(' > ');
 }
 
@@ -493,37 +482,68 @@ const CONTRACT_CLAIMS = Object.freeze({
   hooks: { ask: 'hooks', holds: true, says: (v) => `registers the ${v} hook` },
   diffKeys: { ask: 'diffKeys', holds: true, says: ([o, k]) => `re-projects on a ${o}.${k} change` },
   compares: { ask: 'compares', holds: true, says: (v) => `compares against ${v}` },
+  assigns: { ask: 'assigns', holds: true, says: ([n, v]) => `assigns ${n} = "${v}"` },
+  assignsNo: { ask: 'assigns', holds: false, says: ([n, v]) => `never assigns ${n} = "${v}"` },
+  property: { ask: 'property', holds: true, says: ([k, v]) => `carries ${k}: "${v}"` },
+  propertyNo: { ask: 'property', holds: false, says: ([k, v]) => `carries no ${k}: "${v}"` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
   passesPropsNo: { ask: 'prop', holds: false, says: ([c, p]) => `passes no ${p} to <${c}>` },
   attributes: { ask: 'attribute', holds: true, says: ([a, v]) => `writes ${a}="${v}"` },
   attributesNo: { ask: 'attribute', holds: false, says: ([a, v]) => `writes no ${a}="${v}"` },
+  writes: { ask: 'writes', holds: true, says: (v) => `writes the ${v} attribute` },
+  writesNo: { ask: 'writes', holds: false, says: (v) => `writes no ${v} attribute` },
   readsNoGlobal: { ask: 'global', holds: false, says: (v) => `reads no ${v} global directly` },
 });
 
 const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const MAIN = 'src/main.js';
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
-const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
+const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
-const ESSENCE_BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
-const CRAFTING_SETTINGS = 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte';
-const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
-const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
-const RECIPE_BROWSER_INSPECTOR =
-  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
-const ESSENCE_EDIT = 'src/ui/svelte/apps/manager/EssenceEditView.svelte';
-const LIBRARY_SHELF = 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte';
 const COMPONENT_ROW = 'src/ui/svelte/apps/manager/components/ComponentRow.svelte';
 const COMPONENT_EDIT = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
+const CRAFTING_SETTINGS = 'src/ui/svelte/apps/manager/CraftingSettingsView.svelte';
+const ESSENCE_BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const ESSENCE_EDIT = 'src/ui/svelte/apps/manager/EssenceEditView.svelte';
+// The GM Essence Studio's own components, which sit under `essences/` (issue 1036).
+const ESSENCE_STUDIO = { dir: 'src/ui/svelte/apps/manager/essences' };
+const LIBRARY_SHELF = 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte';
+const MODIFIER_CATALOGUE =
+  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
+const RECIPES_BROWSER = 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte';
+// The library inspector, extracted out of the root (issue 643). It sits under `recipes/`, NOT
+// `recipe/` — the latter is the recipe EDITOR's screenshot-map glob.
+const RECIPE_BROWSER_INSPECTOR =
+  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte';
+const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
+const SYSTEMS_BROWSER = 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
+const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
-const MODIFIER_CATALOGUE =
-  'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte';
+
+/** The manager views a claim may hold of ANY ONE of, which the joined text used to ask of all. */
+const MANAGER_VIEWS = [
+  MANAGER_ROOT,
+  COMPONENTS_BROWSER,
+  COMPONENT_EDIT,
+  ESSENCE_BROWSER,
+  ESSENCE_EDIT,
+  RECIPES_BROWSER,
+  SYSTEMS_BROWSER,
+  SYSTEM_EDIT,
+  TAGS_CATEGORIES,
+  'src/ui/svelte/apps/manager/EnvironmentEditView.svelte',
+  'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+  'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+  'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
+  'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
+  'src/ui/svelte/components/ChanceSlider.svelte',
+];
 
 /** One target, one contract test; every converted structural pin is one row of `claims`. */
 function defineStructureContract(title, target, claims) {
@@ -739,20 +759,16 @@ describe('CraftingSystemManager source contract', () => {
     { names: ['_pendingReadyOpen'], spells: ['StartupPending'] }
   );
 
-  it('loads the systems browser behind that guard', () => {
-    assert.ok(
-      systemsBrowserSource.includes('systemsLoading'),
-      'systems browser should receive loading state'
-    );
-    assert.ok(
-      rootSource.includes('systemsLoading'),
-      'root should pass loading state to systems browser and inspector'
-    );
+  it('states the copy the loading and startup guards read', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.LoadingSystems, 'Loading crafting systems...');
     assert.equal(
       lang.FABRICATE.Admin.Manager.StartupPending,
       'Fabricate is still loading. The crafting system manager will open when startup finishes.'
     );
+  });
+
+  defineStructureContract('loads the systems browser behind that guard', MANAGER_ROOT, {
+    passesProps: [['SystemsBrowserView', 'systemsLoading']],
   });
 
   // What the titlebar renders is mounted; here are the derivation behind it and the
@@ -864,15 +880,18 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  it('renders the manager shell with Systems and Recipes browser structures', () => {
-    for (const snippet of [
-      'class="fabricate-manager"',
-      'data-manager-view={currentView}',
-      'class="manager-header"',
-      'class="manager-breadcrumbs"',
-      "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}",
-      'class="manager-rail"',
-      'class="manager-inspector"',
+  // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
+  // `data-manager-view` are NOT here: every route module reads them off the mounted shell
+  // (`target.querySelector('.fabricate-manager').dataset.managerView`).
+  defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
+    attributes: [
+      ['class', 'manager-header'],
+      ['class', 'manager-breadcrumbs'],
+      ['class', 'manager-rail'],
+      ['class', 'manager-inspector'],
+    ],
+    spells: ['is-rail-collapsed', 'manager-environment-edit-main'],
+    renders: [
       'ComponentsBrowserView',
       'EnvironmentsBrowserView',
       'EssenceBrowserView',
@@ -882,84 +901,57 @@ describe('CraftingSystemManager source contract', () => {
       'RecipesBrowserView',
       'SystemEditView',
       'SystemsBrowserView',
-      'manager-environment-edit-main',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
-    }
-    // `class="manager-empty"` is NOT in this list any more (issue 785).
-    for (const snippet of [
-      'class="manager-main"',
-      '<ManagerToolbar',
-      'class="manager-filter"',
-      "import EmptyState from '../../components/EmptyState.svelte'",
-      '<EmptyState',
-    ]) {
-      assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
-    }
-    for (const snippet of [
-      'manager-system-edit-form',
-      'data-edit-control="advanced-options"',
-      'manager-feature-tile',
-    ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
-    }
-    // --- What survives on System Settings ------------------------------------------------
-    // The participation toggle and nothing else. It reads `requirements.currency.enabled` and
-    // calls `onToggleCurrency`, and renders always so the Optional features section is never
-    // empty.
-    for (const snippet of [
-      'const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true)',
-      'data-system-currency-toggle',
-      'onToggleCurrency',
+    ],
+  });
+
+  // `class="manager-empty"` is NOT in this set any more (issue 785).
+  defineStructureContract('gives every browse route the same main column', MANAGER_VIEWS, {
+    spells: ['manager-main', 'manager-filter'],
+    spellsExactly: ['FABRICATE.Admin.Manager.Environment.EmptyTitle'],
+    renders: ['ManagerToolbar', 'EmptyState'],
+    imports: ['../../components/EmptyState.svelte'],
+  });
+
+  // What System Settings DRAWS — the edit form, the feature tiles, the currency participation
+  // toggle and its tile key — is driven by `tests/components/manager-systems-mounted.js`. The
+  // relocated currency EDITOR (issue 1278) is the absence this states: any of these markers
+  // reappearing means the two scopes can disagree about one world's coins again.
+  defineStructureContract('keeps the crafting system page to its own settings', SYSTEM_EDIT, {
+    renders: ['SystemEditorTabs', 'SystemOverviewView'],
+    declares: ['currencyEnabled'],
+    reads: ['selectedSystem.requirements.currency.enabled'],
+    names: ['onToggleCurrency'],
+    compares: ['settings', 'validation'],
+    spells: ['manager-system-workspace'],
+    spellsExactly: [
       'FABRICATE.Admin.Manager.Feature.Currency',
       'FABRICATE.Admin.Manager.SystemEdit.FeatureHint.Currency',
-    ]) {
-      assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
-    }
-    assert.ok(
-      systemEditSource.includes('data-feature-key="currency"'),
-      'currency toggle tile should always render in the Optional features section'
-    );
-    // The editor itself is GONE from the crafting system page (issue 1278). These are markers of
-    // the card that was deleted; any of them reappearing means the per-system currency surface
-    // has crept back and the two scopes can disagree again.
-    for (const removed of [
+    ],
+    attributes: [['data-edit-control', 'advanced-options']],
+    namesNo: ['currencyProviderOptions', 'onSetCurrencySpendStrategy', 'onAddCurrencyUnit'],
+    spellsNo: [
       'manager-currency-unit-card',
       'data-system-currency-units',
       'data-system-currency-strategy-select',
       'data-system-currency-macros',
-      'currencyProviderOptions',
-      'onSetCurrencySpendStrategy',
-      'onAddCurrencyUnit',
-    ]) {
-      assert.equal(
-        systemEditSource.includes(removed),
-        false,
-        `SystemEditView should no longer carry the relocated currency control ${removed}`
-      );
-    }
-    assert.ok(
-      rootSource.includes("store.toggleRequirement?.('currency', next)"),
-      'root should thread onToggleCurrency to store.toggleRequirement'
-    );
-    assert.ok(
-      rootSource.includes("store.toggleRequirement?.('time', next)"),
-      'root should thread onToggleTime to store.toggleRequirement (issue 714)'
-    );
-    for (const snippet of [
-      'class="manager-systems-table"',
-      'manager-system-row',
-      'manager-system-identity',
-      // Same-named systems are disambiguated in the rail via the shared helper (issue 346).
-      "import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js'",
-      'buildSystemLabelMap(systems)',
-      'systemDisplayLabel(system, systemLabels)',
-    ]) {
-      assert.ok(
-        systemsBrowserSource.includes(snippet),
-        `SystemsBrowserView should include ${snippet}`
-      );
-    }
+    ],
+  });
+
+  defineStructureContract('threads both requirement toggles to the one store seam', MANAGER_ROOT, {
+    callsWith: [['toggleRequirement', 'next']],
+    spellsExactly: ['currency', 'time'],
+  });
+
+  // Same-named systems are disambiguated through the shared helper (issue 346). The rows, their
+  // identity buttons and the status switch are driven by the mounted systems and rail cases.
+  // `<StatusToggle`, not the class literal (issue 1040): the row's switch renders through the
+  // shared primitive, which is the only thing under `src/` that writes `manager-status-toggle`,
+  // so a search for the class would read 0 while the control is present and correct.
+  defineStructureContract('disambiguates same-named systems in the library', SYSTEMS_BROWSER, {
+    declaresProp: ['systemsLoading', 'onToggleSystemEnabled'],
+    imports: ['../../util/systemDisambiguation.js'],
+    calls: ['buildSystemLabelMap', 'systemDisplayLabel'],
+    renders: ['StatusToggle'],
   });
 
   // `foundry` is deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`
@@ -1130,60 +1122,34 @@ describe('CraftingSystemManager source contract', () => {
     assert.deepEqual(failures, []);
   });
 
-  it('routes system Edit to the in-place v2 edit view and existing store callbacks', () => {
-    assert.ok(
-      !rootSource.includes('openLegacySystemSettings'),
-      'root should not keep dead legacy edit routing'
-    );
-    assert.ok(
-      !rootSource.includes('Edit details'),
-      'root should not show the former dead edit details label'
-    );
-    assert.ok(
-      !rootSource.includes('services?.onEditSystem'),
-      'root should not launch the current admin for system row Edit'
-    );
-    assert.ok(
-      managerSource.includes('FABRICATE.Admin.Manager.EditSystem'),
-      'manager should expose a localized system edit action'
-    );
-    assert.ok(
-      rootSource.includes("activeView = 'system-edit'"),
-      'system row Edit should transition to the local edit route'
-    );
-    assert.ok(
-      managerSource.includes('store.saveSystemDetails?.('),
-      'system edit should save details through the admin store'
-    );
-    assert.ok(
-      managerSource.includes('onSetResolutionMode(nextMode)') ||
-        managerSource.includes('store.setResolutionMode?.(nextMode)'),
-      'system edit should delegate resolution changes to the admin store'
-    );
-    assert.ok(
-      rootSource.includes('store.setResolutionMode?.'),
-      'root should pass the resolution-mode callback through to the system-edit view'
-    );
-    assert.ok(
-      !rootSource.includes('store.toggleAdvancedOptions?.'),
-      'root should not retain the removed advanced visibility toggle wiring'
-    );
-    assert.ok(
-      rootSource.includes('store.toggleFeature?.'),
-      'root should delegate feature toggles to the admin store'
-    );
-    assert.ok(
-      !managerSource.includes("storeKey: 'complexRecipes'"),
-      'system edit should not reintroduce the legacy complex recipes toggle'
-    );
-    assert.ok(
-      !managerSource.includes("storeKey: 'craftingChecks'"),
-      'system edit should not reintroduce the legacy crafting checks toggle'
-    );
-    assert.ok(
-      !managerSource.includes("storeKey: 'outcomeRouting'"),
-      'system edit should not reintroduce the legacy outcome routing toggle'
-    );
+  // The v2 route replaced a launch into the legacy admin (issue 429). Saving the details, the
+  // row status switch and the feature toggles are all DRIVEN by
+  // `tests/components/manager-systems-mounted.js`; what stays is the dead wiring's absence and
+  // the callbacks the root threads down to the page.
+  defineStructureContract('routes system Edit to the in-place v2 edit view', MANAGER_ROOT, {
+    assigns: [['activeView', 'system-edit']],
+    reads: ['store.setResolutionMode', 'store.toggleFeature'],
+    namesNo: ['openLegacySystemSettings'],
+    readsNo: ['services.onEditSystem', 'store.toggleAdvancedOptions'],
+    spellsNo: ['Edit details'],
+  });
+
+  // Asked of the WHOLE manager view set, because the action and the save live on two of its
+  // pages: "in at least one of these", stated once.
+  defineStructureContract('saves system details through the admin store', MANAGER_VIEWS, {
+    spellsExactly: ['FABRICATE.Admin.Manager.EditSystem'],
+    reads: ['store.saveSystemDetails'],
+    callsWith: [['setResolutionMode', 'nextMode']],
+  });
+
+  // The three legacy toggles are gone from the feature table, which is the only place a
+  // `storeKey` is written.
+  defineStructureContract('reintroduces none of the legacy system toggles', SYSTEM_EDIT, {
+    propertyNo: [
+      ['storeKey', 'complexRecipes'],
+      ['storeKey', 'craftingChecks'],
+      ['storeKey', 'outcomeRouting'],
+    ],
   });
 
   it('renames the recipe resolution-mode legend and states the salvage copy', () => {
@@ -1266,19 +1232,12 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('resolutionMode={gatheringTaskResolutionMode}'), 'the parent supplies the task mode');
   });
 
-  it('folds the validation overview into a full-width tabbed System Overview page (#429)', () => {
-    // The standalone overview route and the legacy "Edit summary" key are gone.
+  it('renames the standalone overview page and retires the keys it replaced', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemEdit.Summary,
       undefined,
       'the legacy Summary key is removed'
     );
-    assert.ok(
-      !rootSource.includes('SystemEdit.Summary'),
-      'no consumer references the removed Summary key'
-    );
-
-    // The System Overview page is the renamed system-edit route.
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemEdit.Nav,
       'System Overview',
@@ -1294,72 +1253,37 @@ describe('CraftingSystemManager source contract', () => {
       undefined,
       'the page-title key is retired: the heading is the record, not a localized route name'
     );
-    assert.ok(
-      !rootSource.includes('SystemEdit.PageTitle'),
-      'no consumer references the retired page-title key'
-    );
-    assert.ok(
-      rootSource.includes(
-        "selectedSystem?.name || text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"
-      ),
-      'the page title is the selected system name, falling back to the route name when there is ' +
-        'no selection rather than rendering an empty heading'
-    );
-    assert.ok(
-      rootSource.includes(
-        "text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')"
-      ),
-      'the breadcrumb tail still names the route'
-    );
-    assert.ok(
-      rootSource.includes("text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')"),
-      'the renamed nav item reads System Overview'
-    );
-
-    // The standalone Overview route was folded into the system-edit page.
-    assert.ok(
-      !rootSource.includes('data-nav-system-overview'),
-      'the standalone Overview nav item is removed'
-    );
-    assert.ok(
-      !rootSource.includes("activeView = 'system-overview'"),
-      'no route transitions to the standalone overview view'
-    );
-    assert.ok(
-      rootSource.includes("if (view === 'system-overview') return 'system-edit'"),
-      'a stale overview token folds into the system-edit page'
-    );
-
-    // The renamed nav item uses the validation clipboard icon and carries the
-    // open-issue badge that the standalone Overview item used to own.
-    assert.ok(
-      rootSource.includes('data-nav-system-edit'),
-      'the renamed nav item exposes a stable data hook'
-    );
-    assert.ok(
-      rootSource.includes('{#if systemOverviewCount > 0}'),
-      'the renamed nav item carries the open-validation-issue badge'
-    );
-
-    // The page is a full-width tabbed shell mirroring the environment editor.
-    assert.ok(
-      /id: 'system-edit',\s*\n\s*layoutClass: 'full-width-2-track'/.test(rootSource) &&
-        rootSource.includes('class="manager-inspector"'),
-      'the shared inspector is skipped for the full-width system-edit page'
-    );
-    assert.ok(systemEditSource.includes('SystemEditorTabs'), 'SystemEditView renders the tab bar');
-    assert.ok(systemEditSource.includes("activeTab === 'settings'"), 'Settings is a tab panel');
-    assert.ok(systemEditSource.includes("activeTab === 'validation'"), 'Validation is a tab panel');
-    assert.ok(
-      systemEditSource.includes('SystemOverviewView'),
-      'the Validation tab renders the overview list'
-    );
-    assert.ok(
-      systemEditSource.includes('manager-system-workspace'),
-      'the workspace mirrors the environment workspace'
-    );
-
   });
+
+  // The heading is the selected system's NAME, falling back to the route name only when nothing
+  // is selected, rather than rendering an empty heading (#429).
+  defineStructureContract('titles the page after the record it edits', MANAGER_ROOT, {
+    reads: ['selectedSystem.name'],
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.SystemEdit.Nav',
+      'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
+    ],
+    spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
+    writes: ['data-nav-system-edit'],
+    writesNo: ['data-nav-system-overview'],
+    names: ['systemOverviewCount'],
+    assignsNo: [['activeView', 'system-overview']],
+  });
+
+  defineStructureContract(
+    'folds a stale overview token into the system-edit page',
+    { file: MANAGER_ROOT, fn: 'normalizedActiveView' },
+    { spellsExactly: ['system-overview', 'system-edit'] }
+  );
+
+  // The page is a full-width tabbed shell mirroring the environment editor: the aside is skipped
+  // and the column released. The registry entry is the one place that decision is recorded, and
+  // `tests/manager-full-width-gate.test.js` is what holds it to the stylesheet.
+  defineStructureContract(
+    'releases the inspector column for the tabbed overview page',
+    { file: MANAGER_ROOT, constant: 'FULL_WIDTH_VIEWS', record: ['id', 'system-edit'] },
+    { property: [['layoutClass', 'full-width-2-track']] }
+  );
 
   it('keeps first-slice action and navigation hierarchy focused', () => {
     // ISSUE 1515 REVERSED THE TWO CLAUSES THAT USED TO STAND HERE. They said the top bar renders
@@ -1505,18 +1429,6 @@ describe('CraftingSystemManager source contract', () => {
       'selected-system rail should not render the old x clear icon'
     );
     assert.ok(
-      managerSource.includes('toggleSystemEnabled'),
-      'systems browser should expose interactive row status toggles'
-    );
-    // `<StatusToggle`, not the class literal (issue 1040). The row's switch renders through
-    // the shared primitive, which is the only thing under `src/` that writes
-    // `manager-status-toggle` now, so a search for the class would read 0 while the control
-    // is present and correct.
-    assert.ok(
-      systemsBrowserSource.includes('<StatusToggle'),
-      'systems browser should render status as a toggle control'
-    );
-    assert.ok(
       !rootSource.includes("setView('systems')"),
       'systems should not be exposed as a left-rail tab'
     );
@@ -1563,10 +1475,6 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Title, 'Set up your first system');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Quickstart, 'Quickstart');
     assert.equal(lang.FABRICATE.Admin.Manager.EmptySetup.Docs, 'Docs');
-    assert.ok(
-      managerSource.includes('FABRICATE.Admin.Manager.Environment.EmptyTitle'),
-      'empty environments browser should use Manager localized copy'
-    );
     assert.ok(
       rootSource.includes('FABRICATE.Admin.Manager.Environment.EmptySetup.Title'),
       'empty environments inspector should use localized setup copy'
@@ -1792,10 +1700,6 @@ describe('CraftingSystemManager source contract', () => {
     spellsExactly: ['FABRICATE.Admin.Manager.TagsCategories.GeneralReservedFeedback'],
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
-
-  // The Essence Studio's own components, which sit under `essences/` (issue 1036). A directory
-  // target answers for AT LEAST ONE of its files, stated once rather than per file.
-  const ESSENCE_STUDIO = { dir: 'src/ui/svelte/apps/manager/essences' };
 
   // What the browser RENDERS — the rows, the disabled marker, the capability pills, the usage
   // counts, the row toggle and the absent action band — is driven by
