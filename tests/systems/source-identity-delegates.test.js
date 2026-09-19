@@ -181,6 +181,7 @@ const DELEGATES = [
     export: 'extractSourceDescription',
     bag: SNAPSHOT_BAG,
     cases: [{ world: describedSourceWorld, args: (harness) => [harness.fixtures.source] }],
+    argDrop: [{ index: 0 }],
   },
   {
     name: '_buildComponentSourceSnapshot',
@@ -199,7 +200,26 @@ const DELEGATES = [
       },
       // The UNRESOLVED-source arm, which is the only one that tells the three builders apart.
       { world: () => ({}), args: () => ['', null, FALLBACK_DEFINITION, null] },
+      // A non-null, non-default `sourceData` whose `currentUuid` differs from what the resolver
+      // would answer: dropped, `resolveImportedComponentSourceData` gets CALLED (it does not
+      // when the real argument short-circuits the `??`), so an empty `calls` log proves forwarding.
+      {
+        world: describedSourceWorld,
+        args: (harness) => [
+          'Item.ore-src',
+          harness.fixtures.source,
+          null,
+          {
+            currentUuid: 'Item.alt-source',
+            canonicalUuid: null,
+            aliasItemUuids: [],
+            sourceFallbacks: [],
+            references: [],
+          },
+        ],
+      },
     ],
+    argDrop: [{ index: 1 }, { index: 2 }, { index: 3, caseIndex: 2 }],
   },
   {
     name: '_buildRecipeItemSourceSnapshot',
@@ -217,6 +237,7 @@ const DELEGATES = [
       },
       { world: () => ({}), args: () => ['', null, FALLBACK_DEFINITION] },
     ],
+    argDrop: [{ index: 1 }, { index: 2 }],
   },
   {
     name: '_buildToolSourceSnapshot',
@@ -227,6 +248,7 @@ const DELEGATES = [
       { world: describedSourceWorld, args: (harness) => ['Item.ore-src', harness.fixtures.source] },
       { world: () => ({}), args: () => ['', null] },
     ],
+    argDrop: [{ index: 1 }],
   },
   {
     name: '_buildFallbackSourceReferences',
@@ -244,6 +266,7 @@ const DELEGATES = [
         ],
       },
     ],
+    argDrop: [{ index: 3 }],
   },
   {
     name: '_stampSourceIdentity',
@@ -316,6 +339,7 @@ const DELEGATES = [
     export: 'repairItemData',
     bag: SERVICE_BAG,
     cases: [{ world: repairWorld, args: () => [{ includeCompendiums: false }] }],
+    argDrop: [{ index: 0 }],
   },
 ];
 
@@ -338,6 +362,19 @@ async function throughDelegate(entry, scenario) {
 async function throughExport(entry, scenario) {
   const harness = createHarness(scenario.world());
   const args = scenario.args(harness);
+  const call = entry.bag
+    ? entry.module[entry.export](entry.bag(harness.manager), ...args)
+    : entry.module[entry.export](...args);
+  return observation(harness, await call);
+}
+
+/** Call `entry.export` directly against a FRESH harness, with `dropIndex` replaced by `undefined`
+ * (or every argument left intact when `dropIndex` is `undefined`) — the shape issue 1713's
+ * forwarding suite uses for "argument N cannot be dropped unnoticed". */
+async function throughExportWithArgIndex(entry, scenario, dropIndex) {
+  const harness = createHarness(scenario.world());
+  const args = scenario.args(harness);
+  if (dropIndex !== undefined) args[dropIndex] = undefined;
   const call = entry.bag
     ? entry.module[entry.export](entry.bag(harness.manager), ...args)
     : entry.module[entry.export](...args);
@@ -372,6 +409,28 @@ describe('the source-identity delegates forward', () => {
       assert.equal(typeof entry.module[entry.export], 'function', entry.export);
     }
   });
+});
+
+// `Function.length` (the "declares the same parameters" check above) stops counting at the first
+// defaulted parameter, so it is structurally blind to every OPTIONAL argument — exactly where a
+// delegate silently dropping one would go unnoticed by that check alone. `argDrop` names, per
+// entry, which scenario-argument indices are optional AND already carry a non-default value in
+// one of the entry's own cases, so replacing that index with `undefined` changes the export's
+// result — proving the forwarding-equality test above WOULD have caught a delegate that dropped it.
+describe('an optional argument cannot be dropped unnoticed', () => {
+  for (const entry of DELEGATES) {
+    for (const { index, caseIndex = 0 } of entry.argDrop ?? []) {
+      it(`${entry.name}'s argument ${index} cannot be dropped unnoticed by ${entry.export}`, async () => {
+        const scenario = entry.cases[caseIndex];
+        assert.notDeepStrictEqual(
+          await throughExportWithArgIndex(entry, scenario, index),
+          await throughExportWithArgIndex(entry, scenario, undefined),
+          `omitting argument ${index} leaves ${entry.export}'s result unchanged, so a delegate ` +
+            'that dropped it would go unnoticed by the forwarding comparison above'
+        );
+      });
+    }
+  }
 });
 
 describe('the collaborator bags forward their full argument lists', () => {
