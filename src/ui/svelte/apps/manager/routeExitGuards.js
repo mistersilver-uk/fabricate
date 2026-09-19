@@ -87,7 +87,8 @@ function askRouteExitGuards(rows, first, nextView, nextRouteId, answer) {
   return last;
 }
 
-/** The whole cascade, answering what the last row it reached said. */
+/** The whole cascade, answering what the last row it reached said; every row is handed the same
+ * `nextRouteId`, so a future `confirmRouteExit('tool-edit', id)` would waive a guard raised now. */
 export function confirmRouteExitGuards(rows, nextView, nextRouteId = '') {
   return askRouteExitGuards(rows, 0, nextView, nextRouteId, true);
 }

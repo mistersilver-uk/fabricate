@@ -371,7 +371,7 @@ describe('the microtask cost of a dirty exit', () => {
   it('settles inside the drain the mounted suites use, wherever the dirty row sits', async () => {
     // `settleRouteExit` in `tests/components/manager-mounted-shared.js` drains 24 turns. Exactly
     // one row can be active — twelve compare the single `activeView` token and the checks row
-    // reads a `currentView` derived from it — so this IS the reachable worst case; a synthetic
+    // reads a `currentView` derived from it — so this is the reachable worst case; a synthetic
     // thirteen-dirty-row table costs about 59 turns, which no state of the shell reaches.
     for (const guard of ROUTE_EXIT_GUARDS) {
       const { view } = guard;

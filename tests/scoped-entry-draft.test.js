@@ -8,7 +8,6 @@ import { describe, it } from 'node:test';
 
 import {
   SCOPED_ENTRY_IDENTITY_STEP,
-  confirmScopedEntryExit,
   finishScopedEntryExit,
   flushScopedEntryDraft,
   scopedEntryBaseline,
@@ -401,38 +400,15 @@ describe('flushing a draft through the world-scope write family', () => {
   });
 });
 
-describe('the route-exit guard', () => {
-  it('answers true SYNCHRONOUSLY when there is nothing to ask, and asks nothing', () => {
-    // Load-bearing rather than an optimization: the shell's cascade preserves the promise
-    // identity of what it is handed, so a resolved promise on the clean path would put EVERY
-    // route activation in the manager one microtask later.
-    let asked = 0;
-    const answer = confirmScopedEntryExit({
-      dirty: false,
-      confirm: () => {
-        asked += 1;
-        return 'cancel';
-      },
-      save: () => true,
-      discard: () => {},
-    });
-    assert.equal(answer, true);
-    assert.equal(typeof answer?.then, 'undefined', 'the clean path returned a promise');
-    assert.equal(asked, 0);
-  });
-
+describe('the exit finisher the three world-entry rows share', () => {
   it('gates navigation on the SAVE landing, not on the choice being made', async () => {
-    const refused = await confirmScopedEntryExit({
-      dirty: true,
-      confirm: () => Promise.resolve('save'),
+    const refused = await finishScopedEntryExit('save', {
       save: () => Promise.resolve(false),
       discard: () => assert.fail('discard ran on the save branch'),
     });
     assert.equal(refused, false, 'a Save that did not land must leave the GM on the editor');
 
-    const landed = await confirmScopedEntryExit({
-      dirty: true,
-      confirm: () => Promise.resolve('save'),
+    const landed = await finishScopedEntryExit('save', {
       save: () => Promise.resolve(true),
       discard: () => assert.fail('discard ran on the save branch'),
     });
