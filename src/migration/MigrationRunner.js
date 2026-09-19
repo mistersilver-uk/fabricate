@@ -14,8 +14,15 @@ import { WRITEBACK_LEGS } from './migrationWritebackLegs.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
 
-/** The two corpus legs are read one at a time, each with its own containment and GM sentence. */
+/** The table by key, so the two corpus legs can be read one at a time with their own containment. */
 const LEG_BY_KEY = new Map(WRITEBACK_LEGS.map((leg) => [leg.key, leg]));
+const legFor = (key) => {
+  const leg = LEG_BY_KEY.get(key);
+  if (!leg) throw new Error(`Fabricate | writeback table is missing the "${key}" leg`);
+  return leg;
+};
+const RECIPES_LEG = legFor('recipes');
+const SYSTEMS_LEG = legFor('systems');
 
 /**
  * Compare two semver strings numerically. Exported because the Valid Id Basis must answer "is
@@ -203,7 +210,7 @@ export class MigrationRunner {
       // Contained because an escaping rejection is INVISIBLE: the hook dispatcher's try/catch is
       // synchronous, so a rejection out of the module's async `ready` callback fires no error hook
       // and no notification, leaves the readiness promise unsettled and the module with no managers.
-      raw.recipes = await LEG_BY_KEY.get('recipes').read(io);
+      raw.recipes = await RECIPES_LEG.read(io);
     } catch (error) {
       console.error(
         'Fabricate | Migrations deferred: the recipe corpus could not be read, so no migration ran and nothing was saved.',
@@ -217,7 +224,7 @@ export class MigrationRunner {
     }
     try {
       // Contained for the same reason the recipe read is.
-      raw.systems = await LEG_BY_KEY.get('systems').read(io);
+      raw.systems = await SYSTEMS_LEG.read(io);
     } catch (error) {
       console.error(
         'Fabricate | Migrations deferred: the crafting system corpus could not be read, so no migration ran and nothing was saved.',
@@ -232,7 +239,7 @@ export class MigrationRunner {
     // One uninterrupted synchronous block: `ClientSettings#get` reads live storage, so an inbound
     // `updateSetting` can land between two awaited reads but never between two synchronous ones.
     for (const leg of WRITEBACK_LEGS) {
-      if (leg.key in raw) continue;
+      if (Object.hasOwn(raw, leg.key)) continue;
       raw[leg.key] = leg.read(io);
     }
 
