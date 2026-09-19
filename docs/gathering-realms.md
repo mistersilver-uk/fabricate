@@ -111,7 +111,10 @@ Realm create, edit, and delete live under **World > Travel > Realms**, as a real
 - **Delete realm** goes through the standard confirmation dialog.
   If environments or party overrides still reference the realm, the confirmation surfaces referenced-by evidence (how many) before you confirm.
   Deletion never blocks.
-  Dangling references become stale repair evidence instead.
+  Deleting the realm also removes it from the realm membership of every environment that listed it, so no environment is left naming a realm that is gone.
+  An environment the delete leaves with no realms is simply no longer restricted to a realm; it is not disabled or deleted.
+  Party overrides are not rewritten: a party that named the deleted realm keeps the id and shows it as **Unknown realm** until you clear the override from its party card, which is what makes the leftover reference visible for repair.
+  If a realm was deleted before 1.9.7 and environments will no longer save, see [Environments will not save after a realm was deleted]({% link troubleshooting.md %}#environments-will-not-save-after-a-realm-was-deleted).
 
 Scene mappings are authored under **World > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
 Realm modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime.
@@ -201,7 +204,7 @@ An empty (or absent) list means "no rule":
 {: .note }
 > Included realms are chosen in the environment editor's multi-realm selector (toggle on).
 > The biome and exclusion rules are authored through the API or by system import and export.
-> Saving checks that the chosen realms exist on the owning crafting system.
+> Saving checks that the chosen realms exist in the world realm library.
 > These rules gate **location availability** only.
 > The old single free-text region on an environment is **inert**.
 > It is not a composition or availability input and is no longer shown in the editor.

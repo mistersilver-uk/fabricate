@@ -4226,7 +4226,7 @@
             "DeleteNamed": "Delete {name}",
             "DeleteTitle": "Delete {name}?",
             "DeleteContent": "Delete realm <strong>{name}</strong>?",
-            "DeleteReferenced": "It is still referenced by {environments} environment(s) and {parties} party override(s).",
+            "DeleteReferenced": "It is still referenced by {environments} environment(s) and {parties} party override(s). It will be removed from those environments; any that listed only this realm will no longer be restricted to a realm. Party overrides keep the stale id and show it as \"Unknown realm\" until you clear them.",
             "EnabledChip": "Enabled",
             "DisabledChip": "Disabled",
             "SecretChip": "Secret",
