@@ -247,6 +247,46 @@ describe('bulkSelection', () => {
     assert.deepEqual(announced, ['12 components updated.', 'nothing changed']);
   });
 
+  it('re-projects the owner rows when the corpus grows under a settled selection', () => {
+    const state = liftedState({ ids: new Set(['a', 'c']) });
+    const corpus = new SvelteSet([{ id: 'a' }, { id: 'b' }]);
+    const owner = createBulkSelectionOwner({
+      state: () => state,
+      key: 'ids',
+      rows: () => [...corpus],
+    });
+
+    assert.deepEqual(
+      owner.rows.map((row) => row.id),
+      ['a'],
+      'the control: the corpus resolves no row for the second selected id yet'
+    );
+
+    corpus.add({ id: 'c' });
+    flushSync();
+    assert.deepEqual(
+      owner.rows.map((row) => row.id),
+      ['a', 'c'],
+      'the corpus thunk is read inside the owner`s own derived, so the root`s rows stay live'
+    );
+  });
+
+  it('changes owner.ids identity on an equal-size write while owner.count stays equal', () => {
+    const state = liftedState({ ids: new Set(['a', 'b']) });
+    const owner = createBulkSelectionOwner({
+      state: () => state,
+      key: 'ids',
+      rows: () => [],
+    });
+    const before = owner.ids;
+
+    state.ids = new Set(['c', 'd']);
+    flushSync();
+
+    assert.notEqual(owner.ids, before, 'a write always replaces the Set, whatever its size');
+    assert.equal(owner.count, 2, 'while the count, derived from size, recomputes to the same number');
+  });
+
   it('returns the SAME rows array on a second owner read with nothing changed', () => {
     const owner = createBulkSelectionOwner({
       state: () => liftedState({ ids: new Set(['a']) }),
@@ -262,12 +302,22 @@ describe('bulkSelection', () => {
   });
 
   it('returns the SAME Set on a second selectedIds read with nothing changed', () => {
-    const { selection } = openSelection({ selected: ['a'] });
+    const { selection, state } = openSelection({ selected: ['a'] });
 
     assert.equal(
       selection.selectedIds,
       selection.selectedIds,
       'a getter that recomputed would mint a new Set per read and re-run every impact derivation'
+    );
+
+    // The FALLBACK is the only branch on which a recomputing getter is visible: with the field
+    // present both reads answer the one stored Set whether the read is memoised or not.
+    state.ids = undefined;
+    flushSync();
+    assert.equal(
+      selection.selectedIds,
+      selection.selectedIds,
+      'including with no field to read, where each read would otherwise build its own empty Set'
     );
   });
 });
