@@ -2,8 +2,8 @@
  * The two capabilities `bind:popover` is the picker's only wire onto the panel it extracted
  * (issue 1719), neither previously asserted by a shipped suite as a named DOM outcome:
  *   - the panel is registered as an "inside" node of the picker's `dismissOnOutsideClick`, so a
- *     `mousedown` on the panel's own chrome — which is in ANOTHER DOM SUBTREE, being portaled —
- *     does not dismiss it. The action listens on `mousedown` in the CAPTURE phase at `document`;
+ *     `mousedown` on the panel's own chrome — which is in another DOM subtree, being portaled —
+ *     does not dismiss it. The action listens on `mousedown` in the capture phase at `document`;
  *   - the active-option `$effect` scrolls the cursor's row into view, and it reaches that row by
  *     querying the panel element, so a picker holding no panel reference scrolls nothing.
  */
