@@ -15,7 +15,13 @@ import {
   referencesIdentifier as referencesIdentifierOf,
   walkNodes,
 } from '../helpers/moduleAst.js';
-import { componentAstOf, componentScopeOf, moduleAstOf } from '../helpers/parsedSource.js';
+import {
+  componentAstOf,
+  componentAstsIn,
+  componentScopeOf,
+  moduleAstOf,
+  moduleAstsIn,
+} from '../helpers/parsedSource.js';
 import {
   containsLiteral,
   declaredConstant,
@@ -136,11 +142,6 @@ const gatheringRuleLimitStepperSource = readFileSync(
   'utf8'
 );
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
-// The paginated rows/columns are the shared studio-library shelf now.
-const libraryShelfSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte'),
-  'utf8'
-);
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
 const essenceStudioSources = readdirSync(essenceStudioDir)
   .filter((entry) => entry.endsWith('.svelte') || entry.endsWith('.js'))
@@ -413,37 +414,70 @@ function claimsOverCode(code) {
   };
 }
 
+/** The claims a whole parsed component answers, template included. */
+function claimsForComponent(component) {
+  return {
+    ...claimsOverCode(component),
+    renders: (name) => rendersComponent(component, name),
+    imports: (specifier) => importsModule(component, specifier),
+    declares: (name) => declaredConstant(component, name),
+    names: (name) => referencesIdentifier(component, name),
+    spells: (text) => containsLiteral(component, text),
+    spellsExactly: (text) => spellsLiteral(component, text),
+    prop: ([name, propName]) => passesProp(component, name, propName),
+    attribute: ([name, value]) =>
+      templateNodes(component).some((node) => attributeValue(node, name) === value),
+    declaresProp: (name) => declaresProp(component, name),
+    requiresProp: (name) => requiresProp(component, name),
+  };
+}
+
+/** "In at least one of these", stated once: a composite target is a quantifier, not a join. */
+function claimsAcross(subjects) {
+  const kinds = [...new Set(subjects.flatMap((subject) => Object.keys(subject)))];
+  return Object.fromEntries(
+    kinds.map((kind) => [kind, (row) => subjects.some((subject) => subject[kind]?.(row) === true)])
+  );
+}
+
+function claimsForFile(file) {
+  return file.endsWith('.svelte')
+    ? claimsForComponent(componentAstOf(file))
+    : claimsOverCode(moduleAstOf(file).ast);
+}
+
 /**
  * A repo-relative path, optionally narrowed to one class member and one of its properties, or to
- * one function of a component — the AST equivalent of the bounded text slice it replaces — with
- * the claims its kind can answer.
+ * one function of a component — the AST equivalent of the bounded text slice it replaces — or a
+ * list of paths or a directory, which answer for at least one of their files.
  */
 function structureOf(target) {
+  if (Array.isArray(target)) return claimsAcross(target.map(claimsForFile));
+  if (typeof target === 'object' && target.dir) {
+    return claimsAcross([
+      ...componentAstsIn(target.dir).map(claimsForComponent),
+      ...moduleAstsIn(target.dir).map(({ ast }) => claimsOverCode(ast)),
+    ]);
+  }
   const { file, member, property, fn } = typeof target === 'string' ? { file: target } : target;
   if (file.endsWith('.svelte')) {
     const component = componentAstOf(file);
     if (fn) return claimsOverCode(componentFunctionAst(component, fn));
     const scope = componentScopeOf(file);
-    return {
-      ...claimsOverCode(component),
-      renders: (name) => rendersComponent(component, name),
-      imports: (specifier) => importsModule(component, specifier),
-      declares: (name) => declaredConstant(component, name),
-      names: (name) => referencesIdentifier(component, name),
-      spells: (text) => containsLiteral(component, text),
-      spellsExactly: (text) => spellsLiteral(component, text),
-      global: (name) => readsGlobal(scope, name),
-      prop: ([name, propName]) => passesProp(component, name, propName),
-      attribute: ([name, value]) =>
-        templateNodes(component).some((node) => attributeValue(node, name) === value),
-      declaresProp: (name) => declaresProp(component, name),
-      requiresProp: (name) => requiresProp(component, name),
-    };
+    return { ...claimsForComponent(component), global: (name) => readsGlobal(scope, name) };
   }
   const { ast } = moduleAstOf(file);
   let code = member ? classMemberAst(ast, member) : ast;
   if (property) code = propertyAst(code, property);
   return claimsOverCode(code);
+}
+
+/** What a failure message calls the target, whichever of the four shapes it took. */
+function labelOf(target) {
+  if (Array.isArray(target)) return `any of ${target.length} manager views`;
+  if (typeof target === 'string') return target;
+  if (target.dir) return `any of ${target.dir}`;
+  return [target.file, target.member, target.property, target.fn].filter(Boolean).join(' > ');
 }
 
 /** Each claim a contract row may make: the question to ask, and the answer it must get. */
@@ -491,6 +525,9 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
+const ESSENCE_BROWSER = 'src/ui/svelte/apps/manager/EssenceBrowserView.svelte';
+const ESSENCE_EDIT = 'src/ui/svelte/apps/manager/EssenceEditView.svelte';
+const LIBRARY_SHELF = 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte';
 const COMPONENT_ROW = 'src/ui/svelte/apps/manager/components/ComponentRow.svelte';
 const COMPONENT_EDIT = 'src/ui/svelte/apps/manager/ComponentEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
@@ -503,10 +540,7 @@ const MODIFIER_CATALOGUE =
 function defineStructureContract(title, target, claims) {
   it(title, () => {
     const subject = structureOf(target);
-    const label =
-      typeof target === 'string'
-        ? target
-        : [target.file, target.member, target.property].filter(Boolean).join(' > ');
+    const label = labelOf(target);
     for (const [kind, rows] of Object.entries(claims)) {
       const claim = CONTRACT_CLAIMS[kind];
       assert.equal(typeof subject[claim.ask], 'function', `${label} cannot answer "${kind}"`);
@@ -1975,206 +2009,81 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
-  it('keeps manager essence browsing browser-only and source UI feature-gated', () => {
-    assert.ok(
-      rootSource.includes("import EssenceEditView from './EssenceEditView.svelte';"),
-      'root should import the dedicated essence edit route'
-    );
-    assert.ok(
-      rootSource.includes('showEssenceSourceUi'),
-      'root should derive the effect-transfer source UI gate'
-    );
-    assert.ok(
-      rootSource.includes("currentView === 'essence-edit'"),
-      'root should route the dedicated edit view'
-    );
-    assert.ok(
-      rootSource.includes('confirmDiscardDirtyEssenceDraft'),
-      'root should protect dirty essence edit drafts when a confirm seam is available'
-    );
-    assert.ok(
-      essenceBrowserSource.includes('onEditEssence'),
-      'browser row edit should ask the root to route to edit'
-    );
-    assert.ok(
-      essenceBrowserSource.includes('showSourceUi'),
-      'browser should receive the source UI feature gate'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('onUpdateEssence'),
-      'browser should not own essence update persistence'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-edit-row'),
-      'browser should not render inline edit rows'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-create-name'),
-      'browser should not render inline create fields'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-action-band'),
-      'browser should not duplicate the route-header create action'
-    );
-    // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit.
-    assert.ok(
-      !essenceBrowserSource.includes('manager-essence-source-cell-image'),
-      'the source column and its image cell are retired with the table head'
-    );
-    // AND SO IS THE SOURCE-STATE SELECT (issue 1372, maintainer parity round 8). The reference's
-    // bar carries ONE filter beside the search field — the membership pair — and this bar carried
-    // four. A broken link is still findable: the row's summary line NAMES the source and marks
-    // the breakage, the search box reads that name, and the `Effects` chip carries it in its own
-    // tone and title.
-    assert.ok(
-      !essenceBrowserSource.includes('data-essence-source-filter'),
-      'the source-state select is a control the reference does not draw'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('data-essence-status-filter'),
-      'and neither is the status segment'
-    );
-    assert.ok(
-      essenceBrowserSource.includes('data-essence-membership-filter'),
-      'NON-VACUITY: the one filter the reference DOES draw is still on the bar'
-    );
-    // Browser state is LIFTED to the root, which is criterion 12: search, filters.
-    assert.ok(
-      essenceBrowserSource.includes('browserState = $bindable(null)'),
-      'the browser binds its view-state rather than owning it'
-    );
-    assert.ok(
-      rootSource.includes('bind:browserState={essenceBrowserState}'),
-      'and the root is what holds it across the round-trip'
-    );
-    // A card row has no columns, so the rows are a real `<ul role="list">` of `<li>` cards
-    // and the `role="columnheader"` head is gone with the table it labelled. Pinned on the
-    // RENDERED attribute (`role="list"`) rather than on the absence of `role="table"`,
-    // which both files' own comments legitimately mention in prose.
-    assert.ok(
-      libraryShelfSource.includes('role="list"'),
-      'the row list is a real list, not a table with no columns'
-    );
-    assert.ok(
-      !essenceBrowserSource.includes('role="columnheader"'),
-      'and it has no column headers left to label'
-    );
+  // The Essence Studio's own components, which sit under `essences/` (issue 1036). A directory
+  // target answers for AT LEAST ONE of its files, stated once rather than per file.
+  const ESSENCE_STUDIO = { dir: 'src/ui/svelte/apps/manager/essences' };
+
+  // What the browser RENDERS — the rows, the disabled marker, the capability pills, the usage
+  // counts, the row toggle and the absent action band — is driven by
+  // `tests/components/manager-essences-mounted.js`. What stays is the seam and what was deleted.
+  defineStructureContract('keeps essence browsing browser-only', ESSENCE_BROWSER, {
+    declaresProp: ['onEditEssence', 'showSourceUi', 'browserState'],
+    spellsExactly: ['data-essence-membership-filter'],
+    namesNo: ['onUpdateEssence'],
+    spellsNo: [
+      'manager-essence-edit-row',
+      'manager-essence-create-name',
+      'manager-essence-source-cell-image',
+      'data-essence-source-filter',
+      'data-essence-status-filter',
+    ],
+    attributesNo: [['role', 'columnheader']],
   });
 
-  it('uses shared manager essence picker controls on the dedicated edit route', () => {
-    assert.ok(
-      essenceStudioSource.includes(
-        "import IconPicker from '../../../components/IconPicker.svelte';"
-      ),
-      'edit route should use the shared IconPicker'
-    );
-    assert.ok(
-      essenceStudioSource.includes(
-        "import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';"
-      ),
-      'edit route should use the shared source selector'
-    );
-    assert.ok(
-      essenceEditSource.includes('showSourceUi'),
-      'edit route should gate source controls by effect transfer'
-    );
-    assert.ok(
-      essenceEditSource.includes('onDirtyChange(dirty)'),
-      'edit route should expose dirty state to route-exit protection'
-    );
-    assert.ok(
-      essenceEditSource.includes('onSave(draftId || null, updates)'),
-      'edit route should delegate create and update persistence to the root/store seam'
-    );
-    assert.ok(
-      essenceEditSource.includes('id="manager-essence-edit-form"'),
-      'edit route should expose a form target for route-header save actions'
-    );
-    assert.ok(
-      !essenceEditSource.includes('EditKicker'),
-      'edit route should not render a duplicate inner route header'
-    );
-    assert.ok(
-      !essenceEditSource.includes('IconClassHint'),
-      'edit route should not expose raw icon class copy'
-    );
-    // The Save button now lives in the SHARED `ComponentEditorHeader`.
-    assert.ok(
-      rootSource.includes('formId="manager-essence-edit-form"'),
-      'root header should own the primary save action for the edit form'
-    );
-    assert.ok(
-      rootSource.includes('saveAttr="data-essence-edit-save"'),
-      'and it wears this studio own hooks rather than the component studio ones'
-    );
-    // Edit, Duplicate and Delete are the INSPECTOR's.
-    assert.ok(
-      !rootSource.includes('data-essence-action='),
-      'the root no longer inlines any essence inspector action'
-    );
-    // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8).
-    for (const action of ['edit', 'delete', 'copy-source', 'unlink-source']) {
-      assert.ok(
-        essenceStudioSource.includes(`data-essence-action="${action}"`),
-        `the extracted inspector exposes the ${action} action`
-      );
-    }
-    assert.ok(
-      !essenceStudioSource.includes('data-essence-action="duplicate"'),
-      'and it exposes NO duplicate action'
-    );
-    assert.ok(
-      rootSource.includes('<EssenceBrowserInspector'),
-      'and the root renders it as a component'
-    );
-    assert.ok(
-      rootSource.includes('<EssenceBulkEditPanel'),
-      'with the bulk panel replacing it while a selection exists'
-    );
-    assert.ok(
-      rootSource.includes(
-        'store.updateEssence?.(selectedEssenceForInspector.id, { sourceComponentId })'
-      ),
-      'inspector source changes should use updateEssence'
-    );
-    // Criterion 23's four route-wiring items.
-    assert.ok(
-      rootSource.includes(
-        "if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)"
-      ),
-      'the essence route guard skips a same-ESSENCE exit, as the tools and system guards do'
-    );
-    assert.ok(
-      !rootSource.includes(
-        "if (activeView !== 'essence-edit' || nextView === 'essence-edit') return true;"
-      ),
-      'and the token-only form is gone, not merely shadowed'
-    );
-    assert.ok(
-      rootSource.includes("confirmRouteExit('essence-edit', essenceId)"),
-      'and `editEssence` supplies the target id, or the comparison can never be true'
-    );
-    assert.ok(
-      rootSource.includes('store.cancelEssenceDraft?.()'),
-      'and the discard branch reaches the store half of Cancel'
-    );
-    assert.ok(
-      rootSource.includes('importSingleManagedItemFromDrop'),
-      'inspector source drops should reuse the managed-item import seam'
-    );
-    // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out.
-    assert.ok(
-      essenceStudioSource.includes('<BulkDeleteCard'),
-      'the bulk delete arms rather than opening a dialog'
-    );
-    assert.ok(
-      essenceStudioSource.includes('data-essence-bulk-impact'),
-      'and states its impact before it is armed'
-    );
-    assert.ok(
-      !essenceEditSource.includes('game.'),
-      'edit route should not reference Foundry runtime globals'
-    );
+  // A card row has no columns, so the paginated rows are a real list on the shared shelf.
+  defineStructureContract('renders those rows on the shared studio shelf', LIBRARY_SHELF, {
+    attributes: [['role', 'list']],
+  });
+
+  defineStructureContract('routes essence editing to its own page', MANAGER_ROOT, {
+    imports: ['./EssenceEditView.svelte'],
+    declares: ['showEssenceSourceUi'],
+    names: ['essenceBrowserState'],
+    compares: ['essence-edit'],
+    passesProps: [['EssenceBrowserView', 'browserState']],
+    renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
+    spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
+    spellsNo: ['data-essence-action='],
+  });
+
+  // Criterion 23: the guard compares the ESSENCE and not only the view token, so re-entering the
+  // editor for the SAME essence skips the prompt and switching to another one does not.
+  defineStructureContract(
+    'skips a same-essence route exit rather than a same-token one',
+    { file: MANAGER_ROOT, fn: 'confirmEssenceRouteExit' },
+    { names: ['nextEssenceId', 'selectedEssenceId'], compares: ['essence-edit'] }
+  );
+
+  defineStructureContract(
+    'and supplies the target id, or that comparison can never be true',
+    { file: MANAGER_ROOT, fn: 'editEssence' },
+    { callsWith: [['confirmRouteExit', 'essenceId']], spellsExactly: ['essence-edit'] }
+  );
+
+  defineStructureContract('authors an essence on that page and nowhere else', ESSENCE_EDIT, {
+    declaresProp: ['showSourceUi', 'onDirtyChange', 'onSave'],
+    calls: ['onDirtyChange', 'onSave'],
+    attributes: [['id', 'manager-essence-edit-form']],
+    namesNo: ['EditKicker'],
+    spellsNo: ['IconClassHint'],
+    readsNoGlobal: ['game'],
+  });
+
+  // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8), and the armed bulk
+  // delete is a deliberate deviation from the `AGENTS.md` dialog carve-out.
+  defineStructureContract('extracts the inspector and its bulk panel', ESSENCE_STUDIO, {
+    imports: [
+      '../../../components/IconPicker.svelte',
+      '../../../components/EssenceSourceSelector.svelte',
+    ],
+    renders: ['BulkDeleteCard'],
+    attributes: [
+      ['data-essence-action', 'edit'],
+      ['data-essence-action', 'delete'],
+      ['data-essence-action', 'copy-source'],
+      ['data-essence-action', 'unlink-source'],
+    ],
+    attributesNo: [['data-essence-action', 'duplicate']],
   });
 
   defineStructureContract(
