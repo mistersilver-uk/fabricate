@@ -93,7 +93,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // nav scope and the systems-list condition; neither is in an inspector branch.
 // #1510: the recipe studio's `RecipeOverviewTab` (4) and `RecipeIngredientOption` (1) convert
 // onto `Select`, so the total falls 69 -> 64 across 26 rows to 24.
-export const KNOWN_NATIVE_SELECT_TOTAL = 64;
+// #1510: the component studio's `ComponentEditView` (3) and `ComponentComplicationsSection`
+// (2) convert onto `Select`, so the total falls 64 -> 59 across 24 rows to 22.
+export const KNOWN_NATIVE_SELECT_TOTAL = 59;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

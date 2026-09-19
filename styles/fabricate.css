@@ -9108,9 +9108,14 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-salvage-routing-row .manager-input {
+/* `proto:1419`'s 14rem target column, on the shared `<Select>`'s ROOT since issue 1510: the slot is stated on the picker and the trigger fills it. Left hugging, every routing row would be a different width and re-flow as the GM routed an outcome. */
+.fabricate-manager .manager-salvage-route-select {
   flex: 0 1 14rem;
   min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-route-select .fabricate-select-trigger {
+  width: 100%;
 }
 
 /* The set-level "OR", the within-requirement "OR", and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. */
@@ -20452,17 +20457,10 @@
   color: var(--fab-purple);
 }
 
-/* `proto:1324`: ONE full-width select, 38px, radius 9, behind a `border-strong` hairline. */
-.fabricate-manager .manager-component-category-select {
+/* `proto:1324`: ONE full-width control, 38px, radius 9, behind a `border-strong` hairline. It is the shared `<Select>` since issue 1510, so the class rides the picker ROOT and the `form` rung paints the 38px box, the corner, the `surface-soft` fill and the type; what is left here is the width a trigger deliberately never declares — its box belongs to the row it sits in — and the strong hairline the rung does not give. Left hugging, the one control under this card head would resize every time the GM chose a longer category name. */
+.fabricate-manager .manager-component-category-select .fabricate-select-trigger {
   width: 100%;
-  height: 38px;
-  min-height: 38px;
   border-color: var(--fab-border-strong);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text);
-  font-weight: 500;
-  font-size: 12px;
 }
 
 /* `proto:1327`: the note sits DIRECTLY under the select, glyph-led, at 10px/1.45 weight 500, in the ink of the state it names. */
@@ -20556,7 +20554,7 @@
   background: var(--fab-bg-1);
 }
 
-/* `proto:1429`: `Salvage check DC` is a title over a note, with the preset select at the trailing edge — 32px snapped to the 34 rung, radius 9, `surface-soft` behind a `border-strong` hairline. */
+/* `proto:1429`: `Salvage check DC` is a title over a note, with the preset control at the trailing edge, radius 9, `surface-soft` behind a `border-strong` hairline. Its 34px snapped the reference's 32; it stands at the shared control's `form` rung of 38 since issue 1510, which is the published rung nearest both. */
 .fabricate-manager .manager-salvage-dc-card {
   display: flex;
   flex-wrap: wrap;
@@ -20585,18 +20583,16 @@
   line-height: 1.45;
 }
 
-.fabricate-manager .manager-salvage-dc-card .manager-input {
+/* The preset control at the card's trailing edge, the shared `<Select>` since issue 1510. The `form` rung paints its box — 38px, radius 9, `surface-soft`, weight 500 — so what stays here is the hug-and-push slot on the picker root and the `border-strong` hairline the rung does not give. */
+.fabricate-manager .manager-salvage-dc-select {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
-  height: 34px;
-  min-height: 34px;
   margin-left: auto;
+}
+
+.fabricate-manager .manager-salvage-dc-select .fabricate-select-trigger {
   border-color: var(--fab-border-strong);
-  border-radius: 9px;
-  background: var(--fab-surface-soft);
-  font-weight: 500;
-  font-size: 0.72rem;
 }
 
 /* ══ THE WORLD COMPONENT ENTRY, SECOND PARITY PASS (issue 1371, r5a) ══ The second parity pass over Part A, measured with `scripts/visual-parity` against `artifacts/proto-markup.txt` rather than read off the frames. */

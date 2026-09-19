@@ -119,6 +119,7 @@ manager-access-recipe-roster-no-match
 manager-components-normal
 manager-components-essence-chips
 manager-component-edit-inheriting
+manager-component-edit-category-list
 manager-component-edit-world-tags
 manager-components-world-cohort
 manager-components-add-from-catalogue
