@@ -7576,7 +7576,6 @@
         "TaskName": "Task name",
         "TaskDescription": "Task description",
         "TaskImage": "Task image",
-        "ChooseImage": "Choose image",
         "ImagePickerUnavailable": "Image picker is not available.",
         "TaskEnabled": "Task enabled",
         "TaskResolutionMode": "Task resolution mode",
@@ -7698,9 +7697,6 @@
         "Yes": "Yes",
         "No": "No"
       }
-    },
-    "DropZone": {
-      "DefaultLabel": "Drop items here"
     },
     "Alchemy": {
       "Title": "Alchemy",

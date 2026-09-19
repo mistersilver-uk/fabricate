@@ -172,7 +172,7 @@ test('the prop pattern selects names and rejects the two shapes that are not nam
 
 test('a localization key is a translatable default, and English text is not', () => {
   // The distinction the first ratchet turns on, in both directions and against the live tree.
-  for (const key of ['FABRICATE.DropZone.DefaultLabel', 'FABRICATE.Manager.Close']) {
+  for (const key of ['FABRICATE.Admin.Manager.Validation.View', 'FABRICATE.Manager.Close']) {
     assert.ok(LOCALIZATION_KEY.test(key), `${key} is a localization key`);
   }
   for (const text of ['Percentage', 'Colour presets', 'Close', 'Outcome bands', '%', 'View']) {
@@ -185,8 +185,8 @@ test('a localization key is a translatable default, and English text is not', ()
   assert.ok(
     keys.length > 0,
     'no name-bearing prop defaults to a localization key any more, so the exemption this gate ' +
-      'grants is granted to nothing and could be widened without a row moving. `DropZone` is the ' +
-      'component that has shipped one.'
+      'grants is granted to nothing and could be widened without a row moving. ' +
+      '`EditorValidationSurface` is the component that has shipped one.'
   );
 });
 
@@ -212,8 +212,8 @@ test('no shared component defaults an accessible name to untranslated text', () 
     guidance:
       'Naming is a component obligation, and a hard-coded English default is a name no world can ' +
       'change — `game.i18n` never sees it. Default the prop to a localization KEY and let the ' +
-      'lang files carry the words, as `DropZone` does; or, where the caller always has a better ' +
-      'name than the primitive could invent, default to `undefined` and require it.',
+      'lang files carry the words, as `EditorValidationSurface` does; or, where the caller always ' +
+      'has a better name than the primitive could invent, default to `undefined` and require it.',
   });
 });
 

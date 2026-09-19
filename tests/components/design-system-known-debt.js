@@ -118,7 +118,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 277;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 276;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
@@ -201,7 +201,7 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * @see KNOWN_FORMLESS_BUTTONS
  */
 // #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 226;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 225;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */

@@ -158,7 +158,6 @@
   --fab-overlay-light-10: rgb(241 209 181 / 10%);
   --fab-overlay-light-12: rgb(241 209 181 / 12%);
   --fab-overlay-light-14: rgb(241 209 181 / 14%);
-  --fab-overlay-light-16: rgb(241 209 181 / 16%);
   --fab-overlay-light-28: rgb(241 209 181 / 28%);
   --fab-overlay-light-96: rgb(241 209 181 / 96%);
   --fab-danger-surface-strong: rgb(185 124 120 / 36%);
@@ -261,7 +260,6 @@
   --fab-overlay-light-10: rgb(255 255 255 / 10%);
   --fab-overlay-light-12: rgb(255 255 255 / 12%);
   --fab-overlay-light-14: rgb(255 255 255 / 14%);
-  --fab-overlay-light-16: rgb(255 255 255 / 16%);
   --fab-overlay-light-28: rgb(255 255 255 / 28%);
   --fab-overlay-light-96: rgb(255 255 255 / 96%);
   --fab-danger-surface-strong: rgb(120 20 20 / 20%);
@@ -364,7 +362,6 @@
   --fab-overlay-light-10: rgb(240 226 212 / 10%);
   --fab-overlay-light-12: rgb(240 226 212 / 12%);
   --fab-overlay-light-14: rgb(240 226 212 / 14%);
-  --fab-overlay-light-16: rgb(240 226 212 / 16%);
   --fab-overlay-light-28: rgb(240 226 212 / 28%);
   --fab-overlay-light-96: rgb(240 226 212 / 96%);
   --fab-danger-surface-strong: rgb(168 109 102 / 36%);
@@ -467,7 +464,6 @@
   --fab-overlay-light-10: rgb(241 233 216 / 10%);
   --fab-overlay-light-12: rgb(241 233 216 / 12%);
   --fab-overlay-light-14: rgb(241 233 216 / 14%);
-  --fab-overlay-light-16: rgb(241 233 216 / 16%);
   --fab-overlay-light-28: rgb(241 233 216 / 28%);
   --fab-overlay-light-96: rgb(241 233 216 / 96%);
   --fab-danger-surface-strong: rgb(185 131 120 / 36%);
@@ -570,7 +566,6 @@
   --fab-overlay-light-10: rgb(242 236 255 / 10%);
   --fab-overlay-light-12: rgb(242 236 255 / 12%);
   --fab-overlay-light-14: rgb(242 236 255 / 14%);
-  --fab-overlay-light-16: rgb(242 236 255 / 16%);
   --fab-overlay-light-28: rgb(242 236 255 / 28%);
   --fab-overlay-light-96: rgb(242 236 255 / 96%);
   --fab-danger-surface-strong: rgb(199 138 150 / 36%);
@@ -675,7 +670,6 @@
   --fab-overlay-light-10: rgb(243 243 245 / 10%);
   --fab-overlay-light-12: rgb(243 243 245 / 12%);
   --fab-overlay-light-14: rgb(243 243 245 / 14%);
-  --fab-overlay-light-16: rgb(243 243 245 / 16%);
   --fab-overlay-light-28: rgb(243 243 245 / 28%);
   --fab-overlay-light-96: rgb(243 243 245 / 96%);
   --fab-danger-surface-strong: rgb(161 108 96 / 36%);
@@ -778,7 +772,6 @@
   --fab-overlay-light-10: rgb(228 192 102 / 10%);
   --fab-overlay-light-12: rgb(228 192 102 / 12%);
   --fab-overlay-light-14: rgb(228 192 102 / 14%);
-  --fab-overlay-light-16: rgb(228 192 102 / 16%);
   --fab-overlay-light-28: rgb(228 192 102 / 28%);
   --fab-overlay-light-96: rgb(228 192 102 / 96%);
   --fab-danger-surface-strong: rgb(201 110 102 / 36%);
@@ -957,76 +950,6 @@
   align-items: center;
   gap: var(--fab-space-2);
   margin-bottom: var(--fab-space-2);
-}
-
-/* ==========================================
-   Image path picker (environment editor)
-   ========================================== */
-
-.fabricate-manager .image-path-picker-controls {
-  display: flex;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.fabricate-manager .image-path-picker-controls input {
-  min-width: 0;
-  flex: 1 1 58%;
-}
-
-.fabricate-manager .image-path-picker {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .image-path-picker-preview {
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  object-fit: contain;
-  border-radius: 4px;
-  border: 1px solid var(--fab-overlay-light-16);
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-manager .image-path-picker-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-chip);
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.fabricate-manager .image-path-picker.is-button-only .image-path-picker-preview {
-  width: 64px;
-  height: 64px;
-  flex: 0 0 64px;
-}
-
-.fabricate-manager .image-path-picker.is-button-only .image-path-picker-button {
-  flex: 1 1 auto;
-  justify-content: flex-start;
-  height: 36px;
-  padding: 0 var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-20);
-  color: var(--fab-text);
-  cursor: pointer;
-}
-
-.fabricate-manager .image-path-picker.is-button-only .image-path-picker-button:hover:not(:disabled) {
-  border-color: var(--fab-border-strong);
-  background: var(--fab-overlay-dark-32);
-}
-
-.fabricate-manager .image-path-picker.is-button-only .image-path-picker-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* ========================================== Crafting System Manager ========================================== */

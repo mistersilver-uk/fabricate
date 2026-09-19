@@ -184,9 +184,7 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
-  'src/ui/svelte/components/DropZone.svelte',
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/ImagePathPicker.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
@@ -210,7 +208,7 @@ test('the inputs every property below quantifies over are alive', () => {
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 59, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 18, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -402,10 +400,10 @@ const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
 /**
  * Whether `token` names `file`, anchored on the path separator.
  *
- * The anchor is the whole point and the register records why on its own `DropZone` row: a suffix
- * test without it accepts `DropZone.svelte` for `components/ItemDropZone.svelte` and credits a
- * dead component with seven importers. This is only ever asked against ONE row's own caller list,
- * so the ambiguity a bare basename would carry across the tree is not reintroduced.
+ * The anchor is the whole point: a suffix test without it accepts `Chip.svelte` for
+ * `manager/components/EssenceChip.svelte` and credits one component with another's importers.
+ * This is only ever asked against ONE row's own caller list, so the ambiguity a bare basename
+ * would carry across the tree is not reintroduced.
  *
  * @param {string} file repository-relative POSIX path
  * @param {string} token what the prose wrote

@@ -40,7 +40,7 @@ function rows(table) {
 export const TARGET_LIBRARY_NAMES = rows('libraryTargetNames');
 
 /** @see TARGET_LIBRARY_NAMES */
-export const TARGET_LIBRARY_NAME_TOTAL = 59;
+export const TARGET_LIBRARY_NAME_TOTAL = 58;
 
 /**
  * Every manifest row whose `status` reads `target`, keyed on the implementation path, measured at

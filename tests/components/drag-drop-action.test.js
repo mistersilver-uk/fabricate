@@ -67,68 +67,24 @@ function fire(node, type, event) {
   }
 }
 
-/** Build a DropZone-like node wired with the dragDrop action. */
-function buildDropZone({ onDrop, disabled = false, activeClass = 'drop-active' } = {}) {
+/** Build a drop-target node wired with the dragDrop action. */
+function buildDropTarget({ onDrop, disabled = false, activeClass = 'drop-active' } = {}) {
   const div = makeNode();
   const action = dragDrop(div, { onDrop, disabled, activeClass });
   return { div, action };
 }
 
 // ---------------------------------------------------------------------------
-// Suite: DropZone DOM and Behavior
+// Suite: src/ui/svelte/actions/dragDrop.js — DOM wiring and behaviour
 // ---------------------------------------------------------------------------
 
-describe('DropZone DOM and Behavior', () => {
+describe('dragDrop action DOM and behaviour', () => {
   before(() => setupDOM());
   after(() => teardownDOM());
 
-  // Test 1: renders a div with class drop-zone containing an icon and label
-  it('renders a div with class drop-zone containing an icon and label', () => {
-    const div = document.createElement('div');
-    div.className = 'drop-zone';
-
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-download';
-    div.appendChild(icon);
-
-    div.appendChild(document.createTextNode('Drop item here'));
-
-    assert.ok(div.classList.contains('drop-zone'), 'root div has drop-zone class');
-    assert.ok(div.querySelector('i.fas.fa-download'), 'default icon element exists');
-    assert.ok(div.textContent.includes('Drop item here'), 'default label text is present');
-  });
-
-  // Test 2: renders custom icon class when icon prop is provided
-  it('renders custom icon class when icon prop is provided', () => {
-    const div = document.createElement('div');
-    div.className = 'drop-zone';
-
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-plus-circle';
-    div.appendChild(icon);
-
-    assert.ok(div.querySelector('i.fas.fa-plus-circle'), 'custom icon class is applied to i element');
-    assert.equal(div.querySelector('i').className, 'fas fa-plus-circle');
-  });
-
-  // Test 3: renders custom label text
-  it('renders custom label text', () => {
-    const div = document.createElement('div');
-    div.className = 'drop-zone';
-
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-download';
-    div.appendChild(icon);
-
-    const customLabel = 'Drop ingredients here';
-    div.appendChild(document.createTextNode(customLabel));
-
-    assert.ok(div.textContent.includes(customLabel), 'custom label text is rendered');
-  });
-
   // Test 4: adds drop-active class on dragover
   it('adds drop-active class on dragover', () => {
-    const { div } = buildDropZone({ onDrop: () => {} });
+    const { div } = buildDropTarget({ onDrop: () => {} });
 
     fire(div, 'dragover', makeDragEvent('dragover'));
 
@@ -137,7 +93,7 @@ describe('DropZone DOM and Behavior', () => {
 
   // Test 5: removes drop-active class on dragleave when relatedTarget is external
   it('removes drop-active class on dragleave', () => {
-    const { div } = buildDropZone({ onDrop: () => {} });
+    const { div } = buildDropTarget({ onDrop: () => {} });
 
     fire(div, 'dragover', makeDragEvent('dragover'));
     assert.ok(div._classes.has('drop-active'));
@@ -164,7 +120,7 @@ describe('DropZone DOM and Behavior', () => {
   // Test 7: removes drop-active class on drop and calls onDrop with data
   it('removes drop-active class on drop and calls onDrop with data', () => {
     const received = [];
-    const { div } = buildDropZone({ onDrop: (data) => received.push(data) });
+    const { div } = buildDropTarget({ onDrop: (data) => received.push(data) });
 
     fire(div, 'dragover', makeDragEvent('dragover'));
     assert.ok(div._classes.has('drop-active'));
@@ -180,7 +136,7 @@ describe('DropZone DOM and Behavior', () => {
   // Test 8: does not call onDrop when drag data is null
   it('does not call onDrop when drag data is null', () => {
     let called = false;
-    const { div } = buildDropZone({ onDrop: () => { called = true; } });
+    const { div } = buildDropTarget({ onDrop: () => { called = true; } });
 
     fire(div, 'drop', makeDragEvent('drop', { data: null }));
 
@@ -189,7 +145,7 @@ describe('DropZone DOM and Behavior', () => {
 
   // Test 9: does not attach listeners when disabled is true
   it('does not attach listeners when disabled is true', () => {
-    const { div } = buildDropZone({ onDrop: () => {}, disabled: true });
+    const { div } = buildDropTarget({ onDrop: () => {}, disabled: true });
 
     assert.equal((div._listeners['dragover'] ?? []).length, 0, 'no dragover listener when disabled');
     assert.equal((div._listeners['dragleave'] ?? []).length, 0, 'no dragleave listener when disabled');

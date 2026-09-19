@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 207 repeated selectors
  * rather than these 113, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,060 `(at-context, selector)` keys, of which 2,947 appear exactly
+ * Unfiltered, the sheet holds 3,051 `(at-context, selector)` keys, of which 2,938 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,576 rules at that head, 113 repeated keys and 231 appearances
+ * printed from. The sheet holds 2,567 rules at that head, 113 repeated keys and 231 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1515 PHASE 9 MOVES THE THREE CONTEXTUAL FIGURES AND RE-KEYS ONE REPEATED ROW, and the two
  * halves are unrelated to one another. RE-KEYED: the rail's premium chip stops riding the
