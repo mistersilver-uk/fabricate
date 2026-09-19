@@ -209,7 +209,6 @@ function buildCurrencyIngredientState(recipe, deps, option, context, { isMissing
  * `delivered` beside `owned`, never the component/tag `have`, which is not net of plan (917). */
 function buildEssenceIngredientState(recipe, deps, group, option, selection, context) {
   const { requirement, isMissing, missingEntry, availableItems, ...base } = context;
-  const consumedItem = consumedItemForGroup(selection, group, option);
   const need = Math.max(0, Number(option?.match?.amount) || 0);
   // A selection with no pool at all (a duck-typed set that never resolved one) falls
   // back to the missing-group verdict rather than silently reading satisfied.
@@ -217,7 +216,7 @@ function buildEssenceIngredientState(recipe, deps, group, option, selection, con
     ? requirement.delivered
     : Number(missingEntry?.have) || (isMissing ? 0 : need);
   return {
-    ...resolveIngredientVisual(recipe, deps, option, availableItems, consumedItem),
+    ...resolveIngredientVisual(recipe, deps, option, availableItems),
     ...base,
     need,
     delivered: Number(delivered) || 0,
