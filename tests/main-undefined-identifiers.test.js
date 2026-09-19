@@ -69,9 +69,9 @@ describe('every src/ file outside CI’s lint glob resolves its identifiers', ()
       assert.ok(population.includes(rune), `${rune} must be in the population`);
     }
     // A floor re-derived by counting, never carried forward: `find src -name '*.svelte.js'`
-    // answers 17, and none of the 17 sits under CI's lint glob, so all 17 must appear here.
+    // answers 18, and none of the 18 sits under CI's lint glob, so all 18 must appear here.
     assert.ok(
-      population.filter((file) => file.endsWith('.svelte.js')).length >= 17,
+      population.filter((file) => file.endsWith('.svelte.js')).length >= 18,
       'every rune module is in the population'
     );
     for (const covered of ['src/systems/CraftingEngine.js', 'src/toolBreakageRuntime.js']) {
