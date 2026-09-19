@@ -1427,12 +1427,9 @@ describe('CraftingSystemManager source contract', () => {
     { property: [['layoutClass', 'full-width-2-track']] }
   );
 
-  // ISSUE 1515 REVERSED THE TWO CLAUSES THAT USED TO STAND HERE. They said the top bar renders
-  // "only the page title and subtitle", and no view kicker, which was true of the SHELL and false
-  // of the product: six routes drew their own eyebrow a few pixels lower, inside a second page
-  // header of their own. Deleting those headers moved the eyebrow up rather than removing it, so
-  // the shell resolves one per route — and the clause the old assertions were really protecting,
-  // that an eyebrow must not restate the title, is stated positively here.
+  // Deleting the six per-route page headers moved the eyebrow up rather than removing it, so the
+  // shell resolves one per route (issue 1515). What the old "no kicker" clauses were protecting —
+  // that an eyebrow must not restate the title — is stated positively here.
   defineStructureContract('resolves the page eyebrow per route, beside the title', MANAGER_ROOT, {
     names: ['viewKicker'],
     calls: ['viewKicker'],
@@ -2081,10 +2078,9 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The gathering task library, its inspector and the focused editor. What each of these DRAWS
-  // and does — the rows, the drop rules, the component browser, the chance sliders, the paging,
-  // the availability pickers, the Required Tools picker and the toolbar delete — is driven by
-  // `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
+  // What the library, its inspector and the focused editor draw and do — rows, drop rules,
+  // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
+  // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
     renders: ['GatheringTaskEditView', 'ChanceSlider'],
     names: [
@@ -2124,10 +2120,9 @@ describe('CraftingSystemManager source contract', () => {
       'data-gathering-drop-inspector-count',
     ],
     spellsExactly: ['manager-drop-editor-actions', 'manager-drop-editor-values'],
-    // Issue 883: the inspector's slider IS `ChanceSlider`. It used to hand-roll the same
-    // track/fill/range structure and its own input/blur/keydown trio beside it, so the structure
-    // and the handlers must be gone from the root, not merely unused — a surviving copy is what
-    // the next divergence gets written against.
+    // Issue 883: the inspector's slider is `ChanceSlider`. The track/fill structure and the
+    // input/blur/keydown trio it hand-rolled must be gone from the root, not merely unused — a
+    // surviving copy is what the next divergence gets written against.
     spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
     namesNo: ['onGatheringDropRateInput', 'onGatheringDropRateBlur', 'onGatheringDropRateKeydown'],
     // The selected drop inspector renders no component selector, and no second duplicate action.
@@ -2330,11 +2325,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Environment.Tasks.Delete, 'Delete gathering task');
   });
 
-  // The Tools library and the focused editor. What the library DRAWS — the rows, the pager, the
-  // per-system counts, the selection, the three tabs, the absent creation surface and the absent
-  // source drop zone, the dirty guard and the armed removal — is driven by
-  // `tests/components/manager-tools-mounted.js`. What stays is the wiring behind it, including
-  // the two callbacks that are deliberately NOT here.
+  // What the library draws — rows, pager, per-system counts, selection, the three tabs, the
+  // absent creation surface and source drop zone, the dirty guard, the armed removal — is driven
+  // by `tests/components/manager-tools-mounted.js`. What stays is the wiring behind it.
   defineStructureContract('wires the Tools library and focused editor', MANAGER_ROOT, {
     imports: ['./ToolsBrowserView.svelte', './ToolEditView.svelte'],
     compares: ['tools', 'tool-edit'],
@@ -2355,10 +2348,8 @@ describe('CraftingSystemManager source contract', () => {
     reads: [
       'store.openToolDraft',
       'store.saveToolDraft',
-      // `store.deleteToolDraft` GOES WITH THE HEADER BUTTON THAT CALLED IT. It deleted this
-      // system's in-system record alone, leaving the world membership record behind as a ghost
-      // nothing can read; `removeToolFromSystem` is the pair of writes that actually undoes an
-      // adoption, and it is what the removal callout reaches (issue 1373).
+      // `store.deleteToolDraft` left the world membership record behind as a ghost nothing can
+      // read; `removeToolFromSystem` is the pair of writes that undoes an adoption (issue 1373).
       'store.removeToolFromSystem',
       'store.setToolSectionInherited',
       // TOOL CREATION IS A WORLD-SCOPE WRITE NOW.
@@ -2387,10 +2378,9 @@ describe('CraftingSystemManager source contract', () => {
     { callsWith: [['selectLibraryTool', 'entityId']] }
   );
 
-  // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio's
-  // entry is DRIVEN by `tests/components/manager-rail-mounted.js`, which presses it and reads the
-  // route, and asserts the badge is absent at zero; what a mounted case cannot see is which
-  // derivation each span renders.
+  // A rail count is a bare mono numeral in its own span, not a chip (issue 643). The Tool Studio
+  // entry is driven by `tests/components/manager-rail-mounted.js`, which presses it, reads the
+  // route and asserts the badge is absent at zero; which derivation each span renders is not.
   it('renders each rail count as the derived number inside the shared count span', () => {
     const rendered = classRenderedExpressions(componentAstOf(MANAGER_ROOT), 'manager-nav-count');
     const read = rendered.flatMap((expression) => [
@@ -2420,13 +2410,9 @@ describe('CraftingSystemManager source contract', () => {
     spellsNo: ['data-tool-editor-delete'],
   });
 
-  // ── THE BONUS TAKES ITS VALUE FROM THE WORLD LIBRARY (issue 1373, maintainer round 3) ──
-  // The tab used to render a free-text `RollDataExpressionInput` labelled `Bonus expression`,
-  // which the design has no counterpart for at either scope: `proto:2353`-`2369` and
-  // `proto:2886`-`2905` both draw a single-select `World modifiers` list, and `proto:4753` sets
-  // `bonus` to the chosen entry's expression. The persisted shape is untouched; what went away is
-  // the ability to TYPE one. The two absent eyebrows are the headings the design merged into the
-  // one sentence above the gate pair.
+  // The bonus takes its value from the world library (issue 1373): `proto:2353` and `proto:2886`
+  // both draw a single-select `World modifiers` list, so what went away is the ability to type an
+  // expression. The two absent eyebrows are headings the design merged into one sentence.
   defineStructureContract('takes the bonus from the world modifier library', TOOL_REQUIREMENTS, {
     renders: ['ModifierLibraryRow', 'SelectionCheckbox', 'ToolInheritCard'],
     spells: ['manager-tool-prerequisite-list'],
@@ -2484,10 +2470,8 @@ describe('CraftingSystemManager source contract', () => {
   // Svelte evaluates a spread only on a key MISS.
   defineStructureContract('forwards the roster from the world Tool entry too', WORLD_TOOL_ENTRY, {
     passesProps: [['ToolRequirementsTab', 'modifierOptions']],
-    // ONE ACTION ON THE TILE, which is what the design draws (issue 1373's parity round). The
-    // Copy that sat beside Unlink is gone with the raw uuid line it copied: an id is not a fact
-    // this screen states anywhere else, and the third line displaced the hint that says what
-    // dropping onto the tile does.
+    // One action on the tile (issue 1373): the Copy beside Unlink went with the raw uuid line it
+    // copied, which displaced the hint saying what dropping onto the tile does.
     renders: ['ItemDropZone'],
     spells: ['SourceDropHint'],
     writesNo: ['copyLabel', 'subline'],
@@ -2501,11 +2485,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(scopes.length, 2, 'the focused system editor and the world Tool entry');
   });
 
-  // ── EVERY BEHAVIOUR SECTION IS A CARD. This used to require a `manager-tool-section-heading`
-  // block — an unenclosed `<h3>` with a glyph and a hint, sitting on the page background above
-  // loose controls. The design encloses each section in its own bordered, filled card whose head
-  // states the section, whether this system inherits the world Tool's answer or overrides it,
-  // what the world's answer is, and the switch between the two.
+  // Every behaviour section is a card rather than a bare page-background heading over loose
+  // controls: its head states the section, whether this system inherits the world Tool's answer,
+  // what that answer is, and the switch between the two.
   defineStructureContract('draws breakage as inherit-aware cards', TOOL_BREAKAGE, {
     renders: ['ToolInheritCard'],
     writes: ['data-tool-remove-from-system'],
@@ -2616,10 +2598,8 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Tools.Editor.LabelFallback,
       'The name this crafting system shows for the Tool.'
     );
-    // AND THE WORLD FIELD NAMES ITSELF AS OPTIONAL (issue 1373's parity round). Its old copy
-    // described the field's REACH across crafting systems, which is a fact about the override
-    // above rather than about this control, and said nothing about the one thing the design's
-    // frame does: that a blank is allowed and what answers for it.
+    // The world field names itself as optional (issue 1373): its old copy described the override
+    // above rather than saying that a blank is allowed and what answers for it.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Scoped.Entry.DisplayLabelInheritHint,
       'Leave blank to use the linked Item name.'
@@ -2648,11 +2628,9 @@ describe('CraftingSystemManager source contract', () => {
     readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
   });
 
-  // The GM Knowledge surface (issue 785). Everything asserted here is a wiring decision whose
-  // absence is SILENT at runtime: an un-suppressed inspector holds a dead 300px strip open, an
-  // un-threaded `resolutionMode` hides the rail entry from the `global` + alchemy configuration
-  // that motivated the widened gate, and an ungated `setKnowledgeActive` puts a whole-world
-  // actors x items scan on every one of `refresh()`'s callers.
+  // The GM Knowledge surface (issue 785). Each wiring decision here fails silently at runtime: an
+  // un-suppressed inspector holds a dead 300px strip open, an un-threaded `resolutionMode` hides
+  // the rail entry, and an ungated `setKnowledgeActive` scans every actor on every `refresh()`.
   defineStructureContract('routes the Knowledge surface and gates its projection', MANAGER_ROOT, {
     imports: ['./KnowledgeView.svelte'],
     compares: ['knowledge'],
@@ -2834,20 +2812,15 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // The learned-row ALLOWLIST (issue 1289). `_collectKnowledgeLearnedEntries` builds every
-  // learned row as a hand-written object literal, so a field that literal does not name never
-  // reaches the display ladder at all — the row renders whatever an earlier rung answers, with
-  // nothing failing anywhere. Deleting the `granted`/`grantedBy` pair from it survived the
-  // whole suite: the mounted Knowledge suite feeds `projectKnowledgeSnapshot` a hand-built
-  // `rawLearned` fixture, so it proves the ladder and the render but never the collection; the
-  // Foundry step opens no Knowledge row for its throwaway actor; and the View Lab frame is a
-  // screenshot, not a gate.
+  // The learned-row allowlist (issue 1289). `_collectKnowledgeLearnedEntries` builds each row as
+  // a hand-written object literal, so a field it does not name never reaches the display ladder —
+  // the row falls to an earlier rung with nothing failing. Deleting the `granted`/`grantedBy` pair
+  // survived the whole suite, because the mounted Knowledge fixture is hand-built `rawLearned`.
   it('names every learned-entry field the display ladder reads', () => {
     const studio = moduleAstOf(KNOWLEDGE_STUDIO).ast;
-    // Walked to a FIXED POINT from the projection the collected rows are fed to: every
-    // `raw.<field>` that projection reads, and the same again for every function it hands the
-    // same `raw` to, at any depth. One level would miss `granted`/`grantedBy`, which
-    // `learnedRecipeSource` reads only through `learnedRecipeGrantSource`.
+    // Walked to a fixed point from the projection the collected rows are fed to. One level would
+    // miss `granted`/`grantedBy`, which `learnedRecipeSource` reads only through
+    // `learnedRecipeGrantSource`.
     const readFields = new Set();
     const walked = new Set();
     const queue = ['projectLearnedRecipeRow'];
@@ -2946,12 +2919,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   const TOOL_PREVIEW = 'src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
   const declaredClasses = declaredManagerClasses();
 
-  /**
-   * The SEVEN class names `ScopedEntityPreview` renders for a given stem.
-   *
-   * @param {string} stem
-   * @returns {string[]}
-   */
+  /** The seven class names `ScopedEntityPreview` renders for a given stem. */
   function renderedPreviewClasses(stem) {
     const suffixes = templateSuffixes(componentAstOf(SCOPED_PREVIEW), 'classPrefix');
     return [stem, ...new Set(suffixes.map((suffix) => `${stem}-${suffix}`))];
@@ -3008,11 +2976,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     }
   });
 
-  /**
-   * The `{key, fallback}` pair `viewTitle` declares for each world scoped-entity route.
-   *
-   * @returns {Map<string, {key: string, fallback: string}>}
-   */
+  /** The `{key, fallback}` pair `viewTitle` declares per world scoped-entity route. */
   function scopedTitlesFromRoot() {
     const titles = new Map();
     const viewTitle = namedCodeAst(componentAstOf(MANAGER_ROOT).instance, 'viewTitle');
@@ -3025,12 +2989,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     return titles;
   }
 
-  /**
-   * The four facts `scopedEntryRoutes.js` records per entry route, in declaration order.
-   *
-   * @param {string} file
-   * @returns {Array<{entryView: string, entityType: string, catalogueView: string, catalogueTitleKey: string, catalogueTitleFallback: string}>}
-   */
+  /** The four facts `scopedEntryRoutes.js` records per entry route, in declaration order. */
   function declaredEntryRoutes(file) {
     const routes = [];
     for (const node of walkNodes(moduleAstOf(file).ast)) {
@@ -3056,18 +3015,13 @@ describe('world scoped-entity source contract (issue 1362)', () => {
         'cross-check below would be against the wrong set'
     );
 
-    // TWO SPELLINGS, AND BOTH ARE READ (issue 1372). A page that still DELEGATES its body states
-    // the four facts as attributes on `ScopedPlaceholderPage`; a page a screen lane has REPLACED
-    // states them as module constants beside its own `<main>`. Reading only the first form makes
-    // every replaced page answer `undefined` on all four, which collapses the distinctness sets
-    // below to fewer than seven and reds a lane that did everything right — and reading only the
-    // second would do the same to the four that have not been replaced yet. The swap detector has
-    // to survive the transition it exists to police, so it resolves either.
-    // THE SEVEN PAGES, AND THE THREE `WorldComponentEntry*` CHILDREN THAT ARE NOT PAGES (issue
-    // 1371, parity round 4). The world Component entry was rebuilt to the reference as four
-    // files; each child renders a CARD or the rail, declares no route identity and carries no
-    // route hook. They are excluded BY NAME rather than by "has no PAGE_ID", because the
-    // non-vacuity assertion below exists precisely to catch a page that stopped declaring one.
+    // Two spellings, and both are read (issue 1372). A page that still delegates its body states
+    // the four facts as attributes on `ScopedPlaceholderPage`; a page a screen lane has replaced
+    // states them as module constants. Reading either form alone answers `undefined` for the other
+    // half and reds a lane that did everything right, so the swap detector resolves both.
+    // The three `WorldComponentEntry*` children are not pages: each renders a card or the rail and
+    // declares no route identity. They are excluded by name rather than by "has no PAGE_ID",
+    // because the non-vacuity assertion below exists to catch a page that stopped declaring one.
     const SCOPED_ENTRY_CHILDREN = new Set([
       'WorldComponentEntryPreviewRail.svelte',
       'WorldComponentEntrySourceCard.svelte',
@@ -3092,10 +3046,9 @@ describe('world scoped-entity source contract (issue 1362)', () => {
           titleFallback: declared('titleFallback', 'TITLE_FALLBACK'),
         };
       });
-    // NON-VACUITY, because the pair of readings above is exactly the thing that can silently
-    // answer `undefined` for every page after a rename: a set of seven `undefined`s has size one,
-    // which the distinctness assertions below would catch, but a set of seven MISSING title
-    // fallbacks would not — nothing else reads that field.
+    // Non-vacuity: a set of seven `undefined` ids has size one, which the distinctness assertions
+    // below would catch, but seven missing title fallbacks would not — nothing else reads that
+    // field.
     for (const page of pages) {
       for (const field of ['pageId', 'icon', 'titleKey', 'titleFallback']) {
         assert.equal(
@@ -3121,10 +3074,9 @@ describe('world scoped-entity source contract (issue 1362)', () => {
         Boolean(declared),
         `${page.file} claims the route \`${page.pageId}\`, which \`viewTitle\` does not title`
       );
-      // THE SWAP DETECTOR. The page resolves the screen's name for its `<main>` accessible name
-      // and the header resolves it again for the `<h1>`, out of two different files. A swapped
-      // key renders a page titled after its sibling - which nothing in `npm test` renders, and
-      // which the View Lab would publish as a frame before anything failed.
+      // The swap detector. The page resolves the screen's name for its `<main>` accessible name
+      // and the header resolves it again for the `<h1>`, out of two different files; a swapped key
+      // renders a page titled after its sibling, which the View Lab would publish as a frame.
       assert.equal(
         page.titleKey,
         declared.key,
