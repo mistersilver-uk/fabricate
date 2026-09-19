@@ -30,7 +30,7 @@ src/ui/svelte/apps/inventory/bulk	525
 src/ui/svelte/apps/inventory/detail	598
 src/ui/svelte/apps/inventory/detail/salvage	293
 src/ui/svelte/apps/journal	530
-src/ui/svelte/apps/manager	5003
+src/ui/svelte/apps/manager	5002
 src/ui/svelte/apps/manager/checks	1603
 src/ui/svelte/apps/manager/component	347
 src/ui/svelte/apps/manager/components	309
@@ -43,7 +43,7 @@ src/ui/svelte/apps/manager/library	59
 src/ui/svelte/apps/manager/recipe	1142
 src/ui/svelte/apps/manager/recipe-item	335
 src/ui/svelte/apps/manager/recipes	379
-src/ui/svelte/apps/manager/scoped	2435
+src/ui/svelte/apps/manager/scoped	2434
 src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	327
@@ -52,11 +52,11 @@ src/ui/svelte/stores	4526
 src/ui/svelte/util	1218
 src/utils	944
 styles	1042
-tests	19509
+tests	19537
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
-tests/components	14920
+tests/components	14935
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	20
