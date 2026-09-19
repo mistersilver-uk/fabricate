@@ -121,8 +121,6 @@
     "src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte | 1",
     "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | 2",
     "src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte | 3",
-    "src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte | 1",
-    "src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte | 4",
     "src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte | 1",
     "src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte | 1",
     "src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte | 1"

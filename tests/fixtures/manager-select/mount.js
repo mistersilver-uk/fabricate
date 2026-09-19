@@ -9,6 +9,8 @@ import en from '../../../lang/en.json';
 import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte';
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
+import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import RecipeOverviewTab from '../../../src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
 import WorldCurrencyTab from '../../../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 import { installFixtureI18n, mountCaptionShape } from '../select-fixture-shared.js';
@@ -93,6 +95,13 @@ function economyServices(unit) {
   };
 }
 
+// Two tiers of very different label lengths, so the overview cells can be measured on a short
+// value and a long one (issue 1510). `Default DC` is the blank row both lists open with.
+const RECIPE_CHECK_TIERS = [
+  { id: 'tier-easy', name: 'Easy', dc: 8 },
+  { id: 'tier-legendary', name: 'Legendary craftsmanship', dc: 28 },
+];
+
 const SUBJECTS = {
   prerequisites: () =>
     mount(CharacterPrerequisitesCard, {
@@ -159,6 +168,41 @@ const SUBJECTS = {
     mount(GatheringEconomyView, {
       target: mountPoint,
       props: { services: economyServices(startValue || 'hours'), systemId: 'sys' },
+    }),
+  // The recipe studio's four converted cells (issue 1510). `bySubject` with a non-empty modifier
+  // catalogue is the one rule under which the eligible-set cell renders at all.
+  'recipe-overview': () =>
+    mount(RecipeOverviewTab, {
+      target: mountPoint,
+      props: {
+        recipe: {
+          id: 'r1',
+          category: 'Alchemical reagent',
+          checkTierId: startValue || 'tier-easy',
+          minSuccessOutcomeId: startValue || 'tier-easy',
+          craftingModifier: { modifierIds: ['steady'] },
+        },
+        name: 'Tincture of clarity',
+        categories: ['Alchemical reagent', 'Metal'],
+        checkTierOptions: RECIPE_CHECK_TIERS,
+        minSuccessTierOptions: RECIPE_CHECK_TIERS,
+        craftingModifierOptions: [{ id: 'steady', label: 'Steady hands' }],
+        craftingModifierPolicy: 'bySubject',
+        craftingModifierDefaultIds: ['steady'],
+      },
+    }),
+  // One requirement row, so the kind picker renders inside the row's own flex line.
+  'recipe-option': () =>
+    mount(RecipeIngredientOption, {
+      target: mountPoint,
+      props: {
+        option: {
+          quantity: 2,
+          match: { type: startValue === 'tags' ? 'tags' : 'component', componentId: 'cmp-iron' },
+        },
+        componentOptions: [{ id: 'cmp-iron', name: 'Iron ingot' }],
+        itemTags: ['herb', 'rare'],
+      },
     }),
 };
 

@@ -26,6 +26,13 @@
   import RecipeDurationSteppers from './RecipeDurationSteppers.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
+  import Select from '../../../components/Select.svelte';
+  import {
+    buildCategoryOptions,
+    buildCheckTierOptions,
+    buildMinSuccessTierOptions,
+    buildModifierSetOptions,
+  } from './recipeOverviewSelectOptions.js';
 
   let {
     recipe = null,
@@ -112,6 +119,15 @@
   const MODIFIER_SET_LABEL_ID = 'manager-recipe-crafting-modifier-label';
   const MODIFIER_CAP_HINT_ID = 'manager-recipe-crafting-modifier-cap';
   const MODIFIER_SUPPRESSED_ID = 'manager-recipe-crafting-modifier-suppressed';
+
+  // The caption ids the three demoted select wrappers point their triggers at (issue 1510), minted
+  // per INSTANCE rather than as three more fixed literals: a recipe editor can be open beside
+  // another one, and two triggers sharing a caption id would name both controls the same. The
+  // modifier-set caption keeps its fixed id, being the pill group's target too.
+  const instanceId = $props.id();
+  const categoryCaptionId = `${instanceId}-category`;
+  const checkTierCaptionId = `${instanceId}-check-tier`;
+  const minSuccessTierCaptionId = `${instanceId}-min-success-tier`;
 
   // The banner copy for each inert cause: the same two causes the Checks card names, said from
   // this tab's point of view — what the GM loses here, not what to fix there. Each sentence closes
@@ -395,11 +411,21 @@
     hasCustomCategories ? currentCategory : GENERAL_RECIPE_CATEGORY
   );
 
-  function changeCategory(event) {
-    const next = String(event.currentTarget.value || GENERAL_RECIPE_CATEGORY);
-    if (next === currentCategory) return;
-    onSetCategory(next);
+  function changeCategory(next) {
+    const chosen = String(next || GENERAL_RECIPE_CATEGORY);
+    if (chosen === currentCategory) return;
+    onSetCategory(chosen);
   }
+
+  // The four option vocabularies (issue 1510), mapped beside this file rather than in it.
+  const categorySelectOptions = $derived(
+    buildCategoryOptions(categoryOptions, (category) => getRecipeCategoryLabel(category, localize))
+  );
+  const checkTierSelectOptions = $derived(buildCheckTierOptions(checkTierOptions, text));
+  const minSuccessTierSelectOptions = $derived(
+    buildMinSuccessTierOptions(minSuccessTierOptions, text)
+  );
+  const modifierSetOptions = buildModifierSetOptions(text);
 </script>
 
 <section
@@ -472,77 +498,63 @@
   <!-- Select row: Category, then the conditional DC-check + Minimum-success-tier selects that
        only a fixed-type routed check surfaces. -->
   <div class="manager-recipe-overview-selects">
-    <label class="manager-recipe-field" data-recipe-field-category>
-      <span class="manager-recipe-micro-label"
+    <!-- A `<div>` RATHER THAN THE `<label>` THESE THREE ROWS WERE (issue 1510). The control is the
+         shared `<Select>` now — a `<button>` opening a portaled panel dismissed on `mousedown`
+         while open — and a `<label>` FORWARDS a caption click into it, so from the open state the
+         caption's own mousedown dismissed the list and the forwarded click re-opened it. Each
+         micro-label keeps its class, position and copy and names its trigger through
+         `aria-labelledby`, at the cost of no longer being a hit target. -->
+    <div class="manager-recipe-field" data-recipe-field-category>
+      <span class="manager-recipe-micro-label" id={categoryCaptionId}
         >{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span
       >
-      <select
-        data-recipe-category-select
+      <!-- The tooltip rides `triggerTitle`, not `triggerData`: the popover spreads that map FIRST
+           and then writes `title` from its own prop, so a `title` in the map is deleted green. -->
+      <Select
         value={selectedCategory}
+        options={categorySelectOptions}
+        showTick={false}
+        ariaLabelledBy={categoryCaptionId}
         disabled={saving || !hasCustomCategories}
-        title={hasCustomCategories
+        triggerTitle={hasCustomCategories
           ? text('FABRICATE.Admin.Manager.Recipe.CategorySelectLabel', 'Select recipe category')
           : text(
               'FABRICATE.Admin.Manager.Recipe.CategoryNoneHint',
               'No categories defined. Add some under Tags and Categories.'
             )}
-        onchange={changeCategory}
-      >
-        {#each categoryOptions as category (category)}
-          <option value={category}>{getRecipeCategoryLabel(category, localize)}</option>
-        {/each}
-      </select>
-    </label>
+        triggerData={{ 'data-recipe-category-select': '' }}
+        onChange={changeCategory}
+      />
+    </div>
     {#if checkTierOptions.length > 0}
-      <label class="manager-recipe-field" data-recipe-check-tier>
-        <span class="manager-recipe-micro-label"
+      <div class="manager-recipe-field" data-recipe-check-tier>
+        <span class="manager-recipe-micro-label" id={checkTierCaptionId}
           >{text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}</span
         >
-        <select
-          data-recipe-field="checkTierId"
+        <Select
           value={recipe?.checkTierId || ''}
-          onchange={(event) => onUpdateRecipe({ checkTierId: event.currentTarget.value || null })}
+          options={checkTierSelectOptions}
+          ariaLabelledBy={checkTierCaptionId}
           disabled={saving}
-        >
-          <option value=""
-            >{text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC')}</option
-          >
-          {#each checkTierOptions as tier (tier.id)}
-            <option value={tier.id}
-              >{(tier.name ||
-                text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')) +
-                ` (DC ${tier.dc})`}</option
-            >
-          {/each}
-        </select>
-      </label>
+          triggerData={{ 'data-recipe-field': 'checkTierId' }}
+          onChange={(next) => onUpdateRecipe({ checkTierId: next || null })}
+        />
+      </div>
     {/if}
     {#if minSuccessTierOptions.length > 0}
-      <label class="manager-recipe-field" data-recipe-min-success-tier>
-        <span class="manager-recipe-micro-label"
+      <div class="manager-recipe-field" data-recipe-min-success-tier>
+        <span class="manager-recipe-micro-label" id={minSuccessTierCaptionId}
           >{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTier', 'Minimum success tier')}</span
         >
-        <select
-          data-recipe-field="minSuccessOutcomeId"
+        <Select
           value={recipe?.minSuccessOutcomeId || ''}
-          onchange={(event) =>
-            onUpdateRecipe({ minSuccessOutcomeId: event.currentTarget.value || null })}
+          options={minSuccessTierSelectOptions}
+          ariaLabelledBy={minSuccessTierCaptionId}
           disabled={saving}
-        >
-          <option value=""
-            >{text(
-              'FABRICATE.Admin.Manager.Recipe.MinSuccessTierNone',
-              'No override (use final tier)'
-            )}</option
-          >
-          {#each minSuccessTierOptions as tier (tier.id)}
-            <option value={tier.id}
-              >{tier.name ||
-                text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')}</option
-            >
-          {/each}
-        </select>
-      </label>
+          triggerData={{ 'data-recipe-field': 'minSuccessOutcomeId' }}
+          onChange={(next) => onUpdateRecipe({ minSuccessOutcomeId: next || null })}
+        />
+      </div>
     {/if}
     <!-- Check-modifier picks, rendered only under the system's `bySubject` rule and only when the
          system rolls a check for the picks to reach. There is no rule select: a recipe chooses
@@ -556,48 +568,33 @@
          INSIDE the picker cell rather than becoming another sibling. -->
     {#if showModifierControls}
       <div class="manager-recipe-field" data-recipe-crafting-modifier-picker>
-        <label class="manager-recipe-modifier-set-field">
+        <div class="manager-recipe-modifier-set-field">
           <span class="manager-recipe-micro-label" id={MODIFIER_SET_LABEL_ID}
             >{text(
               'FABRICATE.Admin.Manager.Recipe.CraftingModifierPick',
               'Eligible modifiers'
             )}</span
           >
-          <!-- The micro-label above names TWO things — this select, which is inside its `<label>`,
-               and the pill group below through `aria-labelledby` — so a screen-reader user could
-               not tell the two controls apart. The select takes an explicit accessible name
+          <!-- The micro-label above names TWO things — the pill group below, through
+               `aria-labelledby`, and this control, which it used to name by containment — so a
+               screen-reader user could not tell the two apart. The control takes an explicit name
                starting with the visible label (WCAG 2.5.3 Label in Name) and adding what it
-               actually chooses: WHERE the eligible set comes from. -->
-          <select
-            data-recipe-field="craftingModifierSet"
+               chooses: WHERE the eligible set comes from. That is why it is the one demoted
+               wrapper here NOT re-pointed at its caption (issue 1510) — `ariaLabelledBy` would
+               name two controls the same way again, the defect this comment closed. -->
+          <Select
             value={modifierSetMode}
-            aria-label={text(
+            options={modifierSetOptions}
+            showTick={false}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Recipe.CraftingModifierPickSource',
               'Eligible modifiers source'
             )}
-            onchange={(event) => changeModifierSetMode(event.currentTarget.value)}
             disabled={saving}
-          >
-            <option value="inherit"
-              >{text(
-                'FABRICATE.Admin.Manager.Recipe.CraftingModifierSetInherit',
-                'Inherit system default'
-              )}</option
-            >
-            <option value="custom"
-              >{text(
-                'FABRICATE.Admin.Manager.Recipe.CraftingModifierSetCustom',
-                'Custom set'
-              )}</option
-            >
-            <option value="none"
-              >{text(
-                'FABRICATE.Admin.Manager.Recipe.CraftingModifierSetNone',
-                'No modifiers'
-              )}</option
-            >
-          </select>
-        </label>
+            triggerData={{ 'data-recipe-field': 'craftingModifierSet' }}
+            onChange={changeModifierSetMode}
+          />
+        </div>
         {#if modifierSetMode === 'inherit'}
           <!-- Under Inherit there is nothing to author, so the pill row is hidden and the inherited
                set is NAMED — "inheriting" alone says nothing about what this recipe rolls. -->

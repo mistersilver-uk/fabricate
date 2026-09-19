@@ -99,6 +99,7 @@ manager-recipe-edit-crafting-modifier-inert
 manager-recipe-edit-books-scrolls
 manager-recipe-edit-tools
 manager-recipe-edit-ingredients
+manager-recipe-edit-ingredients-kind-list
 manager-recipe-edit-ingredients-cost
 manager-recipe-edit-tag-picker
 manager-recipe-edit-ingredients-or-menu

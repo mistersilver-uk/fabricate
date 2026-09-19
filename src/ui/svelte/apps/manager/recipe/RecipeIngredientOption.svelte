@@ -23,8 +23,9 @@
     2. The resting search border is `--fab-border-strong`, accenting only WHILE TYPING, where an
        accent at rest reads as a field already holding a value.
     3. The plate glyph is 12px, not 11.  4. The suggestion panel is offset 33px.
-    5. The kind select renders at 11px.  6. The tint is per KIND, not per entity — and that last
-       one is NOT a departure from the design, whose own kind table tints per kind too.
+    5. The kind picker is on the `inline` rung (issue 1510).  6. The tint is per KIND, not per
+       entity — and that last one is NOT a departure from the design, whose own kind table tints
+       per kind too.
 
   The seventh disagreement — what Enter commits — is forced by a Fabricate requirement being
   ID-valued rather than by taste, and is stated in the spec section named above.
@@ -48,6 +49,7 @@
     findCurrencyUnit,
   } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import Select from '../../../components/Select.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   // The ONE kind table: the plate's glyph and tint and the kind select's four words are read from
@@ -391,21 +393,19 @@
     <i class={leadIcon}></i>
   </span>
 
-  <!-- A REAL `<select>`: four mutually exclusive values with no search and no imagery is what a
-       select is for, and the platform widget carries keyboard, screen-reader and touch behaviour
-       a hand-rolled menu would reimplement. -->
-  <select
+  <!-- A ONE-OF-N PICKER: four mutually exclusive values, no search, no imagery. A native `<select>`
+       until issue 1510, for a reason that expired — `SearchablePopover` owns the listbox key model,
+       so the replacement is not hand-rolled either. The tooltip rides `triggerTitle`. -->
+  <Select
     class="manager-recipe-option-kind"
-    data-recipe-option-kind
-    aria-label={kindLabel}
-    title={kindLabel}
+    size="inline"
     value={matchType}
-    onchange={(event) => setKind(event.currentTarget.value)}
-  >
-    {#each kindOptions as kind (kind.value)}
-      <option value={kind.value}>{kind.label}</option>
-    {/each}
-  </select>
+    options={kindOptions}
+    ariaLabel={kindLabel}
+    triggerTitle={kindLabel}
+    triggerData={{ 'data-recipe-option-kind': '' }}
+    onChange={setKind}
+  />
 
   {#if matchType === 'tags'}
     <!-- ONE LINE: the policy word, the chosen tags, `+ Tag`, and the Any of / All of control that

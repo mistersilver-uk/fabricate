@@ -120,3 +120,24 @@ export const OR_MENU_GLYPHS = {
   essence: 'fa-solid fa-flask-vial',
   currency: 'fa-solid fa-coins',
 };
+// ── THE KIND PICKER (issue 1510) ─────────────────────────────────────────────────────────
+/**
+ * The requirement row's kind control exactly as `RecipeIngredientOption` renders it: the picker ROOT
+ * with the trigger nested inside, because the root is where `.fabricate-select` and the caller's
+ * `.manager-recipe-option-kind` land while the rung is `.fabricate-select
+ * .fabricate-select-trigger-inline`. A trigger-only fixture matches neither, and the row-parity and
+ * tint measurements would go fictional green on markup the app no longer emits.
+ *
+ * @param {string} label The chosen kind's own word, as the trigger shows it.
+ * @returns {string} The picker's markup.
+ */
+export function kindPickerFixture(label) {
+  return (
+    '<div class="fabricate-picker manager-travel-picker fabricate-select manager-recipe-option-kind">' +
+    '<button type="button" class="fabricate-select-trigger fabricate-select-trigger-inline"' +
+    ' data-recipe-option-kind data-select-size="inline" role="combobox" aria-haspopup="listbox"' +
+    ' aria-expanded="false" aria-label="Requirement kind" title="Requirement kind">' +
+    `<span class="manager-travel-picker-value fabricate-select-value">${label}</span>` +
+    '<i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>'
+  );
+}

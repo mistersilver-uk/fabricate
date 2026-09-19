@@ -1163,9 +1163,11 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at sixteen carriers of the target tuple: four are PINNED by a test or a script ' +
+      'measured at fifteen carriers of the target tuple: three are PINNED by a test or a script ' +
       'that reads their selectors, seven are recorded non-adopters and five are unpinned. The ' +
-      'new non-adopter is the read-only dense ListRow in issue 1648, not a field. Issue ' +
+      'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the carrier ' +
+      'that left is the recipe overview select skin, deleted by issue 1510 when that row became ' +
+      'the shared `<Select>`. Issue ' +
       '1501 measured ONE unpinned carrier and withdrew the class under the two-adopter floor; ' +
       "issue 1371's catalogue, entry and salvage screens then landed four more beneath it, so " +
       'the floor is met and what defers the class now is the work rather than the population — ' +
@@ -1427,9 +1429,10 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    16,
-    'the census is sixteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its four-pinned / seven-non-adopter / five-unpinned split as prose, so a carrier arriving or ' +
+    15,
+    'the census is fifteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its three-pinned / seven-non-adopter / five-unpinned split as prose, so a carrier arriving ' +
+      'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );
   assert.deepEqual(
