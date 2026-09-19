@@ -663,6 +663,23 @@ A party whose current-realm override named the deleted realm still shows it as *
 
 ---
 
+## Importing a System With Realm-Gated Environments Fails
+
+**Symptom:** Importing a crafting system whose gathering environments are restricted to realms fails with an error saying an environment references an unknown realm.
+The same bundle imports cleanly back into the world it was exported from.
+
+**Cause:**
+
+Fabricate 1.9.6 and earlier wrote the imported environments before the realms those environments name.
+Environments are checked against the world realm library as they are written, so the check ran while the realms were still waiting to arrive and rejected the whole import.
+
+**Fix:** Update to 1.9.7 or later, which brings the realm library in before the environments that name it, and import the bundle again.
+Realms the destination world already has keep their own definitions; only realms it does not have are added.
+
+**See also:** [Import & Export]({% link import-export.md %}) covers what a system bundle carries.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:
