@@ -141,6 +141,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './recipes/RecipeBulkEditPanel.svelte',
   // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE.
   './resolutionModeOptions.js',
+  './routeExitGuards.js',
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
   // beside its sibling below because this list is asserted SORTED.
   './scoped/ComponentAddFromCatalogueDialog.svelte',
@@ -157,7 +158,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1372's HEADER-CREATE SEAM.
   './scoped/essenceScoped.js',
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4).
-  './scoped/scopedEntryDraft.js',
   './scoped/scopedEntryRoutes.js',
   './tools/ToolBrowserInspector.svelte',
   './world/WorldCurrencyTab.svelte',
