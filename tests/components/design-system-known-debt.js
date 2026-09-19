@@ -65,6 +65,7 @@ export const KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL = 7;
 export const KNOWN_HEAVY_MONO_WEIGHTS = knownDebt('heavyMonoWeights');
 
 /** @see KNOWN_HEAVY_MONO_WEIGHTS */
+// Issue 1512: the two progressive ordinal pips are the shared list's weight-500 badge now (33 - 2).
 export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 31;
 
 /** A `box-shadow` that is neither an elevation token, `none`, nor an inset ring. */
@@ -132,6 +133,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * @see KNOWN_OFF_LADDER_RADII
  */
 // #1510: the checks conversion removes one remaining 8px radius occurrence from the module sheet.
+// Issue 1512: the retired stage-row box (8px) and rocker buttons (4px) took four with them.
 export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 271;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
@@ -161,6 +163,7 @@ export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 9;
 export const KNOWN_EMPTY_NAME_BINDINGS = knownDebt('unguardedEmptyNameBindings');
 
 /** @see KNOWN_EMPTY_NAME_BINDINGS */
+// Issue 1512: `RowDisclosure` emits `aria-label={label || undefined}` now, so its row leaves whole.
 export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 1;
 
 /**
@@ -171,7 +174,10 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 1;
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 11;
+// Issue 1512: the composition list's four select rows, the step row's header and the drop row
+// are real buttons or non-focusable now (17 - 6). Its second phase converts the two remaining
+// whole-header disclosures — the gathering drop summary and the travel realm header (11 - 2).
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 9;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
@@ -219,7 +225,9 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 // five were de-duplicated by writing that panel once, not converted.
 // Issue 1512: five rows leave whole (220 - 14). The two recipe rows and `RowDisclosure` are paid
 // by the shared list rendering their reorder controls; the other two declare the attribute in place.
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 206;
+// Its second phase closes the book detail's whole slot (206 - 4): all four of that file's raw
+// buttons declare the attribute, so nothing is left open for the next author to fill for free.
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 202;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */

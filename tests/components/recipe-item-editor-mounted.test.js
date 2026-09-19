@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
     // …and the announcement half beside it (issue 1517, review r1).
     'src/ui/svelte/apps/manager/validationAnnouncement.js',
     'src/ui/svelte/util/announceAfterFocus.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',

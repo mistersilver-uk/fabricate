@@ -28,6 +28,7 @@ import {
   multiSystemProgressiveCardRow,
 } from '../helpers/inventoryCollapseFixtures.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -49,6 +50,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/craftingArtResolution.js',
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
     // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
@@ -966,6 +968,65 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       /Description 1/,
       'expanding the row reveals the description'
     );
+  });
+
+  it('opens a book recipe row from its own header button, which names itself and resolves its region', async () => {
+    const recipes = Array.from({ length: 8 }, (_, i) => ({
+      id: `r${i + 1}`,
+      name: `Recipe ${i + 1}`,
+      description: `Description ${i + 1}`,
+      img: null,
+      learned: false,
+    }));
+    const { services } = makeBookServices(makeBook(recipes));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const row = target.querySelector('[data-inventory-learn-recipe="r1"]');
+    const headerOf = () => row.querySelector('.inventory-detail-accordion-toggle');
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: headerOf(),
+      recordName: 'Recipe 1',
+      expanded: false,
+      chevronSelector: '.inventory-detail-accordion-caret',
+      site: 'the book recipe row, collapsed',
+    });
+    assert.ok(
+      Boolean(row.querySelector('[data-inventory-learn="r1"]')),
+      'the row still renders its Learn control'
+    );
+    assert.ok(
+      !headerOf().querySelector('[data-inventory-learn="r1"]'),
+      'and it sits beside the header rather than inside it'
+    );
+
+    headerOf().click();
+    await settle();
+
+    const body = assertWholeHeaderDisclosure({
+      root: target,
+      header: headerOf(),
+      recordName: 'Recipe 1',
+      expanded: true,
+      chevronSelector: '.inventory-detail-accordion-caret',
+      site: 'the book recipe row, open',
+    });
+    assert.ok(
+      body.matches('[data-inventory-recipe-body="r1"]'),
+      'the region the header controls IS the description body'
+    );
+
+    headerOf().click();
+    await settle();
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: headerOf(),
+      recordName: 'Recipe 1',
+      expanded: false,
+      chevronSelector: '.inventory-detail-accordion-caret',
+      site: 'the book recipe row, collapsed again',
+    });
   });
 
   it('does not show the recipe search for a small multi-recipe book (<= 6)', async () => {

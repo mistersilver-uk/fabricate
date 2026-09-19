@@ -13,6 +13,7 @@ import {
   installComponentTestGlobals,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -151,7 +152,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
     });
     let header = target.querySelector('.manager-travel-realms-header');
     assert.equal(header.getAttribute('aria-expanded'), 'false');
-    assert.equal(target.querySelector('[data-manager-realm-editor]'), null);
+    assert.ok(!target.querySelector('[data-manager-realm-editor]'));
     header.click();
     flushSync();
     assert.deepEqual(selections, ['r1']);
@@ -176,6 +177,43 @@ describe('GatheringRealmsTab mounted behavior', () => {
     target.querySelector('.manager-travel-realms-header').click();
     flushSync();
     assert.deepEqual(toggles, ['']);
+    remount();
+  });
+
+  it('opens the realm row from its own header button, which names itself and resolves its region', async () => {
+    const selections = [];
+    await mountTab({
+      realms: [makeRealm({ id: 'r1', name: 'Northreach', environmentCount: 3, partyCount: 1 })],
+      selectedRealmId: '',
+      onSelectRealm: (id) => selections.push(id)
+    });
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: target.querySelector('.manager-travel-realms-header'),
+      recordName: 'Northreach',
+      expanded: false,
+      chevronSelector: '.manager-travel-realms-chevron i',
+      site: 'the travel realm row, collapsed'
+    });
+    target.querySelector('.manager-travel-realms-header').click();
+    flushSync();
+    assert.deepEqual(selections, ['r1'], 'activating the header requests the selection');
+    remount();
+
+    await mountTab({
+      realms: [makeRealm({ id: 'r1', name: 'Northreach', environmentCount: 3, partyCount: 1 })],
+      selectedRealmId: 'r1'
+    });
+    const body = assertWholeHeaderDisclosure({
+      root: target,
+      header: target.querySelector('.manager-travel-realms-header'),
+      recordName: 'Northreach',
+      expanded: true,
+      chevronSelector: '.manager-travel-realms-chevron i',
+      site: 'the travel realm row, open'
+    });
+    assert.ok(body.matches('[data-manager-realm-editor]'), 'the controlled region is the editor body');
+    assert.ok(body.querySelector('[data-manager-realm-env-editor]'), 'and the editor renders inside it');
     remount();
   });
 });
