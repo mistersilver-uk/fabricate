@@ -1,6 +1,7 @@
 /**
  * Structural questions about a Svelte component, answered from its AST rather than its text
- * (issue 1658). `tests/svelte-structure-contract.test.js` pins the two paragraphs below.
+ * (issue 1658). `tests/svelte-structure-contract.test.js` pins the two paragraphs below, so
+ * condense them only together with that test.
  *
  * Do not add a string `includes` on component source to a test. That is the shape
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
@@ -13,6 +14,7 @@ import { parse } from 'svelte/compiler';
 import { parseForESLint } from 'svelte-eslint-parser';
 
 import {
+  calledName,
   declaredConstant as declaresConstant,
   importedModules as importedModuleSpecifiers,
   lazilyImportedModules,
@@ -29,7 +31,7 @@ export function parseComponent(source) {
   return parse(String(source ?? ''), { modern: true });
 }
 
-/** The OTHER vocabulary: the scope-resolved parse `parseComponent` does not produce. */
+/** The other vocabulary: the scope-resolved parse `parseComponent` does not produce. */
 export function parseComponentScope(source) {
   return parseForESLint(String(source ?? ''), {
     filePath: 'probe.svelte',
@@ -105,6 +107,31 @@ export function passesProp(ast, componentName, propName) {
   return occurrences.every((node) => declaresAttribute(node, propName));
 }
 
+/** The props a component destructures from `$props()`, and those it declares with no default. */
+function declaredProps(ast) {
+  const declared = new Set();
+  const required = new Set();
+  for (const node of walkNodes(ast)) {
+    if (node.type !== 'VariableDeclarator' || calledName(node.init) !== '$props') continue;
+    for (const property of node.id?.properties ?? []) {
+      const name = property.key?.name ?? property.value?.left?.name ?? property.value?.name;
+      if (!name) continue;
+      declared.add(name);
+      if (property.value?.type !== 'AssignmentPattern') required.add(name);
+    }
+  }
+  return { declared, required };
+}
+
+export function declaresProp(ast, name) {
+  return declaredProps(ast).declared.has(name);
+}
+
+/** Declared with no default, so an unthreaded caller fails loudly rather than taking a fallback. */
+export function requiresProp(ast, name) {
+  return declaredProps(ast).required.has(name);
+}
+
 function scriptBodies(ast) {
   return [ast.instance?.content?.body ?? [], ast.module?.content?.body ?? []];
 }
@@ -144,7 +171,7 @@ export function spelledLiterals(ast) {
   return found;
 }
 
-/** A SUBSTRING match; for a whole i18n key ask `spellsLiteral`, which a neighbour cannot satisfy. */
+/** A substring match; for a whole i18n key ask `spellsLiteral`, which a neighbour cannot satisfy. */
 export function containsLiteral(ast, text) {
   return spelledLiterals(ast).some((literal) => literal.includes(String(text)));
 }

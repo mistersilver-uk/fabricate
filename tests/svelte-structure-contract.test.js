@@ -26,6 +26,7 @@ import {
   containsLiteral,
   declaredConstant,
   declaresAttribute,
+  declaresProp,
   importedModules,
   importsModule,
   parseComponent,
@@ -33,6 +34,7 @@ import {
   passesProp,
   readsGlobal,
   referencesIdentifier,
+  requiresProp,
   spellsLiteral,
   renderedComponents,
   renderedElements,
@@ -107,6 +109,18 @@ test('passesProp requires every occurrence to declare it, and is false when none
 test('passesProp is false when only some occurrences declare the prop', () => {
   const partial = parseComponent('<div><Chip tone="a" /><Chip /></div>');
   assert.equal(passesProp(partial, 'Chip', 'tone'), false);
+});
+
+test('declaresProp and requiresProp separate a defaulted prop from one with no fallback', () => {
+  const props = parseComponent(
+    '<script>let { store, services = null, ...rest } = $props();</script><div />'
+  );
+  assert.equal(declaresProp(props, 'store'), true);
+  assert.equal(declaresProp(props, 'services'), true);
+  assert.equal(declaresProp(props, 'managerExtensions'), false);
+  assert.equal(requiresProp(props, 'store'), true, 'no default, so an unthreaded caller fails');
+  assert.equal(requiresProp(props, 'services'), false, 'a default answers for the caller instead');
+  assert.equal(declaresProp(parseComponent('<script>let { store } = other();</script><div />'), 'store'), false);
 });
 
 test('declaresAttribute sees a directive as well as a plain attribute', () => {

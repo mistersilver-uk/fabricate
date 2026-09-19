@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   captureCloseOrdering,
+  captureUserHookHandlers,
   withFabricateLifecycleReplay,
 } from '../helpers/extension-composition-harness.js';
 
@@ -187,4 +188,63 @@ test('reaches the Core guards once the companion allows, still in that order', a
     ['companion-dispose', true],
     ['application-close', {}, true],
   ]);
+});
+
+const KNOWLEDGE_STORE_METHODS = Object.freeze([
+  'refreshAccessRosters',
+  'markLearnedRecipeIndexStale',
+  'scheduleKnowledgeRefresh',
+]);
+
+const MANAGER_APP = {
+  modulePath: '/src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+  exportName: 'SvelteCraftingSystemManagerApp',
+};
+
+/**
+ * The polarity and the binding of the Knowledge hook set, which the source contract can only state
+ * as presence: an inverted guard, or a hook bound to the wrong handler, passes that and fails here.
+ */
+test('the production Knowledge hooks refresh for a world actor item, and for nothing else', async () => {
+  const { handlersFor, drainCalls } = await captureUserHookHandlers({
+    ...MANAGER_APP,
+    storeMethods: KNOWLEDGE_STORE_METHODS,
+  });
+
+  const itemHandlers = handlersFor('updateItem');
+  assert.equal(itemHandlers.length, 1, 'one handler owns the owned-item hooks');
+  const [onOwnedItem] = itemHandlers;
+
+  onOwnedItem({ parent: { documentName: 'Actor' } });
+  assert.deepEqual(
+    drainCalls(),
+    ['scheduleKnowledgeRefresh'],
+    "a world actor's item is the only write that refreshes Knowledge"
+  );
+
+  onOwnedItem({ parent: { documentName: 'Actor' }, pack: 'world.recipes' });
+  assert.deepEqual(drainCalls(), [], 'a compendium actor could never change the projection');
+
+  onOwnedItem({ parent: { documentName: 'Item' } });
+  assert.deepEqual(drainCalls(), [], 'and neither could an item embedded in anything but an Actor');
+});
+
+test('the production Actor CRUD hooks reproject the rosters, the index and Knowledge together', async () => {
+  const { handlersFor, drainCalls } = await captureUserHookHandlers({
+    ...MANAGER_APP,
+    storeMethods: KNOWLEDGE_STORE_METHODS,
+  });
+
+  const [onActorCreate] = handlersFor('createActor');
+  onActorCreate({});
+  assert.deepEqual(
+    drainCalls(),
+    ['refreshAccessRosters', 'markLearnedRecipeIndexStale', 'scheduleKnowledgeRefresh'],
+    'an imported Actor carries its items in with no createItem hook, so all three run'
+  );
+  assert.equal(
+    handlersFor('deleteActor')[0],
+    onActorCreate,
+    'and the delete side is bound to the same handler'
+  );
 });

@@ -2509,9 +2509,9 @@ export function registerDowntimeCases() {
     });
   });
 
-  // AC-15, the reachable half. The source contract in `manager-contract.test.js` pins that
-  // both render sites are inside `downtimeCoreFallback === false`; this is the state that
-  // proves the guard is doing work rather than guarding an impossibility.
+  // AC-15, the reachable half. `manager-contract.test.js` counts the two badge render sites; this
+  // is the state that proves the mode guard on them is doing work rather than guarding an
+  // impossibility.
   it('AC-15 — a runtime badge stored while a mount is faulted never reaches Core’s preview row', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();

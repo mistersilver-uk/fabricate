@@ -59,7 +59,7 @@ export function registerRailCases() {
   });
 
 
-  // What issue 1185 took off the titlebar is asserted by its ABSENCE: each would return silently.
+  // What issue 1185 took off the titlebar is asserted by its absence: each would return silently.
   it('renders the titlebar and its resolution status, without the chrome issue 1185 removed', () => {
     useShippedLocalization();
     mountManager();

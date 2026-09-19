@@ -20,11 +20,13 @@ import {
   containsLiteral,
   declaredConstant,
   declaresAttribute,
+  declaresProp,
   importsModule,
   passesProp,
   readsGlobal,
   referencesIdentifier,
   rendersComponent,
+  requiresProp,
   spellsLiteral,
 } from '../helpers/svelteStructureContract.js';
 
@@ -365,22 +367,6 @@ function extendsCallOf(node, name) {
   return false;
 }
 
-/** The props a component destructures from `$props()`, and those it declares with no default. */
-function declaredProps(ast) {
-  const declared = new Set();
-  const required = new Set();
-  for (const node of walkNodes(ast)) {
-    if (node.type !== 'VariableDeclarator' || calledName(node.init) !== '$props') continue;
-    for (const property of node.id?.properties ?? []) {
-      const name = property.key?.name ?? property.value?.left?.name ?? property.value?.name;
-      if (!name) continue;
-      declared.add(name);
-      if (property.value?.type !== 'AssignmentPattern') required.add(name);
-    }
-  }
-  return { declared, required };
-}
-
 function exportedNames(node) {
   const names = new Set();
   for (const inner of walkNodes(node)) {
@@ -426,8 +412,8 @@ function structureOf(target) {
       calls: (name) => callNames(component).has(name),
       callsWith: (pair) => callsWithArgument(component, pair),
       compares: (value) => comparesToLiteral(component, value),
-      declaresProp: (name) => declaredProps(component).declared.has(name),
-      requiresProp: (name) => declaredProps(component).required.has(name),
+      declaresProp: (name) => declaresProp(component, name),
+      requiresProp: (name) => requiresProp(component, name),
     };
   }
   const { ast } = moduleAstOf(file);
@@ -533,11 +519,10 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // The rail renders the active tab set while the host is UNMOUNTED, so the shell owns the live
+  // The rail renders the active tab set while the host is unmounted, so the shell owns the live
   // provider and the host takes it as a prop.
   defineStructureContract('keeps one owner of the active Downtime provider', MANAGER_ROOT, {
-    reads: ['managerExtensions.subscribe'],
-    names: ['WORLD_DOWNTIME_SURFACE_ID'],
+    callsWith: [['subscribe', 'WORLD_DOWNTIME_SURFACE_ID']],
   });
 
   defineStructureContract('leaves the Downtime host subscribing to nothing', DOWNTIME_HOST, {
@@ -568,7 +553,7 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // REQUIRED, with no default: a default would BE the hand-maintained mirror this prop avoids —
+  // Required, with no default: a default would be the hand-maintained mirror this prop avoids —
   // a second copy of Root's literal, agreeing today and undetectable the day it stops.
   defineStructureContract(
     'names its region from the prop and carries no copy of the literal',
@@ -576,7 +561,7 @@ describe('CraftingSystemManager source contract', () => {
     { requiresProp: ['navLabelId'], spellsNo: ['manager-downtime-nav'] }
   );
 
-  // What the `AC-11` to `AC-15` mounted cases cannot say is how MANY render sites exist: a third
+  // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
   // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
   it('renders the Downtime badge at exactly two sites', () => {
     const sites = templateNodes(componentAstOf(MANAGER_ROOT))
@@ -593,7 +578,7 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The companion is disposed BEFORE ApplicationV2 removes its Svelte target; that ordering is
+  // The companion is disposed before ApplicationV2 removes its Svelte target; that ordering is
   // asserted against the real class by `tests/components/manager-extension-composition.test.js`.
 
   // The window height is owned by `scripts/lib/foundryChromeSpec.js` and deep-equalled against the
@@ -619,12 +604,13 @@ describe('CraftingSystemManager source contract', () => {
     names: ['loadCraftingSystemManagerAppClass'],
   });
 
-  // `Document#testUserPermission` short-circuits EVERY GM to OWNER, so GMs are filtered FIRST. No
+  // `Document#testUserPermission` short-circuits every GM to OWNER, so GMs are filtered first. No
   // other file states that `Users#players` is the roster this reads, so it stays asserted here.
   defineStructureContract('derives the access rosters from the non-GM roster', APP_SHELL, {
     reads: ['game.users.players'],
     calls: ['_playerUsers'],
     readsNo: ['actor.isOwner'],
+    namesNo: ['playedBy'],
   });
 
   // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
@@ -646,7 +632,6 @@ describe('CraftingSystemManager source contract', () => {
     {
       reads: ['actor.testUserPermission', 'user.character.id', 'actor.ownership.default'],
       names: ['controlledBy', 'sharedWithAllPlayers'],
-      namesNo: ['playedBy'],
       spells: ['OWNER'],
     }
   );
@@ -658,9 +643,15 @@ describe('CraftingSystemManager source contract', () => {
   );
 
   defineStructureContract(
-    'defines the world Item projection and the Tool source resolver in the service set',
+    'defines the world Item projection in the service set',
     { file: APP_SHELL, member: '_buildServices' },
-    { names: ['getWorldItemOptions'], calls: ['resolveItemSourceSnapshot'] }
+    { names: ['getWorldItemOptions'] }
+  );
+
+  defineStructureContract(
+    'resolves a Tool source through the uuid seam, not the world roster',
+    { file: APP_SHELL, member: '_buildServices', property: 'resolveToolSource' },
+    { calls: ['resolveItemSourceSnapshot'] }
   );
 
   defineStructureContract(
@@ -721,12 +712,13 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // What the titlebar RENDERS is mounted; what stays here is the derivation behind it (issue 1185).
+  // What the titlebar renders is mounted; here are the derivation behind it and the
+  // route-conditional negative the rail case cannot reach (issue 1185).
   defineStructureContract('drives the titlebar premium signal off the whole surface set', MANAGER_ROOT, {
     declares: ['premiumInstalled'],
     calls: ['subscribeSurfaceIds', 'routedOutcomeTierCount'],
     compares: ['routedByCheck'],
-    spellsNo: ['Mythwright', 'mythwright'],
+    spellsNo: ['Mythwright', 'mythwright', 'manager-route-icon'],
   });
 
   it('states the titlebar copy the premium mark and the outcome-tier label read', () => {
@@ -1227,8 +1219,13 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   defineStructureContract('uses manager localization keys rather than hard-coded copy', MANAGER_ROOT, {
-    // In FULL: a substring claim here is satisfied by `…Manager.Titlebar.Premium` next door.
-    spellsExactly: ['FABRICATE.Admin.Manager.Title'],
+    // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted cases
+    // render this copy, which `text(key, fallback)` still produces under a renamed key.
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.Title',
+      'FABRICATE.Admin.Manager.Soon',
+      'FABRICATE.Admin.Manager.Titlebar.Premium',
+    ],
     spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
   });
 
@@ -3560,12 +3557,12 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract(
     'copies a UUID through the Foundry clipboard service',
     { file: APP_SHELL, member: '_buildServices' },
-    {
-      reads: ['game.clipboard'],
-      calls: ['copyPlainText'],
-      readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
-    }
+    { reads: ['game.clipboard'], calls: ['copyPlainText'] }
   );
+
+  defineStructureContract('never bypasses the Foundry clipboard service anywhere in the shell', APP_SHELL, {
+    readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
+  });
 
   // The GM Knowledge surface (issue 785). Everything asserted here is a wiring
   // decision whose absence is SILENT at runtime: an un-suppressed inspector holds a
@@ -3684,12 +3681,13 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The Knowledge SEAM (issue 785). Every rule here is invisible at unit level and
-  // silent at runtime if it regresses: dropping `reprojectKnowledge` from the item
-  // handler leaves a learn/expend/delete on another client unrendered, inverting the
-  // `doc?.pack` guard re-projects the whole world for a compendium write, flattening a
-  // `[hook, id]` tuple leaks the listener across every manager reopen, and removing an
-  // `isGM` gate hands a player a GM mutation.
+  // The Knowledge seam (issue 785). Every rule here is invisible at unit level and silent at
+  // runtime if it regresses: dropping `reprojectKnowledge` from the item handler leaves a
+  // learn/expend/delete on another client unrendered, flattening a `[hook, id]` tuple leaks the
+  // listener across every manager reopen, and removing an `isGM` gate hands a player a GM
+  // mutation. What this file cannot state is which way each guard runs and which handler a hook
+  // is bound to; `tests/components/manager-extension-composition.test.js` drives the real class
+  // against a recording `Hooks` and admin store for that.
   // `Document#pack` falls back to `this.parent?.pack`, so a compendium-actor item is readable off
   // the embedded doc; and `scheduleKnowledgeRefresh` no-ops unless the Knowledge surface is open.
   defineStructureContract(
@@ -3743,23 +3741,26 @@ describe('CraftingSystemManager source contract', () => {
     { calls: ['_knowledgeActor'] }
   );
 
+  // Without the third column, the gated resolver, a row says the mutation is delegated but not
+  // that anything gates it.
   const KNOWLEDGE_MUTATIONS = Object.freeze([
-    ['_expendRecipeItemUse', 'expendOwnedRecipeItemUse'],
-    ['_deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy'],
-    ['_eraseLearnedRecipe', 'eraseLearnedRecipeEntry'],
-    ['_resetActorKnowledge', 'resetActorKnowledgeState'],
+    ['_expendRecipeItemUse', 'expendOwnedRecipeItemUse', '_knowledgeTarget'],
+    ['_deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy', '_knowledgeTarget'],
+    ['_eraseLearnedRecipe', 'eraseLearnedRecipeEntry', '_knowledgeActor'],
+    ['_resetActorKnowledge', 'resetActorKnowledgeState', '_knowledgeActor'],
   ]);
 
-  for (const [method, mutation] of KNOWLEDGE_MUTATIONS) {
+  for (const [method, mutation, gate] of KNOWLEDGE_MUTATIONS) {
     defineStructureContract(
       `${method} resolves through the GM-gated helper and delegates its mutation`,
       { file: APP_SHELL, member: method },
-      { calls: [mutation], names: ['denied'] }
+      { calls: [mutation, gate], names: ['denied'] }
     );
   }
 
-  // ANTI-PIN (issue 1024): a positive `isPlayerCharacterActor` claim is a tautology that survives a
-  // WRONG import, so the claim is that the hardcoded actor type is ABSENT, plus the import.
+  // An anti-pin (issue 1024): a positive `isPlayerCharacterActor` claim is a tautology that
+  // survives the wrong import, so the claim is that the hardcoded actor type is absent, plus the
+  // import.
   defineStructureContract(
     'reaches the player-character roster through the shared, GM-configurable predicate', APP_SHELL,
     {
@@ -3849,7 +3850,7 @@ describe('CraftingSystemManager source contract', () => {
     declares: ['railCollapsedDisplay'],
   });
 
-  // COUNTED, not merely present (issue 1213 review): a mounted case renders one of the two sites,
+  // Counted, not merely present (issue 1213 review): a mounted case renders one of the two sites,
   // so the branch it does not reach would lose the lock silently.
   it('writes the rail toggle twice, and both sites carry the same state attributes', () => {
     const sites = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
