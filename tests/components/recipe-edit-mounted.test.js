@@ -2646,6 +2646,51 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // THE NAME IS READ BEFORE THE ARRAY MOVES (issue 1697, replacing a statement-order pin). The
+  // root writes each patch straight back into the draft, so `results` changes under the card
+  // inside the same click; a name read after `reorderItem` would announce the item that swapped
+  // INTO the slot. This case round-trips the patch the way the root does, which is what makes the
+  // announced name able to be wrong at all.
+  it('progressive: the reorder announcement names the item that moved, not the one that arrived', async () => {
+    const results = [
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+      { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
+    ];
+    let current = { ...RECIPE, complex: false, resultGroups: [{ id: 'grp-1', name: '', results }] };
+    const target = await editHarness.mount(
+      identityProps({
+        complex: false,
+        progressive: true,
+        componentOptions: COMPONENT_OPTIONS,
+        recipe: current,
+        onUpdateRecipe: (patch) => {
+          current = { ...current, ...patch };
+          editHarness.component.$set({ recipe: current });
+        },
+      })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+
+    target
+      .querySelectorAll('[data-recipe-result-row]')[1]
+      .querySelector('[data-recipe-result-move-up]')
+      .click();
+    await flushRender();
+
+    assert.deepEqual(
+      current.resultGroups[0].results.map((result) => result.id),
+      ['res-2', 'res-1'],
+      'the round trip landed, so the array really did move under the card'
+    );
+    assert.match(
+      target.querySelector('[data-recipe-result-order-status]').textContent,
+      /Pure Water moved to position 1 of 2/,
+      'the announcement names the result that moved'
+    );
+    editHarness.remount();
+  });
+
   it('non-progressive: result rows expose no move buttons', async () => {
     const { target } = await mountProgressiveResults(
       [
