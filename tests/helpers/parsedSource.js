@@ -44,6 +44,11 @@ export function componentAstsIn(dir) {
   return pathsIn(dir, '.svelte').map(componentAstOf);
 }
 
+/** The same components as `[repoRelativePath, ast]`, for a corpus whose failures name the file. */
+export function componentAstEntriesIn(dir) {
+  return pathsIn(dir, '.svelte').map((path) => [path, componentAstOf(path)]);
+}
+
 export function moduleAstsIn(dir) {
   return pathsIn(dir, '.js').map(moduleAstOf);
 }

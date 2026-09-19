@@ -1,89 +1,61 @@
+/**
+ * The environment editor's structure contract (issue 1697 retired this file's source-text pins).
+ * Every claim about a `src/` file is a row of the shared table; the `lang/en.json` catalogue
+ * assertions below are not pins and stay as they are.
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { evaluateEnvironmentReadiness, blocksEnable } from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
+import {
+  evaluateEnvironmentReadiness,
+  blocksEnable,
+} from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
 import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
+import { literalStrings } from '../helpers/moduleAst.js';
+import { componentAstEntriesIn, componentAstOf } from '../helpers/parsedSource.js';
+import {
+  declaredConstantValue,
+  defineStructureContract,
+  propertyAst,
+  staticTextCalls,
+} from '../helpers/structureContract.js';
+import { repoRoot } from '../helpers/sourceScan.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(__dirname, '../..');
-const envDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/environment');
+const MANAGER = 'src/ui/svelte/apps/manager';
+const ENV_DIR = `${MANAGER}/environment`;
+const SHELL = `${MANAGER}/EnvironmentEditView.svelte`;
+const MANAGER_ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
+const LIST = `${ENV_DIR}/CompositionList.svelte`;
+const MODE_CONTROL = `${ENV_DIR}/CompositionModeControl.svelte`;
+const INSPECTOR = `${ENV_DIR}/RecordInspector.svelte`;
+const TABS = `${ENV_DIR}/EnvironmentEditorTabs.svelte`;
+const EVIDENCE = `${ENV_DIR}/MatchingEvidenceChips.svelte`;
+const TASKS_TAB = `${ENV_DIR}/EnvironmentTasksTab.svelte`;
+const EVENTS_TAB = `${ENV_DIR}/EnvironmentEventsTab.svelte`;
+const VALIDATION = `${ENV_DIR}/EnvironmentValidationTab.svelte`;
+const OVERVIEW = `${ENV_DIR}/EnvironmentOverviewTab.svelte`;
+const SUMMARY_INSPECTOR = `${ENV_DIR}/EnvironmentSummaryInspector.svelte`;
+const RIGHT_INSPECTOR = `${ENV_DIR}/EnvironmentRightInspector.svelte`;
+// The tab strip is a caller of the promoted `EditorTabs` primitive since issue 1362.
+const EDITOR_TABS = 'src/ui/svelte/components/EditorTabs.svelte';
+const SHELL_VOCABULARY = '../../../../systems/gatheringComposition.js';
+const LIST_VOCABULARY = '../../../../../systems/gatheringComposition.js';
 
-function read(name) {
-  return readFileSync(resolve(envDir, name), 'utf8');
-}
+const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
 function catalogValue(key) {
   return key.split('.').reduce((node, part) => node?.[part], lang);
 }
 
-function decodeStaticString(quote, body) {
-  return Function(`return ${quote}${body}${quote};`)();
+const VALIDATION_KEY_STEM = 'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.';
+
+/** The `[key, fallback]` pair one record-issue label states, as the source spells it. */
+function recordIssueLabel(issueId, kind) {
+  const table = declaredConstantValue(VALIDATION, 'RECORD_ISSUE_LABELS');
+  return literalStrings(propertyAst(propertyAst(table, issueId), kind));
 }
-
-function staticTextCalls(source) {
-  const pattern = /text\(\s*(["'])(FABRICATE(?:\\.|(?!\1).)*)\1\s*,\s*(["'])((?:\\.|(?!\3).)*)\3\s*\)/gs;
-  return [...source.matchAll(pattern)].map(match => ({
-    key: match[2],
-    fallback: decodeStaticString(match[3], match[4])
-  }));
-}
-
-const shellSource = readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'), 'utf8');
-const managerRootSource = readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'), 'utf8');
-const listSource = read('CompositionList.svelte');
-const modeControlSource = read('CompositionModeControl.svelte');
-const inspectorSource = read('RecordInspector.svelte');
-const tabsSource = read('EnvironmentEditorTabs.svelte');
-// The tab strip is a caller of the promoted `EditorTabs` primitive since issue 1362.
-const editorTabsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/components/EditorTabs.svelte'),
-  'utf8'
-);
-const evidenceSource = read('MatchingEvidenceChips.svelte');
-const tasksTabSource = read('EnvironmentTasksTab.svelte');
-const eventsTabSource = read('EnvironmentEventsTab.svelte');
-const validationSource = read('EnvironmentValidationTab.svelte');
-const overviewSource = read('EnvironmentOverviewTab.svelte');
-const summaryInspectorSource = read('EnvironmentSummaryInspector.svelte');
-const rightInspectorSource = read('EnvironmentRightInspector.svelte');
-const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
-// The four-state "included" composition vocabulary has ONE home (issue #1321):
-/** The slice of `CompositionList.svelte` belonging to one `data-section`. */
-function listSection(name) {
-  const start = listSource.indexOf(`data-section="${name}"`);
-  assert.ok(start !== -1, `CompositionList.svelte should still render a ${name} section`);
-  const rest = listSource.slice(start + 1);
-  const next = rest.indexOf('data-section="');
-  return listSource.slice(start, next === -1 ? listSource.length : start + 1 + next);
-}
-
-/**
- * The body of one of `CompositionList.svelte`'s four menu-item builders.
- *
- * @param {string} name The builder function's name.
- * @returns {string} Its source, from the declaration to its closing brace.
- */
-function menuBuilder(name) {
-  const start = listSource.indexOf(`function ${name}(`);
-  assert.ok(start !== -1, `CompositionList.svelte should still declare ${name}()`);
-  const rest = listSource.slice(start);
-  const end = rest.indexOf('\n  }');
-  assert.ok(end !== -1, `${name}() has no recognisable end, so this slice reads the whole file`);
-  return rest.slice(0, end);
-}
-
-const SHARED_INCLUDED_STATES_IMPORT =
-  /import\s*\{[^}]*\bENVIRONMENT_INCLUDED_COMPOSITION_STATES\b[^}]*\}\s*from\s*'[^']*systems\/gatheringComposition\.js'/;
-
-const editorLocalizationSources = [
-  ['EnvironmentEditView.svelte', shellSource],
-  ...readdirSync(envDir)
-    .filter(name => name.endsWith('.svelte'))
-    .map(name => [name, read(name)])
-];
 
 describe('environment editor localization', () => {
   it('defines the EnvironmentEditor namespace in en.json for the keys the editor uses', () => {
@@ -100,14 +72,21 @@ describe('environment editor localization', () => {
       ['Validation', 'Readiness'],
       ['Evidence', 'Biome'],
       ['Tabs', 'Tasks'],
-      ['Runtime', 'Available']
+      ['Runtime', 'Available'],
     ];
     for (const [group, key] of checks) {
-      assert.equal(typeof editor[group]?.[key], 'string', `EnvironmentEditor.${group}.${key} should be a localized string`);
-      assert.ok(editor[group][key].length > 0, `EnvironmentEditor.${group}.${key} should not be empty`);
+      assert.equal(
+        typeof editor[group]?.[key],
+        'string',
+        `EnvironmentEditor.${group}.${key} should be a localized string`
+      );
+      assert.ok(
+        editor[group][key].length > 0,
+        `EnvironmentEditor.${group}.${key} should not be empty`
+      );
     }
     assert.equal(editor.Events.DangerTag.deadly, 'Deadly');
-    // THE SEVERITY WORDS ARE GONE, and pinned absent rather than merely unread (issue 1517).
+    // The severity words are gone, and pinned absent rather than merely unread (issue 1517).
     assert.equal(editor.Validation.Severity, undefined, 'the severity chip words are retired');
     const shared = lang.FABRICATE.Admin.Manager.Validation;
     assert.equal(shared.CountBlocking, 'Blocking');
@@ -135,10 +114,22 @@ describe('environment editor localization', () => {
       ['Composition.QuickRemove', 'Remove'],
       ['Composition.Remove', 'Remove from environment'],
       // BOTH modes are pinned (issue #1315).
-      ['Composition.ManualHint', 'Only the tasks and events you add are available, whether or not they match this environment.'],
-      ['Composition.AutomaticHint', 'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.'],
-      ['Inspector.OverridesHintTask', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source task.'],
-      ['Inspector.OverridesHintEvent', 'Drop-rate adjustments apply only in this environment and do not modify the reusable source event.'],
+      [
+        'Composition.ManualHint',
+        'Only the tasks and events you add are available, whether or not they match this environment.',
+      ],
+      [
+        'Composition.AutomaticHint',
+        'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.',
+      ],
+      [
+        'Inspector.OverridesHintTask',
+        'Drop-rate adjustments apply only in this environment and do not modify the reusable source task.',
+      ],
+      [
+        'Inspector.OverridesHintEvent',
+        'Drop-rate adjustments apply only in this environment and do not modify the reusable source event.',
+      ],
       ['Inspector.DropRateAdjustment', 'Drop-rate adjustment'],
       ['Inspector.DropRateAdjustmentRange', 'Drop-rate adjustment (-100% to +100%)'],
       ['Inspector.ApplyDropRateAdjustmentsOn', 'On'],
@@ -148,14 +139,30 @@ describe('environment editor localization', () => {
       ['Inspector.BaseRate', 'Base'],
       ['Inspector.EffectiveRate', 'Effective'],
       ['Inspector.ClearAdjustment', 'Clear'],
-      ['Tasks.ManualIntro', 'Only tasks you add are available to players, whether or not they match this environment.'],
-      ['Tasks.AutomaticIntro', 'All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.'],
-      ['Events.ManualIntro', 'Only events you add apply here, whether or not they match this environment.'],
-      ['Events.AutomaticIntro', 'All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.']
+      [
+        'Tasks.ManualIntro',
+        'Only tasks you add are available to players, whether or not they match this environment.',
+      ],
+      [
+        'Tasks.AutomaticIntro',
+        'All matching enabled library tasks are available. Exclude any of them here, or force add a non-matching task.',
+      ],
+      [
+        'Events.ManualIntro',
+        'Only events you add apply here, whether or not they match this environment.',
+      ],
+      [
+        'Events.AutomaticIntro',
+        'All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.',
+      ],
     ];
 
     for (const [path, value] of expected) {
-      assert.equal(path.split('.').reduce((node, part) => node?.[part], editor), value, `EnvironmentEditor.${path}`);
+      assert.equal(
+        path.split('.').reduce((node, part) => node?.[part], editor),
+        value,
+        `EnvironmentEditor.${path}`
+      );
     }
 
     // The mutation-proof half of the pair above.
@@ -166,7 +173,11 @@ describe('environment editor localization', () => {
         `EnvironmentEditor.${path} must not offer a force add: manual mode has no filter to override (${value})`
       );
     }
-    for (const path of ['Composition.AutomaticHint', 'Tasks.AutomaticIntro', 'Events.AutomaticIntro']) {
+    for (const path of [
+      'Composition.AutomaticHint',
+      'Tasks.AutomaticIntro',
+      'Events.AutomaticIntro',
+    ]) {
       const value = path.split('.').reduce((node, part) => node?.[part], editor);
       assert.ok(
         /force add/i.test(value),
@@ -180,14 +191,14 @@ describe('environment editor localization', () => {
 
   it('keeps static EnvironmentEditor localization fallbacks aligned with en.json', () => {
     const failures = [];
-    for (const [fileName, source] of editorLocalizationSources) {
-      for (const { key, fallback } of staticTextCalls(source)) {
+    const editorComponents = [[SHELL, componentAstOf(SHELL)], ...componentAstEntriesIn(ENV_DIR)];
+    for (const [file, component] of editorComponents) {
+      for (const { key, fallback } of staticTextCalls(component)) {
         if (!key.startsWith('FABRICATE.Admin.Manager.EnvironmentEditor.')) continue;
         const value = catalogValue(key);
-        if (typeof value !== 'string') {
-          failures.push(`${fileName}: missing ${key}`);
-        } else if (value !== fallback) {
-          failures.push(`${fileName}: ${key} fallback "${fallback}" does not match en.json "${value}"`);
+        if (typeof value !== 'string') failures.push(`${file}: missing ${key}`);
+        else if (value !== fallback) {
+          failures.push(`${file}: ${key} fallback "${fallback}" does not match en.json "${value}"`);
         }
       }
     }
@@ -195,256 +206,443 @@ describe('environment editor localization', () => {
   });
 
   it('keeps dynamic EnvironmentEditor validation fallbacks aligned with en.json', () => {
-    assert.ok(
-      !validationSource.includes('CheckRegion') && !validationSource.includes('hasRegion'),
-      'the region readiness check and its dynamic fallback should be removed'
-    );
-    // Prettier prints these two entries across several lines once the sentence grows.
-    for (const pattern of [
-      /'IssueStaleIncludedTask',\s*'The task "\{name\}" does not match this environment, and composes anyway\.'/,
-      /'IssueStaleIncludedEvent',\s*'The event "\{name\}" does not match this environment, and composes anyway\.'/,
-      /'IssueTaskNoDescriptionTask',\s*'The task "\{name\}" has no player-facing description\.'/
+    // The dynamic half: a table of `[key, fallback]` pairs a template literal completes at call
+    // time, so the catalogue comparison the static sweep above makes has to be made per row.
+    for (const [issueId, kind] of [
+      ['staleIncluded', 'task'],
+      ['staleIncluded', 'event'],
+      ['taskNoDescription', 'task'],
     ]) {
-      assert.match(validationSource, pattern, 'the dynamic fallback should match the English catalog');
-    }
-    assert.ok(
-      /descFallback:\s*'Only the tasks and events you add are available, whether or not they match this environment\.'/.test(modeControlSource),
-      'ManualHint dynamic fallback should match the English catalog'
-    );
-    assert.ok(
-      /descFallback:\s*'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one\.'/.test(modeControlSource),
-      'AutomaticHint dynamic fallback should match the English catalog'
-    );
-  });
-
-  it('formats validation issue record names as natural language instead of bracketed suffixes', () => {
-    assert.ok(validationSource.includes('RECORD_ISSUE_LABELS'), 'validation tab should define per-record message templates');
-    assert.ok(validationSource.includes(".replace('{name}', issue.recordName)"), 'record issue titles should inject the record name into a sentence template');
-    assert.ok(!validationSource.includes('`${base} (${issue.recordName})`'), 'validation tab should not append record names in parentheses');
-  });
-
-  it('no editor component falls back on the legacy Environment.* editor key prefixes', () => {
-    for (const source of [shellSource, listSource, inspectorSource, tabsSource, evidenceSource, tasksTabSource, overviewSource, summaryInspectorSource]) {
-      assert.ok(!/FABRICATE\.Admin\.Manager\.Environment\.(Overview|Composition|Evidence|Diagnostics|Tabs|Runtime|Inspector|Validation)\b/.test(source), 'editor sources should use the EnvironmentEditor namespace');
+      const [key, fallback] = recordIssueLabel(issueId, kind);
+      assert.equal(
+        catalogValue(`${VALIDATION_KEY_STEM}${key}`),
+        fallback,
+        `${issueId}.${kind} states a fallback the English catalog does not carry`
+      );
     }
   });
+
+  defineStructureContract(
+    'the validation tab keeps no region readiness check or its dynamic fallback',
+    VALIDATION,
+    { namesNo: ['hasRegion'], spellsNo: ['CheckRegion', 'hasRegion'] }
+  );
+
+  defineStructureContract(
+    'the manual mode hint states the manual sentence, and the automatic one the automatic',
+    { file: MODE_CONTROL, constant: 'OPTIONS', record: ['value', 'manual'] },
+    {
+      property: [
+        ['descKey', 'ManualHint'],
+        [
+          'descFallback',
+          'Only the tasks and events you add are available, whether or not they match this environment.',
+        ],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'and the automatic record carries the automatic hint, so the two cannot be swapped',
+    { file: MODE_CONTROL, constant: 'OPTIONS', record: ['value', 'automatic'] },
+    {
+      property: [
+        ['descKey', 'AutomaticHint'],
+        [
+          'descFallback',
+          'All matching enabled tasks and events are available; exclude any of them here, or force add a non-matching one.',
+        ],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'validation issue record names are injected into a sentence template, not bracketed',
+    { file: VALIDATION, fn: 'issueTitle' },
+    {
+      names: ['RECORD_ISSUE_LABELS'],
+      calls: ['replace'],
+      callsLiteral: [['replace', '{name}']],
+      reads: ['issue.recordName'],
+    }
+  );
+
+  defineStructureContract(
+    'no editor component falls back on the legacy Environment.* editor key prefixes',
+    [SHELL, LIST, INSPECTOR, TABS, EVIDENCE, TASKS_TAB, OVERVIEW, SUMMARY_INSPECTOR],
+    {
+      spellsNo: [
+        'FABRICATE.Admin.Manager.Environment.Overview',
+        'FABRICATE.Admin.Manager.Environment.Composition',
+        'FABRICATE.Admin.Manager.Environment.Evidence',
+        'FABRICATE.Admin.Manager.Environment.Diagnostics',
+        'FABRICATE.Admin.Manager.Environment.Tabs',
+        'FABRICATE.Admin.Manager.Environment.Runtime',
+        'FABRICATE.Admin.Manager.Environment.Inspector',
+        'FABRICATE.Admin.Manager.Environment.Validation',
+      ],
+    }
+  );
 });
 
 describe('environment multi-realm selector', () => {
-  it('replaces the single-region select with a toggle-gated includedRealmIds chip control', () => {
-    // The legacy single-region <select> bound to environment.region is gone.
-    assert.equal(overviewSource.includes("data-environment-field=\"region\""), false, 'legacy single-region select should be removed');
-    assert.equal(overviewSource.includes('onUpdate({ region:'), false, 'editor should not write the legacy region string');
+  defineStructureContract(
+    'replaces the single-region select with a toggle-gated includedRealmIds chip control',
+    OVERVIEW,
+    {
+      // The legacy single-region `<select>` bound to `environment.region` is gone.
+      attributesNo: [['data-environment-field', 'region']],
+      attributes: [['data-environment-field', 'includedRealmIds']],
+      writes: ['data-environment-realm-empty'],
+      names: ['realmsEnabled', 'addRealm', 'removeRealm', 'realmOptions'],
+      readsNo: ['environment.region'],
+    }
+  );
 
-    // The multi-realm chip control is bound to includedRealmIds and gated on the toggle.
-    assert.ok(overviewSource.includes("data-environment-field=\"includedRealmIds\""), 'realm chip control should hook includedRealmIds');
-    assert.ok(overviewSource.includes('{#if realmsEnabled}'), 'realm field is gated on the Travel & Realms toggle');
-    assert.ok(overviewSource.includes('onUpdate({ includedRealmIds:'), 'add/remove writes includedRealmIds');
-    assert.ok(/function\s+addRealm\s*\(/.test(overviewSource), 'addRealm handler should exist');
-    assert.ok(/function\s+removeRealm\s*\(/.test(overviewSource), 'removeRealm handler should exist');
+  defineStructureContract(
+    'and both realm handlers write includedRealmIds rather than the retired region string',
+    { file: OVERVIEW, fn: 'addRealm' },
+    { calls: ['onUpdate'], keys: ['includedRealmIds'], keysNo: ['region'] }
+  );
 
-    // Empty-state hint points to the Travel tab when no realms exist.
-    assert.ok(overviewSource.includes('data-environment-realm-empty'), 'empty-state hint hook should exist');
-    assert.ok(overviewSource.includes('realmOptions.length === 0'), 'empty state guards on no realm options');
-    assert.equal(typeof lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty, 'string');
-    assert.ok(lang.FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty.includes('World > Travel'), 'empty-state hint names the world route realms are authored on');
+  defineStructureContract(
+    'so a removal writes the same field',
+    { file: OVERVIEW, fn: 'removeRealm' },
+    { calls: ['onUpdate'], keys: ['includedRealmIds'], keysNo: ['region'] }
+  );
+
+  defineStructureContract(
+    'the empty-state hint guards on there being no realm options at all',
+    { file: OVERVIEW, constant: 'availableRealms' },
+    { reads: ['realmOptions.filter'] }
+  );
+
+  it('the empty-state hint points at the world route realms are authored on', () => {
+    const value = catalogValue('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty');
+    assert.equal(typeof value, 'string');
+    assert.ok(
+      value.includes('World > Travel'),
+      'empty-state hint names the world route realms are authored on'
+    );
   });
 
-  it('sources realm options from GatheringRealm records, not the removed vocabulary', () => {
-    assert.ok(overviewSource.includes('realmRecords'), 'overview consumes realmRecords (GatheringRealm records)');
-    assert.equal(shellSource.includes("realmOptions={gatheringVocabularyOptions('realms')}"), false, 'no longer sources realm from the vocabulary');
-    // `worldRealms` since issue 1282.
-    assert.ok(managerRootSource.includes('realmRecords={worldRealms}'), 'root threads the world realm records into the editor');
-    assert.ok(managerRootSource.includes('realmsEnabled={gatheringRealmsEnabled}'), 'root threads the toggle gate into the editor');
-  });
+  defineStructureContract(
+    'sources realm options from GatheringRealm records, not the removed vocabulary',
+    OVERVIEW,
+    { names: ['realmRecords'], namesNo: ['gatheringVocabularyOptions'] }
+  );
+
+  defineStructureContract(
+    'and the root threads the world realm records and the toggle gate into the editor',
+    MANAGER_ROOT,
+    {
+      passesProps: [
+        ['EnvironmentEditView', 'realmRecords'],
+        ['EnvironmentEditView', 'realmsEnabled'],
+        ['EnvironmentEditView', 'eventSelectionMode'],
+      ],
+    }
+  );
 });
 
 describe('environment composition editor structure', () => {
-  it('shell composes tabs, workspace, and its own inspector (header lives in chrome)', () => {
-    for (const snippet of [
-      'EnvironmentEditorTabs',
-      'EnvironmentOverviewTab',
-      'EnvironmentTasksTab',
-      'EnvironmentEventsTab',
-      'EnvironmentValidationTab',
-      'EnvironmentRightInspector',
-      'data-environment-editor',
-      'manager-environment-workspace'
-    ]) {
-      assert.ok(shellSource.includes(snippet), `shell should reference ${snippet}`);
+  defineStructureContract(
+    'shell composes tabs, workspace, and its own inspector (header lives in chrome)',
+    SHELL,
+    {
+      renders: [
+        'EnvironmentEditorTabs',
+        'EnvironmentOverviewTab',
+        'EnvironmentTasksTab',
+        'EnvironmentEventsTab',
+        'EnvironmentValidationTab',
+        'EnvironmentRightInspector',
+      ],
+      rendersNo: ['EnvironmentEditorHeader'],
+      writes: ['data-environment-editor', 'is-inspector-hidden'],
+      attributes: [['class', 'manager-environment-workspace']],
+      passesProps: [['EnvironmentRightInspector', 'activeTab']],
     }
-    assert.ok(!shellSource.includes('EnvironmentEditorHeader'), 'header now lives in the shared chrome, not the editor body');
-    assert.ok(/\{#if activeTab !== 'validation'\}\s*<EnvironmentRightInspector/.test(shellSource), 'right inspector renders on every tab except validation');
-    assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab === 'validation'}"), 'workspace collapses to one column on the validation tab');
-    assert.ok(/<EnvironmentRightInspector[\s\S]*?\{activeTab\}/.test(shellSource), 'shell passes the active tab to the inspector');
-    assert.ok(shellSource.includes('function selectValidationRecord'), 'validation issue actions route through a tab-switching selector');
-    // THE ROUTE IS A TABLE NOW, not an inline ternary (issue 1517, docs round). The row action
-    // has to name the destination three times — the tab it opens, the word the announcement says
-    // and the composition list the record name is read from — so the pairing is written once and
-    // read three times. The clause reads the table rather than the ternary it replaced; the
-    // ORDER the route is written in is read by `describeValidationHostContract` below.
-    assert.ok(/task:\s*\{\s*tab: 'tasks'/.test(shellSource), 'a task issue routes to the Tasks tab');
-    assert.ok(/event:\s*\{\s*tab: 'events'/.test(shellSource), 'an event issue routes to the Events tab');
-    assert.ok(shellSource.includes('activeTab = route.tab'), 'validation issue actions switch to the relevant Tasks/Events tab');
-    assert.ok(shellSource.includes('onSelectRecord={selectValidationRecord}'), 'validation tab uses the tab-switching selector');
-  });
+  );
 
-  it('renders Tasks/Events as a column-headed table', () => {
-    assert.ok(listSource.includes('manager-environment-comp-head'), 'composition list renders a column header row');
-    for (const col of ['ColTask', 'ColEvent', 'ColOverride', 'ColRuntime']) {
-      assert.ok(listSource.includes(col), `composition table defines the ${col} column`);
+  defineStructureContract(
+    'a validation row action routes through one table rather than an inline ternary',
+    { file: SHELL, constant: 'ISSUE_ROUTES', property: 'task' },
+    { property: [['tab', 'tasks']] }
+  );
+
+  defineStructureContract(
+    'so the event kind opens the Events tab from the same table',
+    { file: SHELL, constant: 'ISSUE_ROUTES', property: 'event' },
+    { property: [['tab', 'events']] }
+  );
+
+  defineStructureContract(
+    'and the selector reads the route it looked up rather than branching again',
+    { file: SHELL, fn: 'selectValidationRecord' },
+    {
+      reads: ['route.tab', 'route.key', 'route.fallback'],
+      calls: ['selectRecord', 'announceValidationOutcome'],
     }
-    assert.ok(listSource.includes('ColWeight'), 'composition table defines the blind-mode ColWeight column');
-    assert.ok(!listSource.includes('ColEvidence'), 'composition table no longer renders an evidence column');
-    assert.ok(!listSource.includes('MatchingEvidenceChips'), 'composition rows no longer embed evidence chips inline');
-    assert.ok(listSource.includes('OverrideIndicator'), 'rows surface override state via the OverrideIndicator chip');
-    assert.ok(listSource.includes('active={entry.hasDropRateAdjustment === true}'), 'override chips are driven by drop-rate adjustment state');
-    assert.ok(!listSource.includes('compositionState={entry.compositionState}'), 'override chips are not driven by composition state');
-    assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
-    // Issue 1477 moved the overflow menu into the shared `<ActionMenu>` primitive.
-    assert.ok(listSource.includes('<ActionMenu'), 'rows expose an overflow action menu');
-    assert.ok(
-      !listSource.split('</script>')[1].includes('role="menu"'),
-      'and do not hand-roll one beside it: the primitive writes the role. Scoped to the MARKUP ' +
-        'region, because the script above it names the role in prose explaining the conversion'
-    );
-    assert.ok(/const showEventRankControls = \$derived\(\s*kind === 'event' && eventSelectionMode === 'highestRankedDrop'\s*\)/.test(listSource), 'event rank controls are gated by the highest-ranked system rule');
-    assert.ok(listSource.includes('draggable={showEventRankControls ? true : undefined}'), 'reorder drag is enabled only when event rank controls are active');
-    assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
+  );
+
+  defineStructureContract('renders Tasks/Events as a column-headed table', LIST, {
+    attributes: [
+      ['class', 'manager-environment-comp-head'],
+      ['role', 'button'],
+    ],
+    attributesNo: [['role', 'menu']],
+    spells: ['ColTask', 'ColEvent', 'ColOverride', 'ColRuntime', 'ColWeight'],
+    spellsNo: ['ColEvidence'],
+    rendersNo: ['MatchingEvidenceChips'],
+    renders: ['OverrideIndicator', 'ActionMenu'],
+    passesProps: [['OverrideIndicator', 'active']],
+    passesPropsNo: [['OverrideIndicator', 'compositionState']],
+    reads: ['entry.hasDropRateAdjustment'],
+    spellsExactly: ['manager-environment-comp-row '],
   });
 
-  it('threads the system event selection rule into the events composition list', () => {
-    assert.ok(
-      managerRootSource.includes('eventSelectionMode={selectedGatheringRules.eventSelectionMode}'),
-      'manager root passes selectedGatheringRules.eventSelectionMode into the environment editor'
-    );
-    assert.ok(shellSource.includes("eventSelectionMode = 'allDrops'"), 'environment editor defaults the event rule defensively');
-    assert.ok(shellSource.includes('{eventSelectionMode}'), 'environment editor forwards the event rule to the events tab');
-    assert.ok(eventsTabSource.includes("eventSelectionMode = 'allDrops'"), 'events tab defaults the event rule defensively');
-    assert.ok(eventsTabSource.includes('{eventSelectionMode}'), 'events tab forwards the event rule to CompositionList');
-    assert.ok(listSource.includes("eventSelectionMode = 'allDrops'"), 'composition list defaults to the non-ranked all-drops mode');
+  defineStructureContract(
+    'event rank controls are gated by the highest-ranked system rule',
+    { file: LIST, constant: 'showEventRankControls' },
+    { names: ['kind', 'eventSelectionMode'], compares: ['event', 'highestRankedDrop'] }
+  );
+
+  defineStructureContract(
+    'composition mode is set globally on the overview tab, not per-tab',
+    TASKS_TAB,
+    { writesNo: ['data-composition-mode-select'] }
+  );
+
+  defineStructureContract(
+    'threads the system event selection rule into the events composition list',
+    { file: MANAGER_ROOT, constant: 'selectedGatheringRules' },
+    { names: ['eventSelectionMode'] }
+  );
+
+  defineStructureContract(
+    'and the editor, the events tab and the list each default the rule defensively',
+    [SHELL, EVENTS_TAB, LIST],
+    { defaults: [['eventSelectionMode', 'allDrops']] }
+  );
+
+  defineStructureContract('the editor forwards the event rule to the events tab', SHELL, {
+    passesProps: [['EnvironmentEventsTab', 'eventSelectionMode']],
   });
 
-  it('overview leads with a task-editor-style identity hero and drops the runtime summary', () => {
-    assert.ok(overviewSource.includes('manager-environment-overview-stack'), 'overview central panel is a vertical stack');
-    assert.ok(overviewSource.includes('manager-task-core-card'), 'identity card reuses the task/event hero card');
-    assert.ok(overviewSource.includes('manager-task-identity-fields'), 'identity card uses the shared identity fields layout');
-    assert.ok(overviewSource.includes('manager-environment-overview-duo'), 'player-facing and composition cards sit in a 2-up row');
-    assert.ok(!overviewSource.includes('runtime-summary'), 'runtime summary card is removed from the central panel');
-    assert.ok(!overviewSource.includes('data-overview-section="scene"'), 'linked scene card moved out of the overview central panel');
-    assert.ok(overviewSource.includes("'icons/environment/'"), 'image picker defaults to the core environment icons directory');
+  defineStructureContract('and the events tab forwards it to the composition list', EVENTS_TAB, {
+    passesProps: [['CompositionList', 'eventSelectionMode']],
   });
 
-  it('the runtime preview inspector carries the full runtime counts', () => {
-    for (const fact of ['available-tasks', 'excluded-tasks', 'candidate-tasks', 'available-events', 'excluded-events', 'included-not-matching']) {
-      assert.ok(summaryInspectorSource.includes(`data-runtime-fact="${fact}"`), `runtime preview includes the ${fact} fact`);
+  defineStructureContract(
+    'overview leads with a task-editor-style identity hero and drops the runtime summary',
+    OVERVIEW,
+    {
+      attributes: [
+        ['class', 'manager-environment-overview-stack'],
+        ['class', 'manager-task-core-card'],
+        ['class', 'manager-task-identity-fields'],
+        ['class', 'manager-environment-overview-duo'],
+      ],
+      attributesNo: [['data-overview-section', 'scene']],
+      spellsNo: ['runtime-summary'],
+      declares: ['DEFAULT_ENVIRONMENT_IMAGE_DIR'],
+      spellsExactly: ['icons/environment/'],
     }
-    assert.ok(summaryInspectorSource.includes('manager-fact-grid manager-environment-runtime-grid'), 'runtime preview uses the shared inspector fact grid');
-    assert.ok(!summaryInspectorSource.includes('manager-fact-grid-inline'), 'runtime preview should not use the compact inline fact grid');
-    assert.ok(summaryInspectorSource.includes('manager-fact-line'), 'runtime preview facts use the same text line styling as environment library details facts');
-    assert.ok(summaryInspectorSource.includes('manager-fact-label'), 'runtime preview facts use the shared fact label styling');
+  );
+
+  defineStructureContract('the runtime preview inspector carries the full runtime counts', SUMMARY_INSPECTOR, {
+    attributes: [
+      ['data-runtime-fact', 'available-tasks'],
+      ['data-runtime-fact', 'excluded-tasks'],
+      ['data-runtime-fact', 'candidate-tasks'],
+      ['data-runtime-fact', 'available-events'],
+      ['data-runtime-fact', 'excluded-events'],
+      ['data-runtime-fact', 'included-not-matching'],
+      ['class', 'manager-fact-grid manager-environment-runtime-grid'],
+    ],
+    spellsNo: ['manager-fact-grid-inline'],
+    spells: ['manager-fact-line', 'manager-fact-label'],
   });
 
-  it('exposes blind-mode per-task weight UI but no per-environment strategy or reveal controls', () => {
-    assert.ok(listSource.includes('data-composition-weight'), 'composition list renders a per-task blind weight input');
-    assert.ok(listSource.includes('data-composition-weight-percent'), 'composition list renders a calculated blind weight percentage');
-    assert.ok(listSource.includes('formatWeightPercentage'), 'composition list calculates included-task selection shares');
-    assert.ok(listSource.includes('includedWeightTotal'), 'weight percentages are based on included task weights');
-    assert.ok(listSource.includes('showBlindWeights'), 'weight input is gated to blind task rows');
-    assert.ok(tasksTabSource.includes('onWeightChange'), 'tasks tab wires per-task blind weight changes');
-    assert.ok(!overviewSource.includes('data-overview-section="blind"'), 'overview no longer renders a per-environment blind behaviour card');
-    assert.ok(!overviewSource.includes('data-environment-field="blindStrategy"'), 'overview no longer offers a strategy picker');
-    assert.ok(!overviewSource.includes('data-environment-field="revealPolicy"'), 'overview no longer offers a per-environment reveal override');
+  defineStructureContract(
+    'exposes blind-mode per-task weight UI but no per-environment strategy or reveal controls',
+    LIST,
+    {
+      spells: ['data-composition-weight'],
+      writes: ['data-composition-weight-percent'],
+      names: ['formatWeightPercentage', 'includedWeightTotal', 'showBlindWeights'],
+    }
+  );
+
+  defineStructureContract('tasks tab wires per-task blind weight changes', TASKS_TAB, {
+    passesProps: [['CompositionList', 'onWeightChange']],
   });
 
-  it('collapses task row actions into the overflow menu while preserving event row controls', () => {
-    assert.ok(listSource.includes("{#if kind === 'task'}"), 'composition list branches task rows for compact action menus');
-    // WHICH MENU EACH SECTION RENDERS.
-    assert.ok(listSection('available-to-add').includes('items={availableMenuItems(entry)}'), 'the manual Available to add rows render the available menu');
-    assert.ok(/'data-action': 'include'/.test(menuBuilder('availableMenuItems')), 'the manual Available to add menu offers a plain include');
-    assert.ok(listSection('non-matching').includes('items={nonMatchingMenuItems(entry)}'), 'the automatic Non-matching rows render the non-matching menu');
-    assert.ok(/'data-action': 'force-include'/.test(menuBuilder('nonMatchingMenuItems')), 'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)');
-    assert.ok(/'data-action': 'restore'/.test(menuBuilder('excludedMenuItems')), 'task restore action is available from a menu item');
-    assert.ok(/'data-action': 'exclude'/.test(menuBuilder('includedMenuItems')), 'task remove/exclude action remains available from a menu item');
-    // The verbs still reach the props they always did. One dispatcher serves all four menus.
-    assert.ok(/id === 'include'\) onInclude\(kind, entry\.id\)/.test(listSource), 'the include item calls onInclude');
-    assert.ok(/id === 'force-include'\) onForceInclude\(kind, entry\.id\)/.test(listSource), 'the force-add item calls onForceInclude');
-    assert.ok(/id === 'exclude'\) onExclude\(kind, entry\.id\)/.test(listSource), 'the exclude item calls onExclude');
-    assert.ok(/id === 'restore'\) onRestore\(kind, entry\.id\)/.test(listSource), 'the restore item calls onRestore');
-    assert.ok(listSource.includes('manager-environment-comp-quick-action'), 'manual task rows expose icon-only quick action buttons beside the menu');
-    assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick remove action through the shared exclude handler');
-    assert.ok(listSource.includes('Composition.QuickRemove'), 'manual included task quick action uses Remove copy');
-    assert.ok(listSource.includes('Composition.Remove'), 'manual included task menu action uses Remove from environment copy');
-    assert.ok(listSection('available-to-add').includes("data-quick-action=\"include\""), 'available task rows expose a quick add action');
-    // The deleted manual force add (issue #1315). Manual mode has no filter for a force to
-    // override, so a non-matching row is plainly added: one verb, one icon, whether it matches or
-    // not. Scoped to the section, because the surviving control spells the same `data-action` and
-    // a file-wide negative would red on it.
-    assert.ok(!menuBuilder('availableMenuItems').includes('force-include'), 'the manual Available to add list offers no force add at all');
-    assert.ok(/availableRowAction\(entry\) === 'include'/.test(listSource), 'and its rows key off the plain include action');
-    assert.ok(!/return 'force-include'/.test(listSource), 'availableRowAction no longer returns a force-add action for any row');
-    assert.ok(listSource.includes("{#if showEventRankControls}"), 'ranked event rows keep their distinct action/reorder branch');
-    assert.ok(listSource.includes('showEventRankControls'), 'event drag reordering is tied to ranked event controls');
-    assert.ok(!listSource.includes('{#if showEventRankControls}<span class="manager-environment-comp-handle"></span>{/if}'), 'non-ranked event sections do not render blank handle placeholders');
+  defineStructureContract(
+    'overview offers no per-environment blind behaviour card, strategy picker or reveal override',
+    OVERVIEW,
+    {
+      attributesNo: [
+        ['data-overview-section', 'blind'],
+        ['data-environment-field', 'blindStrategy'],
+        ['data-environment-field', 'revealPolicy'],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'the manual Available to add menu offers a plain include and no force add at all',
+    { file: LIST, fn: 'availableMenuItems' },
+    { property: [['data-action', 'include']], propertyNo: [['data-action', 'force-include']] }
+  );
+
+  defineStructureContract(
+    'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)',
+    { file: LIST, fn: 'nonMatchingMenuItems' },
+    { property: [['data-action', 'force-include']], compares: ['notMatching', 'libraryDisabled'] }
+  );
+
+  defineStructureContract(
+    'task restore remains available from the excluded menu',
+    { file: LIST, fn: 'excludedMenuItems' },
+    { property: [['data-action', 'restore']] }
+  );
+
+  defineStructureContract(
+    'and remove/exclude from the included one',
+    { file: LIST, fn: 'includedMenuItems' },
+    { property: [['data-action', 'exclude']] }
+  );
+
+  defineStructureContract(
+    'one dispatcher serves all four menus, and each verb reaches the prop it always did',
+    { file: LIST, fn: 'runMenuAction' },
+    {
+      calls: ['onInclude', 'onForceInclude', 'onExclude', 'onRestore', 'onOpenSource', 'onReorder'],
+      compares: ['include', 'force-include', 'exclude', 'restore', 'open-source'],
+      callsWith: [
+        ['onInclude', 'kind'],
+        ['onForceInclude', 'entry'],
+        ['onExclude', 'entry'],
+        ['onRestore', 'entry'],
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'manual rows key off the plain include action, which never returns a force add',
+    { file: LIST, fn: 'availableRowAction' },
+    {
+      spellsExactly: ['include', 'library-disabled'],
+      spellsExactlyNo: ['force-include'],
+      compares: ['candidate', 'notMatching', 'libraryDisabled'],
+    }
+  );
+
+  defineStructureContract('manual included rows expose an icon-only quick remove', LIST, {
+    attributes: [
+      ['data-quick-action', 'exclude'],
+      ['data-quick-action', 'include'],
+    ],
+    spells: [
+      'manager-environment-comp-quick-action',
+      'Composition.QuickRemove',
+      'Composition.Remove',
+    ],
   });
 
-  it('the right inspector is tab-specific (summary on overview, record on tasks/events)', () => {
-    assert.ok(rightInspectorSource.includes("activeTab === 'overview'"), 'inspector branches on the overview tab');
-    assert.ok(rightInspectorSource.includes('EnvironmentSummaryInspector'), 'overview shows the environment summary');
-    assert.ok(rightInspectorSource.includes('RecordInspector'), 'tasks/events show the selected record');
-    assert.ok(rightInspectorSource.includes('selectedKind !== recordKind'), 'a record only shows for the active tab kind');
-    assert.ok(rightInspectorSource.includes('data-record-inspector-empty'), 'tasks/events show a no-active-records message when none are available');
-    assert.ok(rightInspectorSource.includes('NoActiveTasks') && rightInspectorSource.includes('NoActiveEvents'), 'empty state reads as "No active tasks/events"');
-  });
+  defineStructureContract(
+    'the right inspector is tab-specific (summary on overview, record on tasks/events)',
+    RIGHT_INSPECTOR,
+    {
+      renders: ['EnvironmentSummaryInspector', 'RecordInspector', 'InspectorCard'],
+      compares: ['overview', 'event'],
+      names: ['selectedKind', 'recordKind', 'recordEntry'],
+      writes: ['data-record-inspector-empty'],
+      spells: ['NoActiveTasks', 'NoActiveEvents'],
+    }
+  );
 
-  it('selected record inspector omits source and composition action controls', () => {
-    assert.ok(!inspectorSource.includes('manager-environment-inspector-actions'), 'selected record inspector should not render an action strip below the record name');
-    assert.ok(!inspectorSource.includes('manager-environment-open-source'), 'selected record inspector should not render an open-source CTA');
-    assert.ok(!inspectorSource.includes('data-record-inspector-section="source"'), 'selected record inspector should not render a Source card');
-    assert.ok(!inspectorSource.includes('data-action="open-source"'), 'selected record inspector should not render source action buttons');
-    assert.ok(!inspectorSource.includes('onInclude'), 'selected record inspector should not accept include callbacks');
-    assert.ok(!inspectorSource.includes('onExclude'), 'selected record inspector should not accept exclude callbacks');
-    assert.ok(!inspectorSource.includes('onRestore'), 'selected record inspector should not accept restore callbacks');
-    assert.ok(!rightInspectorSource.includes('onOpenSourceTask'), 'right inspector should not accept source task callbacks');
-    assert.ok(!rightInspectorSource.includes('onOpenSourceEvent'), 'right inspector should not accept source event callbacks');
-    assert.ok(!rightInspectorSource.includes('onIncludeRecord'), 'right inspector should not accept include callbacks');
-    assert.ok(!rightInspectorSource.includes('onExcludeRecord'), 'right inspector should not accept exclude callbacks');
-    assert.ok(!rightInspectorSource.includes('onRestoreRecord'), 'right inspector should not accept restore callbacks');
-  });
+  defineStructureContract(
+    'selected record inspector omits source and composition action controls',
+    INSPECTOR,
+    {
+      spellsNo: ['manager-environment-inspector-actions', 'manager-environment-open-source'],
+      attributesNo: [
+        ['data-record-inspector-section', 'source'],
+        ['data-action', 'open-source'],
+      ],
+      namesNo: ['onInclude', 'onExclude', 'onRestore'],
+    }
+  );
 
-  it('selected record inspector omits the standalone runtime-state and event-runtime cards', () => {
-    assert.ok(inspectorSource.includes('CompositionStatePill'), 'selected record header should keep the composition pill');
-    assert.ok(inspectorSource.includes('RuntimeStatePill'), 'selected record header should keep the runtime pill');
-    assert.ok(!inspectorSource.includes('data-record-inspector-section="runtime-state"'), 'selected record inspector should not render a Runtime state card');
-    assert.ok(!inspectorSource.includes('data-record-inspector-section="event-runtime"'), 'selected record inspector should not render a Event runtime card');
-    assert.ok(!inspectorSource.includes('data-record-inspector-waiting-for'), 'selected record inspector should not render waiting-for details');
-    assert.ok(!inspectorSource.includes('manager-environment-layer-list'), 'selected record inspector should not render layer rows');
-    for (const deleted of [
-      'Inspector.RuntimeState',
-      'Inspector.LayerLibrary',
-      'Inspector.LayerMatching',
-      'Inspector.LayerComposition',
-      'Inspector.LayerRuntime',
-      'Inspector.Enabled',
-      'Inspector.Disabled',
-      'Inspector.Matches',
-      'Inspector.NoMatch',
-      'Inspector.WaitingFor',
-      'Inspector.ExplainAvailable',
-      'Inspector.ExplainForceIncluded',
-      'Inspector.ExplainConditionsBlocked',
-      'Inspector.ExplainStale',
-      'Inspector.ExplainExcluded',
-      'Inspector.ExplainCandidate',
-      'Inspector.ExplainNotMatching',
-      'Inspector.ExplainLibraryDisabled',
-      'Inspector.EventRuntime',
-      'Inspector.ScopeEnvironment',
-      'Inspector.Scope',
-      'Inspector.EventExplanation'
-    ]) {
-      assert.equal(catalogValue(`FABRICATE.Admin.Manager.EnvironmentEditor.${deleted}`), undefined, `EnvironmentEditor.${deleted} should be removed`);
-      assert.ok(!inspectorSource.includes(deleted), `inspector should not reference ${deleted}`);
+  defineStructureContract(
+    'and the right inspector accepts no source or composition callbacks either',
+    RIGHT_INSPECTOR,
+    {
+      namesNo: [
+        'onOpenSourceTask',
+        'onOpenSourceEvent',
+        'onIncludeRecord',
+        'onExcludeRecord',
+        'onRestoreRecord',
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'selected record inspector omits the standalone runtime-state and event-runtime cards',
+    INSPECTOR,
+    {
+      renders: ['CompositionStatePill', 'RuntimeStatePill'],
+      attributesNo: [
+        ['data-record-inspector-section', 'runtime-state'],
+        ['data-record-inspector-section', 'event-runtime'],
+      ],
+      writesNo: ['data-record-inspector-waiting-for'],
+      spellsNo: ['manager-environment-layer-list'],
+    }
+  );
+
+  const DELETED_INSPECTOR_KEYS = [
+    'Inspector.RuntimeState',
+    'Inspector.LayerLibrary',
+    'Inspector.LayerMatching',
+    'Inspector.LayerComposition',
+    'Inspector.LayerRuntime',
+    'Inspector.Enabled',
+    'Inspector.Disabled',
+    'Inspector.Matches',
+    'Inspector.NoMatch',
+    'Inspector.WaitingFor',
+    'Inspector.ExplainAvailable',
+    'Inspector.ExplainForceIncluded',
+    'Inspector.ExplainConditionsBlocked',
+    'Inspector.ExplainStale',
+    'Inspector.ExplainExcluded',
+    'Inspector.ExplainCandidate',
+    'Inspector.ExplainNotMatching',
+    'Inspector.ExplainLibraryDisabled',
+    'Inspector.EventRuntime',
+    'Inspector.ScopeEnvironment',
+    'Inspector.Scope',
+    'Inspector.EventExplanation',
+  ];
+
+  defineStructureContract(
+    'and references none of the retired inspector strings',
+    INSPECTOR,
+    { spellsNo: DELETED_INSPECTOR_KEYS }
+  );
+
+  it('the retired inspector strings are gone from en.json, and EventChance stays', () => {
+    for (const deleted of DELETED_INSPECTOR_KEYS) {
+      assert.equal(
+        catalogValue(`FABRICATE.Admin.Manager.EnvironmentEditor.${deleted}`),
+        undefined,
+        `EnvironmentEditor.${deleted} should be removed`
+      );
     }
     assert.equal(
       catalogValue('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.EventChance'),
@@ -453,227 +651,304 @@ describe('environment composition editor structure', () => {
     );
   });
 
-  it('the shell auto-selects the first active record on the tasks/events tabs', () => {
-    assert.ok(shellSource.includes("runtimeState === 'available'"), 'auto-select targets active (available) records');
-    assert.ok(/\$effect\(\(\) => \{[\s\S]*?selectRecord\(kind, firstActive\.id\)/.test(shellSource), 'an effect auto-selects the first active record of the active tab kind');
+  defineStructureContract(
+    'the shell auto-selects the first active record on the tasks/events tabs',
+    SHELL,
+    { reads: ['entry.runtimeState'], compares: ['available'], calls: ['selectRecord'] }
+  );
+
+  defineStructureContract('the linked scene card lives in the inspector under the summary', SUMMARY_INSPECTOR, {
+    writes: ['data-environment-summary-scene'],
+    spells: ['manager-environment-scene-dropzone'],
   });
 
-  it('the linked scene card lives in the inspector under the summary', () => {
-    assert.ok(summaryInspectorSource.includes('data-environment-summary-scene'), 'inspector renders the relocated linked scene card');
-    assert.ok(summaryInspectorSource.includes('manager-environment-scene-dropzone'), 'inspector scene card keeps the drop-to-link zone');
+  defineStructureContract(
+    'matching evidence supports compact chips and the inspector evidence table',
+    EVIDENCE,
+    {
+      compares: ['checks'],
+      spells: [
+        'manager-environment-evidence-summary',
+        'manager-environment-evidence-table',
+        'manager-environment-evidence-dimension',
+        'manager-environment-evidence-value-pill',
+      ],
+      writes: ['data-evidence-value-state'],
+      spellsExactly: ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'],
+    }
+  );
+
+  defineStructureContract('the inspector requests the checks evidence variant', INSPECTOR, {
+    passesValues: [['MatchingEvidenceChips', 'variant', 'checks']],
   });
 
-  it('matching evidence supports compact chips and the inspector evidence table', () => {
-    assert.ok(evidenceSource.includes("variant === 'checks'"), 'evidence component branches on the checks variant');
-    assert.ok(evidenceSource.includes('manager-environment-evidence-summary'), 'chip variant renders a value summary line');
-    assert.ok(evidenceSource.includes('manager-environment-evidence-table'), 'checks variant renders a table in the inspector');
-    assert.ok(evidenceSource.includes('manager-environment-evidence-dimension'), 'inspector table renders the evidence dimension column');
-    assert.ok(evidenceSource.includes('manager-environment-evidence-value-pill'), 'inspector table renders value pills');
-    assert.ok(evidenceSource.includes('data-evidence-value-state={pill.state}'), 'inspector value pills expose matching state');
-    assert.ok(evidenceSource.includes("if (variant === 'checks') return true"), 'inspector table renders all evidence dimensions');
-    assert.ok(evidenceSource.includes("['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme']"), 'danger evidence uses the canonical six-level scale');
-    assert.ok(inspectorSource.includes('variant="checks"'), 'inspector requests the checks evidence variant');
+  defineStructureContract(
+    'overview danger selector uses configured danger options and preserves stale values',
+    OVERVIEW,
+    { names: ['dangerLevelOptions', 'renderedDangerOptions'] }
+  );
+
+  defineStructureContract(
+    'and the stale current value is inserted into the rendered option list',
+    { file: OVERVIEW, constant: 'renderedDangerOptions' },
+    { names: ['dangerLevelOptions', 'dangerLevel'], calls: ['some', 'defaultDangerLabel'] }
+  );
+
+  defineStructureContract(
+    'manual mode renders one Available-to-add group instead of Excluded and Non-matching sections',
+    LIST,
+    {
+      imports: [LIST_VOCABULARY],
+      names: ['ENVIRONMENT_INCLUDED_COMPOSITION_STATES'],
+      attributes: [
+        ['data-section', 'included'],
+        ['data-section', 'available-to-add'],
+        ['data-section', 'excluded'],
+        ['data-section', 'non-matching'],
+      ],
+      spells: [
+        'Composition.AvailableToAdd',
+        'Composition.NoAvailableTasksToAdd',
+        'Composition.NoAvailableEventsToAdd',
+        'LibraryDisabledNote',
+        'OpenSource',
+      ],
+      renders: ['Pagination'],
+      rendersNo: ['DiagnosticsDisclosure'],
+    }
+  );
+
+  defineStructureContract(
+    'the included list is filtered through the shared four-state included vocabulary',
+    { file: LIST, constant: 'included' },
+    { reads: ['ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has', 'entry.compositionState'] }
+  );
+
+  defineStructureContract(
+    'available-to-add orders matching records before non-matching and library-disabled',
+    { file: LIST, constant: 'availableToAdd' },
+    {
+      names: [
+        'availableToAddMatching',
+        'availableToAddNonMatching',
+        'availableToAddLibraryDisabled',
+      ],
+    }
+  );
+
+  defineStructureContract(
+    'and manual Available to add classifies nothing off the excluded state',
+    { file: LIST, constant: 'availableToAddMatching' },
+    { compares: ['candidate'], comparesNo: ['excluded'] }
+  );
+
+  defineStructureContract(
+    'non-matching collects notMatching and libraryDisabled',
+    { file: LIST, constant: 'nonMatching' },
+    { compares: ['notMatching', 'libraryDisabled'], reads: ['entry.compositionState'] }
+  );
+
+  defineStructureContract(
+    'inspector renders matching evidence and active drop-rate adjustment overrides',
+    INSPECTOR,
+    {
+      renders: ['MatchingEvidenceChips'],
+      attributes: [
+        ['data-record-inspector-section', 'evidence'],
+        ['data-record-inspector-section', 'overrides'],
+      ],
+      writes: [
+        'data-task-drop-rate-adjustments-toggle',
+        'data-event-drop-rate-adjustments-toggle',
+        'data-drop-rate-adjustment-percent',
+        'data-drop-rate-adjustment-base',
+        'data-drop-rate-adjustment-effective',
+      ],
+      spells: [
+        'DropRateAdjustment',
+        'manager-environment-drop-adjustment-drop',
+        'manager-environment-drop-adjustment-controls',
+        'manager-environment-drop-adjustment-clear',
+        'DropRateAdjustmentRange',
+        'Inspector.BaseChanceModifier',
+      ],
+      attributesNo: [['class', 'manager-condition-modifier-value is-disabled-overrides']],
+      names: [
+        'taskDropRateAdjustmentsEnabled',
+        'eventDropRateAdjustmentsEnabled',
+        'onTaskAdjustmentInput',
+        'onEventAdjustmentInput',
+        'setEventAdjustment',
+        'setTaskDropAdjustment',
+        'adjustmentValueClass',
+      ],
+      spellsNo: ['is-disabled-overrides'],
+    }
+  );
+
+  defineStructureContract(
+    'the icon-only clear action keeps its accessible copy, as a named prop not a rest spread',
+    INSPECTOR,
+    {
+      passesProps: [['IconButton', 'ariaLabel']],
+      spells: ['Inspector.ClearAdjustment'],
+    }
+  );
+
+  defineStructureContract('tabs are a keyboard-navigable tablist', EDITOR_TABS, {
+    attributes: [
+      ['role', 'tablist'],
+      ['role', 'tab'],
+    ],
+    spellsExactly: ['ArrowRight', 'ArrowLeft'],
+    writes: ['onkeydown', 'aria-selected'],
   });
 
-  it('overview danger selector uses configured danger options and preserves stale values', () => {
-    assert.ok(overviewSource.includes('dangerLevelOptions'), 'overview derives danger options from configured values');
-    assert.ok(overviewSource.includes('renderedDangerOptions'), 'overview inserts the current stale danger value into the rendered options');
-    assert.ok(overviewSource.includes('{#each renderedDangerOptions as option (option.id)}'), 'danger select renders the derived option list');
-  });
+  defineStructureContract(
+    'the environment strip keeps its own DOM contract after the promotion',
+    TABS,
+    {
+      passesValues: [
+        ['EditorTabs', 'hookAttribute', 'data-environment-tab-button'],
+        ['EditorTabs', 'idStem', 'environment'],
+        ['EditorTabs', 'ariaLabelKey', 'FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label'],
+        ['EditorTabs', 'containerClass', 'manager-environment-tabs'],
+        ['EditorTabs', 'buttonClass', 'manager-environment-tab-button'],
+      ],
+    }
+  );
 
-  it('manual mode renders one Available-to-add group instead of Excluded and Non-matching sections', () => {
-    // The included section must never surface addable/non-matching records.
-    assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(listSource), 'included section keys off the shared four-state included vocabulary');
-    assert.ok(listSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState)'), 'included section filters records through that shared set');
-    assert.ok(listSource.includes("availableToAddMatching"), 'manual mode has a matching available-to-add group');
-    assert.ok(listSource.includes("availableToAddNonMatching"), 'manual mode has a non-matching available-to-add group');
-    assert.ok(listSource.includes("availableToAddLibraryDisabled"), 'manual mode has a library-disabled available-to-add group');
-    assert.ok(/const availableToAdd = \$derived\(\[\s*\.\.\.availableToAddMatching,\s*\.\.\.availableToAddNonMatching,\s*\.\.\.availableToAddLibraryDisabled,?\s*\]\)/.test(listSource), 'available-to-add orders matching records before non-matching and library-disabled records');
-    assert.ok(listSource.includes('data-section="available-to-add"'), 'manual mode renders an Available to add section');
-    assert.ok(listSource.includes('Composition.AvailableToAdd'), 'Available to add section uses localized copy');
-    assert.ok(listSource.includes('Composition.NoAvailableTasksToAdd'), 'Available to add empty state uses localized copy for the tasks tab');
-    assert.ok(listSource.includes('Composition.NoAvailableEventsToAdd'), 'Available to add empty state uses localized copy for the events tab');
-    assert.ok(!listSource.includes("entry.compositionState === 'excluded' && entry.matches === true && entry.libraryEnabled === true"), 'manual Available to add no longer treats excluded records as restorable');
-    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.matches !== true"), 'manual Available to add no longer force-adds excluded records');
-    assert.ok(!listSource.includes("entry?.compositionState === 'excluded' && entry?.libraryEnabled !== true"), 'manual Available to add no longer classifies excluded records');
-    assert.ok(listSource.includes("{#if mode === 'manual'}"), 'Available to add is gated to manual mode');
-    assert.ok(listSource.includes("{#if mode !== 'manual'}"), 'Excluded and standalone Non-matching sections do not render in manual mode');
-    assert.ok(!listSource.includes("{#if kind !== 'task' && mode === 'manual'}"), 'event manual mode no longer keeps a separate Matching candidates section');
-    assert.ok(listSource.includes("data-section=\"excluded\""), 'automatic task mode and events retain the Excluded section');
-    assert.ok(listSource.includes("data-section=\"non-matching\""), 'automatic task mode and events retain the standalone Non-matching section');
-    assert.ok(/nonMatching = \$derived\(\s*records\.filter\(\s*\(entry\) =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\s*\)\s*\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');
-    assert.ok(listSource.includes('<Pagination'), 'the standalone non-matching list is still paginated where it remains visible');
-    assert.ok(!listSource.includes('DiagnosticsDisclosure'), 'the diagnostics disclosure is replaced by the non-matching list');
-    assert.ok(listSection('available-to-add').includes('data-action="include"'), 'manual available-to-add rows expose an include action');
-    // Was a file-wide `includes('data-action="force-include"')` asserting that MANUAL mode offers
-    // a force add — a claim its own regex could not check, since the two twins spell the attribute
-    // identically. Issue #1315 deleted the manual control and revived the automatic one, so the
-    // original assertion would have kept passing on the opposite control while stating the
-    // opposite rule. Both halves are now scoped and asserted.
-    assert.ok(listSection('non-matching').includes('data-action="force-include"'), 'automatic mode exposes the force-add action on non-matching rows');
-    assert.ok(!listSection('available-to-add').includes('data-action="force-include"'), 'and manual mode does not');
-    assert.ok(listSource.includes('LibraryDisabledNote'), 'library-disabled rows show an "enable in library first" note');
-    assert.ok(listSource.includes('OpenSource'), 'available-to-add rows keep open-source in the overflow menu');
-  });
+  defineStructureContract(
+    'and the primitive still builds BOTH ids from this caller`s one stem',
+    EDITOR_TABS,
+    { names: ['buttonIdStem', 'panelIdStem', 'idStem'], spellsExactly: ['-tab', '-panel'] }
+  );
 
-  it('inspector renders matching evidence and active drop-rate adjustment overrides', () => {
-    assert.ok(inspectorSource.includes('MatchingEvidenceChips'), 'inspector should render match evidence');
-    assert.ok(inspectorSource.includes('data-record-inspector-section="evidence"'), 'inspector should render the evidence section');
-    assert.ok(inspectorSource.includes('variant="checks"'), 'inspector should render the detailed evidence table');
-    assert.ok(inspectorSource.includes('data-record-inspector-section="overrides"'), 'inspector should render the override section');
-    assert.ok(inspectorSource.includes('DropRateAdjustment'), 'override section should edit drop-rate adjustments');
-    assert.ok(inspectorSource.includes('data-task-drop-rate-adjustments-toggle'), 'task overrides should expose an apply toggle');
-    assert.ok(inspectorSource.includes('data-event-drop-rate-adjustments-toggle'), 'event overrides should expose an apply toggle');
-    assert.ok(inspectorSource.includes('taskDropRateAdjustmentsEnabled'), 'task overrides should preserve a separate enabled state');
-    assert.ok(inspectorSource.includes('eventDropRateAdjustmentsEnabled'), 'event overrides should preserve a separate enabled state');
-    assert.ok(inspectorSource.includes('data-drop-rate-adjustment-percent'), 'task override rows should use the custom percent input shell');
-    assert.ok(inspectorSource.includes('type="text"'), 'task override rows should use text percentage input formatting');
-    assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-drop'), 'task override rows should render drop image/name above controls');
-    assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-controls'), 'task override rows should group base/input/effective/clear controls on one row');
-    assert.ok(inspectorSource.includes('data-drop-rate-adjustment-base'), 'task override rows should expose base chance as its own control-row item');
-    assert.ok(inspectorSource.includes('data-drop-rate-adjustment-effective'), 'task override rows should expose effective chance as its own control-row item');
-    assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-clear'), 'task override clear action should be an icon-only button');
-    // `ariaLabel`, not `aria-label`: the clear action is an `<IconButton>` as of issue 1422,
-    // and the primitive takes the accessible name as a REQUIRED-shaped named prop rather than
-    // letting it ride the rest spread. The assertion is retargeted rather than dropped —
-    // the copy it pins is the whole point of the control being icon-only.
-    assert.ok(/ariaLabel=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.ClearAdjustment',\s*'Clear'\s*\)\}/.test(inspectorSource), 'icon-only clear action should keep accessible copy');
-    assert.ok(inspectorSource.includes('class={`manager-environment-drop-adjustment-row is-task-drop ${dropRateAdjustmentsEnabled ? \'\' : \'is-disabled\'} ${adjustmentValueClass(row.adjustment)}`}'), 'task override row card should carry positive/negative/zero state classes');
-    assert.ok(inspectorSource.includes('class="manager-condition-modifier-value" data-drop-rate-adjustment-percent'), 'task override input shell should remain neutral while keeping the percent suffix');
-    assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');
-    assert.ok(inspectorSource.includes('onTaskAdjustmentInput'), 'task override text input should preserve transient signed editing states');
-    assert.ok(inspectorSource.includes('DropRateAdjustmentRange'), 'task override text input should expose its bounded range in accessible copy');
-    // The plain numeric input this replaced.
-    const plainNumericAdjustmentInput =
-      /value=\{row\.adjustment\}\s+aria-label=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.DropRateAdjustment',\s*'Drop-rate adjustment',?\s*\)\}\s+onchange=\{\(?event\)? =>\s*setTaskDropAdjustment\(\s*row\.id,\s*event\.currentTarget\.value,?\s*\)\}/;
-    assert.ok(
-      plainNumericAdjustmentInput.test(
-        [
-          '  value={row.adjustment}',
-          "  aria-label={text(",
-          "    'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment',",
-          "    'Drop-rate adjustment'",
-          '  )}',
-          '  onchange={(event) =>',
-          '    setTaskDropAdjustment(row.id, event.currentTarget.value)}',
-        ].join('\n')
-      ),
-      'the plain-numeric-input guard must still match that input as Prettier would print it'
-    );
-    assert.ok(!plainNumericAdjustmentInput.test(inspectorSource), 'task override rows should no longer use the plain numeric adjustment input');
-    assert.ok(inspectorSource.includes('Inspector.BaseChanceModifier'), 'event overrides should use the singular base-chance-modifier heading');
-    assert.ok(inspectorSource.includes('setEventAdjustment'), 'event adjustment edits should update the environment draft');
-    assert.ok(inspectorSource.includes('onEventAdjustmentInput'), 'event override text input should preserve transient signed editing states');
-    assert.ok(inspectorSource.includes('setTaskDropAdjustment'), 'task drop-row adjustment edits should update the environment draft');
-    assert.ok(!inspectorSource.includes('is-disabled-overrides'), 'override section should no longer be phase-1 disabled');
-  });
+  defineStructureContract(
+    'tab badges count composition membership rather than runtime availability',
+    { file: SHELL, constant: 'badges' },
+    {
+      names: ['taskCompositionCount', 'eventCompositionCount', 'validationBadges'],
+      keys: ['tasks', 'events', 'validation'],
+      readsNo: ['counts.availableTasks', 'counts.availableEvents'],
+    }
+  );
 
-  it('tabs are a keyboard-navigable tablist', () => {
-    assert.ok(editorTabsSource.includes('role="tablist"'), 'tabs should be a tablist');
-    assert.ok(editorTabsSource.includes('role="tab"'), 'each tab should have the tab role');
-    assert.ok(editorTabsSource.includes("'ArrowRight'"), 'tabs should handle ArrowRight');
-    assert.ok(editorTabsSource.includes("'ArrowLeft'"), 'tabs should handle ArrowLeft');
-    assert.ok(editorTabsSource.includes('onkeydown='), 'tabs should wire a keydown handler');
-    assert.ok(editorTabsSource.includes('aria-selected'), 'tabs should expose aria-selected');
-  });
+  defineStructureContract(
+    'the Tasks badge derives from task composition records',
+    { file: SHELL, constant: 'taskCompositionCount' },
+    { calls: ['countIncludedRecords'], reads: ['composition.tasks'] }
+  );
 
-  it('the environment strip keeps its own DOM contract after the promotion', () => {
-    // The three externally-consumed halves a naive extraction drops. `EnvironmentEditView`
-    // renders the `environment-panel-*` ids the primitive's `aria-controls` points at, and the
-    // smoke harness plus the View Lab registry read `data-environment-tab-button`.
-    assert.ok(tabsSource.includes('hookAttribute="data-environment-tab-button"'), 'hook name');
-    assert.ok(tabsSource.includes('idStem="environment"'), 'button id and aria-controls stem');
-    assert.ok(
-      tabsSource.includes('ariaLabelKey="FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label"'),
-      'the strip keeps its own accessible name'
-    );
-    assert.ok(tabsSource.includes('containerClass="manager-environment-tabs"'), 'container class');
-    assert.ok(
-      tabsSource.includes('buttonClass="manager-environment-tab-button"'),
-      'button class, so no shipped rule in styles/fabricate.css stops matching'
-    );
-    // The primitive still builds BOTH ids from this caller's one `idStem`. Issue 1429 split
-    // the two halves so the Checks strip can keep `checks-section-*` buttons beside
-    // `checks-panel-*` panels, and each half falls back to the stem when the caller does not
-    // override it — which is the whole of this site's contract. The RENDERED proof that the
-    // fallback yields the same ids as before is in
-    // `tests/components/editor-tabs-marker-family.test.js`; these two pin that the caller
-    // still hands over one stem rather than two.
-    assert.ok(
-      editorTabsSource.includes('buttonIdStem || `${idStem}-tab`'),
-      'the primitive builds the button id from this caller`s stem'
-    );
-    assert.ok(
-      editorTabsSource.includes('panelIdStem || `${idStem}-panel`'),
-      'and points aria-controls at the panel rendered outside it'
-    );
-  });
+  defineStructureContract(
+    'and the Events badge from event composition records',
+    { file: SHELL, constant: 'eventCompositionCount' },
+    { calls: ['countIncludedRecords'], reads: ['composition.events'] }
+  );
 
-  it('tab badges count composition membership and split validation severities', () => {
-    assert.ok(!shellSource.includes('tasks: counts.availableTasks || 0'), 'Tasks badge should not use runtime availableTasks');
-    assert.ok(!shellSource.includes('events: counts.availableEvents || 0'), 'Events badge should not use runtime availableEvents');
-    // RENAMED from `countComposedRecords` (issue #1321). It filters the four-state INCLUDED set
-    // and always did. The two sets hold the same four members since issue #1315 made
-    // `includedNotMatching` compose, so swapping the import changes nothing TODAY — which is
-    // exactly why the name still matters: with both exported one declaration apart from
-    // `src/systems/gatheringComposition.js`, a name that says "composed" while counting "included"
-    // is an instruction to swap it, and the next state to join one set and not the other turns
-    // that into a silently wrong badge. The negative carries a trailing `(` so it forbids the CALL
-    // and the DECLARATION while leaving the source comment that records the rename free to name it.
-    assert.ok(shellSource.includes('countIncludedRecords(composition?.tasks)'), 'Tasks badge should derive from task composition records');
-    assert.ok(shellSource.includes('countIncludedRecords(composition?.events)'), 'Events badge should derive from event composition records');
-    assert.ok(!shellSource.includes('countComposedRecords('), 'the badge count no longer carries a name that says "composed" while counting "included"');
-    // These three replace a `shellSource.match(/const INCLUDED_COMPOSITION_STATES = .../)?.[0] || ''`
-    // capture that fed four NEGATIVE assertions. The moment the shell stopped declaring that Set,
-    // the capture would have been `''` and all four would have passed VACUOUSLY — green while
-    // proving nothing. A POSITIVE assertion on the shared import cannot fail that way. What the
-    // negatives guarded — `excluded` / `candidate` / `notMatching` / `libraryDisabled` absent from
-    // the included set — is restored and strengthened to exact membership of all three exported
-    // sets in `tests/systems/gatheringComposition.test.js`, which imports them.
-    assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(shellSource), 'badge count imports the shared four-state included vocabulary');
-    assert.ok(shellSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)'), 'badge count filters composition records through that shared set');
-    assert.ok(!shellSource.includes('const INCLUDED_COMPOSITION_STATES'), 'the shell no longer keeps a second copy of the included vocabulary');
-    // THE BADGE READS THE ONE ACCESSOR.
-    assert.ok(shellSource.includes('countReadiness(readiness)'), 'the badge reads the shared readiness accessor');
-    assert.ok(!shellSource.includes("issue.severity === 'critical'"), 'the badge no longer counts a severity of its own');
-    assert.ok(!shellSource.includes("issue.severity === 'warning'"), 'nor a second one beside it');
-    assert.ok(shellSource.includes("tone: 'danger'"), 'validation errors should use danger badge tone');
-    assert.ok(shellSource.includes("tone: 'warning'"), 'validation warnings should use warning badge tone');
-    assert.ok(shellSource.includes('label: String(validationCounts.blocking)'), 'validation error badge should render only the numeric count');
-    assert.ok(shellSource.includes('label: String(validationCounts.warnings)'), 'validation warning badge should render only the numeric count');
-    assert.ok(!shellSource.includes('BadgeError'), 'validation error badge should not use severity text');
-    assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
-    assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
-    assert.ok(editorTabsSource.includes('Array.isArray(value)'), 'tabs should accept multiple badges for a single tab');
-    // The badge is a shared `Chip` since issue 883.
-    assert.ok(editorTabsSource.includes("if (tone === 'warning') return 'warning'"), 'tabs should render warning-toned badge chips');
+  defineStructureContract(
+    'the badge count keeps no second copy of the included vocabulary, and no "composed" name',
+    SHELL,
+    {
+      imports: [SHELL_VOCABULARY],
+      names: ['ENVIRONMENT_INCLUDED_COMPOSITION_STATES'],
+      namesNo: ['INCLUDED_COMPOSITION_STATES', 'countComposedRecords'],
+      readsNo: ['issue.severity'],
+      spellsNo: ['BadgeError', 'BadgeWarning'],
+    }
+  );
+
+  defineStructureContract(
+    'and it filters composition records through that shared set',
+    { file: SHELL, fn: 'countIncludedRecords' },
+    { reads: ['ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has', 'entry.compositionState'] }
+  );
+
+  defineStructureContract(
+    'the validation badge reads the shared readiness accessor',
+    { file: SHELL, constant: 'validationCounts' },
+    { calls: ['countReadiness'], names: ['readiness'] }
+  );
+
+  defineStructureContract(
+    'and renders one numeric badge per tone rather than severity words',
+    { file: SHELL, constant: 'validationBadges' },
+    {
+      keys: ['label', 'tone'],
+      property: [
+        ['tone', 'danger'],
+        ['tone', 'warning'],
+      ],
+      reads: ['validationCounts.blocking', 'validationCounts.warnings'],
+      callsWith: [['String', 'validationCounts']],
+    }
+  );
+
+  defineStructureContract('tabs accept multiple badges for a single tab', EDITOR_TABS, {
+    reads: ['Array.isArray'],
+    callsWith: [['isArray', 'value']],
+    returnsFor: [['warning', 'warning']],
   });
 });
 
 describe('evaluateEnvironmentReadiness', () => {
-  const environment = { enabled: true, name: 'Mines', biomes: ['cave'], dangerTags: ['hazardous'], sceneUuid: '' };
+  const environment = {
+    enabled: true,
+    name: 'Mines',
+    biomes: ['cave'],
+    dangerTags: ['hazardous'],
+    sceneUuid: '',
+  };
 
   it('flags an active environment with no available tasks as critical', () => {
-    const { checks, issues } = evaluateEnvironmentReadiness(environment, { counts: { availableTasks: 0 }, tasks: [], events: [] });
-    assert.equal(checks.find(check => check.id === 'hasName').satisfied, true);
-    assert.equal(checks.find(check => check.id === 'hasBiome').satisfied, true);
-    assert.equal(checks.find(check => check.id === 'hasAvailableTask').satisfied, false);
-    assert.ok(issues.some(issue => issue.id === 'noAvailableTasks' && issue.severity === 'critical' && issue.blocks === 'enable'));
-    assert.ok(issues.some(issue => issue.id === 'activeNoComposition' && issue.severity === 'critical' && issue.blocks === 'enable'));
-    assert.ok(issues.some(issue => issue.id === 'noScene' && issue.severity === 'warning'));
+    const { checks, issues } = evaluateEnvironmentReadiness(environment, {
+      counts: { availableTasks: 0 },
+      tasks: [],
+      events: [],
+    });
+    assert.equal(checks.find((check) => check.id === 'hasName').satisfied, true);
+    assert.equal(checks.find((check) => check.id === 'hasBiome').satisfied, true);
+    assert.equal(checks.find((check) => check.id === 'hasAvailableTask').satisfied, false);
+    assert.ok(
+      issues.some(
+        (issue) =>
+          issue.id === 'noAvailableTasks' &&
+          issue.severity === 'critical' &&
+          issue.blocks === 'enable'
+      )
+    );
+    assert.ok(
+      issues.some(
+        (issue) =>
+          issue.id === 'activeNoComposition' &&
+          issue.severity === 'critical' &&
+          issue.blocks === 'enable'
+      )
+    );
+    assert.ok(issues.some((issue) => issue.id === 'noScene' && issue.severity === 'warning'));
     assert.equal(blocksEnable(issues), true);
   });
 
   it('treats a disabled draft with no available tasks as a non-blocking warning', () => {
-    const disabled = { enabled: false, name: 'Mines', biomes: ['cave'], dangerTags: ['hazardous'], sceneUuid: '' };
-    const { issues } = evaluateEnvironmentReadiness(disabled, { counts: { availableTasks: 0 }, tasks: [], events: [] });
+    const disabled = {
+      enabled: false,
+      name: 'Mines',
+      biomes: ['cave'],
+      dangerTags: ['hazardous'],
+      sceneUuid: '',
+    };
+    const { issues } = evaluateEnvironmentReadiness(disabled, {
+      counts: { availableTasks: 0 },
+      tasks: [],
+      events: [],
+    });
     // The disabled draft now saves fine.
-    const noAvailable = issues.find(issue => issue.id === 'noAvailableTasks');
+    const noAvailable = issues.find((issue) => issue.id === 'noAvailableTasks');
     assert.ok(noAvailable, 'should still surface the no-available-tasks issue');
     assert.equal(noAvailable.severity, 'warning');
     assert.equal(noAvailable.blocks, 'enable');
     // activeNoComposition only fires for an active environment.
-    assert.ok(!issues.some(issue => issue.id === 'activeNoComposition'));
+    assert.ok(!issues.some((issue) => issue.id === 'activeNoComposition'));
     // The single noAvailableTasks issue still blocks enabling.
     assert.equal(blocksEnable(issues), true);
   });
@@ -681,11 +956,18 @@ describe('evaluateEnvironmentReadiness', () => {
   it('does not block enabling when only advisory issues are present', () => {
     const composition = {
       counts: { availableTasks: 1, includedNotMatchingTasks: 1 },
-      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedNotMatching', record: { name: 'Picked Task' } }],
-      events: []
+      tasks: [
+        {
+          id: 'stale',
+          kind: 'task',
+          compositionState: 'includedNotMatching',
+          record: { name: 'Picked Task' },
+        },
+      ],
+      events: [],
     };
     const { issues } = evaluateEnvironmentReadiness(environment, composition);
-    const stale = issues.find(issue => issue.id === 'staleIncluded');
+    const stale = issues.find((issue) => issue.id === 'staleIncluded');
     // The not-matching note carries no blocks field and never did.
     assert.equal(stale.blocks, undefined);
     assert.equal(blocksEnable(issues), false);
@@ -698,17 +980,24 @@ describe('evaluateEnvironmentReadiness', () => {
     // survives because the Included list would otherwise show it identically to a matching pick.
     const composition = {
       counts: { availableTasks: 1, includedNotMatchingTasks: 1 },
-      tasks: [{ id: 'stale', kind: 'task', compositionState: 'includedNotMatching', record: { name: 'Picked Task' } }],
-      events: []
+      tasks: [
+        {
+          id: 'stale',
+          kind: 'task',
+          compositionState: 'includedNotMatching',
+          record: { name: 'Picked Task' },
+        },
+      ],
+      events: [],
     };
     const { issues, checks } = evaluateEnvironmentReadiness(environment, composition);
-    const stale = issues.find(issue => issue.id === 'staleIncluded');
+    const stale = issues.find((issue) => issue.id === 'staleIncluded');
     assert.ok(stale, 'should flag the non-matching pick');
     assert.equal(stale.severity, 'info');
     assert.equal(stale.recordId, 'stale');
     assert.equal(stale.recordName, 'Picked Task');
     assert.equal(
-      checks.find(check => check.id === 'noStaleIncluded'),
+      checks.find((check) => check.id === 'noStaleIncluded'),
       undefined,
       'a deliberate non-matching pick is a note, not an unmet readiness check'
     );
@@ -718,14 +1007,27 @@ describe('evaluateEnvironmentReadiness', () => {
     const composition = {
       counts: { availableTasks: 1, diagnosticTasks: 2, excludedTasks: 1 },
       tasks: [
-        { id: 'hidden-a', kind: 'task', compositionState: 'notMatching', record: { name: 'Forage Moonberries' } },
-        { id: 'hidden-b', kind: 'task', compositionState: 'libraryDisabled', record: { name: 'Forage Brambles' } }
+        {
+          id: 'hidden-a',
+          kind: 'task',
+          compositionState: 'notMatching',
+          record: { name: 'Forage Moonberries' },
+        },
+        {
+          id: 'hidden-b',
+          kind: 'task',
+          compositionState: 'libraryDisabled',
+          record: { name: 'Forage Brambles' },
+        },
       ],
-      events: []
+      events: [],
     };
     const { issues } = evaluateEnvironmentReadiness(environment, composition);
-    assert.ok(!issues.some(issue => issue.id === 'hiddenNonMatching'), 'hidden non-matching records are surfaced in the Tasks/Events tabs, not as validation issues');
-    assert.ok(issues.some(issue => issue.id === 'locallyExcluded' && issue.severity === 'info'));
+    assert.ok(
+      !issues.some((issue) => issue.id === 'hiddenNonMatching'),
+      'hidden non-matching records are surfaced in the Tasks/Events tabs, not as validation issues'
+    );
+    assert.ok(issues.some((issue) => issue.id === 'locallyExcluded' && issue.severity === 'info'));
   });
 });
 
@@ -747,7 +1049,7 @@ describeValidationHostContract({
     {
       marker: "{#if activeTab === 'overview'}",
       present: 'the tab chain must exist',
-      order: 'the region sits outside the tab chain'
-    }
-  ]
+      order: 'the region sits outside the tab chain',
+    },
+  ],
 });

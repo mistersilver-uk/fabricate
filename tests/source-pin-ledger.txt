@@ -37,7 +37,6 @@ tests/components/component-sources-bar-mounted.test.js	8
 tests/components/crafting-view-mounted.test.js	9
 tests/components/design-system-debt-ratchets.test.js	4
 tests/components/empty-state-mounted.test.js	1
-tests/components/environment-editor.test.js	50
 tests/components/essence-chip-mounted.test.js	1
 tests/components/essence-pool-panel-mounted.test.js	10
 tests/components/essence-source-selector-keyboard-mounted.test.js	9
