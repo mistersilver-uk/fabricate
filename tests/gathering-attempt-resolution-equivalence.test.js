@@ -7,7 +7,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { authoredComplication } from './helpers/complicationFixtures.js';
-import { gatheringFixture, resolvedCheck, runRealGatheringAttempt } from './helpers/real-gathering-attempt.js';
+import {
+  gatheringFixture,
+  resolvedCheck,
+  runRealGatheringAttempt,
+} from './helpers/real-gathering-attempt.js';
 
 const SCRAP = { id: 'scrap', name: 'Scrap', difficulty: 1 };
 const MATURE_WORLD_TIME = 300;
@@ -15,15 +19,24 @@ const START_WORLD_TIME = 100;
 
 /** The one shared fixture factory the 4-mode base matrix drives. */
 function modeFixture(mode, { timeRequirement = null } = {}) {
-  const resultGroups = [{
-    id: mode === 'routed' ? 'yield' : 'group-a',
-    name: mode === 'routed' ? 'Yield' : 'Ore',
-    results: [{ id: 'r-win', componentId: 'scrap', quantity: 2 }],
-  }];
+  const resultGroups = [
+    {
+      id: mode === 'routed' ? 'yield' : 'group-a',
+      name: mode === 'routed' ? 'Yield' : 'Ore',
+      results: [{ id: 'r-win', componentId: 'scrap', quantity: 2 }],
+    },
+  ];
   const dropRows =
-    mode === 'd100' ? [{ id: 'row-scrap', componentId: 'scrap', quantity: 1, dropRate: 100, enabled: true }] : [];
+    mode === 'd100'
+      ? [{ id: 'row-scrap', componentId: 'scrap', quantity: 1, dropRate: 100, enabled: true }]
+      : [];
   const fixture = gatheringFixture({
-    mode, components: [SCRAP], resultGroups, dropRows, timeRequirement, chatOutput: true,
+    mode,
+    components: [SCRAP],
+    resultGroups,
+    dropRows,
+    timeRequirement,
+    chatOutput: true,
   });
   if (mode === 'progressive') {
     fixture.system.gatheringCraftingCheck.progressive = { rollFormula: '1d20', awardMode: 'equal' };
@@ -40,7 +53,9 @@ function checkFor(mode) {
 
 /** The write call the entry path actually made: `createTerminalRun` immediate, `completeRun` matured. */
 function writeCallFor(result, matured) {
-  return matured ? result.runManagerCalls.completeRun[0] : result.runManagerCalls.createTerminalRun[0];
+  return matured
+    ? result.runManagerCalls.completeRun[0]
+    : result.runManagerCalls.createTerminalRun[0];
 }
 
 const ENTRIES = ['immediate-legacy', 'matured-legacy', 'matured-versioned'];
@@ -61,7 +76,11 @@ for (const mode of ['straight', 'd100', 'progressive', 'routed']) {
       });
 
       assert.equal(result.error, null);
-      const terminal = matured ? (versioned ? result.maturedResult : result.maturedResult?.completed?.[0]) : result.response;
+      const terminal = matured
+        ? versioned
+          ? result.maturedResult
+          : result.maturedResult?.completed?.[0]
+        : result.response;
       assert.equal(terminal.state, 'succeeded');
       assert.equal(result.record.status, 'succeeded');
 
@@ -70,8 +89,13 @@ for (const mode of ['straight', 'd100', 'progressive', 'routed']) {
       assert.equal(writeCall.status, 'succeeded');
       // The versioned record's own `createdResults` field stays the pending snapshot forever —
       // the real evidence is the response (and its `run`, `mergeRunEconomyEvidence`'d for display).
-      const createdResults = versioned ? result.maturedResult.createdResults : result.record.createdResults;
-      assert.deepEqual(createdResults.map((entry) => entry.componentId), ['scrap']);
+      const createdResults = versioned
+        ? result.maturedResult.createdResults
+        : result.record.createdResults;
+      assert.deepEqual(
+        createdResults.map((entry) => entry.componentId),
+        ['scrap']
+      );
 
       assert.equal(result.chat.length, 1, 'one chat card per terminal attempt');
       assert.equal(result.chat[0].speaker.actor, result.actor.id);
@@ -97,16 +121,27 @@ for (const mode of ['straight', 'd100', 'progressive', 'routed']) {
 /** A routed task with one tool, wired to a caller-controlled breakage plan/apply. */
 function toolFixture({ timeRequirement = null } = {}) {
   const fixture = gatheringFixture({
-    mode: 'routed', components: [SCRAP], timeRequirement,
-    resultGroups: [{ id: 'yield', name: 'Yield', results: [{ id: 'r-win', componentId: 'scrap', quantity: 2 }] }],
+    mode: 'routed',
+    components: [SCRAP],
+    timeRequirement,
+    resultGroups: [
+      { id: 'yield', name: 'Yield', results: [{ id: 'r-win', componentId: 'scrap', quantity: 2 }] },
+    ],
   });
-  fixture.task.tools = [{ componentId: 'tool-axe', breakage: { mode: 'limitedUses', maxUses: null }, onBreak: { mode: 'destroy' } }];
+  fixture.task.tools = [
+    {
+      componentId: 'tool-axe',
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' },
+    },
+  ];
   return fixture;
 }
 
 const BREAKING_TOOL_BREAKAGE = {
   plan: async ({ tools }) => tools.map((tool) => ({ componentId: tool.componentId, broken: true })),
-  apply: async ({ tools }) => tools.map((tool) => ({ componentId: tool.componentId, broken: true })),
+  apply: async ({ tools }) =>
+    tools.map((tool) => ({ componentId: tool.componentId, broken: true })),
 };
 
 for (const entry of ENTRIES) {
@@ -118,8 +153,11 @@ for (const entry of ENTRIES) {
   test(`failureOnBreak (${entry}): a broken tool voids the award, in the write call and the record`, async () => {
     const fixture = toolFixture({ timeRequirement: matured ? { minutes: 1 } : null });
     const result = await runRealGatheringAttempt({
-      ...fixture, toolBreakage: BREAKING_TOOL_BREAKAGE, versioned,
-      worldTime: START_WORLD_TIME, matureWorldTime: matured ? MATURE_WORLD_TIME : null,
+      ...fixture,
+      toolBreakage: BREAKING_TOOL_BREAKAGE,
+      versioned,
+      worldTime: START_WORLD_TIME,
+      matureWorldTime: matured ? MATURE_WORLD_TIME : null,
       resolvedCheckResult: versioned ? checkFor('routed') : null,
     });
 
@@ -146,7 +184,9 @@ for (const entry of ENTRIES) {
 test('matured legacy: reservation-released sits between the commit write and respond', async () => {
   const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
   const result = await runRealGatheringAttempt({
-    ...fixture, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
   });
 
   assert.equal(result.error, null);
@@ -154,7 +194,10 @@ test('matured legacy: reservation-released sits between the commit write and res
   const commitIndex = stages.lastIndexOf('settleHistory');
   const releaseIndex = stages.indexOf('reservation-released');
   const respondIndex = stages.indexOf('respond');
-  assert.ok(commitIndex >= 0 && releaseIndex > commitIndex && respondIndex > releaseIndex, stages.join(' -> '));
+  assert.ok(
+    commitIndex >= 0 && releaseIndex > commitIndex && respondIndex > releaseIndex,
+    stages.join(' -> ')
+  );
 });
 
 // Wrong refactor this fails: stage 3b (the `createTerminalRun` precheck) running after stage 5
@@ -163,10 +206,20 @@ test('matured legacy: reservation-released sits between the commit write and res
 test('immediate: plan and planTools never run, and the run-creation refusal carries its own code, when createTerminalRun is absent', async () => {
   let planCalls = 0;
   const fixture = toolFixture();
-  const toolBreakage = { plan: async () => { planCalls += 1; return []; }, apply: async () => [] };
+  const toolBreakage = {
+    plan: async () => {
+      planCalls += 1;
+      return [];
+    },
+    apply: async () => [],
+  };
   const result = await runRealGatheringAttempt({
-    ...fixture, toolBreakage, rollTotal: 18,
-    beforeStart: ({ runManager }) => { runManager.createTerminalRun = undefined; },
+    ...fixture,
+    toolBreakage,
+    rollTotal: 18,
+    beforeStart: ({ runManager }) => {
+      runManager.createTerminalRun = undefined;
+    },
   });
 
   assert.equal(result.error, null);
@@ -180,7 +233,10 @@ test('immediate: plan and planTools never run, and the run-creation refusal carr
 test('matured legacy on a non-primary GM: the completion hook is suppressed, the chat card is not', async () => {
   const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
   const result = await runRealGatheringAttempt({
-    ...fixture, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME, isPrimaryGM: () => false,
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
+    isPrimaryGM: () => false,
   });
 
   assert.equal(result.error, null);
@@ -189,17 +245,19 @@ test('matured legacy on a non-primary GM: the completion hook is suppressed, the
 });
 
 // Wrong refactor this fails: moving `executeVersionedStage`'s own missing-reference check so
-// `_processMaturedWaitingRun` is reached first. That refusal is also the proof that
-// `_processMaturedWaitingRun`'s own versioned missing-reference branch is dead code: its only
-// versioned caller is `executeVersionedStage`, always after this same check, so no caller can
-// ever reach that branch with an already-missing reference. It cannot be driven to fail on its
-// own terms; this cell is the closest proof the engine, as it stands, admits.
+// `_processMaturedWaitingRun` is reached first. That refusal is also why the matured versioned
+// missing-reference branch is dead: its only caller checks first, so nothing can reach it.
 test('executeVersionedStage refuses a missing reference before delegating to maturity', async () => {
   const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
   const result = await runRealGatheringAttempt({
-    ...fixture, versioned: true, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    versioned: true,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
     resolvedCheckResult: checkFor('routed'),
-    beforeMature: () => { fixture.environment.id = 'renamed-environment'; },
+    beforeMature: () => {
+      fixture.environment.id = 'renamed-environment';
+    },
   });
 
   assert.equal(result.error, null);
@@ -215,10 +273,15 @@ test('executeVersionedStage refuses a missing reference before delegating to mat
 test('persist failure: matured legacy collects the throw into processWorldTime errors', async () => {
   const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
   const result = await runRealGatheringAttempt({
-    ...fixture, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
     beforeMature: ({ runManager }) => {
       const original = runManager.completeRun.bind(runManager);
-      runManager.completeRun = async (...args) => { await original(...args); return null; };
+      runManager.completeRun = async (...args) => {
+        await original(...args);
+        return null;
+      };
     },
   });
 
@@ -234,11 +297,17 @@ test('persist failure: matured legacy collects the throw into processWorldTime e
 test('persist failure: matured versioned throws TERMINAL_HISTORY_NOT_WRITTEN', async () => {
   const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
   const result = await runRealGatheringAttempt({
-    ...fixture, versioned: true, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    versioned: true,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
     resolvedCheckResult: checkFor('routed'),
     beforeMature: ({ runManager }) => {
       const original = runManager.completeRun.bind(runManager);
-      runManager.completeRun = async (...args) => { await original(...args); return null; };
+      runManager.completeRun = async (...args) => {
+        await original(...args);
+        return null;
+      };
     },
   });
 
@@ -248,8 +317,11 @@ test('persist failure: matured versioned throws TERMINAL_HISTORY_NOT_WRITTEN', a
 test('persist failure: immediate passes a null run through, unguarded, rather than refusing', async () => {
   const fixture = modeFixture('routed');
   const result = await runRealGatheringAttempt({
-    ...fixture, rollTotal: 18,
-    beforeStart: ({ runManager }) => { runManager.createTerminalRun = async () => null; },
+    ...fixture,
+    rollTotal: 18,
+    beforeStart: ({ runManager }) => {
+      runManager.createTerminalRun = async () => null;
+    },
   });
 
   // No RUN_CREATION_FAILED refusal — a null run crashes the downstream commit instead, which is
@@ -259,18 +331,23 @@ test('persist failure: immediate passes a null run through, unguarded, rather th
   assert.equal(result.error.code, undefined);
 });
 
-// Ungated refusals: `blockedReasons[0].code` is `TASK_MISCONFIGURED`/`RUN_CREATION_FAILED` on every
-// one of these and on `startAttempt`'s own preflight, so `.data` is the only thing that tells them
-// apart. Wrong refactor this fails: a `refuse` that stops threading the inner outcome/plan code
-// through to `.data`.
+// Ungated refusals: every one answers `TASK_MISCONFIGURED`/`RUN_CREATION_FAILED`, as does
+// `startAttempt`'s preflight, so `.data` is all that tells them apart. Wrong refactor these fail:
+// a `refuse` that stops threading the inner outcome/plan code through to `.data`.
 
 test('matured plan-misconfigured, legacy arm: an unresolvable result component clears with its own diagnostic', async () => {
   const fixture = gatheringFixture({
-    mode: 'routed', components: [], timeRequirement: { minutes: 1 },
-    resultGroups: [{ id: 'yield', name: 'Yield', results: [{ id: 'r', componentId: 'ghost', quantity: 1 }] }],
+    mode: 'routed',
+    components: [],
+    timeRequirement: { minutes: 1 },
+    resultGroups: [
+      { id: 'yield', name: 'Yield', results: [{ id: 'r', componentId: 'ghost', quantity: 1 }] },
+    ],
   });
   const result = await runRealGatheringAttempt({
-    ...fixture, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
   });
 
   assert.equal(result.error, null);
@@ -280,11 +357,18 @@ test('matured plan-misconfigured, legacy arm: an unresolvable result component c
 
 test('matured plan-misconfigured, versioned arm: the same diagnostic, cleared through the versioned cleanup', async () => {
   const fixture = gatheringFixture({
-    mode: 'routed', components: [], timeRequirement: { minutes: 1 },
-    resultGroups: [{ id: 'yield', name: 'Yield', results: [{ id: 'r', componentId: 'ghost', quantity: 1 }] }],
+    mode: 'routed',
+    components: [],
+    timeRequirement: { minutes: 1 },
+    resultGroups: [
+      { id: 'yield', name: 'Yield', results: [{ id: 'r', componentId: 'ghost', quantity: 1 }] },
+    ],
   });
   const result = await runRealGatheringAttempt({
-    ...fixture, versioned: true, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    versioned: true,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
     resolvedCheckResult: checkFor('routed'),
   });
 
@@ -295,11 +379,18 @@ test('matured plan-misconfigured, versioned arm: the same diagnostic, cleared th
 
 test('matured outcome-misconfigured, versioned: an unroutable success tier clears with ROUTED_TIER_UNROUTED', async () => {
   const fixture = gatheringFixture({
-    mode: 'routed', components: [SCRAP], timeRequirement: { minutes: 1 },
-    resultGroups: [{ id: 'g', name: 'Copper', results: [{ id: 'r', componentId: 'scrap', quantity: 1 }] }],
+    mode: 'routed',
+    components: [SCRAP],
+    timeRequirement: { minutes: 1 },
+    resultGroups: [
+      { id: 'g', name: 'Copper', results: [{ id: 'r', componentId: 'scrap', quantity: 1 }] },
+    ],
   });
   const result = await runRealGatheringAttempt({
-    ...fixture, versioned: true, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
+    ...fixture,
+    versioned: true,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
     resolvedCheckResult: checkFor('routed'),
   });
 
@@ -309,8 +400,11 @@ test('matured outcome-misconfigured, versioned: an unroutable success tier clear
 
 test('immediate outcome-misconfigured: an unroutable success tier blocks with ROUTED_TIER_UNROUTED', async () => {
   const fixture = gatheringFixture({
-    mode: 'routed', components: [SCRAP],
-    resultGroups: [{ id: 'g', name: 'Copper', results: [{ id: 'r', componentId: 'scrap', quantity: 1 }] }],
+    mode: 'routed',
+    components: [SCRAP],
+    resultGroups: [
+      { id: 'g', name: 'Copper', results: [{ id: 'r', componentId: 'scrap', quantity: 1 }] },
+    ],
   });
   const result = await runRealGatheringAttempt({ ...fixture, rollTotal: 18 });
 
@@ -320,8 +414,11 @@ test('immediate outcome-misconfigured: an unroutable success tier blocks with RO
 
 test('immediate plan-misconfigured: an unresolvable result component blocks with RESULT_PLAN_DIAGNOSTIC', async () => {
   const fixture = gatheringFixture({
-    mode: 'routed', components: [],
-    resultGroups: [{ id: 'yield', name: 'Yield', results: [{ id: 'r', componentId: 'ghost', quantity: 1 }] }],
+    mode: 'routed',
+    components: [],
+    resultGroups: [
+      { id: 'yield', name: 'Yield', results: [{ id: 'r', componentId: 'ghost', quantity: 1 }] },
+    ],
   });
   const result = await runRealGatheringAttempt({ ...fixture, rollTotal: 18 });
 
@@ -332,7 +429,8 @@ test('immediate plan-misconfigured: an unresolvable result component blocks with
 test('propagated error.code (immediate persist failure): a throwing createTerminalRun surfaces its own code under RUN_CREATION_FAILED', async () => {
   const fixture = modeFixture('routed');
   const result = await runRealGatheringAttempt({
-    ...fixture, rollTotal: 18,
+    ...fixture,
+    rollTotal: 18,
     beforeStart: ({ runManager }) => {
       runManager.createTerminalRun = async () => {
         const failure = new Error('write exploded');
@@ -347,25 +445,28 @@ test('propagated error.code (immediate persist failure): a throwing createTermin
   assert.equal(result.response.blockedReasons[0].data.code, 'WRITE_EXPLODED');
 });
 
-// Component complications: two call sites (`commit`, the immediate/matured-legacy path; and
-// `writeTerminalHistory`, the matured-versioned path), and the resolution-modes requirement that
-// the unit is the result entry, never the component — two rows naming the same component must
-// fire independently. Together the two cells below cover all five stage buckets
-// (`src/utils/complicationPlan.js`): full, halted, skipped and unreached here; full, partial and
-// unreached in the writeTerminalHistory cell. Wrong refactor either fails: deduplicating on
-// componentId, or reading `outcome.resultGroups` (the awarded-only subset) instead of the task's
-// full authored group for the stage list.
+// Complications fire from two call sites — `commit` (immediate, matured-legacy) and
+// `writeTerminalHistory` (matured-versioned) — per result entry, never per component. The cells
+// below fire the four live buckets (full, partial, halted, unreached); a `skipped` stage fires none.
 
 test('progressive complications via commit: full, halted, skipped, unreached, and one component fired twice', async () => {
   const compA = {
-    id: 'comp-a', name: 'A', difficulty: 3,
-    complications: [authoredComplication({ id: 'ca', when: { stageAwarded: true }, activity: 'gathering' })],
+    id: 'comp-a',
+    name: 'A',
+    difficulty: 3,
+    complications: [
+      authoredComplication({ id: 'ca', when: { stageAwarded: true }, activity: 'gathering' }),
+    ],
   };
   const compB = {
-    id: 'comp-b', name: 'B', difficulty: 2,
+    id: 'comp-b',
+    name: 'B',
+    difficulty: 2,
     // On the halted component, never the awarded one — this only fires if the stage list is
     // built from the task's full authored group, not `outcome.resultGroups` (awarded-only).
-    complications: [authoredComplication({ id: 'cb', when: { stageMissed: true }, activity: 'gathering' })],
+    complications: [
+      authoredComplication({ id: 'cb', when: { stageMissed: true }, activity: 'gathering' }),
+    ],
   };
   const compC = { id: 'comp-c', name: 'C', difficulty: 0 };
   const compD = { id: 'comp-d', name: 'D', difficulty: 1 };
@@ -377,7 +478,8 @@ test('progressive complications via commit: full, halted, skipped, unreached, an
     { id: 'd1', componentId: 'comp-d', quantity: 1 },
   ];
   const fixture = gatheringFixture({
-    mode: 'progressive', components: [compA, compB, compC, compD],
+    mode: 'progressive',
+    components: [compA, compB, compC, compD],
     resultGroups: [{ id: 'group-a', name: 'Ore', results }],
   });
   fixture.system.gatheringCraftingCheck.progressive = { rollFormula: '1d20', awardMode: 'equal' };
@@ -386,28 +488,50 @@ test('progressive complications via commit: full, halted, skipped, unreached, an
 
   assert.equal(result.error, null);
   assert.deepEqual(result.record.checkResult.resolutionMeta, {
-    awardedResultIds: ['a1', 'a2'], remaining: 0, partialResultId: null, haltedResultId: 'b1', skippedResultIds: ['c1'],
+    awardedResultIds: ['a1', 'a2'],
+    remaining: 0,
+    partialResultId: null,
+    haltedResultId: 'b1',
+    skippedResultIds: ['c1'],
   });
   assert.deepEqual(
-    result.response.complications.map((entry) => [entry.resultId, entry.componentId, entry.buckets[0]]),
-    [['a1', 'comp-a', 'full'], ['a2', 'comp-a', 'full'], ['b1', 'comp-b', 'halted']],
+    result.response.complications.map((entry) => [
+      entry.resultId,
+      entry.componentId,
+      entry.buckets[0],
+    ]),
+    [
+      ['a1', 'comp-a', 'full'],
+      ['a2', 'comp-a', 'full'],
+      ['b1', 'comp-b', 'halted'],
+    ],
     'the same component fires once per result entry, and the halted stage still fires its own'
   );
 });
 
 test('progressive complications via writeTerminalHistory: full, partial, unreached, and one component fired twice', async () => {
   const compF = {
-    id: 'comp-f', name: 'F', difficulty: 3,
+    id: 'comp-f',
+    name: 'F',
+    difficulty: 3,
     complications: [
       authoredComplication({ id: 'cf-full', when: { stageAwarded: true }, activity: 'gathering' }),
-      authoredComplication({ id: 'cf-partial', when: { stagePartial: true }, activity: 'gathering' }),
+      authoredComplication({
+        id: 'cf-partial',
+        when: { stagePartial: true },
+        activity: 'gathering',
+      }),
     ],
   };
   const compG = {
-    id: 'comp-g', name: 'G', difficulty: 2,
+    id: 'comp-g',
+    name: 'G',
+    difficulty: 2,
     // On the unreached component — only reachable if the stage list is built from the task's
     // full authored group, not `outcome.resultGroups` (awarded-only, which never includes it).
-    complications: [authoredComplication({ id: 'cg', when: { stageMissed: true }, activity: 'gathering' })],
+    complications: [
+      authoredComplication({ id: 'cg', when: { stageMissed: true }, activity: 'gathering' }),
+    ],
   };
   const results = [
     { id: 'f1', componentId: 'comp-f', quantity: 1 },
@@ -415,23 +539,137 @@ test('progressive complications via writeTerminalHistory: full, partial, unreach
     { id: 'g1', componentId: 'comp-g', quantity: 1 },
   ];
   const fixture = gatheringFixture({
-    mode: 'progressive', components: [compF, compG], timeRequirement: { minutes: 1 },
+    mode: 'progressive',
+    components: [compF, compG],
+    timeRequirement: { minutes: 1 },
     resultGroups: [{ id: 'group-f', name: 'Ore', results }],
   });
   fixture.system.gatheringCraftingCheck.progressive = { rollFormula: '1d20', awardMode: 'partial' };
 
   const result = await runRealGatheringAttempt({
-    ...fixture, versioned: true, worldTime: START_WORLD_TIME, matureWorldTime: MATURE_WORLD_TIME,
-    resolvedCheckResult: { success: true, status: 'success', outcome: null, value: 5, data: { total: 5, formula: '1d20' } },
+    ...fixture,
+    versioned: true,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
+    resolvedCheckResult: {
+      success: true,
+      status: 'success',
+      outcome: null,
+      value: 5,
+      data: { total: 5, formula: '1d20' },
+    },
   });
 
   assert.equal(result.error, null);
   assert.deepEqual(result.record.checkResult.resolutionMeta, {
-    awardedResultIds: ['f1', 'f2'], remaining: 0, partialResultId: 'f2', haltedResultId: null, skippedResultIds: [],
+    awardedResultIds: ['f1', 'f2'],
+    remaining: 0,
+    partialResultId: 'f2',
+    haltedResultId: null,
+    skippedResultIds: [],
   });
   assert.deepEqual(
-    result.maturedResult.complications.map((entry) => [entry.resultId, entry.componentId, entry.buckets[0]]),
-    [['f1', 'comp-f', 'full'], ['f2', 'comp-f', 'partial'], ['g1', 'comp-g', 'unreached']],
+    result.maturedResult.complications.map((entry) => [
+      entry.resultId,
+      entry.componentId,
+      entry.buckets[0],
+    ]),
+    [
+      ['f1', 'comp-f', 'full'],
+      ['f2', 'comp-f', 'partial'],
+      ['g1', 'comp-g', 'unreached'],
+    ],
     'the same component fires full and partial per entry, and the unreached stage still fires its own'
   );
+});
+
+// Wrong refactor this fails: routing a cancelled matured outcome into the clear path, which would
+// discard a run the GM can still see. The engine throws `CANCELLED_TIMED_OUTCOME` at this refusal
+// where the base completed the run as cancelled; both agree the waiting run is never cleared.
+test('matured legacy: a cancelled outcome never clears the waiting run', async () => {
+  const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
+  const result = await runRealGatheringAttempt({
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
+    beforeMature: ({ engine }) => {
+      engine._resolveTaskOutcome = async () => ({
+        status: 'cancelled',
+        resultGroups: [],
+        checkResult: null,
+      });
+    },
+  });
+
+  assert.equal(result.runManagerCalls.clearActiveRun.length, 0, 'the run was not cleared');
+  assert.equal(result.runManagerCalls.cancelRun.length, 0, 'and it was not cancelled');
+  assert.equal(result.maturedResult.cleared.length, 0, 'nothing was reported as cleared');
+});
+
+/** The same routed fixture, with the environment data that makes `_richHistoryPayload` non-empty. */
+function richFixture({ timeRequirement = null } = {}) {
+  const fixture = modeFixture('routed', { timeRequirement });
+  fixture.environment.risk = 'wild';
+  fixture.environment.conditions = { weather: 'storm' };
+  return fixture;
+}
+
+// Wrong refactor this fails: dropping either half of the immediate composite's rich merge — the run
+// data would lose the attempt's economy evidence, or the payload would carry a second, separately
+// computed copy instead of the one snapshot both halves share.
+test('immediate: one rich snapshot reaches both the terminal run data and its payload', async () => {
+  const fixture = richFixture();
+  const result = await runRealGatheringAttempt({ ...fixture, rollTotal: 18 });
+
+  assert.equal(result.error, null);
+  const writeCall = writeCallFor(result, false);
+  assert.ok(writeCall.runData.economyEvidence, 'the run data carries the rich evidence');
+  assert.equal(
+    writeCall.payload.economyEvidence,
+    writeCall.runData.economyEvidence,
+    'the same object reaches both'
+  );
+  assert.deepEqual(writeCall.payload.conditionSnapshot, { weather: 'storm' });
+  assert.equal(writeCall.payload.riskLevel, 'wild');
+});
+
+// Wrong refactor this fails: giving the matured path the immediate path's rich composite, which
+// would stamp economy evidence onto terminal run data the base never wrote it to.
+test('matured legacy: the rich snapshot reaches the payload but never the terminal run data', async () => {
+  const fixture = richFixture({ timeRequirement: { minutes: 1 } });
+  const result = await runRealGatheringAttempt({
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
+  });
+
+  assert.equal(result.error, null);
+  const writeCall = writeCallFor(result, true);
+  assert.ok(writeCall.payload.economyEvidence, 'the payload carries the rich evidence');
+  assert.equal(writeCall.payload.riskLevel, 'wild');
+  assert.ok(!writeCall.options.terminalRunData.economyEvidence, 'the terminal run data does not');
+});
+
+// Wrong refactor this fails: resolving the outcome before validating the task, which would roll a
+// misconfigured task's check on the way to clearing the run it is about to discard.
+test('matured legacy: a task misconfigured at maturity clears before the outcome is resolved', async () => {
+  const fixture = modeFixture('routed', { timeRequirement: { minutes: 1 } });
+  let outcomeCalls = 0;
+  const result = await runRealGatheringAttempt({
+    ...fixture,
+    worldTime: START_WORLD_TIME,
+    matureWorldTime: MATURE_WORLD_TIME,
+    beforeMature: ({ engine }) => {
+      const resolveOutcome = engine._resolveTaskOutcome.bind(engine);
+      engine._resolveTaskOutcome = async (...args) => {
+        outcomeCalls += 1;
+        return resolveOutcome(...args);
+      };
+      fixture.system.gatheringCraftingCheck.routed.rollFormula = null;
+    },
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(outcomeCalls, 0, 'the outcome collaborator never ran');
+  assert.equal(result.maturedResult.cleared[0].blockedReasons[0].code, 'TASK_MISCONFIGURED');
 });

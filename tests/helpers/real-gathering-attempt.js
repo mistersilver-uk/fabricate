@@ -68,8 +68,20 @@ function recordRunManagerCalls(runManager, calls, stageJournal) {
       return original(...args);
     };
   };
-  wrap('createTerminalRun', (actor, runData, status, payload, options) => ({ actor, runData, status, payload, options }));
-  wrap('completeRun', (actor, run, status, payload, options) => ({ actor, run, status, payload, options }));
+  wrap('createTerminalRun', (actor, runData, status, payload, options) => ({
+    actor,
+    runData,
+    status,
+    payload,
+    options,
+  }));
+  wrap('completeRun', (actor, run, status, payload, options) => ({
+    actor,
+    run,
+    status,
+    payload,
+    options,
+  }));
   wrap('settleHistory', (actor, runId, payload) => ({ actor, runId, payload }));
   wrap('cancelRun', (actor, runId, options) => ({ actor, runId, options }));
   wrap('clearActiveRun', (actor, runId, options) => ({ actor, runId, options }));
@@ -84,8 +96,18 @@ function recordRunManagerCalls(runManager, calls, stageJournal) {
  * relative to commit and respond, via a `reservation-released` marker.
  */
 function buildEngine({
-  system, store, actor, viewer, runManager, publications, nowWorldTime, createResultCreator, rollD100,
-  isPrimaryGM = () => true, toolBreakage = null, stageJournal,
+  system,
+  store,
+  actor,
+  viewer,
+  runManager,
+  publications,
+  nowWorldTime,
+  createResultCreator,
+  rollD100,
+  isPrimaryGM = () => true,
+  toolBreakage = null,
+  stageJournal,
 }) {
   const rich = new GatheringRichStateService({ environmentStore: store, rollD100, nowWorldTime });
   const engine = new GatheringEngine({
@@ -95,7 +117,13 @@ function buildEngine({
     // them a blind attempt records no reveal and every reveal-gated read answers "hidden"
     // whatever the policy says, which cannot tell a working gate from an absent one.
     richState: Object.fromEntries(
-      ['resolveD100Attempt', 'resolveEnvironmentalEvents', 'commitAcceptedAttempt', 'revealTask', 'listRevealedTaskIds'].map((name) => [name, rich[name].bind(rich)])
+      [
+        'resolveD100Attempt',
+        'resolveEnvironmentalEvents',
+        'commitAcceptedAttempt',
+        'revealTask',
+        'listRevealedTaskIds',
+      ].map((name) => [name, rich[name].bind(rich)])
     ),
     getSystems: () => [system],
     getSelectableActors: () => [actor],
@@ -119,6 +147,9 @@ function buildEngine({
   };
   engine.blindRunStore = {
     get: () => true,
+    reserve: async () => null,
+    reservedUnits: () => 0,
+    canWrite: () => true,
     release: async () => {
       stageJournal.push({ stage: 'reservation-released' });
       return { released: true };
@@ -178,11 +209,18 @@ export async function runRealGatheringAttempt({
   const chat = [];
   const stageJournal = [];
   const runManagerCalls = {
-    createTerminalRun: [], completeRun: [], settleHistory: [], cancelRun: [], clearActiveRun: [],
+    createTerminalRun: [],
+    completeRun: [],
+    settleHistory: [],
+    cancelRun: [],
+    clearActiveRun: [],
   };
   let sequence = 0;
   let now = worldTime;
-  const store = { list: () => [environment], get: (id) => (id === environment.id ? environment : null) };
+  const store = {
+    list: () => [environment],
+    get: (id) => (id === environment.id ? environment : null),
+  };
   const runManager = new GatheringRunManager({
     randomID: () => `run-${++sequence}`,
     nowWorldTime: () => now,
@@ -192,7 +230,15 @@ export async function runRealGatheringAttempt({
   recordRunManagerCalls(runManager, runManagerCalls, stageJournal);
   try {
     globalThis.game = {
-      user: viewer, users: new Map([[viewer.id, viewer]]), actors: [actor], time: { worldTime: now },
+      user: viewer,
+      users: new Map([[viewer.id, viewer]]),
+      actors: [actor],
+      // A getter, so the Foundry global tracks the clock a matured cell advances.
+      time: {
+        get worldTime() {
+          return now;
+        },
+      },
       settings: { get: () => 'publicroll' },
     };
     globalThis.foundry = {
@@ -204,17 +250,40 @@ export async function runRealGatheringAttempt({
       },
     };
     globalThis.fromUuidSync = (uuid) => sources[uuid] ?? null;
-    globalThis.ChatMessage = { getSpeaker: () => ({ actor: actor.id }), create: async (data) => chat.push(data) };
+    globalThis.ChatMessage = {
+      getSpeaker: () => ({ actor: actor.id }),
+      create: async (data) => chat.push(data),
+    };
     stubRoll(rollTotal, [{ number: 1, faces: 20, total: rollTotal }]);
-    const engine = buildEngine({ system, store, actor, viewer, runManager, publications, nowWorldTime: () => now,
+    const engine = buildEngine({
+      system,
+      store,
+      actor,
+      viewer,
+      runManager,
+      publications,
+      nowWorldTime: () => now,
       createResultCreator: createGatheringResultCreator,
       rollD100: () => queue.shift() ?? 1,
-      isPrimaryGM, toolBreakage, stageJournal });
+      isPrimaryGM,
+      toolBreakage,
+      stageJournal,
+    });
     engine.installVersionedRunAuthority({
-      consumeExecutionGrant: async (_grant, context) => ({ operationId: `operation-${context.requestId}`, resolvedCheckResult }),
+      consumeExecutionGrant: async (_grant, context) => ({
+        operationId: `operation-${context.requestId}`,
+        resolvedCheckResult,
+      }),
     });
     if (typeof beforeStart === 'function') await beforeStart({ runManager, engine });
-    const args = { actor, viewer, environmentId: environment.id, taskId, requestId: 'start', executionGrant: 'grant' };
+    const args = {
+      actor,
+      viewer,
+      environmentId: environment.id,
+      taskId,
+      requestId: 'start',
+      executionGrant: 'grant',
+    };
     let response = null;
     let error = null;
     let maturedResult;
@@ -222,17 +291,36 @@ export async function runRealGatheringAttempt({
       response = versioned ? await engine.startVersionedRun(args) : await engine.startAttempt(args);
       if (matureWorldTime != null) {
         now = matureWorldTime;
-        if (typeof beforeMature === 'function') await beforeMature({ environment, task: environment.tasks.find((candidate) => candidate.id === taskId) ?? null, actor, runManager, engine });
+        if (typeof beforeMature === 'function')
+          await beforeMature({
+            environment,
+            task: environment.tasks.find((candidate) => candidate.id === taskId) ?? null,
+            actor,
+            runManager,
+            engine,
+          });
         if (versioned) {
           const waiting = runManager.getActiveRuns(actor)[0];
-          maturedResult = await engine.executeVersionedStage({ actor, runId: waiting.id, expectedRevision: waiting.runRevision, requestId: 'mature', executionGrant: 'grant' });
+          maturedResult = await engine.executeVersionedStage({
+            actor,
+            runId: waiting.id,
+            expectedRevision: waiting.runRevision,
+            requestId: 'mature',
+            executionGrant: 'grant',
+          });
         } else {
           maturedResult = await engine.processWorldTime(now);
         }
       } else {
         const waiting = runManager.getActiveRuns(actor)[0];
         if (versioned && waiting) {
-          response = await engine.executeVersionedStage({ actor, runId: waiting.id, expectedRevision: waiting.runRevision, requestId: 'execute', executionGrant: 'grant' });
+          response = await engine.executeVersionedStage({
+            actor,
+            runId: waiting.id,
+            expectedRevision: waiting.runRevision,
+            requestId: 'execute',
+            executionGrant: 'grant',
+          });
         }
       }
     } catch (failure) {
@@ -255,7 +343,8 @@ export async function runRealGatheringAttempt({
         new RunJournalBuilder({
           gatheringRunSource: fresh,
           getSystem: () => system,
-          getGatheringTask: (_environmentId, id) => environment.tasks.find((task) => task.id === id) ?? null,
+          getGatheringTask: (_environmentId, id) =>
+            environment.tasks.find((task) => task.id === id) ?? null,
           // The SAME decision the chat card takes, from the engine that wrote the record.
           isGatheringIdentityHidden: (args) => engine.isHistoricalBlindIdentityHidden(args),
           getResultItem: () => null,
@@ -338,5 +427,11 @@ export function compendiumSourceItem({ uuid, name, img }) {
 /** The versioned execution authority's recorded answer for a routed/progressive check. */
 export function resolvedCheck(success, outcome) {
   const value = success ? 18 : 3;
-  return { success, status: success ? 'success' : 'failure', outcome, value, data: { total: value, formula: '1d20' } };
+  return {
+    success,
+    status: success ? 'success' : 'failure',
+    outcome,
+    value,
+    data: { total: value, formula: '1d20' },
+  };
 }
