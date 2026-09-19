@@ -357,6 +357,14 @@ An orchestrator `confirmRouteExit(nextView)` chains all of them; it's what every
 Helpers today: `confirmEnvironmentRouteExit`, `confirmEssenceRouteExit`, `confirmComponentRouteExit`, `confirmGatheringTaskRouteExit`, `confirmGatheringEventRouteExit`, `confirmToolsRouteExit`.
 Each pairs with a `finish{Kind}RouteExit` that calls `store.cancel{Kind}Draft?.()` to actually clear the draft *after* the user confirms.
 
+Those four sentences describe the shape issue 1705 replaced, and they are kept because the rule they state did not change: a guard answers for its own route, and one orchestrator asks them all.
+What ships now is one ordered table of thirteen rows in `src/ui/svelte/apps/manager/routeExitGuards.js`, asked row by row through `runRouteExitGuard` and as a whole through `confirmRouteExitGuards`.
+`confirmRouteExit` is still the orchestrator every handler invokes, under the same name and signature.
+`ROUTE_EXIT_GUARDS` states each row's place in the cascade, which navigation it waives (`subject`, `same-view`, `family`, or `none`), and the action its finisher receives when the store helper is absent — a per-row fact that is deliberately not uniform, so do not normalise it.
+The manager supplies one context of arrow accessors over its runes, keyed by the same view tokens: `active`, `isDirty`, `confirm` and `finish`, plus `whenClean` where a clean exit still has work to do, and `subject` or `family` where the row's skip shape needs one.
+The cascade stops at the first `false` and creates no promise while every row is inactive or skipped, because `selectSystem`, `openSystemEssenceRules` and `openToolEditor` read the answer as a boolean and `afterTruthyResult` runs its callback inline only for a non-thenable.
+`tests/manager-route-exit-guards.test.js` pins the table directly, and the mounted suites pin ten of its rows through the real shell.
+
 **2.
 Store layer — `src/ui/svelte/stores/adminStore.js`.** Each kind has a `confirmDiscardDirty{Kind}Draft()` async helper exported on the store.
 It calls `services.confirmDialog?.({ title, content, yes, no })` and returns the boolean.
@@ -368,7 +376,8 @@ The two kinds whose dirty state lives in the store (environment, tools) wrap the
 Foundry layer — `src/ui/svelte/util/foundryBridge.js`.** `services.confirmDialog` is wired to `foundry.applications.api.DialogV2.confirm`.
 In tests, `services.confirmDialog` is absent and the store helpers are stubbed directly on the test fixture — the Svelte layer never knows the difference.
 
-**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/components/manager-mounted.test.js` (locate it with `grep -n confirmDiscardDirty`).
+**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/helpers/manager/managerStoreFake.js` (locate it with `grep -n confirmDiscardDirty`).
+Steps (1), (2), (4) and (5) are unchanged by the table; step (3) is now a row of `ROUTE_EXIT_GUARDS` and its entry in the manager's guard context, which is what `confirmRouteExit` chains.
 
 **The `nextView === '<kind>-view'` same-view skip is NOT safe for a view with no `SCOPE_BROWSER_BY_VIEW` entry.** That map in `CraftingSystemManagerRoot.svelte` lists only `recipe-edit`, `recipe-item-edit`, `component-edit`, and `essence-edit`, and `browserViewForScopeChange` falls back to returning the view token unchanged for everything else.
 So a scope-select **system switch** from such a view calls `confirmRouteExit` with the view it is already on, the same-view skip returns `true`, and the guard silently never fires — even though the draft belongs to the outgoing system and is about to be abandoned.
