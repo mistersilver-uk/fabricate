@@ -242,10 +242,17 @@ const SITE_MAPPING = [
     anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, amount\);/],
   },
   {
-    site: 'RecipeManager have counts',
-    file: 'src/systems/RecipeManager.js',
+    // The three re-derived held totals the display states report: a group's own `have`, one
+    // option choice's isolated `have`, and one held stack row's.
+    site: 'recipeDisplayStates have counts',
+    file: 'src/systems/recipeDisplayStates.js',
     accessor: 'readStackQuantity',
     sites: 3,
+    anchors: [
+      /have: matching\.reduce\(\(sum, item\) => sum \+ readStackQuantity\(item\), 0\)/,
+      /const have = matchingItems\.reduce\(\(sum, item\) => sum \+ readStackQuantity\(item\), 0\)/,
+      /have: readStackQuantity\(item\),/,
+    ],
   },
   {
     site: 'InventoryListingBuilder owned counts',
