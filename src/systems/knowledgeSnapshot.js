@@ -1,5 +1,5 @@
 /**
- * One crafting system's runtime knowledge state across a roster of actors, as PLAIN data (issue
+ * One crafting system's runtime knowledge state across a roster of actors, as plain data (issue
  * 785). Foundry-free by construction: the roster, the definitions and the caps reader all arrive
  * as collaborators, because resolving any of them needs `game` and this module is under an armed
  * `no-restricted-globals` root. Every derivation the surface shows — remaining/spent/inert, the
@@ -11,7 +11,7 @@ import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 
 /**
- * Caps MUST resolve through the engine's reader, never raw `definition.caps` — `_getRecipeItemCaps`
+ * Caps resolve through the engine's reader and never raw `definition.caps` — `_getRecipeItemCaps`
  * folds every legacy derivation (`destroyWhenExhausted` → `whenSpent`, `limitRecipes`/`maxRecipes`
  * → `limitLearning`/`learnsAllowed`, `learningMode` → `learnScope`) that the projection's own
  * derivations assume. `_capsForDefinition` is the definition-only extraction of it.
@@ -58,7 +58,7 @@ function collectKnowledgeOwnedCopies(items, context) {
   return copies;
 }
 
-// `learnedRecipes` is system-AGNOSTIC while definitions are per-system, so an entry belonging to
+// `learnedRecipes` is system-agnostic while definitions are per-system, so an entry belonging to
 // another system, or to a recipe that no longer resolves at all, becomes a roll-up rather than a
 // row. The orphan roll-up is the only pointer to the all-systems reset grain, which is the only
 // grain that can clear those keys (`forgetSystemLearnedRecipes` leaves them in place).
@@ -97,10 +97,10 @@ function collectKnowledgeLearnedEntries(actor, items, context) {
       sourceItemUuid,
       sourceOwned: !!ownedSource,
       sourceItemName: ownedSource?.name || '',
-      // Rung 2 of the learned-source ladder: the MEMBER recipe-item definition name, which is what
+      // Rung 2 of the learned-source ladder: the member recipe-item definition name, which is what
       // survives deletion of the copy a recipe was learned from.
       sourceDefinitionName: context.definitionNameByRecipeId.get(String(recipeId)) || '',
-      // Only a CAPPED book consumes learn budget, so only a capped book can release any on erase.
+      // Only a capped book consumes learn budget, so only a capped book can release any on erase.
       sourceCapped: sourceCaps?.learn?.limitLearning === true,
       // The GM-grant pair (issue 1289), carried RAW and uncoerced. This literal is a hand-built
       // allowlist, so a field it does not name never reaches `learnedRecipeSource` at all. They are
@@ -129,8 +129,9 @@ function describeKnowledgeActor(actor, context) {
 }
 
 /**
- * @param {object} input `actors` are LIVE documents (the projection reads `actor.items` and the
- *   actor's flags); `capsFor` is the definition-only caps reader, injected so a raw
+ * @param {object} input `actors` are live documents, not projections: `matchRecipeItemDefinition`
+ *   resolves its tier-1 durable identity off the item document's own flags, and the learned map is
+ *   read off the actor's. `capsFor` is the definition-only caps reader, injected so a raw
  *   `definition.caps` read cannot creep back in.
  * @returns {{systemId: string, definitionCount: number, characters: object[]}}
  */

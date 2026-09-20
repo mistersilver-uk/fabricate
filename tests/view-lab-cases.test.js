@@ -4064,8 +4064,9 @@ const knowledgeSurfaceCaseIds = () =>
 
 test('a labActors patch confined to a stock table selects every player frame and only those', () => {
   // No manager surface renders a component stack: the manager's only walk of `actor.items`
-  // (`_collectKnowledgeOwnedCopies`) keeps just the items matching a recipe-item definition, so a
-  // component stack or a `toolBroken` flag reaches no manager frame.
+  // (`collectKnowledgeOwnedCopies` in `src/systems/knowledgeSnapshot.js`) keeps just the items
+  // matching a recipe-item definition, so a component stack or a `toolBroken` flag reaches no
+  // manager frame.
   const players = playerCaseIds();
   for (const [table, text] of [
     ['INVENTORIES', "    'sm-iron-ore': 12,"],

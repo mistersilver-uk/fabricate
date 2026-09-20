@@ -565,8 +565,8 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     return game?.fabricate?.getRecipeVisibilityService?.() ?? null;
   }
 
-  // Player characters only, by the SAME predicate the Access roster uses; an NPC's knowledge state
-  // stays reachable through `game.fabricate.resetActorKnowledge`. LIVE documents, because the
+  // Player characters only, by the same predicate the Access roster uses; an NPC's knowledge state
+  // stays reachable through `game.fabricate.resetActorKnowledge`. Live documents, because the
   // projection reads `actor.items` and the actor's flags.
   _knowledgeRosterActors() {
     return Array.from(game.actors?.contents || [])

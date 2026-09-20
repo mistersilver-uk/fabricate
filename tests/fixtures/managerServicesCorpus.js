@@ -610,7 +610,7 @@ export function buildManagerWorld(options = {}) {
 
   // `fromUuidSync` throws two different ways. `strict: true` (the default) throws for an embedded
   // document inside a compendium, which a compendium-sourced party member reaches, and
-  // `strict: false` answers null there instead. `parseUuid` throws for a MALFORMED uuid whatever
+  // `strict: false` answers null there instead. `parseUuid` throws for a malformed uuid whatever
   // `strict` says, which is why only a `try`/`catch` covers both.
   const resolveUuid = (uuid, { strict = true } = {}) => {
     const text = String(uuid);
@@ -690,7 +690,7 @@ export function buildManagerWorld(options = {}) {
 
 /**
  * A DOM double just wide enough for `downloadFile`'s anchor fallback. Insertion and removal are
- * recorded as the OPERATION, not the spelling, because `appendChild`/`append` and
+ * recorded as the operation, not the spelling, because `appendChild`/`append` and
  * `removeChild`/`node.remove()` are the same effect and this oracle pins effects.
  */
 function anchorDom(record) {

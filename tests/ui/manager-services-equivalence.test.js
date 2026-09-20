@@ -331,7 +331,7 @@ describe('the manager shell services bag', () => {
     });
   });
 
-  // Two live subscribers over every channel. A handler constructed once per BAG rather than once
+  // Two live subscribers over every channel. A handler constructed once per bag rather than once
   // per subscribing call routes both registrations at whichever callback subscribed last, so the
   // first subscriber silently stops receiving that channel while the delivery count stays right.
   it('gives each subscriber its own handler on every channel', async () => {
@@ -501,7 +501,7 @@ describe('the manager shell services bag', () => {
     assert.deepStrictEqual(keys, [...MANAGER_SERVICE_KEYS]);
   });
 
-  // A fresh bag per call, not a memoised one. The player shell CREATES six stores in its bag, so
+  // A fresh bag per call, not a memoised one. The player shell creates six stores in its bag, so
   // a cached bag there would hand a second window the first one's selection state; the manager
   // shell answers the same contract so the two shells cannot drift on it.
   it('answers a distinct bag on every call', async () => {
@@ -672,7 +672,7 @@ describe('the player shell services bag', () => {
     }
   });
 
-  // The player bag is NOT buildable with no globals: `createAlchemyStore` calls
+  // The player bag is not buildable with no globals: `createAlchemyStore` calls
   // `getSelectedAlchemySystemId` in its constructor, which reads `game`. The reachable floor is a
   // world with no `game.fabricate`, which every optional-chained forward already tolerates.
   it('builds the player bag against a world with no Fabricate facade', () => {

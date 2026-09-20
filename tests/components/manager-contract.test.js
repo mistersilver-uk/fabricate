@@ -2495,6 +2495,18 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
+  // The two rosters that anti-pin exists for moved with the services bag (issue 1674), so the
+  // claim is asserted over its new home as well as its old one.
+  defineStructureContract(
+    'reaches the player-character roster through the shared, GM-configurable predicate',
+    MANAGER_SERVICES,
+    {
+      imports: ['../config/playerCharacterTypes.js'],
+      comparesNo: ['character'],
+      readsNo: ['game.fabricate.isPlayerCharacterActor'],
+    }
+  );
+
   // The write half moved beside the primitives it drives (issue 1674), so the same anti-pin is
   // asserted there: `activeGM` would lock out the assistant GMs `show()` already admits.
   defineStructureContract('drives the merged knowledge primitives, ungated by activeGM', KNOWLEDGE_TARGETS, {
@@ -2502,7 +2514,7 @@ describe('CraftingSystemManager source contract', () => {
     namesNo: ['activeGM'],
   });
 
-  // The learned-row allowlist (issue 1289). `_collectKnowledgeLearnedEntries` builds each row as
+  // The learned-row allowlist (issue 1289). `collectKnowledgeLearnedEntries` in `src/systems/knowledgeSnapshot.js` builds each row as
   // a hand-written object literal, so a field it does not name never reaches the display ladder:
   // the row falls to an earlier rung with nothing failing, and the mounted fixture cannot see it.
   it('names every learned-entry field the display ladder reads', () => {

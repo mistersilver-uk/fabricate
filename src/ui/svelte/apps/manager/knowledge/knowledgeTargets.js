@@ -15,12 +15,12 @@ import {
 } from './knowledgeMutations.js';
 
 /**
- * `isGM`, NOT `activeGM`: this is a single-client, user-initiated mutation from a GM-only
+ * `isGM` rather than `activeGM`: this is a single-client, user-initiated mutation from a GM-only
  * Application, so there is no N-client duplicate-execution risk, and `activeGM` would lock out the
  * assistant GMs `SvelteCraftingSystemManagerApp.show()` already admits. Foundry authorises the
  * writes for an assistant too (`testUserPermission` short-circuits any `isGM` to OWNER).
  */
-export function knowledgeActor(actorId) {
+function knowledgeActor(actorId) {
   if (game.user?.isGM !== true)
     return { denied: { success: false, message: KNOWLEDGE_MESSAGES.gmOnly } };
   const actor = game.actors?.get?.(actorId);
@@ -30,7 +30,7 @@ export function knowledgeActor(actorId) {
 
 // Prefer the definition the projected row already resolved, so the GM's click acts on exactly the
 // book the row displayed; fall back to a live match when the row is stale.
-export function resolveKnowledgeDefinition({ item, definitionId, systemId }) {
+function resolveKnowledgeDefinition({ item, definitionId, systemId }) {
   const definitions = Array.isArray(
     game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)?.recipeItemDefinitions
   )
@@ -42,9 +42,9 @@ export function resolveKnowledgeDefinition({ item, definitionId, systemId }) {
   return named || matchRecipeItemDefinition(item, definitions, systemId).definition;
 }
 
-// Every seam mutation takes document IDS, never uuids, and a target that vanished between render
+// Every seam mutation takes document ids, never uuids, and a target that vanished between render
 // and click yields a result shape rather than a throw past a store that expects one.
-export function knowledgeTarget(actorId, itemId) {
+function knowledgeTarget(actorId, itemId) {
   const { actor, denied } = knowledgeActor(actorId);
   if (denied) return { denied };
   const item = actor.items?.get?.(itemId);

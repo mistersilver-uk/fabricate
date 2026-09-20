@@ -65,7 +65,7 @@ describe('the system import service', () => {
       await assert.rejects(
         () => services.renderSystemImportDialog(),
         /report assembly blew up/,
-        'the report builder sits OUTSIDE the import try, so its failure surfaces as itself'
+        'the report builder sits outside the import try, so its failure surfaces as itself'
       );
       assert.ok(
         !world.journal.some(

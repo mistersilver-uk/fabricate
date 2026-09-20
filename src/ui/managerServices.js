@@ -27,7 +27,11 @@ import {
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { filterActorUuidsInsideRegion, readSceneRegions } from './svelte/util/sceneRegions.js';
 
-// Foundry's canonical non-GM roster. GMs are filtered FIRST because
+// `contents` is array-or-absent on a real `Collection`, so no non-iterable operand reaches this
+// spread or the two below it; `getWorldActors`' `|| game.actors` leg is the one that does, which is
+// why that site alone keeps `Array.from`.
+//
+// Foundry's canonical non-GM roster. GMs are filtered before the permission test because
 // `Document#testUserPermission` short-circuits every GM to OWNER; `Actor#isOwner` and
 // `Document#permission` are `game.user`-scoped and unusable here. The fallback applies the role
 // floor too, so it agrees with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
@@ -43,7 +47,7 @@ function playerUsers() {
   });
 }
 
-// `playerUsers()` is GM-free by construction, so GAMEMASTER and ASSISTANT are unreachable here.
+// `playerUsers()` is GM-free by construction, so the two GM roles are unreachable here.
 function userRoleLabel(role) {
   const USER_ROLES = globalThis.CONST?.USER_ROLES || { NONE: 0, PLAYER: 1, TRUSTED: 2 };
   const loc = (key, fallback) => {
@@ -69,12 +73,12 @@ function assignedFirstByName(left, right) {
 }
 
 /**
- * Who controls this actor. The relation is a SET, not a single user:
+ * Who controls this actor. The relation is a set of users, not a single one:
  * `RecipeVisibilityService._viewerControlsCharacter` grants access to any viewer whose assigned
  * character is this actor OR who holds Foundry OWNER on it, and `getUserLevel` falls through to
  * `ownership.default`, which `sharedWithAllPlayers` reports.
  */
-export function describeAccessActor(actor) {
+function describeAccessActor(actor) {
   const LEVELS = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS || {
     NONE: 0,
     LIMITED: 1,
@@ -185,7 +189,7 @@ function readinessServices() {
       const systemListener = (...args) => callback('systems', ...args);
       const recipeListener = (...args) => callback('recipes', ...args);
       // Issue 1024: the GM who ticks a new player-character actor type is the one
-      // GUARANTEED to be looking at stale data — the settings sidebar sits over an
+      // certain to be looking at stale data — the settings sidebar sits over an
       // open manager — so the Access, Knowledge and party rosters must republish.
       const playerCharacterTypeListener = (...args) => callback('playerCharacterTypes', ...args);
       hooks.on('fabricate.craftingSystemsChanged', systemListener);
@@ -216,7 +220,7 @@ function sceneServices() {
       const resolveSync = globalThis.fromUuidSync;
       if (typeof resolveSync !== 'function' || !sceneRegionUuid || !Array.isArray(actorUuids))
         return [];
-      // `fromUuidSync` defaults to `strict: true` and THROWS for an embedded document inside a
+      // `fromUuidSync` defaults to `strict: true` and throws for an embedded document inside a
       // compendium, which a compendium-sourced party member reaches; the catch must assign null
       // rather than leave the binding undefined.
       let regionDoc;
@@ -242,7 +246,7 @@ function sceneServices() {
               ?.getActiveTokens?.(false, true)
               ?.find((candidate) => getTokenSceneUuid(candidate) === sceneUuid) ?? null;
           if (!token) return null;
-          // Use the DOCUMENT-derived centre so a just-moved marker resolves to its
+          // Use the document-derived centre so a just-moved marker resolves to its
           // new position (the placeable centre lags during the move animation).
           return tokenDocumentCenter(token);
         },
@@ -284,14 +288,14 @@ function rosterServices() {
         .map((actor) => describeAccessActor(actor))
         .filter((actor) => actor.id && actor.name)
         .sort((a, b) => a.name.localeCompare(b.name)),
-    // Every world actor, deliberately NOT the filtered roster above: the runtime access predicate
+    // Every world actor, deliberately not the filtered roster above: the runtime access predicate
     // applies no type filter, so resolving the editor's granted ids over the filtered list would
     // drop a grant from display and under-report who has access.
     getAccessCharacterActors: () =>
       Array.from(game.actors?.contents || [], (actor) => describeAccessActor(actor))
         .filter((actor) => actor.id && actor.name)
         .sort((a, b) => a.name.localeCompare(b.name)),
-    // The raw actor DOCUMENTS (issue 1132): `buildLearnedRecipeActorIndex` reads each actor's
+    // The raw actor documents (issue 1132): `buildLearnedRecipeActorIndex` reads each actor's
     // flags and `isOwner`, neither of which survives `describeAccessActor`. Unsorted and
     // unfiltered on purpose, because the shared selector owns the scope.
     //
@@ -330,7 +334,7 @@ function actorProjectionServices() {
     },
     // Game-world Items for linked-Item previews. `description` is part of the projection because
     // the world Tools Catalogue reads it as the second rung of a Tool's description (issue 1373).
-    // It is deliberately NOT enriched: enrichment is async and per-document, so running it over
+    // It is deliberately not enriched: enrichment is async and per-document, so running it over
     // every Item would put a full pass behind opening a catalogue.
     getWorldItemOptions: () =>
       Array.from(game.items?.contents || [], (item) => ({
@@ -476,7 +480,7 @@ async function runSystemImport({ file, conflictMode }) {
     for (const warning of validation.warnings) ui.notifications.warn(warning);
 
     const mode = conflictMode === 'copy' ? 'copy' : 'keep';
-    // The DESTINATION world's entity roster (issue 1364). Copy mode requires it: without it every
+    // The destination world's entity roster (issue 1364). Copy mode requires it: without it every
     // incoming component mints a fresh id and the world doubles every record it already holds.
     const worldEntityIndex = {
       components: game.fabricate.getComponentScopeStore?.()?.listEntities?.() ?? [],
@@ -492,7 +496,7 @@ async function runSystemImport({ file, conflictMode }) {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
-      // The importer fails CLOSED on an absent seam, so a lazy lookup would make a broken
+      // The importer fails closed on an absent seam, so a lazy lookup would make a broken
       // accessor present as a successful import that merged nothing (issue 1364).
       componentScopeStore: game.fabricate.getComponentScopeStore?.() ?? null,
       essenceScopeStore: game.fabricate.getEssenceScopeStore?.() ?? null,
@@ -502,7 +506,7 @@ async function runSystemImport({ file, conflictMode }) {
       overwriteExisting: conflictMode === 'overwrite',
     });
   } catch (error) {
-    // Hard failures stay on the DISTINCT error-toast path (never the report).
+    // Hard failures stay on their own error-toast path, never the report.
     ui.notifications.error(`Import failed: ${error.message}`);
     return null;
   }
@@ -516,7 +520,7 @@ async function runSystemImport({ file, conflictMode }) {
  */
 async function reportSystemImport(summary, io) {
   if (summary.system.skipped) {
-    // "already exists — skipped" stays a toast; it does NOT open the report.
+    // "already exists — skipped" stays a toast; it does not open the report.
     ui.notifications.info(`System "${summary.system.name}" already exists — skipped.`);
     await io.adminStore().refresh();
     return null;
@@ -581,7 +585,7 @@ function importServices(io) {
     },
     // Resolves to the assembled report content for `ImportReportModal` to render, or `null` when
     // there is nothing to report (no dialog API, cancelled, failed, or an existing system that
-    // was skipped). This hands DATA to the UI, never a hand-escaped HTML string (issue 877).
+    // was skipped). This hands data to the UI, never a hand-escaped HTML string (issue 877).
     renderSystemImportDialog: async () => {
       const request = await promptSystemImportFile();
       if (!request) return null;

@@ -152,7 +152,7 @@ describe('buildKnowledgeSnapshot', () => {
     const [entry] = character.learnedRecipes;
     assert.equal(entry.sourceOwned, false);
     assert.equal(entry.sourceItemName, '');
-    assert.equal(entry.sourceDefinitionName, 'Bound Primer', 'the FIRST definition claiming it');
+    assert.equal(entry.sourceDefinitionName, 'Bound Primer', 'the first definition claiming it');
     assert.equal(entry.sourceCapped, false, 'an unowned source cannot report a learn cap');
   });
 
