@@ -27,7 +27,7 @@ const IMPORT_FILE = {
     }),
 };
 
-/** A world in which the payload's system does NOT already exist, so the import runs to the report. */
+/** A world in which the payload's system does not already exist, so the import runs to the report. */
 function admitTheImport(world) {
   world.handles.craftingSystemManager.getSystems = () => [];
   world.handles.craftingSystemManager.createSystem = async (input) => ({
