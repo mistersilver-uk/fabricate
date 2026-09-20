@@ -3300,6 +3300,47 @@ export function registerEnvironmentsCases() {
     assert.deepEqual(included, [['task', 'task-add']]);
   });
 
+  it('gates the realm field on the toggle, not on the field simply existing', async () => {
+    mountEditor({
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-in', 'Forage Herbs', 'includedByMatch')],
+        events: [],
+      },
+      realmsEnabled: false,
+    });
+
+    assert.ok(
+      !target.querySelector('[data-environment-field="includedRealmIds"]'),
+      'the realm field stays gone while the world toggle is off'
+    );
+  });
+
+  it('draws the empty-state hint exactly when no realm exists yet, not once one does', async () => {
+    mountEditor({
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-in', 'Forage Herbs', 'includedByMatch')],
+        events: [],
+      },
+      realmsEnabled: true,
+      realmRecords: [],
+    });
+
+    assert.ok(
+      Boolean(target.querySelector('[data-environment-realm-empty]')),
+      'no realm exists yet, so the empty-state hint draws'
+    );
+    assert.ok(
+      !target.querySelector('.manager-environment-membership-add'),
+      'and the add-realm select stays gone until a realm exists'
+    );
+  });
+
   it('offers the force add in automatic mode only, and emits the mode the switch was clicked for', async () => {
     const modes = [];
     const forced = [];

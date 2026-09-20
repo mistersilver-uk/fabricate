@@ -25,7 +25,7 @@ import {
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
 import { componentAstOf } from '../helpers/parsedSource.js';
-import { identifierNames } from '../helpers/moduleAst.js';
+import { identifierNames, walkNodes } from '../helpers/moduleAst.js';
 import {
   attributeExpression,
   carriesSpread,
@@ -690,11 +690,12 @@ describe('InteractableConfigRoot body', () => {
     }
   });
 
-  // THE TWO CONTROLS THAT DECLINED THE CONVERSION.
+  // The two controls that declined the conversion.
   defineStructureContract('keeps Disable and Lock as pressed buttons, state on aria-pressed', ROOT, {
     passesProps: [['ManagerButton', 'onclick']],
     writes: ['aria-pressed'],
     passesPropsNo: [['ManagerButton', 'on']],
+    compares: [false],
     styleDeclares: [
       [
         ['fab-ic-actions', { global: [['fabricate-button', { attribute: ['aria-pressed', 'true'] }]] }],
@@ -702,6 +703,23 @@ describe('InteractableConfigRoot body', () => {
         'var(--fab-accent)',
       ],
     ],
+  });
+
+  it('asks every pressed button for the inverse of the flag it announces', () => {
+    const pressed = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+      attributeExpression(node, 'aria-pressed')
+    );
+    assert.ok(pressed.length > 0, 'at least one button announces a pressed state');
+    const inverted = pressed.filter((node) =>
+      [...walkNodes(attributeExpression(node, 'onclick'))].some(
+        (inner) => inner.type === 'UnaryExpression' && inner.operator === '!'
+      )
+    );
+    assert.equal(
+      inverted.length,
+      pressed.length,
+      'each pressed button toggles the state it announces, not confirms it'
+    );
   });
 
   defineStructureContract('renders the read-only facts as an inline grid and labels the gate "Status"', ROOT, {

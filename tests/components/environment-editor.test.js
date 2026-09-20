@@ -263,6 +263,7 @@ describe('environment editor localization', () => {
       names: ['RECORD_ISSUE_LABELS'],
       calls: ['replace'],
       callsLiteral: [['replace', '{name}']],
+      callsWith: [['replace', 'recordName']],
       reads: ['issue.recordName'],
     }
   );
@@ -312,10 +313,21 @@ describe('environment multi-realm selector', () => {
   );
 
   defineStructureContract(
-    'the empty-state hint guards on there being no realm options at all',
+    'the reduced list drives the add-realm control, filtering out what is already included',
     { file: OVERVIEW, constant: 'availableRealms' },
     { reads: ['realmOptions.filter'] }
   );
+
+  defineStructureContract(
+    'the hint reads the realm count the empty-state branch guards on',
+    OVERVIEW,
+    { reads: ['realmOptions.length'] }
+  );
+
+  // The zero-vs-nonzero polarity of that guard is DOM-observable, not a structural claim a
+  // narrowed AST target can isolate from the file's other zero comparisons: see
+  // "draws the empty-state hint exactly when no realm exists yet, not once one does" in
+  // `manager-environments-mounted.js`.
 
   it('the empty-state hint points at the world route realms are authored on', () => {
     const value = catalogValue('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty');
@@ -421,8 +433,20 @@ describe('environment composition editor structure', () => {
   );
 
   defineStructureContract(
-    'and the editor, the events tab and the list each default the rule defensively',
-    [SHELL, EVENTS_TAB, LIST],
+    'and the editor defaults the rule defensively',
+    SHELL,
+    { defaults: [['eventSelectionMode', 'allDrops']] }
+  );
+
+  defineStructureContract(
+    'and the events tab defaults the rule defensively',
+    EVENTS_TAB,
+    { defaults: [['eventSelectionMode', 'allDrops']] }
+  );
+
+  defineStructureContract(
+    'and the list defaults the rule defensively',
+    LIST,
     { defaults: [['eventSelectionMode', 'allDrops']] }
   );
 
@@ -735,6 +759,18 @@ describe('environment composition editor structure', () => {
       ],
     }
   );
+
+  it('and spreads them in that order, not merely names all three', () => {
+    const [array] = declaredConstantValue(LIST, 'availableToAdd').arguments ?? [];
+    const spreadOrder = (array?.elements ?? [])
+      .filter((element) => element?.type === 'SpreadElement')
+      .map((element) => element.argument?.name);
+    assert.deepEqual(
+      spreadOrder,
+      ['availableToAddMatching', 'availableToAddNonMatching', 'availableToAddLibraryDisabled'],
+      'available-to-add spreads matching, then non-matching, then library-disabled'
+    );
+  });
 
   defineStructureContract(
     'and manual Available to add classifies nothing off the excluded state',
