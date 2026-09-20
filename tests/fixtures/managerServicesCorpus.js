@@ -2,6 +2,8 @@
  * The recording fake world both shells' service bags are driven against, plus the per-key
  * disposition table the equivalence oracle reads. Frozen from the pin commit onwards (issue 1674).
  */
+import assert from 'node:assert/strict';
+
 import { byCodePoint } from '../helpers/ratchetBaseline.js';
 
 
@@ -110,6 +112,22 @@ export const MANAGER_DISPOSITIONS = Object.freeze(
   Object.fromEntries(MANAGER_SERVICE_KEYS.map((key) => [key, dispositionOf(key)]))
 );
 
+// The two list invariants the table's derivation assumes and cannot check: a stale entry in either
+// list is never consulted, and an entry in both resolves silently to `handle`.
+assert.deepStrictEqual(Object.keys(MANAGER_DISPOSITIONS).sort(byCodePoint), [
+  ...MANAGER_SERVICE_KEYS,
+]);
+assert.deepStrictEqual(
+  [...HANDLE_KEYS, ...JOURNAL_KEYS].filter((key) => !MANAGER_SERVICE_KEYS.includes(key)),
+  [],
+  'a disposition list names a key the bag does not carry'
+);
+assert.deepStrictEqual(
+  HANDLE_KEYS.filter((key) => JOURNAL_KEYS.includes(key)),
+  [],
+  'a key with two dispositions resolves to the first and the second is never applied'
+);
+
 export const PLAYER_SERVICE_KEYS = Object.freeze([
   'actorBar',
   'adjustGatheringStamina',
@@ -206,6 +224,17 @@ function fakeDocument({ flags = {}, ...fields }) {
   };
 }
 
+/**
+ * An owned-item collection: iterable like Foundry's `EmbeddedCollection`, and answering `get(id)`,
+ * which is what the GM-gated item mutations resolve their target through. A plain array is
+ * iterable but has no `get`, so every item-scoped mutation would take the silent `noItem` denial.
+ */
+function itemCollection(items) {
+  const collection = [...items];
+  collection.get = (id) => collection.find((item) => item.id === id) ?? null;
+  return collection;
+}
+
 function recipeItem({
   id,
   name,
@@ -215,8 +244,10 @@ function recipeItem({
   compendiumSource,
   duplicateSource,
   img = 'icons/book.webp',
+  record = () => {},
 }) {
   return fakeDocument({
+    delete: async () => record('item.delete', id),
     id,
     name,
     uuid,
@@ -255,8 +286,19 @@ function knowledgeDefinitions() {
  * The caps ladder the snapshot must resolve through. `_capsForDefinition` is preferred over
  * `_getRecipeItemCaps`, and a raw `definition.caps` read misses the legacy derivations entirely.
  */
-function recipeVisibilityService() {
+function recipeVisibilityService(record) {
   return {
+    // The two write seams the gated mutations route through. Journalled with their argument lists,
+    // because without them every mutation answers `unavailable` and the four returns stop
+    // distinguishing a working gate from a broken one.
+    expendRecipeItemUse: async (actor, itemId, definition) => {
+      record('service.expendRecipeItemUse', actor?.id, itemId, definition?.id);
+      return { success: true, timesUsed: 2 };
+    },
+    forgetLearnedRecipes: async (actor, recipeIds, options) => {
+      record('service.forgetLearnedRecipes', actor?.id, recipeIds, options);
+      return { success: true, count: recipeIds.length };
+    },
     _capsForDefinition: (definition) => ({
       item: {
         limitUses: definition?.caps?.limitUses === true || definition?.destroyWhenExhausted === true,
@@ -271,7 +313,7 @@ function recipeVisibilityService() {
   };
 }
 
-function knowledgeActors() {
+function knowledgeActors(record) {
   const arden = fakeDocument({
     id: 'pc-arden',
     name: 'Arden',
@@ -292,8 +334,9 @@ function knowledgeActors() {
       },
     },
   });
-  arden.items = [
+  arden.items = itemCollection([
     recipeItem({
+      record,
       id: 'owned-modern',
       name: 'Arden Primer',
       uuid: 'Item.owned-modern',
@@ -301,6 +344,7 @@ function knowledgeActors() {
       flags: { recipeItemUsage: { timesUsed: 1, inert: false } },
     }),
     recipeItem({
+      record,
       id: 'owned-identity',
       name: 'Claimed Folio',
       uuid: 'Item.owned-identity',
@@ -311,6 +355,7 @@ function knowledgeActors() {
       },
     }),
     recipeItem({
+      record,
       id: 'owned-compendium',
       name: 'Imported Folio',
       uuid: 'Item.owned-compendium',
@@ -318,14 +363,15 @@ function knowledgeActors() {
       compendiumSource: 'Compendium.fab.books.Item.legacy',
     }),
     recipeItem({
+      record,
       id: 'owned-duplicate',
       name: 'Copied Primer',
       uuid: 'Item.owned-duplicate',
       quantity: 1,
       duplicateSource: 'Item.origin-modern',
     }),
-    recipeItem({ id: 'plain', name: 'Rope', uuid: 'Item.plain', quantity: 1 }),
-  ];
+    recipeItem({ record, id: 'plain', name: 'Rope', uuid: 'Item.plain', quantity: 1 }),
+  ]);
   arden.testUserPermission = (user, level) => user?.id === 'alice' && level === 'OWNER';
   arden.getRollData = () => ({ abilities: { str: 14 } });
 
@@ -338,7 +384,7 @@ function knowledgeActors() {
     ownership: { default: 3 },
     flags: { [FLAG_NAMESPACE]: { learnedRecipes: {} } },
   });
-  brisa.items = [];
+  brisa.items = itemCollection([]);
   brisa.testUserPermission = () => false;
 
   const grond = fakeDocument({
@@ -350,7 +396,7 @@ function knowledgeActors() {
     ownership: { default: 0 },
     flags: { [FLAG_NAMESPACE]: { learnedRecipes: { 'recipe-alpha': { learnedAt: 1 } } } },
   });
-  grond.items = [];
+  grond.items = itemCollection([]);
   grond.testUserPermission = () => false;
 
   return [arden, brisa, grond];
@@ -449,7 +495,7 @@ export function buildManagerWorld(options = {}) {
   const journal = [];
   const record = (channel, ...payload) => journal.push([channel, ...payload]);
 
-  const actorDocuments = knowledgeActors();
+  const actorDocuments = knowledgeActors(record);
   const users = worldUsers();
   const scenes = worldScenes();
   const items = worldItems();
@@ -503,10 +549,12 @@ export function buildManagerWorld(options = {}) {
     getVocabularyScopeStore: () => handles.vocabularyScopeStore,
     getGatheringRealmStore: () => handles.gatheringRealmStore,
     getGatheringLocationService: () => handles.gatheringLocationService,
-    getRecipeVisibilityService: () => recipeVisibilityService(),
+    getRecipeVisibilityService: () => recipeVisibilityService(record),
     gathering: { setConditions: async (conditions) => record('gathering.setConditions', conditions) },
-    resetActorKnowledge: async (actorId, systemId) =>
-      record('fabricate.resetActorKnowledge', actorId, systemId) ?? { success: true },
+    resetActorKnowledge: async (actorId, systemId) => {
+      record('fabricate.resetActorKnowledge', actorId, systemId);
+      return { success: true };
+    },
   };
 
   const settings = {

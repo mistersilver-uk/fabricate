@@ -453,12 +453,66 @@
       false
     ],
     [
+      "service.expendRecipeItemUse",
+      "pc-arden",
+      "owned-modern",
+      "def-legacy"
+    ],
+    [
+      "knowledge.expend",
+      {
+        "success": true,
+        "timesUsed": 2
+      }
+    ],
+    [
+      "item.delete",
+      "owned-modern"
+    ],
+    [
+      "knowledge.delete",
+      {
+        "message": "FABRICATE.Knowledge.Manage.Deleted",
+        "messageData": {
+          "name": "Arden Primer"
+        },
+        "success": true
+      }
+    ],
+    [
+      "service.forgetLearnedRecipes",
+      "pc-arden",
+      [
+        "recipe-alpha"
+      ],
+      {
+        "clearDiscovery": false,
+        "freeLearnBudget": true
+      }
+    ],
+    [
+      "knowledge.erase",
+      {
+        "message": "FABRICATE.Knowledge.Manage.Erased",
+        "messageData": {
+          "count": 1
+        },
+        "success": true
+      }
+    ],
+    [
       "fabricate.resetActorKnowledge",
       {
         "actorId": "pc-arden",
         "systemId": "sys-1"
       },
       "<undefined>"
+    ],
+    [
+      "knowledge.reset",
+      {
+        "success": true
+      }
     ],
     [
       "Hooks.on",
@@ -733,58 +787,270 @@
     }
   },
   "player.reached": [
-    "fabricate.adjustGatheringStamina",
-    "fabricate.advanceCraftingRun",
-    "fabricate.cancelCraftingRun",
-    "fabricate.craftRecipe",
-    "fabricate.destroyComponents",
-    "fabricate.dismissJournalRun",
-    "fabricate.evaluateSelectedSet",
-    "fabricate.executeJournalRunCommand",
-    "fabricate.getCraftingComponentSourceIds",
-    "fabricate.getCraftingSourceActors",
-    "fabricate.getCraftingSystemManager",
-    "fabricate.getDismissedJournalRunKeys",
-    "fabricate.getFavouriteRecipeIds",
-    "fabricate.getGatheringConditions",
-    "fabricate.getGatheringDropBreakdown",
-    "fabricate.getGatheringEconomy",
-    "fabricate.getGatheringStaminaState",
-    "fabricate.getHideUnavailableEnvironments",
-    "fabricate.getJournalRunAuthorityAvailability",
-    "fabricate.getProgressiveResultOrder",
-    "fabricate.getRecipeManager",
-    "fabricate.getSelectedGatheringActorId",
-    "fabricate.getSelectedAlchemySystemId",
-    "fabricate.getSelectedCraftingActorId",
-    "fabricate.getWorldTime",
-    "fabricate.getWorldTimeComponents",
-    "fabricate.hydrateCraftingRecipe",
-    "fabricate.learnRecipeFromInventory",
-    "fabricate.listAlchemyForActor",
-    "fabricate.listCraftingForActor",
-    "fabricate.listCraftingSourceActors",
-    "fabricate.listGatheringForActor",
-    "fabricate.listInventoryForActor",
-    "fabricate.listJournalForActor",
-    "fabricate.listSelectableActors",
-    "fabricate.getSelectedCraftingActorId",
-    "fabricate.hydrateCraftingRecipe",
-    "notify.warn",
-    "fabricate.reconcileJournalRunAuthority",
-    "fabricate.restockGatheringNode",
-    "fabricate.salvageComponent",
-    "fabricate.salvageComponents",
-    "fabricate.setCraftingComponentSourceIds",
-    "fabricate.setGatheringEconomy",
-    "fabricate.setGatheringStamina",
-    "fabricate.setHideUnavailableEnvironments",
-    "fabricate.setProgressiveResultOrder",
-    "fabricate.setSelectedGatheringActorId",
-    "fabricate.setSelectedAlchemySystemId",
-    "fabricate.setSelectedCraftingActorId",
-    "fabricate.startGatheringAttempt",
-    "fabricate.submitAlchemyAttempt",
-    "fabricate.toggleFavouriteRecipe"
+    [
+      "fabricate.adjustGatheringStamina",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.advanceCraftingRun",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.cancelCraftingRun",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.craftRecipe",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.destroyComponents",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.dismissJournalRun",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.evaluateSelectedSet",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.executeJournalRunCommand",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.getCraftingComponentSourceIds"
+    ],
+    [
+      "fabricate.getCraftingSourceActors"
+    ],
+    [
+      "fabricate.getCraftingSystemManager"
+    ],
+    [
+      "fabricate.getDismissedJournalRunKeys",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.getFavouriteRecipeIds"
+    ],
+    [
+      "fabricate.getGatheringConditions"
+    ],
+    [
+      "fabricate.getGatheringDropBreakdown",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.getGatheringEconomy",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.getGatheringStaminaState",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.getHideUnavailableEnvironments"
+    ],
+    [
+      "fabricate.getJournalRunAuthorityAvailability"
+    ],
+    [
+      "fabricate.getProgressiveResultOrder"
+    ],
+    [
+      "fabricate.getRecipeManager"
+    ],
+    [
+      "fabricate.getSelectedGatheringActorId"
+    ],
+    [
+      "fabricate.getSelectedAlchemySystemId"
+    ],
+    [
+      "fabricate.getSelectedCraftingActorId"
+    ],
+    [
+      "fabricate.getWorldTime"
+    ],
+    [
+      "fabricate.getWorldTimeComponents",
+      1234
+    ],
+    [
+      "fabricate.hydrateCraftingRecipe",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.learnRecipeFromInventory",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.listAlchemyForActor",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.listCraftingForActor",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.listCraftingSourceActors"
+    ],
+    [
+      "fabricate.listGatheringForActor",
+      {
+        "actorId": "pc-arden",
+        "presentTools": null
+      }
+    ],
+    [
+      "fabricate.listInventoryForActor",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.listJournalForActor",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.listSelectableActors"
+    ],
+    [
+      "fabricate.getSelectedCraftingActorId"
+    ],
+    [
+      "fabricate.hydrateCraftingRecipe",
+      {
+        "actorId": {
+          "answeredBy": "getSelectedCraftingActorId"
+        },
+        "componentSourceActorIds": [],
+        "recipeId": "recipe-alpha"
+      }
+    ],
+    [
+      "notify.warn",
+      "a warning"
+    ],
+    [
+      "fabricate.reconcileJournalRunAuthority",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.restockGatheringNode",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.salvageComponent",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.salvageComponents",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.setCraftingComponentSourceIds",
+      [
+        "src-a"
+      ]
+    ],
+    [
+      "fabricate.setGatheringEconomy",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.setGatheringStamina",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.setHideUnavailableEnvironments",
+      true
+    ],
+    [
+      "fabricate.setProgressiveResultOrder",
+      "key",
+      [
+        "a",
+        "b"
+      ]
+    ],
+    [
+      "fabricate.setSelectedGatheringActorId",
+      "pc-arden"
+    ],
+    [
+      "fabricate.setSelectedAlchemySystemId",
+      "sys-1"
+    ],
+    [
+      "fabricate.setSelectedCraftingActorId",
+      "pc-arden"
+    ],
+    [
+      "fabricate.startGatheringAttempt",
+      {
+        "actorId": "pc-arden",
+        "interactableRef": null,
+        "presentTools": null
+      }
+    ],
+    [
+      "fabricate.submitAlchemyAttempt",
+      {
+        "actorId": "pc-arden"
+      }
+    ],
+    [
+      "fabricate.toggleFavouriteRecipe",
+      "recipe-alpha"
+    ]
   ]
 }

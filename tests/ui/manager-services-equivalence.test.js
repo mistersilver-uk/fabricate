@@ -262,10 +262,36 @@ describe('the manager shell services bag', () => {
       });
       await services.renderImportDialog('sys-1');
       await services.renderSystemImportDialog();
-      await services.expendRecipeItemUse({ actorId: 'pc-arden', itemId: 'owned-modern', systemId: 'sys-1' });
-      await services.deleteOwnedRecipeItem({ actorId: 'pc-arden', itemId: 'owned-modern' });
-      await services.eraseLearnedRecipe({ actorId: 'pc-arden', recipeId: 'recipe-alpha' });
-      await services.resetActorKnowledge({ actorId: 'pc-arden', systemId: 'sys-1' });
+      // The four GM-gated writes. Their return is journalled, because a denial is the failure a GM
+      // cannot see: without it their observable collapses to "callable, does not throw".
+      for (const [label, call] of [
+        [
+          'knowledge.expend',
+          () =>
+            services.expendRecipeItemUse({
+              actorId: 'pc-arden',
+              itemId: 'owned-modern',
+              // Deliberately not the definition the item live-matches, so the journal shows which
+              // rung answered: the row's own definition wins over a fresh match.
+              definitionId: 'def-legacy',
+              systemId: 'sys-1',
+            }),
+        ],
+        [
+          'knowledge.delete',
+          () => services.deleteOwnedRecipeItem({ actorId: 'pc-arden', itemId: 'owned-modern' }),
+        ],
+        [
+          'knowledge.erase',
+          () => services.eraseLearnedRecipe({ actorId: 'pc-arden', recipeId: 'recipe-alpha' }),
+        ],
+        [
+          'knowledge.reset',
+          () => services.resetActorKnowledge({ actorId: 'pc-arden', systemId: 'sys-1' }),
+        ],
+      ]) {
+        world.record(label, normaliseForGolden(await call()));
+      }
       const unsubscribeScene = services.subscribeSceneChange(() => world.record('scene.changed'));
       const unsubscribeMarker = services.subscribeTravelMarkerMove(() => world.record('marker.moved'));
       unsubscribeScene();
@@ -632,7 +658,12 @@ describe('the player shell services bag', () => {
         assert.equal(typeof value, 'function', `${key} is not callable`);
         answers[key] = describeAnswer(await value(...playerArgumentsFor(key)));
       }
-      const reached = world.journal.slice(journalBefore).map(([channel]) => channel);
+      // The whole journal entry, not only its channel: every forwarding key's observable is the
+      // facade method it reaches and the arguments it threads there, and the two argument threads
+      // this bag owns (`presentTools`, `interactableRef`) are invisible to a name-only list.
+      const reached = world.journal
+        .slice(journalBefore)
+        .map((entry) => normaliseForGolden(entry));
       assert.ok(reached.length > 30, 'the forwarding keys must actually reach the facade');
       expectGolden('player.answers', answers);
       expectGolden('player.reached', reached);
