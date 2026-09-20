@@ -52,7 +52,7 @@ tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
 tests/components/gathering-realm-toggle.test.js	36
 tests/components/gathering-task-browser-redesign.test.js	24
-tests/components/gathering-task-editor-economy.test.js	41
+tests/components/gathering-task-editor-economy.test.js	40
 tests/components/gathering-task-editor-summary.test.js	44
 tests/components/gathering-view-actor-bar.test.js	32
 tests/components/icon-picker-layout.test.js	4
