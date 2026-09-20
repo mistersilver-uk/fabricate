@@ -245,7 +245,6 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
     writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
 
-    // The shared disclosure phrase the drop header names itself with (issue 1512).
     const disclosurePhraseDestination = join(tempRoot, 'src/ui/svelte/util/disclosurePhrase.js');
     writeFileSync(disclosurePhraseDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/disclosurePhrase.js'), 'utf8'));
 
@@ -472,8 +471,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   });
 
   it('names a nameless drop from the shared component fallback', async () => {
-    // The lab world holds drops with no name of their own, and a phrase reading "Show details
-    // for " names nothing at all.
+    // The lab world holds drops with no name, and "Show details for " names nothing at all.
     const breakdown = dropBreakdown();
     breakdown.drops[0].name = '';
     const { services } = makeServices(listing([environment()]), breakdown);

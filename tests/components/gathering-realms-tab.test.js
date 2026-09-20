@@ -64,7 +64,6 @@ describe('GatheringRealmsTab mounted behavior', () => {
     for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
     // The lifted browse view-state (issue 1438), imported by BOTH components below.
     writeRawModule('src/ui/model/managerBrowserViewState.js');
-    // The shared disclosure phrase the realm header names itself with (issue 1512).
     writeRawModule('src/ui/svelte/util/disclosurePhrase.js');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);

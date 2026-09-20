@@ -125,7 +125,6 @@ describe('GatheringView mounted behavior', () => {
     const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
     writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
 
-    // The shared disclosure phrase the drop header names itself with (issue 1512).
     const disclosurePhraseDestination = join(tempRoot, 'src/ui/svelte/util/disclosurePhrase.js');
     writeFileSync(disclosurePhraseDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/disclosurePhrase.js'), 'utf8'));
 

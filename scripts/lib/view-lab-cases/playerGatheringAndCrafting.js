@@ -68,8 +68,7 @@ export const CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
       { selector: ':nth-match(.gathering-task-drop-summary, 1)', scroll: true },
-      // The scroll step short-circuits before the driver's activation branch, so the row is opened
-      // from the keyboard by a second step on the same header.
+      // A scroll step short-circuits before the driver's activation branch, so opening is its own.
       { selector: ':nth-match(.gathering-task-drop-summary, 1)', press: 'Enter' },
     ],
     // The open row and the region it names, so a header that only flipped its attribute fails.

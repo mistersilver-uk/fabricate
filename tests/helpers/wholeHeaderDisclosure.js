@@ -49,7 +49,7 @@ export function assertWholeHeaderDisclosure({
     why('and the chevron is decorative, so it adds nothing to the name')
   );
 
-  // `aria-labelledby` would REPLACE name-from-content, dropping the record copy the header draws
+  // `aria-labelledby` would replace name-from-content, dropping the record copy the header draws
   // (its chips, its chance figure) from the name; the phrase appends to that copy instead.
   assert.ok(
     !header.hasAttribute('aria-labelledby'),

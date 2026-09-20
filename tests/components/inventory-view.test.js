@@ -51,7 +51,6 @@ const harness = createMountedComponentHarness({
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/bookRecipeBrowse.js',
-    // The shared disclosure phrase the book's recipe headers name themselves with (issue 1512).
     'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed

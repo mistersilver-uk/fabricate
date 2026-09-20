@@ -144,9 +144,8 @@
                   >
                 {/if}
               </span>
-              <!-- No `role="meter"` inside the button: ARIA makes a button's children
-                   presentational, so the role and its values are stripped from the tree and the
-                   chance is carried by the visible figure and the phrase instead (issue 1512). -->
+              <!-- No `role="meter"` in here: ARIA makes a button's children presentational, so the
+                   role is stripped and the figure and the phrase carry the chance (issue 1512). -->
               <span
                 class="gathering-task-drop-chance"
                 data-gathering-drop-value={pct(drop.finalChance)}
