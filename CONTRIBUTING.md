@@ -834,6 +834,7 @@ This is defense-in-depth: semantic-release also refuses the collision (`EINVALID
 **Route 1 — cut a hotfix line.**
 
 1. Cut `N.N.x` from the **public tag**, never from `release` or `main`: `git branch 1.4.x v1.4.0`.
+Pushing that branch publishes nothing by itself: `release.yml`'s classifier tells apart semantic-release's `success` lifecycle re-adding the already-released base version to the new channel from a genuine mint, and only a genuine mint is published (issue #1864).
 2. Land **`fix:` commits only**; a `feat:` hard-fails with `EINVALIDNEXTVERSION`, the guard rail that keeps feature work off the line.
 3. `release.yml` mints the draft release and publishes the hotfix's own channel (`1.4.x`), never `early-access`.
 4. Promote it with `promote-to-public.yml`, passing `source_channel: 1.4.x`.
