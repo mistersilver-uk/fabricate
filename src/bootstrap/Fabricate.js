@@ -457,11 +457,10 @@ function installFacadeSlice(slice) {
   return Object.keys(descriptors);
 }
 
-// The four slices go on the PROTOTYPE and never on the instance: a class method is non-enumerable,
-// writable and configurable, and `tests/bootstrap/fabricate-boot-contract.test.js` pins both halves.
 /**
- * Every slice member, as installed. A declaration rather than five bare calls, so the module has no
- * top-level side effect, and exported so a suite can assert the install ran rather than infer it.
+ * Every slice member, as installed on the prototype and never on the instance. A declaration
+ * rather than five bare calls, so the module has no top-level side effect, and exported so
+ * `tests/facade-delegation-arity.test.js` asserts the install ran rather than inferring it.
  */
 export const INSTALLED_FACADE_MEMBERS = Object.freeze(
   [craftingFacade, gatheringFacade, companionFacade, bulkFacade, journalFacade].flatMap(

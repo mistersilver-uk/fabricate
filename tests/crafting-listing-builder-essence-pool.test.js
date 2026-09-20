@@ -357,12 +357,14 @@ test('a supplied allocation flows through the same seam and steers the pool', ()
 
 // 6. Source contract — the facade is actually wired to the seam above
 
-test('src/main.js resolves evaluateSelectedSet through the execution steps', () => {
-  const body = MAIN_SOURCE.slice(
-    MAIN_SOURCE.indexOf('evaluateSelectedSet({'),
-    MAIN_SOURCE.indexOf('_getAlchemyListingBuilder()')
-  );
-  assert.ok(body.length > 0, 'the facade method was located');
+test('the crafting slice resolves evaluateSelectedSet through the execution steps', () => {
+  // Both anchors are guarded: `slice(-1, n)` over a large corpus answers the last character, so a
+  // `body.length > 0` check passes on an anchor that moved out of the module.
+  const start = MAIN_SOURCE.indexOf('evaluateSelectedSet({');
+  const end = MAIN_SOURCE.indexOf('_getAlchemyListingBuilder()', start);
+  assert.notEqual(start, -1, 'located evaluateSelectedSet');
+  assert.ok(end > start, 'located the next member after it');
+  const body = MAIN_SOURCE.slice(start, end);
   assert.ok(
     body.includes('resolveStepIngredientSet({'),
     'the step/set resolution runs through the shared helper'
@@ -377,7 +379,7 @@ test('src/main.js resolves evaluateSelectedSet through the execution steps', () 
   );
 });
 
-test('src/main.js wires the run manager into the crafting listing builder and craftRecipe', () => {
+test('the crafting slice wires the run manager into the listing builder and craftRecipe', () => {
   assert.ok(
     MAIN_SOURCE.includes('craftingRunManager: this.craftingRunManager,'),
     'the builder receives the run manager as a constructor dependency'

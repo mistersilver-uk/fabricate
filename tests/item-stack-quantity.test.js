@@ -863,7 +863,7 @@ describe('probeStackQuantityPath', () => {
   });
 });
 
-// The advisory selector. `src/main.js` cannot be imported under `node --test`, which is exactly why
+// The advisory selector. The hooks edge reaches Foundry globals at call time, which is exactly why
 // this decision lives in the accessor module: a three-way branch pinned only by grepping `main.js`
 // is not evidence that the right string reaches the right world.
 
@@ -1126,7 +1126,7 @@ describe('bootstrap wiring', () => {
   })();
 
   it('suggests the ACTIVE SYSTEM preset, not the built-in default', async () => {
-    // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever `main.js`
+    // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever the edge
     // passes here is literally the field the GM is told to type.
     const source = await mainSource;
     assert.match(

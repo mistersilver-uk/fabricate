@@ -1,6 +1,6 @@
 /**
  * Every Foundry hook the entry registers. `init`, `getCompendiumContextOptions` and
- * `getSceneControlButtons` stay at MODULE scope: Foundry builds those surfaces once, before
+ * `getSceneControlButtons` stay at module scope: Foundry builds those surfaces once, before
  * `ready`, so a `ready`-time registration loses first paint. `io` carries what the entry retains.
  */
 
@@ -137,6 +137,7 @@ function invalidateRunCachesForActorUpdate(fabricate, actor, changes) {
   }
 }
 
+// GM-only discoverability: a config button on a linked interactable visual's HUD, resolving the
 // owning behaviour from the reverse linked-visual flags. Shared by both HUDs; it never touches an
 // actor.
 function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
@@ -156,7 +157,7 @@ function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
 
     const root = element instanceof HTMLElement ? element : (element?.[0] ?? null);
     const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
-    if (!column?.appendChild) return;
+    if (!column?.append) return;
 
     const out = game.i18n?.localize?.(localizeKey);
     const label = out && out !== localizeKey ? out : 'Configure Fabricate Interactable';
@@ -308,45 +309,43 @@ function createHeaderButton(labelText, iconClass, actionId, onClick) {
 /** The `/craft <recipe-name>` chat command. Returns `false` to stop the message reaching chat. */
 function handleCraftChatCommand(fabricate, message) {
   if (!message.startsWith('/craft')) return;
-  {
-    const parts = message.split(' ');
-    if (parts.length < 2) {
-      ui.notifications.warn('Usage: /craft <recipe-name>');
-      return false;
-    }
-
-    const recipeName = parts.slice(1).join(' ');
-    const actor = game.user.character;
-
-    if (!actor) {
-      ui.notifications.error('No character selected');
-      return false;
-    }
-
-    const recipes = fabricate.recipeManager.getRecipes({ search: recipeName });
-    if (recipes.length === 0) {
-      ui.notifications.error(`Recipe "${recipeName}" not found`);
-      return false;
-    }
-
-    const recipe = recipes[0];
-
-    fabricate
-      .craft(actor, recipe)
-      .then((result) => {
-        if (result.success) {
-          ui.notifications.info(result.message);
-        } else {
-          ui.notifications.error(result.message);
-        }
-      })
-      .catch((error) => {
-        ui.notifications.error(error.message);
-        console.error('Fabricate | Crafting error:', error);
-      });
-
-    return false; // Prevent the message from being sent to chat
+  const parts = message.split(' ');
+  if (parts.length < 2) {
+    ui.notifications.warn('Usage: /craft <recipe-name>');
+    return false;
   }
+
+  const recipeName = parts.slice(1).join(' ');
+  const actor = game.user.character;
+
+  if (!actor) {
+    ui.notifications.error('No character selected');
+    return false;
+  }
+
+  const recipes = fabricate.recipeManager.getRecipes({ search: recipeName });
+  if (recipes.length === 0) {
+    ui.notifications.error(`Recipe "${recipeName}" not found`);
+    return false;
+  }
+
+  const recipe = recipes[0];
+
+  fabricate
+    .craft(actor, recipe)
+    .then((result) => {
+      if (result.success) {
+        ui.notifications.info(result.message);
+      } else {
+        ui.notifications.error(result.message);
+      }
+    })
+    .catch((error) => {
+      ui.notifications.error(error.message);
+      console.error('Fabricate | Crafting error:', error);
+    });
+
+  return false; // Prevent the message from being sent to chat
 }
 
 /** The `ready` startup sequence, ahead of every `ready`-time registration. */

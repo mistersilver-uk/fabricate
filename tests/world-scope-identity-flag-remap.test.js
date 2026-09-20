@@ -404,9 +404,8 @@ test('the ready startup sequence calls the remap AFTER the owned-item restamp', 
   const source = ENTRY_AND_READY_EDGE.map((file) =>
     readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
   ).join('\n');
-  const edge = source;
-  const restampIndex = liveCallIndex(edge, 'runOwnedItemComponentIdentityRestamp');
-  const remapIndex = liveCallIndex(edge, 'runWorldScopeIdentityFlagRemap');
+  const restampIndex = liveCallIndex(source, 'runOwnedItemComponentIdentityRestamp');
+  const remapIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   assert.ok(restampIndex > 0, 'the premise: the shipped owned-item restamp edge is still there');
   assert.ok(remapIndex > 0, 'the ready body must CALL the world-scope identity flag remap');
   assert.ok(
@@ -838,11 +837,10 @@ test('the ready startup sequence runs the essence remap AFTER the 1.30.0 remap',
   const source = ENTRY_AND_READY_EDGE.map((file) =>
     readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
   ).join('\n');
-  const edge = source;
   // Matched as a live statement, never as a substring — see {@link liveCallIndex}.
-  const rekeyIndex = liveCallIndex(edge, 'runWorldScopeIdentityFlagRemap');
-  const essenceIndex = liveCallIndex(edge, 'runWorldEssenceMergeFlagRemap');
-  const descriptionsIndex = edge.indexOf('notifyUnresolvedItemDescriptions();');
+  const rekeyIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
+  const essenceIndex = liveCallIndex(source, 'runWorldEssenceMergeFlagRemap');
+  const descriptionsIndex = source.indexOf('notifyUnresolvedItemDescriptions();');
   assert.ok(rekeyIndex > 0, 'the premise: the 1.30.0 ready-body edge is still there');
   assert.ok(essenceIndex > 0, 'the ready body must CALL the essence remap, not mention it');
   assert.ok(

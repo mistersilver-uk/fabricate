@@ -1,5 +1,5 @@
 /**
- * The composition root: everything `Fabricate#initialize()` builds, in phases whose ORDER is
+ * The composition root: everything `Fabricate#initialize()` builds, in phases whose order is
  * load-bearing and silent when wrong. The boot-contract suite pins that order behaviourally.
  */
 
@@ -104,13 +104,13 @@ function beginStartup(fabricate) {
 function registerSettingsAndTheme(fabricate) {
   fabricate.registerSettings();
   applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
-  // BEFORE anything reads or writes a stack: it must precede `_runMigrations()`, a migration being
-  // able to touch owned items, and follow `registerSettings()`. No MIGRATIONS entry — the key is
-  // new, so no prior stored value exists to migrate.
 }
 
 /** The migration pass, before any manager loads persisted data. */
 async function runMigrationPass(fabricate) {
+  // Before anything reads or writes a stack: it must precede `_runMigrations()`, a migration being
+  // able to touch owned items, and follow `registerSettings()`. No MIGRATIONS entry — the key is
+  // new, so no prior stored value exists to migrate.
   applyItemStackQuantityPathSetting();
   // Run data migrations before managers load persisted data.
   fabricate._startupMarks.begin(STARTUP_PHASES.MIGRATIONS);
@@ -188,8 +188,7 @@ function buildCoreManagers(fabricate) {
   });
   // Wire the real primary-GM check into the timed world-time resume paths (issue 656). The
   // collaborators default it to a fail-open `() => true` so unit fixtures resume, so passing the
-  // real check here is LOAD-BEARING: it gates every resume write to exactly one client.
-  const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
+  // real check here is load-bearing: it gates every resume write to exactly one client.
   fabricate.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
   fabricate.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
   fabricate.gatheringRunManager = new GatheringRunManager();
@@ -270,11 +269,11 @@ async function loadPersistedData(fabricate) {
   await fabricate.recipeManager.initialize();
   await fabricate.craftingSystemManager.initialize();
   fabricate._startupMarks.end(STARTUP_PHASES.DATA_LOAD);
-  // The WORLD travel configuration (issue 1282), FIRST because the environment store validates
 }
 
 /** The gathering world stores and the current-realm resolver. */
 function buildGatheringStores(fabricate) {
+  // The world travel configuration (issue 1282), first because the environment store validates
   // realm references against it and the resolver and engine both read realms through it.
   fabricate.gatheringRealmStore = new GatheringRealmStore({
     getSetting,
@@ -321,13 +320,13 @@ function buildGatheringStores(fabricate) {
       return senseTravelMarkerRegions({ actor });
     },
   });
-  // Node pools live in the `gatheringEnvironments` WORLD setting and only a GM may write one, so
-  // without this relay a player's decrement rejects and the pool never depletes. On a GM client
-  // the writer applies locally, a socket emit never reaching the emitter.
 }
 
 /** The node-depletion relay and the rich-state service it writes through. */
 function buildGatheringServices(fabricate) {
+  // Node pools live in the `gatheringEnvironments` world setting and only a GM may write one, so
+  // without this relay a player's decrement rejects and the pool never depletes. On a GM client
+  // the writer applies locally, a socket emit never reaching the emitter.
   fabricate.gatheringNodeDepletionWriter = createGatheringNodeDepletionWriter({
     isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
     // `Users#activeGM` is null with no GM connected, so report rather than emit into the void: the
@@ -436,13 +435,13 @@ async function buildGatheringEngine(fabricate) {
     evaluatePreparedRunCheck,
   });
   await fabricate.journalRunCommands?.bootstrapJournalRunAuthority?.();
-  // Issue 901. A blind run's secret state lives in the `gatheringBlindRuns` WORLD setting, which
 }
 
 /** The blind-run and complication relays, both routed through the active GM. */
 function installRelays(fabricate) {
-  // only a GM may update. That is the integrity boundary: a player can still READ world state, but
-  // can no longer FORGE the task their run yields as they could on an Actor flag they own.
+  // Issue 901. A blind run's secret state lives in the `gatheringBlindRuns` world setting, which
+  // only a GM may update. That is the integrity boundary: a player can still read world state, but
+  // can no longer forge the task their run yields as they could on an Actor flag they own.
   fabricate.gatheringBlindRunStore = new GatheringBlindRunStore({
     getSetting,
     setSetting,
@@ -518,14 +517,14 @@ function installRelays(fabricate) {
   getGatheringEngine()?.installComplicationDelivery({
     writer: fabricate.complicationDeliveryWriter,
   });
-  // Housekeeping that drops entries naming deleted content. Each pass is INDEPENDENTLY GUARDED
-  // (issue 970): a refused actor write must never prevent `fabricate.ready` below, every facade method
-  // throwing through `_requireReady()`. The list is composed by `composeStartupPassList` (issue
-  // 1224) BELOW both `initialize()` calls, so its id sets derive from the corpus this boot loaded.
 }
 
 /** Housekeeping that drops entries naming deleted content, then the item hooks. */
 async function runStartupPasses(fabricate) {
+  // Each pass is independently guarded (issue 970): a refused actor write must never prevent
+  // `fabricate.ready` below, every facade method throwing through `_requireReady()`. The list is
+  // composed by `composeStartupPassList` (issue 1224) below both `initialize()` calls, so its id
+  // sets derive from the corpus this boot loaded.
   fabricate._startupMarks.begin(STARTUP_PHASES.STARTUP_MAINTENANCE);
   await runStartupMaintenance(
     composeStartupPassList({
@@ -546,11 +545,11 @@ async function runStartupPasses(fabricate) {
   registerRecipeItemLearningHook(fabricate.recipeVisibilityService);
 }
 
-/** Close the outer span BEFORE readiness is announced, then settle `whenReady()`. */
+/** Close the outer span before readiness is announced, then settle `whenReady()`. */
 function announceReady(fabricate) {
-  // Close the outer span BEFORE readiness is announced, so a `whenReady()` waiter observes a
-  // complete `fabricate:initialize` measure. ABOVE `fabricate.ready = true` deliberately:
-  // `manager-launch-readiness.test.js` pins that line and `fabricate._resolveReady?.();` as ADJACENT.
+  // Close the outer span before readiness is announced, so a `whenReady()` waiter observes a
+  // complete `fabricate:initialize` measure. Above `fabricate.ready = true` deliberately:
+  // `manager-launch-readiness.test.js` pins that line and `fabricate._resolveReady?.();` as adjacent.
   fabricate._startupMarks.end(STARTUP_PHASES.INITIALIZE);
   fabricate.ready = true;
   fabricate._resolveReady?.();

@@ -453,7 +453,7 @@ const io = {
   showCraftingSystemManagerApp,
 };
 
-// The two GM recovery repairs are DECLARED here, beside the startup one-shots that also run them,
+// The two GM recovery repairs are declared here, beside the startup one-shots that also run them,
 // and published to the facade through `src/bootstrap/migrations.js` so no bootstrap module imports
 // this file.
 installIdentityRepairs({ applyWorldEssenceMergeFlagRemap, applyWorldScopeIdentityFlagRemap });

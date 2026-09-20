@@ -275,7 +275,7 @@ test('the default probe matches the injected one, so both seams see the operator
   assert.deepEqual(runContainersChanged(diff, 'not a function'), ['crafting'], 'and the fallback');
 });
 
-test('src/main.js still routes the hook through the matcher it is filtered by', () => {
+test('the hooks edge still routes the hook through the matcher it is filtered by', () => {
   // The filter is load-bearing: `updateActor` fires on every HP tick. An unfiltered hook
   // would be a performance defect, and a filter that never matches is this whole bug.
   const source = readFileSync(resolve(HERE, '..', 'src', 'bootstrap', 'hooks.js'), 'utf8');

@@ -35,7 +35,8 @@ async function resolveJournalSourceActors(run, payload = {}, fallbackActor = nul
       return null;
     }
   }
-  return actors.length > 0 ? actors : fallbackActor ? [fallbackActor] : [];
+  if (actors.length > 0) return actors;
+  return fallbackActor ? [fallbackActor] : [];
 }
 
 function journalSourcesOwnedBy(sender, actors) {

@@ -52,12 +52,12 @@ function message(overrides = {}) {
 }
 
 /**
- * The body of a top-level function in `src/main.js`, from its signature to the first column-zero
+ * The body of a top-level function in the module entry, from its signature to the first column-zero
  * `}`.
  */
 function mainFunctionBody(name) {
   const start = mainSource.indexOf(`function ${name}(`);
-  assert.ok(start !== -1, `src/main.js should declare ${name}`);
+  assert.ok(start !== -1, `the module entry should declare ${name}`);
   const end = mainSource.indexOf('\n}\n', start);
   assert.ok(end > start, `${name} should be a top-level function`);
   return mainSource.slice(start, end);

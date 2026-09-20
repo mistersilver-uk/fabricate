@@ -1,6 +1,6 @@
 /**
  * The published surface: `game.fabricate` and its `gathering`, `api` and macro namespaces. Pure
- * assignment, idempotent from BOTH `init` and `ready`. Every member here is a consumer contract.
+ * assignment, idempotent from both `init` and `ready`. Every member here is a consumer contract.
  */
 
 import { InteractableManager } from '../canvas/InteractableManager.js';
@@ -46,8 +46,6 @@ import { openDeferredAppRethrowing } from '../utils/deferredEntryNotice.js';
 
 import { deprecate } from './gatheringRuntime.js';
 
-// Bind the public API onto the live `game.fabricate` global. A pure assignment, idempotent and safe
-// from BOTH `init` and `ready`, the latter backstopping a manager stalled on "still loading".
 /** The published `game.fabricate.gathering` namespace, deprecated region aliases included. */
 function buildGatheringNamespace(fabricate) {
   return {
@@ -138,7 +136,7 @@ function buildApiClasses(io) {
   };
 }
 
-/** `game.fabricate.exportSystem`: one system, its recipes and every WORLD-scope slice. */
+/** `game.fabricate.exportSystem`: one system, its recipes and every world-scope slice. */
 function buildExportSystem(fabricate) {
   return (systemId) => {
     const systemManager = fabricate.craftingSystemManager;
@@ -202,7 +200,7 @@ function buildImportSystem(fabricate) {
 }
 
 // Bind the public API onto the live `game.fabricate` global. A pure assignment, idempotent and
-// safe from BOTH `init` and `ready`, the latter backstopping a manager stalled on "still loading".
+// safe from both `init` and `ready`, the latter backstopping a manager stalled on "still loading".
 export function bindFabricateGlobal(fabricate, io) {
   game.fabricate = fabricate;
   // Expose the manager singleton so the region behaviour event handlers can resolve

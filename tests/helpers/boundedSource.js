@@ -39,7 +39,8 @@ export function classMemberSource(source, signature, label = 'the source') {
   // the comma is dropped so both spellings hand back the same text to every pin downstream.
   const plain = source.indexOf('\n  }\n', start);
   const listed = source.indexOf('\n  },\n', start);
-  const end = plain < 0 ? listed : listed < 0 ? plain : Math.min(plain, listed);
+  const closers = [plain, listed].filter((index) => index >= 0);
+  const end = closers.length === 0 ? -1 : Math.min(...closers);
   if (end < 0) throw new Error(`\`${signature}\` has no member-level closing brace`);
   return source.slice(start, end + '\n  }'.length);
 }

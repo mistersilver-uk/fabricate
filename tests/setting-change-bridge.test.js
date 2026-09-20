@@ -291,7 +291,7 @@ describe('handleFabricateSettingChange', () => {
 // The registrations live in a `ready` callback that no test under the `npm test` glob can reach —
 // nothing calls `fabricate.initialize()` — so they are pinned at the source, which is the
 // convention `player-character-actor-types.test.js` established for exactly this edge.
-describe('main.js settings hook wiring', () => {
+describe('the hooks edge settings wiring', () => {
   const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/bootstrap/hooks.js'), 'utf8');
 
   it('registers BOTH settings hooks on ONE shared listener', () => {
@@ -422,7 +422,7 @@ describe('the world scope legs', () => {
     });
   }
 
-  it('drives EVERY store `src/main.js` hands the bridge, with the exemptions stated inline', () => {
+  it('drives EVERY store `src/bootstrap/hooks.js` hands the bridge, with the exemptions stated inline', () => {
     // THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
     // `WORLD_STORE_LEGS` is an unexported frozen array, and the `SCOPES` table above is a
     // hand-maintained copy of part of it.
@@ -465,7 +465,7 @@ describe('the world scope legs', () => {
     assert.deepEqual(
       targets.filter((name) => !EXEMPT.has(name)).sort(),
       legs.slice().sort(),
-      'every store `src/main.js` hands the bridge must have a leg that reloads it, or be ' +
+      'every store `src/bootstrap/hooks.js` hands the bridge must have a leg that reloads it, or be ' +
         'exempted above with its reason. A store with no leg NO-OPS silently.'
     );
   });

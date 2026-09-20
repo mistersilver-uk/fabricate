@@ -16,6 +16,7 @@ import {
   buildWorldScopeEntityNotice,
 } from '../systems/worldScopeEntityNotice.js';
 
+// The GM notice for each way a startup migration pass can defer (issue 1242). One complete localized
 // sentence per reason, because the two differ in what the GM must do: only the writeback failure
 // instructs a reload, that path alone leaving this session holding unsaved transformed data.
 const MIGRATION_DEFERRAL_NOTICES = Object.freeze({
@@ -61,7 +62,7 @@ export function applyWorldEssenceMergeFlagRemap(mergeMap) {
   return requireRepair('applyWorldEssenceMergeFlagRemap')(mergeMap);
 }
 
-/** The GM notice for a DEFERRED or an ABORTED pass; `true` means nothing further is reported. */
+/** The GM notice for a deferred or an aborted pass; `true` means nothing further is reported. */
 function reportDeferralOrAbort(summary, localize) {
   // A DEFERRED pass (issue 1242) is NOT an abort, so it gets its own permanent notice rather than
   // the dialog — ABOVE that branch, a deferred summary reporting `aborted: false`.

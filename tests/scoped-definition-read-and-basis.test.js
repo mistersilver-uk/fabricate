@@ -639,13 +639,13 @@ describe('the _scopeBasis call sites', () => {
   });
 });
 
-// Criterion 7 — construction order in src/main.js. THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO
+// Criterion 7 — construction order in the composition root. THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO
 // PRs (issue 1363).
 
-describe('src/main.js construction order', () => {
+describe('composition-root construction order', () => {
   /**
    * Source-order assertions, the idiom `tests/migration-runner-corpus-writeback.test.js` and
-   * `tests/setting-change-bridge.test.js` already use, because `src/main.js` is not otherwise
+   * `tests/setting-change-bridge.test.js` already use, because the composition root is not otherwise
    * reachable by a unit test — and because a mis-ordering here is SILENT: reading an unregistered
    * key throws inside `ClientSettings##assertSetting`, but `load()` is guarded, so the store simply
    * stays unseeded forever with nothing in the console.

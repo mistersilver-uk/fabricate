@@ -142,7 +142,8 @@ export const journalFacade = {
           const sources = uuids
             .map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null)
             .filter(Boolean);
-          return sources.length > 0 ? sources : actor ? [actor] : [];
+          if (sources.length > 0) return sources;
+          return actor ? [actor] : [];
         },
         resolveItemEssences: ({ item, recipe }) => {
           const system = this.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
