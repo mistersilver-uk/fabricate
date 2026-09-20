@@ -148,7 +148,7 @@ tests/icon-vocabulary-api.test.js	5
 tests/iconCatalogueGenerator.test.js	1
 tests/import-folder-drop-wiring.test.js	3
 tests/import-report-label-coverage.test.js	1
-tests/import-system-gathering-bundle.test.js	7
+tests/import-system-gathering-bundle.test.js	9
 tests/invalidation-domain-attribution.test.js	5
 tests/item-directory-manager-launch.test.js	1
 tests/item-stack-quantity.test.js	19
