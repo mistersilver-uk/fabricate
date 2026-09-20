@@ -453,7 +453,7 @@ function makeAdminStoreFor(mode) {
   return { store: createAdminStore(services), dialogs, environment: environments[0] };
 }
 
-describe('site 2 — adminStore._classifyCompositionRecords, through viewState', () => {
+describe('site 2 — environmentComposition.classifyCompositionRecords, through viewState', () => {
   /** Every classified row for one mode's environment, keyed by record id. */
   async function classifiedRowsFor(mode) {
     const { store } = makeAdminStoreFor(mode);
@@ -476,7 +476,7 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
         CASES.filter((entry) => entry.mode === mode),
         (entry) =>
           ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(rowsById.get(entry.id).compositionState),
-        `_classifyCompositionRecords compositionState (${mode})`
+        `classifyCompositionRecords compositionState (${mode})`
       );
     }
   });
@@ -507,7 +507,7 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
       assertMatrixArm(
         CASES.filter((entry) => entry.mode === mode),
         (entry) => rowsById.get(entry.id).runtimeState === 'available',
-        `_classifyCompositionRecords runtimeState, i.e. the store's own composed projection (${mode})`
+        `classifyCompositionRecords runtimeState, i.e. the store's own composed projection (${mode})`
       );
     }
   });

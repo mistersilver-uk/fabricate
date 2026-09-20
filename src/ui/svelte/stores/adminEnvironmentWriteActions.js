@@ -224,7 +224,7 @@ export function createEnvironmentWriteActions({
       const reordered = await environmentStore.reorder(systemId, orderedEnvironmentIds);
       const environments = Array.isArray(reordered) ? reordered : [];
       const selectedId = get(selectedEnvironmentId);
-      if (selectedId && environments.every((environment) => !(environment.id === selectedId))) {
+      if (selectedId && environments.every((environment) => environment.id !== selectedId)) {
         selectedEnvironmentId.set(environments[0]?.id || '');
         environmentDraftDirty.set(false);
         environmentDraftIsNew.set(false);

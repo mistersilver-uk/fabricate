@@ -334,7 +334,7 @@ export function createEnvironmentDraftSection({
 
       if (canKeepNewDraft) {
         environmentId = '';
-      } else if (environments.every((environment) => !(environment.id === environmentId))) {
+      } else if (environments.every((environment) => environment.id !== environmentId)) {
         environmentId = environments[0]?.id || '';
         selectedEnvironmentId.set(environmentId);
       }

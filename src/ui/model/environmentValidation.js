@@ -120,7 +120,7 @@ function inferEnvironmentValidationTarget(
     return { taskId: task.id, path: `${prefix}.visibility.formula` };
   }
 
-  const timeUnit = lower.match(/timerequirement\.(minutes|hours|days|months|years)/)?.[1];
+  const timeUnit = /timerequirement\.(minutes|hours|days|months|years)/.exec(lower)?.[1];
   if (timeUnit) return { taskId: task.id, path: `${prefix}.timeRequirement.${timeUnit}` };
   if (/timerequirement must include a positive duration/.test(lower)) {
     return { taskId: task.id, path: `${prefix}.timeRequirement.minutes` };
@@ -136,7 +136,7 @@ function inferEnvironmentValidationTarget(
     return { taskId: task.id, path: `${prefix}.failureOutcome.macroUuid` };
   }
 
-  const resultGroupName = message.match(/result group "([^"]+)"/)?.[1];
+  const resultGroupName = /result group "([^"]+)"/.exec(message)?.[1];
   if (resultGroupName) {
     const group = resolveResultGroupValidationTarget({
       task,
@@ -171,7 +171,7 @@ function inferEnvironmentValidationTarget(
     };
   }
 
-  const resultId = message.match(/progressive result "([^"]+)"/)?.[1];
+  const resultId = /progressive result "([^"]+)"/.exec(message)?.[1];
   if (resultId) return { taskId: task.id, path: `${prefix}.result.${resultId}.componentId` };
 
   return { taskId: task.id, path: `${prefix}.name` };
@@ -201,7 +201,7 @@ function normalizeValidationGroupName(value) {
 
 function findTaskForValidationMessage(message, draft) {
   const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
-  const taskName = String(message || '').match(/Task "([^"]+)"/)?.[1];
+  const taskName = /Task "([^"]+)"/.exec(String(message || ''))?.[1];
   if (taskName) {
     return tasks.find((task) => task?.name === taskName) || tasks[0] || null;
   }

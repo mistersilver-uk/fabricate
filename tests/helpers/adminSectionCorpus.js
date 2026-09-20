@@ -69,7 +69,8 @@ function createEnvironmentStoreDouble(environments, journal, failures) {
     create: async (payload) => {
       journal.record('environments.create', [payload]);
       failOnce('environments.create');
-      const created = { ...clone(payload), id: payload.id || `env-new-${(idSeq += 1)}` };
+      idSeq += 1;
+      const created = { ...clone(payload), id: payload.id || `env-new-${idSeq}` };
       rows.push(created);
       return clone(created);
     },
@@ -214,7 +215,10 @@ export function createRecordingServices({
     getFoundrySystemId: () => foundrySystemId,
     getGatheringEnvironmentStore: () => environmentStore,
     getCurrencyConfigStore: () => currencyStore,
-    randomID: () => `id-${(idSeq += 1)}`,
+    randomID: () => {
+      idSeq += 1;
+      return `id-${idSeq}`;
+    },
     localize: (key) => key,
     notify: {
       info: (message) => journal.record('notify.info', [String(message)]),
