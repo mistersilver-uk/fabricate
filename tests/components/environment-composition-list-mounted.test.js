@@ -292,7 +292,8 @@ describe('CompositionList mounted layout', () => {
     await renderComposition({
       kind: 'task',
       mode: 'automatic',
-      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id])
+      onForceInclude: (kind, id) => calls.push(['forceInclude', kind, id]),
+      onRestore: (kind, id) => calls.push(['restore', kind, id])
     });
 
     assert.deepEqual(sectionNames(), ['included', 'excluded', 'non-matching']);
@@ -311,6 +312,12 @@ describe('CompositionList mounted layout', () => {
     assert.ok(forceAdd.textContent.includes('Force add'));
     forceAdd.click();
     assert.deepEqual(calls.at(-1), ['forceInclude', 'task', 'nonmatching']);
+
+    const excludedMenu = await openRowMenu('excluded-nonmatching');
+    const restore = excludedMenu.querySelector('[data-action="restore"]');
+    assert.ok(Boolean(restore), 'the excluded row menu offers Restore');
+    restore.click();
+    assert.deepEqual(calls.at(-1), ['restore', 'task', 'excluded-nonmatching']);
 
     const disabledMenu = await openRowMenu('disabled');
     assert.ok(disabledMenu.textContent.includes('Enable in library first'));
