@@ -3254,7 +3254,7 @@ The plate, the named pill's mark and each suggestion's take one colour per kind 
 The tint is on the MARK and never on the tile or the pill, which would make four rows of four kinds read as four differently-coloured cards.
 - **No row carries a `REQUIRED` badge.**
 A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a group is AND-required by position and a per-row badge restates what the absence of the group already says.
-- **The kind is a real `<select>`,** carrying the kinds the adders offer plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
+- **The kind is the shared select,** rendered through `components/Select.svelte` at its `inline` rung and never a native `<select>` (issue 1510), carrying the kinds the adders offer plus whichever kind the row already IS, so an authored requirement always reads back as what it is even where its kind is no longer offered.
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
 Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.

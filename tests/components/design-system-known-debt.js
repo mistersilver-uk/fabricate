@@ -91,7 +91,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // #1707 phase 2: the root's 12 became 2 and `GatheringRulesInspector.svelte` took 10, so the
 // total is unchanged and only the file count moves, 25 rows to 26. The two the root keeps are its
 // nav scope and the systems-list condition; neither is in an inspector branch.
-export const KNOWN_NATIVE_SELECT_TOTAL = 69;
+// #1510: the recipe studio's `RecipeOverviewTab` (4) and `RecipeIngredientOption` (1) convert
+// onto `Select`, so the total falls 69 -> 64 across 26 rows to 24.
+export const KNOWN_NATIVE_SELECT_TOTAL = 64;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

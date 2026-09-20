@@ -180,9 +180,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
-  // The app's own select (issue 1504), whose whole subject — the option list — exists only while it is open.
+  // The app's own select (issue 1504); its whole subject — the option list — exists only while
+  // open. The recipe studio's kind list adds the `inline` rung (issue 1510).
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
+    'manager-recipe-edit-ingredients-kind-list',
     'player-inventory-page-size',
     'interactables-manager-region-open',
   ]),

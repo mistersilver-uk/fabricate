@@ -1014,6 +1014,14 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-prerequisite-operator',
   'data-economy-regen-policy',
   'data-economy-regen-unit',
+  // ISSUE 1510 PHASE 2, COMMIT 2a — the recipe studio. `data-recipe-field` is spelled WITH its
+  // value at the three cells that carry it, because the bare attribute is shared with the tab's
+  // inputs and textareas and a bare entry would ban driving those natively too.
+  'data-recipe-category-select',
+  'data-recipe-field="checkTierId"',
+  'data-recipe-field="minSuccessOutcomeId"',
+  'data-recipe-field="craftingModifierSet"',
+  'data-recipe-option-kind',
 ]);
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
@@ -1092,9 +1100,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 14,
+    replacements.length >= 17,
     `only ${replacements.length} \`chooseSelectOption(\` call sites remain in the registry, ` +
-      'against a floor of 14. Converted steps were reverted to the native `select:` verb, or the ' +
+      'against a floor of 17. Converted steps were reverted to the native `select:` verb, or the ' +
       'helper was renamed and this clause is now judging an empty set.'
   );
   assert.deepEqual(

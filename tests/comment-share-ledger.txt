@@ -1,7 +1,7 @@
 scripts	2657
 scripts/foundry	13
 scripts/lib	1712
-scripts/lib/view-lab-cases	949
+scripts/lib/view-lab-cases	956
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
 src	1251
@@ -41,7 +41,7 @@ src/ui/svelte/apps/manager/environment	555
 src/ui/svelte/apps/manager/essences	633
 src/ui/svelte/apps/manager/knowledge	200
 src/ui/svelte/apps/manager/library	59
-src/ui/svelte/apps/manager/recipe	1142
+src/ui/svelte/apps/manager/recipe	1161
 src/ui/svelte/apps/manager/recipe-item	335
 src/ui/svelte/apps/manager/recipes	379
 src/ui/svelte/apps/manager/scoped	2434
@@ -53,14 +53,14 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1218
 src/utils	944
 styles	1042
-tests	19839
+tests	19843
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
-tests/components	15027
+tests/components	15080
 tests/fixtures	34
 tests/fixtures/chip	15
-tests/fixtures/manager-select	20
+tests/fixtures/manager-select	25
 tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
