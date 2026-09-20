@@ -77,7 +77,7 @@
   const list = createBrowserListState({
     state: () => ui,
     resetAxes: { categoryFilter: 'all', essenceFilter: 'all', pageIndex: 0 },
-    // The selection is scoped to this system, and the root drops the staged draft at zero (772).
+    // The selection is scoped to this system; the root drops the staged draft at zero (issue 772).
     onSystemSwitch: () => selection.reset(),
   });
 
