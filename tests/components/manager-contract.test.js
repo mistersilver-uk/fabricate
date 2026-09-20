@@ -108,6 +108,8 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
 
 const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const MANAGER_SERVICES = 'src/ui/managerServices.js';
+const KNOWLEDGE_SNAPSHOT = 'src/systems/knowledgeSnapshot.js';
+const KNOWLEDGE_TARGETS = 'src/ui/svelte/apps/manager/knowledge/knowledgeTargets.js';
 const MAIN = 'src/main.js';
 
 /** Every module the entry composes; each carries the chunk-split claim in its own contract row. */
@@ -2453,29 +2455,29 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'gates the Knowledge seam on isGM and denies a non-GM with the GM-only message',
-    { file: APP_SHELL, member: '_knowledgeActor' },
+    { file: KNOWLEDGE_TARGETS, fn: 'knowledgeActor' },
     { reads: ['game.user.isGM', 'KNOWLEDGE_MESSAGES.gmOnly'] }
   );
 
   defineStructureContract(
     'runs that gate before any document lookup on the item target too',
-    { file: APP_SHELL, member: '_knowledgeTarget' },
-    { calls: ['_knowledgeActor'] }
+    { file: KNOWLEDGE_TARGETS, fn: 'knowledgeTarget' },
+    { calls: ['knowledgeActor'] }
   );
 
   // Without the third column, the gated resolver, a row says the mutation is delegated but not
   // that anything gates it.
   const KNOWLEDGE_MUTATIONS = Object.freeze([
-    ['_expendRecipeItemUse', 'expendOwnedRecipeItemUse', '_knowledgeTarget'],
-    ['_deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy', '_knowledgeTarget'],
-    ['_eraseLearnedRecipe', 'eraseLearnedRecipeEntry', '_knowledgeActor'],
-    ['_resetActorKnowledge', 'resetActorKnowledgeState', '_knowledgeActor'],
+    ['expendRecipeItemUse', 'expendOwnedRecipeItemUse', 'knowledgeTarget'],
+    ['deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy', 'knowledgeTarget'],
+    ['eraseLearnedRecipe', 'eraseLearnedRecipeEntry', 'knowledgeActor'],
+    ['resetActorKnowledge', 'resetActorKnowledgeState', 'knowledgeActor'],
   ]);
 
   for (const [method, mutation, gate] of KNOWLEDGE_MUTATIONS) {
     defineStructureContract(
       `${method} resolves through the GM-gated helper and delegates its mutation`,
-      { file: APP_SHELL, member: method },
+      { file: KNOWLEDGE_TARGETS, fn: method },
       { calls: [mutation, gate], names: ['denied'] }
     );
   }
@@ -2486,15 +2488,19 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract(
     'reaches the player-character roster through the shared, GM-configurable predicate', APP_SHELL,
     {
-      imports: [
-        './svelte/apps/manager/knowledge/knowledgeMutations.js',
-        '../config/playerCharacterTypes.js',
-      ],
+      imports: ['../config/playerCharacterTypes.js'],
       comparesNo: ['character'],
       readsNo: ['game.fabricate.isPlayerCharacterActor'],
       namesNo: ['activeGM'],
     }
   );
+
+  // The write half moved beside the primitives it drives (issue 1674), so the same anti-pin is
+  // asserted there: `activeGM` would lock out the assistant GMs `show()` already admits.
+  defineStructureContract('drives the merged knowledge primitives, ungated by activeGM', KNOWLEDGE_TARGETS, {
+    imports: ['./knowledgeMutations.js'],
+    namesNo: ['activeGM'],
+  });
 
   // The learned-row allowlist (issue 1289). `_collectKnowledgeLearnedEntries` builds each row as
   // a hand-written object literal, so a field it does not name never reaches the display ladder:
@@ -2529,9 +2535,9 @@ describe('CraftingSystemManager source contract', () => {
       `the learned-row ladder no longer reads \`raw.<field>\`, so this derivation proves nothing (found ${[...readFields].join(', ') || 'nothing'})`
     );
 
-    const collector = classMemberAst(
-      moduleAstOf(APP_SHELL).ast,
-      '_collectKnowledgeLearnedEntries'
+    const collector = namedCodeAst(
+      moduleAstOf(KNOWLEDGE_SNAPSHOT).ast,
+      'collectKnowledgeLearnedEntries'
     );
     const literal = pushedRecord(collector, 'learnedRecipes');
     assert.ok(

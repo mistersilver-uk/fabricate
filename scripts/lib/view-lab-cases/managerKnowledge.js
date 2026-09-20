@@ -56,6 +56,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      // The snapshot projection this frame renders moved out of the shell (issue 1674).
+      /^src\/systems\/knowledgeSnapshot\.js$/,
     ],
   }),
   managerCase({
