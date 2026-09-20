@@ -11,7 +11,7 @@ src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	117
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	247
 src/models/Recipe.js::_validate	120
 src/systems/BulkSalvageService.js	819
-src/systems/CompendiumImporter.js	1575
+src/systems/CompendiumImporter.js	1580
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
 src/systems/CompendiumImporter.js::importFromPackData	291
 src/systems/CraftingEngine.js	7839
