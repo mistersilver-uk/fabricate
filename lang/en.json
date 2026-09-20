@@ -7551,8 +7551,6 @@
         "NewEnvironment": "New Environment",
         "NewEnvironmentName": "New Gathering Environment",
         "NewTaskName": "Configure gathering task",
-        "NewResultGroupName": "Results",
-        "TaskCopySuffix": "{name} Copy",
         "NewDraftTitle": "New Gathering Environment",
         "Unsaved": "Unsaved",
         "Invalid": "Invalid",
