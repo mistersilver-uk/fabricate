@@ -323,10 +323,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // The four caption ids the converted pickers are named by, per instance (issue 1510).
+  // The four caption ids the converted pickers are named by, plus the one hint a converted picker
+  // is described by, per instance (issue 1510).
   const instanceId = $props.id();
   const captionIds = {
     defaultEnvironment: `${instanceId}-default-environment`,
+    defaultEnvironmentHint: `${instanceId}-default-environment-hint`,
     deplete: `${instanceId}-node-deplete`,
     respawn: `${instanceId}-node-respawn`,
     gainMode: `${instanceId}-node-gain-mode`,
@@ -1120,10 +1122,11 @@
               options={environmentSelectOptions}
               showTick={false}
               ariaLabelledBy={captionIds.defaultEnvironment}
+              ariaDescribedBy={captionIds.defaultEnvironmentHint}
               triggerData={{ 'data-gathering-task-field': 'defaultEnvironmentId' }}
               onChange={(next) => setDefaultEnvironment(next)}
             />
-            <span class="manager-muted"
+            <span id={captionIds.defaultEnvironmentHint} class="manager-muted"
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironmentHint',
                 'Used when a dropped node is not inside a tagged scene region. Hold Alt while dropping to always pick manually.'

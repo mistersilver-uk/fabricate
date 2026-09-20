@@ -460,6 +460,26 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     }
   });
 
+  it('describes the default-environment picker by the hint that sits beside it', async () => {
+    // The `Field` host is a `<div>` now, so the hint is no longer part of the computed name and
+    // has to be referenced explicitly (issue 1510).
+    const { root } = await mountEditor();
+    const picker = '[data-gathering-task-field="defaultEnvironmentId"]';
+    const trigger = root.querySelector(picker);
+    const described = (trigger.getAttribute('aria-describedby') ?? '').trim();
+    assert.ok(described.length > 0, `${picker} carries no \`aria-describedby\` at all`);
+    const hint = trigger.ownerDocument.getElementById(described);
+    assert.ok(
+      Boolean(hint),
+      `${picker} points \`aria-describedby\` at "${described}", which names no element`
+    );
+    assert.match(
+      hint.textContent.replaceAll(/\s+/gu, ' ').trim(),
+      /tagged scene region/u,
+      'and the element it names is the canvas-drop hint, not another caption'
+    );
+  });
+
   it('forwards the chosen value of every converted picker to the update function', async () => {
     for (const control of CONVERTED) {
       const { root, updates } = await mountEditor();
