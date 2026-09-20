@@ -30,7 +30,7 @@ export const FABRICATE_EXPORT_SCHEMA_VERSION = 6;
 
 /**
  * Default current-condition selection used when resetting runtime condition
- * state on export. Mirrors `DEFAULT_GATHERING_CONDITIONS` in adminStore.js.
+ * state on export. Mirrors `DEFAULT_GATHERING_CONDITIONS` in gatheringComposition.js.
  */
 export const DEFAULT_CURRENT_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 

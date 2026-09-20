@@ -4,6 +4,7 @@
  * argument, so the gathering library's confirms read it without reaching into a store (issue 1708).
  */
 import {
+  DEFAULT_GATHERING_CONDITIONS,
   ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
   conditionSettingsToCurrent,
   environmentComposesRecord,
@@ -17,9 +18,6 @@ import {
   normalizeDraftTaskDropRateAdjustments,
   normalizeDraftTaskDropRateAdjustmentsEnabled,
 } from './environmentValidation.js';
-
-/** The weather and time a world falls back to when its gathering config authors neither. */
-export const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 
 export function gatheringLibraryRecordMatchesEnvironment(
   record,

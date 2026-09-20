@@ -54,10 +54,12 @@ import {
   resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
-import { conditionSettingsToCurrent } from '../../../systems/gatheringComposition.js';
+import {
+  conditionSettingsToCurrent,
+  DEFAULT_GATHERING_CONDITIONS,
+} from '../../../systems/gatheringComposition.js';
 import {
   buildEnvironmentCompositionViewModel,
-  DEFAULT_GATHERING_CONDITIONS,
   environmentComposesGatheringRecord as _environmentComposesGatheringRecord,
 } from '../../model/environmentComposition.js';
 import { emptyEnvironmentState as _emptyEnvironmentState } from '../../model/environmentValidation.js';
