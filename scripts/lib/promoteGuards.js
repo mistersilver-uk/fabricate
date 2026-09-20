@@ -76,6 +76,69 @@ export function assertHotfixMinimumNotRaised({
   };
 }
 
+/** The tester identity a config declares for one channel: the group names and the secret's name. */
+function testerIdentity(config, channel) {
+  const declared = config?.channels?.[channel] ?? {};
+  const groups = Array.isArray(declared.testerGroups) ? declared.testerGroups.map(String) : [];
+  const secretEnv =
+    typeof declared.testerSecretEnv === 'string' && declared.testerSecretEnv.trim() !== ''
+      ? declared.testerSecretEnv.trim()
+      : '(none)';
+  return { groups, secretEnv };
+}
+
+/** One side of the comparison, in a form safe to log: no segment value, only names. */
+function describeIdentity({ groups, secretEnv }) {
+  return `tester group(s) [${groups.join(', ') || 'none'}] via ${secretEnv}`;
+}
+
+/**
+ * Diagnose a disagreement between the ref a promotion was dispatched from and the ref that
+ * publishes a channel, about that channel's tester identity (§Tester group identity). Compares
+ * names only — a segment value is a secret and is never read here.
+ *
+ * @returns {{drifted: boolean, summary: string, remedy: string}} The diagnosis.
+ */
+export function evaluateTesterConfigDrift({
+  channel,
+  dispatchConfig,
+  publisherConfig,
+  publisherRef = 'origin/release',
+}) {
+  const dispatch = testerIdentity(dispatchConfig, channel);
+  const publisher = testerIdentity(publisherConfig, channel);
+  const sides =
+    `this ref declares ${describeIdentity(dispatch)}, while ${publisherRef} — the ref that ` +
+    `publishes ${channel} — declares ${describeIdentity(publisher)}`;
+
+  // Group names compared as sets: declaration order carries no meaning, a rename does.
+  const dispatchGroups = new Set(dispatch.groups);
+  const publisherGroups = new Set(publisher.groups);
+  const sameGroups =
+    dispatchGroups.size === publisherGroups.size &&
+    [...dispatchGroups].every((group) => publisherGroups.has(group));
+
+  if (sameGroups && dispatch.secretEnv === publisher.secretEnv) {
+    return {
+      drifted: false,
+      summary: `${channel} tester identity agrees across refs: ${sides}.`,
+      remedy: '',
+    };
+  }
+
+  return {
+    drifted: true,
+    summary:
+      `tester-configuration drift on ${channel}: ${sides}. A tester group's identity is ` +
+      'deployment configuration, so the prefix this promotion evaluates is not the one the ' +
+      'channel has actually been published under.',
+    remedy:
+      `Publish the current ${channel} head under the new identity first — a release-s3.yml ` +
+      `workflow_dispatch from the ref carrying it (tag = that head's version, channel ${channel}) ` +
+      `— or land the rotation on ${publisherRef} so the publisher and this ref agree.`,
+  };
+}
+
 /** Decide one private target for the registry-lead check, per §Registry lead prohibition. */
 export function evaluateRegistryLeadTarget({ channel, sourceChannel, label, head, version }) {
   const isSourceChannel = channel === sourceChannel;

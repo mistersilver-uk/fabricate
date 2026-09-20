@@ -139,6 +139,54 @@ describe('handleFabricateSettingChange', () => {
     ]);
   });
 
+  // The WORLD travel leg (issue 1282). Realms left the crafting system record, so the systems
+  // branch above can no longer announce a realm edit through `SYSTEM_FIELD_DOMAINS`.
+  it('reloads the world realm library and scopes the change to PARTICIPATING systems', () => {
+    const emitted = [];
+    const order = [];
+    const handled = handleFabricateSettingChange('fabricate.travelConfig', {
+      travelStore: {
+        load: () => order.push('load'),
+      },
+      craftingSystemManager: {
+        getSystems: () => [
+          { id: 'on', gatheringRealmSettings: { enabled: true } },
+          { id: 'off', gatheringRealmSettings: { enabled: false } },
+          { id: 'none' },
+        ],
+      },
+      callAll: (hook, payload) => {
+        order.push(hook);
+        emitted.push([hook, payload]);
+      },
+    });
+
+    assert.equal(handled, true);
+    // ORDERING IS A MUST: a consumer that reacts reads the library back through the store.
+    assert.equal(order[0], 'load', 'the library is re-read BEFORE anything is announced');
+
+    const [republish, change] = emitted;
+    assert.equal(republish[0], 'fabricate.craftingSystemsChanged');
+    assert.equal(change[0], 'fabricate.craftingDataChanged');
+    assert.deepEqual(
+      change[1].scopes,
+      // Only the participating system. One with Travel & Realms off gates nothing on location,
+      // and a system carrying no settings at all answers the same.
+      [{ systemId: 'on', domains: ['resolution-config'] }],
+      'the realm edit is attributed to the systems that can resolve against it'
+    );
+  });
+
+  it('travel: tolerates a missing realm store and still claims the key', () => {
+    const emitted = [];
+    const handled = handleFabricateSettingChange('fabricate.travelConfig', {
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+
+    assert.equal(handled, true, 'the key is still claimed, so nothing else tries to handle it');
+    assert.deepEqual(emitted, [['fabricate.craftingSystemsChanged', []]]);
+  });
+
   // The WORLD character libraries leg (issue 1308).
   it('reloads the character-libraries store and announces the UNION of all three domains', () => {
     const emitted = [];
@@ -270,6 +318,9 @@ describe('main.js settings hook wiring', () => {
       'craftingSystemManager',
       'recipeManager',
       'gatheringEnvironmentStore',
+      // The world realm library's leg. Without it a replicated travel edit leaves every other
+      // client's realm store at its boot value for the whole session (issue 1858).
+      'travelStore',
       'callAll',
     ]) {
       assert.ok(

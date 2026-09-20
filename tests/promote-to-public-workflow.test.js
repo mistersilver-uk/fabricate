@@ -93,3 +93,63 @@ test('the registry payload constructs the v, and never re-derives it from the ar
     'the artefact IS the version being promoted, compared literally now the manifest carries no prefix'
   );
 });
+
+// Tester-group identity is deployment configuration, and early-access is published only from
+// `release` — so a promotion dispatched from `main` can evaluate a prefix no publish has written
+// (issue #1872). The guard diagnoses that, and hangs the remedy on the refusal it explains.
+test('the guard reads the publisher ref config and extends the absent-head refusal with the drift remedy', () => {
+  const guard = parseJobs(readFileSync(WORKFLOW, 'utf8')).guard;
+
+  const captureIndex = guard.steps.findIndex((step) =>
+    /git show origin\/release:release\.s3\.config\.json/.test(step.run)
+  );
+  assert.notEqual(captureIndex, -1, "no step reads origin/release's own release.s3.config.json");
+  const capture = guard.steps[captureIndex];
+  assert.match(
+    capture.run,
+    /git fetch origin ["']?\+?refs\/heads\/release/,
+    'origin/release must be fetched before it is read — a checkout does not guarantee the ref'
+  );
+  const written = /> "\$RUNNER_TEMP\/([\w.-]+)"/.exec(capture.run);
+  assert.ok(written, 'the publisher config must be written under $RUNNER_TEMP, not the checkout');
+
+  const checksIndex = guard.steps.findIndex((step) => step.id === 'checks');
+  assert.ok(captureIndex < checksIndex, 'the capture must precede the step that reads it');
+
+  const checks = guard.steps[checksIndex];
+  assert.ok(
+    String(checks.env.PUBLISHER_CONFIG ?? '').endsWith(`/${written[1]}`),
+    `the guard reads ${checks.env.PUBLISHER_CONFIG}, but the capture writes ${written[1]}`
+  );
+  assert.match(checks.env.PUBLISHER_CONFIG, /\$\{\{\s*runner\.temp\s*\}\}/);
+  assert.match(checks.run, /process\.env\.PUBLISHER_CONFIG/);
+  assert.match(
+    checks.run,
+    /evaluateTesterConfigDrift/,
+    'the guard must import and call the shared drift diagnosis, not restate it inline'
+  );
+
+  const flat = checks.run.replace(/\s+/g, ' ');
+  assert.match(flat, /console\.warn\(`::warning::\$\{drift\.summary\}`\)/, 'drift must be logged');
+  // A drift-driven refusal of its own would block every promotion made while two refs legitimately
+  // disagree. Drift is a diagnosis: it explains why an early-access head is absent.
+  assert.ok(!/fail\(drift\./.test(flat), 'configuration drift must never refuse on its own');
+  for (const conjunct of [/verdict\.kind === 'absent'/, /channel === 'early-access'/, /drift\.drifted/]) {
+    assert.match(flat, conjunct, 'the remedy is hung on the absent-head early-access refusal only');
+  }
+  assert.match(
+    flat,
+    /fail\(verdict\.reason \+ /,
+    'the remedy must EXTEND the registry-lead refusal, not replace the reason it explains'
+  );
+  assert.match(flat, /drift\.remedy/);
+
+  // The diagnosis is advisory, so a malformed publisher config must not hard-fail the guard: the
+  // parse falls back to an empty declaration and says so.
+  assert.match(
+    flat,
+    /try \{ publisherConfig = JSON\.parse\(await readFile\(process\.env\.PUBLISHER_CONFIG, 'utf8'\)\); \} catch/,
+    'an unparseable publisher config would refuse the promotion outright'
+  );
+  assert.match(flat, /catch \(error\) \{ console\.log\( `::notice::/);
+});
