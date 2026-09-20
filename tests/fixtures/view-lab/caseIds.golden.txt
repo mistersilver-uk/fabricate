@@ -81,6 +81,7 @@ manager-recipes-bulk-delete-armed
 manager-crafting-group-expanded
 manager-books-scrolls-normal
 manager-books-scrolls-item
+manager-books-scrolls-cap-filter-list
 manager-crafting-settings
 manager-recipe-item-overview
 manager-recipe-item-contents

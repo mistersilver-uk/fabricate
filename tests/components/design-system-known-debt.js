@@ -102,7 +102,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // across 18 rows to 17.
 // #1510: the environment overview's three and the Tool rails' one convert onto `Select`, so the
 // total falls 44 -> 40 across 17 rows to 15.
-export const KNOWN_NATIVE_SELECT_TOTAL = 40;
+// #1510: the systems, recipe-access and recipe-item browse toolbars' six convert onto `Select`,
+// so the total falls 40 -> 34 across 15 rows to 12.
+export const KNOWN_NATIVE_SELECT_TOTAL = 34;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

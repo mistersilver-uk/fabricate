@@ -65,7 +65,7 @@ tests/canvas/regions	7
 tests/components	10
 tests/fixtures	12
 tests/fixtures/chip	49
-tests/fixtures/manager-select	19
+tests/fixtures/manager-select	18
 tests/fixtures/overlay-host	25
 tests/fixtures/player-select	22
 tests/fixtures/searchable-popover	52
