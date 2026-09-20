@@ -1275,6 +1275,13 @@ class Fabricate {
         load: () => this.gatheringEnvironmentStore?.load?.() ?? [],
         save: (environments) => this.gatheringEnvironmentStore?.save?.(environments)
       },
+      // Lazy for the same reason, and its `save` cannot fail OPEN: with the realm store not yet
+      // assigned `get()` answers null, so the travel merge takes the raw-setting path instead of
+      // awaiting a `save` that resolves to `undefined` and reporting a merge it never made.
+      travelStore: {
+        get: () => this.gatheringRealmStore?.get?.() ?? null,
+        save: (config) => this.gatheringRealmStore?.save?.(config)
+      },
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
