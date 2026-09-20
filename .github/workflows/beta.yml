@@ -9,9 +9,11 @@ name: "Beta"
 #     object is ever created here — that omission is the privacy mechanism, so this workflow does
 #     NOT assert a GitHub release/asset. The S3 publish IS the assertion.
 #   * The version/tag come from the config's successCmd, which writes next_version/next_tag to
-#     $GITHUB_OUTPUT — but ONLY when a release is actually minted. A `main` push with no releasing
-#     commits computes "no release" and leaves both empty; the publish job is gated on next_version
-#     and skips, and the job does NOT fail.
+#     $GITHUB_OUTPUT whenever the `success` lifecycle fires — which includes the addChannel phase,
+#     where an already-released version is added to this line's channel and nothing is minted
+#     (issue 1864). The `Classify what this run minted` step is what tells the two apart, and the
+#     job's outputs come from IT; the publish job is gated on next_version and skips when this push
+#     minted nothing, and the job does NOT fail.
 #   * The tested beta tag is published to the beta channel by the reusable release-s3.yml.
 
 on:
@@ -56,8 +58,10 @@ jobs:
     permissions:
       contents: write
     outputs:
-      next_version: ${{ steps.semrel.outputs.next_version }}
-      next_tag: ${{ steps.semrel.outputs.next_tag }}
+      # The CLASSIFIER's outputs, not semrel's: they are populated only for a version this run
+      # actually minted, so publish-s3 and verify-publish read an empty value otherwise.
+      next_version: ${{ steps.minted.outputs.next_version }}
+      next_tag: ${{ steps.minted.outputs.next_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -83,18 +87,51 @@ jobs:
             git branch -f "$b" "origin/$b"
           done
 
+      - name: Snapshot the tags that exist before this run
+        # The discriminator the classifier below needs. semantic-release creates and PUSHES a
+        # genuine release's tag before its `success` lifecycle fires, so "does $next_tag exist now"
+        # is true whether or not this run minted it. Runs after the step above, which is what
+        # fetched the tags, and before semantic-release, which is what adds one.
+        run: git tag --list > "$RUNNER_TEMP/pre-release-tags.txt"
+
       - name: Semantic Release
         id: semrel
         # GITHUB_REF_NAME/GITHUB_REF are reserved and cannot be overridden by a step `env:`; they
         # are naturally `main` here because this workflow is push-triggered on `main`, which is what
         # keeps classifyBranch on the beta line. The config's successCmd writes next_version/next_tag
-        # to this step's $GITHUB_OUTPUT, but ONLY when a release is minted (no release ⇒ both empty).
+        # to this step's $GITHUB_OUTPUT whenever the `success` lifecycle fires — including the
+        # addChannel phase, which mints nothing. The classifier below tells the two apart.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Local bin rather than `npx` per Sonar S6505/S8543 — see the note on ci.yml's commitlint
         # step. This step holds a write-scoped GITHUB_TOKEN, so an on-demand registry fetch here is
         # the worst place in the repo to leave one.
         run: ./node_modules/.bin/semantic-release
+
+      - name: Classify what this run minted
+        id: minted
+        # THE mint gate (issue 1864). A tag semantic-release reported but that already existed
+        # before this run was not minted here: its addChannel phase adds an already-released
+        # version to this line's channel, and the raw semrel outputs then name a version published
+        # by the run that really minted it. Only a tag ABSENT from the pre-run snapshot populates
+        # these outputs; publish-s3 and verify-publish skip otherwise.
+        env:
+          NEXT_VERSION: ${{ steps.semrel.outputs.next_version }}
+          NEXT_TAG: ${{ steps.semrel.outputs.next_tag }}
+        run: |
+          if [ -z "$NEXT_TAG" ]; then
+            echo "::notice::semantic-release minted nothing on this push; nothing will be published."
+            exit 0
+          fi
+          if grep -Fxq -- "$NEXT_TAG" "$RUNNER_TEMP/pre-release-tags.txt"; then
+            echo "::notice::$NEXT_TAG existed before this run — semantic-release's addChannel phase re-added an already-released version to this line's channel and minted nothing; nothing will be published."
+            exit 0
+          fi
+          {
+            echo "next_version=$NEXT_VERSION"
+            echo "next_tag=$NEXT_TAG"
+          } >> "$GITHUB_OUTPUT"
+          echo "This run minted $NEXT_TAG."
 
   publish-s3:
     needs: semantic-release
