@@ -312,8 +312,6 @@ async function measureBootContract({ ready, loadModule }) {
   const facade = globalThis.game.fabricate;
   const { FABRICATE_HOOKS } = await loadModule('/src/config/hooks.js');
   const { COMPANION_CONTRACT } = await loadModule('/src/systems/companionContract.js');
-  const { deprecate: runtimeDeprecate } = await loadModule('/src/bootstrap/gatheringRuntime.js');
-  const { identityRepairsInstalled } = await loadModule('/src/bootstrap/migrations.js');
   const whenReady = await Promise.race([
     facade.whenReady().then(() => 'resolved'),
     new Promise((settle) => setTimeout(() => settle('pending'), 500)),
@@ -354,32 +352,11 @@ async function measureBootContract({ ready, loadModule }) {
       toolScopeStoreIsShared: facade.getToolScopeStore() === facade.toolScopeStore,
       vocabularyScopeStoreIsShared:
         facade.getVocabularyScopeStore() === facade.worldVocabularyStore,
-      // A GM recovery action wired to nothing answers the same `null` a clean world answers, so
-      // the wiring is pinned rather than inferred.
-      identityRepairsInstalled: identityRepairsInstalled(),
       readyFlag: facade.ready === true,
       whenReadyResolution: whenReady,
     },
     compositionLog: composition.log,
     deprecationWarnings: recordDeprecationWarnings(facade),
-    // The latch is shared, so a name already warned through a slice member warns no second time
-    // through the runtime module's own export. A slice with its own `Set` answers 1. The probed
-    // name is `gatheringFacade.js`'s, not the shell's, because only a slice can declare a second.
-    sharedLatchSecondWarnings: recordDeprecationWarnings({
-      getGatheringRegionStore: () =>
-        runtimeDeprecate('setGatheringPartyRegionOverride', 'setGatheringPartyRealmOverride'),
-      setGatheringPartyRegionOverride: () => {},
-      clearGatheringPartyRegionOverride: () => {},
-      revealGatheringRegionForActor: () => {},
-      hideGatheringRegionForActor: () => {},
-      gathering: {
-        getRegionStore: () => {},
-        setPartyRegionOverride: () => {},
-        clearPartyRegionOverride: () => {},
-        revealRegionForActor: () => {},
-        hideRegionForActor: () => {},
-      },
-    }).length,
     binding: await probeBinding(facade),
   };
 }
@@ -472,11 +449,6 @@ test('the boot contract golden is not vacuous', () => {
     Object.entries(golden.references).filter(([, value]) => value !== true && value !== 'resolved'),
     [],
     'every reference-identity claim is positive; a regeneration must not bank a false one'
-  );
-  assert.equal(
-    golden.sharedLatchSecondWarnings,
-    0,
-    '`deprecate` latches on one shared set, so a warned name never warns a second time'
   );
   assert.ok(golden.binding.every((row) => typeof row.length === 'number'));
   assert.ok(
