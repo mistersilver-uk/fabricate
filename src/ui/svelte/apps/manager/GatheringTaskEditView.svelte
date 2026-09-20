@@ -1277,9 +1277,12 @@
                   class="manager-task-stamina-modifier-row"
                   data-gathering-stamina-modifier={ref.id}
                 >
-                  <!-- Both keep their own `aria-label`: the row renders no caption at all. -->
+                  <!-- Both keep their own `aria-label`: the row renders no caption at all, and
+                       each label string is also how the mounted suites address these two
+                       triggers, which carry no data hook (issue 1510). -->
                   <Select
                     size="inline"
+                    minWidth={200}
                     value={ref.modifierId}
                     options={modifierSelectOptions}
                     ariaLabel={text(

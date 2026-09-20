@@ -10916,6 +10916,14 @@
   width: 100%;
 }
 
+/* The stamina modifier row's two pickers fill their own grid cells instead: the row is a `minmax(0, 1fr) 56px` grid whose cells the native selects filled, and a hugging trigger would leave the 1fr cell part-empty and re-measure as the GM picks a longer modifier name (issue 1510). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  .manager-task-stamina-modifier-row
+  .fabricate-select-trigger {
+  width: 100%;
+}
+
 .fabricate-manager .manager-gathering-task-edit-view textarea {
   min-height: 54px;
   padding: var(--fab-space-2) var(--fab-space-2);
