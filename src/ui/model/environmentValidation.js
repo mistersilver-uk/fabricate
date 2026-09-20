@@ -1,7 +1,6 @@
 /**
  * The environment editor's pure validation layer: the empty projection, the save-rejection report
- * the editor renders inline, and the per-field draft normalizers. No Foundry global, no store and
- * no closure read — every input arrives as an argument (issue 1708).
+ * the editor renders inline, and the per-field draft normalizers (issue 1708).
  */
 
 export function emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {

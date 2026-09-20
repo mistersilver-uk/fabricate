@@ -1,7 +1,6 @@
 /**
  * The GM Knowledge surface (issue 785), a section of `createAdminStore` (issue 1708). It owns its
- * own snapshot cache and publishes out of band, because `refresh()` is invoked by about forty
- * mutation paths and a whole-world `actors x items` scan has no cheap invalidation signature.
+ * snapshot cache and publishes out of band: a whole-world scan must never join `refresh()`.
  */
 import { get } from 'svelte/store';
 
@@ -23,7 +22,7 @@ export function createKnowledgeSection({
   let knowledgeSnapshot = null;
   let knowledgeSelectedActorId = '';
   let knowledgeRefreshScheduled = false;
-  // Resolved ONCE per surface entry from the DEFINITION count, never as a live derivation: a GM
+  // Resolved once per surface entry from the definition count, never as a live derivation: a GM
   // authoring the first recipe item elsewhere would flip 0 -> 1 and yank the open tab mid-task.
   let knowledgeDefaultTab = defaultKnowledgeTab(0);
   let knowledgeDefaultTabResolved = false;
@@ -40,9 +39,9 @@ export function createKnowledgeSection({
     return copies.find((copy) => String(copy?.itemId) === String(itemId)) || null;
   }
 
-  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key is a STATIC
-  // literal at its call site, because an interpolated key is invisible to both
-  // `ui-lang-keys-resolve` and `lang-keys-no-orphans` and a missing message would ship silently.
+  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key is a static
+  // literal at its call site: an interpolated key is invisible to `ui-lang-keys-resolve` and
+  // `lang-keys-no-orphans`, so a missing message would ship silently.
   function knowledgeText(key, fallback, data = null) {
     const localized = data ? services.localize?.(key, data) : services.localize?.(key);
     if (localized) return localized;
@@ -201,7 +200,7 @@ export function createKnowledgeSection({
     });
   }
 
-  /** Reset this character's learned knowledge for the SELECTED system. */
+  /** Reset this character's learned knowledge for the selected system. */
   async function resetActorSystemKnowledge(actorId) {
     const confirmed = await confirmKnowledgeReset(
       'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',

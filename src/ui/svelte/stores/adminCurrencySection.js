@@ -1,7 +1,6 @@
 /**
- * The WORLD currency ladder (issue 1278), a section of `createAdminStore` (issue 1708). It owns no
- * writable: every read and write goes through the injected `CurrencyConfigStore`, which is why the
- * publish projection re-reads the config each time rather than caching it per system.
+ * The world currency ladder (issue 1278), a section of `createAdminStore` (issue 1708). It owns no
+ * writable: every read and write goes through the injected `CurrencyConfigStore`.
  */
 import {
   getCurrencyPresetsForFoundrySystem,
@@ -68,9 +67,8 @@ function deleteSubUnitFromList(units, parentUnitId, subUnitId) {
   return { nextUnits, changed };
 }
 
-// The WORLD currency projection (issue 1278). A top-level sibling, never hung off
-// `selectedSystem`: the config is world scope, and hanging it there would make the same ladder
-// appear to change when the GM merely clicks a different crafting system.
+// The world currency projection (issue 1278): a top-level sibling of `selectedSystem`, never a
+// key inside it, because the config is world scope and a system change must not appear to move it.
 export function emptyWorldCurrencyState() {
   return {
     worldCurrency: {
@@ -83,9 +81,9 @@ export function emptyWorldCurrencyState() {
   };
 }
 
-// The derived `validateCurrencyProfile` report for the world ladder (issue 1493), a top-level
-// sibling of `worldCurrency` rather than a fifth key inside it, since `CurrencyConfig` is exactly
-// those four keys. Only `valid` and `errors` are published; no surface reads the rest.
+// The derived `validateCurrencyProfile` report for the world ladder (issue 1493), published as a
+// sibling of `worldCurrency` because `CurrencyConfig` is exactly its own four keys. Only `valid`
+// and `errors` are published.
 function emptyWorldCurrencyValidation() {
   return { valid: true, errors: [] };
 }
@@ -109,8 +107,8 @@ export function createCurrencySection({ services, randomID, refresh }) {
     const store = services.getCurrencyConfigStore?.();
     if (!store) return emptyWorldCurrencyState();
     const worldCurrency = normalizeWorldCurrencyConfig(store.get(), { randomID });
-    // Validated on every publish, off the SAME normalized config the editor renders, so the
-    // report can never describe a ladder the GM is not looking at. Pure in-memory work.
+    // Validated on every publish, off the same normalized config the editor renders, so the
+    // report can never describe a ladder the GM is not looking at.
     return { worldCurrency, worldCurrencyValidation: buildWorldCurrencyValidation(worldCurrency) };
   }
 

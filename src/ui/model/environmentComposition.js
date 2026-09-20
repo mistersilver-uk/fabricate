@@ -1,7 +1,7 @@
 /**
  * The environment composition projection: which library tasks and events an environment composes,
- * why, and what each row's drop-rate adjustment comes to. Pure — every collaborator arrives as an
- * argument, so the gathering library's confirms read it without reaching into a store (issue 1708).
+ * why, and each row's drop-rate adjustment. Every collaborator arrives as an argument, so the
+ * gathering library's confirms read it without reaching into a store (issue 1708).
  */
 import {
   DEFAULT_GATHERING_CONDITIONS,
@@ -155,7 +155,7 @@ export function classifyCompositionRecords({
       compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
     else compositionState = 'includedByMatch';
 
-    // A record is runtime-available only when its composition state would compose it AND current
+    // A record is runtime-available only when its composition state would compose it and current
     // weather/time satisfy its required conditions. `composed` projects `environmentComposesRecord`
     // onto the shared four-state vocabulary in `gatheringComposition.js`.
     const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
@@ -322,8 +322,7 @@ function requiredToolCount(tasks) {
   for (const row of tasks) {
     if (row.runtimeState !== 'available') continue;
     for (const toolId of Array.isArray(row.record?.toolIds) ? row.record.toolIds : []) {
-      // Trim before counting, matching the helper this replaced: an untrimmed pair would count
-      // ' pick ' and 'pick' as two distinct required tools.
+      // Trimmed before counting: an untrimmed pair would count ' pick ' and 'pick' as two tools.
       const trimmed = String(toolId ?? '').trim();
       if (trimmed) toolIds.add(trimmed);
     }
@@ -336,9 +335,8 @@ function compositionCounts(tasks, events) {
     const available = records.filter((r) => r.runtimeState === 'available').length;
     const excluded = records.filter((r) => r.compositionState === 'excluded').length;
     const candidate = records.filter((r) => r.compositionState === 'candidate').length;
-    // `includedNotMatching` composes (ruling 2), so this counts records that ARE runtime available
-    // whenever conditions are met. The field was `unavailable*` behind a fact labelled "Included but
-    // unavailable" — inverted against its own label — so producer, consumers and label were renamed.
+    // `includedNotMatching` composes (ruling 2, issue 1315), so these records are runtime
+    // available whenever conditions are met.
     const includedNotMatching = records.filter(
       (r) => r.compositionState === 'includedNotMatching'
     ).length;

@@ -1,7 +1,6 @@
 /**
  * The eight environment writes (issue 1708): every action that persists through the gathering
- * environment store. It owns no state — the draft section's writables and its two state helpers
- * arrive as a bag, so the two halves of one section present one API.
+ * environment store. It owns no state; the draft section's writables arrive as a bag.
  */
 import { get } from 'svelte/store';
 
@@ -168,9 +167,8 @@ export function createEnvironmentWriteActions({
     const targetEnvironment =
       currentEnvironments.find((environment) => environment.id === targetId) ||
       get(environmentDraft);
-    // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
-    // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which is
-    // HTML.
+    // The name is raw in the title, which ApplicationV2 assigns through `innerText`, and escaped
+    // in the content, which is HTML.
     const environmentName = String(targetEnvironment?.name || targetId);
     const escapedEnvironmentName = escapeHtml(environmentName);
     const confirmed = await services.confirmDialog?.({

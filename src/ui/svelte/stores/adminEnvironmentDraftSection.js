@@ -1,8 +1,7 @@
 /**
- * The gathering environment editor's draft (issue 1708): the eleven closure variables it owns, the
- * out-of-band publish, the `refresh()` projection, and the discard guard four navigation paths
- * call into. The persisting actions live in `adminEnvironmentWriteActions.js` and are composed in
- * here, so the store sees one section presenting one API.
+ * The gathering environment editor's draft (issue 1708): its eleven closure variables, the
+ * out-of-band publish, the `refresh()` projection and the guard four navigation paths call into.
+ * It composes `adminEnvironmentWriteActions.js`, so the store sees one section and one API.
  */
 import { get, writable } from 'svelte/store';
 

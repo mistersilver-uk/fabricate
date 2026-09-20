@@ -1,8 +1,6 @@
 /**
  * The Tool rules editor's draft (issue 1373), a section of `createAdminStore` (issue 1708). It owns
- * the nine draft writables and publishes out of band, so it contributes no `buildState` to
- * `refresh()`. The read union it seeds from and the record it saves are deliberately different:
- * `toolRecordForSave` restores every inheriting section from the live in-system record.
+ * the nine draft writables and publishes out of band, so it adds no `buildState` to `refresh()`.
  */
 import { get, writable } from 'svelte/store';
 
@@ -37,8 +35,8 @@ export function createToolDraftSection({
     const draft = get(toolDraft);
     const baseline = get(toolDraftBaseline);
     const systemId = get(toolDraftSystemId);
-    // THE UNION, because this is a display projection and the draft it overlays is one too (issue
-    // 1373). A raw-array library beneath a union-seeded draft would be two answers to one question.
+    // The read union, because this is a display projection and the draft it overlays is one too
+    // (issue 1373): a raw-array library beneath a union-seeded draft would answer one question twice.
     const library = systemId ? resolvedSystemTools(systemId) : [];
     const overlay = (entries, entry) => {
       if (!entry) return entries.map(clonePlain);
@@ -251,8 +249,8 @@ export function createToolDraftSection({
     patchToolsDraftViewState();
     try {
       const itemUuid = get(toolDraftSourceItemUuid);
-      // SECTION-AWARE: `toolRecordForSave` restores every INHERITING section from the live in-system
-      // record, so a draft seeded from the read union cannot write the world's answer as an override.
+      // Section-aware: `toolRecordForSave` restores every inheriting section from the live
+      // in-system record, so a union-seeded draft cannot write the world's answer as an override.
       const result = await systemManager.upsertTool(
         systemId,
         toolRecordForSave(systemId, draft),
@@ -260,8 +258,8 @@ export function createToolDraftSection({
       );
       if (!result?.item) throw new Error('Tool save returned no item');
       const persisted = normalizeGatheringLibraryTool(result.item, randomID);
-      // AND THE EDITOR GOES BACK TO THE UNION, not to the record the manager just wrote: an
-      // inheriting section's persisted value is deliberately NOT what this screen shows.
+      // The editor goes back to the union, not to the record the manager just wrote: an
+      // inheriting section's persisted value is deliberately not what this screen shows.
       const saved =
         resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(persisted.id)) ||
         persisted;
@@ -352,9 +350,8 @@ export function createToolDraftSection({
             baseline ? { ...baseline, ...written } : baseline
           );
         } else {
-          // THE UNION, NOT THE RECORD THE MANAGER HANDED BACK (issue 1373). `saved` is the raw in-system
-          // record, so re-seeding a clean draft from it would put every inheriting section back onto the
-          // value this screen exists not to show.
+          // The union, not the record the manager handed back (issue 1373): `saved` is the raw
+          // in-system record, and re-seeding a clean draft from it would restore the inherited value.
           const resolved =
             resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(saved.id)) ||
             saved;
@@ -396,7 +393,7 @@ export function createToolDraftSection({
     const target = String(toolId || '').trim();
     const system = String(systemId || '').trim();
     if (!target || !system || typeof inherit !== 'boolean') return false;
-    // READ BEFORE THE WRITE. Once the switch says overriding, the union answers this section from
+    // Read before the write: once the switch says overriding, the union answers this section from
     // the in-system record, so the world value the GM was looking at is no longer reachable here.
     const shown = inherit
       ? undefined
@@ -533,7 +530,7 @@ export function createToolDraftSection({
 
   /**
    * The record a save actually persists: the draft, with every inheriting section restored from the
-   * live in-system record. The save reads the SWITCH, not the draft, because persisting the draft
+   * live in-system record. The save reads the switch, not the draft, because persisting the draft
    * whole would freeze one moment's world default onto this system with nothing going red.
    * `ui-integration` `### Tools Tab` states it (issue 1373).
    */
