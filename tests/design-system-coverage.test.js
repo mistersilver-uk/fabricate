@@ -915,7 +915,7 @@ test('every class-family rule count the manifest asserts is re-derived from the 
 });
 
 test('every call-site override count the manifest asserts is re-derived from the stylesheet', () => {
-  // The family count beside it reads DIGITS, so the override half was spelled out and therefore
+  // The family count beside it reads as digits, so the override half was spelled out and therefore
   // gated by nothing for five commits of the select conversion while every commit moved it. A
   // caller override is a family rule on the trigger qualified by a class outside the `fabricate-`
   // namespace: every application root and every family class carries that prefix, so a non-prefixed
