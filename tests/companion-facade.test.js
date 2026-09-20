@@ -31,6 +31,16 @@ import {
   POOLED_HOLDINGS_READ_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
 import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => FABRICATE_ENTRY_SOURCES[file])
+  .join('\n');
+
 
 import {
   assertContractResult,
@@ -1645,7 +1655,7 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('publishes COMPANION beside HOOKS, and publishes no grant symbol anywhere else', () => {
-    const source = readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8');
+    const source = FABRICATE_ENTRY_SOURCE;
     assert.ok(
       source.includes('HOOKS: FABRICATE_HOOKS,') &&
         source.includes('COMPANION: COMPANION_CONTRACT'),

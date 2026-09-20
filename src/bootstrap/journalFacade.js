@@ -1,7 +1,6 @@
 /**
- * The journal half of the `game.fabricate` facade: the run-command edge, the world-time reads the
- * journal renders against, and the journal listing projector. Method shorthand, for the reason
- * `./gatheringFacade.js` states.
+ * The journal half of the `game.fabricate` facade: the run-command edge, the world-time reads and
+ * the listing projector. Method shorthand, for the reason `./gatheringFacade.js` states.
  */
 
 import {

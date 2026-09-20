@@ -1,7 +1,7 @@
 /**
- * The gathering half of the `game.fabricate` facade, installed on `Fabricate.prototype` by
- * `./Fabricate.js`. Method shorthand and never arrows: every member runs with `this` bound to the
- * singleton, and an arrow would also lose the shape `tests/facade-delegation-arity.test.js` scans.
+ * The gathering half of the `game.fabricate` facade, installed on `Fabricate.prototype`. Method
+ * shorthand and never arrows: a member runs with `this` bound to the singleton, and an arrow would
+ * lose both that and the shape `tests/facade-delegation-arity.test.js` scans for.
  */
 
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';

@@ -1031,7 +1031,7 @@ test('1286: a delivery dropped because the actor is not permission-testable is R
 
 test('the delivery writer is composed with the Foundry edges and a non-Math.random mint', () => {
   assert.ok(
-    mainSource.includes('this.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
+    mainSource.includes('fabricate.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
     'the acting-client writer should be composed during bootstrap'
   );
   assert.ok(
@@ -1052,13 +1052,13 @@ test('1286: the delivery writer is INJECTED into both engines that fire complica
   // at the bootstrap site. Both engines are asserted, because only one of them is obvious.
   assert.ok(
     mainSource.includes(
-      'this.craftingEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter })'
+      'fabricate.craftingEngine?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
     ),
     'the crafting engine (immediate craft, timed craft FINISH and salvage) takes the writer'
   );
   assert.ok(
     mainSource.includes(
-      'gatheringEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter })'
+      'getGatheringEngine()?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
     ),
     'and so does the gathering engine'
   );

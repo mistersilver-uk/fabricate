@@ -1,8 +1,7 @@
 /**
- * Every Foundry hook the module entry registers, and the bodies they run. `init`,
- * `getCompendiumContextOptions` and `getSceneControlButtons` stay at MODULE scope because Foundry
- * builds those surfaces once, before `ready`; a `ready`-time registration loses first paint.
- * `io` carries what `src/main.js` retains, so nothing here imports the module entry.
+ * Every Foundry hook the entry registers. `init`, `getCompendiumContextOptions` and
+ * `getSceneControlButtons` stay at MODULE scope: Foundry builds those surfaces once, before
+ * `ready`, so a `ready`-time registration loses first paint. `io` carries what the entry retains.
  */
 
 import { InteractableManager } from '../canvas/InteractableManager.js';

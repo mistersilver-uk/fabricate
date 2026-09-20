@@ -5,13 +5,23 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { findCuratedIconRecord, listCuratedIconVocabulary } from '../src/utils/iconVocabulary.js';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => FABRICATE_ENTRY_SOURCES[file])
+  .join('\n');
+
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
   FOUNDRY_ICON_DEFINITIONS
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 const apiDocs = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
 
 describe('the published icon vocabulary (issue 1269)', () => {
@@ -161,9 +171,9 @@ describe('the icon vocabulary accessors on game.fabricate (issue 1269)', () => {
     );
     assert.ok(
       mainSource.includes(
-        "import { findCuratedIconRecord, listCuratedIconVocabulary } from './utils/iconVocabulary.js';"
+        "import { findCuratedIconRecord, listCuratedIconVocabulary } from '../utils/iconVocabulary.js';"
       ),
-      'main.js should take both projections from the shared module rather than re-implementing them'
+      'the facade should take both projections from the shared module rather than re-implementing them'
     );
   });
 

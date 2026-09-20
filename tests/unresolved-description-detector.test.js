@@ -215,7 +215,7 @@ const mainSource = [
 test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () => {
   assert.match(
     mainSource,
-    /new CraftingSystemManager\(\s*this\.recipeManager\s*,\s*\{/,
+    /new CraftingSystemManager\(\s*fabricate\.recipeManager\s*,\s*\{/,
     'the manager must be constructed WITH seams — the bare one-argument form silently ' +
       'reverts issue 800 in production, because both seams default to pass-throughs'
   );
@@ -223,7 +223,7 @@ test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () 
   assert.match(mainSource, /primeEnricherCache:\s*\(rawTexts\) => primeEnricherCache\(rawTexts\)/);
   assert.match(
     mainSource,
-    /import \{[^}]*\benrichToHtml\b[^}]*\bprimeEnricherCache\b[^}]*\} from '\.\/ui\/svelte\/util\/foundryBridge\.js'/,
+    /import \{[^}]*\benrichToHtml\b[^}]*\bprimeEnricherCache\b[^}]*\} from '\.\.?\/ui\/svelte\/util\/foundryBridge\.js'/,
     'both seams must be imported from the Foundry bridge'
   );
 });

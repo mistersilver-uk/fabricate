@@ -181,7 +181,7 @@ test('main.js binds game.fabricate from BOTH init and ready via an idempotent he
 test('initialize() resolves the replay-safe readiness promise (guards drift)', () => {
   assert.match(
     mainSource,
-    /this\.ready = true;\s*\n\s*this\._resolveReady\?\.\(\);/,
+    /fabricate\.ready = true;\s*\n\s*fabricate\._resolveReady\?\.\(\);/,
     'completing startup settles the whenReady() promise'
   );
   assert.ok(

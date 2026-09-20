@@ -7,6 +7,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => FABRICATE_ENTRY_SOURCES[file])
+  .join('\n');
+
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -28,10 +38,7 @@ const { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } = aw
   '../src/systems/stepRecipeView.js'
 );
 
-const MAIN_SOURCE = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../src/main.js'),
-  'utf8'
-);
+const MAIN_SOURCE = FABRICATE_ENTRY_SOURCE;
 
 // Fixtures — a two-step forge recipe whose FIRST step is essence-funded
 

@@ -77,11 +77,11 @@ test('every public player hook is namespaced, reachable on the API, and document
 });
 
 test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
-  assertRegistryBind('managerExtensions', './ui/managerExtensions.js');
+  assertRegistryBind('managerExtensions', '../ui/managerExtensions.js');
 });
 
 test('Fabricate publishes the stable player extension API through both lifecycle binds', () => {
-  assertRegistryBind('playerExtensions', './ui/playerExtensions.js');
+  assertRegistryBind('playerExtensions', '../ui/playerExtensions.js');
 });
 
 test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
@@ -124,7 +124,7 @@ test('Fabricate routes gathering node depletion to the active GM', () => {
   assert.ok(
     mainSource.includes('createGatheringNodeDepletionWriter') &&
       mainSource.includes('routeGatheringNodeDepleteMessage') &&
-      mainSource.includes("from './systems/gatheringNodeSocket.js'"),
+      mainSource.includes("from '../systems/gatheringNodeSocket.js'"),
     'main.js should import the gathering node depletion writer and router'
   );
   assert.ok(
@@ -132,7 +132,9 @@ test('Fabricate routes gathering node depletion to the active GM', () => {
     'the inbound route should be rate limited per sender'
   );
   assert.ok(
-    mainSource.includes('depleteEnvironmentNode: (payload) => this.gatheringNodeDepletionWriter.deplete(payload)'),
+    /depleteEnvironmentNode: \(payload\) =>\s*fabricate\.gatheringNodeDepletionWriter\.deplete\(payload\)/.test(
+      mainSource
+    ),
     'the rich-state service should receive the GM-routed depletion seam'
   );
   assert.ok(
@@ -161,7 +163,7 @@ test('Fabricate wires RecipeManager to the live crafting-system manager', () => 
   // inline now route through — including `_validateSignatures`.
   assert.match(
     mainSource,
-    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*this\.currencyConfigStore,?\s*\}\)/s,
+    /fabricate\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*fabricate\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*fabricate\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*fabricate\.currencyConfigStore,?\s*\}\)/s,
     'RecipeManager production initialization should receive the live crafting-system resolver and manager'
   );
 });
@@ -170,12 +172,12 @@ test('Fabricate wires the world currency config into both currency readers', () 
   // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
   // per-system `enabled` flag with the world's ladder.
   assert.ok(
-    mainSource.includes('this.currencyConfigStore = new CurrencyConfigStore({'),
+    mainSource.includes('fabricate.currencyConfigStore = new CurrencyConfigStore({'),
     'main.js should construct the world currency config store'
   );
   assert.match(
     mainSource,
-    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*this\.currencyConfigStore/,
+    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*fabricate\.currencyConfigStore/,
     'CraftingEngine should receive the world currency config store'
   );
 });

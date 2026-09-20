@@ -5,6 +5,16 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => FABRICATE_ENTRY_SOURCES[file])
+  .join('\n');
+
 
 import {
   COMPONENT_FLAG_STAMP_TARGET,
@@ -22,7 +32,7 @@ import {
 } from '../src/systems/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+const MAIN = FABRICATE_ENTRY_SOURCE;
 
 /** The body of one named `async function` in `src/main.js`. */
 function bodyOf(name) {

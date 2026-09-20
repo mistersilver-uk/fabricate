@@ -1,7 +1,6 @@
 /**
- * The `module.fabricate` socket edge: the per-sender budgets, the elected-GM apply paths for a
- * blind gathering start and a complication delivery, and the router itself. `broadcast.emit`
- * excludes the emitting socket, so the sender applies its own effect through the same functions.
+ * The `module.fabricate` socket edge: the per-sender budgets, the elected-GM apply paths and the
+ * router. `broadcast.emit` excludes the emitter, so a sender applies its own effect through these.
  */
 
 import { InteractableManager } from '../canvas/InteractableManager.js';

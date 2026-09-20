@@ -81,7 +81,9 @@ test('openRecipeManager reports a failed load and rethrows it', () => {
   // RETHROWING: a public API member must keep returning a promise that rejects, so a macro
   // author's `await` still sees the failure after the user has been told.
   assert.ok(
-    /^[^}]*return openDeferredAppRethrowing\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/.test(apiSource),
+    /^[^}]*return openDeferredAppRethrowing\(\s*io\.showCraftingSystemManagerApp,\s*io\.reportManagerLoadFailure\s*\)/.test(
+      apiSource
+    ),
     'openRecipeManager should dispatch through the rethrowing wrapper'
   );
   assert.ok(
@@ -96,19 +98,21 @@ test('openRecipeManager reports a failed load and rethrows it', () => {
 
 test('the api export stays raw and un-notified', () => {
   const source = mainSource();
-  const apiStart = source.indexOf('game.fabricate.api = {');
-  assert.notEqual(apiStart, -1, 'main.js should expose the advanced-user api object');
+  const apiStart = source.indexOf('function buildApiClasses(io) {');
+  assert.notEqual(apiStart, -1, 'the public API should expose the advanced-user api object');
   const apiSource = source.slice(apiStart, source.indexOf('\n  };', apiStart));
 
   // DELIBERATE (issue 1565): an API consumer owns its own error handling, and the Foundry smoke
   // is one of these consumers — a failure there must surface as a named failing step rather than
   // as a notification-mirrored console error.
   assert.ok(
-    /^\s*loadCraftingSystemManagerAppClass,$/m.test(apiSource),
+    /^\s*loadCraftingSystemManagerAppClass: io\.loadCraftingSystemManagerAppClass,$/m.test(
+      apiSource
+    ),
     'the api member should be the bare loader'
   );
   assert.ok(
-    !/loadCraftingSystemManagerAppClass:/.test(apiSource),
+    !/loadCraftingSystemManagerAppClass: \(\)/.test(apiSource),
     'not a wrapped or notifying variant'
   );
 });

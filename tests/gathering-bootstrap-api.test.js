@@ -20,15 +20,10 @@ const toolRuntimePath = resolve(__dirname, '../src/gatheringToolRuntime.js');
 const adaptersPath = resolve(__dirname, '../src/gatheringBootstrapAdapters.js');
 // The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
 const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const mainSource = [
-  'src/main.js',
-  'src/bootstrap/gatheringFacade.js',
-  'src/bootstrap/gatheringRuntime.js',
-  'src/bootstrap/hooks.js',
-  'src/bootstrap/Fabricate.js',
-  'src/bootstrap/composeServices.js',
-]
-  .map((file) => entrySources[file] ?? '')
+const mainSource = Object.keys(entrySources)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => entrySources[file])
   .join('\n');
 const toolRuntimeSource = readFileSync(toolRuntimePath, 'utf8');
 const adaptersSource = readFileSync(adaptersPath, 'utf8');
@@ -248,20 +243,20 @@ test('expression adapter accepts evaluator payload shape and uses actor roll dat
 
 test('bootstrap constructs gathering collaborators after systems load with explicit seams', () => {
   assert.ok(
-    mainSource.indexOf('await this.craftingSystemManager.initialize();') <
-      mainSource.indexOf('this.gatheringEnvironmentStore = new GatheringEnvironmentStore'),
+    mainSource.indexOf('await fabricate.craftingSystemManager.initialize();') <
+      mainSource.indexOf('fabricate.gatheringEnvironmentStore = new GatheringEnvironmentStore'),
     'environment store should be created after systems initialize'
   );
   assert.ok(
-    mainSource.includes('this.gatheringEnvironmentStore.load();'),
+    mainSource.includes('fabricate.gatheringEnvironmentStore.load();'),
     'environment store should load persisted environments during bootstrap'
   );
 
   for (const expected of [
-    'environmentStore: this.gatheringEnvironmentStore',
-    'runManager: this.gatheringRunManager',
-    'evaluator: this.gatheringGateAndCheckEvaluator',
-    'systemManager: this.craftingSystemManager',
+    'environmentStore: fabricate.gatheringEnvironmentStore',
+    'runManager: fabricate.gatheringRunManager',
+    'evaluator: fabricate.gatheringGateAndCheckEvaluator',
+    'systemManager: fabricate.craftingSystemManager',
     'getSelectableActors: getGatheringSelectableActors',
     'isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer)',
     'sceneAccess: createGatheringSceneAccess({',
@@ -269,7 +264,7 @@ test('bootstrap constructs gathering collaborators after systems load with expli
     'getCurrentScene: (viewer) => resolveViewerScene({',
     'currentUser: game.user,',
     'return senseTravelMarkerRegions({ actor });',
-    'resultCreator: createGatheringResultCreator(this.craftingSystemManager)',
+    'resultCreator: createGatheringResultCreator(fabricate.craftingSystemManager)',
     'failureFeedback: createGatheringFailureFeedback()',
     'getRunViewer: getGatheringRunViewer',
     'localize: localizeGathering'
@@ -278,9 +273,9 @@ test('bootstrap constructs gathering collaborators after systems load with expli
   }
 
   for (const expected of [
-    'removeRunsForSystem: (systemId) => this.gatheringRunManager.removeRunsForSystem(systemId)',
-    'removeRunsForEnvironment: (environmentId) => this.gatheringRunManager.removeRunsForEnvironment(environmentId)',
-    'removeRunsForTask: (taskId, options) => this.gatheringRunManager.removeRunsForTask(taskId, options)'
+    'removeRunsForSystem: (systemId) =>\n        fabricate.gatheringRunManager.removeRunsForSystem(systemId)',
+    'removeRunsForEnvironment: (environmentId) =>\n        fabricate.gatheringRunManager.removeRunsForEnvironment(environmentId)',
+    'removeRunsForTask: (taskId, options) =>\n        fabricate.gatheringRunManager.removeRunsForTask(taskId, options)'
   ]) {
     assert.ok(mainSource.includes(expected), `environment cleanup should wire ${expected}`);
   }
@@ -319,7 +314,7 @@ test('world-time hooks dispatch gathering without coupling failures to existing 
   // composition root is its only writer, so no facade member can hand the engine out.
   assert.match(
     mainSource,
-    /(?=[\s\S]*let gatheringEngine = null;)(?=[\s\S]*setGatheringEngine\(new GatheringEngine\()/,
+    /(?=[\s\S]*let gatheringEngine = null;)(?=[\s\S]*setGatheringEngine\(\s*new GatheringEngine\()/,
     'GatheringEngine should remain module-private while still receiving timed completion calls'
   );
   assert.match(

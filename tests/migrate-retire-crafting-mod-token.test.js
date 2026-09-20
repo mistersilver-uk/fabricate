@@ -11,6 +11,16 @@ import { fileURLToPath } from 'node:url';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => FABRICATE_ENTRY_SOURCES[file])
+  .join('\n');
+
 import {
   applyRetireCraftingModToken,
   buildRetiredCraftingModNotice,
@@ -550,10 +560,7 @@ test('runner: a malformed transient report is coerced rather than passed to a no
 // Foundry side effects and a `.css` asset import), so this repo's established pattern for covering
 // it is a source-text guard.
 
-const MAIN_SOURCE = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../src/main.js'),
-  'utf8'
-);
+const MAIN_SOURCE = FABRICATE_ENTRY_SOURCE;
 
 test('main.js reads the counts off the runner SUMMARY, not off the data payload', () => {
   assert.ok(

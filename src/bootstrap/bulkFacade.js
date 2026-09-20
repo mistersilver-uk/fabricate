@@ -1,7 +1,6 @@
 /**
- * The bulk salvage and destroy half of the `game.fabricate` facade. `salvageComponents` and
- * `destroyComponents` are the only supported entry points, because the per-target ownership gate
- * is here. Method shorthand, for the reason `./gatheringFacade.js` states.
+ * The bulk half of the `game.fabricate` facade. `salvageComponents` and `destroyComponents` are the
+ * only supported entry points, the per-target ownership gate being here. Method shorthand.
  */
 
 import { applyBulkChatVisibility } from '../systems/bulkChatVisibility.js';

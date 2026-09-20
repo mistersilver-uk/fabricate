@@ -656,7 +656,7 @@ describe('src/main.js construction order', () => {
    */
   const at = (needle) => {
     const index = MAIN_SOURCE.indexOf(needle);
-    assert.notEqual(index, -1, `src/main.js no longer contains \`${needle}\``);
+    assert.notEqual(index, -1, `the module entry and src/bootstrap/ no longer contain \`${needle}\``);
     return index;
   };
 
@@ -670,14 +670,14 @@ describe('src/main.js construction order', () => {
     'worldVocabularyStore',
   ]) {
     it(`constructs and loads ${store} after settings and migrations, before both managers`, () => {
-      const construction = at(`this.${store} = create`);
-      const load = at(`this.${store}.load();`);
-      assert.ok(at('this.registerSettings();') < construction, 'settings must be registered first');
-      assert.ok(at('await this._runMigrations();') < construction, 'migrations run before stores');
+      const construction = at(`fabricate.${store} = create`);
+      const load = at(`fabricate.${store}.load();`);
+      assert.ok(at('fabricate.registerSettings();') < construction, 'settings must be registered first');
+      assert.ok(at('await fabricate._runMigrations();') < construction, 'migrations run before stores');
       assert.ok(construction < load, 'constructed, then loaded');
-      assert.ok(load < at('this.recipeManager = new RecipeManager('), 'before the recipe manager');
+      assert.ok(load < at('fabricate.recipeManager = new RecipeManager('), 'before the recipe manager');
       assert.ok(
-        load < at('this.craftingSystemManager = new CraftingSystemManager('),
+        load < at('fabricate.craftingSystemManager = new CraftingSystemManager('),
         'and before the crafting system manager, which derives its basis from these stores'
       );
     });
@@ -723,12 +723,12 @@ describe('src/main.js construction order', () => {
 
   it('runs the world identity drift audit after the three loads and before either manager', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    assert.ok(at('this.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
+    assert.ok(at('fabricate.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
     assert.ok(
-      audit < at('this.recipeManager = new RecipeManager('),
+      audit < at('fabricate.recipeManager = new RecipeManager('),
       'and before the recipe manager, which is the first thing that can read the union'
     );
-    assert.ok(audit < at('this.craftingSystemManager = new CraftingSystemManager('));
+    assert.ok(audit < at('fabricate.craftingSystemManager = new CraftingSystemManager('));
   });
 
   it('gates the audit on the ACTIVE GM, not on isGM', () => {
@@ -756,8 +756,8 @@ describe('src/main.js construction order', () => {
   it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     assert.ok(
-      audit < at('  async _runMigrations() {'),
-      'the audit is inside initialize(), which is declared before _runMigrations()'
+      audit < at('export async function runMigrations(fabricate) {'),
+      'the audit is in the composition root, not in the migration pass'
     );
     const line = MAIN_SOURCE.slice(MAIN_SOURCE.lastIndexOf('\n', audit) + 1, audit);
     assert.equal(

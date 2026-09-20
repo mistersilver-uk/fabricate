@@ -1,7 +1,6 @@
 /**
- * The gathering runtime edge: the module-scope `GatheringEngine` holder the composition root
- * writes and the journal, socket and facade modules read, the actor-selection predicates, and the
- * macro, tool-breakage, failure-feedback and localization seams the engine is constructed with.
+ * The gathering runtime edge: the `GatheringEngine` holder the composition root writes and four
+ * modules read, the actor-selection predicates, and the seams the engine is constructed with.
  */
 
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';

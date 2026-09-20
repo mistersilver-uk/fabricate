@@ -1,7 +1,6 @@
 /**
- * The Journal run-command authority edge: the source-actor resolution and ownership rules the
- * authority authorizes against, the crafting operation table it dispatches, and the service the
- * composition root hangs on the facade. The pure halves live in `src/systems/journalRunCommands.js`.
+ * The Journal run-command authority edge: source-actor resolution, the crafting operation table and
+ * the service the composition root hangs on the facade. The pure halves are in `src/systems/`.
  */
 
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';

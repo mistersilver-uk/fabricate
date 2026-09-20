@@ -1,6 +1,5 @@
 /**
- * The companion-contract half of the `game.fabricate` facade: the GM-gated knowledge, currency,
- * check-roll, component-award and pooled-holdings members, with the refusal-string pairs each
+ * The companion-contract half of the `game.fabricate` facade, with the refusal-string pairs each
  * gate reports in its own words. Method shorthand, for the reason `./gatheringFacade.js` states.
  */
 

@@ -12,6 +12,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
+  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
+  .sort()
+  .map((file) => FABRICATE_ENTRY_SOURCES[file])
+  .join('\n');
+
 
 const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
 const { prepareForImport } = await import('../src/systems/CraftingSystemExporter.js');
@@ -20,7 +30,7 @@ const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } =
   await import('./helpers/fullAuthoringFixture.js');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 // A thin delegating environment store that resolves its target lazily, reproducing
 // the exact seam `src/main.js` passes when the real store does not exist yet.
@@ -183,7 +193,7 @@ test('#699 keep-mode API-path round-trip preserves the gathering authoring bundl
 });
 
 test('source contract: src/main.js builds the shared CompendiumImporter with the gathering seams', () => {
-  const marker = 'this.compendiumImporter = new CompendiumImporter(';
+  const marker = 'fabricate.compendiumImporter = new CompendiumImporter(';
   const start = mainSource.indexOf(marker);
   assert.ok(start >= 0, 'located the shared CompendiumImporter construction in src/main.js');
   const closure = mainSource.slice(
@@ -197,14 +207,14 @@ test('source contract: src/main.js builds the shared CompendiumImporter with the
   // does NOT match and fails here.
   assert.match(
     closure,
-    /new CompendiumImporter\(\s*this\.craftingSystemManager,\s*this\.recipeManager,\s*\{/,
+    /new CompendiumImporter\(\s*fabricate\.craftingSystemManager,\s*fabricate\.recipeManager,\s*\{/,
     'the shared importer must be constructed with a seams object'
   );
 
   // Lazy resolution of the environment store (constructed AFTER the importer).
   assert.ok(
-    closure.includes('this.gatheringEnvironmentStore?.list'),
-    'environmentStore seam must resolve this.gatheringEnvironmentStore lazily'
+    closure.includes('fabricate.gatheringEnvironmentStore?.list'),
+    'environmentStore seam must resolve the field lazily'
   );
   assert.match(closure, /environmentStore:/, 'wires the environmentStore seam');
 
