@@ -200,6 +200,10 @@ export class GatheringRealmStore extends SettingsBackedStore {
    * removes it, and returns the deleted realm plus referenced-by repair evidence so the GM
    * confirm copy can warn about what the removal changes.
    *
+   * `repaired.environments` is DIAGNOSTIC-ONLY: the count of environments this delete rewrote,
+   * for logs and tests. No UI consumes it — the GM is told what the delete will do by the
+   * pre-delete confirm, and the travel section reports only errors.
+   *
    * @param {string} realmId
    * @param {{ environmentStore?: object, partyStore?: object }} [collaborators]
    * @returns {Promise<{ deleted: object|null, referencedBy: { environments: object[], partyOverrides: object[] }, repaired: { environments: number } }>}
