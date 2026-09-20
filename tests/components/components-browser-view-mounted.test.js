@@ -273,27 +273,6 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
 // DISTINCT operations and these cases keep them distinct, because conflating them is the
 // defect: a collapsed group's rows are not rendered, so the page control must never reach
 // them while the results link must.
-// Issue 1716 — the component half of the manager's crafting-system switch contract, as the shared
-// parameterised run in `browserListStateCases.js`.
-describeBrowserListState({
-  label: 'ComponentsBrowserView',
-  harness: browser,
-  props: ({ rowCount, selectedSystemId, browserState }) => ({
-    itemCards: manyGeneral(rowCount),
-    categoryVocabulary: ['general'],
-    selectedSystemId,
-    browserState
-  }),
-  // Both filters name a vocabulary the new system does not share, and the page goes with them.
-  resetAxes: {
-    categoryFilter: ['alchemy', 'all'],
-    essenceFilter: ['e1', 'all'],
-    pageIndex: [1, 0]
-  },
-  // Sort and grouping are preferences, and the page size with them.
-  preservedAxes: { sortKey: 'difficulty', groupByCategory: false, pageSize: 5 }
-});
-
 describeBrowserBulkSelection({
   label: 'ComponentsBrowserView',
   prefix: 'component',
@@ -319,6 +298,25 @@ describeBrowserBulkSelection({
     count: 1,
     why: 'the row still carries exactly ONE action — a labelled `Edit rules ↗` since parity round 4'
   }
+});
+
+describeBrowserListState({
+  label: 'ComponentsBrowserView',
+  harness: browser,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    itemCards: manyGeneral(rowCount),
+    categoryVocabulary: ['general'],
+    selectedSystemId,
+    browserState
+  }),
+  // Both filters name a vocabulary the new system does not share, and the page goes with them.
+  resetAxes: {
+    categoryFilter: ['alchemy', 'all'],
+    essenceFilter: ['e1', 'all'],
+    pageIndex: [1, 0]
+  },
+  // Sort and grouping are preferences, and the page size with them.
+  preservedAxes: { sortKey: 'difficulty', groupByCategory: false, pageSize: 5 }
 });
 
 // The grouped `pageIds` branch, which the shared cases stopped reaching when this screen's group

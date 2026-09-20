@@ -1,9 +1,7 @@
 /**
  * The manager browsers' crafting-system switch contract, as one parameterised run of cases
  * (issue 1716). Six views share one sentinel over the lifted `systemId`, so the contract is
- * stated once and instantiated per view: SonarCloud's new-code duplication gate counts
- * `tests/**` and `sonar.cpd.exclusions` is inert under Automatic Analysis, so six hand-copied
- * runs are exactly the block it refuses.
+ * stated once and instantiated per view.
  *
  * The switch is driven with `harness.setProps({ selectedSystemId })` on a live mount, never a
  * remount: a remount re-initialises every component-local `$state` to the same default the
@@ -14,8 +12,6 @@
  * tracking it; the assertions read that object, which is where every reset is written.
  *
  * @typedef {object} BrowserListStateView
- * @property {string} label the view's name, for the describe block.
- * @property {object} harness a `createMountedComponentHarness` instance.
  * @property {(args: {rowCount: number, selectedSystemId: string, browserState: object}) => object}
  *   props the full mount props for a corpus of `rowCount` rows.
  * @property {Record<string, [unknown, unknown]>} resetAxes one entry per axis the view's shipped
@@ -23,7 +19,6 @@
  * @property {Record<string, unknown>} preservedAxes the axes the effect deliberately does not
  *   reset. Seeded before the mount, because a page position has to be in range for the clamp
  *   effect to leave it alone.
- * @property {boolean} [clampsPage] true for a view that adopts the page window.
  * @property {{props: Function, selector: string, typed: string, why: string}} [localDraft] a
  *   component-local draft input the switch must clear, with the props that render it.
  */

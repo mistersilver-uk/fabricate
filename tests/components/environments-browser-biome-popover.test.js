@@ -310,9 +310,8 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
   });
 });
 
-// Issue 1716 — the crafting-system switch contract for the three views this one harness compiles.
 // `EnvironmentsBrowserView` renders the two gathering browsers itself and threads their lifted
-// state straight through, so all three instantiations mount the same component.
+// state through, so all three instantiations below mount the same component.
 const SWITCH_SYSTEM = 'sys-first';
 
 /** One gathering vocabulary the biome add-form can render against. */
