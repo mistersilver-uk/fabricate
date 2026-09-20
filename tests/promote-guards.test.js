@@ -312,6 +312,15 @@ test('group order carries no meaning — the names are compared as a SET', () =>
   assert.equal(drift.drifted, false);
 });
 
+test('a repeated group name is not a second group — the set sizes, not the lengths, decide', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith({ ...ROTATED, testerGroups: ['patrons-2026', 'patrons-2026'] }),
+    publisherConfig: configWith({ ...ROTATED, testerGroups: ['patrons-2026', 'guild-artisan-2026'] }),
+  });
+  assert.equal(drift.drifted, true);
+});
+
 test('an absent channel on the publisher ref drifts against a declared one', () => {
   const drift = evaluateTesterConfigDrift({
     channel: 'early-access',

@@ -580,6 +580,18 @@ test('every job that publishes from a checked-out tag takes its configuration fr
           "reads the TAG's release.s3.config.json and a rotated tester group can never be populated"
       );
 
+      // release-s3.js's parseArgs ignores an unknown flag, so a tag predating --config would publish
+      // under its own configuration while the job believed it had passed the ref's.
+      assert.ok(
+        steps
+          .slice(checkoutIndex, publishIndex + 1)
+          .map((step) => step.run)
+          .join('\n')
+          .includes(`grep -q -- "'--config'"`),
+        `${label} never checks that the checked-out tag's release-s3.js accepts --config, so a tag ` +
+          'that predates the flag publishes under its own configuration and the job reads as correct'
+      );
+
       const captureIndex = steps.findIndex((step) => CAPTURES_CONFIG.test(step.run));
       assert.notEqual(captureIndex, -1, `${label} never captures the config from $GITHUB_SHA`);
 

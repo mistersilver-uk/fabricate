@@ -143,4 +143,13 @@ test('the guard reads the publisher ref config and extends the absent-head refus
     'the remedy must EXTEND the registry-lead refusal, not replace the reason it explains'
   );
   assert.match(flat, /drift\.remedy/);
+
+  // The diagnosis is advisory, so a malformed publisher config must not hard-fail the guard: the
+  // parse falls back to an empty declaration and says so.
+  assert.match(
+    flat,
+    /try \{ publisherConfig = JSON\.parse\(await readFile\(process\.env\.PUBLISHER_CONFIG, 'utf8'\)\); \} catch/,
+    'an unparseable publisher config would refuse the promotion outright'
+  );
+  assert.match(flat, /catch \(error\) \{ console\.log\( `::notice::/);
 });

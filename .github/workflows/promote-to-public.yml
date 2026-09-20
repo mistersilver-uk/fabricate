@@ -195,7 +195,14 @@ jobs:
           // Tester identity is deployment configuration read from THIS ref, while early-access is
           // published from `release`. DIAGNOSED, never an independent refusal: drift is why an
           // early-access head can be absent, so the remedy belongs on that refusal.
-          const publisherConfig = JSON.parse(await readFile(process.env.PUBLISHER_CONFIG, 'utf8'));
+          let publisherConfig = {};
+          try {
+            publisherConfig = JSON.parse(await readFile(process.env.PUBLISHER_CONFIG, 'utf8'));
+          } catch (error) {
+            console.log(
+              `::notice::the publisher ref's release.s3.config.json is unreadable (${error.message}); the drift check compares against an empty declaration, which reports drift.`
+            );
+          }
           const drift = evaluateTesterConfigDrift({
             channel: 'early-access',
             dispatchConfig: config,
@@ -424,6 +431,10 @@ jobs:
           # checkout below moves the tree to v$VERSION, so the capture has to precede it.
           git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
           git checkout "v$VERSION"
+          grep -q -- "'--config'" scripts/release-s3.js || {
+            echo "::error::scripts/release-s3.js at v$VERSION predates --config, so the deployment configuration captured from the workflow ref would be ignored. Promote a version whose tag carries --config support."
+            exit 1
+          }
           node scripts/release-s3.js --version "$VERSION" --channel public \
             --config "$RUNNER_TEMP/release.s3.config.json"
 

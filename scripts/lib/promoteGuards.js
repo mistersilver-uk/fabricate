@@ -112,9 +112,11 @@ export function evaluateTesterConfigDrift({
     `publishes ${channel} — declares ${describeIdentity(publisher)}`;
 
   // Group NAMES compared as sets: declaration order carries no meaning, a rename does.
+  const dispatchGroups = new Set(dispatch.groups);
+  const publisherGroups = new Set(publisher.groups);
   const sameGroups =
-    dispatch.groups.length === publisher.groups.length &&
-    dispatch.groups.every((group) => publisher.groups.includes(group));
+    dispatchGroups.size === publisherGroups.size &&
+    [...dispatchGroups].every((group) => publisherGroups.has(group));
 
   if (sameGroups && dispatch.secretEnv === publisher.secretEnv) {
     return {
