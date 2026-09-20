@@ -1386,6 +1386,8 @@ const CHECKS_STUDIO_DIR = 'src/ui/svelte/apps/manager/checks';
 const CHECKS_STUDIO_SRC = [
   ...readdirSync(CHECKS_STUDIO_DIR).map((entry) => join(CHECKS_STUDIO_DIR, entry)),
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  // The Checks rail entries and their issue badges are `ManagerSystemNav.svelte`'s (issue 1717).
+  'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
 ]
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');

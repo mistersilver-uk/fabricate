@@ -192,10 +192,10 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
       rootSource.includes('resolveActiveCraftingTab(currentView)'),
       'root should derive the active crafting tab from the shared activeCraftingTab helper'
     );
-    assert.ok(
-      rootSource.includes("aria-current={isCraftingRoute ? 'page' : undefined}"),
-      'crafting parent aria-current should track isCraftingRoute'
-    );
+    // The third claim — that the crafting parent's `aria-current` tracks `isCraftingRoute` — is
+    // RETIRED rather than re-pointed at `ManagerSystemNav.svelte` (issue 1717): the rail census in
+    // `tests/components/manager-rail-mounted.js` records `#manager-nav-crafting`'s `aria-current`
+    // by value in all four rail states, which is the behaviour this spelling stood for.
   });
 
   it('no longer redirects crafting views on the experimental toggle in normalizedActiveView (issue 745)', () => {

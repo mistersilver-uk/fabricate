@@ -117,17 +117,19 @@ describe('Travel & Realms participation toggle', () => {
 });
 
 describe('World and Travel navigation', () => {
+  // The three rail-markup claims this used to make are RETIRED rather than re-pointed at
+  // `ManagerWorldNav.svelte` (issue 1717): `#manager-world-nav-travel`, its `data-world-nav-item`
+  // and `#manager-world-nav-parties` are now recorded, attribute by attribute and in document
+  // order, by the rail census in `tests/components/manager-rail-mounted.js`, and reached by the
+  // membership loop in `tests/foundry-manager-rail-hooks.test.js`. What stays here is the half
+  // the shell still owns: the route token, and that nothing about the selected system gates it.
   it('exposes World > Travel as an ungated world route', () => {
-    assert.ok(managerRootSource.includes('id="manager-world-nav-travel"'), 'World exposes Travel');
-    assert.ok(managerRootSource.includes('data-world-nav-item="travel"'), 'the Travel entry is a World nav item');
-    assert.ok(managerRootSource.includes('id="manager-world-nav-parties"'), 'World still exposes Parties');
     assert.ok(
       managerRootSource.includes("const isWorldTravelRoute = $derived(currentView === 'world-travel')"),
       'the route is its own view token'
     );
     // Ungated: nothing about the selected system may decide whether the route exists.
     assert.equal(managerRootSource.includes('canShowSystemTravel'), false);
-    assert.equal(managerRootSource.includes('id="manager-nav-travel"'), false);
     assert.equal(managerRootSource.includes('manager-system-travel-group'), false);
   });
 
