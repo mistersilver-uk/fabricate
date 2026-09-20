@@ -209,7 +209,7 @@ function railRenderingFiles(sources) {
   return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
 }
 
-function relativeImportsOf(sources, file, text) {
+function relativeImportsOf(file, text) {
   const found = [];
   for (const match of text.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
     found.push(normalizePath(relative(ROOT, resolve(dirname(resolve(ROOT, file)), match[1]))));
@@ -219,7 +219,7 @@ function relativeImportsOf(sources, file, text) {
 
 function navDeclarationScope(sources, template) {
   const builders = [...sources].filter(([, text]) => text.includes(template));
-  // The id template and the item table can sit in DIFFERENT units (issue 1717): a rail entry
+  // The id template and the item table can sit in different units (issue 1717): a rail entry
   // component builds the id, from a table the component that renders it owns and passes in. So
   // the roots are the builders plus whatever renders one, and the scope is those and their
   // relative imports.
@@ -230,7 +230,7 @@ function navDeclarationScope(sources, template) {
     added = false;
     for (const [file, text] of sources) {
       if (roots.has(file) || !file.endsWith('.svelte')) continue;
-      if (relativeImportsOf(sources, file, text).some((resolved) => roots.has(resolved))) {
+      if (relativeImportsOf(file, text).some((resolved) => roots.has(resolved))) {
         roots.set(file, text);
         added = true;
       }
@@ -238,7 +238,7 @@ function navDeclarationScope(sources, template) {
   }
   const scope = new Map(roots);
   for (const [file, text] of [...roots]) {
-    for (const resolved of relativeImportsOf(sources, file, text)) {
+    for (const resolved of relativeImportsOf(file, text)) {
       if (sources.has(resolved)) scope.set(resolved, sources.get(resolved));
     }
   }

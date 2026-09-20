@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The rail's WORLD section: its heading row, the four world scoped-entity catalogue leaves, the
+  The rail's world section: its heading row, the four world scoped-entity catalogue leaves, the
   Parties leaf, and the Travel, Rules & Resources and Downtime groups (issue 1717).
 
   Props:
@@ -11,9 +11,11 @@
   | `downtimeNavLabelId` | `(tabId) => string` | — | forwarded to the Downtime group; the root mints it because the Downtime host stamps it too |
 
   Invariants:
-  - The four catalogue leaves render from one `{#each}` over a frozen table, and emit the DOM
-    the four authored copies did — pinned by the rail census in
-    `tests/components/manager-rail-mounted.js`.
+  - The four catalogue leaves render from one `{#each}` over a frozen table and emit the markup
+    the four authored copies did — their shape pinned by the rail census in
+    `tests/components/manager-rail-mounted.js`, and each leaf's `countKey` by
+    `tests/components/manager-world-scope-mounted.js`, whose fixture gives the four columns
+    distinct values.
 -->
 <script>
   import ManagerWorldDowntimeNavGroup from './ManagerWorldDowntimeNavGroup.svelte';
@@ -58,8 +60,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
-  // children come from whichever provider holds the surface, so this cannot name a section.
+  // One sentence for all five groups, and deliberately generic: the Downtime group's children
+  // come from whichever provider holds the surface, so this cannot name a section.
   const railGroupLockedTitle = $derived(
     text(
       'FABRICATE.Admin.Manager.Nav.LockedOpen',

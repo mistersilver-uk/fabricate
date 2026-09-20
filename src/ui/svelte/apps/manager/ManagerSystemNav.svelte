@@ -54,8 +54,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
-  // children come from whichever provider holds the surface, so this cannot name a section.
+  // One sentence for all five groups, and deliberately generic: the Downtime group's children
+  // come from whichever provider holds the surface, so this cannot name a section.
   const railGroupLockedTitle = $derived(
     text(
       'FABRICATE.Admin.Manager.Nav.LockedOpen',
@@ -68,7 +68,8 @@
   const placeholderViews = [
     {
       id: 'graph',
-      // The rail id, as a COMPLETE LITERAL rather than a `manager-nav-${view.id}` template.
+      // The rail id as a complete literal, never a `manager-nav-${view.id}` template: both
+      // harnesses target rail entries by id and an interpolated one is invisible to the gate.
       navId: 'manager-nav-graph',
       icon: 'fas fa-project-diagram',
       labelKey: 'FABRICATE.Admin.Manager.Nav.Graph',
@@ -192,9 +193,7 @@
       </div>
     {/if}
   </div>
-  <!--
-    SCREEN TITLE, NOT A DOMAIN NOUN (issue 1362).
-  -->
+  <!-- A screen title, not a domain noun (issue 1362). -->
   <button
     type="button"
     class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`}
@@ -258,11 +257,8 @@
     <span class="manager-nav-label"
       >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span
     >
-    <!-- NO ZERO BADGE (issue 1373). The rail states counts where there is something to
-         count; a `0` beside `Tool Rules` on a system that has adopted none is a badge
-         whose whole content is the absence the row already reads as, and the reference
-         draws none. Scoped to this row: the other rail counts are the other lanes' and
-         their reference frames were not read in this pass. -->
+    <!-- No zero badge on this row (issue 1373): the count renders only where there is
+         something to count. -->
     {#if toolsNavCount > 0}
       <span class="manager-nav-count">{toolsNavCount}</span>
     {/if}
@@ -278,9 +274,8 @@
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
-      <!-- The parent badge is an ISSUE COUNT, not a record count, so it wears the
-           pill treatment and names its unit. A collapsed rail still renders it —
-           that is the only signal left when the children are hidden. -->
+      <!-- An issue count, not a record count, so it wears the pill and names its unit; a
+           collapsed rail still renders it, being the only signal left. -->
       {#if checksNavCount > 0}
         <span
           class="manager-nav-issue-badge"
@@ -327,11 +322,9 @@
             <span class="manager-nav-label"
               >{text(checksItem.labelKey, checksItem.labelFallback)}</span
             >
-            <!-- THREE distinguishable markers can land in this column, and they must
-                 not be confusable: a record-count numeral (`.manager-nav-count`,
-                 which Checks never has), an ISSUE badge (a pill naming its unit),
-                 and an UNSAVED marker (a different SHAPE with its own name, not the
-                 same dot in another colour). -->
+            <!-- Three markers can land in this column and must stay distinguishable: a
+                 record count, an issue badge naming its unit, and an unsaved marker of
+                 its own shape. -->
             {#if checksItem.dirty}
               <span
                 class="manager-nav-dirty-marker"
@@ -436,13 +429,8 @@
   >
     <i class={view.icon} aria-hidden="true"></i>
     <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
-    <!-- NOT a rail marker. The Rail Marker Family is four marks and a record COUNT
-         is one of them: a bare mono numeral standing for records behind the row. "Soon"
-         is a word on a row that has no records and no route, so drawing it through the
-         count vehicle made that vehicle's own definition false wherever a reader
-         checked it. It gets `.manager-nav-planned` (issue 1515): the same quiet trailing
-         text at the same rung, in the BODY face rather than the mono one, because a
-         word has no numerals to align and this sheet ships no real mono 600. -->
+    <!-- Not a rail marker: a record count is a numeral, and "Soon" is a word on a row with
+         no records, so it takes `.manager-nav-planned` rather than the count (issue 1515). -->
     <span class="manager-nav-planned">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
   </button>
 {/each}

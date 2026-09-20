@@ -2998,7 +2998,7 @@
       worldRules: isWorldRulesRoute,
       worldDowntime: isWorldDowntimeRoute,
     }),
-    // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
+    // The whole rail locks open over a companion's Downtime surface (issue 1213).
     railLocked: () => isWorldDowntimeRoute && !downtimeCoreFallback,
   });
   $effect(() => navRail.syncLocks());

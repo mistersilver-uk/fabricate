@@ -4,7 +4,7 @@
  * source, as the root's route `$derived`s are; a plain object is read once and cached forever,
  * which would make every liveness assertion below vacuous. Two of the six mutation controls can be
  * killed only here: `expanded` dropping its lock disjunct, and `collapsedDisplay` dropping
- * `&& !railLockedOpen`. Both are asserted WITHOUT calling `syncLocks()`, which is what makes them
+ * `&& !railLockedOpen`. Both are asserted without calling `syncLocks()`, which is what makes them
  * observable at all.
  */
 import { describe, it, before, after } from 'node:test';
@@ -114,6 +114,15 @@ describe('navRailModel', () => {
     model.toggleGroup('worldTravel', event);
     flushSync();
     assert.ok(model.expanded.worldTravel, 'a locked group ignores a programmatic toggle too');
+
+    // Observed after the lock releases: while it holds, `expanded` is true either way, so the
+    // assertion above cannot tell a refused toggle from a recorded one.
+    groupLocks.set('worldTravel', false);
+    flushSync();
+    assert.ok(
+      !model.expanded.worldTravel,
+      'and the refused toggle never recorded intent behind the lock'
+    );
   });
 
   it('expands unconditionally through expandGroup and both ways through setGroupExpanded', () => {

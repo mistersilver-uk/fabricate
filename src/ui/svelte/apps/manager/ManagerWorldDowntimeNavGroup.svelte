@@ -38,8 +38,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
-  // children come from whichever provider holds the surface, so this cannot name a section.
+  // One sentence for all five groups, and deliberately generic: the Downtime group's children
+  // come from whichever provider holds the surface, so this cannot name a section.
   const railGroupLockedTitle = $derived(
     text(
       'FABRICATE.Admin.Manager.Nav.LockedOpen',
@@ -48,8 +48,8 @@
   );
   // The rail's Downtime children render the active tab set.
   const downtimeNavItems = $derived(downtimeTabs);
-  // The rail sub-item BUTTON's element id. It is the click target the mounted suite drives and
-  // the anchor the group's markup is keyed on.
+  // The sub-item button's element id: the click target the mounted suite drives, and the anchor
+  // the group's markup is keyed on.
   const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
   // The id of the sub-item's badge element (issue 1302) — the `aria-describedby` target, and
   // never a descendant of `downtimeNavLabelId`'s span, which names the companion panel region.
@@ -64,7 +64,7 @@
   const downtimeNavRollupTotal = $derived(
     downtimeCoreFallback ? 0 : navTabBadgeTotal(downtimeTabs, downtimeNavTabBadges)
   );
-  // Renders only while the children are hidden — BOTH disjuncts are load-bearing.
+  // Renders only while the children are hidden; both disjuncts are load-bearing.
   const downtimeNavRollupVisible = $derived(
     !downtimeCoreFallback &&
       downtimeNavRollupTotal > 0 &&
@@ -89,7 +89,7 @@
     const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
     return text(key, fallback).replace('{label}', label).replace('{count}', String(count));
   }
-  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213).
+  // Reveal the switcher on route entry (issue 1213).
   const downtimeNavNodes = $state({});
   let revealedDowntimeNavId = null;
   $effect(() => {
@@ -108,8 +108,8 @@
 </script>
 
 <!--
-  Downtime is a GROUP, not a leaf: the design nests the same four previews under it that
-  Core's own tab strip offers, each carrying a premium padlock.
+  Downtime is a group, not a leaf: it nests the same four previews Core's own tab strip offers,
+  each carrying a premium padlock.
 -->
 {#if worldDowntimeAvailable}
   <div
@@ -142,7 +142,7 @@
       <span class="manager-nav-label">
         {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
       </span>
-      <!-- The chip is MUTED, never removed, once a companion holds the surface (issue 1185). -->
+      <!-- The chip is muted, never removed, once a companion holds the surface (issue 1185). -->
       {#if !downtimeNavRollupVisible}
         <span
           class={`manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
@@ -191,7 +191,7 @@
         aria-label={text('FABRICATE.Admin.Manager.World.Downtime.NavSections', 'Downtime previews')}
       >
         {#each downtimeNavItems as item (item.id)}
-          <!-- `accessibleName` and `tooltip` LAND HERE in provider mode (issue 1213). -->
+          <!-- `accessibleName` and `tooltip` land here in provider mode (issue 1213). -->
           <button
             type="button"
             class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
@@ -210,7 +210,7 @@
             <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
               >{downtimeTabText(item, 'label')}</span
             >
-            <!-- IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515). -->
+            <!-- The issue-summary vehicle, never the record count (issue 1515). -->
             {#if !downtimeCoreFallback}
               {@const badge = downtimeSubitemBadge(item)}
               {#if badge}
@@ -223,10 +223,8 @@
                 >
               {/if}
             {/if}
-            <!--
-              The padlock and the premium note below advertise CORE'S preview. A companion
-              owning the surface has nothing locked, so neither renders.
-            -->
+            <!-- The padlock and the note advertise Core's preview; a companion owning the
+                 surface has nothing locked, so neither renders. -->
             {#if downtimeCoreFallback}
               <span class="manager-nav-lock" data-world-downtime-lock
                 ><i class="fas fa-lock" aria-hidden="true"></i></span

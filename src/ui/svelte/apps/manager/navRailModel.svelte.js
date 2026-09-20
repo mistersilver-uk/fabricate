@@ -1,11 +1,10 @@
 /**
  * The manager navigation rail's group expansion and its collapse seam (issue 1717). Every input is
- * a THUNK: the two route inputs because each caller value is itself a `$derived` and must be read
- * inside this module's own `$derived.by` to subscribe across the boundary, and `services` because
- * reading the root's prop in the call expression would capture its initial value under
- * `state_referenced_locally`. `expanded` is user intent OR the route lock, so a locked group
- * renders open before `syncLocks()` has recorded that intent; and `collapsedDisplay` is
- * display-only, so a locked-open rail reads expanded without overwriting the stored preference.
+ * a thunk: the two route inputs so their `$derived` values are read inside this module's own
+ * `$derived.by`, and `services` so the setting seam reads the caller's live prop rather than the
+ * value it held at construction. `expanded` is user intent or the route lock, so a locked group
+ * renders open before `syncLocks()` has recorded that intent; `collapsedDisplay` is display-only,
+ * so a locked-open rail reads expanded without overwriting the stored preference.
  */
 const RAIL_GROUP_IDS = Object.freeze([
   'crafting',
@@ -17,7 +16,16 @@ const RAIL_GROUP_IDS = Object.freeze([
 ]);
 
 export function createNavRailModel({ services: servicesSeam, groupLocks, railLocked } = {}) {
-  const services = servicesSeam?.();
+  function storedCollapse() {
+    const services = servicesSeam?.();
+    return services?.getSetting?.('managerRailCollapsed') === true;
+  }
+
+  function storeCollapse(value) {
+    const services = servicesSeam?.();
+    services?.setSetting?.('managerRailCollapsed', value);
+  }
+
   const userExpanded = $state({
     crafting: false,
     checks: false,
@@ -26,7 +34,7 @@ export function createNavRailModel({ services: servicesSeam, groupLocks, railLoc
     worldRules: false,
     worldDowntime: false,
   });
-  let collapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
+  let collapsed = $state(storedCollapse());
 
   const lockedOpen = $derived.by(() => groupLocks?.() ?? {});
   const expanded = $derived.by(() => {
@@ -48,7 +56,7 @@ export function createNavRailModel({ services: servicesSeam, groupLocks, railLoc
   function toggleRail() {
     if (railLockedOpen) return;
     collapsed = !collapsed;
-    services?.setSetting?.('managerRailCollapsed', collapsed);
+    storeCollapse(collapsed);
   }
 
   function toggleGroup(group, event) {
@@ -65,7 +73,7 @@ export function createNavRailModel({ services: servicesSeam, groupLocks, railLoc
     userExpanded[group] = on;
   }
 
-  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later
+  // Entering a sub-tab also records the intent, so the group stays open when the GM later
   // navigates away instead of snapping shut behind them.
   function syncLocks() {
     const locks = lockedOpen;

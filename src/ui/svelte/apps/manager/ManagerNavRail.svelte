@@ -91,7 +91,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Every rail-toggle attribute reads the DISPLAY value, never the stored one.
+  // Every rail-toggle attribute reads the display value, never the stored one.
   const railToggleLabel = $derived(
     navRail.collapsedDisplay
       ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')

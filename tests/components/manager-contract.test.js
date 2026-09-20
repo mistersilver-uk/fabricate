@@ -522,15 +522,15 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
-  // `data-manager-view` are not here: every route module reads them off the mounted shell
-  // (`target.querySelector('.fabricate-manager').dataset.managerView`).
   // `manager-rail` is `ManagerNavRail`'s own identity since issue 1717; `is-rail-collapsed` is
   // still the shell's, because it is on `.manager-body`.
   defineStructureContract('names the rail aside', MANAGER_NAV_RAIL, {
     attributes: [['class', 'manager-rail']],
   });
 
+  // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
+  // `data-manager-view` are not here: every route module reads them off the mounted shell
+  // (`target.querySelector('.fabricate-manager').dataset.managerView`).
   defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
     attributes: [
       ['class', 'manager-header'],
@@ -1079,7 +1079,7 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The tab the submenu reads is the ROOT's still; the placeholder it routes into moved to the
+  // The tab the submenu reads is still the shell's; the placeholder it routes into moved to the
   // gathering inspector rail with issue 1707, whose own contract claims the write.
   defineStructureContract("keeps the gathering rail's active tab on the shell", MANAGER_ROOT, {
     names: ['activeGatheringTab'],
