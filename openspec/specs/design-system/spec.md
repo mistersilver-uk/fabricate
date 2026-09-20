@@ -237,6 +237,8 @@ Five more satisfy it as of issue 1509: `EditorTabs` emits `fabricate-tabs`, `Edi
 None of the five portals anything either, so each needs exactly one root, and each declares one `mirrored` fixture pair.
 All five are pure CAPABILITIES today, and that is measured rather than assumed: every importer of every one of them lies under `src/ui/svelte/apps/manager/`, so no surface outside the manager renders one yet.
 Issue 1518 is the change that turns them into facts.
+`SortableList` satisfies it as of issue 1512, emitting `fabricate-sortable-list`; it portals nothing and needs one root, and it is the first entry here whose family was never application-rooted at all, so the gate is told by name that a class matching the family pattern is a namespace class.
+It declares NO `mirrored` fixture pair, and that is measured rather than omitted: the only class a hand-written fixture of a converted list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes too, so a mirror keyed on it would demand that row class on rows this list does not render.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 It reads a composed class list as well as a written one, because a primitive that builds its classes in `<script>` writes no `class="…"` attribute at all and a markup-only extractor would report such a family clean while measuring nothing.
 It reads a declared class MAP as well.
@@ -907,6 +909,7 @@ An empty state INSIDE AN OVERLAY the product has already drawn a boundary around
 
 A number a GM can change is a stepper and never a stat box.
 A continuous scale cut into named regions is a range bar whose spans tile; an ordered set of named tiers with a position marker is a tier track.
+A GRIP is the pointer's drag handle and the keyboard's move control, one per ordered row; a ROCKER is the stacked up and down chevron PAIR that steps a row one position, and neither word names the other's affordance.
 
 #### Scenario: A list row and an editor both show the same record state
 
@@ -916,18 +919,49 @@ A continuous scale cut into named regions is a range bar whose spans tile; an or
 
 ### Requirement: An ordered row opens in place to its editing body
 
-Where a record is authored inside the list that orders it — recipe steps, component complications, result tiers, settlement tiers — the row MUST expand in place rather than opening a separate editor.
+Where a record is authored inside the list that orders it — recipe steps, component complications, recipe result groups, check DC tiers — the row MUST expand in place rather than opening a separate editor.
 The list owns three disclosure modes: a single-open accordion, an always-open mode that renders every body and drops the disclosure control, and the plain collapsed list where rows carry no body at all.
 The always-open mode is REQUIRED wherever the body is the entire subject of the surface, because a single-expand accordion on such a surface defaults to showing nothing and ships unseen.
 
-The row itself MUST remain a non-interactive element and the disclosure MUST be the only button in it.
-A whole-row button nests the row's own delete and menu controls, which is invalid DOM that `createElement` accepts and no mounted test detects.
+`SortableList` is the one LIST implementation of this requirement.
+Where the opener is a chevron beside the row's content, `RowDisclosure` is that control; where the opener is the whole header, the header is itself the button and cannot nest the component, because a button may not contain a button.
+The three modes MUST be encoded as the two booleans the list already declares rather than as a mode enum: `expandable` with `alwaysOpen` false is the accordion, `alwaysOpen` is the always-open mode, and `expandable` false is the plain collapsed list.
+A row that opens in place but carries no order of its own renders the list with its reorder disabled — no grip, no rocker, no reorder callback required — rather than a grip that reorders nothing.
+
+The row itself MUST remain non-focusable, and not a button, and the disclosure MUST be the only control in it that opens the row.
+A whole-row button nests the row's own grip, chevrons, delete and menu controls, which is invalid DOM that `createElement` accepts and no mounted test detects.
 The disclosure carries `aria-expanded` and an `aria-controls` pointing at the body region, and its accessible name is the record it opens.
+Where the disclosure is the whole header, that header is the one button, every other control of the row is its SIBLING, and the chevron inside it is decorative.
+Such a header takes its name from its OWN CONTENT plus a visually hidden phrase that states the disclosure and names the record, and never from an `aria-labelledby` pointing at that phrase: measured in Chromium, the referenced form replaced the content instead of appending to it, dropping a realm row's state chip and leaving a drop row with no record in its name at all.
+It emits `aria-controls` only while the body it names is mounted, because a whole-header row unmounts its body and a dangling IDREF is the defect "Naming, announcement and hit targets are component obligations" already forbids.
+
+This requirement's subject is a row that OPENS.
+A whole-row control that only SELECTS a record into a panel beside it has no body, no disclosure and no region to point `aria-controls` at, so it is bound by the naming, focus and hit-target obligations and by the rule that a focusable element which is not a form control declares `data-keyboard-focus="true"`, and by nothing else here.
+
+A collection whose rows are compared DOWN a column stays a table under "A table is used only where columns are compared", and its reorder controls are held to the input and announcement obligations without adopting the list.
+A paginated table is the clearest case: a reorder callback expressed over a page cannot state a move within the whole ordered set.
 
 Disclosure state and drag state MUST live in the list and be keyed by record id, not lifted into the store the list renders from.
+The key MUST be the item's own `id` field, read by the list, rather than a key function the caller supplies: the expanded id is bindable, so the list and its caller must agree on ONE derivation.
+A caller whose records carry no stable id supplies one before it renders them.
 Every persisted edit refreshes that store, and state held there collapses the row the GM is editing.
 
+A collapsed body that the LIST renders STAYS IN THE DOM under `display: none` rather than being unmounted, and its controls leave the tab order with it.
+One markup tree is easier to reason about than a second rendering path, and retention holds the uncommitted field state that unmounting discards.
+This MUST be one switch in one component: no caller chooses it and no prop exposes it.
+A whole-header row outside the list is not yet bound by this, and that debt is recorded in the non-conformance list under `ui-integration`'s "Shared product UI primitives" rather than treated as a conforming case.
+
+Reorder answers BOTH inputs, and the list owns both halves because no shared action supports either one for a reorder.
+The grip is the pointer's drag handle and a real button that moves its row with the up and down arrow keys, since HTML5 drag and drop has no keyboard path at all.
+A visible up and down chevron rocker renders in every disclosure mode wherever the list orders; a list declared non-reorderable draws neither grip nor rocker, and at the ends the unavailable chevron is disabled rather than hidden.
+The grip LEADS and the rocker TRAILS: the rocker's two controls are named for the direction they move the row and sit in the trailing cluster, and the disclosure sits leading, so the two chevron pairs are never adjacent.
+The row being dragged carries a state class so the GM can see which row is travelling.
+The move is announced through a polite live region by the shared reorder helper, AFTER focus has landed on the control that made the move — the grip for its own arrow keys, the pressed chevron for a rocker click, and the grip again where that chevron has disabled itself at an end.
+The moved item's name is read BEFORE the move, because the caller round-trips the array and the item at that index afterwards is a different record.
+
 An adder for the collection MUST render as the list's own footer rather than as a sibling of the list, so it stays in flow with the collection it extends.
+Where a surface replaces the list entirely with an empty message, the adder follows the message it now sits under, because a footer of a list that is not rendered cannot render either.
+A surface whose prototype pins the adder outside the list in the POPULATED state records that deviation at its call site with the prototype frame named.
 
 #### Scenario: A GM edits a field inside an expanded row
 
@@ -940,6 +974,24 @@ An adder for the collection MUST render as the list's own footer rather than as 
 - **WHEN** a tab's entire subject is the content of each row body
 - **THEN** the list renders in always-open mode
 - **AND** it drops the disclosure control rather than defaulting every row to collapsed
+
+#### Scenario: A GM collapses a row carrying an uncommitted edit
+
+- **WHEN** a GM types into a field in an expanded row and collapses the row without persisting
+- **THEN** the body stays in the DOM and keeps what was typed
+- **AND** every control in it leaves the tab order
+
+#### Scenario: A GM reorders a row from the keyboard
+
+- **WHEN** a GM focuses a row's grip and presses the down arrow
+- **THEN** the row moves one position and focus follows it
+- **AND** the new position is announced after the focus lands, not before
+
+#### Scenario: A whole-row control only selects a record
+
+- **WHEN** a row's whole area selects a record into a panel beside it and opens no body
+- **THEN** it is a real button with an accessible name and a hit target, and it declares `data-keyboard-focus="true"`
+- **AND** it is not held to the disclosure, retention or reorder rules above, because it discloses nothing
 
 ### Requirement: Set membership is edited through a bounded, staged picker
 
