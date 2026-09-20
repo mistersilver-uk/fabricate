@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compile } from 'svelte/compiler';
+import { compile, compileModule } from 'svelte/compiler';
 
 import { repoRoot, stripComments } from '../sourceScan.js';
 import { rewriteClientImports } from '../svelte-component-harness.js';
@@ -33,13 +33,16 @@ export const CLOSURE_FLOOR = 50;
 
 /**
  * Every module the mounted root's STATIC graph reaches, split by what the temp tree does with it.
+ * A `.svelte.js` is its own bucket: copied verbatim it throws `ReferenceError: $state is not
+ * defined` the moment the compiled root imports it, so it is compiled like a component.
  *
  * @param {string} [rootPath] The mounted root, repo-relative.
- * @returns {{ components: string[], modules: string[] }} Sorted repo-relative paths.
+ * @returns {{ components: string[], modules: string[], runeModules: string[] }} Sorted paths.
  */
 export function deriveManagerModuleClosure(rootPath = MANAGER_ROOT) {
   const components = [];
   const modules = [];
+  const runeModules = [];
   const seen = new Set();
   const queue = [rootPath];
   while (queue.length > 0) {
@@ -53,7 +56,7 @@ export function deriveManagerModuleClosure(rootPath = MANAGER_ROOT) {
           'list cannot be trusted'
       );
     }
-    (current.endsWith('.svelte') ? components : modules).push(current);
+    bucketFor(current, { components, modules, runeModules }).push(current);
     const source = stripComments(readFileSync(absolute, 'utf8'));
     for (const [, specifier] of source.matchAll(RELATIVE_SPECIFIER)) {
       const child = relative(repoRoot, resolve(dirname(absolute), specifier)).replaceAll('\\', '/');
@@ -68,7 +71,14 @@ export function deriveManagerModuleClosure(rootPath = MANAGER_ROOT) {
   }
   components.sort(comparePaths);
   modules.sort(comparePaths);
-  return { components, modules };
+  runeModules.sort(comparePaths);
+  return { components, modules, runeModules };
+}
+
+/** Which of the three lists one derived path belongs to. */
+function bucketFor(path, { components, modules, runeModules }) {
+  if (path.endsWith('.svelte')) return components;
+  return path.endsWith('.svelte.js') ? runeModules : modules;
 }
 
 /** Compile one component into the temp tree, recording that it was written. */
@@ -86,6 +96,18 @@ function writeCompiled(tempRoot, compiledSveltePaths, sourcePath) {
   compiledSveltePaths.add(sourcePath.replaceAll('\\', '/'));
 }
 
+/**
+ * Compile one runes module to `<path>.js`, which is what `rewriteClientImports` already rewrites a
+ * `.svelte.js` specifier to, so the compiled root's import of it resolves.
+ */
+function writeCompiledRuneModule(tempRoot, sourcePath) {
+  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
+  const compiled = compileModule(source, { filename: sourcePath, generate: 'client', dev: true });
+  const destination = join(tempRoot, `${sourcePath}.js`);
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, rewriteClientImports(compiled.js.code));
+}
+
 /** Copy one plain module verbatim; the compiled components resolve their imports against these. */
 function copyRawModule(tempRoot, sourcePath) {
   const destination = join(tempRoot, sourcePath);
@@ -101,10 +123,11 @@ function copyRawModule(tempRoot, sourcePath) {
  * @returns {Set<string>} Every component written, for `assertCompiledSvelteClosure`.
  */
 export function compileManagerTree(tempRoot, rootPath = MANAGER_ROOT) {
-  const { components, modules } = deriveManagerModuleClosure(rootPath);
+  const { components, modules, runeModules } = deriveManagerModuleClosure(rootPath);
   const compiledSveltePaths = new Set();
   for (const component of components) writeCompiled(tempRoot, compiledSveltePaths, component);
   for (const module of modules) copyRawModule(tempRoot, module);
+  for (const runeModule of runeModules) writeCompiledRuneModule(tempRoot, runeModule);
   return compiledSveltePaths;
 }
 

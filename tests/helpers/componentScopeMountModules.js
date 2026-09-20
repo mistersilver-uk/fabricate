@@ -314,13 +314,16 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         'src/ui/model/browserGroupCounts.js',
         // ... and, since issue 1036, the shared page-window model too. Same consequence.
         'src/ui/model/browserPagination.js',
-        // The pure bulk selection + staging model (issue 772). The view imports it for the
-        // selection helpers and its toolbar reads the description it returns.
+        // The pure bulk selection + staging model (issue 772). Since issue 1706 the view no
+        // longer imports it for the selection helpers — those moved to the composable below.
         'src/ui/model/componentBulkEditModel.js',
         // Its shared leaf (issue 1010): those selection helpers now live here and
         // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
         'src/utils/bulkSelectionModel.js',
       ],
+      // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than
+      // copied; copied verbatim it throws `ReferenceError: $state is not defined`.
+      runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
       compiledModules,
       componentPath,
     }),
