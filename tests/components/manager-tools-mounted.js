@@ -1304,8 +1304,15 @@ export function registerToolsCases() {
 
     assert.equal(target.querySelector('input[name="tool-replacement-type"]'), null);
     assert.equal(target.querySelector('[data-item-drop-zone="tool-replacement"]'), null);
-    assert.ok(target.querySelector('.manager-tool-replacement-component-trigger'));
-    assert.equal(target.querySelector('[data-tool-replacement-target] select'), null);
+    // Which picker, rather than "not a native select" (issue 1510). The replacement target is a
+    // `SearchablePopover` because each row draws a Component's art; the shared one-of-N `Select`
+    // draws a label and no image, so the two are told apart by the trigger the card renders.
+    const replacement = target.querySelector('[data-tool-replacement-target]');
+    assert.ok(Boolean(replacement.querySelector('.manager-tool-replacement-component-trigger')));
+    assert.ok(
+      !replacement.querySelector('.fabricate-select-trigger'),
+      'the card is not the shared one-of-N picker, which can draw no Component art'
+    );
   });
 
   it('threads system repair vocabularies and enabled features into the Tool editor', async () => {

@@ -83,6 +83,15 @@
       .fixture-column {
         width: 760px;
       }
+
+      /*
+        The Tool editor's rail column, which `[data-manager-view="tool-edit"] .manager-body` gives
+        a fixed 340px track. The rail's own padding comes from `.manager-tool-preview` in
+        `styles/fabricate.css`; only the track width is fixture chrome.
+      */
+      .fixture-rail {
+        width: 340px;
+      }
     </style>
   </head>
   <body class="vtt game theme-dark">

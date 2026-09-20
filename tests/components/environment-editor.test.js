@@ -729,6 +729,20 @@ describe('environment composition editor structure', () => {
     { names: ['dangerLevelOptions', 'dangerLevel'], calls: ['some', 'defaultDangerLabel'] }
   );
 
+  // The markup pin moved onto the shared picker at issue 1510, so what this reads is the hand-off
+  // rather than an `{#each}` this component no longer writes. What a GM sees and chooses is
+  // asserted against the DOM by `environment-overview-realms.test.js`.
+  defineStructureContract(
+    "and the derived list is mapped onto the shared picker's option shape",
+    { file: OVERVIEW, constant: 'dangerSelectOptions' },
+    { names: ['renderedDangerOptions'], calls: ['map'] }
+  );
+
+  defineStructureContract('and handed to the picker as its option list', OVERVIEW, {
+    renders: ['Select'],
+    names: ['dangerSelectOptions'],
+  });
+
   defineStructureContract(
     'manual mode renders one Available-to-add group instead of Excluded and Non-matching sections',
     LIST,

@@ -1077,6 +1077,14 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-gathering-task-node-respawn',
   'data-gathering-task-node-interval-unit',
   'data-gathering-task-node-gain-mode',
+  // Issue 1510 phase 2, commit 2e — the environment overview and the Tool rails.
+  // `data-environment-field` is spelled with its value, the bare attribute being shared with the
+  // identity card's name input, textarea, status toggle and two chip rows; `data-tool-preview-actor`
+  // is bare and prefixes nothing. The overview's two add controls are deliberately absent: each
+  // carries the chip row's own `data-chip-remove-fallback` rather than a hook of its own, and that
+  // attribute is on the rows and on three availability menus too.
+  'data-environment-field="dangerLevel"',
+  'data-tool-preview-actor',
 ]);
 
 /**
@@ -1165,10 +1173,11 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
 // this PR's own screenshot evidence — not as a red unit test. Eleven steps converted at issue
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
-// manager's — its first phase took the two `[data-world-currency-strategy-select]` steps, leaving
-// THREE native `select:` steps in the registry: the recipe category filter, the system Component
-// Rules list's essence filter and the system Tool Rules list's sort. All three are issue 1510's
-// later phases to retire, so the surface this clause covers is still shrinking towards zero.
+// manager's. Its first phase took the two `[data-world-currency-strategy-select]` steps; phase 2
+// took the gathering task editor's respawn policy in commit 2d and the environment overview's two
+// membership add controls in commit 2e. Three native `select:` steps remain, all of them phase 3's
+// to retire: the recipe category filter, the system Component Rules list's essence filter and the
+// system Tool Rules list's sort. The surface this clause covers is still shrinking towards zero.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
   // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
   // which is how every one of these steps is authored.

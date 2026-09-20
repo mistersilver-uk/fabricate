@@ -2,7 +2,11 @@
  * System scope: the Tool Rules browser, the tool editor and the parity frames the smoke's tool walk pins.
  */
 
-import { TOOL_EDITOR_SHELL_MATCHES, TOOL_LIST_MATCHES } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  TOOL_EDITOR_SHELL_MATCHES,
+  TOOL_LIST_MATCHES,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -289,6 +293,35 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntityPreview\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+    ],
+  }),
+  // The Tool rails' first open-panel frame (issue 1510), and the first opened from an inspector
+  // rail. Its labels are world actor names, so it is where the `toolbar` rung's 320px panel cap is
+  // read against the longest name a roster holds.
+  managerCase({
+    id: 'manager-tool-preview-actor-list',
+    label: 'Manager — Tool rules editor Preview as actor list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      { selector: '#manager-nav-tool-rules' },
+      { selector: '[data-tool-edit-rules]' },
+      { selector: '[data-tool-preview-actor]' },
+    ],
+    expectView: 'tool-edit',
+    // Two claims a closed frame cannot make: the panel exists and it is the unticked list.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover:not(.fabricate-select-popover-ticked)' +
+      ' [role="option"] .fabricate-select-label',
+    // The panel sits inside the application root rather than clipped by the rail it opened from.
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    position: { width: 1280, height: 720 },
+    kinds: ['manager', 'tools'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBehaviorPreview\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({

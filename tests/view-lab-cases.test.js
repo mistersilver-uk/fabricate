@@ -1240,7 +1240,13 @@ test('environment empty membership evidence clears the actual fixture and is sel
         2,
         `${id} clears, adds, then removes the last ${kind}`
       );
-      assert.ok(viewCase.steps.some((step) => step.select === member));
+      // The add step is `chooseSelectOption`'s pair since issue 1510, not the `select:` verb.
+      assert.ok(
+        viewCase.steps.some((step) =>
+          step.selector?.endsWith(`.fabricate-select-popover [data-popover-option="${member}"]`)
+        ),
+        `${id} adds the ${kind} back by clicking its option row`
+      );
     }
     assert.equal(viewCase.expectContained.length, 4);
     for (const entry of viewCase.expectContained.filter(({ target }) =>
@@ -2383,23 +2389,26 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty-five frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty-seven frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
 // and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first to twenty-fifth at issue 1510, which are the recipe studio's
-// kind list, the component studio's category list, the checks studio's trigger comparison list and
-// the gathering studio's respawn policy and stamina modifier lists — the first five converted
-// manager selects whose panels have a frame at all, the third the first opened from inside a card
-// the walk has to author before it exists, the fourth the first in an editor the rail reaches
-// through a submenu, and the fifth the first whose row has to be authored before its trigger
-// exists).
+// option panels, and the twenty-first to twenty-seventh at issue 1510, which are the recipe
+// studio's kind list, the component studio's category list, the checks studio's trigger comparison
+// list, the gathering studio's respawn policy and stamina modifier lists, the environment editor's
+// danger ceiling and the Tool rails' `Preview as` roster — the seven converted manager selects
+// whose panels have a frame at all, the third the first opened from inside a card the walk has to
+// author before it exists, the fourth the first in an editor the rail reaches through a submenu,
+// the fifth the first whose row has to be authored before its trigger exists, the sixth the first
+// ticked one of them and the seventh the first opened from an inspector rail rather than from an
+// editor body).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
   'manager-checks-trigger-operator-list',
   'manager-component-edit-category-list',
+  'manager-environment-danger-level-list',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
@@ -2412,6 +2421,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-system-edit-lists',
+  'manager-tool-preview-actor-list',
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',

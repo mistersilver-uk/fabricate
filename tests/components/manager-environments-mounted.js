@@ -18,6 +18,12 @@ import {
   managerComponents,
   settleBetweenTests,
 } from './manager-mounted-shared.js';
+import {
+  assertSelectHasResolvedName,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 let Component;
 let EnvironmentEditViewComponent;
@@ -880,9 +886,19 @@ export function registerEnvironmentsCases() {
       null,
       'region availability picker is removed from the task editor'
     );
-    assert.equal(timeAvailability.querySelector('select'), null);
-    assert.equal(weatherAvailability.querySelector('select'), null);
-    assert.equal(biomeAvailability.querySelector('select'), null);
+    // What each row is, rather than "not a native select" (issue 1510): this editor renders none
+    // at all now, so each of these three read as a claim about any tree. An availability row edits
+    // a set — an add menu feeding the chip row beside it — never a picker holding one value.
+    for (const field of [timeAvailability, weatherAvailability, biomeAvailability]) {
+      const menu = field.querySelector('button.manager-condition-menu-button');
+      assert.ok(Boolean(menu), 'each availability row renders its own add-menu trigger');
+      assert.equal(menu.getAttribute('aria-haspopup'), 'listbox');
+      assert.ok(Boolean(field.querySelector('.manager-chip-row')), 'and the set it adds into');
+      assert.ok(
+        !field.querySelector('.fabricate-select-trigger'),
+        'and no shared one-of-N picker, which holds one value rather than a set'
+      );
+    }
     const biomePill = biomeAvailability.querySelector(
       '[data-gathering-task-availability-pill="biomes"][data-condition-id="forest"]'
     );
@@ -2849,6 +2865,8 @@ export function registerEnvironmentsCases() {
 
   it('uses configured danger choices while preserving stale current danger values', async () => {
     target = document.createElement('div');
+    // The portal host: the danger ceiling's panel goes to the nearest application root.
+    target.className = 'fabricate-manager';
     document.body.appendChild(target);
     mounted = mount(EnvironmentEditViewComponent, {
       target,
@@ -2873,16 +2891,19 @@ export function registerEnvironmentsCases() {
     });
     flushSync();
 
-    const dangerSelect = target.querySelector('[data-environment-field="dangerLevel"]');
-    assert.equal(dangerSelect.value, 'extreme');
-    assert.deepEqual(
-      Array.from(dangerSelect.options).map((option) => option.value),
-      ['extreme', 'safe', 'hazardous']
+    const danger = '.fabricate-select-trigger[data-environment-field="dangerLevel"]';
+    assert.equal(
+      assertSelectHasResolvedName(target, danger),
+      'Danger level',
+      'the demoted caption names the trigger, and the hint below it is no longer part of the name'
     );
-    assert.deepEqual(
-      Array.from(dangerSelect.options).map((option) => option.textContent.trim()),
-      ['Extreme', 'Camp safe', 'Rough going']
-    );
+    assert.equal(selectTriggerText(target, danger), 'Extreme');
+    assert.deepEqual(selectOptionValues(target, danger), ['extreme', 'safe', 'hazardous']);
+    assert.deepEqual(selectOptionLabels(target, danger), [
+      'Extreme',
+      'Camp safe',
+      'Rough going',
+    ]);
   });
 
   it('scores inspector danger evidence against the six-level canonical scale', async () => {

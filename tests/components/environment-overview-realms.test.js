@@ -7,8 +7,26 @@ import { pathToFileURL } from 'node:url';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createClassComponent } from '../../node_modules/svelte/src/legacy/legacy-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  createSvelteCompiler,
+  installComponentTestGlobals
+} from '../helpers/svelte-component-harness.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionValues
+} from '../helpers/select-control.js';
+
+// The primitive's sentinel id, spelled as every driving suite spells it; `select-mounted.test.js`
+// pins the spelling against `Select.svelte`.
+const UNCHANGED_OPTION_ID = '__unchanged__';
+
+// The two add controls share the chip row's focus-fallback hook rather than carrying one of their
+// own, so the trigger class is what tells them apart from the row inside their own field.
+const ADD_TRIGGER = '.fabricate-select-trigger[data-chip-remove-fallback]';
+const DANGER_TRIGGER = '.fabricate-select-trigger[data-environment-field="dangerLevel"]';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -36,6 +54,8 @@ function baseProps(overrides = {}) {
 
 async function mountTab(props) {
   target = document.createElement('div');
+  // The portal host: without this class a converted panel lands on `<body>`.
+  target.className = 'fabricate-manager';
   document.body.appendChild(target);
   let environment = props.environment;
   mounted = createClassComponent({ component: EnvironmentOverviewTab, target, props: {
@@ -64,13 +84,20 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-env-overview-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
-    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
+    // The popover closure rides in because all three pickers are `<Select>`s as of issue 1510.
+    for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
     writeRawModule('src/gatheringImageDefaults.js');
     writeRawModule('src/ui/svelte/util/gatheringFormat.js');
+    writeRawModule('src/ui/svelte/apps/manager/environment/environmentSelectOptions.js');
     writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
-    // The realm and biome rows render the shared chip as of issue 1515. A `.svelte` this tree
+    // The realm and biome rows render the shared chip as of issue 1515, and their add controls plus
+    // the danger picker render the shared `<Select>` as of issue 1510. A `.svelte` this tree
     // renders but this list omits does not FAIL this suite - the temp tree dies on
     // ERR_MODULE_NOT_FOUND and node reports every test here as `# cancelled`.
+    // Spelled out, not spread: `mounted-harness-primitive-allowlist.test.js` reads the literals.
+    writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/EmptyState.svelte');
@@ -100,7 +127,10 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     const field = target.querySelector('[data-environment-field="includedRealmIds"]');
     assert.ok(field, 'realm field renders when enabled');
     assert.ok(target.querySelector('[data-environment-realm-empty]'), 'empty-state hint renders');
-    assert.equal(field.querySelector('select'), null, 'no add-select when there are no realms');
+    assert.ok(
+      !field.querySelector('.fabricate-select-trigger'),
+      'no add control at all when there are no realms'
+    );
     remount();
   });
 
@@ -120,23 +150,36 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     }));
 
     const field = target.querySelector(fieldSelector);
+    const trigger = `${fieldSelector} ${ADD_TRIGGER}`;
     const empty = () => field.querySelector('.manager-empty.is-inline.is-field');
     const pills = () => field.querySelectorAll(`[data-environment-${kind}-pill]`);
-    const available = () => Array.from(field.querySelectorAll('select option')).map(o => o.value).filter(Boolean);
+    // What the picker offers, opened and closed again; the sentinel row is not a member.
+    const available = () => {
+      const values = selectOptionValues(target, trigger).filter((value) => value !== UNCHANGED_OPTION_ID);
+      closeSelectPanel(target, trigger);
+      return values;
+    };
     assert.ok(empty(), 'starts with a field-sized empty state');
     assert.equal(empty().textContent.trim(), `No ${kind}s selected`);
+    assert.equal(
+      assertSelectHasResolvedName(target, trigger),
+      `Add ${kind}`,
+      'the add control keeps the name its native select announced'
+    );
     assert.deepEqual(available(), options);
     for (const [index, id] of options.entries()) {
-      const select = field.querySelector('select');
-      select.value = id;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      chooseSelectOption(target, trigger, id);
       await tick();
       flushSync();
       assert.deepEqual(updates.at(-1), { [property]: options.slice(0, index + 1) });
       assert.equal(pills().length, index + 1);
       assert.ok(!empty(), 'selection replaces the placeholder');
-      assert.deepEqual(available(), options.slice(index + 1));
+      if (index < options.length - 1) assert.deepEqual(available(), options.slice(index + 1));
     }
+    assert.ok(
+      !target.querySelector(trigger),
+      'with every member selected the add control is gone, so there is nothing left to offer'
+    );
     for (const [index, id] of options.entries()) {
       field.querySelector(`[data-environment-${kind}-pill="${id}"] [data-chip-remove]`).click();
       await tick();
@@ -148,6 +191,36 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     assert.deepEqual(available(), options);
     assert.equal(empty().textContent.trim(), `No ${kind}s selected`);
     assert.equal(field.querySelector(`[data-environment-${kind}-status]`).textContent.trim(), `No ${kind}s selected`);
+    remount();
+  });
+
+  it('writes the danger ceiling the GM picks, under the key the editor persists', async () => {
+    // The one site whose wrapper demoted (issue 1510): a `<Field as="label">` named its trigger
+    // by containment, with the caption and the hint sentence after it.
+    const updates = [];
+    await mountTab(baseProps({
+      dangerOptions: [{ id: 'safe', label: 'Camp safe' }, { id: 'hazardous', label: 'Rough going' }],
+      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: [], dangerLevel: 'safe' },
+      onUpdate: (patch) => updates.push(patch)
+    }));
+
+    const trigger = target.querySelector(DANGER_TRIGGER);
+    assert.ok(Boolean(trigger), 'the danger ceiling renders the shared picker');
+    assert.equal(
+      assertSelectHasResolvedName(target, DANGER_TRIGGER),
+      'Danger level',
+      'the caption names the trigger by id, and the hint paragraph is no longer part of the name'
+    );
+    assert.ok(
+      !trigger.closest('label'),
+      'a `<label>` would forward a caption click into a control that cannot be closed from it'
+    );
+    assert.equal(trigger.querySelector('.fabricate-select-value').textContent.trim(), 'Camp safe');
+
+    chooseSelectOption(target, DANGER_TRIGGER, 'hazardous');
+    await tick();
+    flushSync();
+    assert.deepEqual(updates.at(-1), { dangerLevel: 'hazardous' });
     remount();
   });
 
@@ -212,9 +285,9 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
   it('keeps focus in the row when the LAST chip is removed and no add control is left', async () => {
     // THE LADDER RAN OUT (issue 1515). `Chip` resolves its focus destination BEFORE it removes
     // the chip: the next chip's remove control, else the previous chip's, else the nearest
-    // enclosing `[data-chip-remove-fallback]`. This row hung that hook on its add-`<select>`,
-    // which renders only while an UNSELECTED realm remains — so with one realm in the world and
-    // that realm selected there was no next chip, no previous chip and no select, and removing
+    // enclosing `[data-chip-remove-fallback]`. This row hung that hook on its add control, which
+    // renders only while an UNSELECTED realm remains — so with one realm in the world and that
+    // realm selected there was no next chip, no previous chip and no add control, and removing
     // the last chip dropped focus to `<body>`. That is the unfocused-window state (Space pauses
     // the game, the arrows pan the canvas) with the keyboard user stranded at the top of the
     // document. The row itself is the rung that cannot disappear.
@@ -226,7 +299,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
 
     const field = target.querySelector('[data-environment-field="includedRealmIds"]');
     assert.ok(
-      !field.querySelector('select'),
+      !field.querySelector('.fabricate-select-trigger'),
       'the precondition IS the defect: every realm is selected, so the add control is gone'
     );
 

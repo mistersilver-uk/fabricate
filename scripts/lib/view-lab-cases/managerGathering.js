@@ -452,6 +452,9 @@ export const CASES = Object.freeze([
       '.manager-environment-context-biomes',
     ];
     const emptyFields = fields.map((field) => `${field} .manager-empty.is-field`);
+    // Both add controls are `<Select>` triggers since issue 1510, and neither carries a hook of its
+    // own, so each is addressed by the trigger class inside its own field.
+    const addTriggers = fields.map((field) => `${field} .fabricate-select-trigger`);
     const context = '[data-overview-section="context"]';
     return managerCase({
       id: `manager-environment-empty-membership-${suffix}`,
@@ -477,7 +480,7 @@ export const CASES = Object.freeze([
           const remove = `[data-environment-${kind}-pill="${id}"] [data-chip-remove]`;
           return [
             { selector: remove, press: 'Space' },
-            { selector: `${fields[index]} select`, select: id },
+            ...chooseSelectOption(addTriggers[index], id),
             { selector: remove, press: 'Space' },
           ];
         }),
@@ -487,14 +490,46 @@ export const CASES = Object.freeze([
       expectSelector: `.fabricate-manager${emptyFields.map((selector) => `:has(${selector})`).join('')}`,
       expectVisible: context,
       expectNoHorizontalOverflow: context,
-      expectContained: [...emptyFields, ...fields.map((field) => `${field} select`)].map(
-        (target) => ({ container: '.manager-main', target })
-      ),
+      expectContained: [...emptyFields, ...addTriggers].map((target) => ({
+        container: '.manager-main',
+        target,
+      })),
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
       ],
     });
+  }),
+  // The environment editor's first open-panel frame (issue 1510), and the first ticked one in the
+  // registry — so it is also where the tick gutter's bite out of the panel width is visible.
+  managerCase({
+    id: 'manager-environment-danger-level-list',
+    label: 'Manager — Environment danger level list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-environment-field="dangerLevel"]' },
+    ],
+    expectView: 'environment-edit',
+    // Three claims a closed frame cannot make: the panel exists, it is the ticked list, and it
+    // names the level in the GM's words rather than the `hazardous` the model stores.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="hazardous"] .fabricate-select-label',
+    // The panel sits inside the application root rather than clipped by the card it opened from.
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   managerCase({
     id: 'manager-environment-edit-events',

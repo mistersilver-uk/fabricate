@@ -261,6 +261,41 @@ const CONVERTED_SITES = Object.freeze([
     column: false,
     floor: 132,
   }),
+  // ISSUE 1510 COMMIT 2e — the danger ceiling, the one 2e site whose value a prop can drive. Its
+  // counterpart is one sheet rule off the wrapper class its three pickers share.
+  Object.freeze({
+    subject: 'environment-overview',
+    name: 'the environment danger ceiling',
+    hook: '[data-environment-field="dangerLevel"]',
+    values: ['safe', 'hazardous'],
+    column: true,
+    columnSelector: '.manager-environment-context-field',
+  }),
+]);
+
+/**
+ * The three 2e sites a `?value=` cannot drive — both add controls rest on the sentinel and the Tool
+ * roster holds component state — measured at rest against the column each must fill (issue 1510).
+ */
+const RESTING_WIDTH_SITES = Object.freeze([
+  Object.freeze({
+    subject: 'environment-overview',
+    name: 'the realm membership add control',
+    hook: '[data-environment-field="includedRealmIds"] .fabricate-select-trigger',
+    columnSelector: '.manager-environment-context-field',
+  }),
+  Object.freeze({
+    subject: 'environment-overview',
+    name: 'the biome membership add control',
+    hook: '.manager-environment-context-biomes .fabricate-select-trigger',
+    columnSelector: '.manager-environment-context-field',
+  }),
+  Object.freeze({
+    subject: 'tool-preview',
+    name: 'the Tool rails Preview as roster',
+    hook: '[data-tool-preview-actor]',
+    columnSelector: '[data-tool-actor-preview]',
+  }),
 ]);
 
 /**
@@ -394,6 +429,25 @@ describe('a converted manager trigger keeps the width its native select had (iss
       'the fixture renders two distinct category labels, not one duplicated'
     );
   });
+
+  for (const site of RESTING_WIDTH_SITES) {
+    it(`holds ${site.name} at its column width`, async () => {
+      // No second value to compare, so the claim is the one the counterpart exists to make: the
+      // trigger fills its column instead of hugging. `.fabricate-field.manager-field select`
+      // supplied that width natively and is element-typed, so it reaches no `<button>`.
+      const measured = await measureTrigger(site.subject, site.hook, '', site.columnSelector);
+      assert.ok(
+        measured.column > 0,
+        `${site.name} resolved no ${site.columnSelector} column to measure against`
+      );
+      assert.ok(
+        Math.abs(measured.shipped - measured.column) < EPSILON,
+        `${site.name} measured ${measured.shipped}px inside a ${measured.column}px column, and ` +
+          `hugs at ${measured.unfloored}px with its width rule removed — so the caller-owned ` +
+          'trigger width is not reaching it'
+      );
+    });
+  }
 
   it('holds the add-sub-unit control at its column width across its option labels', async () => {
     // THE SITE THE CONVERSION REGRESSED, and the one `?value=` cannot reach.
@@ -529,6 +583,9 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
       hook: '[data-economy-regen-policy]',
       start: 'hours',
     },
+    // The same three, opened at rest. The roster's labels are world actor names rather than a
+    // closed vocabulary, so it is the one that can outgrow the `toolbar` rung's 320px cap.
+    ...RESTING_WIDTH_SITES.map((site) => ({ ...site, start: '' })),
   ];
 
   for (const site of PANEL_SITES) {

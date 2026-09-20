@@ -17,7 +17,12 @@ import { railCounts as sharedRailCounts } from '../helpers/validationSurfaceRead
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 // Issue 1504: a converted control is a shared `<Select>`.
-import { chooseSelectOption } from '../helpers/select-control.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
@@ -1899,15 +1904,27 @@ export function registerWorldScopeCases() {
             { uuid: 'Actor.wolf', id: 'wolf', name: 'Dire Wolf', img: '', isPlayerCharacter: false },
           ],
         });
-        const picker = target.querySelector('[data-tool-preview-actor]');
-        assert.ok(Boolean(picker), 'the world tool entry rendered no Preview as picker');
+        const picker = '.fabricate-select-trigger[data-tool-preview-actor]';
+        assert.ok(
+          Boolean(target.querySelector(picker)),
+          'the world tool entry rendered no Preview as picker'
+        );
+        assert.equal(
+          assertSelectHasResolvedName(target, picker),
+          'Preview as actor',
+          'the kicker above it is a paragraph, so the trigger keeps its own name string'
+        );
         assert.deepEqual(
-          [...picker.querySelectorAll('option')].map((option) => [option.value, option.textContent.trim()]),
-          [
-            ['', 'No actor'],
-            ['Actor.mira', 'Mira'],
-          ],
-          'the picker must list the player character by UUID and leave the bestiary out'
+          selectOptionLabels(target, picker),
+          ['No actor', 'Mira'],
+          'the picker must list the player character and leave the bestiary out'
+        );
+        // The no-actor sentinel carries the primitive's own handle for an empty value, because a
+        // `data-popover-option=""` would be no handle at all.
+        assert.deepEqual(
+          selectOptionValues(target, picker),
+          ['__unchanged__', 'Actor.mira'],
+          'and it must offer each one by UUID'
         );
       });
     });
