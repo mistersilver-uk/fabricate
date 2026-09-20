@@ -112,12 +112,10 @@
     "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 2",
     "src/ui/svelte/apps/manager/SystemsBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 1",
-    "src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte | 3",
     "src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte | 2",
     "src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte | 10",
     "src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte | 1",
-    "src/ui/svelte/apps/manager/VocabularyShellPanel.svelte | 1",
-    "src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte | 1"
+    "src/ui/svelte/apps/manager/VocabularyShellPanel.svelte | 1"
   ],
   "nativeSelectsInDialogBodies": [
     "src/canvas/environmentDialog.js | 1",
