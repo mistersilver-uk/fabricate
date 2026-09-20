@@ -181,6 +181,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   // The listbox cursor's arithmetic (issue 1503).
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -196,7 +197,8 @@ export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte'
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
 // THE APP'S ONE SELECT, plus `Field` (its labelled-form wrapper) and the popover closure above —
@@ -207,7 +209,8 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/SearchablePopover.svelte'
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS

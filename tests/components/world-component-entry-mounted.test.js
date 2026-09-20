@@ -55,6 +55,7 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],
 });

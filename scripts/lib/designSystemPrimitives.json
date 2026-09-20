@@ -520,6 +520,15 @@
       "why": "ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:1016`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, cited by construct rather than by line because the line cited here had rotted onto an unrelated entry, for a reason the caller count cannot express: omitting it there CANCELS every test in the mounted suite — `# cancelled N`, never `# fail` — rather than hanging it, which is what that guard's own header states in as many words. That is why that list is not derived from this manifest."
     },
     {
+      "path": "src/ui/svelte/components/SearchablePopoverPanel.svelte",
+      "library": "<SearchPopover>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/SearchablePopover.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/components/SearchablePopover.svelte`, whose portaled panel this is. It carries the `<SearchPopover>` entry that specifies its PARENT rather than a specimen of its own. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, because omitting it there CANCELS every suite whose tree opens a picker rather than failing it."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
       "library": null,
       "evidence": "targeted",

@@ -124,6 +124,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/RunActionBar.svelte',
   'src/ui/svelte/components/RunProgress.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // Issue 1719: the picker's portaled panel, extracted as an internal part of the entry above. It
+  // sorts immediately after its parent, which is the whole reason the part is named for the part
+  // rather than for a new piece of vocabulary. Its entry names fifteen frames against the
+  // parent's ten, because every caller that opens a panel draws this file and only this file.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   // Issue 1504: the app's own select.
   'src/ui/svelte/components/Select.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
@@ -208,7 +213,7 @@ test('the inputs every property below quantifies over are alive', () => {
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 59, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
