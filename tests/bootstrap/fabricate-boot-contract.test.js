@@ -1,9 +1,7 @@
 /**
- * The module entry's BOOT CONTRACT (issue 1715), observed from a real boot rather than from source
- * text: the facade's own and prototype property descriptors, the published key sets, the ordered
- * hook registrations, the composition phase order, the socket router and the deprecation log.
- * It pins behaviour that must survive `src/main.js` being split across `src/bootstrap/`, so it
- * reads no `src/` text and is frozen once regenerated.
+ * The module entry's boot contract (issue 1715), observed from a real boot: the facade's
+ * descriptors and key sets, the ordered hook registrations, the composition phase order, the socket
+ * router and the deprecation log. It reads no `src/` text and is frozen once regenerated.
  */
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -18,7 +16,7 @@ const REGENERATE =
   'UPDATE_BOOT_CONTRACT_GOLDEN=1 node --conditions=browser --test ' +
   'tests/bootstrap/fabricate-boot-contract.test.js, then review the diff';
 
-/** Instance fields whose FIRST assignment orders the composition root. */
+/** Instance fields whose first assignment orders the composition root. */
 const COMPOSED_FIELDS = Object.freeze([
   '_startupMarks',
   'currencyConfigStore',
@@ -76,7 +74,7 @@ const DEPRECATED_ALIASES = Object.freeze([
   ['gathering', 'hideRegionForActor', [{}]],
 ]);
 
-/** Facade members probed through a DETACHED reference, so an instance-bound copy is visible. */
+/** Facade members probed through a detached reference, so an instance-bound copy is visible. */
 const BINDING_PROBES = Object.freeze([
   'craftRecipe',
   'salvageComponent',
@@ -251,8 +249,8 @@ async function failed(invoke) {
 }
 
 /**
- * Each probed member called through the facade and again through a DETACHED reference. A method
- * written as an arrow instead of shorthand loses `this` on BOTH, and an instance-bound copy keeps
+ * Each probed member called through the facade and again through a detached reference. A method
+ * written as an arrow instead of shorthand loses `this` on both, and an instance-bound copy keeps
  * it on both; only prototype method shorthand answers `false` then `true`.
  */
 async function probeBinding(facade) {
@@ -275,6 +273,20 @@ async function measureBootContract({ ready, loadModule }) {
   const hookEventsAtYield = [...hooks.registrations.values()].map((entry) => entry.event);
   const instance = (await loadModule('/src/main.js')).default;
   const composition = installCompositionRecorder(instance);
+  // The `ready` backstop re-binds `game.fabricate` BEFORE `initialize()`, so a listener of the
+  // `fabricate.journalRunAuthorityRestored` that pass fires meets a bound global. The bind
+  // registers no hook, so only this recorder can see it move.
+  const gameGlobal = globalThis.game;
+  let boundFacade = gameGlobal.fabricate;
+  Object.defineProperty(gameGlobal, 'fabricate', {
+    get: () => boundFacade,
+    set(value) {
+      composition.log.push('bind:game.fabricate');
+      boundFacade = value;
+    },
+    enumerable: true,
+    configurable: true,
+  });
   const socketListeners = installSocketRecorder();
 
   const callAllLog = [];
@@ -288,12 +300,20 @@ async function measureBootContract({ ready, loadModule }) {
     await ready();
   } finally {
     hooks.callAll = originalCallAll;
+    Object.defineProperty(gameGlobal, 'fabricate', {
+      value: boundFacade,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
     composition.restore();
   }
 
   const facade = globalThis.game.fabricate;
   const { FABRICATE_HOOKS } = await loadModule('/src/config/hooks.js');
   const { COMPANION_CONTRACT } = await loadModule('/src/systems/companionContract.js');
+  const { deprecate: runtimeDeprecate } = await loadModule('/src/bootstrap/gatheringRuntime.js');
+  const { identityRepairsInstalled } = await loadModule('/src/bootstrap/migrations.js');
   const whenReady = await Promise.race([
     facade.whenReady().then(() => 'resolved'),
     new Promise((settle) => setTimeout(() => settle('pending'), 500)),
@@ -334,11 +354,32 @@ async function measureBootContract({ ready, loadModule }) {
       toolScopeStoreIsShared: facade.getToolScopeStore() === facade.toolScopeStore,
       vocabularyScopeStoreIsShared:
         facade.getVocabularyScopeStore() === facade.worldVocabularyStore,
+      // A GM recovery action wired to nothing answers the same `null` a clean world answers, so
+      // the wiring is pinned rather than inferred.
+      identityRepairsInstalled: identityRepairsInstalled(),
       readyFlag: facade.ready === true,
       whenReadyResolution: whenReady,
     },
     compositionLog: composition.log,
     deprecationWarnings: recordDeprecationWarnings(facade),
+    // The latch is shared, so a name already warned through a slice member warns no second time
+    // through the runtime module's own export. A slice with its own `Set` answers 1. The probed
+    // name is `gatheringFacade.js`'s, not the shell's, because only a slice can declare a second.
+    sharedLatchSecondWarnings: recordDeprecationWarnings({
+      getGatheringRegionStore: () =>
+        runtimeDeprecate('setGatheringPartyRegionOverride', 'setGatheringPartyRealmOverride'),
+      setGatheringPartyRegionOverride: () => {},
+      clearGatheringPartyRegionOverride: () => {},
+      revealGatheringRegionForActor: () => {},
+      hideGatheringRegionForActor: () => {},
+      gathering: {
+        getRegionStore: () => {},
+        setPartyRegionOverride: () => {},
+        clearPartyRegionOverride: () => {},
+        revealRegionForActor: () => {},
+        hideRegionForActor: () => {},
+      },
+    }).length,
     binding: await probeBinding(facade),
   };
 }
@@ -398,7 +439,7 @@ test('the module entry boots to its pinned contract', { timeout: 300000 }, async
     golden.binding,
     'a facade member written as an arrow rather than method shorthand fails attached too'
   );
-  assert.deepStrictEqual(measured, golden);
+  assert.deepStrictEqual(measured, golden, REGENERATE);
 });
 
 test('the boot contract golden is not vacuous', () => {
@@ -427,6 +468,16 @@ test('the boot contract golden is not vacuous', () => {
     'there is no accessor among them, so no descriptor lacks `writable`'
   );
   assert.ok(golden.compositionLog.length >= 30);
+  assert.deepEqual(
+    Object.entries(golden.references).filter(([, value]) => value !== true && value !== 'resolved'),
+    [],
+    'every reference-identity claim is positive; a regeneration must not bank a false one'
+  );
+  assert.equal(
+    golden.sharedLatchSecondWarnings,
+    0,
+    '`deprecate` latches on one shared set, so a warned name never warns a second time'
+  );
   assert.ok(golden.binding.every((row) => typeof row.length === 'number'));
   assert.ok(
     golden.binding.some((row) => row.failsDetached && !row.failsAttached),

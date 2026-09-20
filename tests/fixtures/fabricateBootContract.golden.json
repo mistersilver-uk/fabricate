@@ -1629,10 +1629,12 @@
     "essenceScopeStoreIsShared": true,
     "toolScopeStoreIsShared": true,
     "vocabularyScopeStoreIsShared": true,
+    "identityRepairsInstalled": true,
     "readyFlag": true,
     "whenReadyResolution": "resolved"
   },
   "compositionLog": [
+    "bind:game.fabricate",
     "assign:_startupMarks",
     "call:registerSettings",
     "settings:register",
@@ -1682,6 +1684,7 @@
     "Fabricate: gathering.revealRegionForActor is deprecated; use gathering.revealRealmForActor instead.",
     "Fabricate: gathering.hideRegionForActor is deprecated; use gathering.hideRealmForActor instead."
   ],
+  "sharedLatchSecondWarnings": 0,
   "binding": [
     {
       "name": "craftRecipe",

@@ -24,7 +24,7 @@ const MIGRATION_DEFERRAL_NOTICES = Object.freeze({
 });
 
 /**
- * The two identity repairs `game.fabricate` re-exposes as GM recovery actions. They are DECLARED in
+ * The two identity repairs `game.fabricate` re-exposes as GM recovery actions. They are declared in
  * `src/main.js`, beside the startup one-shots that also run them, and published here so the facade
  * reaches them without a `src/bootstrap/` module importing the module entry.
  */
@@ -34,12 +34,31 @@ export function installIdentityRepairs(repairs) {
   identityRepairs = repairs ?? {};
 }
 
+/** Whether both repairs are wired; the boot contract pins this, an absent wire being silent. */
+export function identityRepairsInstalled() {
+  return (
+    typeof identityRepairs.applyWorldScopeIdentityFlagRemap === 'function' &&
+    typeof identityRepairs.applyWorldEssenceMergeFlagRemap === 'function'
+  );
+}
+
+/** A missing repair throws rather than answering `null`, which a clean world also answers. */
+function requireRepair(name) {
+  const repair = identityRepairs[name];
+  if (typeof repair !== 'function') {
+    throw new TypeError(
+      `Fabricate | ${name} was never installed, so the GM recovery action is dead`
+    );
+  }
+  return repair;
+}
+
 export function applyWorldScopeIdentityFlagRemap(rekeyMap) {
-  return identityRepairs.applyWorldScopeIdentityFlagRemap?.(rekeyMap) ?? null;
+  return requireRepair('applyWorldScopeIdentityFlagRemap')(rekeyMap);
 }
 
 export function applyWorldEssenceMergeFlagRemap(mergeMap) {
-  return identityRepairs.applyWorldEssenceMergeFlagRemap?.(mergeMap) ?? null;
+  return requireRepair('applyWorldEssenceMergeFlagRemap')(mergeMap);
 }
 
 /** The GM notice for a DEFERRED or an ABORTED pass; `true` means nothing further is reported. */

@@ -132,9 +132,10 @@ export function localizeGathering(key, data = {}) {
 
 /**
  * The one-shot deprecation notice for a renamed public name, and the set that makes it fire once
- * per name. Declared in exactly ONE module: every deprecated public name here is a gathering
- * realm-or-region rename, and this is the leaf the class shell, the gathering slice and the
- * published namespace each import without a cycle. A second set would warn twice per name.
+ * per name. Declared in exactly one module — the leaf the class shell, the gathering slice and the
+ * published namespace each import without a cycle — and held there by
+ * `tests/scalar-helper-duplicates.test.js`. A second set would warn twice for any name reachable
+ * through both the facade and the published namespace; today none is.
  */
 const _deprecationWarned = new Set();
 
