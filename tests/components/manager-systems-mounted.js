@@ -970,6 +970,57 @@ export function registerSystemsCases() {
     );
   });
 
+  it('drops the library to page one when a search narrows the corpus under the page', async () => {
+    // The clamp effect is the only thing that can move the page here: this toolbar's search box
+    // writes the term and no page reset, so an unclamped page two over a one-row result renders
+    // nothing at all (issue 1716).
+    const store = createStore([]);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, { target, props: { store, services: {} } });
+    flushSync();
+
+    store.viewState.update((state) => ({
+      ...state,
+      systems: Array.from({ length: 12 }, (unused, index) => ({
+        id: `sys-${String(index + 1).padStart(2, '0')}`,
+        name: `System ${String(index + 1).padStart(2, '0')}`,
+        description: 'A crafting system.',
+        enabled: true,
+        resolutionMode: 'simple',
+        features: {},
+        featureCount: 0,
+        componentCount: 0,
+        recipeCount: 0,
+        currencyEnabled: false,
+        selected: false,
+      })),
+    }));
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-system-row')].map((row) => row.dataset.systemId),
+      ['sys-11', 'sys-12'],
+      'the control: twelve systems over a page of ten put the tail on page two'
+    );
+
+    const search = target.querySelector('input[type="search"]');
+    search.value = 'System 01';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-system-row')].map((row) => row.dataset.systemId),
+      ['sys-01'],
+      'the one match renders, which a page-two window over one row could not show'
+    );
+  });
+
   it('supports search, row selection, in-place system edit, and row actions', async () => {
     const calls = [];
     let onEditSystemCalled = false;
