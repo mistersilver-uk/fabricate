@@ -207,6 +207,16 @@ test('source contract: src/main.js builds the shared CompendiumImporter with the
     'environmentStore seam must resolve this.gatheringEnvironmentStore lazily'
   );
   assert.match(closure, /environmentStore:/, 'wires the environmentStore seam');
+
+  // The world realm store is constructed after the importer too, so its seam resolves lazily for
+  // the same reason. Dropping it sends the travel merge back to the raw setting write, which lands
+  // the library BEHIND the store's cache and leaves a hook-free world rejecting realm-gated
+  // environments (issue 1858).
+  assert.match(closure, /travelStore:/, 'wires the travelStore seam');
+  assert.ok(
+    closure.includes('this.gatheringRealmStore?.'),
+    'travelStore seam must resolve this.gatheringRealmStore lazily'
+  );
   assert.match(
     closure,
     /getSetting:\s*\(key\)\s*=>\s*getSetting\(key\)/,

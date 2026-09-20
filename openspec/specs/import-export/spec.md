@@ -204,6 +204,10 @@ An incoming configuration carrying no realms MUST write nothing, and a merge tha
 Copy-mode import MUST NOT regenerate realm ids: they are cross-referenced by environment location availability, party overrides and the actor discovery flag, and regenerating them would orphan every one of those references (see `data-models/spec.md` -> TravelConfig requirement 4).
 Realms are therefore no longer part of what a copy-mode import rebinds at all: a copy that duplicated the world's realms would give the destination two records for one valley.
 
+**The travel merge MUST be persisted BEFORE the imported environments are persisted, and MUST reach the destination THROUGH the realm store rather than behind its cache.**
+An imported environment the destination does not already hold under the same id has no persisted counterpart there, so it owns every realm id on it and none of them is prunable (`gathering-and-harvesting/spec.md` -> Gathering Environments requirement 18); the environment store validates those ids against the world realm library on every write, so persisting the environment list first rejects the whole import of a realm-gated system into a world that does not yet have those places.
+Writing the setting earlier is necessary but not sufficient: a direct setting write leaves the realm store's cache holding the pre-import library, and the environment store resolves the library through that cache, so the merge MUST refresh the store as part of the write and MUST NOT depend on a replicated-setting hook firing between the two writes.
+
 ### Character libraries merge on import
 
 Import MUST merge the payload's `characterLibraries` into the destination world's own NON-DESTRUCTIVELY, on exactly the terms the currency and travel merges use and for the same reason: both libraries are world scope, so there is no key under which an import may simply replace what is there, and overwriting would destroy libraries the destination GM authored for systems that have nothing to do with this import.
@@ -222,7 +226,8 @@ Copy-mode import MUST NOT regenerate character-prerequisite or modifier ids: the
 They are world scope and already merge destination-wins, so rebinding them would fork the world's own rules once per copy.
 
 **The character-libraries merge MUST run BEFORE the crafting system is created or updated, and MUST reach the destination through the store rather than behind its cache.**
-This is the ONE ordering difference between this slice and the currency and travel slices, which are persisted LAST because nothing reads them during normalization.
+This is the ONE ordering difference between this slice and the currency slice, which is persisted LAST because nothing reads it during crafting-system normalization.
+The travel slice is not read during crafting-system normalization either, but the environment writes that follow it are validated against the world realm library, so it carries an ordering rule of its own (see *Travel configuration merge on import*).
 Both of these libraries ARE read during normalization: `CraftingSystemManager` derives its Valid Id Basis from them on every system normalize, so a system created while the incoming entries are still only in the payload has every tool prerequisite reference and every default modifier id pruned against a basis that cannot yet see them.
 Writing the setting earlier is necessary but not sufficient — a direct setting write leaves the store's cache holding the pre-import libraries, and the manager reads the cache — so the merge MUST refresh the store as part of the write.
 

@@ -6,6 +6,7 @@
 
 import { buildExportPayload } from '../../src/systems/CraftingSystemExporter.js';
 import { GatheringEnvironmentStore } from '../../src/systems/GatheringEnvironmentStore.js';
+import { GatheringRealmStore } from '../../src/systems/GatheringRealmStore.js';
 
 export const VERSION = '9.9.9';
 
@@ -27,8 +28,15 @@ globalThis.game.user = globalThis.game.user || { isGM: true };
 globalThis.game.packs = globalThis.game.packs || [];
 globalThis.fromUuid = globalThis.fromUuid || (async () => null); // all external refs absent
 
-/** Stand up the shared single-store harness for a fixture. */
-export function makeHarness(fixture) {
+/**
+ * Stand up the shared single-store harness for a fixture.
+ *
+ * @param {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig?: object, characterLibraries?: object }} fixture
+ * @param {{ simulateSettingChangeReload?: boolean }} [options] `false` stands up a world with NO
+ *   `travelConfig` hook, which is what a headless world and a no-op replicated write both are.
+ * @returns {{ settings: Map, getSetting: Function, setSetting: Function, systemManager: object, recipeManager: object, environmentStore: GatheringEnvironmentStore, travelStore: GatheringRealmStore }}
+ */
+export function makeHarness(fixture, { simulateSettingChangeReload = true } = {}) {
   const settings = new Map();
   settings.set('gatheringConfig', structuredClone(fixture.gatheringConfig));
   // The WORLD travel configuration (issue 1282).
@@ -40,9 +48,21 @@ export function makeHarness(fixture) {
   settings.set('essenceScope', structuredClone(fixture.essenceScope ?? {}));
   settings.set('toolScope', structuredClone(fixture.toolScope ?? {}));
   const getSetting = (key) => settings.get(key);
+  // The REAL realm store stands in for the world library, and the write path reloads it the way
+  // `settingChangeBridge` does on a `travelConfig` change. Without this the environment store had
+  // no `travelStore` at all, so the round trip never exercised realm validation — which is how an
+  // import that persisted environments before the realms they cite went unnoticed (issue 1848).
+  // That reload is SIMULATED, so `simulateSettingChangeReload: false` is the world in which no
+  // such hook fires and the write has to reach the store itself (issue 1858).
+  let travelStore = null;
   const setSetting = async (key, value) => {
     settings.set(key, structuredClone(value));
+    if (key === 'travelConfig' && simulateSettingChangeReload) travelStore?.load?.();
   };
+  travelStore = new GatheringRealmStore({ getSetting, setSetting });
+  // Warm, the way `src/main.js` loads it at startup: a COLD store lazily reads the setting on
+  // its first `list()`, which hides an import that writes the realms too late.
+  travelStore.load();
 
   const systems = new Map([[fixture.system.id, structuredClone(fixture.system)]]);
   const systemManager = {
@@ -84,13 +104,22 @@ export function makeHarness(fixture) {
     setSetting,
     systemManager,
     getSystems: () => [...systems.values()],
+    travelStore,
     randomID: () => deterministicId('env'),
   });
   // Seed environments (normalize on load; no validation on the seed path).
   settings.set('gatheringEnvironments', structuredClone(fixture.environments));
   environmentStore.load();
 
-  return { settings, getSetting, setSetting, systemManager, recipeManager, environmentStore };
+  return {
+    settings,
+    getSetting,
+    setSetting,
+    systemManager,
+    recipeManager,
+    environmentStore,
+    travelStore,
+  };
 }
 
 /**

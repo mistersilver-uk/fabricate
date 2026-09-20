@@ -80,23 +80,29 @@ function exportedEnvelope({ system = sourceSystem(), travelConfig = worldTravelC
 }
 
 /** A destination world with its own system and its own (optionally empty) realm library. */
-function destinationWorld(travelConfig = {}) {
-  return makeHarness({
-    system: {
-      id: 'sys-destination',
-      name: 'Destination',
-      gatheringRealmSettings: { enabled: true },
+function destinationWorld(travelConfig = {}, options) {
+  return makeHarness(
+    {
+      system: {
+        id: 'sys-destination',
+        name: 'Destination',
+        gatheringRealmSettings: { enabled: true },
+      },
+      recipes: [],
+      environments: [],
+      gatheringConfig: { systems: {}, vocabularies: {}, conditions: {} },
+      travelConfig,
     },
-    recipes: [],
-    environments: [],
-    gatheringConfig: { systems: {}, vocabularies: {}, conditions: {} },
-    travelConfig,
-  });
+    options
+  );
 }
 
 function importerInto(world) {
   return new CompendiumImporter(world.systemManager, world.recipeManager, {
     environmentStore: world.environmentStore,
+    // The seam `src/main.js` wires. The raw setting pair stays beside it, so the tests that hand
+    // the importer settings alone still cover the fallback.
+    travelStore: world.travelStore,
     getSetting: world.getSetting,
     setSetting: world.setSetting,
     isGM: () => true,
@@ -197,6 +203,85 @@ describe('the library survives the WHOLE import composition, not just the merge 
     }
   });
 
+  it('lands the realm library BEFORE the environments that cite it', async () => {
+    // T18 (issue 1848). The destination world has no realms at all, and the environment store
+    // validates every realm id it is handed against the world library on each write — so an
+    // import that persisted the environments first rejected the whole import of a realm-gated
+    // system. Ordering, not validation, is what makes this land.
+    const world = destinationWorld();
+    assert.deepEqual(realmIds(world.getSetting('travelConfig')), [], 'nowhere to gate on yet');
+
+    const { persisted } = await runWholeComposition(world, exportedEnvelope());
+
+    const imported = world.environmentStore.list().find((env) => env.name === 'Vale Foraging');
+    assert.deepEqual(
+      imported.includedRealmIds,
+      [VALE_ID],
+      'the gate survives the import rather than being rejected or silently pruned'
+    );
+    assert.ok(realmIds(persisted).includes(VALE_ID), 'and the place it names arrived with it');
+  });
+
+  it('lands the library and the realm-gated environment in a world with NO travelConfig hook', async () => {
+    // Ordering alone is not enough (issue 1858). T18 above passes on a SIMULATED `updateSetting`
+    // reload; a world where no such hook fires — a no-op replicated write, a headless world —
+    // leaves the realm store's cache holding the pre-import library, and the environment store
+    // resolves the library through that cache. So the merge writes THROUGH the store.
+    const world = destinationWorld({}, { simulateSettingChangeReload: false });
+    assert.deepEqual(world.travelStore.list(), [], 'the store starts on an empty library');
+
+    const { persisted } = await runWholeComposition(world, exportedEnvelope());
+
+    assert.ok(realmIds(persisted).includes(VALE_ID), 'the setting carries the merged library');
+    assert.ok(
+      world.travelStore.list().some((realm) => realm.id === VALE_ID),
+      'and so does the live store, without any hook having re-read the setting'
+    );
+    const imported = world.environmentStore.list().find((env) => env.name === 'Vale Foraging');
+    assert.ok(Boolean(imported), 'the realm-gated environment was not rejected');
+    assert.deepEqual(imported.includedRealmIds, [VALE_ID], 'and its gate survived intact');
+  });
+
+  it('lands BOTH libraries before an enabled automatic environment that needs them', async () => {
+    // Issues 1315 and 1848 each moved a library ahead of the environments; the release backport
+    // of 1848 briefly persisted the environments twice, once BEFORE the task library. An enabled
+    // automatic environment is the shape that notices: its enable gate asks the live task library
+    // whether anything composes, so an import into a world with neither library used to reject it.
+    const world = destinationWorld();
+    const task = {
+      id: 'task-vale-forage',
+      name: 'Forage the vale',
+      enabled: true,
+      biomes: [],
+      weather: [],
+      timeOfDay: [],
+      dropRows: [],
+    };
+    // Forced rather than matched, so the test asks only "is the task library there yet" and not
+    // the automatic matching rule: a forced id still has to name a record the library holds.
+    const environment = { ...realmGatedEnvironment(), enabled: true, forcedTaskIds: [task.id] };
+    const envelope = buildExportPayload(
+      sourceSystem(),
+      [],
+      '1.27.0',
+      [environment],
+      { systems: { [SOURCE_SYSTEM_ID]: { tasks: [task] } } },
+      {},
+      worldTravelConfig()
+    );
+
+    await runWholeComposition(world, envelope);
+
+    const library = world.getSetting('gatheringConfig')?.systems ?? {};
+    assert.ok(
+      Object.values(library).some((slice) => (slice?.tasks ?? []).some((t) => t.id === task.id)),
+      'the task library landed under the destination system'
+    );
+    const imported = world.environmentStore.list().find((env) => env.name === 'Vale Foraging');
+    assert.equal(imported.enabled, true, 'the enable gate was answered against the imported library');
+    assert.deepEqual(imported.includedRealmIds, [VALE_ID], 'and the realm gate survived too');
+  });
+
   it('seeds the reveal mode and modifier visibility into an unconfigured world', async () => {
     const world = destinationWorld();
     const { persisted } = await runWholeComposition(world, exportedEnvelope());
@@ -244,6 +329,21 @@ describe('the library survives the WHOLE import composition, not just the merge 
 });
 
 describe('merging an imported realm library into a world that already has one', () => {
+
+  it('a delegator whose realm store is absent takes the raw setting path, not a phantom success', async () => {
+    // `src/main.js` hands the importer a lazy delegator that is always an object; the fail-closed
+    // rule is decided on the RESOLVED store, so a `get()` answering null must route to the raw
+    // setting write and never await a `save` that resolves to undefined.
+    const save = () => {
+      throw new Error('a delegator save must never be awaited');
+    };
+    const { importer, settings } = importerOverSettings(
+      { travelConfig: { realms: [] } },
+      { travelStore: { get: () => null, save } }
+    );
+    await importer._persistTravelConfig({ realms: [{ id: VALE_ID, name: 'Vale' }] });
+    assert.deepEqual(realmIds(settings.travelConfig), [VALE_ID]);
+  });
   it('appends only genuinely new places — the DESTINATION wins an id collision', async () => {
     const { importer, settings } = importerOver({
       revealMode: 'manual',
