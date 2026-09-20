@@ -157,11 +157,10 @@
     return option?.label || defaultDangerLabel(id);
   }
 
-  // The danger caption's id: its picker is named by that caption, not by a string (issue 1510).
+  // The danger caption's id and the hint's: the picker is named by that caption rather than by a
+  // string, and the hint is announced by nothing unless pointed at as well (issue 1510).
   const instanceId = $props.id();
   const dangerCaptionId = `${instanceId}-danger-level`;
-  // And the hint's id: the `<div>` host takes the hint out of the computed name, so the trigger
-  // has to point at it explicitly for the ceiling sentence to be announced at all.
   const dangerHintId = `${instanceId}-danger-level-hint`;
 
   // Each add control's name, stated once: the trigger's `aria-label` and its sentinel row's label.
@@ -401,9 +400,8 @@
               </Field>
             {/if}
 
-            <!-- A `<div>`, not the `<label>` it was: `Select.svelte`'s host invariant. The caption
-                 names the trigger through `ariaLabelledBy`, and the hint sentence the `<label>`
-                 used to contribute is reattached through `ariaDescribedBy` (issue 1510). -->
+            <!-- A `<div>`, not the `<label>` it was: `Select.svelte`'s host invariant, so the caption
+                 names the trigger and the hint it used to contribute is reattached (issue 1510). -->
             <Field as="div" class="manager-environment-context-field">
               <span id={dangerCaptionId}
                 >{text(

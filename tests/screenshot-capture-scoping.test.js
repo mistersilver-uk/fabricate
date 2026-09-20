@@ -31,7 +31,7 @@ import {
   SMOKE_SOURCE_SEGMENTS,
 } from './helpers/interactablesSmokeLocators.js';
 import { SMOKE_SCENARIOS } from '../scripts/foundry-smoke/registry.mjs';
-import { collectWorkingTreeSources } from './helpers/sourceScan.js';
+import { SOURCES } from './helpers/primitiveAdoptionContract.js';
 
 /** Every scenario in the registry, groups and their children alike, in walk order. */
 function* flattenScenarios(scenarios) {
@@ -1095,7 +1095,9 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
  * needs three of the list to survive and forty-odd entries accumulated over five commits.
  */
 function assertEveryConvertedHookResolves() {
-  const sources = Object.values(collectWorkingTreeSources(['src'], ['.svelte', '.js']));
+  // The `src/**/*.svelte` corpus is imported rather than walked again: every hook on the list is a
+  // component-emitted attribute, and one collector for the tree is one collector.
+  const sources = Object.values(SOURCES);
   const missing = CONVERTED_SELECT_HOOKS.filter((hook) => {
     // A valued hook is written `'data-x': 'y'` through `triggerData`, never as the literal
     // attribute, so both spellings count as resolving it.
