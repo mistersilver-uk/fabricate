@@ -18,13 +18,24 @@ import {
   TRANSIENT_TEARDOWN_SKIP_PREFIX,
 } from '../scripts/lib/foundrySmokeSignal.js';
 import { attachConsoleCapture } from '../scripts/foundry-smoke/pageOps/pageLifecycle.mjs';
-import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
+import {
+  SMOKE_SOURCE,
+  SMOKE_SOURCE_FILES,
+  SMOKE_SOURCE_SEGMENTS,
+} from './helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HARNESS_PATH = join(__dirname, '..', 'scripts', 'foundry-test-run.mjs');
 
 // A stand-in for "some pattern supplied as an in-source default", built HERE (issue 1010).
 const RETIRED_OBJECTS_WAIVER = /reading 'OBJECTS'/;
+
+/** One smoke module's own text, so an ordered pin cannot be satisfied across a module boundary. */
+function smokeModule(fileSuffix) {
+  const at = SMOKE_SOURCE_FILES.findIndex((file) => file.endsWith(fileSuffix));
+  assert.ok(at >= 0, `no smoke module ends with ${fileSuffix}`);
+  return SMOKE_SOURCE_SEGMENTS[at];
+}
 
 // ── The split smoke signal ────────────────────────────────────────────────
 
@@ -260,42 +271,46 @@ test('attachConsoleCapture logs failed responses and requests without gating on 
   assert.deepEqual(consoleErrors, []);
 });
 
-// ── Source contract: the signal is written from the finally block ─────────
+// ── Source contract: the signal is written inside runSmokeCleanup ─────────
+// The runner-side half of this contract — that runSmokeCleanup is called from the runner's own
+// `finally` — is pinned separately by tests/foundry-smoke-scenarios.test.js:176-189.
 
-test('stepFailures/consoleErrorCount are assigned in the finally block, beside results.consoleErrors', async () => {
-  const source = SMOKE_SOURCE;
+test('runSmokeCleanup assigns stepFailures/consoleErrorCount after the cleanup phase, before summary.json', () => {
+  const source = smokeModule('cleanup.mjs');
 
-  // NOTE: this is an INTENTIONAL literal coupling to the harness spelling (`results.consoleErrors =
-  // consoleErrors;`, `} finally {`, the summary path).
+  // NOTE: this is an INTENTIONAL literal coupling to cleanup.mjs's spelling (`results.consoleErrors =
+  // consoleErrors;`, `endPhase();`, the summary path).
 
-  // Anchor on the unique finally-block assignment the split signal sits beside.
-  const anchor = source.indexOf('results.consoleErrors = consoleErrors;');
-  assert.ok(anchor > 0, 'expected results.consoleErrors assignment in the harness');
-
-  // The finally block that owns that anchor opens with `} finally {` before it,
-  // and the summary.json write closes it after.
-  const finallyOpen = source.lastIndexOf('} finally {', anchor);
-  assert.ok(finallyOpen > 0 && finallyOpen < anchor, 'anchor must live inside a finally block');
+  // Anchor on the unique post-cleanup-phase assignment the split signal sits beside.
+  const endPhaseAt = source.indexOf('endPhase();');
+  assert.ok(endPhaseAt > 0, 'expected endPhase() to close the cleanup phase');
+  const anchor = source.indexOf('results.consoleErrors = consoleErrors;', endPhaseAt);
+  assert.ok(anchor > endPhaseAt, 'results.consoleErrors must be assigned after the cleanup phase closes');
 
   const summaryWrite = source.indexOf("join(resultsDir, 'summary.json')", anchor);
   assert.ok(summaryWrite > anchor, 'summary.json write must follow the anchor');
 
-  const stepFailuresAssign = source.indexOf('results.stepFailures =');
-  const consoleErrorCountAssign = source.indexOf('results.consoleErrorCount =');
+  const stepFailuresAssign = source.indexOf('results.stepFailures =', anchor);
+  const consoleErrorCountAssign = source.indexOf('results.consoleErrorCount =', anchor);
 
-  // Both assignments exist, sit AFTER the finally opens (not in the try), and
-  // BEFORE summary.json is written — i.e. in the same finally block.
-  assert.ok(stepFailuresAssign > finallyOpen, 'results.stepFailures must be assigned inside the finally block');
-  assert.ok(consoleErrorCountAssign > finallyOpen, 'results.consoleErrorCount must be assigned inside the finally block');
+  // Both assignments exist, sit AFTER results.consoleErrors, and BEFORE summary.json is written —
+  // i.e. in the same post-cleanup segment of runSmokeCleanup.
+  assert.ok(stepFailuresAssign > anchor, 'results.stepFailures must be assigned after results.consoleErrors');
+  assert.ok(
+    consoleErrorCountAssign > anchor,
+    'results.consoleErrorCount must be assigned after results.consoleErrors'
+  );
   assert.ok(stepFailuresAssign < summaryWrite, 'results.stepFailures must be written before summary.json');
   assert.ok(consoleErrorCountAssign < summaryWrite, 'results.consoleErrorCount must be written before summary.json');
 
   // And they are computed with computeSmokeSignal, the same helper this suite tests.
   assert.match(source, /computeSmokeSignal\(results\)/);
+});
 
-  // Pin the ACTUAL gate too: the terminal throw at the end of the try goes
-  // through evaluateSmokeOutcome (steps-first ordering, no input waives a step),
-  // not an inline re-implementation that could drift from the tested helper.
+test('the runner evaluates its terminal gate via evaluateSmokeOutcome, not an inline re-implementation', () => {
+  // The terminal throw at the end of the runner's try goes through evaluateSmokeOutcome
+  // (steps-first ordering, no input waives a step) — a runner-side concern, not cleanup.mjs's.
+  const source = smokeModule('foundry-test-run.mjs');
   assert.match(source, /evaluateSmokeOutcome\(\{ steps: results\.steps, consoleErrors \}\)/);
 });
 
@@ -545,29 +560,32 @@ test('source: d0RequiredCapturesComplete flips true AFTER the last capture, BEFO
   assert.match(source, /d0RequiredCapturesComplete: false,/);
 });
 
-test('source: results.degraded and results.rendererCrashed are assigned in the finally block before summary.json', async () => {
-  const source = SMOKE_SOURCE;
+test('runSmokeCleanup assigns results.degraded and results.rendererCrashed after the cleanup phase, before summary.json', () => {
+  const source = smokeModule('cleanup.mjs');
 
-  const anchor = source.indexOf('results.consoleErrors = consoleErrors;');
-  assert.ok(anchor > 0, 'expected the finally-block consoleErrors anchor');
-  const finallyOpen = source.lastIndexOf('} finally {', anchor);
-  assert.ok(finallyOpen > 0 && finallyOpen < anchor, 'anchor must live inside a finally block');
+  const endPhaseAt = source.indexOf('endPhase();');
+  assert.ok(endPhaseAt > 0, 'expected endPhase() to close the cleanup phase');
+  const anchor = source.indexOf('results.consoleErrors = consoleErrors;', endPhaseAt);
+  assert.ok(anchor > endPhaseAt, 'expected the post-cleanup-phase consoleErrors anchor');
   const summaryWrite = source.indexOf("join(resultsDir, 'summary.json')", anchor);
   assert.ok(summaryWrite > anchor, 'summary.json write must follow the anchor');
 
-  const degradedAssign = source.indexOf('results.degraded =', finallyOpen);
-  // Distinguish from the crash listener's `results.rendererCrashed = true` (which
-  // sits in the try, before the finally) by matching the finally-block coercion.
-  const rendererAssign = source.indexOf('results.rendererCrashed = Boolean(', finallyOpen);
+  const degradedAssign = source.indexOf('results.degraded =', anchor);
+  const rendererAssign = source.indexOf('results.rendererCrashed = Boolean(', anchor);
 
-  assert.ok(degradedAssign > finallyOpen, 'results.degraded must be assigned inside the finally block');
-  assert.ok(rendererAssign > finallyOpen, 'results.rendererCrashed must be assigned inside the finally block');
+  assert.ok(degradedAssign > anchor, 'results.degraded must be assigned after results.consoleErrors');
+  assert.ok(rendererAssign > anchor, 'results.rendererCrashed must be assigned after results.consoleErrors');
   assert.ok(degradedAssign < summaryWrite, 'results.degraded must be written before summary.json');
   assert.ok(rendererAssign < summaryWrite, 'results.rendererCrashed must be written before summary.json');
 
   // degraded is computed via the same helper this suite tests.
   assert.match(source, /const \{ stepFailures, consoleErrorCount, degraded \} = computeSmokeSignal\(results\)/);
-  // A causation-bearing renderer-crash listener feeds rendererCrashed.
+});
+
+test('a causation-bearing renderer-crash listener feeds results.rendererCrashed', () => {
+  // The listener that sets results.rendererCrashed = true lives in the runner's try, before its
+  // finally calls runSmokeCleanup — a runner-side concern, not cleanup.mjs's.
+  const source = smokeModule('foundry-test-run.mjs');
   assert.match(source, /page\.on\('crash'/);
 });
 
