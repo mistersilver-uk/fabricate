@@ -16,7 +16,7 @@ import { deleteSmokeWorldDocuments } from './pageOps/pageLifecycle.mjs';
  * Echo every waived console error to $GITHUB_STEP_SUMMARY for audit. A waiver must never be silent:
  * the CI log records which known-benign errors were admitted this run.
  */
-export async function echoWaivedConsoleErrorsToStepSummary(waived) {
+async function echoWaivedConsoleErrorsToStepSummary(waived) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath || waived.length === 0) return;
   const lines = [
@@ -37,7 +37,7 @@ export async function echoWaivedConsoleErrorsToStepSummary(waived) {
 /**
  * Format a list of timing entries as an aligned stdout table so slow phases are obvious in CI logs.
  */
-export function formatTimingsTable(timings) {
+function formatTimingsTable(timings) {
   if (timings.length === 0) return '';
   const rows = timings.map(({ phase, durationMs }) => ({
     phase,
@@ -58,7 +58,7 @@ export function formatTimingsTable(timings) {
  * Render the slowest captured views as an aligned stdout table (R3, #750). Only the top `limit` are
  * shown — enough to spot where the D0 walk spends its time — with each view's phase for context.
  */
-export function formatSlowestViewsTable(timings, limit = 12) {
+function formatSlowestViewsTable(timings, limit = 12) {
   if (timings.length === 0) return '';
   const sorted = [...timings].sort((a, b) => b.durationMs - a.durationMs).slice(0, limit);
   const rows = sorted.map(({ label, phase, durationMs }) => ({

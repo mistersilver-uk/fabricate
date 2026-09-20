@@ -116,27 +116,25 @@ test('the harness seeds tours on the CONTEXT, before the first page exists', asy
 test('the inlined page copy stays consistent with the tested module', () => {
   // `addInitScript` serializes its callback into the page, where this module's imports do not exist
   // — so the merge logic is necessarily duplicated there.
-  const harnessPromise = Promise.resolve(SMOKE_SOURCE);
-  return harnessPromise.then((harness) => {
-    const call = harness.slice(harness.indexOf('async function suppressFoundryTours'));
-    const body = call.slice(0, call.indexOf('\n}\n'));
-    assert.ok(
-      body.includes('key: TOUR_PROGRESS_STORAGE_KEY'),
-      'the init script must take its key from the module, not a literal'
-    );
-    assert.ok(
-      body.includes('stepIndex: SUPPRESSED_STEP_INDEX'),
-      'the init script must take its step index from the module, not a literal'
-    );
-    assert.ok(
-      body.includes('CORE_TOUR_IDS'),
-      'the init script must take its tour ids from the module, not a literal'
-    );
-    assert.ok(
-      body.includes("typeof core[id] !== 'number'"),
-      'the init script must merge without lowering recorded progress, matching withSuppressedTours'
-    );
-  });
+  const harness = SMOKE_SOURCE;
+  const call = harness.slice(harness.indexOf('async function suppressFoundryTours'));
+  const body = call.slice(0, call.indexOf('\n}\n'));
+  assert.ok(
+    body.includes('key: TOUR_PROGRESS_STORAGE_KEY'),
+    'the init script must take its key from the module, not a literal'
+  );
+  assert.ok(
+    body.includes('stepIndex: SUPPRESSED_STEP_INDEX'),
+    'the init script must take its step index from the module, not a literal'
+  );
+  assert.ok(
+    body.includes('CORE_TOUR_IDS'),
+    'the init script must take its tour ids from the module, not a literal'
+  );
+  assert.ok(
+    body.includes("typeof core[id] !== 'number'"),
+    'the init script must merge without lowering recorded progress, matching withSuppressedTours'
+  );
 });
 
 test('overlay detection is diagnostic only — it can never fail a healthy run', async () => {

@@ -202,7 +202,7 @@ export async function captureAlchemyThemes(ctx) {
 
 /**
  * Capture a manager view after applying the standard layout and overlay checks.
- * @param {import('playwright').Page} page
+ * @param {object} ctx The scenario context.
  * @param {{ width?: number, height?: number, layout: string, label: string, settleMs?: number }} options
  */
 export async function captureStableManagerView(

@@ -68,8 +68,8 @@ export function resolveSmokeProfileFlags(argv = process.argv.slice(2), env = pro
   // Scoping is active only under `screenshots` AND when a non-empty target set was supplied.
   const SCREENSHOT_SCOPING_ACTIVE =
     SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
-  // R2 (#750): the two 7-theme sweeps produce 14 `*-theme-<id>` frames that nothing asserts and
-  // that `ui-pr-screenshot-evidence.mjs` deliberately does not map.
+  // R2 (#750): captureManagerThemes + captureAlchemyThemes produce 14 `*-theme-<id>` frames that
+  // nothing asserts and that `ui-pr-screenshot-evidence.mjs`'s VIEW_RECIPES deliberately skips.
   const CAPTURE_THEME_SWEEPS =
     ['1', 'true', 'yes'].includes(String(env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase()) ||
     argv.includes('--themes');

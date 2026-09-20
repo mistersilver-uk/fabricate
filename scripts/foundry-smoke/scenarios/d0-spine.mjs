@@ -307,7 +307,7 @@ export default {
     d0ImportAlchemyExperimental,
   ],
   publishes: ['d0TeardownTolerated', 'd0RequiredCapturesComplete'],
-  consumes: ['cleanup', 'craftingSetup'],
+  consumes: ['cleanup', 'craftingSetup', 'd0RequiredCapturesComplete'],
   async run(ctx, { runChildren }) {
     const { page, results, screenshot, startPhase } = ctx;
     const { cleanup, craftingSetup } = ctx.shared;

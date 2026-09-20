@@ -177,14 +177,17 @@ test('SMOKE_SCENARIOS is the walk, in order, with no cleanup or teardown entry',
   }
 });
 
-test('every consumed key is published earlier in walk order, or by the runner', () => {
+test('every consumed key is published earlier in walk order, by the runner, or by the scenario itself', () => {
   const runnerPublished = new Set(['cleanup', 'bootTimings', 'screenshotRunIdentity']);
   const published = new Set(runnerPublished);
   for (const scenario of flatten(SMOKE_SCENARIOS)) {
+    // A scenario's own publishes land first: a scenario may write a key early in its run body
+    // and read it back later in the same run (a self-consumed publish, e.g. d0-spine's own
+    // d0RequiredCapturesComplete), which is not the forward-reference this guard checks for.
+    for (const key of scenario.publishes ?? []) published.add(key);
     for (const key of scenario.consumes ?? []) {
       assert.ok(published.has(key), `${scenario.id} consumes '${key}' before anything publishes it`);
     }
-    for (const key of scenario.publishes ?? []) published.add(key);
   }
 });
 

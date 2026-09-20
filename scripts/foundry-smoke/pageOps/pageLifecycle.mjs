@@ -834,8 +834,8 @@ export function attachConsoleCapture(page, ignoredErrorPatterns, sinks) {
     const text = location ? `${msg.text()} (${location})` : msg.text();
     consoleLog.push(`[${msg.type()}] ${text}`);
     if (msg.type() === 'error') {
-      // Route through the SHARED classifier the pageerror handler below also uses: a waiver
-      // match is recorded for audit only; anything else enters the gating consoleErrors list.
+      // Route through the SHARED classifier the pageerror handler below also uses: a match
+      // against the waiver patterns (defaults + any --allowed-console-error-patterns) is waived.
       if (classifyCapturedError(text, ignoredErrorPatterns).waived) {
         waivedConsoleErrors.push(text);
       } else {

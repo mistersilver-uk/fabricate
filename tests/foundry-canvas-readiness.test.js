@@ -3,15 +3,10 @@
  * (issue 1010).
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { isCanvasReadyForScene } from '../scripts/lib/foundryCanvasReadiness.js';
 import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
-
-const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const SCENE_ID = 'sceneAzureGrove';
 const OTHER_SCENE_ID = 'scenePreviouslyViewed';

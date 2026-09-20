@@ -1,7 +1,5 @@
 /** The Foundry smoke harness and the manager rail, held in lockstep IN CI (issue 1362). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -12,7 +10,6 @@ import {
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SMOKE_SOURCE, withinOneModule } from './helpers/interactablesSmokeLocators.js';
 
-const ROOT = resolve(import.meta.dirname, '..');
 // Read as TEXT. `foundry-test-run.mjs` launches Chromium on import, so a suite that imported it
 // would start the whole smoke run inside `node --test`.
 const harness = SMOKE_SOURCE;

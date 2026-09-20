@@ -1,8 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
   parseAllowedConsoleErrorPatterns,
@@ -23,9 +20,6 @@ import {
   SMOKE_SOURCE_FILES,
   SMOKE_SOURCE_SEGMENTS,
 } from './helpers/interactablesSmokeLocators.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const HARNESS_PATH = join(__dirname, '..', 'scripts', 'foundry-test-run.mjs');
 
 // A stand-in for "some pattern supplied as an in-source default", built HERE (issue 1010).
 const RETIRED_OBJECTS_WAIVER = /reading 'OBJECTS'/;
