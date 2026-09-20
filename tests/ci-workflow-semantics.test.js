@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -393,7 +395,7 @@ test('every declared tester-path secret reaches release-s3.js through every work
   }
 
   // Non-vacuity: every assertion below is a loop, and an empty one passes.
-  assert.ok(publishers.length >= 6, `found ${publishers.length} release-s3.js references`);
+  assert.ok(publishers.length >= 7, `found ${publishers.length} release-s3.js references`);
   assert.ok(callers.length >= 2, `found ${callers.length} callers of ${RELEASE_S3_WORKFLOW}`);
   assert.ok(declaredByReusable, 'release-s3.yml declares no workflow_call secrets');
 
@@ -475,6 +477,8 @@ test('a semantic-release publisher only publishes a version THIS run minted', ()
   // semantic-release's addChannel phase fires `success` for an ALREADY-released version, so the
   // raw successCmd outputs cannot tell a mint from a re-add. The discriminator is the tag set
   // captured before the run; the job's outputs must come from the step that applies it.
+  let assetPins = 0;
+
   for (const file of ['release.yml', 'beta.yml']) {
     const source = readFileSync(path.join(WORKFLOWS, file), 'utf8');
     const jobs = parseJobs(source);
@@ -518,12 +522,18 @@ test('a semantic-release publisher only publishes a version THIS run minted', ()
     );
     assert.equal(classifier.env.NEXT_TAG, '${{ steps.semrel.outputs.next_tag }}');
     assert.equal(classifier.env.NEXT_VERSION, '${{ steps.semrel.outputs.next_version }}');
-    // The no-mint case must SAY so; a silent skip reads as a publish that simply did not log.
-    assert.match(classifier.run, /::notice::/, `${file}'s classifier must state the no-mint case`);
+    // The no-mint case must say so, naming the phase that produced it; a silent skip reads as a
+    // publish that simply did not log.
+    assert.match(
+      classifier.run,
+      /::notice::\$NEXT_TAG existed before this run — semantic-release's addChannel phase/,
+      `${file}'s classifier must name the addChannel re-add as the reason nothing is published`
+    );
 
     // Where the publisher asserts its draft's assets, that assertion is about the MINTED draft.
     const assets = steps.find((step) => /gh release view/.test(step.run));
     if (assets) {
+      assetPins += 1;
       assert.equal(assets.if, "${{ steps.minted.outputs.next_tag != '' }}");
       assert.equal(assets.env.RELEASE_TAG, '${{ steps.minted.outputs.next_tag }}');
     }
@@ -540,12 +550,66 @@ test('a semantic-release publisher only publishes a version THIS run minted', ()
     // Non-vacuity: a gate that is false for everything would satisfy the three assertions above.
     const minted = mintedContext({ nextVersion: '1.9.7', verify: 'success' });
     assert.equal(gateValue(jobs['publish-s3'].if, minted), true, `${file} skips a genuinely minted version`);
+    assert.equal(gateValue(jobs['verify-publish'].if, minted), true, `${file} skips verifying a real publish`);
     if (jobs['forward-port']) {
       assert.equal(gateValue(jobs['forward-port'].if, minted), true, `${file} skips the forward-port for a minted version`);
       // The workflow_dispatch(tag) re-entry is unaffected: it publishes the tag it was given.
       const reentry = mintedContext({ nextVersion: '', tag: 'v1.9.6', verify: 'success' });
       assert.equal(gateValue(jobs['publish-s3'].if, reentry), true, `${file}'s re-entry path no longer publishes`);
     }
+  }
+
+  // Non-vacuity: the draft-asset assertions live behind an `if`, so a renamed step would skip them.
+  assert.ok(assetPins >= 1, 'no semantic-release job was found asserting its drafted release assets');
+});
+
+/** The env var a classifier step binds to one semantic-release output. */
+function inputNameFor(step, output) {
+  return Object.entries(step.env).find(([, expr]) => expr.includes(`outputs.${output}`))?.[0];
+}
+
+/** Run a classifier's own `run:` body against a synthetic pre-run tag snapshot. */
+function runClassifier(step, { tag, version, snapshot }) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'mint-classifier-'));
+  try {
+    writeFileSync(path.join(dir, 'pre-release-tags.txt'), snapshot);
+    const outputFile = path.join(dir, 'github-output');
+    writeFileSync(outputFile, '');
+    const env = { PATH: process.env.PATH, RUNNER_TEMP: dir, GITHUB_OUTPUT: outputFile };
+    env[inputNameFor(step, 'next_tag')] = tag;
+    env[inputNameFor(step, 'next_version')] = version;
+    const result = spawnSync('bash', ['-e'], { input: step.run, env, encoding: 'utf8' });
+    return { ...result, outputs: readFileSync(outputFile, 'utf8') };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("the classifier's shell body mints only a tag absent from the pre-run snapshot", () => {
+  // The workflow-level assertions above read the gate; this one runs it. A tag already in the
+  // snapshot is an addChannel re-add and populates no output, so nothing downstream publishes.
+  for (const file of ['release.yml', 'beta.yml']) {
+    const source = readFileSync(path.join(WORKFLOWS, file), 'utf8');
+    const step = parseJobs(source)['semantic-release'].steps.find((one) => one.id === 'minted');
+    const snapshot = 'v1.9.6\n';
+
+    const readd = runClassifier(step, { tag: 'v1.9.6', version: '1.9.6', snapshot });
+    assert.equal(readd.status, 0, `${file}'s classifier failed on a re-add: ${readd.stderr}`);
+    assert.equal(readd.outputs, '', `${file} published v1.9.6 again after an addChannel re-add`);
+    assert.match(readd.stdout, /::notice::v1\.9\.6 existed before this run/);
+
+    const mint = runClassifier(step, { tag: 'v1.9.7', version: '1.9.7', snapshot });
+    assert.equal(mint.status, 0, `${file}'s classifier failed on a mint: ${mint.stderr}`);
+    assert.equal(mint.outputs, 'next_version=1.9.7\nnext_tag=v1.9.7\n', `${file} minted nothing`);
+
+    // Exactness: v1.9.6 is a prefix of v1.9.60, and a substring match would swallow the mint.
+    const longer = runClassifier(step, { tag: 'v1.9.60', version: '1.9.60', snapshot });
+    assert.equal(longer.outputs, 'next_version=1.9.60\nnext_tag=v1.9.60\n', `${file} lost v1.9.60`);
+
+    const nothing = runClassifier(step, { tag: '', version: '', snapshot });
+    assert.equal(nothing.status, 0, `${file}'s classifier failed when semrel minted nothing`);
+    assert.equal(nothing.outputs, '', `${file} published a version semantic-release never named`);
+    assert.match(nothing.stdout, /::notice::semantic-release minted nothing/);
   }
 });
 
@@ -613,6 +677,14 @@ test('every job that publishes from a checked-out tag takes its configuration fr
       }
     }
   }
+
+  // The preflights above grep a literal out of the publisher's source, so that literal is a
+  // hand-maintained mirror: pin it here rather than let a rename make every preflight refuse.
+  assert.match(
+    readFileSync(path.join(REPOSITORY_ROOT, 'scripts', 'release-s3.js'), 'utf8'),
+    /'--config'/,
+    'the tag preflights grep for "\'--config\'" in scripts/release-s3.js; that literal has moved'
+  );
 
   // Non-vacuity: the walk must reach BOTH shapes — the dedicated publisher and the promotion's
   // single-body re-stage — or one of them could lose its capture unobserved.

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   assertHotfixMinimumNotRaised,
@@ -370,4 +373,38 @@ test('no path SEGMENT reaches the summary or the remedy — only names are compa
   } finally {
     delete process.env.S3_GUILD_ARTISAN_PATH_SECRET;
   }
+});
+
+// The shipped config is the shape the guard actually reads in CI, so the fixtures above are a
+// mirror of it: a renamed field would leave them green and every real promotion undiagnosed.
+test('the shipped release.s3.config.json declares an early-access identity the guard can read', () => {
+  const real = JSON.parse(
+    readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'release.s3.config.json'),
+      'utf8'
+    )
+  );
+  const agrees = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: real,
+    publisherConfig: real,
+  });
+  assert.equal(agrees.drifted, false, 'the shipped config drifts against itself');
+
+  const preRotation = {
+    ...real,
+    channels: {
+      ...real.channels,
+      'early-access': { ...real.channels['early-access'], testerGroups: ['patrons-2026'] },
+    },
+  };
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: real,
+    publisherConfig: preRotation,
+  });
+  assert.equal(drift.drifted, true);
+  assert.match(drift.summary, /guild-artisan-2026/);
+  assert.match(drift.summary, /patrons-2026/);
+  assert.match(drift.summary, /S3_GUILD_ARTISAN_PATH_SECRET/);
 });
