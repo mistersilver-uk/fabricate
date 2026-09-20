@@ -5,14 +5,6 @@ import {
   getCharacterPrerequisitePresetsForFoundrySystem,
   seedCharacterPrerequisitePresets,
 } from '../../../config/characterPrerequisitePresets.js';
-import {
-  getCurrencyPresetsForFoundrySystem,
-  seedCurrencyPresets,
-} from '../../../config/currencyPresets.js';
-import {
-  getDefaultProviderId,
-  getProviderCanonicalUnits,
-} from '../../../config/currencyProviders.js';
 import { getFabricateFlag } from '../../../config/flags.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
@@ -56,13 +48,6 @@ import {
   planTagRemovals,
   planRecipeTagRemovals,
 } from '../../model/vocabularyCascade.js';
-import {
-  canAddCurrencySubUnit,
-  CURRENCY_MACRO_KEYS,
-  normalizeCurrencyUnit,
-  normalizeWorldCurrencyConfig,
-  validateCurrencyProfile,
-} from '../../../systems/currencyProfile.js';
 import {
   authoredCheckModifierIds,
   isRollExpression,
@@ -124,10 +109,7 @@ import {
 import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
 import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
 import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
-import {
-  defaultKnowledgeTab,
-  projectKnowledgeSnapshot,
-} from '../apps/manager/knowledge/knowledgeStudio.js';
+import { projectKnowledgeSnapshot } from '../apps/manager/knowledge/knowledgeStudio.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   TIME_OF_DAY_ICONS,
@@ -155,7 +137,13 @@ import {
   clonePlain as _clonePlain,
   fallbackRandomID as _fallbackRandomID,
   normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
+  reorderListByIndex as _reorderListByIndex,
 } from './adminStoreInternals.js';
+import {
+  createCurrencySection,
+  emptyWorldCurrencyState,
+} from './adminCurrencySection.js';
+import { createKnowledgeSection } from './adminKnowledgeSection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
@@ -285,68 +273,6 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
 });
 
 // --- Module-private helper functions ---
-
-// --- Currency unit mutation helpers, module-level and shallow so the mutate callbacks stay flat ---
-
-function _stripSubUnit(unit, subUnitId) {
-  return {
-    ...unit,
-    contains: (unit.contains || []).filter((entry) => entry.unitId !== subUnitId),
-  };
-}
-
-function _deleteCurrencyUnitFromList(units, unitId) {
-  if (!unitId) return null;
-  const nextUnits = units
-    .filter((unit) => unit.id !== unitId)
-    .map((unit) => _stripSubUnit(unit, unitId));
-  return nextUnits.length === units.length ? null : nextUnits;
-}
-
-/** Reorder a list, returning a new array, or `null` for an invalid or no-op move. */
-function _reorderListByIndex(list, fromIndex, toIndex) {
-  const source = Array.isArray(list) ? list : [];
-  const from = Number(fromIndex);
-  const to = Number(toIndex);
-  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
-  if (from < 0 || from >= source.length) return null;
-  if (to < 0 || to >= source.length) return null;
-  if (from === to) return null;
-  const next = [...source];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
-}
-
-function _setSubUnitAmount(entry, subUnitId, numericAmount) {
-  if (entry.unitId !== subUnitId) return entry;
-  return { ...entry, amount: numericAmount };
-}
-
-function _updateSubUnitAmountInList(units, parentUnitId, subUnitId, numericAmount) {
-  let changed = false;
-  const nextUnits = units.map((unit) => {
-    if (unit.id !== parentUnitId) return unit;
-    const contains = (unit.contains || []).map((entry) => {
-      const updated = _setSubUnitAmount(entry, subUnitId, numericAmount);
-      if (updated !== entry) changed = true;
-      return updated;
-    });
-    return { ...unit, contains };
-  });
-  return { nextUnits, changed };
-}
-
-function _deleteSubUnitFromList(units, parentUnitId, subUnitId) {
-  let changed = false;
-  const nextUnits = units.map((unit) => {
-    if (unit.id !== parentUnitId) return unit;
-    const contains = (unit.contains || []).filter((entry) => entry.unitId !== subUnitId);
-    if (contains.length !== (unit.contains || []).length) changed = true;
-    return { ...unit, contains };
-  });
-  return { nextUnits, changed };
-}
 
 function _nextSystemName(systemManager) {
   const base = 'New Crafting System';
@@ -1073,39 +999,6 @@ function _graphSearchMatches(index, lowerSearchTerm) {
   return matches;
 }
 
-// The WORLD currency projection (issue 1278). A top-level sibling, never hung off
-// `selectedSystem`: the config is world scope, and hanging it there would make the same ladder
-// appear to change when the GM merely clicks a different crafting system.
-function _emptyWorldCurrencyState() {
-  return {
-    worldCurrency: {
-      spendStrategy: 'actorProperty',
-      providerId: '',
-      macros: { canAfford: '', increment: '', decrement: '', balance: '' },
-      units: [],
-    },
-    worldCurrencyValidation: _emptyWorldCurrencyValidation(),
-  };
-}
-
-// The derived `validateCurrencyProfile` report for the world ladder (issue 1493), a top-level
-// sibling of `worldCurrency` rather than a fifth key inside it, since `CurrencyConfig` is exactly
-// those four keys. Only `valid` and `errors` are published; no surface reads the rest.
-function _emptyWorldCurrencyValidation() {
-  return { valid: true, errors: [] };
-}
-
-function _buildWorldCurrencyValidation(config) {
-  const report = validateCurrencyProfile(config?.units, {
-    spendStrategy: config?.spendStrategy,
-    macros: config?.macros,
-  });
-  return {
-    valid: report?.valid === true,
-    errors: Array.isArray(report?.errors) ? [...report.errors] : [],
-  };
-}
-
 // The WORLD character libraries projection (issue 1308), a top-level sibling for the reason the
 // currency projection is one.
 function _emptyCharacterLibrariesState() {
@@ -1433,18 +1326,6 @@ export function createAdminStore(services) {
     return layoutGraph(buildBoundedRecipeGraph(index, { scope }));
   }
 
-  // `refresh()` is invoked by ~40 mutation paths and a whole-world `actors x items` scan has no cheap
-  // invalidation signature, so the knowledge projection must not join it (issue 785).
-  // `knowledgeActive` makes `refreshKnowledge()` a total no-op while the surface is closed.
-  let knowledgeActive = false;
-  let knowledgeSnapshot = null;
-  let knowledgeSelectedActorId = '';
-  let knowledgeRefreshScheduled = false;
-  // Resolved ONCE per surface entry from the DEFINITION count, never as a live derivation: a GM
-  // authoring the first recipe item elsewhere would flip 0 -> 1 and yank the open tab mid-task.
-  let knowledgeDefaultTab = defaultKnowledgeTab(0);
-  let knowledgeDefaultTabResolved = false;
-
   // Per-store item-card memo (store-instance scope, NEVER module-global — avoids cross-app/test
   // bleed). OWNED here and INJECTED into the projection for that reason; see
   // `adminComponentRowProjection.js`. Cleared in `refresh()` on a resolved-system-id change.
@@ -1505,7 +1386,7 @@ export function createAdminStore(services) {
     knowledge: projectKnowledgeSnapshot(null, { active: false }),
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
-    ..._emptyWorldCurrencyState(),
+    ...emptyWorldCurrencyState(),
     ..._emptyCharacterLibrariesState(),
     // The three world-scope entity corpora (issue 1362). Seeded EMPTY rather than absent so a world
     // screen mounted before the first publish reads a shape, and `seeded` reads all-false — an
@@ -2224,6 +2105,19 @@ export function createAdminStore(services) {
   // Kept thin: uniqueness/invariant validation lives in GatheringPartyStore and GatheringRealmStore;
   // this section surfaces their errors inline and refreshes derived view state.
   const travel = _createTravelSection();
+
+  // --- Currency and Knowledge sections (issue 1708) ---
+  // Each owns its own state and returns the subset of the store API it implements; the store holds
+  // only the returned object and wires the few call-ins the rest of it makes.
+  const currency = createCurrencySection({ services, randomID: _randomID, refresh });
+  const knowledge = createKnowledgeSection({
+    services,
+    viewState,
+    selectedSystemId,
+    deleteConfirmButtons: _deleteConfirmButtons,
+    onMicrotask: _onMicrotask,
+    isDestroyed: () => destroyed,
+  });
 
   function _createTravelSection() {
     function getPartyStore() {
@@ -3934,22 +3828,10 @@ export function createAdminStore(services) {
       graphSearchTerm: get(graphSearch),
       ...environmentState,
       ...travel.buildState(),
-      ...buildWorldCurrencyState(),
+      ...currency.buildState(),
       ...buildCharacterLibrariesState(),
       ...worldScopeState,
     }));
-  }
-
-  // Read the world currency config straight from its store on every publish: cheap (one setting
-  // read plus a normalize), and honest when another client's GM edits the ladder — there is no
-  // per-system cache to invalidate because there is no per-system copy any more.
-  function buildWorldCurrencyState() {
-    const store = services.getCurrencyConfigStore?.();
-    if (!store) return _emptyWorldCurrencyState();
-    const worldCurrency = normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID });
-    // Validated on every publish, off the SAME normalized config the editor renders, so the
-    // report can never describe a ladder the GM is not looking at. Pure in-memory work.
-    return { worldCurrency, worldCurrencyValidation: _buildWorldCurrencyValidation(worldCurrency) };
   }
 
   // The three world-scope entity corpora (issue 1362), read straight from their stores on every
@@ -4836,206 +4718,6 @@ export function createAdminStore(services) {
     };
   }
 
-  // GM Knowledge surface (issue 785).
-
-  function _knowledgeRawCharacter(actorId) {
-    const characters = Array.isArray(knowledgeSnapshot?.characters)
-      ? knowledgeSnapshot.characters
-      : [];
-    return characters.find((character) => String(character?.id) === String(actorId)) || null;
-  }
-
-  function _knowledgeRawOwnedCopy(actorId, itemId) {
-    const copies = _knowledgeRawCharacter(actorId)?.ownedCopies || [];
-    return copies.find((copy) => String(copy?.itemId) === String(itemId)) || null;
-  }
-
-  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key is a STATIC
-  // literal at its call site, because an interpolated key is invisible to both
-  // `ui-lang-keys-resolve` and `lang-keys-no-orphans` and a missing message would ship silently.
-  function _knowledgeText(key, fallback, data = null) {
-    const localized = data ? services.localize?.(key, data) : services.localize?.(key);
-    if (localized) return localized;
-    if (!data) return fallback;
-    return Object.entries(data).reduce(
-      (text, [name, value]) => text.replace(`{${name}}`, String(value)),
-      fallback
-    );
-  }
-
-  function _notifyKnowledgeResult(result) {
-    const message = result?.message;
-    if (!message) return;
-    const text = services.localize?.(message, result?.messageData) || message;
-    if (result?.success === true) services.notify?.info?.(text);
-    else services.notify?.error?.(text);
-  }
-
-  function _publishKnowledge() {
-    viewState.update((prev) => ({
-      ...prev,
-      knowledge: projectKnowledgeSnapshot(knowledgeSnapshot, {
-        active: knowledgeActive,
-        selectedActorId: knowledgeSelectedActorId,
-        defaultTab: knowledgeDefaultTab,
-      }),
-    }));
-  }
-
-  function _clearKnowledgeCache() {
-    knowledgeSnapshot = null;
-    knowledgeDefaultTabResolved = false;
-    knowledgeSelectedActorId = '';
-  }
-
-  /**
-   * Re-read the Knowledge snapshot.
-   *
-   * @param {{force?: boolean}} [options] `force` re-reads the seam; otherwise a cached snapshot is
-   * simply re-published.
-   */
-  async function refreshKnowledge({ force = false } = {}) {
-    if (!knowledgeActive) return false;
-    if (force || !knowledgeSnapshot) {
-      const systemId = get(selectedSystemId);
-      knowledgeSnapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
-      if (!knowledgeDefaultTabResolved) {
-        knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
-        knowledgeDefaultTabResolved = true;
-      }
-    }
-    _publishKnowledge();
-    return true;
-  }
-
-  /** Hook entry point. */
-  function scheduleKnowledgeRefresh() {
-    if (destroyed || !knowledgeActive || knowledgeRefreshScheduled) return;
-    knowledgeRefreshScheduled = true;
-    _onMicrotask(async () => {
-      knowledgeRefreshScheduled = false;
-      if (destroyed) return;
-      await refreshKnowledge({ force: true });
-    });
-  }
-
-  /** Enter or leave the Knowledge surface. */
-  async function setKnowledgeActive(active) {
-    const next = active === true;
-    knowledgeActive = next;
-    if (!next) {
-      _clearKnowledgeCache();
-      _publishKnowledge();
-      return false;
-    }
-    await refreshKnowledge({ force: true });
-    return true;
-  }
-
-  /** Select a roster character. Pure re-publication — no seam read. */
-  function selectKnowledgeActor(actorId) {
-    knowledgeSelectedActorId = String(actorId || '');
-    if (!knowledgeActive) return false;
-    _publishKnowledge();
-    return true;
-  }
-
-  async function _runKnowledgeMutation(call) {
-    const result = (await call()) || {
-      success: false,
-      message: 'FABRICATE.Knowledge.Manage.Failed',
-    };
-    _notifyKnowledgeResult(result);
-    await refreshKnowledge({ force: true });
-    return result;
-  }
-
-  /** Spend one charge of an owned recipe-item copy. */
-  async function expendRecipeItemUse(actorId, itemId) {
-    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
-    return _runKnowledgeMutation(() =>
-      services.expendRecipeItemUse?.({
-        actorId,
-        itemId,
-        definitionId: copy?.definitionId || '',
-        systemId: get(selectedSystemId),
-      })
-    );
-  }
-
-  /** Delete one owned copy. */
-  async function deleteOwnedRecipeItem(actorId, itemId) {
-    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
-    const quantity = Number(copy?.quantity) || 1;
-    if (quantity > 1) {
-      const confirmed = await services.confirmDialog?.({
-        title: _knowledgeText(
-          'FABRICATE.Admin.Manager.Knowledge.DeleteStackTitle',
-          'Delete the whole stack?'
-        ),
-        content: `<p>${_knowledgeText(
-          'FABRICATE.Admin.Manager.Knowledge.DeleteStackContent',
-          'This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.',
-          { quantity }
-        )}</p>`,
-        ..._deleteConfirmButtons(),
-      });
-      if (!confirmed) return { success: false, cancelled: true };
-    }
-    return _runKnowledgeMutation(() => services.deleteOwnedRecipeItem?.({ actorId, itemId }));
-  }
-
-  /**
-   * Erase one learned recipe. Frees the learn budget but deliberately leaves discovery progress
-   * intact — an erase is an un-learn, a reset is an amnesia.
-   */
-  async function eraseLearnedRecipe(actorId, recipeId) {
-    return _runKnowledgeMutation(() => services.eraseLearnedRecipe?.({ actorId, recipeId }));
-  }
-
-  async function _confirmKnowledgeReset(titleKey, titleFallback, contentKey, contentFallback) {
-    const note = _knowledgeText(
-      'FABRICATE.Admin.Manager.Knowledge.ResetDiscoveryNote',
-      'Erasing a single memory leaves discovery progress intact; a reset also clears it.'
-    );
-    return services.confirmDialog?.({
-      title: _knowledgeText(titleKey, titleFallback),
-      content: `<p>${_knowledgeText(contentKey, contentFallback)}</p><p>${note}</p>`,
-      // A reset erases learned knowledge but deletes no definition, so it names its own
-      // verb rather than reusing the delete pair.
-      yes: {
-        label: _knowledgeText('FABRICATE.Admin.Manager.Knowledge.ResetConfirm', 'Reset'),
-        callback: () => true,
-      },
-      no: { callback: () => false },
-    });
-  }
-
-  /** Reset this character's learned knowledge for the SELECTED system. */
-  async function resetActorSystemKnowledge(actorId) {
-    const confirmed = await _confirmKnowledgeReset(
-      'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',
-      'Reset this system?',
-      'FABRICATE.Admin.Manager.Knowledge.ResetSystemContent',
-      'Clear every recipe this character has learned in the selected crafting system.'
-    );
-    if (!confirmed) return { success: false, cancelled: true };
-    const systemId = get(selectedSystemId);
-    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId }));
-  }
-
-  /** Reset this character's learned knowledge across every system. */
-  async function resetActorAllKnowledge(actorId) {
-    const confirmed = await _confirmKnowledgeReset(
-      'FABRICATE.Admin.Manager.Knowledge.ResetAllTitle',
-      'Reset every system?',
-      'FABRICATE.Admin.Manager.Knowledge.ResetAllContent',
-      'Clear every recipe this character has learned across all crafting systems, including entries whose recipe no longer exists.'
-    );
-    if (!confirmed) return { success: false, cancelled: true };
-    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId: null }));
-  }
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -5073,7 +4755,7 @@ export function createAdminStore(services) {
     _clearSystemScopedSearches();
     // The Knowledge snapshot is scoped to ONE system's recipe-item definitions
     // (identity is system-scoped), so it can never survive a system change.
-    _clearKnowledgeCache();
+    knowledge.clearCache();
     selectedEnvironmentId.set('');
     selectedEnvironmentSystemId.set(systemId || '');
     _setEnvironmentDraftState(null, { persistedDraft: null });
@@ -7825,217 +7507,6 @@ export function createAdminStore(services) {
   const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
   const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
 
-  // Currency is WORLD scope (issue 1278): a world runs exactly one Foundry game system and so has
-  // exactly one way actors store coins.
-
-  async function _updateCurrencyConfig(mutate) {
-    const store = services.getCurrencyConfigStore?.();
-    if (!store) return false;
-
-    const currency = normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID });
-    const result = await mutate(currency);
-    if (result === false) return false;
-
-    await store.save(currency);
-    await refresh();
-    return result ?? true;
-  }
-
-  async function addCurrencyUnit(partial = {}) {
-    return await _updateCurrencyConfig((currency) => {
-      const id = String(partial?.id || _randomID()).trim();
-      if (!id || currency.units.some((unit) => unit.id === id)) return null;
-      const unit = normalizeCurrencyUnit(
-        {
-          id,
-          label:
-            partial?.label ||
-            services.localize?.('FABRICATE.Admin.Manager.CurrencyUnits.NewLabel') ||
-            'Currency unit',
-          abbreviation: partial?.abbreviation || '',
-          icon: partial?.icon || 'fa-solid fa-coins',
-          actorPath: partial?.actorPath || '',
-          contains: partial?.contains || [],
-        },
-        _randomID
-      );
-      if (!unit) return null;
-      currency.units = [...currency.units, unit];
-      return unit;
-    });
-  }
-
-  async function updateCurrencyUnit(unitId, updates = {}) {
-    return await _updateCurrencyConfig((currency) => {
-      if (!unitId) return false;
-      let changed = false;
-      currency.units = currency.units.map((unit) => {
-        if (unit.id !== unitId) return unit;
-        changed = true;
-        return normalizeCurrencyUnit({ ...unit, ...updates, id: unit.id }, _randomID) || unit;
-      });
-      return changed;
-    });
-  }
-
-  async function deleteCurrencyUnit(unitId) {
-    return await _updateCurrencyConfig((currency) => {
-      const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
-      if (!nextUnits) return false;
-      currency.units = nextUnits;
-      return true;
-    });
-  }
-
-  /**
-   * Move one currency unit from `fromIndex` to `toIndex` (issue 768); array order is the persisted
-   * order. Takes no system id, because the ladder is world scope.
-   */
-  async function reorderCurrencyUnit(fromIndex, toIndex) {
-    return await _updateCurrencyConfig((currency) => {
-      const next = _reorderListByIndex(currency.units, fromIndex, toIndex);
-      if (!next) return false;
-      currency.units = next;
-      return true;
-    });
-  }
-
-  async function addCurrencySubUnit(parentUnitId, subUnitId, amount = 1) {
-    return await _updateCurrencyConfig((currency) => {
-      if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
-      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
-      currency.units = currency.units.map((unit) =>
-        unit.id === parentUnitId
-          ? {
-              ...unit,
-              contains: [...(unit.contains || []), { unitId: subUnitId, amount: numericAmount }],
-            }
-          : unit
-      );
-      return true;
-    });
-  }
-
-  async function updateCurrencySubUnit(parentUnitId, subUnitId, amount) {
-    return await _updateCurrencyConfig((currency) => {
-      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
-      const { nextUnits, changed } = _updateSubUnitAmountInList(
-        currency.units,
-        parentUnitId,
-        subUnitId,
-        numericAmount
-      );
-      currency.units = nextUnits;
-      return changed;
-    });
-  }
-
-  async function deleteCurrencySubUnit(parentUnitId, subUnitId) {
-    return await _updateCurrencyConfig((currency) => {
-      const { nextUnits, changed } = _deleteSubUnitFromList(
-        currency.units,
-        parentUnitId,
-        subUnitId
-      );
-      currency.units = nextUnits;
-      return changed;
-    });
-  }
-
-  function _foundrySystemId() {
-    return typeof services.getFoundrySystemId === 'function'
-      ? String(services.getFoundrySystemId() || '')
-      : '';
-  }
-
-  // Provider inventory mode means "use the system's coins": the provider owns the denomination
-  // ladder, so `config.units` is overwritten with its canonical units and re-normalized, keeping
-  // the engine's affordability math aligned.
-  function _applyProviderCanonicalUnits(currency) {
-    const normalizedCanonical = getProviderCanonicalUnits(currency.providerId)
-      .map((unit) => normalizeCurrencyUnit(unit, _randomID))
-      .filter(Boolean);
-    if (normalizedCanonical.length === 0) return;
-    currency.units = normalizedCanonical;
-  }
-
-  async function setCurrencySpendStrategy(spendStrategy) {
-    const nextStrategy = ['actorInventory', 'macro'].includes(spendStrategy)
-      ? spendStrategy
-      : 'actorProperty';
-    return await _updateCurrencyConfig((currency) => {
-      currency.spendStrategy = nextStrategy;
-      // Switching to actorInventory seeds a default providerId and syncs the provider's canonical units,
-      // guarded so a no-provider system never wipes the GM's. Switching to macro leaves them in place,
-      // because macros own conversion by abbreviation.
-      if (nextStrategy === 'actorInventory') {
-        if (!currency.providerId) {
-          currency.providerId = getDefaultProviderId(_foundrySystemId());
-        }
-        _applyProviderCanonicalUnits(currency);
-      }
-      return true;
-    });
-  }
-
-  async function setCurrencyProvider(providerId) {
-    return await _updateCurrencyConfig((currency) => {
-      currency.providerId = String(providerId || '').trim();
-      // Selecting a provider adopts its canonical units under the actorInventory strategy; under
-      // other strategies the providerId is inert and user-managed units stay untouched.
-      if (currency.spendStrategy === 'actorInventory') {
-        _applyProviderCanonicalUnits(currency);
-      }
-      return true;
-    });
-  }
-
-  async function setCurrencyMacro(key, uuid) {
-    if (!CURRENCY_MACRO_KEYS.includes(key)) return false;
-    return await _updateCurrencyConfig((currency) => {
-      currency.macros = { ...currency.macros, [key]: String(uuid || '').trim() };
-      return true;
-    });
-  }
-
-  async function clearCurrencyMacro(key) {
-    return await setCurrencyMacro(key, '');
-  }
-
-  async function seedCurrencyUnitPresets() {
-    const foundrySystemId =
-      typeof services.getFoundrySystemId === 'function'
-        ? String(services.getFoundrySystemId() || '')
-        : '';
-    const presets = getCurrencyPresetsForFoundrySystem(foundrySystemId);
-    if (!presets || presets.length === 0) {
-      return { added: [], skipped: [], unsupported: true, foundrySystemId };
-    }
-    return await _updateCurrencyConfig((currency) => {
-      const result = seedCurrencyPresets({
-        presets,
-        currentUnits: currency.units || [],
-      });
-      currency.units = result.next
-        .map((unit) => normalizeCurrencyUnit(unit, _randomID))
-        .filter(Boolean);
-      // pf2e coins live in the actor inventory (read/spent via actor.inventory.removeCoins),
-      // not at a flat actor property, so the pf2e preset selects the actorInventory spend
-      // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
-      currency.spendStrategy = foundrySystemId === 'pf2e' ? 'actorInventory' : 'actorProperty';
-      // pf2e seeds the system's default provider; dnd5e stays on actorProperty where providerId is
-      // inert (but still normalized/persisted).
-      if (foundrySystemId === 'pf2e') {
-        currency.providerId = getDefaultProviderId(foundrySystemId);
-        // The actorInventory strategy is provider-owned, so overwrite the seeded units with the
-        // provider's canonical ladder (a clean overwrite of the same pf2e preset list) rather than
-        // the merge above, keeping the engine on canonical denominations.
-        _applyProviderCanonicalUnits(currency);
-      }
-      return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
-    });
-  }
-
   async function saveAlchemyConfig(config = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -8908,9 +8379,7 @@ export function createAdminStore(services) {
     unsubscribeTravelMarkerMove = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
-    knowledgeRefreshScheduled = false;
-    knowledgeActive = false;
-    _clearKnowledgeCache();
+    knowledge.deactivate();
     // The graph index retains the whole recipe corpus's component sets (issue 1082); a closed
     // manager must not keep them alive alongside the knowledge snapshot.
     graphIndexCache = null;
@@ -9104,18 +8573,18 @@ export function createAdminStore(services) {
     saveGatheringCheckActive,
     saveGatheringCheckProgressive,
     saveGatheringCheckRouted,
-    addCurrencyUnit,
-    updateCurrencyUnit,
-    deleteCurrencyUnit,
-    reorderCurrencyUnit,
-    addCurrencySubUnit,
-    updateCurrencySubUnit,
-    deleteCurrencySubUnit,
-    setCurrencySpendStrategy,
-    setCurrencyProvider,
-    setCurrencyMacro,
-    clearCurrencyMacro,
-    seedCurrencyUnitPresets,
+    addCurrencyUnit: currency.addCurrencyUnit,
+    updateCurrencyUnit: currency.updateCurrencyUnit,
+    deleteCurrencyUnit: currency.deleteCurrencyUnit,
+    reorderCurrencyUnit: currency.reorderCurrencyUnit,
+    addCurrencySubUnit: currency.addCurrencySubUnit,
+    updateCurrencySubUnit: currency.updateCurrencySubUnit,
+    deleteCurrencySubUnit: currency.deleteCurrencySubUnit,
+    setCurrencySpendStrategy: currency.setCurrencySpendStrategy,
+    setCurrencyProvider: currency.setCurrencyProvider,
+    setCurrencyMacro: currency.setCurrencyMacro,
+    clearCurrencyMacro: currency.clearCurrencyMacro,
+    seedCurrencyUnitPresets: currency.seedCurrencyUnitPresets,
     saveAlchemyConfig,
     setAlchemyCheckMode,
     saveTeaserConfig,
@@ -9177,16 +8646,16 @@ export function createAdminStore(services) {
     deleteRealm: travel.deleteRealm,
     setGatheringRealmsEnabled,
     // --- GM Knowledge surface (issue 785) ---
-    setKnowledgeActive,
-    refreshKnowledge,
-    scheduleKnowledgeRefresh,
+    setKnowledgeActive: knowledge.setKnowledgeActive,
+    refreshKnowledge: knowledge.refreshKnowledge,
+    scheduleKnowledgeRefresh: knowledge.scheduleKnowledgeRefresh,
     markLearnedRecipeIndexStale,
-    selectKnowledgeActor,
-    expendRecipeItemUse,
-    deleteOwnedRecipeItem,
-    eraseLearnedRecipe,
-    resetActorSystemKnowledge,
-    resetActorAllKnowledge,
+    selectKnowledgeActor: knowledge.selectKnowledgeActor,
+    expendRecipeItemUse: knowledge.expendRecipeItemUse,
+    deleteOwnedRecipeItem: knowledge.deleteOwnedRecipeItem,
+    eraseLearnedRecipe: knowledge.eraseLearnedRecipe,
+    resetActorSystemKnowledge: knowledge.resetActorSystemKnowledge,
+    resetActorAllKnowledge: knowledge.resetActorAllKnowledge,
     // World scope: components, essences and tools (issue 1362). The key set is part of the contract —
     // `setEnabled` is absent on `worldScope.component`, and `setWorldTags` / `setMutedTags` exist only
     // there. `tool.addToSystem` is `adoptWorldTool` rather than the raw world-scope write; see there.
