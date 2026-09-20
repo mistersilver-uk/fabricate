@@ -85,7 +85,8 @@ An empty (or absent) list means "no rule":
 {: .note }
 > Included realms are chosen in the environment editor's multi-realm selector (toggle on).
 > The biome and exclusion rules are authored through the API or by system import and export.
-> Saving checks that the chosen realms exist on the owning crafting system.
+> Saving checks that the chosen realms exist in the world realm library.
+> A realm id an environment already carried whose realm has since been deleted is dropped from it on the next save rather than blocking that save.
 > These rules gate **location availability** only.
 > The old single free-text region on an environment is **inert**.
 > It is not a composition or availability input and is no longer shown in the editor.
@@ -160,7 +161,7 @@ See the [API Reference]({% link api/index.md %}) for exact signatures.
 | Realm library, reveal mode, and modifier visibility | At the world level | The realms and realm-disclosure settings shared by every crafting system that enables Travel & Realms |
 | Enable Travel & Realms toggle | On each crafting system | Whether that system's environments are gated by realm (see [Enabling Travel & Realms](#enabling-travel--realms)) |
 | Parties | At the world level | Fabricate-managed parties, members, travel actors, and per-system overrides |
-| Realm discovery | On each actor | Which realms that character has discovered, per system |
+| Realm discovery | On each actor | Which realms that character has discovered; discovery is world-wide, so a place a character has found stays found whichever crafting system they were serving |
 
 Because the realm library is a world setting, it travels along with any crafting-system export as that export's own travel configuration, and merges into the destination world when you import (through the import dialog and the export API), automatically.
 Importing into a world with no realms of its own adopts the whole library, its reveal mode, and its modifier visibility.

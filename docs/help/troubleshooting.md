@@ -717,6 +717,7 @@ Environments are stored as one world list, and a single id that names no realm m
 
 **Fix:** Update to 1.9.7 or later.
 The next successful environment save removes the stale realm ids from every environment carrying one, and logs once what it removed.
+That repair is not limited to editing an environment in the Manager: any write that persists environments does it, including the ordinary play writes that deplete, restock or respawn a resource node or change an environment's conditions, so a world usually repairs itself without a GM touching anything.
 An environment left with no realm ids is no longer restricted to a realm; it is not disabled or deleted.
 
 From 1.9.7 on, deleting a realm removes it from the realm membership of every environment that listed it as part of the delete, so the problem cannot recur.
