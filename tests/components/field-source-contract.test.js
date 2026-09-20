@@ -134,8 +134,11 @@ test('the host set is the closed three, and all three still have real users', ()
   // The `label` floor dropped 45 → 40 when the checks studio's selects moved onto the `Select`
   // primitive: each wrapper existed to name a native `<select>`, and the primitive now carries
   // that name itself (`ariaLabelledBy`/`ariaLabel`), so no site changed which host announces it.
+  // It dropped again 40 → 36 when the gathering task editor's four captioned selects converted:
+  // each `<Field as="label">` demoted to `as="div"` and the caption's id became the trigger's
+  // `ariaLabelledBy`, so the same caption still names the same control.
   for (const [host, floor] of [
-    ['label', 40],
+    ['label', 36],
     ['div', 28],
     ['fieldset', 1],
   ]) {
