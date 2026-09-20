@@ -14,7 +14,7 @@ src/systems/BulkSalvageService.js	819
 src/systems/CompendiumImporter.js	1580
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
 src/systems/CompendiumImporter.js::importFromPackData	291
-src/systems/CraftingEngine.js	7839
+src/systems/CraftingEngine.js	7437
 src/systems/CraftingEngine.js::_applyToolBreakage	111
 src/systems/CraftingEngine.js::_buildVersionedStageOperation	229
 src/systems/CraftingEngine.js::_createSingleResult	160
@@ -27,7 +27,6 @@ src/systems/CraftingEngine.js::_startTimedStep	196
 src/systems/CraftingEngine.js::craftAlchemy	145
 src/systems/CraftingEngine.js::describeVersionedStageCheck	117
 src/systems/CraftingEngine.js::executeVersionedStage	173
-src/systems/CraftingEngine.js::salvage	504
 src/systems/CraftingLifecycleExecutor.js::execute	113
 src/systems/CraftingRunManager.js	1195
 src/systems/CraftingSystemExporter.js::prepareForImport	162

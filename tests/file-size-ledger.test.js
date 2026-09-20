@@ -226,7 +226,8 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // on #1858, which performed the extraction that debt named: the realm library read, the
   // membership baseline, the prune and the unknown-realm rejection now live in
   // `src/systems/environmentRealmMembership.js`, leaving the store under the threshold with no
-  // successor function over the 100-line one.
+  // successor function over the 100-line one. Issue 1714 then banked the oversized `salvage`
+  // function: its named pipeline functions and `salvagePipeline.js` stay below both thresholds.
   assert.equal(files, 104, 'oversized files');
-  assert.equal(keys.length - files, 113, 'oversized functions');
+  assert.equal(keys.length - files, 112, 'oversized functions');
 });

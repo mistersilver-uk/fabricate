@@ -113,6 +113,19 @@ import {
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
+  beginSalvageSettlement,
+  commitSalvage,
+  fireSalvageComplications,
+  openSalvageRun,
+  publishSalvageFailure,
+  publishSalvageSuccess,
+  resolveSalvageFailure,
+  resolveSalvageRunRecord,
+  runSalvageCheck,
+  salvageRefusal,
+  validateSalvageTools,
+} from './salvagePipeline.js';
+import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
@@ -193,19 +206,6 @@ function addHistoricalEssenceContribution(carriers, essenceId, source) {
   else carrier.contributions.push({ essenceId, amount: source.essenceTotal });
 }
 
-/** Narrow a resolution's fired complications to the four keys the SALVAGE RUN RECORD stores
- * (issue 1286). Redaction happens HERE, at the write, through `publicComplications`, keyed on
- * the AUDIENCE rather than the acting user's role — the container is an ACTOR flag the owning
- * player can read. `resultId` is required: a complication fires per RESULT ENTRY. */
-function salvageRunComplicationRecords(fired) {
-  return publicComplications(fired).map(({ resultId, componentId, complicationId, buckets }) => ({
-    resultId,
-    componentId,
-    complicationId,
-    buckets,
-  }));
-}
-
 /** Resolve the still-live inventory documents named by persisted Item UUIDs. Timed FINISH uses
  * them as Tool exclusions, because a partially consumed stack remains in inventory after START. */
 function resolveLiveInventoryItemsByUuid(actors, itemUuids) {
@@ -215,21 +215,6 @@ function resolveLiveInventoryItemsByUuid(actors, itemUuids) {
       .flatMap((actor) => [...(actor?.items ?? [])])
       .filter((item) => item?.uuid && uuidSet.has(item.uuid))
   );
-}
-
-/** The concrete owned Item documents a quantity-based consumption plan will touch, in the same
- * order `_consumeComponentItems` uses. */
-function selectedQuantityItems(items, quantity) {
-  const selected = new Set();
-  let remaining = Number(quantity) || 0;
-  for (const item of Array.isArray(items) ? items : []) {
-    if (remaining <= 0) break;
-    selected.add(item);
-    // Under-reading here OVER-selects items into the plan that the delete branch then
-    // destroys one by one, so this is a routed site even though it never writes.
-    remaining -= readStackQuantity(item);
-  }
-  return selected;
 }
 
 /** Stamp the durable per-system component identity on a crafted OUTPUT item's data, BEFORE
@@ -6630,26 +6615,66 @@ export class CraftingEngine {
    *   socket message (issue 1286) — the GM-side rate limiter is sized on one message per run.
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
-    const deferComplicationDelivery = options?.deferComplicationDelivery === true;
-    const actor = await fromUuid(actorUuid);
-    if (!actor) {
-      return { success: false, results: null, message: 'Actor not found', salvageRun: null };
+    const ctx = await this._openSalvageContext(actorUuid, craftingSystemId, componentId, options);
+    if (ctx.refusal) return ctx.refusal;
+    const record = await resolveSalvageRunRecord(this, ctx);
+    if (record) return record.result;
+    const tools = await validateSalvageTools(this, ctx);
+    if (tools) return tools.result;
+    const opened = await openSalvageRun(this, ctx);
+    if (opened) return opened.result;
+    const checked = await runSalvageCheck(this, ctx);
+    if (checked) return checked.result;
+    // The settlement write stays outside the bracket, where `try` opened before this split: it is
+    // an actor-flag write whose rejection must escape uncaught, because inside the bracket
+    // `_recordSalvageUncertainty` would answer it with a second write to the same flag.
+    await beginSalvageSettlement(this, ctx);
+    try {
+      await resolveSalvageFailure(this, ctx);
+      const failed = await publishSalvageFailure(this, ctx);
+      if (failed) return failed.result;
+      await commitSalvage(this, ctx);
+      await fireSalvageComplications(this, ctx);
+      const succeeded = await publishSalvageSuccess(this, ctx);
+      return succeeded.result;
+    } catch (error) {
+      await this._recordSalvageUncertainty(ctx, error);
+      throw error;
+    }
+  }
+
+  /**
+   * The Foundry edge, the call inputs and the component this salvage runs against. A `refusal` is
+   * the caller's own return; every one of them is reached before any salvage run exists.
+   */
+  async _openSalvageContext(actorUuid, craftingSystemId, componentId, options) {
+    const ctx = {
+      actorUuid,
+      craftingSystemId,
+      componentId,
+      options,
+      deferComplicationDelivery: options?.deferComplicationDelivery === true,
+      actor: await fromUuid(actorUuid),
+      // The thunk exists only to keep the bare `game` read in this file; `openSalvageRun` samples
+      // it once.
+      readWorldTime: () => Number(game.time?.worldTime || 0),
+      refusal: null,
+    };
+    if (!ctx.actor) {
+      ctx.refusal = salvageRefusal('Actor not found');
+      return ctx;
     }
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
-    const system = systemManager?.getSystem(craftingSystemId);
-    if (!system) {
-      return {
-        success: false,
-        results: null,
-        message: `Crafting system "${craftingSystemId}" not found`,
-        salvageRun: null,
-      };
+    ctx.system = systemManager?.getSystem(craftingSystemId);
+    if (!ctx.system) {
+      ctx.refusal = salvageRefusal(`Crafting system "${craftingSystemId}" not found`);
+      return ctx;
     }
 
-    const managedItems = resolvedComponentsFor(system);
-    const componentDefinition = findById(getDefinitionIndex(managedItems), componentId);
-    const component = componentDefinition
+    ctx.managedItems = resolvedComponentsFor(ctx.system);
+    const componentDefinition = findById(getDefinitionIndex(ctx.managedItems), componentId);
+    ctx.component = componentDefinition
       ? {
           ...componentDefinition,
           salvage: {
@@ -6658,480 +6683,53 @@ export class CraftingEngine {
           },
         }
       : null;
-    if (!component) {
-      return {
-        success: false,
-        results: null,
-        message: `Component "${componentId}" not found in system`,
-        salvageRun: null,
-      };
+    if (!ctx.component) {
+      ctx.refusal = salvageRefusal(`Component "${componentId}" not found in system`);
+      return ctx;
     }
 
-    if (!system.features?.salvage) {
-      return {
-        success: false,
-        results: null,
-        message: 'Salvage feature is not enabled on this crafting system',
-        salvageRun: null,
-      };
+    if (!ctx.system.features?.salvage) {
+      ctx.refusal = salvageRefusal('Salvage feature is not enabled on this crafting system');
+      return ctx;
     }
-    if (!component.salvage?.enabled) {
-      return {
-        success: false,
-        results: null,
-        message: `Salvage is not enabled for component "${component.name || componentId}"`,
-        salvageRun: null,
-      };
+    if (!ctx.component.salvage?.enabled) {
+      ctx.refusal = salvageRefusal(
+        `Salvage is not enabled for component "${ctx.component.name || componentId}"`
+      );
+      return ctx;
     }
 
     // 4. Validate salvage configuration via ResolutionModeService
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     if (resolutionService) {
-      const validation = resolutionService.validateSalvage(component, system);
+      const validation = resolutionService.validateSalvage(ctx.component, ctx.system);
       if (!validation.valid) {
-        return {
-          success: false,
-          // The SAME additive discriminator the misconfigured-check abort carries (issue 859).
-          // This gate runs BEFORE `_runSalvageCraftingCheck`, so without the flag a caller reads
-          // a GM-side config error as a rolled failure and tells the player "nothing recovered".
-          misconfigured: true,
-          results: null,
-          message: `Invalid salvage configuration: ${validation.errors.join(', ')}`,
-          salvageRun: null,
-        };
-      }
-    }
-
-    const salvageRunManager = this._getSalvageRunManager();
-    let salvageRun = null;
-    // Track whether THIS call created the salvage run (vs reused an existing one),
-    // so a cancelled interactive salvage can discard its phantom run and net ZERO
-    // run mutation — mirroring the crafting `createdThisCall` phantom-discard.
-    let salvageRunCreatedThisCall = false;
-    if (salvageRunManager) {
-      salvageRun = options?.runId
-        ? salvageRunManager.getActiveRun(actor, options.runId)
-        : salvageRunManager.findActiveRunForComponent(actor, craftingSystemId, componentId);
-    }
-    if (salvageRun) assertNativeEffectsUninvoked(salvageRun);
-
-    if (options?.runId && !salvageRun && salvageRunManager) {
-      return {
-        success: false,
-        results: null,
-        message: 'Active salvage run not found',
-        salvageRun: null,
-      };
-    }
-
-    const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
-    const componentItems = this.findComponentItems(actor, component, system);
-    const totalAvailable = componentItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
-    if (totalAvailable < ingredientQuantity) {
-      if (salvageRunManager && salvageRun) {
-        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
-          failureReason: `Not enough "${component.name || componentId}" to salvage. Need ${ingredientQuantity}, have ${totalAvailable}`,
-        });
-      }
-      return {
-        success: false,
-        results: null,
-        message: `Not enough "${component.name || componentId}" to salvage. Need ${ingredientQuantity}, have ${totalAvailable}`,
-        salvageRun,
-      };
-    }
-
-    const syntheticRecipe = { craftingSystemId, components: managedItems };
-    const salvageTools = this._resolveSalvageTools(system, component.salvage);
-    const toolValidation = await this._validateTools(
-      [actor],
-      syntheticRecipe,
-      salvageTools,
-      null,
-      actor,
-      { excludedItems: selectedQuantityItems(componentItems, ingredientQuantity) }
-    );
-    if (!toolValidation.valid) {
-      if (salvageRunManager && salvageRun) {
-        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
-          failureReason: toolValidation.message,
-        });
-      }
-      return { success: false, results: null, message: toolValidation.message, salvageRun };
-    }
-
-    const now = Number(game.time?.worldTime || 0);
-    const timeRequirement = component.salvage?.timeRequirement || null;
-
-    if (salvageRunManager && !salvageRun) {
-      salvageRun = await salvageRunManager.createRun(actor, {
-        actorUuid,
-        craftingSystemId,
-        componentId,
-        componentName: component.name || componentId,
-        status: 'inProgress',
-        startedAt: now,
-        usedTools: [],
-        // CAPTURE the starting user's result order onto the run (issue 651 D2) — the ONLY settings
-        // read on the salvage path. A resumed salvage is driven by the synced `updateWorldTime`
-        // hook, which fires on EVERY client, so reading the order from the run is what makes the
-        // executing user irrelevant. The key is scoped per (systemId, componentId), because
-        // component ids are NOT globally unique (issue 766), and must match the store's exactly.
-        resultOrder: this.getPlayerResultOrder({
-          scope: 'salvage',
-          id: `${craftingSystemId}:${componentId}`,
-        }),
-      });
-      salvageRunCreatedThisCall = true;
-    }
-
-    if (salvageRunManager && timeRequirement && !options?.skipTimeGate) {
-      salvageRun = await salvageRunManager.markRunWaitingForTime(
-        actor,
-        salvageRun,
-        timeRequirement
-      );
-      const canProceed = salvageRunManager.canProceedTimeGate(salvageRun, now);
-      if (!canProceed) {
-        const remaining = Math.max(
-          0,
-          Math.ceil(Number(salvageRun.timeGate?.availableAt || 0) - now)
+        // The SAME additive discriminator the misconfigured-check abort carries (issue 859).
+        // This gate runs BEFORE `_runSalvageCraftingCheck`, so without the flag a caller reads
+        // a GM-side config error as a rolled failure and tells the player "nothing recovered".
+        ctx.refusal = salvageRefusal(
+          `Invalid salvage configuration: ${validation.errors.join(', ')}`,
+          { misconfigured: true }
         );
-        return {
-          success: true,
-          // The run STARTED and is waiting on world time; nothing has been awarded yet (issue
-          // 859). Additive and purely descriptive, so a caller can tell "started, come back later"
-          // from "succeeded and awarded" without re-deriving it from `results == null`.
-          waiting: true,
-          results: null,
-          message: `Salvage started for ${component.name || componentId} (${remaining}s remaining)`,
-          salvageRun,
-        };
       }
     }
+    return ctx;
+  }
 
-    if (salvageRunManager && salvageRun) {
-      salvageRun = await salvageRunManager.markRunInProgress(actor, salvageRun);
-    }
-
-    const checkResult = await this._runSalvageCraftingCheck(component, system, actor, {
-      interactive: options?.interactive === true,
-      toolItems: toolValidation.tools,
-      rollDecision: options?.rollDecision ?? null,
-    });
-    const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
-
-    // A misconfigured required salvage check is a GM-side system gap, not a rolled failure: abort
-    // with ZERO mutation so the component is never consumed and no tools are broken. Discard a
-    // run created by THIS call so nothing is left `inProgress`; a reused pre-existing run is left
-    // untouched. The failure-consumption policy below applies only to genuine rolled failures.
-    if (checkResult.misconfigured) {
-      if (salvageRunManager && salvageRun && salvageRunCreatedThisCall) {
-        await salvageRunManager.discardRun(actor, salvageRun.id);
-      }
-      return {
-        success: false,
-        // Additive discriminator (issue 859): a GM-side config gap, NOT a rolled
-        // failure. `success` is unchanged, so no existing consumer regresses; a caller
-        // that cares can now say "not configured — tell your GM" instead of reporting a
-        // failed roll that never happened.
-        misconfigured: true,
-        results: null,
-        message: checkResult.message,
-        salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
-      };
-    }
-
-    // The player dismissed the interactive roll dialog: a user choice, not a failure. Abort with
-    // ZERO mutation before the failure/consumption paths below, and discard a run created by THIS
-    // call so a cancel leaves no orphaned `inProgress` run. A reused run is left untouched.
-    if (checkResult.cancelled) {
-      if (salvageRunManager && salvageRun && salvageRunCreatedThisCall) {
-        await salvageRunManager.discardRun(actor, salvageRun.id);
-      }
-      return {
-        success: false,
-        cancelled: true,
-        results: null,
-        message: 'Salvage cancelled',
-        salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
-      };
-    }
-
-    const salvageCheck = resolveSalvageCheck(system);
-    if (salvageRunManager && salvageRun) {
-      salvageRun.resolutionSnapshot = {
-        kind: salvageCheck.checkUsable ? 'check' : 'none',
-        mode: salvageCheck.mode,
-      };
-      salvageRun.historySettlement = {
-        consumption:
-          checkResult.success || failurePolicy.consumeComponentOnFail ? 'pending' : 'notApplicable',
-        awards: 'pending',
-      };
-      await salvageRunManager.updateRun(actor, salvageRun);
-    }
-    try {
-      if (!checkResult.success) {
-        let consumedOnFail = [];
-        let usedTools = [];
-        try {
-          if (failurePolicy.consumeComponentOnFail) {
-            consumedOnFail = await this._consumeComponentItems(
-              actor,
-              componentItems,
-              ingredientQuantity
-            );
-            await this._recordSalvageConsumption(
-              actor,
-              salvageRunManager,
-              salvageRun,
-              consumedOnFail
-            );
-          }
-          if (failurePolicy.breakToolsOnFail) {
-            // Salvage parity (issue 419): the FAILURE path breaks required tools only
-            // when `breakToolsOnFail === true` (this gate), matching crafting.
-            const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
-            usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
-              forceBreak: salvageFailBreak.forceBreak,
-              authority: salvageFailBreak.authority,
-              reason: salvageFailBreak.reason,
-              triggerId: salvageFailBreak.triggerId,
-            });
-          }
-        } catch (error) {
-          if (error.code === 'HISTORY_EFFECT_UNCERTAIN') throw error;
-          console.error('Fabricate | Error during salvage failure-path consumption:', error);
-        }
-
-        // THE FAILURE AWARD (issue 1098, decision 5), which is why `failureResultPolicy: 'never'`
-        // is what the 1.25.0 migration seeds onto every existing world. The disposition is
-        // EXPLICIT: the default `'success'` would hand back the clamped SUCCESS group instead.
-        const failureResultGroups = activityPermitsFailureResults(system, 'salvage')
-          ? this._resolveSalvageResultGroups(component, system, checkResult, salvageRun, 'failure')
-          : [];
-        // The success branch builds this view before `_createSingleResult`; the failure
-        // branch had none, because it never created anything.
-        const failureSalvageRecipeView =
-          failureResultGroups.length > 0 ? this._buildSalvageRecipeView(component, system) : null;
-        const { resultItems: failureResultItems, createdRecords: failureCreatedRecords } =
-          failureSalvageRecipeView
-            ? await this._awardSalvageResultGroups({
-                actor,
-                resultGroups: failureResultGroups,
-                consumedItems: consumedOnFail,
-                tools: toolValidation.tools,
-                salvageRecipeView: failureSalvageRecipeView,
-                checkResult,
-              })
-            : { resultItems: [], createdRecords: [] };
-
-        if (salvageRunManager && salvageRun) {
-          salvageRun.createdResults = failureCreatedRecords.map(itemReceipt);
-          await salvageRunManager.updateRun(actor, salvageRun);
-          salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
-            consumedComponents: consumedOnFail.map(mapConsumedIngredientRef),
-            historySettlement: {
-              consumption: salvageRun.historySettlement?.consumption ?? 'notApplicable',
-              awards: 'complete',
-            },
-            usedTools,
-            // In the SUCCESS BRANCH'S SHAPE, through the same mapper. An empty list beside
-            // real items on the actor is a durable contradiction, not a cosmetic gap.
-            createdResults: failureCreatedRecords.map(itemReceipt),
-            checkResult: {
-              success: false,
-              outcome: checkResult.outcome,
-              value: checkResult.value,
-              data: checkResult.data || {},
-            },
-            failureReason: checkResult.message || 'Salvage check failed',
-          });
-        }
-
-        // Salvage chat parity (issue 675): crafting posts on failure too. Report the
-        // source forfeited on failure (per the consumption policy) and any tools that
-        // broke — merged into one "Consumed on Failure" section by the shared card.
-        const forfeitedQuantity = consumedOnFail.reduce(
-          (sum, { quantity }) => sum + (Number(quantity) || 0),
-          0
-        );
-        await this._postSalvageChatMessage({
-          success: false,
-          actor,
-          system,
-          component,
-          consumedQuantity: forfeitedQuantity,
-          // The card renders these under its own failure-award section (issue 1098);
-          // an empty list leaves every existing failure card byte-for-byte unchanged.
-          results: failureResultItems,
-          usedTools,
-          failureReason: checkResult.message || 'Salvage check failed',
-          rollValue: rollTotalForCard(checkResult),
-          tierStep: tierStepForCard(checkResult),
-          suppressed: options?.suppressChat === true,
-        });
-
-        return {
-          success: false,
-          // `null` when nothing was awarded — that is what every existing caller reads as
-          // "a failed salvage produced nothing", and the bulk-salvage surfaces read THIS
-          // value rather than the run record or the card (issue 1098, AF5/CF9).
-          results: failureResultItems.length > 0 ? failureResultItems : null,
-          message: checkResult.message || 'Salvage check failed',
-          salvageRun,
-        };
-      }
-
-      const resultGroups = this._resolveSalvageResultGroups(
-        component,
-        system,
-        checkResult,
-        salvageRun
-      );
-      // Captured HERE, beside the resolution it must agree with, because `completeRun`
-      // below reassigns `salvageRun` and the ordered list is read off its captured
-      // `resultOrder` (issue 1286). Null for every non-progressive salvage.
-      const complicationInputs = this._progressiveSalvagePlanInputs(
-        component,
-        system,
-        checkResult,
-        salvageRun
-      );
-      const consumedItems = await this._consumeComponentItems(
-        actor,
-        componentItems,
-        ingredientQuantity
-      );
-      await this._recordSalvageConsumption(actor, salvageRunManager, salvageRun, consumedItems);
-      // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
-      // `breakToolsOnFail` gate exists here), via the shared seam.
-      const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
-      const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
-        forceBreak: salvageSuccessBreak.forceBreak,
-        authority: salvageSuccessBreak.authority,
-        reason: salvageSuccessBreak.reason,
-        triggerId: salvageSuccessBreak.triggerId,
-      });
-
-      const salvageRecipeView = this._buildSalvageRecipeView(component, system);
-      const { resultItems, createdRecords } = await this._awardSalvageResultGroups({
-        actor,
-        resultGroups,
-        consumedItems,
-        tools: toolValidation.tools,
-        salvageRecipeView,
-        checkResult,
-      });
-      if (salvageRunManager && salvageRun) {
-        salvageRun.createdResults = createdRecords.map(itemReceipt);
-        await salvageRunManager.updateRun(actor, salvageRun);
-      }
-
-      // Component complications (issue 1286): after the items are on the actor and before the card
-      // is posted. It sits BEFORE the run completion because `firedComplications` is written AT
-      // WRITE TIME, in the completion payload, and `completeRun` moves the run into `history`,
-      // which cannot be amended afterwards.
-      let complicationRequests = null;
-      let firedComplications = null;
-      if (complicationInputs) {
-        const fired = await this._fireComponentComplications({
-          activity: 'salvage',
-          actor,
-          craftingSystemId,
-          stages: complicationInputs.stages,
-          award: complicationInputs.award,
-          checkBreakage: this._resolveSalvageCheckBreakage(system),
-          checkResult,
-          deliver: deferComplicationDelivery !== true,
-        });
-        firedComplications = fired?.fired ?? null;
-        if (deferComplicationDelivery === true) complicationRequests = fired?.gmRequests ?? [];
-      }
-      // TWO redactions of one list, deliberately: the run record narrows to four durable
-      // keys, the return carries the seven a view-model renders. Both start from
-      // `publicComplications`, so neither can widen past the player audience.
-      const runComplications = salvageRunComplicationRecords(firedComplications);
-      const playerComplications = publicComplications(firedComplications);
-
-      if (salvageRunManager && salvageRun) {
-        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
-          consumedComponents: consumedItems.map(mapConsumedIngredientRef),
-          historySettlement: { consumption: 'complete', awards: 'complete' },
-          usedTools,
-          createdResults: createdRecords.map(itemReceipt),
-          checkResult: {
-            success: true,
-            outcome: checkResult.outcome,
-            value: checkResult.value,
-            data: checkResult.data || {},
-          },
-          failureReason: null,
-          // Spread conditionally so a salvage that fired nothing — which is every
-          // non-progressive salvage and most progressive ones — writes a record with no
-          // such key at all, exactly as it did before this feature existed. `completeRun`
-          // spreads its payload with NO allowlist, so the field persists once written.
-          ...(runComplications.length > 0 && { firedComplications: runComplications }),
-        });
-      }
-
-      // Salvage chat parity (issue 675): the same card crafting posts, reading as a
-      // salvage analogue — the source broken down, the materials recovered, and any
-      // tools that broke. Gated on the same `chatOutput` toggle inside the poster.
-      const consumedQuantity = consumedItems.reduce(
-        (sum, { quantity }) => sum + (Number(quantity) || 0),
-        0
-      );
-      await this._postSalvageChatMessage({
-        success: true,
-        actor,
-        system,
-        component,
-        consumedQuantity,
-        results: resultItems,
-        usedTools,
-        failureReason: '',
-        rollValue: rollTotalForCard(checkResult),
-        tierStep: tierStepForCard(checkResult),
-        suppressed: options?.suppressChat === true,
-        firedComplications,
-      });
-
-      return {
-        success: true,
-        results: resultItems,
-        message: `Successfully salvaged ${component.name || componentId}`,
-        // Present ONLY when the caller asked to batch (bulk salvage). Addressing only, by
-        // construction: a GM request carries no name, description, macro uuid or
-        // visibility, so there is nothing here for a player-facing surface to redact.
-        ...(complicationRequests === null ? undefined : { complicationRequests }),
-        // The FIRED surface, and unlike the requests above it needs redacting — it is read
-        // by the player's own salvage view-model, so a `gmOnly` complication must not be
-        // here even when a GM is the acting user. Omitted entirely when nothing
-        // player-visible fired, so an unchanged caller sees an unchanged return.
-        ...(playerComplications.length > 0 && { complications: playerComplications }),
-        // The rolled total, threaded top-level so the player summary can read it even on
-        // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
-        // a no-check simple salvage (nothing was rolled); a finite number otherwise.
-        value: checkResult.value ?? null,
-        salvageRun,
-      };
-    } catch (error) {
-      if (salvageRunManager && salvageRun) {
-        const saved = salvageRunManager.getActiveRun(actor, salvageRun.id);
-        if (saved) {
-          const field = error.historyField ?? 'awards';
-          saved.historySettlement = { ...saved.historySettlement, [field]: 'uncertain' };
-          if (Array.isArray(error.receipts))
-            saved[field === 'consumption' ? 'consumedComponents' : 'createdResults'] =
-              error.receipts.map(itemReceipt);
-          await salvageRunManager.updateRun(actor, saved);
-        }
-      }
-      throw error;
-    }
+  /** An interrupted salvage's uncertain effect, recorded on the still-active run so a resumed run
+   * refuses to replay what this call may already have applied. */
+  async _recordSalvageUncertainty(ctx, error) {
+    const { actor, salvageRun, salvageRunManager } = ctx;
+    if (!salvageRunManager || !salvageRun) return;
+    const saved = salvageRunManager.getActiveRun(actor, salvageRun.id);
+    if (!saved) return;
+    const field = error.historyField ?? 'awards';
+    saved.historySettlement = { ...saved.historySettlement, [field]: 'uncertain' };
+    if (Array.isArray(error.receipts))
+      saved[field === 'consumption' ? 'consumedComponents' : 'createdResults'] =
+        error.receipts.map(itemReceipt);
+    await salvageRunManager.updateRun(actor, saved);
   }
 
   async _recordSalvageConsumption(actor, manager, run, consumed) {
