@@ -159,6 +159,7 @@ An absent or `unknown` provenance counts as an unidentified build and never sati
 Re-run it from the SAME commit.
 A target already written from this build is recognised by its provenance and skipped, and only the unwritten targets are completed — the resume path in the **Publish completeness** requirement.
 For a push-triggered stable release, re-dispatch `release.yml` via `workflow_dispatch` with `--ref` set to the branch that produced the tag and the already-minted `tag` supplied; for any channel, `release-s3.yml` can be dispatched directly with the same `tag` and `channel`.
+A `release-s3.yml` dispatch publishes the tag's bytes under the dispatch ref's deployment configuration, because the workflow captures `release.s3.config.json` from the ref it runs on before checking the tag out; dispatch from the ref carrying the tester configuration you intend to publish under, and expect a named refusal when the tag's `scripts/release-s3.js` predates `--config` (issue #1872).
 
 Do NOT reach for `--overwrite` to get past a failed publish.
 `--overwrite` replaces the bytes of a version a target already advertises, and a version's published artefacts are immutable — clients already on it never re-fetch, and any CDN holding the immutable zip pins the old bytes — so overwriting splits one version string across two different builds.
@@ -837,6 +838,7 @@ This is defense-in-depth: semantic-release also refuses the collision (`EINVALID
 Pushing that branch publishes nothing by itself: `release.yml`'s classifier tells apart semantic-release's `success` lifecycle re-adding the already-released base version to the new channel from a genuine mint, and only a genuine mint is published (issue #1864).
 2. Land **`fix:` commits only**; a `feat:` hard-fails with `EINVALIDNEXTVERSION`, the guard rail that keeps feature work off the line.
 3. `release.yml` mints the draft release and publishes the hotfix's own channel (`1.4.x`), never `early-access`.
+   That happens on the first `fix:` you push, not on the bare cut: until then the line's channel has no head, and a `release.yml` run with `publish-s3`, `verify-publish` and `forward-port` skipped is the expected outcome of cutting the line, not a failed release (issue #1864).
 4. Promote it with `promote-to-public.yml`, passing `source_channel: 1.4.x`.
 5. Bring the fix back into `release` through a **reviewed pull request based on `release`**, merged with a **merge commit** (never a squash); the automation's forward-port then carries it on to `main`.
 6. Delete the hotfix branch once the fix has landed in `release`.
