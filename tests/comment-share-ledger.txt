@@ -4,7 +4,7 @@ scripts/lib	1712
 scripts/lib/view-lab-cases	949
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
-src	1249
+src	1251
 src/canvas	376
 src/canvas/linkedVisuals	64
 src/canvas/regions	331
@@ -13,7 +13,7 @@ src/integrations	20
 src/migration	1353
 src/models	460
 src/models/match	66
-src/systems	25649
+src/systems	25741
 src/ui	1109
 src/ui/model	414
 src/ui/presenters	3486
@@ -48,11 +48,11 @@ src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	336
 src/ui/svelte/components	1423
-src/ui/svelte/stores	4526
+src/ui/svelte/stores	4536
 src/ui/svelte/util	1218
 src/utils	944
 styles	1042
-tests	19695
+tests	19789
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
@@ -63,11 +63,11 @@ tests/fixtures/manager-select	20
 tests/fixtures/overlay-host	28
 tests/fixtures/player-select	8
 tests/fixtures/searchable-popover	13
-tests/helpers	4203
+tests/helpers	4219
 tests/helpers/manager	300
 tests/helpers/scale	622
 tests/journal	157
-tests/stores	1529
+tests/stores	1551
 tests/systems	357
 tests/util	379
 tests/view-lab	413

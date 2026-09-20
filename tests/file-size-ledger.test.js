@@ -221,6 +221,12 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // modules behind a composing manager: the file fell from 901 lines to under the 800-line
   // threshold and `_spawnInteractableRegion` fell from 107 lines to under the 100-line one, so
   // both rows left the ledger and no successor crossed either threshold.
+  // It rose to 105 when the 1.9.7 hotfix (#1848) was forward-ported and
+  // `src/systems/GatheringEnvironmentStore.js` crossed the 800-line threshold, and returned to 104
+  // on #1858, which performed the extraction that debt named: the realm library read, the
+  // membership baseline, the prune and the unknown-realm rejection now live in
+  // `src/systems/environmentRealmMembership.js`, leaving the store under the threshold with no
+  // successor function over the 100-line one.
   assert.equal(files, 104, 'oversized files');
   assert.equal(keys.length - files, 113, 'oversized functions');
 });
