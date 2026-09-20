@@ -125,7 +125,7 @@ src/ui/svelte/apps/gathering/GatheringView.svelte	527
 src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte	676
 src/ui/svelte/apps/inventory/InventoryItemCard.svelte	550
 src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte	852
-src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte	701
+src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte	698
 src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte	793
 src/ui/svelte/apps/journal/RunDetail.svelte	818
 src/ui/svelte/apps/journal/StepDetails.svelte	569
