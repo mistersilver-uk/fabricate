@@ -340,6 +340,16 @@ describe('CraftingSystemManager source contract', () => {
     );
   }
 
+  it('lists every src/bootstrap module, so a new one cannot escape the chunk-split row', () => {
+    assert.deepEqual(
+      readdirSync(resolve(repoRoot, 'src/bootstrap'))
+        .filter((file) => file.endsWith('.js'))
+        .sort()
+        .map((file) => `src/bootstrap/${file}`),
+      [...BOOTSTRAP_MODULES].sort()
+    );
+  });
+
   // `Document#testUserPermission` short-circuits every GM to OWNER, so GMs are filtered first. No
   // other file states that `Users#players` is the roster this reads, so it stays asserted here.
   defineStructureContract('derives the access rosters from the non-GM roster', APP_SHELL, {
