@@ -157,9 +157,12 @@ See the [API Reference]({% link api/index.md %}) for exact signatures.
 
 | What | Where it lives | Contents |
 |:---------|:----|:---------|
-| Realms and realm settings | On each crafting system | The realms and realm behavior settings for that system |
+| Realm library, reveal mode, and modifier visibility | At the world level | The realms and realm-disclosure settings shared by every crafting system that enables Travel & Realms |
+| Enable Travel & Realms toggle | On each crafting system | Whether that system's environments are gated by realm (see [Enabling Travel & Realms](#enabling-travel--realms)) |
 | Parties | At the world level | Fabricate-managed parties, members, travel actors, and per-system overrides |
 | Realm discovery | On each actor | Which realms that character has discovered, per system |
 
-Because realms live on the crafting system, they travel with the system when you export and import it (through the import dialog and the export API), automatically.
-Import checks the realm data, warns about unnamed realms, accepts older exports, and re-homes each imported realm to the system you are importing into.
+Because the realm library is a world setting, it travels along with any crafting-system export as that export's own travel configuration, and merges into the destination world when you import (through the import dialog and the export API), automatically.
+Importing into a world with no realms of its own adopts the whole library, its reveal mode, and its modifier visibility.
+Importing into a world that already has realms only adds a realm it does not already have, by id, so an existing realm is never replaced, and the destination keeps its own reveal mode and modifier visibility.
+See [Import & Export]({% link crafting-systems/import-export.md %}) for the rest of what an export carries.

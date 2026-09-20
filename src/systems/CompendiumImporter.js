@@ -992,6 +992,11 @@ export class CompendiumImporter {
    * The scalars (reveal mode, modifier visibility) are seeded ONLY into an unconfigured world.
    * A world that already has realms has already answered how it discloses its places, and an
    * imported system does not get to overrule it.
+   *
+   * Persists through the resolved `travelStore` seam when one resolves, otherwise through the
+   * raw setting pair (issue 1858). The store write publishes the merged library to its cache
+   * before the setting write resolves, so the environment writes that follow it read the merged
+   * library directly, with no dependence on a replicated-setting hook.
    * @private
    */
   async _persistTravelConfig(incoming) {

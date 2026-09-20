@@ -32,6 +32,8 @@ See [World Currency]({% link world/rules/currency.md %}) for how it merges into 
 - Your world's travel configuration: the realm library, the reveal mode, and the modifier visibility.
 This is carried along with every export because travel is a world setting shared by every crafting system that enables Travel & Realms, not something each system configures on its own.
 Realms merge into the destination world by id, with the destination winning a collision, so an import never overwrites a realm the destination GM already authored.
+The reveal mode and modifier visibility carry over only into a world that has no realms of its own yet.
+A world that already has realms keeps its own reveal mode and modifier visibility, whatever the import carries.
 See [Gathering Realms & Travel]({% link world/travel/index.md %}) for how the realm library is authored.
 
 Every export records a version marker so future format changes stay backward compatible.
