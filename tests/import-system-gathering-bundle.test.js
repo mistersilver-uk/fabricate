@@ -187,13 +187,13 @@ test('#699 keep-mode API-path round-trip preserves the gathering authoring bundl
   assert.deepEqual(second.gatheringConfig, first.gatheringConfig);
 });
 
-test('source contract: src/main.js builds the shared CompendiumImporter with the gathering seams', () => {
+test('source contract: src/bootstrap/composeServices.js builds the shared CompendiumImporter with the gathering seams', () => {
   const marker = 'fabricate.compendiumImporter = new CompendiumImporter(';
   const start = mainSource.indexOf(marker);
-  assert.ok(start >= 0, 'located the shared CompendiumImporter construction in src/main.js');
+  assert.ok(start >= 0, 'located the shared CompendiumImporter construction in src/bootstrap/composeServices.js');
   const closure = mainSource.slice(
     start,
-    mainSource.indexOf('this.craftingEngine = new CraftingEngine(')
+    mainSource.indexOf('fabricate.craftingEngine = new CraftingEngine(')
   );
   assert.ok(closure.length > 0, 'isolated the importer construction closure');
 
@@ -219,8 +219,8 @@ test('source contract: src/main.js builds the shared CompendiumImporter with the
   // environments (issue 1858).
   assert.match(closure, /travelStore:/, 'wires the travelStore seam');
   assert.ok(
-    closure.includes('this.gatheringRealmStore?.'),
-    'travelStore seam must resolve this.gatheringRealmStore lazily'
+    closure.includes('fabricate.gatheringRealmStore?.'),
+    'travelStore seam must resolve fabricate.gatheringRealmStore lazily'
   );
   assert.match(
     closure,
