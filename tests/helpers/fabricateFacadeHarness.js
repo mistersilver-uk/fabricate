@@ -45,12 +45,17 @@ import {
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
 import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
 import { classMemberSource } from './boundedSource.js';
+import { collectSources, repoRoot } from './sourceScan.js';
 
 /**
- * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above against
- * this, because the module itself cannot be imported under `node --test`.
+ * The entry and the `src/bootstrap/` modules it composes, read through ONE call (issue 1715).
+ * Every owner-gate suite pins its faithful copy above against this.
  */
-export const MAIN_SOURCE = readFileSync(resolve(import.meta.dirname, '../../src/main.js'), 'utf8');
+const ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+
+export const MAIN_SOURCE = [...Object.keys(ENTRY_SOURCES).filter((file) => file.startsWith('src/bootstrap/')).sort(), 'src/main.js']
+  .map((file) => ENTRY_SOURCES[file])
+  .join('\n');
 
 /**
  * THIS FILE as text, so a "faithful copy" claim can be checked rather than trusted (issue 1202).
@@ -506,7 +511,7 @@ export class FabricateFacadeUnderTest {
   // `_resolveCraftingActor(null)` returns `null`, so the shared preamble would always answer
   // `noActor` for a member that reads no actor and can never emit one.
   async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
-    const gmOnly = this._game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
+    const gmOnly = this._game.user?.isGM === true ? null : COMPANION_OUTCOMES.gmOnly;
     if (gmOnly || this.ready !== true) {
       return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);
     }

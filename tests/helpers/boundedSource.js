@@ -33,13 +33,15 @@ function sliceToCloser(source, locator, closer, missing, unclosed) {
  * is now vacuous, which must fail loudly rather than assert on `''`.
  */
 export function classMemberSource(source, signature, label = 'the source') {
-  return sliceToCloser(
-    source,
-    signature,
-    '\n  }',
-    `${label} declares no \`${signature}\``,
-    `\`${signature}\` has no member-level closing brace`
-  );
+  const start = source.indexOf(signature);
+  if (start < 0) throw new Error(`${label} declares no \`${signature}\``);
+  // A class member closes on `\n  }` and an object-literal slice member on `\n  },` (issue 1715);
+  // the comma is dropped so both spellings hand back the same text to every pin downstream.
+  const plain = source.indexOf('\n  }\n', start);
+  const listed = source.indexOf('\n  },\n', start);
+  const end = plain < 0 ? listed : listed < 0 ? plain : Math.min(plain, listed);
+  if (end < 0) throw new Error(`\`${signature}\` has no member-level closing brace`);
+  return source.slice(start, end + '\n  }'.length);
 }
 
 /**

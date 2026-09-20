@@ -2,20 +2,11 @@
 // In production builds, a Vite plugin resolves this to a no-op since Foundry
 // loads the stylesheet via module.json's "styles" field instead.
 import '../styles/fabricate.css';
-
-import {
-  TOOL_IMAGE_SENTINEL,
-  linkedComponentFor,
-  resolveToolDisplayImage,
-  resolveToolDisplayName,
-} from './models/toolDisplay.js';
-import { findById, getDefinitionIndex } from './utils/definitionIndex.js';
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CompendiumImporter, scopeStoreDelegate } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
-import { RunJournalBuilder } from './ui/presenters/RunJournalBuilder.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
@@ -30,13 +21,10 @@ import { createWorldVocabularyStore } from './systems/WorldVocabularyStore.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
-import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIds } from './systems/gatheringRealmDiscovery.js';
-import { buildLocationSummaryForViewer } from './systems/gatheringLocation.js';
-import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';
 import { GatheringRunManager } from './systems/GatheringRunManager.js';
 import { GatheringGateAndCheckEvaluator } from './systems/GatheringGateAndCheckEvaluator.js';
 import { GatheringRichStateService } from './systems/GatheringRichStateService.js';
-import { secondsPerUnitFromCalendar, daysPerYearFromCalendar } from './systems/foundryCalendar.js';
+import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
 import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
@@ -47,7 +35,7 @@ import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGath
 import { applyAuthoredComplications, buildComplicationMacroContext, createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, isRunnableComplicationMacro, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
 import { buildGmComplicationCardContent, gmComplicationCardEntries, rollGmComplicationEffect } from './systems/complicationRuntime.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
-import { buildInteractiveRollOptions, promptBulkCheckRoll, promptCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
+import { promptCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
@@ -55,8 +43,6 @@ import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './ui/presenters/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
 import { InventoryListingBuilder } from './ui/presenters/InventoryListingBuilder.js';
-import { BulkSalvageService } from './systems/BulkSalvageService.js';
-import { BulkDestroyService } from './systems/BulkDestroyService.js';
 import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './ui/presenters/AlchemyListingBuilder.js';
 import {
@@ -64,20 +50,16 @@ import {
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
   resolveCheckFormulaDisplay,
-  runFormulaPassFail,
-  runFormulaProgressive,
 } from './systems/checkRoll.js';
 import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.js';
 import {
   JOURNAL_RUN_SOCKET_KIND,
   authorityUnavailableAvailability,
-  authorityUnavailableRefusal,
   createGatheringJournalRunOperations,
   createJournalExecutionReconstructor,
   createJournalRunCommandService,
   createManagerMutation,
   executePublicCraft,
-  executePublicGather,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
@@ -89,15 +71,12 @@ import { findCuratedIconRecord, listCuratedIconVocabulary } from './utils/iconVo
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   createGatheringResultCreator,
-  resolveGatheringResultSource,
-  gatheringRunItemRef
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
 // The item -> managed-component resolver the crafting listing's summary phase tallies held
 // stacks with (issue 1075), shared with InventoryListingBuilder's owned-row matching.
-import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';
+import { findMatchingComponent } from './utils/essenceResolver.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
-import { findStackableMatch } from './utils/sourceUuid.js';
 import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
 // Issue 1565: the deferred-chunk failure and stale-entry-script notices. Everything a semantic
 // mutation could break is in that module because nothing in THIS file is executable by a unit test;
@@ -112,9 +91,7 @@ import {
 } from './utils/deferredEntryNotice.js';
 import { createMemoizedLoad } from './utils/memoizedModuleLoad.js';
 import {
-  callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
-  createGatheringSelectableActorsGetter,
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
   resolveViewerScene,
@@ -124,7 +101,6 @@ import {
   createGatheringToolAvailability,
   matchGatheringTools
 } from './gatheringToolRuntime.js';
-import { createToolBreakageRuntime } from './toolBreakageRuntime.js';
 import {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass,
@@ -141,7 +117,6 @@ import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from '
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET, WORLD_ESSENCE_MERGE_FLAG_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
-import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
@@ -164,7 +139,7 @@ import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
 // THE SHARED READ SEAM (issue 1370). Seven call sites in this file enter through it, and this file
 // is outside the CI lint glob — so an omitted import here is a ReferenceError that no lint, no test
 // and no build reports. `tests/main-undefined-identifiers.test.js` is the guard.
-import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityReads.js';
+import { resolvedComponentsFor } from './systems/scopedEntityReads.js';
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './systems/restampOwnedItemComponentIdentity.js';
@@ -179,72 +154,8 @@ import {
 } from './systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
 import {
-  AFFORDABILITY_MESSAGE_KEYS,
-  CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_CONTRACT,
-  COMPANION_OUTCOMES,
-  COMPONENT_AWARD_MESSAGE_KEYS,
-  CURRENCY_CREDIT_MESSAGE_KEYS,
-  KNOWLEDGE_GRANT_MESSAGE_KEYS,
-  affordabilityResult,
-  bulkCheckDecisionResult,
-  checkRollResult,
-  componentAwardResult,
-  currencyCreditResult,
-  gatePooledActorUuids,
-  knowledgeGrantResult,
-  pooledHoldingsConsumeResult,
-  pooledHoldingsReadResult
 } from './systems/companionContract.js';
-// Aliased on import because the facade delegator below carries the SAME name. A class method is
-// not a bare identifier in its own body, so the unaliased import would resolve correctly and read
-// as a recursive call to every human who met it.
-import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from './systems/companionKnowledgeGrant.js';
-// Aliased for the same reason as the grant above.
-import { awardComponents as awardComponentsToActor } from './systems/companionComponentAward.js';
-// Aliased for the same reason as the grant above.
-import {
-  resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
-  rollActorCheck as rollStandaloneActorCheck
-} from './systems/companionCheckRoll.js';
-// Aliased for the same reason again (issue 1342): both facade delegators carry the SAME names as
-// the leaves they delegate to, and the alias says which side of the boundary is which.
-import { readPooledHoldings as readPooledHoldingsAcrossActors } from './systems/companionPooledHoldings.js';
-import { consumePooledHoldings as consumePooledHoldingsFromActors } from './systems/companionPooledConsumption.js';
-
-/**
- * `rollActorCheck`'s OWN refusal strings for the shared authorization preamble. There is deliberately
- * NO pair for `resolveBulkCheckDecision`: it takes no `actorId` and never reaches the preamble.
- */
-const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
-  gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
-});
-
-/**
- * `awardComponents`' and `creditCurrency`'s OWN refusal strings (issue 1301). TWO PAIRS AND NOT ONE:
- * a refused award reports itself in the award's words and a refused credit in the credit's.
- */
-const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
-  gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
-});
-
-const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
-  gmOnlyKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-  noActorKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
-});
-
-/**
- * The two pooled members carry NO hoisted refusal-string trio (issue 1342): the SET-valued preamble's
- * `message` is not read verbatim, so both branch on `gate.outcome` and build their own result.
- */
-import {
-  affordsCurrencySpends,
-  buildCurrencyAffordProbe,
-  checkWorldCurrencyAffordability,
-  creditWorldCurrency,
-} from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -277,13 +188,29 @@ import {
   shouldOfferInteractableConfigEntry
 } from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
+import { bulkFacade } from './bootstrap/bulkFacade.js';
+import { companionFacade } from './bootstrap/companionFacade.js';
+import { gatheringFacade } from './bootstrap/gatheringFacade.js';
+import {
+  createGatheringFailureFeedback,
+  createGatheringToolBreakage,
+  deprecate,
+  getBarSelectableActors,
+  getGatheringEngine,
+  getGatheringRunViewer,
+  getGatheringSelectableActors,
+  isCurrentWorldPaused,
+  isSelectableGatheringActor,
+  localizeGathering,
+  resolveGatheringActor,
+  setGatheringEngine,
+} from './bootstrap/gatheringRuntime.js';
+import { journalFacade } from './bootstrap/journalFacade.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
-
-let gatheringEngine = null;
 
 // Per-sender throttle for inbound gathering node depletions, held at module scope so the window
 // survives across socket messages — a per-message limiter would never refuse anything. Only the
@@ -615,7 +542,7 @@ function createJournalCommandsForFabricate(fabricate) {
     operations: {
       crafting: createCraftingJournalOperations(fabricate, () => service),
       gathering: createGatheringJournalRunOperations({
-        getEngine: () => gatheringEngine,
+        getEngine: () => getGatheringEngine(),
         runManager: fabricate.gatheringRunManager,
         getService: () => service,
         getUser: (userId) => game.users?.get(userId) ?? null,
@@ -702,36 +629,6 @@ function reportStaleEntryScript() {
   ui.notifications?.warn?.(message, { console: false });
 }
 
-/** Resolve a stored gathering actor preference against Foundry's actor collection. */
-function resolveGatheringActor(actorId) {
-  return game.actors?.get?.(actorId) ?? null;
-}
-
-/** Whether the current user may select an actor for gathering. */
-function isSelectableGatheringActor(actor) {
-  return isGatheringActorSelectableByUser(actor, game.user);
-}
-
-const getGatheringSelectableActors = createGatheringSelectableActorsGetter({
-  getActors: () => game.actors,
-  getCurrentUser: () => game.user,
-  isSelectable: isGatheringActorSelectableByUser
-});
-
-/**
- * The actor-selection top bar's predicate: attempt authorization's ownership rule plus the
- * player-character concept. It NARROWS the bar, never attempt authorization.
- */
-function isSelectableBarActor({ actor, viewer } = {}) {
-  return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);
-}
-
-const getBarSelectableActors = createGatheringSelectableActorsGetter({
-  getActors: () => game.actors,
-  getCurrentUser: () => game.user,
-  isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })
-});
-
 /**
  * Push the configured item stack-quantity path into the accessor, then optionally probe it and warn
  * the GM (issue 1024). ORDER IS LOAD-BEARING: re-configure BEFORE the probe. The re-configure is
@@ -773,15 +670,6 @@ function describeStackQuantityProbe(report) {
   return game.i18n?.format?.(advisory.key, advisory.data) ?? advisory.key;
 }
 
-function getGatheringRunViewer({ run } = {}) {
-  const userId = run?.userId;
-  return game.users?.get?.(userId) ?? { id: userId ?? null, isGM: false };
-}
-
-function isCurrentWorldPaused() {
-  return game.paused === true;
-}
-
 /**
  * The ACTIVE-GM edge for a relayed BLIND gathering start (issue 901). THE GM RE-RUNS THE WHOLE
  * ATTEMPT WITH THE REQUESTING USER AS THE VIEWER, so every gate is re-evaluated against the player
@@ -796,7 +684,7 @@ async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, ta
   if (!startActor) return null;
   // `interactive: false`: the situational-modifier dialog belongs to the player's client, never the
   // GM's, and a timed blind run does not roll at start anyway.
-  return gatheringEngine?.startAttempt({
+  return getGatheringEngine()?.startAttempt({
     viewer: requester,
     actor: startActor,
     environmentId,
@@ -967,52 +855,6 @@ async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid
   return applied;
 }
 
-/** Execute a gathering macro through the shared macro runner. */
-async function runGatheringMacro(macroUuid, context = {}) {
-  return MacroExecutor.run(macroUuid, context);
-}
-
-function createGatheringToolBreakage({ craftingSystemManager, evaluateExpression }) {
-  return createToolBreakageRuntime({
-    matchTools: ({ actor, system, task, tools = [], presentTools = null }) =>
-      matchGatheringTools({ actor, system, task, tools, craftingSystemManager, presentTools }),
-    buildItemRef: (actor, item) => gatheringRunItemRef(actor, item),
-    resolveReplacementSource: ({ componentId, system }) =>
-      resolveGatheringResultSource({ componentId, quantity: 1 }, system, craftingSystemManager),
-    resolveItemUuid: (uuid) => fromUuid(uuid),
-    evaluateExpression
-  });
-}
-
-function createGatheringFailureFeedback() {
-  return {
-    async apply({ failureOutcome, actor, viewer, system, environment, task, outcome, checkResult } = {}) {
-      if (failureOutcome?.mode === 'macro') {
-        try {
-          return await runGatheringMacro(failureOutcome.macroUuid, {
-            kind: 'gatheringFailure',
-            actor,
-            viewer,
-            system,
-            environment,
-            task,
-            outcome,
-            checkResult
-          });
-        } catch (err) {
-          console.error('Fabricate | Gathering failure-feedback macro failed:', err);
-          const fallback = game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') || 'Gathering produced no results.';
-          ui.notifications?.warn?.(fallback);
-          return { message: fallback, error: err?.message || 'Macro threw' };
-        }
-      }
-      const message = failureOutcome?.text || game.i18n?.localize?.('FABRICATE.Gathering.FailureDefault') || 'Gathering produced no results.';
-      ui.notifications?.warn?.(message);
-      return { message };
-    }
-  };
-}
-
 function fabricateEscapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1074,10 +916,6 @@ async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
   });
 }
 
-function localizeGathering(key, data = {}) {
-  return game.i18n?.format?.(key, data) ?? game.i18n?.localize?.(key) ?? key;
-}
-
 /**
  * Dispatch startup and `updateWorldTime` processing for crafting, salvage and gathering; timed
  * gathering completion goes to the module-internal GatheringEngine, never exposed on `game.fabricate`.
@@ -1097,20 +935,9 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
     },
     {
       label: 'Gathering',
-      callback: () => gatheringEngine?.processWorldTime?.(worldTime)
+      callback: () => getGatheringEngine()?.processWorldTime?.(worldTime)
     }
   ]));
-}
-
-// Tracks which deprecated API names have already warned, so the notice fires once per old name
-// rather than on every call.
-const _deprecationWarned = new Set();
-
-/** One-time console deprecation notice for a renamed public API method. Never throws. */
-function deprecate(oldName, newName) {
-  if (_deprecationWarned.has(oldName)) return;
-  _deprecationWarned.add(oldName);
-  console.warn(`Fabricate: ${oldName} is deprecated; use ${newName} instead.`);
 }
 
 class Fabricate {
@@ -1388,7 +1215,7 @@ class Fabricate {
       resolveRegionBehavior: (ref) => resolveInteractableBehaviorByRef(ref),
       writeInteractableBehavior: (ref, patch) => writeInteractableBehaviorNode(ref, patch)
     });
-    gatheringEngine = new GatheringEngine({
+    const gatheringEngine = setGatheringEngine(new GatheringEngine({
       // Load-bearing: without it every connected client resumes the same matured timed run and
       // double-applies its items, tool wear and node depletion.
       resumeTimedRuns: isPrimaryGM,
@@ -1445,7 +1272,7 @@ class Fabricate {
           behaviorId: ref?.behaviorId,
           update
         })
-    });
+    }));
     installGatheringJournalRunAuthority({
       engine: gatheringEngine,
       service: this.journalRunCommands,
@@ -1548,7 +1375,6 @@ class Fabricate {
     this._resolveReady?.();
     console.log('Fabricate | Ready');
   }
-
 
   /** Run versioned startup data migrations via MigrationRunner. */
   async _runMigrations() {
@@ -1872,107 +1698,6 @@ class Fabricate {
     return this.gatheringLocationService;
   }
 
-  /**
-   * Read redaction-safe current-realm evidence for a selected actor, gated on a system and
-   * player-callable: the resolved source token and display data only, never a secret realm record.
-   */
-  getGatheringLocationForActor({ actorId = null, actor = null, systemId = null } = {}) {
-    this._requireReady();
-    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
-    if (!resolvedActor || !systemId) return null;
-    // Realm/travel disabled for this system: no location surface at all.
-    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    const context = this.gatheringLocationService?.buildCurrentRealmContext({ actor: resolvedActor });
-    if (!context) return null;
-    const isGM = game.user?.isGM === true;
-    // Reveal mode and realm discovery are both WORLD facts now (issue 1282). `systemId` above
-    // remains the GATE — whether this system surfaces a location at all — and nothing more.
-    const revealMode = getRealmRevealMode(this.gatheringRealmStore?.get?.());
-    const discoveredRealmIds = getDiscoveredRealmIds(resolvedActor);
-    return buildLocationSummaryForViewer({ context, isGM, revealMode, discoveredRealmIds });
-  }
-
-  /**
-   * Set a party's manual current-realm override. GM-only, and a party has ONE override since issue
-   * 1282, so `systemId` gates the write rather than selecting which one is written.
-   */
-  setGatheringPartyRealmOverride({ partyId = null, systemId = null, realmIds = [] } = {}) {
-    this._requireReady();
-    this._requireGM();
-    if (!partyId || !systemId) return null;
-    // Realm/travel disabled: no-op, and no override writes.
-    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.setCurrentRealmOverride(partyId, realmIds);
-  }
-
-  /** @deprecated Use `setGatheringPartyRealmOverride`. */
-  setGatheringPartyRegionOverride({ partyId = null, systemId = null, regionIds = [] } = {}) {
-    deprecate('setGatheringPartyRegionOverride', 'setGatheringPartyRealmOverride');
-    return this.setGatheringPartyRealmOverride({ partyId, systemId, realmIds: regionIds });
-  }
-
-  /** Clear a party's current-realm override for one crafting system. GM-only. */
-  clearGatheringPartyRealmOverride({ partyId = null, systemId = null } = {}) {
-    this._requireReady();
-    this._requireGM();
-    if (!partyId || !systemId) return null;
-    // Realm/travel disabled: no-op, and no override writes.
-    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return null;
-    return this.gatheringPartyStore?.clearCurrentRealmOverride(partyId);
-  }
-
-  /** @deprecated Use `clearGatheringPartyRealmOverride`. */
-  clearGatheringPartyRegionOverride({ partyId = null, systemId = null } = {}) {
-    deprecate('clearGatheringPartyRegionOverride', 'clearGatheringPartyRealmOverride');
-    return this.clearGatheringPartyRealmOverride({ partyId, systemId });
-  }
-
-  /**
-   * Reveal a realm's discovery on an actor. GM-only, the realm must exist in the WORLD library, and
-   * `systemId` is the participation gate rather than an ownership claim.
-   */
-  revealGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null, source = 'manual', partyId = null } = {}) {
-    this._requireReady();
-    this._requireGM();
-    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
-    if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
-    const system = this.craftingSystemManager?.getSystem(systemId);
-    // Realm/travel disabled: no-op, and no discovery writes.
-    if (!isGatheringRealmsEnabled(system)) return Promise.resolve(false);
-    // `systemId` above stays the GATE — whether this system surfaces travel at all. The realm is
-    // validated against the WORLD library (issue 1282), and the discovery it writes is world-wide.
-    return revealGatheringRealm(resolvedActor, {
-      realmId,
-      source,
-      partyId,
-      validateRealmExists: this.gatheringRealmStore?.get?.(),
-      now: () => Date.now()
-    });
-  }
-
-  /** @deprecated Use `revealGatheringRealmForActor`. */
-  revealGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null, source = 'manual', partyId = null } = {}) {
-    deprecate('revealGatheringRegionForActor', 'revealGatheringRealmForActor');
-    return this.revealGatheringRealmForActor({ actorId, actor, systemId, realmId: regionId, source, partyId });
-  }
-
-  /** Hide a realm's discovery on an actor. GM-only. */
-  hideGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null } = {}) {
-    this._requireReady();
-    this._requireGM();
-    const resolvedActor = actor || (actorId ? game.actors?.get(actorId) : null);
-    if (!resolvedActor || !systemId || !realmId) return Promise.resolve(false);
-    // Realm/travel disabled: no-op, and no discovery writes.
-    if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);
-    return hideGatheringRealm(resolvedActor, { realmId });
-  }
-
-  /** @deprecated Use `hideGatheringRealmForActor`. */
-  hideGatheringRegionForActor({ actorId = null, actor = null, systemId = null, regionId = null } = {}) {
-    deprecate('hideGatheringRegionForActor', 'hideGatheringRealmForActor');
-    return this.hideGatheringRealmForActor({ actorId, actor, systemId, realmId: regionId });
-  }
-
   /** Get the gathering run manager. */
   getGatheringRunManager() {
     return this.gatheringRunManager;
@@ -2033,38 +1758,6 @@ class Fabricate {
   }
 
   /**
-   * List gathering environments and tasks for the current user and selected actor; the engine always
-   * receives the current Foundry user as viewer. An omitted `rememberedActorId` falls back to the
-   * persisted selection, resolved against the OWNERSHIP list rather than the player-character one.
-   */
-  listGatheringForActor(options = {}) {
-    if (!this.ready) {
-      throw new Error('Fabricate not initialized');
-    }
-
-    // Resolve against the persisted last-gathering selection by default; an explicit truthy id
-    // still overrides.
-    const withRememberedActor = this._withRememberedActorDefault(options);
-
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'listForActor', withRememberedActor, () => game.user);
-  }
-
-  /**
-   * The actors the current user may select in the unified-window actor selection bar: selectable
-   * PLAYER CHARACTERS, owned for a non-GM and all for a GM. Display data only. This predicate is
-   * DISTINCT from gathering attempt authorization and does not expand it.
-   */
-  listSelectableActors() {
-    this._requireReady();
-    return getBarSelectableActors({ viewer: game.user }).map((actor) => ({
-      id: actor?.id ?? actor?.uuid ?? null,
-      uuid: actor?.uuid ?? null,
-      name: actor?.name ?? '',
-      img: actor?.img ?? null
-    }));
-  }
-
-  /**
    * List Fabricate's curated icon vocabulary. ONE vocabulary serves every icon field, published here
    * so a companion binds to it instead of hand-curating a second list that drifts. It is measured
    * from the Font Awesome bundle a Foundry install ships rather than from Font Awesome's metadata.
@@ -2098,11 +1791,6 @@ class Fabricate {
   /** Read the persisted remembered gathering-actor selection; an empty string when unset. */
   getSelectedGatheringActorId() {
     return getSetting(SETTING_KEYS.LAST_GATHERING_ACTOR) || '';
-  }
-
-  /** Persist the remembered gathering-actor selection to the existing client setting. */
-  setSelectedGatheringActorId(id) {
-    return setSetting(SETTING_KEYS.LAST_GATHERING_ACTOR, id ?? '');
   }
 
   /**
@@ -2261,269 +1949,6 @@ class Fabricate {
   }
 
   /**
-   * The ONE authorization rule every GM-gated, actor-targeted facade member applies (issue 1289);
-   * `companion-api/spec.md` § Behavioural Member Rules owns the normative GM -> actor -> readiness
-   * order. THE MESSAGE KEYS ARE PARAMETERS. A SECOND COPY lives on the GM Knowledge surface's shell,
-   * unifying them crossing the facade/UI boundary; named here so a THIRD copy meets it.
-   */
-  _requireGmActor(actorId, { gmOnlyKey, noActorKey }) {
-    if (game.user?.isGM !== true) {
-      return { actor: null, outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey };
-    }
-    const actor = this._resolveCraftingActor(actorId);
-    if (!actor) {
-      return { actor: null, outcome: COMPANION_OUTCOMES.noActor, message: noActorKey };
-    }
-    return { actor, outcome: null, message: null };
-  }
-
-  /**
-   * The SET-VALUED extension of `_requireGmActor`, for the two pooled members (issue 1342).
-   * `companion-api/spec.md` § Behavioural Member Rules owns every rule, the DUPLICATED GM text and
-   * the UUID address included. It takes NO refusal strings — each pooled delegator answers through
-   * its own result builder.
-   */
-  _requireGmActors(actorUuids) {
-    if (game.user?.isGM !== true) {
-      return { actors: null, outcome: COMPANION_OUTCOMES.gmOnly, messageData: null };
-    }
-    return gatePooledActorUuids(actorUuids, {
-      resolveActor: (uuid) => {
-        const addressed = globalThis.fromUuidSync?.(uuid) ?? null;
-        if (addressed?.documentName !== 'Actor') return null;
-        return addressed.inCompendium === true ? null : addressed;
-      }
-    });
-  }
-
-  /**
-   * GM-only crafting-knowledge reset (issue 773), clearing one actor's learned recipes and scoped
-   * discovery for one system, or every system when `systemId` is null. EXPLICITLY GM-GATED, it
-   * mutating player-owned actor state and, for `total`-scope books, a world setting. NEVER THROWS.
-   */
-  async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
-    const gate = this._requireGmActor(actorId, {
-      gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly',
-      noActorKey: 'FABRICATE.Knowledge.Reset.NoActor'
-    });
-    if (gate.outcome) return { success: false, message: gate.message };
-    const actor = gate.actor;
-    const service = this.recipeVisibilityService;
-    const result = systemId
-      ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
-      : await service.forgetAllLearnedRecipes(actor, { freeLearnBudget });
-    return {
-      success: result.success === true,
-      message: 'FABRICATE.Knowledge.Reset.Success',
-      messageData: { actor: actor.name, count: result.count || 0, systemId },
-    };
-  }
-
-  /**
-   * `COMPANION.grantRecipeKnowledge` — teach one actor one recipe with NO owned book (issue 1289).
-   * Unbounded by design, WHICH IS WHY it lives in the free function `grantRecipeKnowledgeToActor`:
-   * `RecipeVisibilityService` is handed out LIVE AND UNGATED, so the write would be reachable from
-   * any player's console. It owns preconditions 1-3 only.
-   */
-  async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {
-    const gate = this._requireGmActor(actorId, {
-      gmOnlyKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-      noActorKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
-    });
-    // ONE guard, holding the normative order: the preamble's refusal decides first and readiness
-    // only where it passed, because `_requireReady()` throws and this member may not.
-    if (gate.outcome || this.ready !== true) {
-      return knowledgeGrantResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await grantRecipeKnowledgeToActor({ actor: gate.actor, recipeId, grantedBy }, {
-      resolveRecipe: (id) => this.recipeManager?.getRecipe?.(id) ?? null,
-      resolveSystem: (recipe) => this.craftingSystemManager?.getSystem?.(recipe?.craftingSystemId) ?? null,
-      isObservable: (system) => this.recipeVisibilityService?.isLearnedKnowledgeObservable?.(system) === true,
-      readFlag: (actor, key, fallback) => getFabricateFlag(actor, key, fallback),
-      writeFlag: (actor, key, value) => setFabricateFlag(actor, key, value)
-    });
-  }
-
-  /**
-   * `COMPANION.checkAffordability` — can this actor afford `amount` of `unitId` against the WORLD
-   * coin ladder (issue 1289)? World scope, so no `requirements.currency` toggle; ladder-aware; it
-   * writes nothing. GM-gated for the grant's reason plus its own: on a `macro`-strategy world it
-   * triggers GM-authored macro code with caller-chosen arguments.
-   */
-  async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {
-    const gate = this._requireGmActor(actorId, {
-      gmOnlyKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
-      noActorKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
-    });
-    if (gate.outcome || this.ready !== true) {
-      return affordabilityResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await checkWorldCurrencyAffordability(gate.actor, { unitId, amount }, this._worldCurrencySeams());
-  }
-
-  /**
-   * The ONE seam bag both WORLD-scoped currency members inject (issue 1301). `isElectedExecutor` is
-   * deliberately NOT here — the check gates on no call site, writing nothing — and `creditCurrency`
-   * spreads this bag and adds it.
-   */
-  _worldCurrencySeams() {
-    return {
-      getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
-      actorPropertyCoinSpender: this.actorPropertyCoinSpender,
-      actorInventoryCoinSpender: this.actorInventoryCoinSpender
-    };
-  }
-
-  /**
-   * `COMPANION.creditCurrency` — credit `amount` of `unitId` to an actor against the WORLD coin
-   * ladder (issue 1301), sharing request resolution with `checkAffordability`. SITED BESIDE IT so
-   * the two delegators are not adjacent here or in the harness mirror — MEASURED: adjacent
-   * near-identical delegators concatenate into ONE duplicated run over the debt bar. It routes
-   * through the spender's `refund`, so `caller: 'award'` tells a credit from a cancel. NOT IDEMPOTENT.
-   */
-  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
-    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
-    if (gate.outcome || this.ready !== true) {
-      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await creditWorldCurrency(gate.actor, { unitId, amount, callSite }, {
-      ...this._worldCurrencySeams(),
-      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
-    });
-  }
-
-  /**
-   * The seam bag `readPooledHoldings` injects (issue 1342). It SPREADS `_worldCurrencySeams`, the
-   * read's currency axis being the same WORLD ladder; `findComponentItems` is the PUBLISHED matcher,
-   * so what this COUNTS and what the consume TAKES cannot disagree. THREE SEAMS THE LEAF DECLARES
-   * ARE DELIBERATELY ABSENT, for the reason `createOrStack` is absent from the award bag.
-   */
-  _pooledHoldingsSeams() {
-    return {
-      ...this._worldCurrencySeams(),
-      listSystems: () => this.craftingSystemManager?.getSystems?.() ?? [],
-      craftingSystemManager: this.craftingSystemManager,
-      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
-    };
-  }
-
-  /**
-   * `COMPANION.readPooledHoldings` — what a SET of characters holds between them (issue 1342);
-   * `companion-api/spec.md` § The Read Is Not A Reservation owns the rules. Sited HERE for the
-   * duplicated-run reason on `creditCurrency`, and the first member addressed by actor UUID.
-   */
-  async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
-    const gate = this._requireGmActors(actorUuids);
-    if (gate.outcome || this.ready !== true) {
-      return pooledHoldingsReadResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
-    }
-    return await readPooledHoldingsAcrossActors(gate.actors, { costs }, this._pooledHoldingsSeams());
-  }
-
-  /**
-   * The ONE seam bag both Standalone Check Roll members inject. `resolveActor` and `isGm` are
-   * deliberately ABSENT, both gates living in the facade; `prompt` and `promptBulk` exist because
-   * both prompt functions AUTO-CONFIRM where there is no `DialogV2`.
-   */
-  _companionCheckSeams() {
-    return {
-      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
-      hasDiceEngine: () => typeof globalThis.Roll === 'function',
-      localize: (key, fallback) => {
-        const resolved = bridgeLocalize(key);
-        return typeof resolved === 'string' && resolved !== '' && resolved !== key ? resolved : fallback;
-      },
-      prompt: promptCheckRoll,
-      promptBulk: promptBulkCheckRoll,
-      runPassFail: runFormulaPassFail,
-      runProgressive: runFormulaProgressive,
-      buildRollOptions: buildInteractiveRollOptions
-    };
-  }
-
-  /**
-   * `COMPANION.rollActorCheck` — roll ONE formula for ONE actor, graded against a `dc` or ungraded
-   * (issue 1293). It owns preconditions 1-3 only; the leaf owns the call-site gate.
-   */
-  async rollActorCheck({ actorId = null, callSite = null, formula = null, dc = null, compare = null, label = null, interactive = false, rollDecision = null } = {}) {
-    const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
-    if (gate.outcome || this.ready !== true) {
-      return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await rollStandaloneActorCheck({ actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision }, this._companionCheckSeams());
-  }
-
-  /**
-   * `COMPANION.resolveBulkCheckDecision` — answer ONE roll decision the caller will apply to N rolls
-   * it makes (issue 1293). It rolls nothing, and is GM-gated INLINE rather than through
-   * `_requireGmActor`, which § Behavioural Member Rules scopes to ACTOR-TARGETED members.
-   */
-  async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
-    const gmOnly = game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
-    if (gmOnly || this.ready !== true) {
-      return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await resolveStandaloneBulkCheckDecision({ callSite, formulas }, this._companionCheckSeams());
-  }
-
-  /**
-   * The seam bag `awardComponents` injects (issue 1301). FIVE seams, the sixth — `createOrStack` —
-   * deliberately ABSENT: the leaf defaults it to the shared import, so passing it here would give
-   * the create primitive two spellings and let a facade change route the award past the seam.
-   */
-  _componentAwardSeams() {
-    return {
-      resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
-      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
-      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? [],
-      resolveSourceItem: (uuid) => fromUuid(uuid),
-      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
-    };
-  }
-
-  /**
-   * `COMPANION.awardComponents` — place components onto an actor's sheet (issue 1301);
-   * `companion-api/spec.md` § The Award Members owns the rules. Preconditions 1-3 only; the leaf
-   * owns the call-site gate, the election and the `awards` validation. NOT IDEMPOTENT.
-   */
-  async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {
-    const gate = this._requireGmActor(actorId, AWARD_COMPONENTS_GATE_KEYS);
-    if (gate.outcome || this.ready !== true) {
-      return componentAwardResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
-    }
-    return await awardComponentsToActor(gate.actor, { systemId, awards, callSite }, this._componentAwardSeams());
-  }
-
-  /**
-   * The seam bag `consumePooledHoldings` injects (issue 1342): `_worldCurrencySeams` plus the
-   * election, as `creditCurrency` does, this member WRITING. THE COMPONENT TRIO IS BOUND IDENTICALLY
-   * TO THE AWARD'S, award, salvage and take having to resolve through one matcher.
-   */
-  _pooledConsumptionSeams() {
-    return {
-      ...this._worldCurrencySeams(),
-      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
-      resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
-      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
-      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
-    };
-  }
-
-  /**
-   * `COMPANION.consumePooledHoldings` — take costs from what a SET of characters holds between them
-   * (issue 1342); § The Pooled Holdings Members owns the rules. The first published member that
-   * REMOVES value, sited HERE for the duplicated-run reason recorded on `creditCurrency`.
-   */
-  async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
-    const gate = this._requireGmActors(actorUuids);
-    if (gate.outcome || this.ready !== true) {
-      return pooledHoldingsConsumeResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
-    }
-    return await consumePooledHoldingsFromActors(gate.actors, { callSite, costs }, this._pooledConsumptionSeams());
-  }
-
-
-  /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft} but taking actor
    * IDS rather than documents, and resolving the crafting actor and component sources so the attempt
    * uses the inventory scope the listing was computed for. New starts use version 1 and preserve
@@ -2571,211 +1996,6 @@ class Fabricate {
     return await this.craftingEngine.salvage(craftingActor.uuid, systemId, componentId, {
       interactive
     });
-  }
-
-  /**
-   * Lazily build and cache the `BulkSalvageService` behind `salvageComponents` (issue 859), every
-   * collaborator injected so it reaches no Foundry global. CACHING IS SOUND BECAUSE EVERY
-   * COLLABORATOR IS READ OFF `this` AT CALL TIME: `this.craftingEngine` is `null` until
-   * `initialize()`, so a captured field value could hold `null` forever.
-   */
-  _getBulkSalvageService() {
-    if (this._bulkSalvageService) return this._bulkSalvageService;
-    this._bulkSalvageService = new BulkSalvageService({
-      salvage: (actorUuid, systemId, componentId, options) =>
-        this.craftingEngine.salvage(actorUuid, systemId, componentId, options),
-      getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
-      promptRollDecision: promptBulkCheckRoll,
-      postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
-      // The BATCHED complication relay (issue 1286), read off `this` at call time. One message per
-      // addressed (system, actor) PAIR rather than per ROW, both halves being GM-side authorization
-      // inputs and the rate limit being sized against the pair count.
-      deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
-      // The executing user's stored progressive stage order, through the SAME edge
-      // `ResolutionModeService` and `CraftingEngine` are given (issue 1286). Only the pre-run
-      // forecast consumes it; left unwired it quietly reads the AUTHORED order instead.
-      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
-      // Key-only, matching every card module's `localize` contract; the aggregate card substitutes
-      // its own counts.
-      localize: (key) => game.i18n?.localize?.(key) ?? key
-    });
-    return this._bulkSalvageService;
-  }
-
-  /** Lazily build and cache the `BulkDestroyService` behind `destroyComponents` (issue 859). */
-  _getBulkDestroyService() {
-    if (this._bulkDestroyService) return this._bulkDestroyService;
-    this._bulkDestroyService = new BulkDestroyService({
-      getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
-      // Destroy MUST resolve documents through the identical matcher salvage uses, case-SENSITIVE
-      // name fallback included, or it would delete what the player was shown as a different
-      // component. Read off `this.craftingEngine` at CALL time, this service being cached.
-      findComponentItems: (actor, component, system) =>
-        this.craftingEngine.findComponentItems(actor, component, system),
-      // Must RETURN the deleted documents: `unitsDeleted` comes from what came back, never from what
-      // was asked for, a `preDeleteItem` hook being able to veto individual ids silently.
-      deleteItems: (actor, itemIds) => actor.deleteEmbeddedDocuments('Item', itemIds)
-    });
-    return this._bulkDestroyService;
-  }
-
-  /**
-   * Post the ONE aggregated bulk-salvage chat card. THE ORDER OF THE THREE STEPS IS LOAD-BEARING:
-   * SPEAKER first, `applyMode`'s `ic` branch reading `chatData.speaker.actor` unguarded; VISIBILITY
-   * before `create`, the legacy `rollMode` option being honoured only for a message carrying rolls;
-   * and `create` LAST, with `author`, the V14 schema having no `user` field. THE SPEAKER IS BUILT,
-   * NEVER INFERRED — `getSpeaker()` with no actor falls through to the CONTROLLED TOKENS. NEVER read
-   * `core.messageMode`: `assertSetting` throws on V13 and `??` does not catch a throw.
-   */
-  async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {
-    // `globalThis.` rather than the bare global: optional chaining does not rescue an UNDECLARED
-    // identifier, so a bare `fromUuidSync?.()` throws under a harness that has not installed it,
-    // and this poster must never cost a completed run its report.
-    const actor = actorUuid ? (globalThis.fromUuidSync?.(actorUuid) ?? null) : null;
-    const alias = actorNames.filter(Boolean).join(', ') || game.user?.name || '';
-    const speaker = actor
-      ? ChatMessage.getSpeaker({ actor })
-      : { scene: game.scenes?.current?.id ?? null, actor: null, token: null, alias };
-
-    const chatData = { author: game.user?.id, speaker, content };
-    applyBulkChatVisibility(chatData, rollMode || game.settings?.get?.('core', 'rollMode'));
-    return await ChatMessage.create(chatData);
-  }
-
-  /**
-   * Gate a bulk target list, resolving ONE actor per row from `target.actorId ?? actorId` and NOTHING
-   * ELSE. No persisted-selection tail, unlike `_resolveCraftingSources`: a bulk run may span actors,
-   * so that fallback would silently RETARGET an unresolved row. Order is preserved.
-   */
-  _gateBulkTargets(targets, actorId) {
-    return (targets || []).filter(Boolean).map((target) => ({
-      target,
-      actor: this._resolveCraftingActor(target.actorId ?? actorId)
-    }));
-  }
-
-  /**
-   * Weave a service's result rows back into the caller's ORIGINAL target order, substituting a
-   * refusal row where the gate resolved no actor, or "the third one failed" is unreadable.
-   */
-  _mergeBulkRows(gated, ranItems, buildRefusedRow) {
-    const rows = [];
-    let next = 0;
-    for (const entry of gated) {
-      if (entry.actor && next < ranItems.length) {
-        rows.push(ranItems[next]);
-        next += 1;
-      } else {
-        rows.push(buildRefusedRow(entry.target));
-      }
-    }
-    return rows;
-  }
-
-  /**
-   * The identity fields every refusal row carries, resolved from the crafting system so it still
-   * READS as the thing the player selected rather than as a blank line.
-   */
-  _buildNotPermittedRow(target) {
-    const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
-    return {
-      actorId: target?.actorId ?? null,
-      actorName: '',
-      systemId: target?.systemId ?? null,
-      componentId: target?.componentId ?? null,
-      name: component?.name || '',
-      img: component?.img || '',
-      // The facade's own outcome, never folded into `skipped`: "you may not act on this actor" and
-      // "this row was not runnable" are different answers and the panel chips them differently.
-      outcome: 'notPermitted',
-      skipReason: null
-    };
-  }
-
-  /**
-   * Salvage MANY owned components in one gesture (issue 859). IT TAKES AN `actorId` PER TARGET,
-   * NEVER AN `actorUuid`, AT ANY NESTING LEVEL: neither the engine nor `BulkSalvageService` performs
-   * an ownership check, so the per-target `_resolveCraftingActor` is the ONLY gate, and it resolves
-   * through `game.actors`, excluding compendium-backed and unlinked token actors. An unresolvable
-   * actor becomes a `notPermitted` ROW rather than a throw. `interactive` defaults TRUE here, unlike
-   * `salvageComponent`. STATED LIMIT: `onProgress`'s `total` counts the rows the SERVICE was given.
-   */
-  async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {
-    this._requireReady();
-    const gated = this._gateBulkTargets(targets, actorId);
-    const runnable = gated.filter((entry) => entry.actor);
-
-    const result = await this._getBulkSalvageService().run({
-      targets: runnable.map(({ target, actor }) => ({
-        actorUuid: actor.uuid,
-        actorId: actor.id,
-        actorName: actor.name,
-        systemId: target.systemId,
-        componentId: target.componentId
-      })),
-      interactive,
-      onProgress
-    });
-    // A dismissed prompt returns before the first engine call, so nothing ran and there is no
-    // per-row story to tell — pass the zero-mutation shape through rather than reporting refusals.
-    if (result.cancelled) return result;
-
-    const items = this._mergeBulkRows(gated, result.items, (target) => ({
-      ...this._buildNotPermittedRow(target),
-      rollValue: null,
-      tierStep: null,
-      message: '',
-      results: [],
-      consumed: [],
-      tools: []
-    }));
-    return {
-      cancelled: false,
-      items,
-      counts: {
-        ...result.counts,
-        total: items.length,
-        notPermitted: items.length - result.items.length
-      },
-      posted: result.posted
-    };
-  }
-
-  /**
-   * Permanently destroy MANY owned components in one gesture (issue 859), under `salvageComponents`'
-   * gate, merge and `onProgress` limit. DELETES WHOLE STACKS, deliberately NOT gated on
-   * `features.salvage` or `salvage.enabled`: a player can already delete their own Items, so this is
-   * ergonomics and not capability. No chat card. The caller owns the confirmation.
-   */
-  async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
-    this._requireReady();
-    const gated = this._gateBulkTargets(targets, actorId);
-    const runnable = gated.filter((entry) => entry.actor);
-
-    const result = await this._getBulkDestroyService().run({
-      targets: runnable.map(({ target, actor }) => ({
-        // The RESOLVED document, not an id: the service's matcher and delete both need the actor
-        // itself, and re-resolving there would be a second gate to keep honest.
-        actor,
-        actorId: actor.id,
-        actorName: actor.name,
-        systemId: target.systemId,
-        componentId: target.componentId
-      })),
-      onProgress
-    });
-
-    const items = this._mergeBulkRows(gated, result.items, (target) => ({
-      ...this._buildNotPermittedRow(target),
-      requested: 0,
-      unitsDeleted: 0,
-      documentsDeleted: 0,
-      staleIds: 0,
-      items: [],
-      vetoed: []
-    }));
-    return { items, unitsDeleted: result.unitsDeleted, documentsDeleted: result.documentsDeleted };
   }
 
   /**
@@ -3020,182 +2240,12 @@ class Fabricate {
   }
 
   /**
-   * Start a gathering attempt for the current user; the raw GatheringEngine stays module-internal so
-   * every public attempt carries current-user viewer enforcement. `interactive` prompts on the
-   * routed and progressive paths only.
-   */
-  startGatheringAttempt(options = {}) {
-    if (!this.ready) {
-      throw new Error('Fabricate not initialized');
-    }
-
-    // Resolve the SAME actor the listing was computed for. Without this the engine falls back to
-    // `selectableActors[0]` and silently mis-gates the attempt — the "nothing happens" bug.
-    const withRememberedActor = this._withRememberedActorDefault(options);
-    const selectableActors = getGatheringSelectableActors({ viewer: game.user });
-    const selectedActor = withRememberedActor.actor ?? (
-      withRememberedActor.rememberedActorId
-        ? selectableActors.find((actor) =>
-            [actor?.id, actor?.uuid].includes(withRememberedActor.rememberedActorId)) ?? null
-        : (selectableActors[0] ?? null)
-    );
-    Object.assign(withRememberedActor, { actor: selectedActor, lifecycleVersion: 1 });
-
-    // `requestStart`, not `startAttempt`: a blind timed start this client may not write is routed to
-    // the active GM before any task is drawn (issue 901). Wrapped in `executePublicGather` so a
-    // READY attempt still finishes in one call — the `lifecycleVersion: 1` stamped above routes it
-    // into a started run awaiting execution, so without this the public API answers
-    // `accepted: true` and awards nothing (issue 1759). A waiting or timed attempt is untouched.
-    return executePublicGather({
-      requestStart: () =>
-        callGatheringRuntimeWithCurrentViewer(
-          gatheringEngine,
-          'requestStart',
-          withRememberedActor,
-          () => game.user
-        ),
-      actor: selectedActor,
-      executeCommand: (command, commandOptions) =>
-        this.executeJournalRunCommand(command, commandOptions),
-      // The gathering screen's `interactive: true` reaches the execute, so a required check still
-      // opens its roll dialog; a macro's omitted flag stays the silent route (issue 1780).
-      interactive: withRememberedActor.interactive === true,
-    });
-  }
-
-  /**
-   * The per-drop "What you might find" breakdown for one opened task, defaulting the remembered actor
-   * to the persisted selection and enforcing the current user as viewer.
-   */
-  getGatheringDropBreakdown(options = {}) {
-    if (!this.ready) {
-      throw new Error('Fabricate not initialized');
-    }
-
-    const withRememberedActor = this._withRememberedActorDefault(options);
-
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'getTaskDropBreakdown', withRememberedActor, () => game.user);
-  }
-
-  inspectGatheringEnvironmentState(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.inspectEnvironment(options.environmentId) ?? null;
-  }
-
-  restockGatheringNode(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.restockNode(options);
-  }
-
-  updateGatheringConditions(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.updateConditions(options);
-  }
-
-  /**
    * Read current gathering conditions and configured tag vocabularies. Player-safe: weather,
    * time-of-day and the available tags, but no GM-only library internals.
    */
   getGatheringConditions() {
     this._requireReady();
     return this.gatheringRichStateService?.getConditions();
-  }
-
-  /** Set the current global gathering weather tag. */
-  setGatheringWeather(weatherTag) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.setWeather(weatherTag);
-  }
-
-  /** Set the current global gathering time-of-day tag. */
-  setGatheringTimeOfDay(timeOfDayTag) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.setTimeOfDay(timeOfDayTag);
-  }
-
-  /**
-   * Atomically update global gathering conditions, an omitted field keeping its value. A mutation
-   * requires a GM and validates its tags through the rich state service.
-   */
-  setGatheringConditions(conditions = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.setConditions(conditions);
-  }
-
-  setGatheringStamina(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
-    // Legacy back-compat: a `{ provider: 'external' }` argument maps to a read-only max. The service
-    // tolerates the legacy value too, but mapping it here keeps the boundary on `maxReadOnly`.
-    const { provider, ...rest } = options;
-    const mapped =
-      provider === undefined ? rest : { ...rest, maxReadOnly: provider === 'external' };
-    return this.gatheringRichStateService?.setActorStamina(actor, mapped);
-  }
-
-  adjustGatheringStamina(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
-    return this.gatheringRichStateService?.adjustActorStamina(actor, options);
-  }
-
-  /** Read a crafting system's gathering economy block. Player-safe: mode and regen cadence. */
-  getGatheringEconomy(options = {}) {
-    this._requireReady();
-    return this.gatheringRichStateService?.systemEconomy(options.systemId) ?? null;
-  }
-
-  /** Set a crafting system's gathering economy block. GM-only. */
-  setGatheringEconomy(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.setSystemEconomy(options);
-  }
-
-  /** The stamina pools of player-owned actors for one system, for the GM Gathering State panel. */
-  getGatheringStaminaState(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    const systemId = options.systemId;
-    const service = this.gatheringRichStateService;
-    if (!service || !systemId) return [];
-    // Player characters only, per the CONFIGURED player-character actor types (issue 1024), so a
-    // Fallout `robot` appears once the GM ticks it. No rolled pool reports `max: null`.
-    return Array.from(game.actors?.contents ?? [])
-      .filter(actor => isPlayerCharacterActor(actor))
-      .map(actor => {
-        const stamina = service.getActorStamina(actor, systemId);
-        return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
-      });
-  }
-
-  /** (Re)roll a character's stamina pool from the system templates and persist it. GM-only. */
-  rollGatheringStamina(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    const actor = options.actor || (options.actorId ? game.actors?.get(options.actorId) : null);
-    if (!actor) return null;
-    return this.gatheringRichStateService?.seedActorStaminaIfNeeded({ actor, systemId: options.systemId, force: true });
-  }
-
-  revealGatheringTask(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.revealTask(options.actor, options);
-  }
-
-  clearGatheringTaskReveal(options = {}) {
-    this._requireReady();
-    this._requireGM();
-    return this.gatheringRichStateService?.clearReveal(options.actor, options);
   }
 
   _requireReady() {
@@ -3206,240 +2256,15 @@ class Fabricate {
     if (game.user?.isGM !== true) throw new Error('Gathering rich state changes require a GM user');
   }
 
-  /**
-   * Submit a current-lifecycle operation through active-GM authority after initialization. Actor
-   * UUIDs address this authenticated command boundary, whose GM handler rechecks the attested
-   * sender's ownership; they do not replace actor IDs in the player crafting facades. A timeout is
-   * an unknown response, not proof of failure and not permission to replay. `command` start uses an
-   * empty runId and revision zero, and alchemy uses runType `crafting`.
-   * `options` MUST BE FORWARDED: it carries `interactive`, and this signature once took `command`
-   * alone while its caller passed both, so `game.fabricate.craft()` on a checked recipe opened a
-   * dialog nobody could answer and waited forever — the source pin covered the CALL, not this
-   * signature (issue 1759).
-   */
-  executeJournalRunCommand(command, options) {
-    this._requireReady();
-    return this.journalRunCommands?.executeJournalRunCommand(command, options)
-      ?? Promise.resolve(authorityUnavailableRefusal());
-  }
-
-  /**
-   * Hide a terminal entry for the current user in this world, preserving actor history. The awaited
-   * user-scoped write follows the user across devices and can reject.
-   */
-  dismissJournalRun(options) {
-    this._requireReady();
-    return this.journalRunCommands?.dismissJournalRun(options)
-      ?? Promise.resolve(authorityUnavailableRefusal());
-  }
-
-  /** This user's hidden native run keys for one actor; a different viewer gets an empty set. */
-  getDismissedJournalRunKeys(options) {
-    return this.journalRunCommands?.getDismissedJournalRunKeys(options) ?? new Set();
-  }
-
   /** Cached authority availability; it neither provisions a ledger nor releases a claim. */
   getJournalRunAuthorityAvailability() {
     return this.journalRunCommands?.getJournalRunAuthorityAvailability()
       ?? authorityUnavailableAvailability();
   }
 
-  /**
-   * Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing
-   * ledger is returned rather than refused, boot recovery and the command path already provision
-   * automatically, and it never clears a retained execution claim.
-   */
-  setupJournalRunAuthority() {
-    return this.journalRunCommands?.setupJournalRunAuthority()
-      ?? Promise.resolve(authorityUnavailableRefusal());
-  }
-
-  /**
-   * Record manual disposition of an exact retained execution claim as the active GM. Inspect actual
-   * receipts and the uncertain applying boundary first, after confirming no other GM realm is still
-   * executing; planned amounts are not proof of awards or spending. `claimId` is the claim's random
-   * token (the `journalRunClaimId` flag on the ledger's `FabRunAuthority1` page), never the page id
-   * or a run id. THIS RELEASES AUTHORITY ONLY: the old request stays non-replayable, an uncertain
-   * run effect remains recovery-required, and it performs no replay, compensation or rollback.
-   */
-  reconcileJournalRunAuthority(options) {
-    return this.journalRunCommands?.reconcileJournalRunAuthority(options)
-      ?? Promise.resolve(authorityUnavailableRefusal());
-  }
-
   /** Current world time in seconds, on this edge so the Journal store stays free of `game.*`. */
   getWorldTime() {
     return Number(game.time?.worldTime || 0);
-  }
-
-  /**
-   * Calendar components for an absolute world time, plus `daysPerYear` where derivable, so the pure
-   * `worldTimeLabel` util can compose a campaign day without touching `game.*`.
-   */
-  getWorldTimeComponents(worldTime = this.getWorldTime()) {
-    const calendar = game.time?.calendar ?? null;
-    if (typeof calendar?.timeToComponents !== 'function') return null;
-    try {
-      const components = calendar.timeToComponents(Number(worldTime) || 0);
-      if (!components || typeof components !== 'object') return null;
-      const daysPerYear = daysPerYearFromCalendar(calendar);
-      if (daysPerYear !== null) components.daysPerYear = daysPerYear;
-      return components;
-    } catch {
-      return null;
-    }
-  }
-
-  /** Lazily construct the singleton `RunJournalBuilder`, so it is not rebuilt per listing call. */
-  _getRunJournalBuilder() {
-    if (!this._runJournalBuilder) {
-      this._runJournalBuilder = new RunJournalBuilder({
-        craftingRunManager: this.craftingRunManager,
-        salvageRunManager: this.salvageRunManager,
-        gatheringRunSource: this.gatheringRunManager,
-        recipeManager: this.recipeManager,
-        resolutionModeService: this.resolutionModeService,
-        recipeVisibility: this.recipeVisibilityService,
-        getSystem: (systemId) => this.craftingSystemManager?.getSystem(systemId) ?? null,
-        getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
-        getGatheringTask: (environmentId, taskId) =>
-          this._resolveJournalGatheringTask(environmentId, taskId),
-        // GM-only secret preview of an in-flight blind run's drawn task (issue 901). The builder
-        // consults it only for a GM viewer; a player's journal shows the generic blind label.
-        getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
-        // D-027: history names a blind task only once the reveal policy has disclosed it, never
-        // because the viewer owns the actor. The engine owns the chat card's identical decision.
-        isGatheringIdentityHidden: (args) =>
-          gatheringEngine?.isHistoricalBlindIdentityHidden?.(args) === true,
-        getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
-        getComponent: (systemId, componentId) =>
-          this._resolveJournalComponent(systemId, componentId),
-        getViewer: () => game.user,
-        localize: (key, data) => localizeGathering(key, data),
-        nowWorldTime: () => this.getWorldTime(),
-        // The per-pass inventory snapshot's component resolver (issue 1228): the Journal reads no
-        // tallies itself, but its snapshot must be the same complete value every other pass builds.
-        resolveComponentForItem: findMatchingComponent,
-        getComponentSourceActors: ({ actor, run }) => {
-          const uuids = Array.isArray(run?.componentSourceActorUuids)
-            ? run.componentSourceActorUuids
-            : [];
-          const sources = uuids
-            .map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null)
-            .filter(Boolean);
-          return sources.length > 0 ? sources : (actor ? [actor] : []);
-        },
-        resolveItemEssences: ({ item, recipe }) => {
-          const system = this.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
-          return resolveItemEssences(
-            item,
-            resolvedComponentsFor(system),
-            recipe?.craftingSystemId,
-            findMatchingComponent
-          );
-        },
-        affordCurrency: ({ actor, recipe, match }) =>
-          buildCurrencyAffordProbe(
-            actor,
-            recipe,
-            this.craftingEngine?._currencySeams?.() ?? {}
-          )(match),
-        // The AGGREGATE answer the per-option probe above cannot give: two currency ingredients
-        // each affordable alone but not together (issue 1648, F2).
-        affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
-          affordsCurrencySpends(
-            actor,
-            recipe,
-            currencySpends,
-            this.craftingEngine?._currencySeams?.() ?? {}
-          ),
-        getDismissedRunKeys: ({ actorUuid, viewerId }) =>
-          this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
-        getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
-      });
-    }
-    return this._runJournalBuilder;
-  }
-
-  /**
-   * Resolve a system library tool to `{ id, name, img }` through `data-models` requirement 13's
-   * precedence. THE SNAPSHOT RUNG IS LOAD-BEARING: an item-sourced Tool has a null `componentId` by
-   * construction and without it printed its raw id (issue 1119).
-   */
-  _resolveJournalTool(systemId, toolId) {
-    const system = this.craftingSystemManager?.getSystem(systemId);
-    if (!system || !toolId) return null;
-    const tool = resolvedToolsFor(system).find((entry) => entry?.id === toolId);
-    if (!tool) return null;
-    const component = linkedComponentFor(tool, resolvedComponentsFor(system));
-    const img = resolveToolDisplayImage(tool, component);
-    return {
-      id: tool.id,
-      name: resolveToolDisplayName(tool, component, tool.id),
-      // The Journal renders its own default artwork, so the generic sentinel stays null.
-      img: img === TOOL_IMAGE_SENTINEL ? null : img,
-    };
-  }
-
-  /**
-   * Resolve a gathering run's task to `{ name, img }` via the COMPOSED environment, which alone
-   * carries the authored name and image; null leaves the raw-id fallback.
-   */
-  _resolveJournalGatheringTask(environmentId, taskId) {
-    if (!environmentId || !taskId) return null;
-    const environment = gatheringEngine?._findEnvironment?.(environmentId);
-    const tasks = Array.isArray(environment?.tasks) ? environment.tasks : [];
-    const task = tasks.find((entry) => entry?.id === taskId);
-    return task ? { name: task.name, img: task.img } : null;
-  }
-
-  /**
-   * Resolve a run's awarded item to `{ name, img }` by recorded uuid, labelling history written
-   * before name and img were captured at award time. Best-effort and synchronous.
-   */
-  _resolveJournalResultItem(itemUuid) {
-    if (!itemUuid || typeof fromUuidSync !== 'function') return null;
-    let doc = null;
-    try {
-      doc = fromUuidSync(itemUuid);
-    } catch {
-      doc = null;
-    }
-    return doc ? { name: doc.name ?? null, img: doc.img ?? null } : null;
-  }
-
-  /**
-   * Resolve a system component to `{ name, img }` for the Journal: a salvage run's title and the
-   * fallback for a result that captured neither; null leaves the raw-id fallback.
-   */
-  _resolveJournalComponent(systemId, componentId) {
-    if (!systemId || !componentId) return null;
-    const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
-    return component ? { name: component.name ?? null, img: component.img ?? null } : null;
-  }
-
-  /**
-   * Resolve the Journal's selected actor against the bar-selectable list, remembered id first, then
-   * the first selectable — the gathering listing's remembered-actor seam.
-   */
-  _resolveJournalActor(rememberedActorId) {
-    const selectable = getBarSelectableActors({ viewer: game.user });
-    if (selectable.length === 0) return null;
-    if (rememberedActorId) {
-      const wanted = String(rememberedActorId);
-      const match = selectable.find((actor) => actor?.id === wanted || actor?.uuid === wanted);
-      if (match) return match;
-    }
-    return selectable[0];
-  }
-
-  /** The unified Journal listing, through the same remembered-actor seam as the gathering listing. */
-  listJournalForActor(options = {}) {
-    this._requireReady();
-    const { rememberedActorId } = this._withRememberedActorDefault(options);
-    const actor = this._resolveJournalActor(rememberedActorId);
-    return this._getRunJournalBuilder().buildListing({ actor, viewer: game.user });
   }
 
   /**
@@ -3562,6 +2387,23 @@ class Fabricate {
     return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);
   }
 }
+
+/** Install one facade slice as prototype methods, matching the descriptors a class method carries. */
+function installFacadeSlice(slice) {
+  const descriptors = {};
+  for (const [name, value] of Object.entries(slice)) {
+    descriptors[name] = { value, enumerable: false, writable: true, configurable: true };
+  }
+  Object.defineProperties(Fabricate.prototype, descriptors);
+  return Object.keys(descriptors);
+}
+
+// The four slices go on the PROTOTYPE and never on the instance: a class method is non-enumerable,
+// writable and configurable, and `tests/bootstrap/fabricate-boot-contract.test.js` pins both halves.
+installFacadeSlice(gatheringFacade);
+installFacadeSlice(companionFacade);
+installFacadeSlice(bulkFacade);
+installFacadeSlice(journalFacade);
 
 const fabricate = new Fabricate();
 
@@ -4482,7 +3324,6 @@ function neutralizeInheritedInteractableLink(document) {
     });
   }
 }
-
 
 /**
  * Add the system-agnostic Craft button to the Items Directory header, injecting when an element

@@ -6,10 +6,19 @@ import { fileURLToPath } from 'node:url';
 import { compileFunction } from 'node:vm';
 
 import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainPath = resolve(__dirname, '../src/main.js');
-const mainSource = readFileSync(mainPath, 'utf8');
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const mainSource = [
+  ...Object.keys(entrySources)
+    .filter((file) => file.startsWith('src/bootstrap/'))
+    .sort(),
+  'src/main.js',
+]
+  .map((file) => entrySources[file])
+  .join('\n');
 
 /**
  * Assert one public hook namespace is on the aggregate, correctly named, and documented.
@@ -210,7 +219,7 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
   // single shared predicate so the gate never drifts from the engine/resolver.
   assert.ok(
     mainSource.includes(
-      "import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"
+      "import { getRealmRevealMode, isGatheringRealmsEnabled } from '../systems/gatheringRealms.js';"
     ),
     'main.js imports the shared gate predicate and the WORLD reveal-mode reader'
   );
@@ -224,7 +233,9 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
     'revealGatheringRealmForActor no-ops (false) when disabled'
   );
   assert.ok(
-    mainSource.includes('if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);'),
+    /if \(!isGatheringRealmsEnabled\(this\.craftingSystemManager\?\.getSystem\(systemId\)\)\)\s*return Promise\.resolve\(false\);/.test(
+      mainSource
+    ),
     'hideGatheringRealmForActor no-ops (false) when disabled'
   );
 });
@@ -257,7 +268,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
   // that hands them a resolver is not: without this line every crafting row's owned-material tally
   // silently reads as if the player owns nothing, and no existing test goes red.
   assert.ok(
-    mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
+    /import \{ findMatchingComponent \} from '\.\.?\/utils\/essenceResolver\.js';/.test(mainSource),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
   );
   assert.ok(

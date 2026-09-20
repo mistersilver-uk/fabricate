@@ -26,8 +26,7 @@ import {
 // LOCATORS, not assertions: each names the signature `mainMethodSource` slices from, so it has to
 // be the CURRENT one verbatim.
 const GATE = '_gateBulkTargets(targets, actorId) {';
-const SALVAGE =
-  'async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {';
+const SALVAGE = 'async salvageComponents({';
 const DESTROY =
   'async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {';
 
@@ -605,7 +604,7 @@ describe('issue 1202 — the multiplied component lookups stay index-backed', ()
     it(`${signature.slice(0, signature.indexOf('('))} resolves through the retained index`, () => {
       const body = mainMethodSource(signature);
       assert.ok(
-        body.includes('findById(getDefinitionIndex('),
+        /findById\(\s*getDefinitionIndex\(/.test(body),
         `${signature} must resolve its component id through the retained index — it runs ` +
           `${multiplier}, so a scan here is an additive rows x components term.`
       );
@@ -636,8 +635,8 @@ describe('issue 1202 — the multiplied component lookups stay index-backed', ()
       ['the harness mirror', mirror],
     ]) {
       assert.ok(
-        body.includes(
-          'findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId)'
+        /findById\(\s*getDefinitionIndex\(resolvedComponentsFor\(system\)\),\s*target\?\.componentId\s*\)/.test(
+          body
         ),
         `${label} must resolve the component through the retained index, or "faithful copy" ` +
           `is a claim the tree does not support.`

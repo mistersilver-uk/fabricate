@@ -3,21 +3,28 @@
  * fix is the part worth keeping, because it is the shape of the trap.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 /** Normalise line endings before scanning. */
 function normaliseEndings(text) {
   return text.split(String.fromCharCode(13) + '\n').join('\n');
 }
 
+// The facade spans the entry and its `src/bootstrap/` slices (issue 1715), read through ONE call;
+// a slice member is method shorthand at a class member's indentation, so `METHOD` scans both.
+const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+
 const mainSource = normaliseEndings(
-  readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8')
+  ['src/main.js', ...Object.keys(entrySources).filter((file) => file.startsWith('src/bootstrap/')).sort()]
+    .map((file) => entrySources[file])
+    .join('\n')
 );
 
 /** A method declared at class-body indentation, with its parameter list and body. */
-const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\}/g;
+const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\},?\n/g;
 
 /** `this.<service>?.<sameName>(` — the delegation shape the facade uses throughout. */
 const HANDOFF_OWNER = /this\.[A-Za-z_][\w$]*$/;

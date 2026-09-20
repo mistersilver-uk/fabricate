@@ -1146,7 +1146,7 @@ describe('the harness copies are faithful to src/main.js', () => {
     for (const [label, body] of bothTexts(BULK)) {
       assert.ok(body.length > 100, `non-vacuity: ${label} sliced to ${body.length} characters`);
       assert.ok(
-        body.includes('user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null'),
+        body.includes('user?.isGM === true ? null : COMPANION_OUTCOMES.gmOnly'),
         `${label} lost the inline GM gate`
       );
       assert.ok(

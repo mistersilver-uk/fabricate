@@ -703,16 +703,15 @@ describe('the player complication seam', () => {
 
   describe("the bulk forecast's stored-order seam", () => {
     it('is wired in main.js, under the same edge the engine reads', () => {
-      // `main.js` cannot be imported under `node --test` (it reaches Foundry globals at module
-      // scope), so the composition is pinned against its source, as the complication socket suite
-      // pins its own apply body.
-      const source = readFileSync(resolve(repoRoot, 'src/main.js'), 'utf8');
+      // The bulk slice cannot be imported under `node --test` (it reaches Foundry globals), so the
+      // composition is pinned against its source, as the complication socket suite pins its apply.
+      const source = readFileSync(resolve(repoRoot, 'src/bootstrap/bulkFacade.js'), 'utf8');
       const start = source.indexOf('_getBulkSalvageService() {');
-      assert.ok(start !== -1, 'src/main.js should declare _getBulkSalvageService');
+      assert.ok(start !== -1, 'src/bootstrap/bulkFacade.js should declare _getBulkSalvageService');
       const body = source.slice(start, source.indexOf('\n  }', start));
 
       assert.ok(
-        /getPlayerResultOrder:\s*entry\s*=>\s*this\._readPlayerResultOrder\(entry\)/.test(body),
+        /getPlayerResultOrder:\s*\(?entry\)?\s*=>\s*this\._readPlayerResultOrder\(entry\)/.test(body),
         'BulkSalvageService must be given the same result-order edge CraftingEngine has'
       );
     });

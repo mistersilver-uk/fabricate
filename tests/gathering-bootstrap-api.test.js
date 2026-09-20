@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSelectableActorsGetter,
@@ -15,10 +16,19 @@ import { createGatheringToolAvailability } from '../src/gatheringToolRuntime.js'
 import { GatheringGateAndCheckEvaluator } from '../src/systems/GatheringGateAndCheckEvaluator.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainPath = resolve(__dirname, '../src/main.js');
 const toolRuntimePath = resolve(__dirname, '../src/gatheringToolRuntime.js');
 const adaptersPath = resolve(__dirname, '../src/gatheringBootstrapAdapters.js');
-const mainSource = readFileSync(mainPath, 'utf8');
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const mainSource = [
+  'src/main.js',
+  'src/bootstrap/gatheringFacade.js',
+  'src/bootstrap/gatheringRuntime.js',
+  'src/bootstrap/Fabricate.js',
+  'src/bootstrap/composeServices.js',
+]
+  .map((file) => entrySources[file] ?? '')
+  .join('\n');
 const toolRuntimeSource = readFileSync(toolRuntimePath, 'utf8');
 const adaptersSource = readFileSync(adaptersPath, 'utf8');
 
@@ -35,9 +45,10 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
   }
 
   assert.equal(
-    mainSource.includes('getGatheringEngine()'),
+    mainSource.includes('  getGatheringEngine() {'),
     false,
-    'game.fabricate should not expose a raw GatheringEngine accessor'
+    'game.fabricate should not expose a raw GatheringEngine accessor: the holder in ' +
+      '`src/bootstrap/gatheringRuntime.js` is a module function, never a facade member'
   );
   assert.equal(
     mainSource.includes('this.gatheringEngine'),
@@ -47,14 +58,14 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
 
   assert.match(
     mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'listForActor', withRememberedActor, \(\) => game\.user\);/,
+    /return callGatheringRuntimeWithCurrentViewer\(\s*getGatheringEngine\(\),\s*'listForActor',\s*withRememberedActor,\s*\(\) => game\.user\s*\);/,
     'listGatheringForActor should delegate through current-user viewer enforcement (with the remembered-actor default)'
   );
   // `requestStart`, not `startAttempt` (issue 901): the public entry must go through the routing
   // wrapper, which hands a blind timed start to the active GM BEFORE any task is drawn.
   assert.match(
     mainSource,
-    /return executePublicGather\(\{[\s\S]*?requestStart: \(\) =>[\s\S]*?callGatheringRuntimeWithCurrentViewer\([\s\S]*?gatheringEngine,[\s\S]*?'requestStart',[\s\S]*?withRememberedActor,[\s\S]*?\(\) => game\.user/,
+    /return executePublicGather\(\{[\s\S]*?requestStart: \(\) =>[\s\S]*?callGatheringRuntimeWithCurrentViewer\([\s\S]*?getGatheringEngine\(\),[\s\S]*?'requestStart',[\s\S]*?withRememberedActor,[\s\S]*?\(\) => game\.user/,
     'startGatheringAttempt should complete a ready attempt through executePublicGather, still '
       + 'delegating to requestStart under current-user viewer enforcement (with the '
       + 'remembered-actor default)'
@@ -79,7 +90,7 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
   );
   assert.match(
     mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'getTaskDropBreakdown', withRememberedActor, \(\) => game\.user\);/,
+    /return callGatheringRuntimeWithCurrentViewer\(\s*getGatheringEngine\(\),\s*'getTaskDropBreakdown',\s*withRememberedActor,\s*\(\) => game\.user\s*\);/,
     'getGatheringDropBreakdown should delegate through current-user viewer enforcement (with the remembered-actor default)'
   );
 });
@@ -99,7 +110,7 @@ test('actor-selection bar wiring filters to player characters and returns redact
   );
   assert.ok(
     mainSource.includes(
-      "import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';"
+      "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
     ),
     'main.js should import the shared, GM-configurable player-character predicate'
   );
@@ -287,7 +298,7 @@ test('world-time hooks dispatch gathering without coupling failures to existing 
   );
   assert.match(
     mainSource,
-    /label: 'Gathering',\s*callback: \(\) => gatheringEngine\?\.processWorldTime\?\.\(worldTime\)/s,
+    /label: 'Gathering',\s*callback: \(\) => getGatheringEngine\(\)\?\.processWorldTime\?\.\(worldTime\)/s,
     'gathering world-time processing should run through GatheringEngine.processWorldTime'
   );
   assert.match(
@@ -302,9 +313,11 @@ test('world-time hooks dispatch gathering without coupling failures to existing 
     /Hooks\.on\('updateWorldTime', \(worldTime\) => \{\s*void processFabricateWorldTime\(worldTime\);\s*\}\);/s,
     'updateWorldTime hook should explicitly fire-and-forget the guarded dispatcher'
   );
+  // Both halves in one pin: `src/bootstrap/gatheringRuntime.js` holds the only binding and the
+  // composition root is its only writer, so no facade member can hand the engine out.
   assert.match(
     mainSource,
-    /let gatheringEngine = null;[\s\S]*gatheringEngine = new GatheringEngine\(/,
+    /(?=[\s\S]*let gatheringEngine = null;)(?=[\s\S]*setGatheringEngine\(new GatheringEngine\()/,
     'GatheringEngine should remain module-private while still receiving timed completion calls'
   );
   assert.match(
