@@ -578,6 +578,24 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-preview-usability]').textContent,
       /Unusable here/
     );
+
+    // AND BACK TO NO ACTOR. The sentinel row is the one whose `dataId` differs from the id the
+    // primitive hands to `onChange` — `__unchanged__` against the empty string — so it is the row
+    // a reader cannot check without driving it; the spelling is the hand-maintained mirror
+    // `select-mounted.test.js` pins against `Select.svelte`.
+    chooseSelectOption(root, PREVIEW_ACTOR, '__unchanged__');
+    await tick();
+    await tick();
+    assert.equal(
+      selectTriggerText(root, PREVIEW_ACTOR),
+      'No actor',
+      'the roster clears back to its sentinel'
+    );
+    assert.match(
+      root.querySelector('[data-tool-preview-gate]').textContent,
+      /One prerequisite must be met\./u,
+      'and the gate sentence returns to the no-actor copy rather than keeping Wisp’s verdict'
+    );
   });
 
   it('states the required-for empty case rather than an empty region', async () => {
