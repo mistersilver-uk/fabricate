@@ -1069,7 +1069,7 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-preview-against-select',
   'data-simple-band-record',
   // Issue 1510 phase 2, commit 2d — the gathering task editor. `data-gathering-task-field` is
-  // spelled WITH its value, the bare attribute being shared with the core card's name input and
+  // spelled with its value, the bare attribute being shared with the core card's name input and
   // description textarea. The four node hooks are bare, measured: of the family's seven attributes
   // only `-interval` prefixes another, and what it prefixes is the converted unit trigger itself.
   'data-gathering-task-field="defaultEnvironmentId"',
@@ -1192,9 +1192,10 @@ test('no View Lab step drives a converted select with the registry’s native `s
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
     replacements.length >= 18,
-    `only ${replacements.length} \`chooseSelectOption(\` call sites remain in the registry, ` +
-      'against a floor of 18. Converted steps were reverted to the native `select:` verb, or the ' +
-      'helper was renamed and this clause is now judging an empty set.'
+    `only ${replacements.length} \`chooseSelectOption(\` occurrences remain in the registry, ` +
+      'against a floor of 18 — 17 call sites plus the definition in `caseFactories.js`, which the ' +
+      'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
+      'was renamed and this clause is now judging an empty set.'
   );
   assert.deepEqual(
     offenders,

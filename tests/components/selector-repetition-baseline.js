@@ -79,8 +79,8 @@
  * split or deleted: the rule count stands at 2,619, the keyed and singleton figures at 3,123 and
  * 3,004, and the phase writes no new rule at all — both families declare NO focus pair and NO font
  * floor, and both refusals are asserted rather than merely absent.
- * ISSUE 1510 PHASE 2'S FOURTH COMMIT MOVES THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED
- * ONES. Converting the gathering task editor's seven selects strips the `select` token from two
+ * Issue 1510 phase 2's fourth commit moves the three contextual figures and none of the repeated
+ * ones. Converting the gathering task editor's seven selects strips the `select` token from two
  * `.manager-gathering-task-edit-view` legs and adds two trigger-width rules — one for the four
  * stacked fields, and one the review round added for the stamina row's two grid cells — so two
  * rules arrive and are singletons in both keyings while the two narrowed selectors re-key in place:

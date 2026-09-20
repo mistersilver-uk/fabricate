@@ -58,7 +58,7 @@ export function respawnPolicyOptions(text) {
 }
 
 /**
- * The respawn interval's unit, from `Economy.Unit.*`'s SINGULAR half — the one the stamina
+ * The respawn interval's unit, from `Economy.Unit.*`'s singular half — the one the stamina
  * regeneration row already reads, so "Every 3 Minute" is carried; `Recipe.DurationUnitPlural`
  * declares no `weeks` and cannot be adopted.
  */

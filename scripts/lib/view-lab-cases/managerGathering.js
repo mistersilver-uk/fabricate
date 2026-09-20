@@ -113,7 +113,7 @@ export const CASES = Object.freeze([
       ],
       expectView: 'gathering-task-edit',
       // A trigger has no `:checked` and the row click shuts the panel, so the claim rides what the
-      // choice UNLOCKS: the interval row renders only under `overTime` (issue 1510).
+      // choice unlocks: the interval row renders only under `overTime` (issue 1510).
       expectSelector:
         '.manager-task-node-interval-row .fabricate-select-trigger[data-gathering-task-node-interval-unit]',
       expectVisible: '[data-gathering-task-node-interval]',
@@ -131,7 +131,7 @@ export const CASES = Object.freeze([
   ),
   // The gathering studio's first open-panel frame (issue 1510), and the only way to photograph a
   // converted control's list: it exists only while the panel is open, and an open panel cannot
-  // double as the route's closed-state frame. This one is UNTICKED, unlike the checks studio's.
+  // double as the route's closed-state frame. This one is unticked, unlike the checks studio's.
   managerCase({
     id: 'manager-gathering-task-node-respawn-list',
     label: 'Manager — Gathering resource node respawn list',
@@ -149,7 +149,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-task-node-respawn]' },
     ],
     expectView: 'gathering-task-edit',
-    // Three claims a closed frame cannot make: the panel exists, it is the UNTICKED list, and it
+    // Three claims a closed frame cannot make: the panel exists, it is the unticked list, and it
     // names the policy in the GM's words rather than the `overTime` the model stores.
     expectSelector:
       '.fabricate-manager .fabricate-select-popover:not(.fabricate-select-popover-ticked)' +

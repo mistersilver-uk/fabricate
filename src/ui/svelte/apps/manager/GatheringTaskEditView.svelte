@@ -2719,10 +2719,10 @@
 
   /* Size the unit picker to its content: this field's standing refusal of the `width: 100%` the
      other four converted fields ask for by class, answered against `.manager-field select` before
-     the conversion and against a caller rule now. `:global()` is LOAD-BEARING and so is the
+     the conversion and against a caller rule now. `:global()` is load-bearing and so is the
      attribute — the trigger is a `<button>` a child component renders and Svelte stamps no scoping
      hash on one, so the scoped spelling would match nothing and die silently, while the scoping
-     class it does emit is `:where(.svelte-hash)`, which contributes ZERO. The class column is 2
+     class it does emit is `:where(.svelte-hash)`, which contributes nothing. The class column is 2
      here and 3 with the attribute, out-ranking a two-class caller rule rather than tying it on the
      source order of two separately loaded stylesheets. */
   .manager-task-node-interval-row

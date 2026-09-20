@@ -1095,7 +1095,7 @@ test('resource-node interval evidence reaches over-time controls at both require
     assert.equal(viewCase.expectView, 'gathering-task-edit');
     assert.deepEqual(viewCase.position, { width, height });
     assert.ok(viewCase.steps.some((step) => step.selector?.includes('sm-task-prospect')));
-    // CHOSEN, not `select:`ed, since issue 1510 converted the control: the step is the factory's
+    // Chosen, not `select:`ed, since issue 1510 converted the control: the step is the factory's
     // own pair rather than two selectors spelled here, which would pin the panel's internals.
     assert.deepEqual(viewCase.steps.slice(-4), [
       ...chooseSelectOption('[data-gathering-task-node-respawn]', 'overTime'),
@@ -2359,16 +2359,18 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty-four frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty-five frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
 // and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first to twenty-fourth at issue 1510, which are the recipe studio's
+// option panels, and the twenty-first to twenty-fifth at issue 1510, which are the recipe studio's
 // kind list, the component studio's category list, the checks studio's trigger comparison list and
-// the gathering studio's respawn policy list — the first four converted MANAGER selects whose panels
-// have a frame at all, the third the first opened from inside a card the walk has to author before
-// it exists, and the fourth the first in an editor the rail reaches through a submenu).
+// the gathering studio's respawn policy and stamina modifier lists — the first five converted
+// manager selects whose panels have a frame at all, the third the first opened from inside a card
+// the walk has to author before it exists, the fourth the first in an editor the rail reaches
+// through a submenu, and the fifth the first whose row has to be authored before its trigger
+// exists).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',

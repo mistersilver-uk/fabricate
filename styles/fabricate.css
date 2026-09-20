@@ -10911,7 +10911,7 @@
   padding: var(--fab-space-1) var(--fab-space-2);
 }
 
-/* The full width the narrowed rules above can no longer supply, stated once for the four converted fields that want it: each is a stacked `.manager-field` column and the `form` rung deliberately leaves its trigger hugging. The respawn interval's unit picker is NOT one of them and refuses it in the component's own `<style>` (issue 1510). */
+/* The full width the narrowed rules above can no longer supply, stated once for the four converted fields that want it: each is a stacked `.manager-field` column and the `form` rung deliberately leaves its trigger hugging. The respawn interval's unit picker is not one of them and refuses it in the component's own `<style>` (issue 1510). */
 .fabricate-manager .manager-gathering-task-edit-view .manager-task-field-select .fabricate-select-trigger {
   width: 100%;
 }

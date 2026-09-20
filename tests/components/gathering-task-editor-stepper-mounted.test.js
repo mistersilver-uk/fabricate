@@ -372,7 +372,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     assert.match(rule[0], /width: auto/, 'and it is the width that is being released');
   });
 
-  // ── The seven converted pickers (issue 1510), each DRIVEN rather than read.
+  // ── The seven converted pickers (issue 1510), each driven rather than read.
   const CONVERTED = [
     {
       id: 'default environment',

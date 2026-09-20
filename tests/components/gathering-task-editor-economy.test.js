@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// The node card's two vocabularies are DATA since issue 1510 converted its selects: read from the
+// The node card's two vocabularies are data since issue 1510 converted its selects: read from the
 // module that declares them rather than matched in the editor's markup.
 import {
   respawnGainModeOptions,
@@ -100,7 +100,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
       ['guaranteed', 'chance', 'expression'],
       'the gain-mode picker offers the three shipped modes'
     );
-    // The removed legacy policies are gone — from the vocabulary AND from the editor.
+    // The removed legacy policies are gone — from the vocabulary and from the editor.
     for (const policy of ['none', 'elapsedTime', 'probability', 'manualAndElapsedTime']) {
       assert.ok(
         !respawnPolicyOptions(fallback).some((option) => option.value === policy),
