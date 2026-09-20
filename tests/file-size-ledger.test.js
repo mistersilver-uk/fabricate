@@ -221,6 +221,11 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // modules behind a composing manager: the file fell from 901 lines to under the 800-line
   // threshold and `_spawnInteractableRegion` fell from 107 lines to under the 100-line one, so
   // both rows left the ledger and no successor crossed either threshold.
-  assert.equal(files, 104, 'oversized files');
+  // 105 after forward-porting the 1.9.7 hotfix (#1848): `src/systems/GatheringEnvironmentStore.js`
+  // crossed the 800-line threshold when a save learned to prune a stale realm id the persisted
+  // record already carried instead of rejecting every environment write. Recorded as debt rather
+  // than absorbed, because the change shipped from the hotfix line; the remedy is to lift the
+  // realm-membership baseline and prune helpers into their own module, tracked on #1858.
+  assert.equal(files, 105, 'oversized files');
   assert.equal(keys.length - files, 113, 'oversized functions');
 });

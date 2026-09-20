@@ -43,16 +43,21 @@ export class GatheringRealmValidationError extends Error {
  * and its referenced-by evidence collection, because neither duplicates anything elsewhere —
  * pushing them into `adminStore` would be a genuine downgrade.
  *
- * `delete` never blocks: it returns referenced-by repair evidence (environments and party
- * overrides that still cite the realm) so the GM confirm copy can warn before removal.
+ * `delete` never blocks. It strips the realm from every environment's realm membership first,
+ * then removes the realm, and returns referenced-by repair evidence (environments and party
+ * overrides that cited it) plus the count of environments it repaired. A membership write that
+ * fails is logged and the realm goes anyway; the environment store prunes what is left on its
+ * next save. Party overrides are deliberately untouched — the party card can clear a stale one.
  */
 export class GatheringRealmStore extends SettingsBackedStore {
   constructor({
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
     randomID = null,
+    warn = console.warn,
   } = {}) {
     super({ getSetting, setSetting, settingKey: SETTING_KEYS.TRAVEL_CONFIG });
+    this.warn = warn;
     this.randomID = randomID || (() => globalThis.foundry?.utils?.randomID?.());
     this.config = null;
   }
@@ -191,23 +196,94 @@ export class GatheringRealmStore extends SettingsBackedStore {
   }
 
   /**
-   * Delete a realm. Never blocks; returns the deleted realm plus referenced-by repair evidence
-   * collected from the optional environment/party stores so the GM confirm copy can warn about
-   * dangling references.
+   * Delete a realm. Never blocks; strips the realm from every environment that cites it, then
+   * removes it, and returns the deleted realm plus referenced-by repair evidence so the GM
+   * confirm copy can warn about what the removal changes.
    *
    * @param {string} realmId
    * @param {{ environmentStore?: object, partyStore?: object }} [collaborators]
-   * @returns {Promise<{ deleted: object|null, referencedBy: { environments: object[], partyOverrides: object[] } }>}
+   * @returns {Promise<{ deleted: object|null, referencedBy: { environments: object[], partyOverrides: object[] }, repaired: { environments: number } }>}
    */
   async delete(realmId, { environmentStore = null, partyStore = null } = {}) {
     const realms = this._realms();
     const existing = realms.find((r) => r.id === realmId);
-    if (!existing) return { deleted: null, referencedBy: { environments: [], partyOverrides: [] } };
+    if (!existing) {
+      return {
+        deleted: null,
+        referencedBy: { environments: [], partyOverrides: [] },
+        repaired: { environments: 0 },
+      };
+    }
 
     const referencedBy = this._collectReferences(realmId, { environmentStore, partyStore });
+    // BEFORE the realm leaves the library, not after: the environment store validates realm ids
+    // against that library on every write, so a rewrite issued afterwards would be rejected by
+    // the very deletion it exists to repair.
+    const environments = await this._stripRealmFromEnvironments(realmId, environmentStore);
     const next = realms.filter((r) => r.id !== realmId);
     await this._persistRealms(next, next);
-    return { deleted: cloneJson(existing), referencedBy };
+    return { deleted: cloneJson(existing), referencedBy, repaired: { environments } };
+  }
+
+  /**
+   * Remove `realmId` from every environment's realm membership, in ONE list write where the
+   * seam offers one. Returns the number of environments actually written; a failure never
+   * aborts the deletion, only logs it — reported as zero when the list write itself fails, or
+   * as however many landed before a per-environment fallback failed partway through.
+   *
+   * @returns {Promise<number>}
+   */
+  async _stripRealmFromEnvironments(realmId, environmentStore) {
+    let list;
+    try {
+      list = typeof environmentStore?.list === 'function' ? environmentStore.list() : null;
+    } catch (error) {
+      this.warn(
+        `Fabricate | Could not read the environment list to strip deleted realm "${realmId}"; deleting it anyway`,
+        error
+      );
+      return 0;
+    }
+    if (!Array.isArray(list)) return 0;
+
+    const repairedIds = new Set();
+    const scrubbed = list.map((env) => {
+      const includedRealmIds = withoutRealm(env?.includedRealmIds, realmId);
+      const excludedRealmIds = withoutRealm(env?.excludedRealmIds, realmId);
+      if (!includedRealmIds && !excludedRealmIds) return env;
+      repairedIds.add(env.id);
+      return {
+        ...env,
+        ...(includedRealmIds && { includedRealmIds }),
+        ...(excludedRealmIds && { excludedRealmIds }),
+      };
+    });
+    if (repairedIds.size === 0) return 0;
+
+    let written = 0;
+    try {
+      if (typeof environmentStore.save === 'function') {
+        await environmentStore.save(scrubbed);
+        return repairedIds.size;
+      }
+      if (typeof environmentStore.update !== 'function') return 0;
+      for (const env of scrubbed) {
+        if (!repairedIds.has(env.id)) continue;
+        await environmentStore.update(env.id, {
+          includedRealmIds: env.includedRealmIds ?? [],
+          excludedRealmIds: env.excludedRealmIds ?? [],
+        });
+        written += 1;
+      }
+      return written;
+    } catch (error) {
+      this.warn(
+        `Fabricate | Could not strip deleted realm "${realmId}" from environment realm membership; deleting it anyway`,
+        error
+      );
+      // The per-environment fallback may have landed some writes before the failure; report those.
+      return written;
+    }
   }
 
   _collectReferences(realmId, { environmentStore, partyStore }) {
@@ -217,7 +293,16 @@ export class GatheringRealmStore extends SettingsBackedStore {
     // Every environment in the world, not one system's: a world realm can be cited by
     // environments belonging to any crafting system that opted in, and the GM needs to see all
     // of them before deleting the place they name.
-    const envList = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
+    // Evidence collection must not block the delete either: an unreadable list reports nothing.
+    let envList = [];
+    try {
+      envList = typeof environmentStore?.list === 'function' ? environmentStore.list() : [];
+    } catch (error) {
+      this.warn(
+        `Fabricate | Could not read the environment list for realm "${realmId}" delete evidence`,
+        error
+      );
+    }
     for (const env of Array.isArray(envList) ? envList : []) {
       const included =
         Array.isArray(env?.includedRealmIds) && env.includedRealmIds.includes(realmId);
@@ -270,6 +355,12 @@ export class GatheringRealmStore extends SettingsBackedStore {
   async save(config) {
     return this._persist(config);
   }
+}
+
+/** The list without `realmId`, or null when it never carried it (so the record is untouched). */
+function withoutRealm(realmIds, realmId) {
+  if (!Array.isArray(realmIds) || !realmIds.includes(realmId)) return null;
+  return realmIds.filter((id) => id !== realmId);
 }
 
 function replaceAt(array, index, value) {
