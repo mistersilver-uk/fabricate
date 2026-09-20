@@ -2401,8 +2401,8 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
 // whose panels have a frame at all, the third the first opened from inside a card the walk has to
 // author before it exists, the fourth the first in an editor the rail reaches through a submenu,
 // the fifth the first whose row has to be authored before its trigger exists, the sixth the first
-// ticked one of them and the seventh the first opened from an inspector rail rather than from an
-// editor body).
+// in an environment editor and the seventh the first opened from an inspector rail rather than from
+// an editor body).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -2433,6 +2433,36 @@ const ANCHORED_POPOVER_FRAMES = [
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 
+// The anchored-panel class families a member's own `expectSelector` can name: every portaled panel
+// in the tree is either a `*-popover` or the action menu's `fabricate-action-menu-panel`.
+const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel/u;
+
+// The one member whose selector claims no panel. Its walk DOES open the shared icon picker, but its
+// `expectSelector` was spent on issue 1117's bounds pair, so it is listed here by name rather than
+// silently tolerated by a weaker clause.
+const ANCHORED_POPOVER_FRAMES_WITHOUT_A_PANEL_CLAIM = ['manager-system-edit-lists'];
+
+test('every anchored-popover frame claims an open panel in its own expectSelector', () => {
+  // The membership list above is gated against `sourceMatches` routing and NOTHING ELSE: reducing
+  // either issue 1510 case's `expectSelector` to a bare `.fabricate-manager` left all of this
+  // file's registry tests green. So the sentence the failure message makes about what each id
+  // proves is asserted here rather than only asserted about.
+  const byId = new Map(VIEW_LAB_CASES.map((viewCase) => [viewCase.id, viewCase]));
+  const claimless = [];
+  for (const id of ANCHORED_POPOVER_FRAMES) {
+    const viewCase = byId.get(id);
+    assert.ok(Boolean(viewCase), `${id} is listed as an anchored-popover frame but is not a case`);
+    if (!ANCHORED_PANEL_CLAIM.test(viewCase.expectSelector ?? '')) claimless.push(id);
+  }
+  assert.deepEqual(
+    claimless,
+    ANCHORED_POPOVER_FRAMES_WITHOUT_A_PANEL_CLAIM,
+    'these frames are published for the positioning seam but their own `expectSelector` names no ' +
+      'portaled panel, so the capture would pass with the panel closed and the evidence the seam ' +
+      'is published for cannot move'
+  );
+});
+
 for (const seamFile of [
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
@@ -2444,9 +2474,10 @@ for (const seamFile of [
       selected.sort((a, b) => a.localeCompare(b)),
       ANCHORED_POPOVER_FRAMES,
       `a change confined to ${seamFile} publishes the wrong set of frames. Every id here is a ` +
-        'frame whose own `expectSelector` requires a panel to have been measured, clamped and ' +
-        'portaled, so a regression in that pass is visible in each of them and in no other frame ' +
-        'in the registry. A SHORTER list means a case dropped the seam from its `sourceMatches` ' +
+        'frame whose walk leaves a panel measured, clamped and portaled, so a regression in that ' +
+        'pass is visible in each of them and in no other frame in the registry; the clause above ' +
+        'asserts each one says so in its own `expectSelector`, bar the one exception it names. ' +
+        'A SHORTER list means a case dropped the seam from its `sourceMatches` ' +
         'and now shows a panel nothing routes to; a LONGER one means the seam was added to a ' +
         'frame that draws its trigger closed, which publishes evidence that cannot move.'
     );

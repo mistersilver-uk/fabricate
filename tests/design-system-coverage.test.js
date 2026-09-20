@@ -868,6 +868,13 @@ const STYLESHEET_SELECTORS = selectorListsIn(
 const FAMILY_RULE_CLAIM =
   /(\d+) `\.([a-z][a-z\d-]*)-\*` rules(?: under `\.([a-z][a-z\d-]*)`)? in `styles\/fabricate\.css`/gu;
 
+/**
+ * A claim that some share of a family's rules are CALL-SITE overrides on the trigger box, which the
+ * family count above cannot see: it is the half of the claim that says who owns each rule.
+ */
+const TRIGGER_OVERRIDE_CLAIM =
+  /(\d+) `\.([a-z][a-z\d-]*)-\*` rules in `styles\/fabricate\.css`, (\d+) of them CALL-SITE overrides on the trigger box/gu;
+
 /** A claim about the number of rules in a row's OWN component's scoped `<style>` block. */
 const SCOPED_RULE_CLAIM = /(\d+) scoped rules/gu;
 
@@ -903,6 +910,43 @@ test('every class-family rule count the manifest asserts is re-derived from the 
       `${claim.row.path} states "${claim.text}" and ${STYLESHEET} has ${measured.length}. A ` +
         'stylesheet claim in a register row is not decoration: two rows disqualified a component ' +
         'on one of these, and it had been false since before the row was written.'
+    );
+  }
+});
+
+test('every call-site override count the manifest asserts is re-derived from the stylesheet', () => {
+  // The family count beside it reads DIGITS, so the override half was spelled out and therefore
+  // gated by nothing for five commits of the select conversion while every commit moved it. A
+  // caller override is a family rule on the trigger qualified by a class outside the `fabricate-`
+  // namespace: every application root and every family class carries that prefix, so a non-prefixed
+  // class in the selector is the caller's own wrapper and nothing else.
+  const claims = MANIFEST_ROWS.flatMap((row) =>
+    [...row.why.matchAll(TRIGGER_OVERRIDE_CLAIM)].map((found) => ({
+      row,
+      text: found[0],
+      family: `.${found[2]}-`,
+      overrides: Number(found[3]),
+    }))
+  );
+  assert.ok(
+    claims.length > 0,
+    'no manifest row states a call-site override count in the notation this property reads, so ' +
+      'either the notation changed and the claim is unchecked again or the row that made one stopped'
+  );
+  for (const claim of claims) {
+    const measured = STYLESHEET_SELECTORS.filter(
+      (selector) =>
+        selector.includes(`${claim.family}trigger`) &&
+        [...selector.matchAll(/\.([a-z][a-z\d-]*)/gu)].some(
+          (found) => !found[1].startsWith('fabricate-')
+        )
+    );
+    assert.equal(
+      measured.length,
+      claim.overrides,
+      `${claim.row.path} states "${claim.text}" and ${STYLESHEET} has ${measured.length} such ` +
+        'rules. The override share is what says the primitive owns the control and the caller owns ' +
+        'only its box, so a wrong figure misreports where the family\'s weight actually sits.'
     );
   }
 });

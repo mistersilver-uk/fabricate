@@ -31,6 +31,7 @@ import {
   SMOKE_SOURCE_SEGMENTS,
 } from './helpers/interactablesSmokeLocators.js';
 import { SMOKE_SCENARIOS } from '../scripts/foundry-smoke/registry.mjs';
+import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 
 /** Every scenario in the registry, groups and their children alike, in walk order. */
 function* flattenScenarios(scenarios) {
@@ -1088,6 +1089,29 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
 ]);
 
 /**
+ * Every converted hook still names a control in `src/`.
+ * A renamed hook leaves a dead entry banning nothing, and the floor above cannot see it: renaming
+ * `data-tool-preview-actor` in the component left this whole file green, because the floor only
+ * needs three of the list to survive and forty-odd entries accumulated over five commits.
+ */
+function assertEveryConvertedHookResolves() {
+  const sources = Object.values(collectWorkingTreeSources(['src'], ['.svelte', '.js']));
+  const missing = CONVERTED_SELECT_HOOKS.filter((hook) => {
+    // A valued hook is written `'data-x': 'y'` through `triggerData`, never as the literal
+    // attribute, so both spellings count as resolving it.
+    const valued = /^([^=]+)="(.+)"$/u.exec(hook);
+    const needles = valued ? [`'${valued[1]}': '${valued[2]}'`, hook] : [hook];
+    return !sources.some((source) => needles.some((needle) => source.includes(needle)));
+  });
+  assert.deepEqual(
+    missing,
+    [],
+    'these hooks name no control under `src/`, so the ban judges nothing and a capture step could ' +
+      'drive the renamed control with `selectOption` unchallenged'
+  );
+}
+
+/**
  * Every `const <name> = …locator('<selector>')` binding in a producer, so a drive written against a
  * binding is judged by the hook the binding carries. The clauses below read a 400-character
  * look-back and this harness binds outside it: the tier-step target's hook is declared roughly 700
@@ -1156,6 +1180,7 @@ test('no capture producer drives a converted select with Playwright’s <select>
       'floor of 3. A lower number means the hooks were renamed and this ban now names controls ' +
       'nothing drives.'
   );
+  assertEveryConvertedHookResolves();
   assert.deepEqual(
     offenders,
     [],
