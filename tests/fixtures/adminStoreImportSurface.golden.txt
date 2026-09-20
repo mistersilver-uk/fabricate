@@ -3,14 +3,6 @@ import {
   getCharacterPrerequisitePresetsForFoundrySystem,
   seedCharacterPrerequisitePresets,
 } from '../../../config/characterPrerequisitePresets.js';
-import {
-  getCurrencyPresetsForFoundrySystem,
-  seedCurrencyPresets,
-} from '../../../config/currencyPresets.js';
-import {
-  getDefaultProviderId,
-  getProviderCanonicalUnits,
-} from '../../../config/currencyProviders.js';
 import { getFabricateFlag } from '../../../config/flags.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
@@ -53,27 +45,19 @@ import {
   planRecipeTagRemovals,
 } from '../../model/vocabularyCascade.js';
 import {
-  canAddCurrencySubUnit,
-  CURRENCY_MACRO_KEYS,
-  normalizeCurrencyUnit,
-  normalizeWorldCurrencyConfig,
-  validateCurrencyProfile,
-} from '../../../systems/currencyProfile.js';
-import {
   authoredCheckModifierIds,
   isRollExpression,
   resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
+import { conditionSettingsToCurrent } from '../../../systems/gatheringComposition.js';
 import {
-  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
-  ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
-  conditionSettingsToCurrent,
-  environmentComposesRecord,
-  resolveGatheringCompositionMode,
-} from '../../../systems/gatheringComposition.js';
-import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
-import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+  buildEnvironmentCompositionViewModel,
+  DEFAULT_GATHERING_CONDITIONS,
+  environmentComposesGatheringRecord as _environmentComposesGatheringRecord,
+} from '../../model/environmentComposition.js';
+import { emptyEnvironmentState as _emptyEnvironmentState } from '../../model/environmentValidation.js';
+import { normalizeNodeConfig } from '../../../systems/gatheringNodeConfig.js';
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
@@ -99,15 +83,9 @@ import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,
   TOOL_BREAKAGE_AUTHORITIES,
-  TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
 import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
-import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
-import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
-import {
-  defaultKnowledgeTab,
-  projectKnowledgeSnapshot,
-} from '../apps/manager/knowledge/knowledgeStudio.js';
+import { projectKnowledgeSnapshot } from '../apps/manager/knowledge/knowledgeStudio.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   TIME_OF_DAY_ICONS,
@@ -131,7 +109,15 @@ import {
   clonePlain as _clonePlain,
   fallbackRandomID as _fallbackRandomID,
   normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
+  reorderListByIndex as _reorderListByIndex,
 } from './adminStoreInternals.js';
+import { createEnvironmentDraftSection } from './adminEnvironmentDraftSection.js';
+import { createToolDraftSection } from './adminToolDraftSection.js';
+import {
+  createCurrencySection,
+  emptyWorldCurrencyState,
+} from './adminCurrencySection.js';
+import { createKnowledgeSection } from './adminKnowledgeSection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
