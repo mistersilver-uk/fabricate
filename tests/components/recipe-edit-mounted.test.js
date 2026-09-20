@@ -2646,10 +2646,10 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  // THE NAME IS READ BEFORE THE ARRAY MOVES (issue 1697, replacing a statement-order pin). The
+  // The name is read before the array moves (issue 1697, replacing a statement-order pin). The
   // root writes each patch straight back into the draft, so `results` changes under the card
   // inside the same click; a name read after `reorderItem` would announce the item that swapped
-  // INTO the slot. This case round-trips the patch the way the root does, which is what makes the
+  // into the slot. This case round-trips the patch the way the root does, which is what makes the
   // announced name able to be wrong at all.
   it('progressive: the reorder announcement names the item that moved, not the one that arrived', async () => {
     const results = [

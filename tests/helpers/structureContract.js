@@ -59,7 +59,7 @@ function staticTextCalls(component) {
   }
   return calls;
 }
-// A structural claim is a ROW in a `defineStructureContract` table, never another
+// A structural claim is a row in a `defineStructureContract` table, never another
 // parse-and-assert pair: the repeated pair is the shape the duplication gate fails (issue 1691).
 
 function classMemberAst(ast, name) {
@@ -69,7 +69,7 @@ function classMemberAst(ast, name) {
   throw new Error(`no class member \`${name}\``);
 }
 
-/** Every element or component node in a template, for the claims that COUNT render sites. */
+/** Every element or component node in a template, for the claims that count render sites. */
 function templateNodes(component) {
   const nodes = [];
   for (const node of walkNodes(component.fragment)) {
@@ -476,7 +476,7 @@ function structureOf(target) {
 
 /** What a failure message calls the target, whichever of the four shapes it took. */
 function labelOf(target) {
-  if (Array.isArray(target)) return `any of ${target.length} manager views`;
+  if (Array.isArray(target)) return `any of ${target.length} files`;
   if (typeof target === 'string') return target;
   if (target.dir) return `any of ${target.dir}`;
   const { file, member, constant, property, fn, record } = target;

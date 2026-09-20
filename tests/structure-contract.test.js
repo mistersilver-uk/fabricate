@@ -40,7 +40,7 @@ test('a composed member+property target scopes a claim to one seam, not to the f
 test('labelOf names each target shape, so a failure says which slice was read', () => {
   assert.equal(labelOf(CONFIG_APP), CONFIG_APP);
   assert.equal(labelOf({ file: CONFIG_APP, member: '_buildServices', property: 'setEnabled' }), `${CONFIG_APP} > _buildServices > setEnabled`);
-  assert.equal(labelOf([CONFIG_APP, CONFIG_APP]), 'any of 2 manager views');
+  assert.equal(labelOf([CONFIG_APP, CONFIG_APP]), 'any of 2 files');
   assert.equal(labelOf({ dir: 'src/ui' }), 'any of src/ui');
 });
 

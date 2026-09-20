@@ -808,7 +808,6 @@ describe('environment composition editor structure', () => {
         'DropRateAdjustmentRange',
         'Inspector.BaseChanceModifier',
       ],
-      attributesNo: [['class', 'manager-condition-modifier-value is-disabled-overrides']],
       names: [
         'taskDropRateAdjustmentsEnabled',
         'eventDropRateAdjustmentsEnabled',

@@ -34,7 +34,7 @@ const ACCESS_SURFACE = `${MANAGER}/AccessTabView.svelte`;
 const GRANT_ACCESS_INSPECTOR = `${MANAGER}/GrantAccessInspector.svelte`;
 const STORE = 'src/ui/svelte/stores/adminStore.js';
 // The GM browser row and inspector projection left `adminStore.js` for pure modules in issue 1090,
-// so a claim about a PROJECTED field is asked of the projection rather than of the store.
+// so a claim about a projected field is asked of the projection rather than of the store.
 const ROW_PROJECTION = 'src/ui/svelte/stores/adminRecipeRowProjection.js';
 const SYSTEM_PROJECTION = 'src/ui/svelte/stores/adminSystemInspectorProjection.js';
 const MODEL = 'src/models/Recipe.js';
@@ -52,7 +52,7 @@ const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 
 /**
- * The GLOBAL sheet's leg of the issue-796 cap. A component's own `<style>` is asked through the
+ * The global sheet's leg of the issue-796 cap. A component's own `<style>` is asked through the
  * `styleDeclares` claim instead; this reads `styles/fabricate.css`, which is not `src/` text.
  */
 function assertGlobalRuleHasNoMaxWidth(selector, { mustContain = [] } = {}) {
@@ -142,7 +142,7 @@ describe('RecipeEditView identity-only single column', () => {
     {
       namesNo: ['knowledgeMode', 'onAddRecipeItem', 'onSetRecipeItem', 'dragDrop', 'resolveDropData'],
       spellsNo: ['manager-environment-scene-dropzone', 'manager-environment-scene-linked'],
-      // The read-only summary props ARE expected, and are forwarded to the tab.
+      // The read-only summary props are expected, and are forwarded to the tab.
       names: ['recipeItemDefinitions', 'onRemoveRecipeItem'],
     }
   );
@@ -180,7 +180,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
       namesNo: ['dragDrop', 'onAddRecipeItem', 'deleteRecipeItemDefinition', 'linkedRecipeItemUuid'],
       writesNo: ['data-recipe-item-dropzone'],
       spellsNo: ['RecipeItemLinkAnother'],
-      // Removing THIS recipe from a book it already appears in is still allowed.
+      // Removing this recipe from a book it already appears in is still allowed.
       names: ['onRemoveRecipeItem', 'recipeItemId'],
       writes: ['data-recipe-open-books'],
     }
@@ -210,7 +210,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
 
   // Issue 796: the linked-book list tiles into a fixed three-column grid (widened from the earlier
   // auto-fill 220px tracks, which truncated long titles), dropping the old `max-width: 520px` cap.
-  // The COMPOUND chain keeps the claim pinned to the grid rule; the file also carries a bare
+  // The compound chain keeps the claim pinned to the grid rule; the file also carries a bare
   // `.manager-recipe-item-links { margin }` rule a bare-class claim could latch onto.
   defineStructureContract(
     'tiles the linked-book list into an uncapped three-column grid (Access-tab parity)',
@@ -232,7 +232,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
     passesValues: [['EmptyState', 'contextClass', 'manager-recipe-tab-empty']],
   });
 
-  // The original bug capped BOTH the list and the empty state. Without this symmetric guard a
+  // The original bug capped both the list and the empty state. Without this symmetric guard a
   // re-cap of only the empty panel would ship green.
   it('keeps the empty state a full-width uncapped panel', () => {
     assertGlobalRuleHasNoMaxWidth('.fabricate-manager .manager-recipe-tab-empty', {
@@ -286,7 +286,7 @@ describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (iss
     TABS,
     {
       reads: ['visibilityEffect.showAccess', 'visibilityEffect.showBooksScrolls'],
-      // The prop must NOT be called `effect` — it would shadow the $effect rune.
+      // The prop must not be called `effect` — it would shadow the $effect rune.
       declaresProp: ['visibilityEffect'],
     }
   );
@@ -328,7 +328,7 @@ describe('Step mode lives on the Overview tab (issue 676: rehomed from the delet
         ['optionDataAttr', 'data-recipe-step-mode-option'],
         ['data-recipe-section', 'recipe-step-mode'],
       ],
-      // The rail was the ONLY consumer of these two handlers.
+      // The rail was the only consumer of these two handlers.
       names: ['onEnterMultiStep', 'onRevertToSingleStep', 'multiStepEnabled'],
     }
   );
@@ -370,7 +370,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
     { spells: ['ModeBanner.SettingsHint'] }
   );
 
-  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the reported VALUE,
+  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the reported value,
   // so a shared hook would resolve to whichever rendered first.
   defineStructureContract(
     'takes its capture hook as a prop so two banners on one tab cannot collide',
@@ -387,11 +387,11 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
 
   defineStructureContract('and the Overview tab passes its own hooks', OVERVIEW, {
     spells: ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks'],
-    // The rejected design's neutral "the system decides" banner is GONE.
+    // The rejected design's neutral "the system decides" banner is gone.
     spellsNo: ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner'],
   });
 
-  // Visual differentiation was promised by the design and is delivered as COLOUR ONLY.
+  // Visual differentiation was promised by the design and is delivered as colour only.
   defineStructureContract(
     'differentiates a second banner by tone without moving its geometry',
     BANNER,
@@ -441,9 +441,9 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
 });
 
 describe('the progressive reorder announcement', () => {
-  // The STATEMENT ORDER inside `moveItem` — the name read before the array moves — is proved by
+  // The statement order inside `moveItem` — the name read before the array moves — is proved by
   // the clicked mounted case in `recipe-edit-mounted.test.js`, which round-trips the patch the way
-  // the root does and reads the announced sentence. What stays here is the sentence's SHAPE.
+  // the root does and reads the announced sentence. What stays here is the sentence's shape.
   defineStructureContract(
     'announces through ONE localized key with placeholders, not a concatenation',
     { file: RESULT_GROUP_CARD, fn: 'moveItem' },
@@ -496,7 +496,7 @@ describe('adminStore recipe-item projections + API', () => {
     }
   );
 
-  // The legacy uuid alias is never a FIELD the store or the projections read or emit. The row's
+  // The legacy uuid alias is never a field the store or the projections read or emit. The row's
   // book membership resolves through the shared `utils/recipeItemMembership.js`, whose legacy leg
   // reads that alias, and the projection names it in the comment explaining why — so the claim is
   // about a key and a member read, which a comment cannot satisfy.
@@ -912,10 +912,10 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
   );
 });
 
-// Issue 884 — a recipe's icon is its OWN `img` and nothing else. The four GM readers used to
-// prefix a book image the store projected from the FIRST definition CONTAINING the recipe;
+// Issue 884 — a recipe's icon is its own `img` and nothing else. The four GM readers used to
+// prefix a book image the store projected from the first definition containing the recipe;
 // membership being many-to-many, that made the rendered icon a function of definition order. They
-// now share ONE chokepoint, `resolveRecipeImage`.
+// now share one chokepoint, `resolveRecipeImage`.
 describe('recipe image readers resolve the recipe own image through the shared helper', () => {
   const READERS = [
     ['RecipesBrowserView', BROWSER, '../../util/craftingImageDefaults.js', 'recipe'],
@@ -1038,7 +1038,7 @@ describe('routed result-set head anchors the add-trigger to the right (issue 643
       passesValues: [['SearchablePopover', 'triggerAddMarker', 'routing-option']],
       writes: ['data-routing-chip'],
       spells: ['manager-recipe-routing-picker'],
-      // The trigger is the LAST flow child, so the auto margin pushes only it right.
+      // The trigger is the last flow child, so the auto margin pushes only it right.
       rendersBefore: [['EachBlock', 'SearchablePopover']],
     }
   );
@@ -1068,7 +1068,7 @@ describe('recipe image picker no longer reuses the scene-locked visuals', () => 
 // Issue 1018. Two DIFFERENT predicates used to share the name `enableBlocked`.
 describe('the editor enable-toggle gate is named apart from the activation gate (issue 1018)', () => {
   defineStructureContract('leaves no `enableBlocked` anywhere in the editor pair', [EDIT, OVERVIEW], {
-    // `enableToggleBlocked` is a DIFFERENT identifier, so the name claim cannot false-positive.
+    // `enableToggleBlocked` is a different identifier, so the name claim cannot false-positive.
     namesNo: ['enableBlocked'],
   });
 

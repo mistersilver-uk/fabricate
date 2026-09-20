@@ -1,6 +1,6 @@
 /**
  * The rich GM Interactable config panel: its shell's structure contract, its root's, and the
- * behaviour of the three seams whose CONTRACT IS AN ORDER IN TIME rather than a shape (issue 1697
+ * behaviour of the three seams whose contract is an order in time rather than a shape (issue 1697
  * retired this file's source-text pins). The pure view logic lives in
  * `interactable-config-view.test.js` and `interactable-config-actions.test.js`.
  */
@@ -49,7 +49,7 @@ const STATUS_TOGGLE = 'src/ui/svelte/components/StatusToggle.svelte';
 const SELECT = 'src/ui/svelte/components/Select.svelte';
 const POPOVER_LAYOUT = 'src/ui/svelte/util/iconPickerPopover.js';
 
-/** `styles/fabricate.css` is the shipped GLOBAL sheet, not `src/` text: it stays a text read. */
+/** `styles/fabricate.css` is the shipped global sheet, not `src/` text: it stays a text read. */
 const sheetSource = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
 /** One mutating seam of the services bag, addressed by name so a claim cannot slide onto another. */
@@ -106,7 +106,7 @@ describe('InteractableConfigApp shell', () => {
     APP,
     {
       names: ['applyInteractableBehaviorUpdate', 'emitInteractableBehaviorWrite'],
-      // The one safe FILE-WIDE negative: this file calls `.update(` on no receiver at all, so the
+      // The one safe file-wide negative: this file calls `.update(` on no receiver at all, so the
       // absence cannot be satisfied by a same-named method on the instance Map.
       callsNo: ['update'],
       readsNo: ['behavior.update', 'region.delete', 'globalThis.confirm'],
@@ -197,7 +197,7 @@ describe('InteractableConfigApp shell', () => {
 
   defineStructureContract('and the lock seam its own', seam('setLocked'), {
     calls: ['_assertGM', 'planSetLocked', 'writeBehavior'],
-    // A locked interactable stays VISIBLE, so this seam must not reconcile the marker.
+    // A locked interactable stays visible, so this seam must not reconcile the marker.
     callsNo: ['_reconcileMarkerHidden'],
   });
 
@@ -358,7 +358,7 @@ describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)',
     assert.deepEqual(updates, [{ system: { state: { locked: true } } }], 'wrapped under system, not raw state');
   });
 
-  // THE ORDER IS THE CONTRACT, AND NO CONTRACT ROW CAN STATE IT (issue 1697). A row proves the
+  // The order is the contract, and no contract row can state it (issue 1697). A row proves the
   // right functions are named in the right seam; it cannot prove the marker reconcile waits for
   // the behaviour write to settle and then re-resolves, rather than reading a captured snapshot.
   // The app class imports a `.svelte` root Node cannot parse, so the module graph is loaded with
@@ -367,6 +367,8 @@ describe('InteractableConfigApp behaviour-write wrap (BUG: Disable/Lock no-op)',
   let InteractableConfigApp;
 
   before(async () => {
+    // Process-wide and never deregistered: every `.svelte` specifier this file's process resolves
+    // from here on returns `export default null;`, so this suite must not gain a mounted case.
     registerHooks({
       load(url, context, nextLoad) {
         if (!url.endsWith('.svelte')) return nextLoad(url, context);
@@ -669,7 +671,7 @@ describe('InteractableConfigRoot body', () => {
     );
   });
 
-  // AND EACH SWITCH REACHES THE `aria-pressed` BRANCH (issue 1520 review). `StatusToggle` renders
+  // And each switch reaches the `aria-pressed` branch (issue 1520 review). `StatusToggle` renders
   // one of three hosts off its `as` prop, and only the default `button` host writes
   // `aria-pressed`: `as="checkbox"` renders a real checkbox and `as="indicator"` a
   // `<span role="img">`, neither of which announces a pressed state at all.

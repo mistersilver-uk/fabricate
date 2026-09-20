@@ -154,7 +154,7 @@ function templateValueTokens(ast) {
 
 /**
  * Assert a window renders the shared control primitives and keeps only its own layout classes.
- * The residue comes from what the component DRAWS — attribute names, static attribute values and
+ * The residue comes from what the component draws — attribute names, static attribute values and
  * the classes its own `<style>` selects — so a token surviving only in a comment stops counting,
  * and an orphan style rule for a retired class still fails.
  *
