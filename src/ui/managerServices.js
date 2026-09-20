@@ -62,6 +62,12 @@ function userColor(user) {
   return typeof color === 'string' ? color : color.css || color.toString?.() || '';
 }
 
+// Assigned-first, then by name.
+function assignedFirstByName(left, right) {
+  if (left.assigned !== right.assigned) return left.assigned ? -1 : 1;
+  return left.name.localeCompare(right.name);
+}
+
 /**
  * Who controls this actor. The relation is a SET, not a single user:
  * `RecipeVisibilityService._viewerControlsCharacter` grants access to any viewer whose assigned
@@ -89,9 +95,7 @@ export function describeAccessActor(actor) {
     })
     .filter(Boolean)
     // Assigned-first, then by name — the assigned player is the one the GM means.
-    .sort((a, b) =>
-      a.assigned === b.assigned ? a.name.localeCompare(b.name) : a.assigned ? -1 : 1
-    );
+    .sort(assignedFirstByName);
 
   const defaultLevel = Number(actor.ownership?.default ?? LEVELS.NONE);
   return {
@@ -451,7 +455,7 @@ async function promptSystemImportFile() {
     },
     rejectClose: false,
   });
-  if (!result || !result.file) return null;
+  if (!result?.file) return null;
   return { file: result.file, conflictMode: result.conflictMode };
 }
 

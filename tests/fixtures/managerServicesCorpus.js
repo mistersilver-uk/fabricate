@@ -2,6 +2,8 @@
  * The recording fake world both shells' service bags are driven against, plus the per-key
  * disposition table the equivalence oracle reads. Frozen from the pin commit onwards (issue 1674).
  */
+import { byCodePoint } from '../helpers/ratchetBaseline.js';
+
 
 export const MANAGER_SERVICE_KEYS = Object.freeze([
   'choiceDialog',
@@ -98,13 +100,14 @@ export const JOURNAL_KEYS = Object.freeze([
  * Every service key's oracle. A key with no entry is a failure rather than a skip, which is what
  * makes a newly added key visible to the suite.
  */
+function dispositionOf(key) {
+  if (HANDLE_KEYS.includes(key)) return 'handle';
+  if (JOURNAL_KEYS.includes(key)) return 'journal';
+  return 'data';
+}
+
 export const MANAGER_DISPOSITIONS = Object.freeze(
-  Object.fromEntries(
-    MANAGER_SERVICE_KEYS.map((key) => [
-      key,
-      HANDLE_KEYS.includes(key) ? 'handle' : JOURNAL_KEYS.includes(key) ? 'journal' : 'data',
-    ])
-  )
+  Object.fromEntries(MANAGER_SERVICE_KEYS.map((key) => [key, dispositionOf(key)]))
 );
 
 export const PLAYER_SERVICE_KEYS = Object.freeze([
@@ -680,11 +683,11 @@ export function installWorld(world) {
   set('fromUuid', async (uuid) => world.resolveUuid(uuid));
   set('fromUuidSync', (uuid, options) => world.resolveUuid(uuid, options));
   set('document', anchorDom(world.record));
-  set('Blob', class RecordingBlob {
-    constructor(parts, options) {
-      world.record('Blob.construct', parts.join(''), options.type);
-    }
-  });
+  // A constructible double rather than a class, which would carry a constructor and nothing else.
+  function RecordingBlob(parts, options) {
+    world.record('Blob.construct', parts.join(''), options.type);
+  }
+  set('Blob', RecordingBlob);
   set('URL', {
     createObjectURL: () => {
       world.record('URL.createObjectURL');
@@ -712,7 +715,9 @@ export function installWorld(world) {
 export function recordingHooks(record) {
   const registered = [];
   const fire = (event, ...args) => {
-    for (const entry of [...registered]) {
+    // A snapshot, so a handler that subscribes while this fires is not invoked by it.
+    const delivering = registered.slice();
+    for (const entry of delivering) {
       if (entry.event === event && entry.live) entry.handler(...args);
     }
   };
@@ -880,7 +885,7 @@ export function normaliseForGolden(value) {
   if (Array.isArray(value)) return value.map(normaliseForGolden);
   return Object.fromEntries(
     Object.keys(value)
-      .sort()
+      .sort(byCodePoint)
       .map((key) => [key, normaliseForGolden(value[key])])
   );
 }
