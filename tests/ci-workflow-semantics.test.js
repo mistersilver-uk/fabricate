@@ -474,7 +474,7 @@ function mintedContext({ nextVersion, tag = '', verify = 'skipped' }) {
 const SNAPSHOT_REDIRECT = /git tag --list\s*>\s*"([^"]+)"/;
 
 test('a semantic-release publisher only publishes a version THIS run minted', () => {
-  // semantic-release's addChannel phase fires `success` for an ALREADY-released version, so the
+  // semantic-release's addChannel phase fires `success` for an already-released version, so the
   // raw successCmd outputs cannot tell a mint from a re-add. The discriminator is the tag set
   // captured before the run; the job's outputs must come from the step that applies it.
   let assetPins = 0;
@@ -492,7 +492,7 @@ test('a semantic-release publisher only publishes a version THIS run minted', ()
     assert.notEqual(classifierIndex, -1, `${file} has no mint classifier step`);
 
     // The snapshot is worthless taken after the run: semantic-release pushes a real release's tag
-    // BEFORE its success lifecycle fires, so the tag exists by the time the classifier looks.
+    // before its success lifecycle fires, so the tag exists by the time the classifier looks.
     assert.ok(
       snapshotIndex < semrelIndex && semrelIndex < classifierIndex,
       `${file} must snapshot the tags, THEN run semantic-release, THEN classify what it minted`
@@ -530,7 +530,7 @@ test('a semantic-release publisher only publishes a version THIS run minted', ()
       `${file}'s classifier must name the addChannel re-add as the reason nothing is published`
     );
 
-    // Where the publisher asserts its draft's assets, that assertion is about the MINTED draft.
+    // Where the publisher asserts its draft's assets, that assertion is about the minted draft.
     const assets = steps.find((step) => /gh release view/.test(step.run));
     if (assets) {
       assetPins += 1;
@@ -538,7 +538,7 @@ test('a semantic-release publisher only publishes a version THIS run minted', ()
       assert.equal(assets.env.RELEASE_TAG, '${{ steps.minted.outputs.next_tag }}');
     }
 
-    // The REAL `if:` text, evaluated. A run that minted nothing publishes nothing and verifies
+    // The real `if:` text, evaluated. A run that minted nothing publishes nothing and verifies
     // nothing — and release.yml's forward-port, which gates on verify-publish, does not fire.
     const nothing = mintedContext({ nextVersion: '' });
     assert.equal(gateValue(jobs['publish-s3'].if, nothing), false, `${file} publishes on a no-mint run`);
@@ -615,9 +615,9 @@ test("the classifier's shell body mints only a tag absent from the pre-run snaps
 
 /** The capture of the deployment configuration from the ref the workflow is running at. */
 const CAPTURES_CONFIG = /git show "\$GITHUB_SHA":release\.s3\.config\.json/;
-/** A checkout that MOVES THE TREE to a release tag, as distinct from `git checkout -B <branch>`. */
+/** A checkout that moves the tree to a release tag, as distinct from `git checkout -B <branch>`. */
 const CHECKS_OUT_A_TAG = /git checkout ["']?v?\$\{?[A-Z_]+/;
-/** An INVOCATION of the publisher, as distinct from a dry-run plan that echoes its command line. */
+/** An invocation of the publisher, as distinct from a dry-run plan that echoes its command line. */
 const INVOKES_RELEASE_S3 = /^\s*node scripts\/release-s3\.js/m;
 
 test('every job that publishes from a checked-out tag takes its configuration from the workflow ref', () => {
@@ -660,7 +660,7 @@ test('every job that publishes from a checked-out tag takes its configuration fr
       assert.notEqual(captureIndex, -1, `${label} never captures the config from $GITHUB_SHA`);
 
       // The capture must precede the checkout, which is what makes the file unreadable. Where the
-      // two share one step, the ordering is by LINE within that step's `run:` body; where the
+      // two share one step, the ordering is by line within that step's `run:` body; where the
       // checkout is its own step, it is by step.
       if (captureIndex === checkoutIndex) {
         const lines = steps[captureIndex].run.split('\n');
@@ -686,7 +686,7 @@ test('every job that publishes from a checked-out tag takes its configuration fr
     'the tag preflights grep for "\'--config\'" in scripts/release-s3.js; that literal has moved'
   );
 
-  // Non-vacuity: the walk must reach BOTH shapes — the dedicated publisher and the promotion's
+  // Non-vacuity: the walk must reach both shapes — the dedicated publisher and the promotion's
   // single-body re-stage — or one of them could lose its capture unobserved.
   assert.ok(visited.includes('release-s3.yml job "release-s3"'), `release-s3.yml was not visited (saw ${visited.join('; ') || 'nothing'})`);
   assert.ok(visited.includes('promote-to-public.yml job "publish"'), `the public re-stage was not visited (saw ${visited.join('; ') || 'nothing'})`);

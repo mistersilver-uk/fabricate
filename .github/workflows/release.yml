@@ -99,7 +99,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      # The CLASSIFIER's outputs, not semrel's: they are populated only for a version this run
+      # The classifier's outputs, not semrel's: they are populated only for a version this run
       # actually minted, so every downstream `if:` below reads an empty value otherwise.
       next_version: ${{ steps.minted.outputs.next_version }}
       next_tag: ${{ steps.minted.outputs.next_tag }}
@@ -135,10 +135,9 @@ jobs:
           done
 
       - name: Snapshot the tags that exist before this run
-        # The discriminator the classifier below needs. semantic-release creates and PUSHES a
-        # genuine release's tag before its `success` lifecycle fires, so "does $next_tag exist now"
-        # is true whether or not this run minted it. Runs after the step above, which is what
-        # fetched the tags, and before semantic-release, which is what adds one.
+        # The discriminator the classifier below needs: semantic-release pushes a genuine release's
+        # tag before its `success` lifecycle fires, so "does $next_tag exist now" is true either
+        # way. Must run after the tag fetch above and before semantic-release, which adds one.
         run: git tag --list > "$RUNNER_TEMP/pre-release-tags.txt"
 
       - name: Semantic Release
@@ -147,9 +146,8 @@ jobs:
         # are naturally `release` (or the hotfix `N.N.x`) here because this workflow is push-triggered
         # on those branches, which is what keeps classifyBranch on the STABLE line and loads the
         # (drafted) @semantic-release/github plugin. The config's successCmd writes
-        # next_version/next_tag to this step's $GITHUB_OUTPUT whenever the `success` lifecycle
-        # fires — which INCLUDES the addChannel phase, where an already-released version is added
-        # to this line's channel and nothing is minted. The classifier below tells the two apart.
+        # next_version/next_tag to this step's $GITHUB_OUTPUT on every `success` lifecycle,
+        # addChannel included; the classifier below tells a mint from a re-add (issue 1864).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Local bin rather than `npx` per Sonar S6505/S8543 — see the note on ci.yml's commitlint
@@ -159,12 +157,9 @@ jobs:
 
       - name: Classify what this run minted
         id: minted
-        # THE mint gate (issue 1864). A tag semantic-release reported but that already existed
-        # before this run was not minted here: semantic-release's addChannel phase adds an existing
-        # release to a newly-cut line's channel, and the raw semrel outputs then name a version
-        # published by the run that really minted it. Cutting `1.9.x` from v1.9.6 published v1.9.6
-        # to the `1.9.x` channel that way. Only a tag ABSENT from the pre-run snapshot populates
-        # these outputs; publish-s3, verify-publish and forward-port all skip otherwise.
+        # The mint gate (issue 1864). semantic-release's addChannel phase reports a tag it did not
+        # mint — cutting `1.9.x` from v1.9.6 reported v1.9.6 — so only a tag absent from the pre-run
+        # snapshot populates these outputs; publish-s3, verify-publish and forward-port then skip.
         env:
           NEXT_VERSION: ${{ steps.semrel.outputs.next_version }}
           NEXT_TAG: ${{ steps.semrel.outputs.next_tag }}

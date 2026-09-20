@@ -76,7 +76,7 @@ export function assertHotfixMinimumNotRaised({
   };
 }
 
-/** The tester identity a config declares for one channel: the group NAMES and the secret's NAME. */
+/** The tester identity a config declares for one channel: the group names and the secret's name. */
 function testerIdentity(config, channel) {
   const declared = config?.channels?.[channel] ?? {};
   const groups = Array.isArray(declared.testerGroups) ? declared.testerGroups.map(String) : [];
@@ -94,8 +94,8 @@ function describeIdentity({ groups, secretEnv }) {
 
 /**
  * Diagnose a disagreement between the ref a promotion was dispatched from and the ref that
- * publishes a channel about that channel's tester identity, per §Tester group identity.
- * Compares NAMES only — a segment value is a secret and is never read here.
+ * publishes a channel, about that channel's tester identity (§Tester group identity). Compares
+ * names only — a segment value is a secret and is never read here.
  *
  * @returns {{drifted: boolean, summary: string, remedy: string}} The diagnosis.
  */
@@ -111,7 +111,7 @@ export function evaluateTesterConfigDrift({
     `this ref declares ${describeIdentity(dispatch)}, while ${publisherRef} — the ref that ` +
     `publishes ${channel} — declares ${describeIdentity(publisher)}`;
 
-  // Group NAMES compared as sets: declaration order carries no meaning, a rename does.
+  // Group names compared as sets: declaration order carries no meaning, a rename does.
   const dispatchGroups = new Set(dispatch.groups);
   const publisherGroups = new Set(publisher.groups);
   const sameGroups =

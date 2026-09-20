@@ -96,7 +96,7 @@ test('the registry payload constructs the v, and never re-derives it from the ar
 
 // Tester-group identity is deployment configuration, and early-access is published only from
 // `release` — so a promotion dispatched from `main` can evaluate a prefix no publish has written
-// (issue #1872). The guard DIAGNOSES that, and hangs the remedy on the refusal it explains.
+// (issue #1872). The guard diagnoses that, and hangs the remedy on the refusal it explains.
 test('the guard reads the publisher ref config and extends the absent-head refusal with the drift remedy', () => {
   const guard = parseJobs(readFileSync(WORKFLOW, 'utf8')).guard;
 
@@ -132,7 +132,7 @@ test('the guard reads the publisher ref config and extends the absent-head refus
   const flat = checks.run.replace(/\s+/g, ' ');
   assert.match(flat, /console\.warn\(`::warning::\$\{drift\.summary\}`\)/, 'drift must be logged');
   // A drift-driven refusal of its own would block every promotion made while two refs legitimately
-  // disagree. Drift is a DIAGNOSIS: it explains why an early-access head is absent.
+  // disagree. Drift is a diagnosis: it explains why an early-access head is absent.
   assert.ok(!/fail\(drift\./.test(flat), 'configuration drift must never refuse on its own');
   for (const conjunct of [/verdict\.kind === 'absent'/, /channel === 'early-access'/, /drift\.drifted/]) {
     assert.match(flat, conjunct, 'the remedy is hung on the absent-head early-access refusal only');

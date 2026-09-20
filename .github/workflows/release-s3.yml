@@ -120,11 +120,9 @@ jobs:
           fi
 
       - name: Capture the deployment configuration from the workflow ref
-        # Tester-group identity is DEPLOYMENT configuration, not a property of the released bytes
-        # (issue 1872): it must come from the ref this workflow runs at, never from the tag. The
-        # checkout below moves the tree to the tag, so the capture has to happen first. Without it
-        # a rotated group can never be populated for an already-minted version — every dispatch,
-        # whatever its --ref, would republish under the tag's own configuration.
+        # Tester-group identity is deployment configuration, not a property of the released bytes
+        # (issue 1872): it comes from the ref this workflow runs at, never from the tag. The
+        # checkout below moves the tree to the tag, so the capture has to precede it.
         run: git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
 
       - name: Checkout release tag
@@ -133,8 +131,8 @@ jobs:
         run: git checkout "$RELEASE_TAG"
 
       - name: The tag's publisher must accept --config
-        # release-s3.js's parseArgs IGNORES an unknown flag, so a tag predating --config would
-        # silently publish under its OWN configuration while this workflow believed it had passed
+        # release-s3.js's parseArgs ignores an unknown flag, so a tag predating --config would
+        # silently publish under its own configuration while this workflow believed it had passed
         # the ref's. Named refusal rather than a silent wrong prefix.
         run: |
           grep -q -- "'--config'" scripts/release-s3.js || {
@@ -171,9 +169,8 @@ jobs:
           # `git checkout "$tag"`, so GITHUB_SHA still names the ref that triggered the run, not the
           # commit whose bytes this zip carries. The provenance guard keys resume/overwrite on it.
           #
-          # The two sources are deliberately different: the BYTES come from the tag (this tree),
-          # while the DEPLOYMENT CONFIGURATION — which tester groups exist and which secret each
-          # derives its segment from — comes from the workflow ref, captured before the checkout.
+          # The two sources differ deliberately: the bytes come from the tag (this tree), while the
+          # deployment configuration comes from the workflow ref, captured before the checkout.
           SOURCE_SHA="$(git rev-parse HEAD)"
           node scripts/release-s3.js \
             --version "$VERSION" \

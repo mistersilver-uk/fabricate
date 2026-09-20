@@ -147,11 +147,10 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Capture the publisher ref's deployment configuration
-        # early-access is published ONLY from `release` (release.yml resolves release-s3.yml at the
-        # CALLER's commit), so a promotion dispatched from `main` can evaluate a tester identity no
-        # publish has ever used — which surfaces as a 404 head and reads as a cohort risk rather
-        # than as configuration drift (issue 1872). Absent is tolerated with an empty object: the
-        # drift check then simply finds nothing to compare.
+        # early-access is published only from `release`, so a promotion dispatched from `main` can
+        # evaluate a tester identity no publish has used — a 404 head that reads as a cohort risk
+        # rather than as configuration drift (issue 1872). An unreadable publisher config falls back
+        # to an empty object, which compares as "declares no tester group" and is reported as drift.
         run: |
           git fetch origin "+refs/heads/release:refs/remotes/origin/release" --force \
             || echo "::notice::could not fetch origin/release; the tester-configuration drift check has nothing to compare."
@@ -192,8 +191,8 @@ jobs:
           const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
           const s3 = new S3Client({ region: process.env.AWS_REGION });
 
-          // Tester identity is deployment configuration read from THIS ref, while early-access is
-          // published from `release`. DIAGNOSED, never an independent refusal: drift is why an
+          // Tester identity is deployment configuration read from this ref, while early-access is
+          // published from `release`. Diagnosed, never an independent refusal: drift is why an
           // early-access head can be absent, so the remedy belongs on that refusal.
           let publisherConfig = {};
           try {
