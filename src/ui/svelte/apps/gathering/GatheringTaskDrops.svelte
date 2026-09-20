@@ -23,6 +23,7 @@
   import Kicker from '../../components/Kicker.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import Notice from '../../components/Notice.svelte';
+  import { disclosurePhraseKey } from '../../util/disclosurePhrase.js';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
   import GatheringDropModifiers from './GatheringDropModifiers.svelte';
@@ -68,8 +69,8 @@
     expandedIds = next;
   }
 
-  /** The disclosure's own name, which its visible content does not supply. */
-  const phraseKey = (open) => `FABRICATE.Common.Disclosure.${open ? 'Collapse' : 'Expand'}`;
+  /** A drop the world left nameless still has to be announced, so the phrase names the kind. */
+  const NAMELESS_DROP = 'FABRICATE.Labels.UnknownComponent';
 </script>
 
 {#if loading}
@@ -117,18 +118,18 @@
         {@const key = drop.id ?? index}
         {@const isOpen = expandedIds.has(key)}
         {@const bodyId = `fab-drop-modifiers-${key}`}
-        {@const phraseId = `fab-drop-phrase-${key}`}
+        {@const phraseName = drop.name || localize(NAMELESS_DROP)}
         <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
           <!-- The whole summary is the disclosure and therefore the button, not a focusable
                `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
-               `aria-labelledby` keeps the name the phrase rather than the copy and the meter. -->
+               The name is this header's own copy plus the hidden phrase; `aria-controls` is emitted
+               only while the body it names is mounted. -->
           <button
             type="button"
             data-keyboard-focus="true"
             class="gathering-task-drop-summary"
             aria-expanded={isOpen}
-            aria-controls={bodyId}
-            aria-labelledby={phraseId}
+            aria-controls={isOpen ? bodyId : undefined}
             onclick={() => toggle(key)}
           >
             <Medallion art={drop.img || DEFAULT_DROP_IMG} alt="" size={36} />
@@ -143,15 +144,11 @@
                   >
                 {/if}
               </span>
+              <!-- No `role="meter"` inside the button: ARIA makes a button's children
+                   presentational, so the role and its values are stripped from the tree and the
+                   chance is carried by the visible figure and the phrase instead (issue 1512). -->
               <span
                 class="gathering-task-drop-chance"
-                role="meter"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow={pct(drop.finalChance)}
-                aria-label={localize('FABRICATE.App.Gathering.Detail.FindChance', {
-                  x: pct(drop.finalChance),
-                })}
                 data-gathering-drop-value={pct(drop.finalChance)}
               >
                 <FillBar value={pct(drop.finalChance)} size="sm" />
@@ -161,8 +158,11 @@
             <span class="gathering-task-drop-chevron" aria-hidden="true">
               <i class={`fas ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
             </span>
-            <span class="visually-hidden" id={phraseId}
-              >{localize(phraseKey(isOpen), { name: drop.name })}</span
+            <span class="visually-hidden"
+              >{localize(disclosurePhraseKey(isOpen), { name: phraseName })}
+              {localize('FABRICATE.App.Gathering.Detail.FindChance', {
+                x: pct(drop.finalChance),
+              })}</span
             >
           </button>
 

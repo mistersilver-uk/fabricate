@@ -13,7 +13,7 @@
   import { toPercent as pct } from '../../util/gatheringFormat.js';
 
   // `bodyId` lands on this root rather than a wrapper, so the region the row's disclosure names
-  // with `aria-controls` IS the body (issue 1512).
+  // with `aria-controls` is the body (issue 1512).
   let { drop = null, bodyId = '' } = $props();
 
   function signedPercent(value) {

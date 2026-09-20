@@ -27,6 +27,7 @@
   import Select from '../../../components/Select.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
+  import { disclosurePhraseKey } from '../../../util/disclosurePhrase.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../../util/recipeItemAccessBadge.js';
   import {
@@ -110,9 +111,6 @@
   function craftRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
-
-  /** The whole-header disclosure's own name, which the medallion and the title do not supply. */
-  const phraseKey = (open) => `FABRICATE.Common.Disclosure.${open ? 'Collapse' : 'Expand'}`;
 
   // Search appears only once a book teaches more than a page's worth of recipes.
   let recipeSearch = $state('');
@@ -329,18 +327,17 @@
           {#each pagedRecipes as recipe (recipe.id)}
             {@const expanded = expandedRecipeId === recipe.id}
             {@const bodyId = `fab-book-recipe-body-${recipe.id}`}
-            {@const phraseId = `fab-book-recipe-phrase-${recipe.id}`}
             <li class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
               <div class="inventory-detail-accordion-header">
-                <!-- The whole header is the disclosure (issue 1512): it resolves `aria-controls`
-                     to the body, declares itself focused, and is named by the phrase. -->
+                <!-- The whole header is the disclosure (issue 1512): it declares itself focused,
+                     is named by its own copy plus the hidden phrase, and emits `aria-controls` only
+                     while the body it names is mounted. -->
                 <button
                   type="button"
                   data-keyboard-focus="true"
                   class="inventory-detail-accordion-toggle"
                   aria-expanded={expanded}
-                  aria-controls={bodyId}
-                  aria-labelledby={phraseId}
+                  aria-controls={expanded ? bodyId : undefined}
                   onclick={() => toggleRecipe(recipe.id)}
                 >
                   <Medallion {...resolveCraftingArt(recipe.img ?? '')} alt="" size={40} />
@@ -351,8 +348,8 @@
                     class:fa-chevron-right={!expanded}
                     aria-hidden="true"
                   ></i>
-                  <span class="visually-hidden" id={phraseId}
-                    >{localize(phraseKey(expanded), { name: recipe.name })}</span
+                  <span class="visually-hidden"
+                    >{localize(disclosurePhraseKey(expanded), { name: recipe.name })}</span
                   >
                 </button>
                 {#if learnable}{@render learnControl(

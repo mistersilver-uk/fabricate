@@ -11,6 +11,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import { disclosurePhraseKey } from '../../util/disclosurePhrase.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
@@ -89,9 +90,6 @@
     onSelectRealm(realmId === selectedRealmId ? '' : realmId);
   }
 
-  /** The header's own name: its chips and icon do not supply one. */
-  const phraseKey = (open) => `FABRICATE.Common.Disclosure.${open ? 'Collapse' : 'Expand'}`;
-
   function countLabel(count, oneKey, oneFallback, manyKey, manyFallback) {
     if (count === 1) return text(oneKey, oneFallback);
     return text(manyKey, manyFallback).replace('{count}', String(count));
@@ -154,7 +152,6 @@
       {#each pagedRealms as realm (realm.id)}
         {@const isExpanded = realm.id === selectedRealmId}
         {@const bodyId = `fab-realm-editor-${realm.id}`}
-        {@const phraseId = `fab-realm-phrase-${realm.id}`}
         <div
           class={`manager-travel-realms-row ${isExpanded ? 'is-expanded is-selected' : ''}`}
           role="listitem"
@@ -162,14 +159,14 @@
         >
           <!-- The whole header is the disclosure and therefore the button, not a focusable
                `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
-               `aria-labelledby` keeps the name the phrase, not the name plus two count chips. -->
+               The name is the row's own copy — its name and its state chip — plus the hidden
+               phrase; `aria-controls` is emitted only while the editor it names is mounted. -->
           <button
             type="button"
             data-keyboard-focus="true"
             class="manager-travel-realms-header"
             aria-expanded={isExpanded}
-            aria-controls={bodyId}
-            aria-labelledby={phraseId}
+            aria-controls={isExpanded ? bodyId : undefined}
             onclick={() => selectRow(realm.id)}
           >
             <div class="manager-travel-realms-left">
@@ -196,8 +193,8 @@
             <span class="manager-travel-realms-chevron" aria-hidden="true">
               <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
             </span>
-            <span class="visually-hidden" id={phraseId}
-              >{localize(phraseKey(isExpanded), { name: realm.name })}</span
+            <span class="visually-hidden"
+              >{localize(disclosurePhraseKey(isExpanded), { name: realm.name })}</span
             >
           </button>
 
