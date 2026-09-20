@@ -29,6 +29,7 @@
     describeActiveEssenceFilters,
   } from '../../../model/essenceBrowserModel.js';
   import { createBulkSelection } from './bulkSelection.svelte.js';
+  import { createBrowserListState } from './browserListState.svelte.js';
   import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
@@ -66,20 +67,19 @@
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the SOURCE filter, the page and the bulk selection, whose subjects the
-  // new system does not share; status, sort, view mode and page size are preferences and are not.
-  // The sentinel is `ui.systemId`, PERSISTED on the lifted state rather than a component-local
-  // `$state`, which re-initialises to '' on every mount and would misread a return as a switch.
+  // The source filter, the page and the selection name subjects the new system does not share;
+  // status, sort, view mode and page size are preferences. The sentinel is persisted, not local.
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: { searchTerm: '', sourceFilter: 'all', pageIndex: 0 },
+    onSystemSwitch: () => {
+      selection.reset();
+      // The membership axis names this system's records, for the source filter's own reason.
+      membershipFilter = 'in';
+    },
+  });
   $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.searchTerm = '';
-    ui.sourceFilter = 'all';
-    ui.pageIndex = 0;
-    selection.reset();
-    ui.systemId = selectedSystemId;
-    // The membership axis names THIS system's records, so it cannot survive a system switch for
-    // the same reason the source filter cannot.
-    membershipFilter = 'in';
+    list.syncSystem(selectedSystemId);
   });
 
   function text(key, fallback) {
