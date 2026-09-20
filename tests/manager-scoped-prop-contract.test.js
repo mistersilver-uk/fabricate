@@ -75,7 +75,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../../model/recipeBrowserModel.js',
   '../../../model/recipeBulkEditModel.js',
   '../../../model/vocabularyUsage.js',
-  '../../../navTabBadgeStore.js',
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
@@ -111,6 +110,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './ImportReportModal.svelte',
   './ItemPageInspector.svelte',
   './KnowledgeView.svelte',
+  // Added by issue 1717: the rail's WORLD section is its own unit, and it took the nav-tab badge
+  // helpers with it, so `../../../navTabBadgeStore.js` left this list in the same commit.
+  './ManagerWorldNav.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',

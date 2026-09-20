@@ -111,6 +111,8 @@ const MAIN = 'src/main.js';
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
+const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
+  'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
@@ -257,7 +259,7 @@ describe('CraftingSystemManager source contract', () => {
   // What the `AC-11` to `AC-15` mounted cases cannot say is how many render sites exist: a third
   // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
   it('renders the Downtime badge at exactly two sites', () => {
-    const sites = templateNodes(componentAstOf(MANAGER_ROOT))
+    const sites = templateNodes(componentAstOf(MANAGER_WORLD_DOWNTIME_NAV_GROUP))
       .filter((node) =>
         (node.attributes ?? []).some((attribute) =>
           String(attribute.name ?? '').startsWith('data-world-downtime-badge')

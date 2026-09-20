@@ -112,6 +112,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
+  import ManagerWorldNav from './ManagerWorldNav.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -168,7 +169,6 @@
     managerHeaderActionClass,
     WORLD_DOWNTIME_SURFACE_ID,
   } from '../../../managerExtensions.js';
-  import { resolveNavTabBadge, navTabBadgeTotal } from '../../../navTabBadgeStore.js';
   import {
     mapModifierToPrerequisite,
     mapPrerequisiteToModifier,
@@ -2853,22 +2853,9 @@
     if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
     worldDowntimeTabId = tabs[0].id;
   });
-  // The rail's Downtime children render the active tab set.
-  const downtimeNavItems = $derived(downtimeTabs);
-  // The rail sub-item BUTTON's element id. It is the click target the mounted suite drives and
-  // the anchor the group's markup is keyed on.
-  const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
   // The id of the element carrying the sub-item's VISIBLE LABEL, stated once and used twice: the
   // rail stamps it.
   const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
-  // The id of the sub-item's badge element (issue 1302) — the `aria-describedby` target, and
-  // never a descendant of `downtimeNavLabelId`'s span, which names the companion panel region.
-  const downtimeNavBadgeId = (tabId) => `manager-downtime-nav-badge-${tabId}`;
-  // The badge Core renders for one sub-item, in provider mode only: Core's own preview tabs never
-  // carry a `badge`.
-  function downtimeSubitemBadge(item) {
-    return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);
-  }
   // Gated on provider mode rather than merely on the channel being empty.
   const downtimeRuntimeChrome = $derived(downtimeCoreFallback ? null : downtimeRouteChrome);
   // Header actions belong to the live mount, then to the active TAB, then to the provider's own
@@ -3092,36 +3079,15 @@
   const railLockedOpen = $derived(isWorldDowntimeRoute && !downtimeCoreFallback);
   // DISPLAY-ONLY.
   const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
-  // The Downtime parent rollup total (issue 1302) — Core's own summary of what is hidden behind a
-  // closed disclosure.
-  const downtimeNavRollupTotal = $derived(
-    downtimeCoreFallback ? 0 : navTabBadgeTotal(downtimeTabs, downtimeNavTabBadges)
-  );
-  // Renders only while the children are hidden — BOTH disjuncts are load-bearing.
-  const downtimeNavRollupVisible = $derived(
-    !downtimeCoreFallback &&
-      downtimeNavRollupTotal > 0 &&
-      (!railGroupExpanded.worldDowntime || railCollapsedDisplay)
-  );
-  // "{count} update" / "{count} updates" — Core's own generic word.
-  function downtimeRollupName(count) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOne'
-        : 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOther';
-    const fallback = count === 1 ? '{count} update' : '{count} updates';
-    return text(key, fallback).replace('{count}', String(count));
-  }
-  // The parent row's composed accessible name while the rollup shows.
-  function downtimeParentName(count) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOne'
-        : 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOther';
-    const fallback = count === 1 ? '{label}, {count} update' : '{label}, {count} updates';
-    const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
-    return text(key, fallback).replace('{label}', label).replace('{count}', String(count));
-  }
+  // INTERIM (issue 1717): `createNavRailModel` is built here once the rail's own unit lands; the
+  // units extracted ahead of it read the root's existing rail state through the model's surface.
+  const navRail = $derived({
+    expanded: railGroupExpanded,
+    lockedOpen: railGroupLockedOpen,
+    collapsedDisplay: railCollapsedDisplay,
+    railLockedOpen,
+    toggleGroup: toggleRailGroup,
+  });
   // Every rail-toggle attribute reads the DISPLAY value, never the stored one.
   const railToggleLabel = $derived(
     railCollapsedDisplay
@@ -3138,22 +3104,6 @@
   const railToggleIcon = $derived(
     railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
-  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213).
-  const downtimeNavNodes = $state({});
-  let revealedDowntimeNavId = null;
-  $effect(() => {
-    if (!railLockedOpen || !railGroupExpanded.worldDowntime) {
-      revealedDowntimeNavId = null;
-      return;
-    }
-    const tabId = worldDowntimeTabId;
-    if (revealedDowntimeNavId === tabId) return;
-    const node = downtimeNavNodes[tabId];
-    if (!node) return;
-    revealedDowntimeNavId = tabId;
-    // happy-dom does not implement it, hence the optional call.
-    node.scrollIntoView?.({ block: 'nearest' });
-  });
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off `selectedSystem`
   // (issue 785).
   const knowledgeState = $derived($viewState.knowledge || null);
@@ -9409,466 +9359,39 @@
             <span class="manager-nav-planned">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
           </button>
         {/each}
-        <section
-          class="manager-world-nav"
-          data-world-nav-section
-          aria-labelledby="manager-world-heading"
-        >
-          <div class="manager-world-heading-row">
-            <h2 id="manager-world-heading">
-              {text('FABRICATE.Admin.Manager.World.Heading', 'WORLD')}
-            </h2>
-            <span id="manager-world-scope">
-              {text('FABRICATE.Admin.Manager.World.Scope', 'every system')}
-            </span>
-          </div>
-          <!--
-            The four world scoped-entity leaves (issue 1362, epic 1357).
-          -->
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-components' || currentView === 'world-component-entry' ? 'is-active' : ''}`}
-            id="manager-world-nav-component-catalogue"
-            data-world-nav-item="component-catalogue"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
-              'Component catalogue'
-            )}
-            aria-current={currentView === 'world-components' ||
-            currentView === 'world-component-entry'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('world-components')}
-          >
-            <i class="fas fa-cubes-stacked" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text(
-                'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
-                'Component catalogue'
-              )}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.components}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-vocabulary' ? 'is-active' : ''}`}
-            id="manager-world-nav-vocabulary"
-            data-world-nav-item="vocabulary"
-            aria-label={text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
-            aria-current={currentView === 'world-vocabulary' ? 'page' : undefined}
-            onclick={() => setView('world-vocabulary')}
-          >
-            <i class="fas fa-tags" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.vocabulary}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-essences' || currentView === 'world-essence-entry' ? 'is-active' : ''}`}
-            id="manager-world-nav-essence-catalogue"
-            data-world-nav-item="essence-catalogue"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle',
-              'Essence Catalogue'
-            )}
-            aria-current={currentView === 'world-essences' || currentView === 'world-essence-entry'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('world-essences')}
-          >
-            <i class="fas fa-flask-vial" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle', 'Essence Catalogue')}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.essences}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-tools' || currentView === 'world-tool-entry' ? 'is-active' : ''}`}
-            id="manager-world-nav-tool-catalogue"
-            data-world-nav-item="tool-catalogue"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle',
-              'Tools Catalogue'
-            )}
-            aria-current={currentView === 'world-tools' || currentView === 'world-tool-entry'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('world-tools')}
-          >
-            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue')}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.tools}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${isWorldRoute ? 'is-active' : ''}`}
-            id="manager-world-nav-parties"
-            data-world-nav-item="parties"
-            aria-label={text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
-            aria-current={isWorldRoute ? 'page' : undefined}
-            onclick={openWorldParties}
-          >
-            <i class="fas fa-users" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
-            </span>
-            <span class="manager-nav-count">{travelParties.length}</span>
-          </button>
-          <!--
-            World > Travel (issue 1282).
-          -->
-          <div
-            class={`manager-nav-group manager-world-travel-group ${railGroupExpanded.worldTravel ? 'is-expanded' : ''}`}
-            data-world-travel-section
-          >
-            <button
-              type="button"
-              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldTravelRoute ? 'is-active' : ''}`}
-              id="manager-world-nav-travel"
-              data-world-nav-item="travel"
-              aria-label={text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}
-              aria-current={isWorldTravelRoute ? 'page' : undefined}
-              aria-controls="manager-travel-submenu"
-              aria-expanded={railGroupExpanded.worldTravel}
-              onclick={activateWorldTravelParent}
-            >
-              <i class="fas fa-route" aria-hidden="true"></i>
-              <span class="manager-nav-label">
-                {text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}
-              </span>
-              <span class="manager-nav-count">{worldRealms.length}</span>
-            </button>
-            <button
-              type="button"
-              class="manager-nav-toggle"
-              id="manager-travel-toggle"
-              data-world-travel-toggle
-              aria-label={railGroupExpanded.worldTravel
-                ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
-                : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
-              aria-controls="manager-travel-submenu"
-              aria-expanded={railGroupExpanded.worldTravel}
-              disabled={railGroupLockedOpen.worldTravel}
-              aria-disabled={railGroupLockedOpen.worldTravel}
-              title={railGroupLockedOpen.worldTravel ? railGroupLockedTitle : undefined}
-              onclick={(event) => toggleRailGroup('worldTravel', event)}
-            >
-              <i
-                class={railGroupExpanded.worldTravel ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                aria-hidden="true"
-              ></i>
-            </button>
-            {#if railGroupExpanded.worldTravel}
-              <div
-                class="manager-nav-submenu"
-                id="manager-travel-submenu"
-                data-world-travel-submenu
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.World.TravelDestinations',
-                  'Travel destinations'
-                )}
-              >
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldTravelRoute && worldTravelTab === 'realms' ? 'is-active' : ''}`}
-                  id="manager-travel-nav-realms"
-                  data-world-travel-item="realms"
-                  aria-current={isWorldTravelRoute && worldTravelTab === 'realms'
-                    ? 'page'
-                    : undefined}
-                  onclick={() => openWorldTravelDestination('realms')}
-                >
-                  <i class="fas fa-mountain-sun" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldTravelRoute && worldTravelTab === 'map' ? 'is-active' : ''}`}
-                  id="manager-travel-nav-map"
-                  data-world-travel-item="map"
-                  aria-current={isWorldTravelRoute && worldTravelTab === 'map' ? 'page' : undefined}
-                  onclick={() => openWorldTravelDestination('map')}
-                >
-                  <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')}
-                  </span>
-                </button>
-              </div>
-            {/if}
-          </div>
-          <!--
-            World > Rules & Resources (issue 1311).
-          -->
-          <div
-            class={`manager-nav-group manager-world-rules-group ${railGroupExpanded.worldRules ? 'is-expanded' : ''}`}
-            data-world-rules-section
-          >
-            <button
-              type="button"
-              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldRulesRoute ? 'is-active' : ''}`}
-              id="manager-world-nav-rules"
-              data-world-nav-item="rules"
-              aria-label={text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}
-              aria-current={isWorldRulesRoute ? 'page' : undefined}
-              aria-controls="manager-rules-submenu"
-              aria-expanded={railGroupExpanded.worldRules}
-              onclick={activateWorldRulesParent}
-            >
-              <i class="fas fa-scale-balanced" aria-hidden="true"></i>
-              <span class="manager-nav-label">
-                {text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}
-              </span>
-              <span class="manager-nav-count">
-                {selectedCurrencyUnits.length +
-                  selectedCharacterPrerequisites.length +
-                  selectedSystemModifiers.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              class="manager-nav-toggle"
-              id="manager-rules-toggle"
-              data-world-rules-toggle
-              aria-label={railGroupExpanded.worldRules
-                ? text('FABRICATE.Admin.Manager.World.CollapseRules', 'Collapse Rules & Resources')
-                : text('FABRICATE.Admin.Manager.World.ExpandRules', 'Expand Rules & Resources')}
-              aria-controls="manager-rules-submenu"
-              aria-expanded={railGroupExpanded.worldRules}
-              disabled={railGroupLockedOpen.worldRules}
-              aria-disabled={railGroupLockedOpen.worldRules}
-              title={railGroupLockedOpen.worldRules ? railGroupLockedTitle : undefined}
-              onclick={(event) => toggleRailGroup('worldRules', event)}
-            >
-              <i
-                class={railGroupExpanded.worldRules ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                aria-hidden="true"
-              ></i>
-            </button>
-            {#if railGroupExpanded.worldRules}
-              <div
-                class="manager-nav-submenu"
-                id="manager-rules-submenu"
-                data-world-rules-submenu
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.World.RulesDestinations',
-                  'Rules & Resources'
-                )}
-              >
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldCurrencyRoute ? 'is-active' : ''}`}
-                  id="manager-rules-nav-currency"
-                  data-world-rules-item="currency"
-                  aria-current={isWorldCurrencyRoute ? 'page' : undefined}
-                  onclick={() => openWorldRulesDestination('currency')}
-                >
-                  <i class="fas fa-coins" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldPrerequisitesRoute ? 'is-active' : ''}`}
-                  id="manager-rules-nav-prerequisites"
-                  data-world-rules-item="prerequisites"
-                  aria-current={isWorldPrerequisitesRoute ? 'page' : undefined}
-                  onclick={() => openWorldRulesDestination('prerequisites')}
-                >
-                  <i class="fas fa-user-shield" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text(
-                      'FABRICATE.Admin.Manager.CharacterPrerequisites.Title',
-                      'Character prerequisites'
-                    )}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldModifiersRoute ? 'is-active' : ''}`}
-                  id="manager-rules-nav-modifiers"
-                  data-world-rules-item="modifiers"
-                  aria-current={isWorldModifiersRoute ? 'page' : undefined}
-                  onclick={() => openWorldRulesDestination('modifiers')}
-                >
-                  <i class="fas fa-user-gear" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
-                  </span>
-                </button>
-              </div>
-            {/if}
-          </div>
-          <!--
-            Downtime is a GROUP, not a leaf: the design nests the same four previews under it that
-             Core's own tab strip offers, each carrying a premium padlock.
-          -->
-          {#if worldDowntimeAvailable}
-            <div
-              class={`manager-nav-group manager-world-downtime-group ${railGroupExpanded.worldDowntime ? 'is-expanded' : ''}`}
-              data-world-downtime-section
-            >
-              <button
-                type="button"
-                class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
-                id="manager-world-nav-downtime"
-                data-world-nav-item="downtime"
-                title={downtimeCoreFallback
-                  ? text(
-                      'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
-                      'Unlock Downtime Studio with Fabricate Premium'
-                    )
-                  : text(
-                      'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
-                      'Downtime Studio is unlocked by Fabricate Premium'
-                    )}
-                aria-label={downtimeNavRollupVisible
-                  ? downtimeParentName(downtimeNavRollupTotal)
-                  : text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
-                aria-current={isWorldDowntimeRoute ? 'page' : undefined}
-                aria-controls="manager-downtime-submenu"
-                aria-expanded={railGroupExpanded.worldDowntime}
-                onclick={openWorldDowntime}
-              >
-                <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-                <span class="manager-nav-label">
-                  {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
-                </span>
-                <!--
-                The chip is MUTED, never removed, once a companion holds the surface (issue 1185).
-              -->
-                {#if !downtimeNavRollupVisible}
-                  <span
-                    class={`manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
-                    data-world-nav-premium
-                    data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
-                    >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
-                  >
-                {/if}
-                <!--
-                The rollup — Core's own summary of what the closed disclosure is hiding.
-              -->
-                {#if !downtimeCoreFallback}
-                  {#if downtimeNavRollupVisible}
-                    <span
-                      class="manager-nav-issue-badge"
-                      data-world-downtime-badge-total
-                      role="img"
-                      aria-label={downtimeRollupName(downtimeNavRollupTotal)}
-                      >{downtimeNavRollupTotal}</span
-                    >
-                  {/if}
-                {/if}
-              </button>
-              <button
-                type="button"
-                class="manager-nav-toggle"
-                id="manager-downtime-toggle"
-                data-world-downtime-toggle
-                aria-label={railGroupExpanded.worldDowntime
-                  ? text('FABRICATE.Admin.Manager.World.Downtime.CollapseNav', 'Collapse Downtime')
-                  : text('FABRICATE.Admin.Manager.World.Downtime.ExpandNav', 'Expand Downtime')}
-                aria-controls="manager-downtime-submenu"
-                aria-expanded={railGroupExpanded.worldDowntime}
-                disabled={railGroupLockedOpen.worldDowntime}
-                aria-disabled={railGroupLockedOpen.worldDowntime}
-                title={railGroupLockedOpen.worldDowntime ? railGroupLockedTitle : undefined}
-                onclick={(event) => toggleRailGroup('worldDowntime', event)}
-              >
-                <i
-                  class={railGroupExpanded.worldDowntime
-                    ? 'fas fa-chevron-up'
-                    : 'fas fa-chevron-down'}
-                  aria-hidden="true"
-                ></i>
-              </button>
-              {#if railGroupExpanded.worldDowntime}
-                <div
-                  class="manager-nav-submenu"
-                  id="manager-downtime-submenu"
-                  data-world-downtime-submenu
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.World.Downtime.NavSections',
-                    'Downtime previews'
-                  )}
-                >
-                  {#each downtimeNavItems as item (item.id)}
-                    <!--
-                    `accessibleName` and `tooltip` LAND HERE in provider mode (issue 1213).
-                  -->
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
-                      id={downtimeNavItemId(item.id)}
-                      bind:this={downtimeNavNodes[item.id]}
-                      data-world-downtime-item={item.id}
-                      title={downtimeTabText(item, 'tooltip')}
-                      aria-label={downtimeCoreFallback
-                        ? undefined
-                        : downtimeTabText(item, 'accessibleName')}
-                      aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
-                        ? 'true'
-                        : undefined}
-                      aria-describedby={downtimeSubitemBadge(item)
-                        ? downtimeNavBadgeId(item.id)
-                        : undefined}
-                      onclick={() => openWorldDowntimePreview(item.id)}
-                    >
-                      <i class={item.icon} aria-hidden="true"></i>
-                      <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
-                        >{downtimeTabText(item, 'label')}</span
-                      >
-                      <!--
-                      IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515).
-                    -->
-                      {#if !downtimeCoreFallback}
-                        {@const badge = downtimeSubitemBadge(item)}
-                        {#if badge}
-                          <span
-                            class="manager-nav-issue-badge"
-                            data-world-downtime-badge={item.id}
-                            id={downtimeNavBadgeId(item.id)}
-                            role="img"
-                            aria-label={badge.accessibleName}>{badge.count}</span
-                          >
-                        {/if}
-                      {/if}
-                      <!--
-                      The padlock and the premium note below advertise CORE'S preview. A
-                      companion owning the surface has nothing locked, so neither renders.
-                    -->
-                      {#if downtimeCoreFallback}
-                        <span class="manager-nav-lock" data-world-downtime-lock
-                          ><i class="fas fa-lock" aria-hidden="true"></i></span
-                        >
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-                {#if downtimeCoreFallback}
-                  <p class="manager-nav-callout" data-world-downtime-callout>
-                    <span class="manager-nav-callout-kicker">
-                      <i class="fas fa-lock" aria-hidden="true"></i>
-                      {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
-                    </span>
-                    {text(
-                      'FABRICATE.Admin.Manager.World.Downtime.RailNote',
-                      'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
-                    )}
-                  </p>
-                {/if}
-              {/if}
-            </div>
-          {/if}
-        </section>
+        <ManagerWorldNav
+          {navRail}
+          {currentView}
+          {setView}
+          {worldScopedCounts}
+          {isWorldRoute}
+          {openWorldParties}
+          {travelParties}
+          {isWorldTravelRoute}
+          {activateWorldTravelParent}
+          {worldRealms}
+          {worldTravelTab}
+          {openWorldTravelDestination}
+          {isWorldRulesRoute}
+          {activateWorldRulesParent}
+          {selectedCurrencyUnits}
+          {selectedCharacterPrerequisites}
+          {selectedSystemModifiers}
+          {isWorldCurrencyRoute}
+          {isWorldPrerequisitesRoute}
+          {isWorldModifiersRoute}
+          {openWorldRulesDestination}
+          {worldDowntimeAvailable}
+          {isWorldDowntimeRoute}
+          {downtimeCoreFallback}
+          {downtimeTabs}
+          {downtimeNavTabBadges}
+          {downtimeTabText}
+          {downtimeNavLabelId}
+          {worldDowntimeTabId}
+          {openWorldDowntime}
+          {openWorldDowntimePreview}
+        />
       </nav>
     </aside>
 
