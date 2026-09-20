@@ -803,6 +803,47 @@ describe('adminStore travel section', () => {
     fallbackStore.destroy();
   });
 
+  // The delete has already succeeded by the time the post-delete re-read runs, so a failing
+  // re-read is logged and not reported as a failed delete (issue 1848). Armed as a ONE-SHOT on
+  // the next `getSystems()` after the delete resolves, so the refresh is the only thing that
+  // rejects: arming the whole run would prove nothing about WHERE the rejection is tolerated.
+  it('deleteRealm reports success when the post-delete refresh rejects, and warns', async () => {
+    const { services, calls, realmRecords } = createServices({
+      realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: [] }],
+      environments: [{ id: 'e1', craftingSystemId: 'system-a', name: 'Grove', includedRealmIds: ['r1'] }]
+    });
+    const systemManager = services.getCraftingSystemManager();
+    const realmStore = services.getGatheringRealmStore();
+    const originalDelete = realmStore.delete;
+    realmStore.delete = async (...args) => {
+      const result = await originalDelete(...args);
+      const listSystems = systemManager.getSystems;
+      systemManager.getSystems = () => {
+        systemManager.getSystems = listSystems;
+        throw new Error('boom');
+      };
+      return result;
+    };
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => { warnings.push(args); };
+    const store = createAdminStore(services);
+    await flush();
+    try {
+      const deleted = await store.deleteRealm('r1');
+      await flush();
+
+      assert.equal(deleted, true, 'the realm IS deleted; a failed re-read does not unsay that');
+      assert.equal(calls.realmDelete.length, 1, 'the delete ran once and was not retried');
+      assert.ok(!realmRecords.some(realm => realm.id === 'r1'), 'the realm left the world library');
+      assert.equal(warnings.length, 1, 'the failed re-read is logged, not surfaced to the GM');
+      assert.match(String(warnings[0][0]), /Failed to refresh after deleting a realm/);
+    } finally {
+      console.warn = originalWarn;
+      store.destroy();
+    }
+  });
+
   it('surfaces stale member/travel-actor/override-region references for repair', async () => {
     const { services } = createServices({
       parties: [{
