@@ -101,7 +101,6 @@ export class GatheringEnvironmentStore extends SettingsBackedStore {
     super({ getSetting, setSetting, settingKey: SETTING_KEYS.GATHERING_ENVIRONMENTS });
     this.systemManager = systemManager;
     this.getSystems = getSystems;
-    this.travelStore = travelStore;
     this.randomID = randomID || (() => foundry.utils.randomID());
     this.runCleanup = runCleanup;
     this.warn = warn;

@@ -938,8 +938,8 @@ effective `revealPolicy === 'never'`.
   `discoveredGatheringRealms` flags with GM reveal/hide, the `GatheringLocationService` current-realm resolver
   (`manualOverride`/live `travelActor` sensing/`unresolved`), environment location availability evaluation in listing + start guard,
   redaction-safe disclosure/travel guidance, the `game.fabricate.gathering` API surface, system import/export realm ride-along,
-  and the GM navigation (permanent World > Parties for global party management and gated per-system overrides; Gathering > Travel for realm authoring and Map Region Links).
-  **Phase 3 Scene Region automation SHIPPED** (PR #291): Gathering > Travel > Map Region Links authors `sceneMappings`, and live `travelActor` token sensing
+  and the GM navigation (permanent World > Parties for global party management and gated per-system overrides; World > Travel for realm authoring and Map Region Links).
+  **Phase 3 Scene Region automation SHIPPED** (PR #291): World > Travel > Map Region Links authors `sceneMappings`, and live `travelActor` token sensing
   (`senseSceneRegions` over `TokenDocument#regions` with a position hit-test fallback) resolves the current realm at runtime.
   **Not yet shipped (later phases):** `onPartyTokenEntry` reveal automation (still enum-only, no hook), realm modifier _application_ (Phase 4,
   `GatheringRealmModifier` records normalize/validate but do not yet adjust runtime), player travel view, and player-facing/full discovery controls.

@@ -12,14 +12,16 @@ import { CompendiumImporter } from '../../src/systems/CompendiumImporter.js';
  * @returns {{ importer: CompendiumImporter, settings: object }} the importer plus the LIVE
  *   settings object it writes through, so a test asserts against what was actually persisted.
  */
-export function importerOverSettings(seed = {}) {
+export function importerOverSettings(seed = {}, extraSeams = {}) {
   const settings = { ...seed };
-  // Seams are the THIRD constructor argument.
+  // Seams are the THIRD constructor argument; `extraSeams` lets a test add one (e.g. a travelStore
+  // delegator) without the harness growing a parameter per seam.
   const importer = new CompendiumImporter(null, null, {
     getSetting: (key) => settings[key],
     setSetting: async (key, value) => {
       settings[key] = value;
     },
+    ...extraSeams,
   });
   return { importer, settings };
 }

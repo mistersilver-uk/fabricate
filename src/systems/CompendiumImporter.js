@@ -995,9 +995,9 @@ export class CompendiumImporter {
    * @private
    */
   async _persistTravelConfig(incoming) {
+    if (!incoming || typeof incoming !== 'object') return;
     const store = this._resolveTravelStore();
     if (!store && (!this._getSetting || !this._setSetting)) return;
-    if (!incoming || typeof incoming !== 'object') return;
 
     const current = (store ? store.get() : this._getSetting(TRAVEL_CONFIG_KEY)) || {};
     const currentRealms = Array.isArray(current.realms) ? current.realms : [];

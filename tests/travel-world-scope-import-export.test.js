@@ -329,6 +329,21 @@ describe('the library survives the WHOLE import composition, not just the merge 
 });
 
 describe('merging an imported realm library into a world that already has one', () => {
+
+  it('a delegator whose realm store is absent takes the raw setting path, not a phantom success', async () => {
+    // `src/main.js` hands the importer a lazy delegator that is always an object; the fail-closed
+    // rule is decided on the RESOLVED store, so a `get()` answering null must route to the raw
+    // setting write and never await a `save` that resolves to undefined.
+    const save = () => {
+      throw new Error('a delegator save must never be awaited');
+    };
+    const { importer, settings } = importerOverSettings(
+      { travelConfig: { realms: [] } },
+      { travelStore: { get: () => null, save } }
+    );
+    await importer._persistTravelConfig({ realms: [{ id: VALE_ID, name: 'Vale' }] });
+    assert.deepEqual(realmIds(settings.travelConfig), [VALE_ID]);
+  });
   it('appends only genuinely new places — the DESTINATION wins an id collision', async () => {
     const { importer, settings } = importerOver({
       revealMode: 'manual',
