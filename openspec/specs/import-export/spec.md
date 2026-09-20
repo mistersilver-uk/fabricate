@@ -205,7 +205,7 @@ Copy-mode import MUST NOT regenerate realm ids: they are cross-referenced by env
 Realms are therefore no longer part of what a copy-mode import rebinds at all: a copy that duplicated the world's realms would give the destination two records for one valley.
 
 **The travel merge MUST be persisted BEFORE the imported environments are persisted, and MUST reach the destination THROUGH the realm store rather than behind its cache.**
-An imported environment has no persisted counterpart in the destination, so it owns every realm id on it and none of them is prunable (`gathering-and-harvesting/spec.md` -> Gathering Environments requirement 18); the environment store validates those ids against the world realm library on every write, so persisting the environment list first rejects the whole import of a realm-gated system into a world that does not yet have those places.
+An imported environment the destination does not already hold under the same id has no persisted counterpart there, so it owns every realm id on it and none of them is prunable (`gathering-and-harvesting/spec.md` -> Gathering Environments requirement 18); the environment store validates those ids against the world realm library on every write, so persisting the environment list first rejects the whole import of a realm-gated system into a world that does not yet have those places.
 Writing the setting earlier is necessary but not sufficient: a direct setting write leaves the realm store's cache holding the pre-import library, and the environment store resolves the library through that cache, so the merge MUST refresh the store as part of the write and MUST NOT depend on a replicated-setting hook firing between the two writes.
 
 ### Character libraries merge on import
