@@ -651,7 +651,7 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
   // a 240px sheet on `--fab-bg-3` — the LIGHTEST rung, over a pane painted darker than it — with
   // a 6px corner, an 8px-inset divider-ruled field, an 8px-inset list and 40px rows.
   const popoverScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopover.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopoverPanel.svelte')
   );
   const stamp = (markup) =>
     [
@@ -1154,7 +1154,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
   // WHY IT IS MEASURED AND NOT READ. Three of this panel's claims are cascade questions that a
   // sheet cannot answer on its own:
   const popoverScoped = scopedComponentCss(
-    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopover.svelte')
+    resolve(__dirname, '../../src/ui/svelte/components/SearchablePopoverPanel.svelte')
   );
   const stamp = (markup) =>
     [

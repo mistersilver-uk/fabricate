@@ -36,7 +36,14 @@ const CLASS_PROPS = Object.freeze([
 const PRIMITIVES = Object.freeze([
   Object.freeze({
     name: 'SearchablePopover',
-    components: Object.freeze(['src/ui/svelte/components/SearchablePopover.svelte']),
+    // The picker and its portaled panel are one entry (issue 1719), because the family they write
+    // between them is one family: the trigger's two rules stay in the picker and the panel's
+    // twenty-one moved with the markup they root on, so `roots`, `family` and `anchors` apply to
+    // the pair unchanged and every floor below is measured over their union.
+    components: Object.freeze([
+      'src/ui/svelte/components/SearchablePopover.svelte',
+      'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+    ]),
     roots: Object.freeze(['fabricate-picker', 'fabricate-picker-popover']),
     family: 'manager-travel-[\\w-]+',
     anchors: Object.freeze([
@@ -2050,15 +2057,19 @@ test('each primitive’s own scoped styles name no application root either', () 
   }
 
   assert.ok(
-    blocks >= 5,
-    `only ${blocks} of the twenty component files hold a REAL scoped \`<style>\` block — one ` +
-      'opened after `</script>`. FIVE do today: `SearchablePopover`, `ManagerColorPopover` and ' +
+    blocks >= 7,
+    `only ${blocks} of the twenty-three component files hold a REAL scoped \`<style>\` block — one ` +
+      'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
+      '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
+      '`ManagerColorPopover` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
       '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation ' +
       'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
-      'rule that types the inline second datum on an option`s name line, and `ItemDropZone`, ' +
+      'rule that types the inline second datum on an option`s name line, `ItemDropZone`, ' +
       'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +
-      'and the mono address line under the name. All three blocks STAY ' +
+      'and the mono address line under the name, and `ModifierPillSelect`, whose block is the ' +
+      'disabled-trigger tint and the visually-hidden status span its multi-select cap announces. ' +
+      'All seven blocks STAY ' +
       'where they are: a scoped block is injected unlayered and this sheet is ' +
       'loaded into `layer(modules)`, so moving those rules into the sheet would be a layer ' +
       'change and would move a frame. The rest name a `<style>` only in DOCBLOCK PROSE, ' +

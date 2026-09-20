@@ -538,7 +538,7 @@ test('every re-rooted family carries a shared scope and an entry in the gate tha
   const entries = areaScopeGateComponents();
   assert.ok(
     entries.size >= 22,
-    `the area-scope gate reader found only ${entries.size} component paths, against the 23 that ` +
+    `the area-scope gate reader found only ${entries.size} component paths, against the 24 that ` +
       'file holds across 22 entries. The reader has stopped matching and the clause below passes ' +
       'on nothing.'
   );

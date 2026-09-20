@@ -527,6 +527,15 @@
       "why": "ONE caller, `src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte`. The `<TintPicker>` entry is carried by its sibling `ManagerColorPopover.svelte`, which clears the bar and is a member of the set."
     },
     {
+      "path": "src/ui/svelte/components/SearchablePopoverPanel.svelte",
+      "library": "<SearchPopover>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/SearchablePopover.svelte"
+      ],
+      "why": "ONE caller, `src/ui/svelte/components/SearchablePopover.svelte`, whose portaled panel this is. It carries the `<SearchPopover>` entry that specifies its PARENT rather than a specimen of its own. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, because omitting it there CANCELS every suite whose tree opens a picker rather than failing it."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
       "library": null,
       "evidence": "targeted",

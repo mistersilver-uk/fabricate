@@ -138,6 +138,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   // The shared one-of-N picker (issue 1510). The Overview tab's three select cells and the
   // ingredient row's kind control render it, and a `.svelte` the tree renders but this list omits
   // HANGS the suite (# cancelled) rather than failing it.
