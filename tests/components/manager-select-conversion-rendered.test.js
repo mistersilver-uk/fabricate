@@ -184,6 +184,8 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
 /**
  * The converted sites this fixture can mount, and what each one's row is measured against.
  * "Alchemical reagent" measures 152.08px in this fixture, above the 140px floor by design.
+ * `rung` is the `size=` each call site passes (absent means the primitive's `form` default), and it
+ * is asserted because nothing else in the corpus reads a converted trigger's height band.
  */
 const CONVERTED_SITES = Object.freeze([
   Object.freeze({
@@ -192,6 +194,7 @@ const CONVERTED_SITES = Object.freeze([
     hook: '[data-prerequisite-operator]',
     values: ['gte', 'neq'],
     column: true,
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'currency',
@@ -199,6 +202,7 @@ const CONVERTED_SITES = Object.freeze([
     hook: '[data-world-currency-strategy-select]',
     values: ['macro', 'actorProperty'],
     column: true,
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'import',
@@ -208,6 +212,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['', ''],
     column: false,
     floor: 140,
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'economy',
@@ -215,6 +220,7 @@ const CONVERTED_SITES = Object.freeze([
     hook: '[data-economy-regen-unit]',
     values: ['hours', 'minutes'],
     column: true,
+    rung: 'form',
   }),
   // ISSUE 1510 COMMIT 2a — the recipe studio. Its cells sit in `.manager-recipe-field` rather than
   // in a `Field` column, and their width came from `.manager-recipe-field select`, so the
@@ -226,6 +232,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['tier-easy', 'tier-legendary'],
     column: true,
     columnSelector: '.manager-recipe-field',
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'recipe-overview',
@@ -234,6 +241,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['Metal', 'Alchemical reagent'],
     column: true,
     columnSelector: '.manager-recipe-field',
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'recipe-overview',
@@ -242,6 +250,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['tier-easy', 'tier-legendary'],
     column: true,
     columnSelector: '.manager-recipe-field',
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'recipe-overview',
@@ -250,6 +259,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['inherit', 'custom'],
     column: true,
     columnSelector: '.manager-recipe-modifier-set-field',
+    rung: 'form',
   }),
   // The one 2a site whose row hugs by design: the kind picker states 132px on the picker ROOT and
   // the trigger fills it, so both option words measure the same fixed slot.
@@ -260,6 +270,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['component', 'tags'],
     column: false,
     floor: 132,
+    rung: 'inline',
   }),
   // ISSUE 1510 COMMIT 2e — the danger ceiling, the one 2e site whose value a prop can drive. Its
   // counterpart is one sheet rule off the wrapper class its three pickers share.
@@ -270,6 +281,7 @@ const CONVERTED_SITES = Object.freeze([
     values: ['safe', 'hazardous'],
     column: true,
     columnSelector: '.manager-environment-context-field',
+    rung: 'form',
   }),
 ]);
 
@@ -283,18 +295,21 @@ const RESTING_WIDTH_SITES = Object.freeze([
     name: 'the realm membership add control',
     hook: '[data-environment-field="includedRealmIds"] .fabricate-select-trigger',
     columnSelector: '.manager-environment-context-field',
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'environment-overview',
     name: 'the biome membership add control',
     hook: '.manager-environment-context-biomes .fabricate-select-trigger',
     columnSelector: '.manager-environment-context-field',
+    rung: 'form',
   }),
   Object.freeze({
     subject: 'tool-preview',
     name: 'the Tool rails Preview as roster',
     hook: '[data-tool-preview-actor]',
     columnSelector: '[data-tool-actor-preview]',
+    rung: 'toolbar',
   }),
 ]);
 
@@ -327,7 +342,8 @@ function readOpenPanel(page) {
  * @param {string} subject
  * @param {string} hook
  * @param {string} value
- * @returns {Promise<{shipped: number, unfloored: number, face: string, column: number}>}
+ * @returns {Promise<{shipped: number, unfloored: number, face: string, column: number,
+ *   rung: string}>}
  */
 async function measureTrigger(subject, hook, value, columnSelector = '.manager-field') {
   const page = await openFixture(subject, value);
@@ -337,6 +353,7 @@ async function measureTrigger(subject, hook, value, columnSelector = '.manager-f
       const shipped = trigger.getBoundingClientRect().width;
       const face = globalThis.getComputedStyle(trigger).fontFamily;
       const column = trigger.closest(column_)?.getBoundingClientRect().width ?? 0;
+      const rung = trigger.getAttribute('data-select-size');
       trigger.style.width = 'auto';
       trigger.style.minWidth = '0px';
       const unfloored = trigger.getBoundingClientRect().width;
@@ -345,11 +362,30 @@ async function measureTrigger(subject, hook, value, columnSelector = '.manager-f
         unfloored: Number(unfloored.toFixed(2)),
         column: Number(column.toFixed(2)),
         face,
+        rung,
       };
     }, [hook, columnSelector]);
   } finally {
     await page.close();
   }
+}
+
+/**
+ * Assert one site's trigger reports the size rung its call site passes.
+ *
+ * @param {{name: string, rung: string}} site
+ * @param {string|null} measured The trigger's `data-select-size`.
+ */
+function assertRung(site, measured) {
+  // The rung names a HEIGHT, a corner, a type size and a fill together, so losing it puts a
+  // 38px `form` box on a 34px rail line - four pixels proud of its own row. Every other clause
+  // here reads width, which the rung does not touch, so this is the only thing that sees it.
+  assert.equal(
+    measured,
+    site.rung,
+    `${site.name} reports the \`${measured}\` size rung where its call site passes ` +
+      `\`${site.rung}\`, so its height, corner, type size and fill are all a band out`
+  );
 }
 
 describe('a converted manager trigger keeps the width its native select had (issue 1510)', () => {
@@ -373,6 +409,9 @@ describe('a converted manager trigger keeps the width its native select had (iss
         measureTrigger(site.subject, site.hook, site.values[0], site.columnSelector),
         measureTrigger(site.subject, site.secondHook ?? site.hook, site.values[1], site.columnSelector),
       ]);
+
+      assertRung(site, shortest.rung);
+      assertRung(site, longest.rung);
 
       if (site.column) {
         assert.ok(
@@ -436,6 +475,7 @@ describe('a converted manager trigger keeps the width its native select had (iss
       // trigger fills its column instead of hugging. `.fabricate-field.manager-field select`
       // supplied that width natively and is element-typed, so it reaches no `<button>`.
       const measured = await measureTrigger(site.subject, site.hook, '', site.columnSelector);
+      assertRung(site, measured.rung);
       assert.ok(
         measured.column > 0,
         `${site.name} resolved no ${site.columnSelector} column to measure against`

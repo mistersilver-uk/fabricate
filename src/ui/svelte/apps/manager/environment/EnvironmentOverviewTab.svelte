@@ -160,6 +160,9 @@
   // The danger caption's id: its picker is named by that caption, not by a string (issue 1510).
   const instanceId = $props.id();
   const dangerCaptionId = `${instanceId}-danger-level`;
+  // And the hint's id: the `<div>` host takes the hint out of the computed name, so the trigger
+  // has to point at it explicitly for the ceiling sentence to be announced at all.
+  const dangerHintId = `${instanceId}-danger-level-hint`;
 
   // Each add control's name, stated once: the trigger's `aria-label` and its sentinel row's label.
   function addRealmLabel() {
@@ -398,9 +401,9 @@
               </Field>
             {/if}
 
-            <!-- A `<div>`, not the `<label>` it was: `Select.svelte`'s host invariant. Naming the
-                 trigger by the caption's id also narrows what is announced from the caption plus
-                 the hint sentence to the caption alone (issue 1510). -->
+            <!-- A `<div>`, not the `<label>` it was: `Select.svelte`'s host invariant. The caption
+                 names the trigger through `ariaLabelledBy`, and the hint sentence the `<label>`
+                 used to contribute is reattached through `ariaDescribedBy` (issue 1510). -->
             <Field as="div" class="manager-environment-context-field">
               <span id={dangerCaptionId}
                 >{text(
@@ -408,7 +411,7 @@
                   'Danger level'
                 )}</span
               >
-              <p class="manager-muted manager-environment-context-hint">
+              <p id={dangerHintId} class="manager-muted manager-environment-context-hint">
                 {text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint',
                   'A ceiling — events up to and including this level can appear.'
@@ -418,6 +421,7 @@
                 value={dangerLevel}
                 options={dangerSelectOptions}
                 ariaLabelledBy={dangerCaptionId}
+                ariaDescribedBy={dangerHintId}
                 triggerData={{ 'data-environment-field': 'dangerLevel' }}
                 onChange={(next) => onUpdate({ dangerLevel: next })}
               />

@@ -16,7 +16,8 @@ import {
   assertSelectHasResolvedName,
   chooseSelectOption,
   closeSelectPanel,
-  selectOptionValues
+  selectOptionValues,
+  selectTriggerText
 } from '../helpers/select-control.js';
 
 // The primitive's sentinel id, spelled as every driving suite spells it; `select-mounted.test.js`
@@ -167,6 +168,14 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
       'the add control keeps the name its native select announced'
     );
     assert.deepEqual(available(), options);
+    // The sentinel row is the picker's own name sitting in the list, not a member: choosing it
+    // must write nothing. Without this the add handlers' `if (!id) return;` guard is unproven and
+    // its loss would persist an empty-string member - a chip with no label, matching nothing.
+    chooseSelectOption(target, trigger, UNCHANGED_OPTION_ID);
+    await tick();
+    flushSync();
+    assert.equal(updates.length, 0, 'the sentinel row is the picker name, not a member to add');
+    assert.equal(pills().length, 0, 'and it adds no chip');
     for (const [index, id] of options.entries()) {
       chooseSelectOption(target, trigger, id);
       await tick();
@@ -174,7 +183,16 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
       assert.deepEqual(updates.at(-1), { [property]: options.slice(0, index + 1) });
       assert.equal(pills().length, index + 1);
       assert.ok(!empty(), 'selection replaces the placeholder');
-      if (index < options.length - 1) assert.deepEqual(available(), options.slice(index + 1));
+      if (index < options.length - 1) {
+        // The picker rests on the sentinel rather than on what was just added, so the trigger
+        // reads its own name again - the resting face the native select had.
+        assert.equal(
+          selectTriggerText(target, trigger),
+          `Add ${kind}`,
+          'the picker resets to its sentinel'
+        );
+        assert.deepEqual(available(), options.slice(index + 1));
+      }
     }
     assert.ok(
       !target.querySelector(trigger),
@@ -187,6 +205,16 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
       assert.deepEqual(updates.at(-1), { [property]: options.slice(index + 1) });
       assert.equal(pills().length, options.length - index - 1);
       assert.equal(Boolean(empty()), index === options.length - 1);
+      if (index === options.length - 1) {
+        // The fallback ladder's OTHER end (issue 1515). The exhausted end - no chip, no add control,
+        // focus held by the row - is gated below; this is the end where the add control is back on
+        // screen because a member is free again, so the hook `Chip` resolves outward is the TRIGGER.
+        // Without this the outward search could stop resolving to the button and nothing would fail.
+        assert.ok(
+          document.activeElement?.matches(ADD_TRIGGER),
+          `focus landed on the add control, got ${document.activeElement?.tagName}.${document.activeElement?.className}`
+        );
+      }
     }
     assert.deepEqual(available(), options);
     assert.equal(empty().textContent.trim(), `No ${kind}s selected`);
@@ -214,6 +242,20 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     assert.ok(
       !trigger.closest('label'),
       'a `<label>` would forward a caption click into a control that cannot be closed from it'
+    );
+    // The hint the `<label>` used to contribute to the name is reattached as a DESCRIPTION, so the
+    // ceiling sentence is still announced; without the referrer it is announced by nothing.
+    const described = (trigger.getAttribute('aria-describedby') ?? '').trim();
+    assert.ok(described.length > 0, 'the danger trigger carries no `aria-describedby` at all');
+    const hint = target.ownerDocument.getElementById(described);
+    assert.ok(
+      Boolean(hint),
+      `the danger trigger points \`aria-describedby\` at "${described}", which names no element`
+    );
+    assert.match(
+      hint.textContent.replaceAll(/\s+/gu, ' ').trim(),
+      /up to and including this level/u,
+      'and the element it names is the ceiling hint, not the caption'
     );
     assert.equal(trigger.querySelector('.fabricate-select-value').textContent.trim(), 'Camp safe');
 
