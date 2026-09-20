@@ -93,13 +93,14 @@ test('syncGatheringDirectoryButton does not duplicate an existing Gathering butt
   assert.equal(actions.querySelectorAll('[data-fabricate-action="gathering"]').length, 1);
 });
 
-// main.js imports CSS, so execute its bounded declarations and actual registration instead.
-// Only the external app openers and Foundry state are doubles; DOM creation/sync are real.
+// `src/bootstrap/hooks.js` reaches Foundry globals at call time, so execute its bounded
+// declarations and actual registrations instead. Only the external app openers and Foundry state
+// are doubles; DOM creation and sync are real.
 function directoryHarness(t, { isGM = true, resolveActions = findItemsDirectoryActionsContainer } = {}) {
   const window = new Window();
   t.after(() => window.happyDOM.close());
   const document = window.document;
-  const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/bootstrap/hooks.js', import.meta.url), 'utf8');
   const { ast } = parseModule(source);
   const declarations = ['addModuleButtonsToItemsDirectory', 'hasGatheringEnabledSystems', 'createHeaderButton']
     .map(name => {
@@ -120,7 +121,14 @@ function directoryHarness(t, { isGM = true, resolveActions = findItemsDirectoryA
   const ui = {};
   const system = { features: { gathering: true } };
   const manager = { failure: null };
-  const sync = runInNewContext(`${declarations}\n${registrations.join('\n')}\naddModuleButtonsToItemsDirectory;`, {
+  const io = {
+    showCraftingSystemManagerApp: async () => {
+      opened.push('manager');
+      if (manager.failure) throw manager.failure;
+    },
+    reportManagerLoadFailure: (error) => reported.push(error),
+  };
+  const bound = runInNewContext(`${declarations}\n${registrations.join('\n')}\naddModuleButtonsToItemsDirectory;`, {
     document,
     ui,
     game: { user: { isGM }, fabricate: { getCraftingSystemManager: () => ({ getSystems: () => [system] }) } },
@@ -130,12 +138,9 @@ function directoryHarness(t, { isGM = true, resolveActions = findItemsDirectoryA
     syncGatheringDirectoryButton,
     openDeferredApp,
     getFabricateAppClass: () => ({ show: tab => opened.push(tab) }),
-    showCraftingSystemManagerApp: async () => {
-      opened.push('manager');
-      if (manager.failure) throw manager.failure;
-    },
-    reportManagerLoadFailure: error => reported.push(error)
+    io
   });
+  const sync = (itemsDir) => bound(io, itemsDir);
   const directory = (html = '<header class="directory-header"></header>') => {
     const element = document.createElement('section');
     element.innerHTML = html;

@@ -292,7 +292,7 @@ describe('handleFabricateSettingChange', () => {
 // nothing calls `fabricate.initialize()` — so they are pinned at the source, which is the
 // convention `player-character-actor-types.test.js` established for exactly this edge.
 describe('main.js settings hook wiring', () => {
-  const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/main.js'), 'utf8');
+  const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/bootstrap/hooks.js'), 'utf8');
 
   it('registers BOTH settings hooks on ONE shared listener', () => {
     // The first-ever write to a world setting is a CREATE, not an update (issue 1024), so a world
@@ -426,7 +426,7 @@ describe('the world scope legs', () => {
     // THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
     // `WORLD_STORE_LEGS` is an unexported frozen array, and the `SCOPES` table above is a
     // hand-maintained copy of part of it.
-    const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/main.js'), 'utf8');
+    const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/bootstrap/hooks.js'), 'utf8');
     const bridgeSource = readFileSync(
       resolve(import.meta.dirname, '..', 'src/config/settingChangeBridge.js'),
       'utf8'

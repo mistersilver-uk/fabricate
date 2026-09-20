@@ -8,7 +8,6 @@ import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
-import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
 import { CharacterLibrariesStore } from './systems/CharacterLibrariesStore.js';
@@ -28,14 +27,12 @@ import { secondsPerUnitFromCalendar } from './systems/foundryCalendar.js';
 import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
-import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
-import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
+import { EVENT_SCENE_SOCKET, createEventSceneTrigger } from './systems/eventSceneCoordinator.js';
+import { createGatheringNodeDepletionWriter } from './systems/gatheringNodeSocket.js';
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
-import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
-import { applyAuthoredComplications, buildComplicationMacroContext, createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, isRunnableComplicationMacro, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
-import { buildGmComplicationCardContent, gmComplicationCardEntries, rollGmComplicationEffect } from './systems/complicationRuntime.js';
-import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
-import { promptCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
+import { createGatheringBlindStartWriter } from './systems/gatheringBlindRunSocket.js';
+import { createComplicationDeliveryWriter } from './systems/complicationSocket.js';
+import { enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
@@ -43,24 +40,14 @@ import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './ui/presenters/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
 import { InventoryListingBuilder } from './ui/presenters/InventoryListingBuilder.js';
-import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './ui/presenters/AlchemyListingBuilder.js';
 import {
-  evaluatePreparedCraftingCheck,
   evaluatePreparedRunCheck,
-  postCheckRollHandoff,
   resolveCheckFormulaDisplay,
 } from './systems/checkRoll.js';
-import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.js';
 import {
-  JOURNAL_RUN_SOCKET_KIND,
   authorityUnavailableAvailability,
-  createGatheringJournalRunOperations,
-  createJournalExecutionReconstructor,
-  createJournalRunCommandService,
-  createManagerMutation,
   executePublicCraft,
-  installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
@@ -68,7 +55,6 @@ import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
 import { findCuratedIconRecord, listCuratedIconVocabulary } from './utils/iconVocabulary.js';
-import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   createGatheringResultCreator,
 } from './gatheringResultCreation.js';
@@ -86,7 +72,6 @@ import {
   STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,
   buildStaleEntryNotice,
   createDeferredChunkFailureReporter,
-  openDeferredApp,
   openDeferredAppRethrowing
 } from './utils/deferredEntryNotice.js';
 import { createMemoizedLoad } from './utils/memoizedModuleLoad.js';
@@ -104,22 +89,14 @@ import {
 import {
   getFabricateAppClass,
   getCraftingSystemManagerAppClass,
-  getInteractableBrowserAppClass,
   getInteractableConfigAppClass,
   getInteractablesManagerAppClass
 } from './ui/appFactory.js';
-import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { managerExtensions } from './ui/managerExtensions.js';
 import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
-import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
-import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET, WORLD_ESSENCE_MERGE_FLAG_TARGET } from './config/settings.js';
-import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET, WORLD_ESSENCE_MERGE_FLAG_TARGET } from './config/settings.js';
 import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
-import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
-import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
-import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
 // ALIASED, because the facade below exposes a PUBLIC method of the same name wrapping this one
@@ -161,32 +138,16 @@ import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.j
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
 import {
-  handleInteractableSocketMessage,
   applyInteractableBehaviorUpdate,
   resolveInteractableBehaviorByRef,
   writeInteractableBehaviorNode
 } from './canvas/interactableSocketBridge.js';
-import { registerInteractableRegionBehavior } from './canvas/regions/FabricateInteractableRegionBehavior.js';
-import {
-  evaluateInteractableCreate,
-  neutralizeInheritedLinkedVisual,
-  buildUnconfiguredSentinelPatch
-} from './canvas/regions/interactableCreationGuard.js';
-import {
-  isInteractableRegionBehavior,
-  readInteractableBehaviorSystem
-} from './canvas/regions/interactableRegionFlags.js';
 import { syncInteractableMarkers } from './canvas/regions/interactableMarkerDepletion.js';
 import {
   decideWorldInteractableCleanup,
   executeWorldInteractableCleanup,
   planHasWork
 } from './canvas/regions/interactableCleanup.js';
-import {
-  assignInteractableConfigSheet,
-  resolveInteractableConfigTarget,
-  shouldOfferInteractableConfigEntry
-} from './canvas/regions/interactableConfigSheet.js';
 import * as CraftingSystemExporter from './systems/CraftingSystemExporter.js';
 import { bulkFacade } from './bootstrap/bulkFacade.js';
 import { companionFacade } from './bootstrap/companionFacade.js';
@@ -206,368 +167,18 @@ import {
   setGatheringEngine,
 } from './bootstrap/gatheringRuntime.js';
 import { journalFacade } from './bootstrap/journalFacade.js';
+import { applyItemStackQuantityPathSetting, registerModuleHooks } from './bootstrap/hooks.js';
+import { createJournalCommandsForFabricate } from './bootstrap/journalOperations.js';
+import {
+  applyComplicationDelivery,
+  applyGatheringBlindStart,
+  showEventScenePrompt,
+} from './bootstrap/socketRouter.js';
 import './ui/SvelteFabricateApp.svelte.js';
 import './ui/InteractableBrowserApp.svelte.js';
 import './ui/InteractionPromptApp.svelte.js';
 import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
-
-// Per-sender throttle for inbound gathering node depletions, held at module scope so the window
-// survives across socket messages — a per-message limiter would never refuse anything. Only the
-// active GM ever consults it.
-const gatheringDepletionRateLimiter = createDepletionRateLimiter();
-// A separate budget for the blind-start relay (issue 901), so a burst of gathers and a burst of
-// starts cannot starve one another through a shared allowance.
-const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
-// Third budget, for the complication relay (issue 1286). Charged per MESSAGE, and one resolution —
-// a whole bulk salvage included — emits exactly one.
-const complicationDeliveryRateLimiter = createComplicationRateLimiter();
-// Suppresses a complication re-delivered to THIS context. Module scope for the reason the limiters
-// are: a per-message set would remember nothing. It cannot cover an elected GM with the world open
-// in two tabs, which is a stated, accepted residual rather than an oversight.
-const complicationDeliveryDedupe = createComplicationDeliveryDedupe();
-
-async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
-  const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
-  const persisted = Array.isArray(run?.componentSourceActorUuids)
-    ? run.componentSourceActorUuids
-    : null;
-  const uuids = persisted ?? supplied ?? [];
-  const actors = [];
-  for (const uuid of uuids) {
-    try {
-      const actor = await globalThis.fromUuid?.(uuid);
-      if (actor) actors.push(actor);
-    } catch (_error) {
-      return null;
-    }
-  }
-  return actors.length > 0 ? actors : (fallbackActor ? [fallbackActor] : []);
-}
-
-function journalSourcesOwnedBy(sender, actors) {
-  return sender?.isGM === true || actors.every(
-    (actor) => actor?.testUserPermission?.(sender, 'OWNER') === true
-  );
-}
-
-function consumeJournalGrant(service, grant, context) {
-  return service?.consumeExecutionGrant?.(grant, context) ?? null;
-}
-
-function createCraftingJournalOperations(fabricate, getService) {
-  const authorizeRollHandoff = async ({ actor, run, payload, sender, privateEvaluation }) => {
-    const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
-    if (!componentSourceActors) return false;
-    const recipeId = privateEvaluation?.recipeId ?? run?.recipeId;
-    const recipe = fabricate.recipeManager?.getRecipe?.(recipeId) ?? null;
-    if (!recipe) return false;
-    if (sender?.isGM === true) return true;
-    if (!sender) return false;
-    return Boolean(
-      fabricate.recipeVisibilityService?.getVisibleRecipes?.({
-        viewer: sender,
-        craftingActor: actor,
-        componentSourceActors,
-        craftingSystemId: recipe.craftingSystemId,
-      })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
-    );
-  };
-  const managerMutation = createManagerMutation((grant, context) =>
-    consumeJournalGrant(getService(), grant, context));
-  return {
-    getRun: ({ actor, runId }) => {
-      fabricate.craftingRunManager?.invalidateCache?.(actor?.id);
-      return fabricate.craftingRunManager?.getRun?.(actor, runId)
-        ?? fabricate.craftingRunManager?.getActiveRun?.(actor, runId)
-        ?? null;
-    },
-    authorize: async ({ actor, run, payload, sender }) => {
-      const sourceActors = await resolveJournalSourceActors(run, payload, actor);
-      return Boolean(sourceActors && journalSourcesOwnedBy(sender, sourceActors));
-    },
-    prepareStart: async ({ actor, payload, preparationGrant, requestId }) => {
-      if (payload.activityKind !== 'alchemy') return { success: true, payload };
-      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
-      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
-      if (!system || system.resolutionMode !== 'alchemy') {
-        return { success: false, reason: 'alchemy-system-not-found' };
-      }
-      const submitted = Array.isArray(payload.submittedItems) ? payload.submittedItems : [];
-      const componentIds = submitted.map((record) => record?.componentId);
-      if (componentIds.some((id) => typeof id !== 'string' || id.length === 0)) {
-        return { success: false, reason: 'alchemy-submission-invalid' };
-      }
-      const canonicalSubmissions = resolveAlchemySubmissions(
-        sourceActors,
-        resolvedComponentsFor(system),
-        componentIds,
-        payload.craftingSystemId
-      );
-      if (
-        canonicalSubmissions.length !== submitted.length ||
-        canonicalSubmissions.some((record, index) => record.item?.uuid !== submitted[index]?.itemUuid)
-      ) {
-        return { success: false, reason: 'alchemy-submission-invalid' };
-      }
-      const prepare = fabricate.craftingEngine?.prepareVersionedAlchemyStart;
-      if (typeof prepare !== 'function') return { success: false, reason: 'unsupported-operation' };
-      const prepared = await prepare.call(fabricate.craftingEngine, {
-        actor,
-        sourceActors,
-        craftingSystemId: payload.craftingSystemId,
-        submittedItems: canonicalSubmissions,
-        executionGrant: preparationGrant,
-        requestId,
-      });
-      if (!prepared?.matched) {
-        return {
-          success: true,
-          executionOperation: 'executeAlchemyFizzle',
-          payload,
-          trustedContext: {
-            ...prepared,
-            alchemySubmittedItems: canonicalSubmissions,
-          },
-        };
-      }
-      return {
-        success: true,
-        payload: {
-          ...payload,
-          recipeId: prepared.recipeId,
-          selectionPlan: prepared.selectionPlan,
-        },
-        trustedContext: {
-          ...prepared,
-          alchemySubmittedItems: canonicalSubmissions,
-        },
-      };
-    },
-    start: async ({ actor, payload, executionGrant, requestId, sender }) => {
-      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
-      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const start = fabricate.craftingEngine?.startVersionedRun;
-      if (typeof start !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return start.call(fabricate.craftingEngine, {
-        viewer: sender,
-        actor,
-        sourceActors,
-        recipeId: payload.recipeId,
-        selectionPlan: payload.selectionPlan,
-        completionMode: payload.completionMode,
-        executionGrant,
-        requestId,
-      });
-    },
-    executeAlchemyFizzle: async ({ actor, payload, executionGrant, requestId, sender }) => {
-      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
-      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
-      const submitted = Array.isArray(payload.submittedItems) ? payload.submittedItems : [];
-      const submittedItems = resolveAlchemySubmissions(
-        sourceActors,
-        resolvedComponentsFor(system),
-        submitted.map((record) => record?.componentId),
-        payload.craftingSystemId
-      );
-      if (
-        submittedItems.length !== submitted.length ||
-        submittedItems.some((record, index) => record.item?.uuid !== submitted[index]?.itemUuid)
-      ) {
-        return { success: false, reason: 'alchemy-submission-invalid' };
-      }
-      const execute = fabricate.craftingEngine?.executeVersionedAlchemyFizzle;
-      if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return execute.call(fabricate.craftingEngine, {
-        viewer: sender,
-        actor,
-        sourceActors,
-        craftingSystemId: payload.craftingSystemId,
-        submittedItems,
-        executionGrant,
-        requestId,
-      });
-    },
-    describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId }) => {
-      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
-      if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
-      const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
-      if (typeof describe !== 'function') {
-        return { required: false, blocked: 'unsupported-operation' };
-      }
-      const descriptor = await describe.call(fabricate.craftingEngine, {
-        actor,
-        componentSourceActors,
-        runId: run.id,
-        selectionPlan: payload.selectionPlan,
-        preparationGrant,
-        requestId,
-      });
-      if (!descriptor?.required) return descriptor;
-      const visible = await authorizeRollHandoff({
-        actor, run, payload, sender, privateEvaluation: descriptor.privateEvaluation,
-      });
-      if (visible) return descriptor;
-      // The engine describes the check on the GM. Only the attested initiator's
-      // entitlement permits its subject or modifiers to enter the initial reply.
-      // An unnamed descriptor uses the local prompt's generic check title.
-      return {
-        ...descriptor,
-        publicPrompt: {
-          allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
-          allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
-        },
-      };
-    },
-    evaluateCheck: async ({ actor, privateEvaluation, decision, sender }) => {
-      const componentSourceActors = await resolveJournalSourceActors(null, {
-        sourceActorUuids: privateEvaluation?.componentSourceActorUuids,
-      }, actor) ?? [];
-      const recipe = fabricate.recipeManager?.getRecipe?.(privateEvaluation?.recipeId) ?? null;
-      const visible = sender?.isGM === true || Boolean(
-        recipe && fabricate.recipeVisibilityService?.getVisibleRecipes?.({
-          viewer: sender,
-          craftingActor: actor,
-          componentSourceActors,
-          craftingSystemId: recipe.craftingSystemId,
-        })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
-      );
-      return evaluatePreparedCraftingCheck(privateEvaluation, actor, decision, {
-        secret: !visible,
-      });
-    },
-    authorizeRollHandoff,
-    execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision, sender }) => {
-      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
-      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const execute = fabricate.craftingEngine?.executeVersionedStage;
-      if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return execute.call(fabricate.craftingEngine, {
-        viewer: sender,
-        actor,
-        componentSourceActors,
-        runId: run.id,
-        expectedRevision,
-        selectionPlan: payload.selectionPlan,
-        trigger: payload.trigger === 'worldTime' ? 'worldTime' : 'manual',
-        executionGrant,
-        requestId,
-      });
-    },
-    beginStep: async ({ actor, run, payload, executionGrant, requestId, expectedRevision, sender }) => {
-      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
-      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const begin = fabricate.craftingEngine?.beginVersionedStage;
-      if (typeof begin !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return begin.call(fabricate.craftingEngine, {
-        viewer: sender,
-        actor,
-        componentSourceActors,
-        runId: run.id,
-        expectedRevision,
-        selectionPlan: payload.selectionPlan,
-        executionGrant,
-        requestId,
-      });
-    },
-    cancel: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
-      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
-      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
-      const cancel = fabricate.craftingEngine?.cancelVersionedRun;
-      if (typeof cancel !== 'function') return { success: false, reason: 'unsupported-operation' };
-      return cancel.call(fabricate.craftingEngine, {
-        actor,
-        runId: run.id,
-        expectedRevision,
-        executionGrant,
-        requestId,
-      });
-    },
-    pause: (args) => managerMutation(args, 'pause', () =>
-      fabricate.craftingRunManager?.pauseRun?.(args.actor, args.runId, {
-        expectedRevision: args.expectedRevision,
-      })),
-    resume: (args) => managerMutation(args, 'resume', () =>
-      fabricate.craftingRunManager?.resumeRun?.(args.actor, args.runId, {
-        expectedRevision: args.expectedRevision,
-      })),
-    setCompletionMode: (args) => managerMutation(args, 'setCompletionMode', () =>
-      fabricate.craftingRunManager?.setCompletionMode?.(
-        args.actor,
-        args.runId,
-        args.payload.completionMode,
-        { expectedRevision: args.expectedRevision }
-      )),
-    setSelection: (args) => {
-      const recipe = fabricate.recipeManager?.getRecipe?.(args.run.recipeId);
-      const step = recipe?.getExecutionSteps?.()?.[args.payload.stepIndex];
-      const selection = args.payload.selectionPlan ?? {};
-      const selectedId = String(selection.selectedIngredientSetId ?? '').trim();
-      const selectedSet = step?.ingredientSets?.find((set) => set.id === selectedId);
-      if (!selectedSet) return { success: false, reason: 'ingredient-set-not-found' };
-      // This callback runs inside the authority claim, after actor/source ownership
-      // and revision checks. Snapshot the authored route here, never client evidence.
-      return managerMutation(args, 'setSelection', () =>
-        fabricate.craftingRunManager?.setStepSelectionPlan?.(
-          args.actor,
-          args.runId,
-          args.payload.stepIndex,
-          {
-            ...selection,
-            selectedIngredientSetId: selectedSet.id,
-            selectedRequirementSnapshot: selectedSet.toJSON?.() ?? selectedSet,
-          },
-          { expectedRevision: args.expectedRevision }
-        ));
-    },
-  };
-}
-
-function createJournalCommandsForFabricate(fabricate) {
-  const authority = createFoundryJournalRunAuthority({
-    reconstructExecutions: createJournalExecutionReconstructor({
-      getCraftingRunManager: () => fabricate.craftingRunManager,
-      getGatheringRunManager: () => fabricate.gatheringRunManager,
-    }),
-    // A refusal that has LIFTED invalidates every surface that captured it, the Journal having read
-    // availability when it built its listing (issue 1648, M25). Broadcast the LIFT, never the
-    // refusal: a refusal is true while it holds, and announcing it repaints mid-command.
-    onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
-  });
-  let service = null;
-  service = createJournalRunCommandService({
-    authority,
-    operations: {
-      crafting: createCraftingJournalOperations(fabricate, () => service),
-      gathering: createGatheringJournalRunOperations({
-        getEngine: () => getGatheringEngine(),
-        runManager: fabricate.gatheringRunManager,
-        getService: () => service,
-        getUser: (userId) => game.users?.get(userId) ?? null,
-      }),
-    },
-    currentUser: () => game.user,
-    activeGM: () => game.users?.activeGM ?? null,
-    getUser: (userId) => game.users?.get(userId) ?? null,
-    resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
-    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
-    randomId: () => foundry.utils.randomID(),
-    promptCheck: (descriptor) => promptCheckRoll({
-      name: descriptor?.label,
-      activity: descriptor?.label,
-      allowAdvantage: descriptor?.allowAdvantage === true,
-      modifierChoice: descriptor?.modifierChoice ?? null,
-    }),
-    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
-    getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
-    setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
-    onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
-  });
-  installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
-  return service;
-}
 
 // The GM notice for each way a startup migration pass can DEFER (issue 1242). One complete localized
 // sentence per reason, because the two differ in what the GM must do: only the writeback failure
@@ -627,293 +238,6 @@ function reportStaleEntryScript() {
   // purity would let Rolldown delete this expression STATEMENT. `release-build.test.js` asserts both.
   console.warn(STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE, { buildVersion, installedVersion });
   ui.notifications?.warn?.(message, { console: false });
-}
-
-/**
- * Push the configured item stack-quantity path into the accessor, then optionally probe it and warn
- * the GM (issue 1024). ORDER IS LOAD-BEARING: re-configure BEFORE the probe. The re-configure is
- * UNGATED, the engine path having to be live everywhere, while the notification is GM-only.
- */
-function applyItemStackQuantityPathSetting({ notify = false } = {}) {
-  let stored = null;
-  try {
-    stored = getSetting(SETTING_KEYS.ITEM_STACK_QUANTITY_PATH);
-  } catch {
-    // Unregistered or unreadable: `configureItemStackQuantityPath` keeps the current path rather
-    // than storing a falsy one, and never throws.
-  }
-  const path = configureItemStackQuantityPath(stored);
-  if (!notify || game.user?.isGM !== true) return path;
-
-  // `game.items` ONLY, a bounded read-only scan, and THAT SCOPE IS A REAL LIMIT: a world whose items
-  // all live in compendia and on sheets yields `'no-items'`, which is SILENCE and never a clean bill
-  // of health. The suggested correction is the ACTIVE SYSTEM's preset, not the built-in default.
-  const report = probeStackQuantityPath(game.items ?? [], {
-    path,
-    defaultPath: stackQuantityPathPresetFor(game.system?.id),
-  });
-  const message = describeStackQuantityProbe(report);
-  // PERMANENT: subject to the scope caveat above, this is the remaining defence against a typo'd
-  // path destroying stacks. The object-valued write guard cannot see the failure, because all four
-  // consume sites take `item.delete()` INSTEAD of `item.update(...)`.
-  if (message) ui.notifications?.warn?.(message, { permanent: true });
-  return path;
-}
-
-/**
- * The GM-facing advisory for a stack-quantity probe result, or `null` when healthy: THE DECISION is
- * `stackQuantityAdvisory`'s and this is the i18n edge. The string names the CONSEQUENCE plainly.
- */
-function describeStackQuantityProbe(report) {
-  const advisory = stackQuantityAdvisory(report);
-  if (!advisory) return null;
-  return game.i18n?.format?.(advisory.key, advisory.data) ?? advisory.key;
-}
-
-/**
- * The ACTIVE-GM edge for a relayed BLIND gathering start (issue 901). THE GM RE-RUNS THE WHOLE
- * ATTEMPT WITH THE REQUESTING USER AS THE VIEWER, so every gate is re-evaluated against the player
- * who asked and `_isOpaqueBlindTask` stays TRUE. `senderId` is the attested socket sender.
- */
-async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, taskId = null, interactableRef = null } = {}) {
-  const requester = game.users?.get?.(senderId) ?? null;
-  if (!requester) return null;
-  const resolve = globalThis.fromUuidSync;
-  let startActor = null;
-  try { startActor = typeof resolve === 'function' ? resolve(String(actorUuid)) : null; } catch (_) { startActor = null; }
-  if (!startActor) return null;
-  // `interactive: false`: the situational-modifier dialog belongs to the player's client, never the
-  // GM's, and a timed blind run does not roll at start anyway.
-  return getGatheringEngine()?.startAttempt({
-    viewer: requester,
-    actor: startActor,
-    environmentId,
-    taskId,
-    interactableRef,
-    interactive: false
-  });
-}
-
-/** Resolve an addressed actor synchronously, or `null` when it names nothing reachable. */
-function resolveComplicationActor(actorUuid) {
-  const resolve = globalThis.fromUuidSync;
-  if (typeof resolve !== 'function' || !actorUuid) return null;
-  try { return resolve(String(actorUuid)) ?? null; } catch (_) { return null; }
-}
-
-/** The corpus the GM-side re-read resolves against (issue 1286): THIS client's own components. */
-function complicationComponentsFor(craftingSystemId) {
-  return fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
-}
-
-/**
- * The token and speaker the GM side resolves for an addressed actor, NEVER read from the payload.
- * Guarded: a throwing `getSpeaker` would reject out of the fire-and-forget apply.
- */
-function resolveComplicationSpeaker(actor) {
-  try {
-    const token = actor?.token ?? actor?.getActiveTokens?.(false, true)?.[0] ?? null;
-    return { token, speaker: globalThis.ChatMessage?.getSpeaker?.({ actor, token }) ?? null };
-  } catch (error) {
-    console.warn('Fabricate | Could not resolve a complication speaker', error);
-    return { token: null, speaker: null };
-  }
-}
-
-/**
- * Run one complication's authored macro on this elected-GM client and REPORT what happened, never
- * throwing; `recipes-and-steps/spec.md` § Complication Macros owns the `script` call-site gate, the
- * double uuid resolve and why the return is a REPORT rather than the macro's own value.
- */
-async function runComplicationMacro({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
-  const macroUuid = complication.macroUuid;
-  if (!macroUuid) return { status: 'none', macroUuid: null };
-  let macro;
-  try {
-    macro = await fromUuid(macroUuid);
-  } catch {
-    macro = null;
-  }
-  if (!isRunnableComplicationMacro(macro)) {
-    console.warn(
-      `Fabricate | Complication "${complication.name || complication.id}" names a macro that could not be resolved to a script macro and was skipped (${macroUuid})`
-    );
-    return { status: 'skipped', macroUuid };
-  }
-  try {
-    await MacroExecutor.run(macroUuid, buildComplicationMacroContext({
-      craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
-    }));
-    return { status: 'ran', macroUuid };
-  } catch (error) {
-    console.error(`Fabricate | Complication macro failed (${macroUuid})`, error);
-    return { status: 'failed', macroUuid };
-  }
-}
-
-/**
- * Everything the elected GM DOES for one re-read complication: a `gmOnly` effect roll, then the
- * macro. Independent, so each carries its own guard, and the macro is unordered.
- */
-async function runComplicationDelivery({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
-  const effect = await rollGmComplicationEffect({ complication, actor, speaker });
-  const macro = await runComplicationMacro({
-    craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
-  });
-  return { effect, macro };
-}
-
-/**
- * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286). NEITHER THE MACRO NOR
- * THE EFFECT ROLL IS GATED BY THIS, and it SELECTS ROWS rather than vetoing the card —
- * `recipes-and-steps/spec.md` § Complication Macros owns both rules. Read from THIS client's copy,
- * defaulted CLOSED.
- */
-function complicationChatOutputEnabled(craftingSystemId) {
-  return fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
-}
-
-/**
- * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome: `skipped`
- * is an unresolvable `macroUuid` and `failed` a body that threw; `none` and `ran` are outcomes.
- */
-function hasComplicationMacroFault(row) {
-  const status = row?.report?.macro?.status;
-  return status === 'skipped' || status === 'failed';
-}
-
-/**
- * The GM-only chat card for one delivered resolution — the OUTPUT half of a `gmOnly` complication
- * (issue 1286); `recipes-and-steps/spec.md` § Complication Macros owns the row set and the
- * `chatOutput` rule. FOUR STEPS, IN AN ORDER THAT IS LOAD-BEARING: the `chatOutput` gate first and
- * over the ROW SET, so a gated-off system with nothing faulted returns before any projection;
- * SPEAKER before the visibility pass, which `applyBulkChatVisibility` states as a caller contract;
- * VISIBILITY before `create`, through an EXPLICIT `gmroll`; and `create` INSIDE the same guard, so
- * a card that could not be made GM-only is never posted.
- */
-async function postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied = [] }) {
-  try {
-    // Over `applied` rather than the projected entries, so the suppressed case returns early.
-    const delivered = Array.isArray(applied) ? applied : [];
-    const reported = complicationChatOutputEnabled(craftingSystemId)
-      ? delivered
-      : delivered.filter((row) => hasComplicationMacroFault(row));
-    if (reported.length === 0) return null;
-    // `gmComplicationCardEntries` — the only projection that may carry an authored description or a
-    // severity to a GM surface — augmented with what THIS client did. A suite can drive it directly.
-    const entries = gmComplicationCardEntries(reported);
-    const content = buildGmComplicationCardContent(
-      { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
-      (key) => game.i18n?.localize?.(key) ?? key
-    );
-    if (!content) return null;
-
-    const chatData = { author: game.user?.id, speaker, content };
-    applyBulkChatVisibility(chatData, 'gmroll');
-    return await ChatMessage.create(chatData);
-  } catch (error) {
-    console.error('Fabricate | Failed to post the GM complication card', error);
-    return null;
-  }
-}
-
-/**
- * The ELECTED-GM edge for a relayed complication delivery (issue 1286); `recipes-and-steps/spec.md`
- * § Complication Macros owns the re-read, the attested `senderId` and the per-complication
- * isolation. The Foundry EDGE only — the pure half lives in `complicationSocket.js`.
- */
-async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid, resolutionId, complications = [] } = {}) {
-  const senderUser = game.users?.get?.(senderId) ?? null;
-  if (!senderUser) return null;
-  const actor = resolveComplicationActor(actorUuid);
-  // Failing CLOSED is right, but VISIBLY: `fromUuidSync` answers a compendium uuid with an index
-  // entry carrying no `testUserPermission`, so such a delivery would be refused with no trace.
-  if (!actor || typeof actor.testUserPermission !== 'function') {
-    console.warn('Fabricate | Refused a complication delivery: the addressed actor could not be resolved to a permission-testable document', {
-      senderId, actorUuid
-    });
-    return null;
-  }
-  // Ask the ATTESTED SENDER's own permission directly: `actor.isOwner` resolves against the AMBIENT
-  // `game.user`, which on the elected GM's client owns every actor. THE RULE (issue 1288) IS THAT NO
-  // OWNERSHIP PREDICATE ON A GM-SIDE APPLY PATH MAY READ `isOwner`.
-  if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
-    console.warn('Fabricate | Refused a complication delivery: the sender does not own the addressed actor', {
-      senderId, actorUuid
-    });
-    return null;
-  }
-  const { token, speaker } = resolveComplicationSpeaker(actor);
-  const applied = await applyAuthoredComplications({
-    components: complicationComponentsFor(craftingSystemId),
-    complications,
-    execute: ({ component, complication, entry }) => runComplicationDelivery({
-      craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
-    })
-  });
-  await postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied });
-  return applied;
-}
-
-function fabricateEscapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[ch]));
-}
-
-function eventScenePromptText(key, fallback, data) {
-  const i18n = game?.i18n;
-  if (!i18n) return fallback;
-  if (data) return i18n.format?.(key, data) ?? fallback;
-  const out = i18n.localize?.(key);
-  return out && out !== key ? out : fallback;
-}
-
-// GM-side prompt choosing which active players to pull to a dropped event's linked scene. Lives
-// here rather than in the engine because it is Foundry glue.
-async function showEventScenePrompt({ sceneUuid, eventName } = {}) {
-  const scene = typeof fromUuid === 'function' ? await fromUuid(sceneUuid) : null;
-  if (!scene) {
-    ui.notifications?.warn?.(eventScenePromptText(
-      'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Missing',
-      'The event\'s linked scene could not be found.'
-    ));
-    return;
-  }
-  const sceneName = scene.name || sceneUuid;
-  const players = Array.from(game.users?.contents || []).filter(user => user?.active && !user?.isGM);
-  const intro = eventScenePromptText(
-    'FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Intro',
-    `${eventName || 'An event'} dropped. Move players to ${sceneName}?`,
-    { event: eventName || 'An event', scene: sceneName }
-  );
-  const rows = players.length === 0
-    ? `<p class="notes">${fabricateEscapeHtml(eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.NoPlayers', 'No active players to move.'))}</p>`
-    : players.map(user => `<label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="fab-pull-player" value="${fabricateEscapeHtml(user.id)}" checked /> ${fabricateEscapeHtml(user.name)}</label>`).join('');
-  const content = `<div style="display:flex;flex-direction:column;gap:6px;"><p>${fabricateEscapeHtml(intro)}</p>${rows}</div>`;
-  renderDialog({
-    title: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Title', 'An event occurred'),
-    content,
-    default: 'move',
-    buttons: {
-      move: {
-        label: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Move', 'Move players'),
-        callback: (html) => {
-          const root = html?.[0] ?? html;
-          const userIds = root
-            ? Array.from(root.querySelectorAll('.fab-pull-player:checked')).map(input => input.value)
-            : [];
-          void viewScene(sceneUuid);
-          if (userIds.length > 0) {
-            game.socket?.emit(EVENT_SCENE_SOCKET, { action: 'pullToScene', sceneUuid, userIds });
-          }
-        }
-      },
-      cancel: {
-        label: eventScenePromptText('FABRICATE.Admin.Manager.Environment.Events.EventScenePrompt.Cancel', 'Cancel')
-      }
-    }
-  });
 }
 
 /**
@@ -2407,35 +1731,6 @@ installFacadeSlice(journalFacade);
 
 const fabricate = new Fabricate();
 
-// The init-time Foundry CONFIG entries for the canvas Interactable foundation. Idempotent, so it is
-// safe from BOTH `init` and `ready`, the latter backstopping a late module evaluation.
-function registerFabricateConfig() {
-  // Register the region-first `fabricate.interactable` data model and its type icon. Defensive and
-  // idempotent: a no-op when the Foundry region APIs are unavailable.
-  registerInteractableRegionBehavior(CONFIG);
-
-  // The CORE schema-driven `RegionBehaviorConfig` as the document sheet for `fabricate.interactable`:
-  // the rich `InteractableConfigApp` is an ApplicationV2, NOT a DocumentSheet, so registering it
-  // left `behavior.sheet` null and broke the edit pencil. The rich panel stays on the HUD entry.
-  try {
-    const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig
-      ?? globalThis.DocumentSheetConfig;
-    const RegionBehavior = foundry?.documents?.RegionBehavior
-      ?? CONFIG?.RegionBehavior?.documentClass
-      ?? globalThis.RegionBehavior;
-    const RegionBehaviorConfig = globalThis.foundry?.applications?.sheets?.RegionBehaviorConfig;
-    if (typeof RegionBehaviorConfig === 'function') {
-      assignInteractableConfigSheet({
-        registrar: DocumentSheetConfig,
-        RegionBehavior,
-        SheetClass: RegionBehaviorConfig
-      });
-    }
-  } catch (_error) {
-    // Defensive: a sheet-registration shape mismatch must not break init.
-  }
-}
-
 // Bind the public API onto the live `game.fabricate` global. A pure assignment, idempotent and safe
 // from BOTH `init` and `ready`, the latter backstopping a manager stalled on "still loading".
 function bindFabricateGlobal() {
@@ -2645,239 +1940,6 @@ async function runInteractableWorldCleanup() {
   );
   return applied;
 }
-
-Hooks.once('init', async () => {
-  console.log('Fabricate | Init Hook');
-  registerFabricateConfig();
-  bindFabricateGlobal();
-});
-
-// GM-only Compendium Directory bulk-import action, at module top-level and NOT in the `ready` body:
-// that context menu is built once in `_onFirstRender`, BEFORE `ready`. It MUTATES in place.
-Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
-  contextOptions.push(buildCompendiumImportContextOption({
-    localize: bridgeLocalize,
-    isGM: () => game.user?.isGM,
-    isItemPack: (id) => game.packs.get(id)?.documentName === 'Item',
-    getPackName: (id) => {
-      const pack = game.packs.get(id);
-      return pack?.title ?? pack?.metadata?.label ?? id;
-    },
-    getSystems: () => game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [],
-    promptSelectSystem: promptSelectCraftingSystem,
-    importPack: (systemId, packId) => game.fabricate.getCraftingSystemManager().addItemsFromPack(systemId, packId),
-    notify: ui.notifications
-  }));
-});
-
-Hooks.once('ready', async () => {
-  // Issue 1565: FIRST, because it depends on nothing Fabricate has built and a client on a stale
-  // entry script may fail below. In the `ready` body, not `initialize()`, which the View Lab calls.
-  reportStaleEntryScript();
-  // Backstop for the `init` a late module evaluation can miss. Both helpers are idempotent, so this
-  // guarantees `game.fabricate` and the Interactable CONFIG exist before readiness flips.
-  registerFabricateConfig();
-  bindFabricateGlobal();
-  await fabricate.initialize();
-  await processFabricateWorldTime();
-  await runRecipeItemFlagAutoStamp();
-  await runComponentFlagAutoStamp();
-  // AFTER the MigrationRunner, which persists the `1.15.0` tool source-ref migration at init, and
-  // after the component stamp: this reads the migration-populated tool refs.
-  await runToolFlagAutoStamp();
-  // Issue 600: re-stamp durable component identity onto owned items resolving by name only. AFTER
-  // the source-side stamp, so a fresh drag inherits the flag first.
-  await runOwnedItemComponentIdentityRestamp();
-  // Issue 1363: remap the identity flags the `1.30.0` re-key invalidated. AFTER the source-side
-  // stamps and the owned-item restamp, neither of which reaches this population.
-  await runWorldScopeIdentityFlagRemap();
-  // Issue 1654: remap the essence references the `1.34.0` merge invalidated. AFTER the `1.30.0`
-  // remap — both rewrite the same run containers, and this one writes a forced replacement.
-  await runWorldEssenceMergeFlagRemap();
-
-  // Issue 800: a GM-only cue for a world whose stored descriptions predate write-time resolution.
-  // A DETECTOR only — it rewrites nothing and self-clears once the GM has run Repair Item Data.
-  notifyUnresolvedItemDescriptions();
-
-  // Issue 1024: the GM-only advisory for a stack-quantity path that resolves nothing, or reads on
-  // the prepared document but is absent from `_source` so every write is discarded. The path was
-  // configured during `initialize()`; this adds the world scan, which needs `game.items`.
-  applyItemStackQuantityPathSetting({ notify: true });
-
-  // Wire the region-first canvas Interactable foundation: drop interception, the region-enter
-  // prompt, the controlToken re-trigger and the interact keybinding. `register()` is idempotent.
-  InteractableManager.instance.register();
-
-  game.socket?.on(EVENT_SCENE_SOCKET, (payload, senderId) => {
-    if (
-      payload?.kind === JOURNAL_RUN_SOCKET_KIND.REQUEST ||
-      payload?.kind === JOURNAL_RUN_SOCKET_KIND.REPLY
-    ) {
-      Promise.resolve(fabricate.journalRunCommands?.handleSocketMessage(payload, senderId)).catch(
-        (error) => console.error('Fabricate | Journal run socket command failed', error)
-      );
-    }
-    // `senderId` is Foundry's server-attested sender user id — the trusted 2nd callback arg of a
-    // custom module socket broadcast, set from the authenticated session in
-    // `dist/server/sockets.mjs handleCustomSocket` — which the interactable handler authenticates
-    // privileged edges against (issue 593); payload `userId` fields are spoofable. Guarded because
-    // this router shares the `module.fabricate` channel with the Interactable round-trip below.
-    try {
-      routeEventSceneSocketMessage(payload, {
-        currentUserId: () => game.user?.id,
-        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
-        showPrompt: showEventScenePrompt,
-        viewSceneForSelf: (uuid) => viewScene(uuid)
-      });
-    } catch (_error) {
-      // Defensive: never block the Interactable payload below.
-    }
-    // The same channel carries the environment node depletion a player emits: only the active GM may
-    // write `gatheringEnvironments`, so the decrement is applied here from its own stored state.
-    try {
-      routeGatheringNodeDepleteMessage(payload, {
-        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
-        senderId,
-        // Bounds the residual denial-of-resource surface: the applier re-checks the node economy
-        // but not whether the sender could reach that task, so throttle to human gathering speed.
-        allowSender: gatheringDepletionRateLimiter,
-        applyDeplete: (args) => {
-          // The apply is async and nothing awaits a socket handler, so a failed world-setting write
-          // must be caught here or it lands as an unhandled rejection on the GM's client.
-          Promise.resolve(fabricate.gatheringRichStateService?.applyEnvironmentNodeDepletion(args))
-            .catch(error => console.warn('Fabricate | Gathering node depletion failed', error));
-        }
-      });
-    } catch (_error) {
-      // Defensive: never block the Interactable payload below.
-    }
-    // The same channel carries a player's BLIND gathering start (issue 901): only the active GM may
-    // write `gatheringBlindRuns`, and only a client the player does not control may draw the task.
-    try {
-      routeGatheringBlindStartMessage(payload, {
-        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
-        senderId,
-        allowSender: gatheringBlindStartRateLimiter,
-        applyStart: (args) => {
-          // Nothing awaits a socket handler, so a rejected start must be caught here.
-          Promise.resolve(applyGatheringBlindStart(args))
-            .catch(error => console.warn('Fabricate | Blind gathering start failed', error));
-        }
-      });
-    } catch (_error) {
-      // Defensive: never block the Interactable payload below.
-    }
-    // The same channel carries a relayed COMPLICATION delivery (issue 1286): the GM-only card and
-    // macro run from that GM's OWN record. Addressing only — the wire names no macro or content.
-    try {
-      routeComplicationDeliveryMessage(payload, {
-        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
-        senderId,
-        // Applied LAST of the refusal gates, so a malformed or unauthenticated message never
-        // consumes a sender's budget. Charged per MESSAGE: one resolution emits exactly one.
-        allowSender: complicationDeliveryRateLimiter,
-        // An elected GM holding two sockets in ONE context receives the message twice; two tabs are
-        // two contexts and remain a stated, accepted residual.
-        isFreshDelivery: complicationDeliveryDedupe,
-        applyComplications: (args) => {
-          // Nothing awaits a socket handler, so a rejected apply must be caught here.
-          Promise.resolve(applyComplicationDelivery(args))
-            .catch(error => console.warn('Fabricate | Complication delivery failed', error));
-        }
-      });
-    } catch (_error) {
-      // Defensive: never block the Interactable payload below.
-    }
-    // The same channel carries the Interactable node-update and region-first activation round-trip:
-    // only the active GM writes and validates, and only the targeted user opens a granted session.
-    handleInteractableSocketMessage(payload, {
-      senderId,
-      isSenderGM: (id) => game.users?.get(id)?.isGM === true,
-      validateAndGrant: (request) => InteractableManager.instance.validateAndGrant(request),
-      openGrant: (grant) => InteractableManager.instance.openGrant(grant),
-      notifyDenied: (reason) => InteractableManager.instance.notifyActivationDenied(reason)
-    });
-  });
-
-  addModuleButtonsToItemsDirectory();
-  Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());
-  Hooks.on('renderItemDirectory', (app) => addModuleButtonsToItemsDirectory(app));
-  Hooks.on('updateItem', (item, changes) => {
-    void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
-  });
-
-  // Env-node-driven marker swap: a depleting or recharging task node flips every linked Tile marker
-  // to or from `depletedBehavior.swapImage`, and both the gather decrement and the world-time
-  // respawn write `fabricate.gatheringEnvironments`, so reacting to that setting covers BOTH. THE
-  // HANDLER TAKES THE `Setting` DOCUMENT ONLY, the two hooks differing in their second argument;
-  // collaborators are resolved PER CALL and shared so the two listeners cannot drift.
-  const fabricateSettingChangeTargets = () => ({
-    craftingSystemManager: fabricate.craftingSystemManager,
-    recipeManager: fabricate.recipeManager,
-    gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
-    currencyConfigStore: fabricate.currencyConfigStore,
-    travelStore: fabricate.gatheringRealmStore,
-    characterLibrariesStore: fabricate.characterLibrariesStore,
-    // Issue 1359. Without these three the bridge legs receive `undefined` and NO-OP silently — the
-    // key still counts as handled — so the client's corpus stays at its boot value all session.
-    componentScopeStore: fabricate.componentScopeStore,
-    essenceScopeStore: fabricate.essenceScopeStore,
-    toolScopeStore: fabricate.toolScopeStore,
-    // Issue 1392. Same silent failure as the three above.
-    worldVocabularyStore: fabricate.worldVocabularyStore,
-    callAll: (hook, payload) => Hooks.callAll(hook, payload)
-  });
-  const handleFabricateSettingDocumentChange = (setting) => {
-    try {
-      const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
-      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
-        void runInteractableMarkerSync();
-      }
-      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ITEM_STACK_QUANTITY_PATH}`) {
-        // Re-configure, THEN probe: the setting is runtime-mutable, and a startup-only probe would
-        // separate the advisory from the typo by an arbitrary amount of destroyed inventory.
-        applyItemStackQuantityPathSetting({ notify: true });
-      }
-      // Dismissals are `scope: 'user'`, so `updateSetting` delivers EVERY user's document to every
-      // client. `Setting#user` is an id (`idOnly: true` on V14.365); the `.id` read stays honest.
-      if (
-        key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.JOURNAL_RUN_DISMISSALS}`
-        && (setting?.user?.id ?? setting?.user) === game.user?.id
-      ) {
-        Hooks.callAll('fabricate.journalDismissalsChanged');
-      }
-      // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` fire only on the GM's
-      // client, while the setting hooks fire everywhere the replicated world setting lands, so
-      // reload the stale in-memory manager here and re-emit the local hook.
-      handleFabricateSettingChange(key, fabricateSettingChangeTargets());
-    } catch (error) {
-      console.error('Fabricate | Failed to handle a Fabricate setting change', error);
-    }
-  };
-  Hooks.on('updateSetting', handleFabricateSettingDocumentChange);
-  // THE FIRST EVER WRITE TO A WORLD SETTING IS A CREATE, NOT AN UPDATE (issue 1024), so without this
-  // a first-time value propagates to nobody until reload. BOTH LEGS SHARE ONE LISTENER.
-  Hooks.on('createSetting', handleFabricateSettingDocumentChange);
-  const refreshJournalRunAuthorityAvailability = () => {
-    void fabricate.journalRunCommands?.refreshJournalRunAuthorityAvailability?.();
-  };
-  const bootstrapJournalRunAuthority = () => {
-    void fabricate.journalRunCommands?.bootstrapJournalRunAuthority?.();
-  };
-  Hooks.on('createJournalEntry', refreshJournalRunAuthorityAvailability);
-  Hooks.on('updateJournalEntry', refreshJournalRunAuthorityAvailability);
-  Hooks.on('deleteJournalEntry', refreshJournalRunAuthorityAvailability);
-  Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability);
-  Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability);
-  Hooks.on('updateUser', bootstrapJournalRunAuthority);
-  Hooks.on('userConnected', bootstrapJournalRunAuthority);
-  Hooks.on('canvasReady', () => {
-    void runInteractableMarkerSync();
-  });
-  void runInteractableMarkerSync();
-
-  Hooks.callAll('fabricate.ready');
-});
 
 /**
  * Issue 555 (repurposed by 567) — the one-shot, primary-GM-gated backfill stamping
@@ -3175,284 +2237,28 @@ async function runInteractableMarkerSync() {
   }
 }
 
-Hooks.on('updateWorldTime', (worldTime) => {
-  void processFabricateWorldTime(worldTime);
-});
-
-// Cross-client run-cache coherence (issues 733 + 739): the run managers cache an actor's runs and
-// never learn of another client's write, so the stale cache is dropped when the synced document
-// lands. THE KEY FILTER IS LOAD-BEARING — `updateActor` also fires on every HP tick.
-Hooks.on('updateActor', (actor, changes) => {
-  invalidateRunCachesForActorUpdate(actor, changes);
-});
-
-function invalidateRunCachesForActorUpdate(actor, changes) {
-  if (!actor?.id) return;
-  const changed = runContainersChanged(changes, foundry.utils.hasProperty);
-  if (changed.length === 0) return;
-  // The crafting and salvage caches key on `actor.id` and the gathering cache on the actor uuid, so
-  // each manager is passed the key it stores under.
-  const invalidators = {
-    crafting: () => fabricate.craftingRunManager?.invalidateCache(actor.id),
-    salvage: () => fabricate.salvageRunManager?.invalidateCache(actor.id),
-    gathering: () => fabricate.gatheringRunManager?.invalidateCache(actor.uuid ?? actor.id),
-  };
-  for (const key of changed) {
-    invalidators[key]?.();
-  }
-}
-
-// GM-only scene-control button launching the Interactable browser. Foundry V13 passes `controls` as
-// a keyed RECORD, not the pre-V13 array, and the pure seam mutates that record.
-Hooks.on('getSceneControlButtons', (controls) => {
-  addInteractableSceneControl(controls, {
-    isGM: game.user?.isGM === true,
-    onClick: () => getInteractableBrowserAppClass().show(),
-    // The Manage Interactables panel (issue 335): a sibling GM-only tool listing every interactable
-    // on the scene and promoting regions.
-    onManageClick: () => getInteractablesManagerAppClass().show(),
-    localize: (key, fallback) => {
-      const out = game.i18n?.localize?.(key);
-      return out && out !== key ? out : fallback;
-    }
-  });
-});
-
-// GM-only discoverability: a config button on a linked interactable visual's HUD, resolving the
-// owning behaviour from the reverse linked-visual flags. Shared by both HUDs; it never touches an
-// actor.
-function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
-  try {
-    const document = hud?.object?.document ?? hud?.document ?? null;
-    if (!shouldOfferInteractableConfigEntry(document, { isGM: game.user?.isGM === true })) return;
-
-    const target = resolveInteractableConfigTarget(document, {
-      resolveRegion: (regionUuid) => {
-        const region = fromUuidSync?.(regionUuid) ?? null;
-        const regionId = region?.id ?? region?._id ?? null;
-        const sceneId = region?.parent?.id ?? region?.parent?._id ?? null;
-        return regionId && sceneId ? { sceneId, regionId } : null;
-      }
-    });
-    if (!target) return;
-
-    const root = element instanceof HTMLElement ? element : element?.[0] ?? null;
-    const column = root?.querySelector?.('.col.left') ?? root?.querySelector?.('.col') ?? root;
-    if (!column?.appendChild) return;
-
-    const out = game.i18n?.localize?.(localizeKey);
-    const label = out && out !== localizeKey ? out : 'Configure Fabricate Interactable';
-
-    const button = window.document.createElement('button');
-    button.type = 'button';
-    button.className = 'control-icon fabricate-interactable-config-hud';
-    button.title = label;
-    button.setAttribute('aria-label', label);
-    button.innerHTML = '<i class="fas fa-sliders"></i>';
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      void getInteractableConfigAppClass().show(target);
-    });
-    column.appendChild(button);
-  } catch (_error) {
-    // Defensive: a HUD augmentation must never throw into Foundry's render.
-  }
-}
-
-Hooks.on('renderTileHUD', (hud, element) => {
-  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromTile' });
-});
-
-Hooks.on('renderTokenHUD', (hud, element) => {
-  installInteractableConfigHudEntry(hud, element, { localizeKey: 'FABRICATE.Canvas.Interactable.Config.OpenFromToken' });
-});
-
-// The `fabricate.interactable` Region Behaviour creation edge (issues 334 + 342). An empty `system`
-// is VALID-but-UNCONFIGURED since #342, so the create is ALLOWED and the behaviour is born inert.
-// AN INHERITED MARKER LINK IS NEUTRALISED HERE, region duplication cloning `linkedVisual` verbatim.
-Hooks.on('preCreateRegionBehavior', (document) => {
-  try {
-    // The decision seam always allows through now; it is referenced so the edge keeps one decision
-    // point and a future cancellation policy has a home.
-    evaluateInteractableCreate(document);
-    if (!isInteractableRegionBehavior(document)) {
-      return undefined;
-    }
-
-    if (applyUnconfiguredSentinelStamp(document)) {
-      notifyUnconfiguredInteractableCreated();
-    }
-    neutralizeInheritedInteractableLink(document);
-    return undefined;
-  } catch (_error) {
-    // Defensive: a guard error must never block an unrelated behaviour creation.
-    return undefined;
-  }
-});
-
 /**
- * Stamp the unconfigured sentinel onto any identity field the empty-system instantiation left empty;
- * `updateSource` is the V13 preCreate seam, a preCreate hook mutating the source in place.
+ * What `src/bootstrap/` needs from the module entry: the singleton, the world-time dispatcher, the
+ * startup one-shots, the marker sync and the deferred manager entry. The dependency runs one way —
+ * `src/main.js` to `src/bootstrap/` — so no bootstrap module imports this file.
  */
-function applyUnconfiguredSentinelStamp(document) {
-  const system = readInteractableBehaviorSystem(document) ?? document?.system ?? {};
-  const sentinel = buildUnconfiguredSentinelPatch(system);
-  if (!sentinel.changed || typeof document?.updateSource !== 'function') {
-    return false;
-  }
-  document.updateSource(sentinel.patch);
-  return true;
-}
+const io = {
+  fabricate,
+  bindFabricateGlobal,
+  processFabricateWorldTime,
+  reportManagerLoadFailure,
+  reportStaleEntryScript,
+  runComponentFlagAutoStamp,
+  runInteractableMarkerSync,
+  runOwnedItemComponentIdentityRestamp,
+  runRecipeItemFlagAutoStamp,
+  runToolFlagAutoStamp,
+  runWorldEssenceMergeFlagRemap,
+  runWorldScopeIdentityFlagRemap,
+  showCraftingSystemManagerApp,
+};
 
-/** INFO, not an error: creation succeeded and the interactable only needs configuring. */
-function notifyUnconfiguredInteractableCreated() {
-  const out = game.i18n?.localize?.('FABRICATE.Canvas.Interactable.Create.Unconfigured');
-  const message =
-    out && out !== 'FABRICATE.Canvas.Interactable.Create.Unconfigured'
-      ? out
-      : 'Created an unconfigured Fabricate interactable. Configure its source (type, system, tool/task) from the Interactable config panel; it stays inert until then.';
-  ui.notifications?.info?.(message);
-}
-
-/** A fresh interactable NEVER inherits another's marker link; type-agnostic, so the caller gates it. */
-function neutralizeInheritedInteractableLink(document) {
-  const neutralised = neutralizeInheritedLinkedVisual(document?.system);
-  if (neutralised.changed && typeof document?.updateSource === 'function') {
-    document.updateSource({
-      'system.linkedVisual.uuid': neutralised.patch.linkedVisual.uuid,
-      'system.linkedVisual.documentName': neutralised.patch.linkedVisual.documentName
-    });
-  }
-}
-
-/**
- * Add the system-agnostic Craft button to the Items Directory header, injecting when an element
- * exists — `ready` can precede the sidebar's first render, so `renderItemDirectory` retries per
- * rendered sidebar or popout instance.
- */
-function addModuleButtonsToItemsDirectory(itemsDir = ui.items) {
-  if (!itemsDir?.element) {
-    return;
-  }
-
-  const header = itemsDir.element.querySelector('.directory-header, header');
-  if (!header) {
-    console.error('Fabricate | Items directory header not found');
-    return;
-  }
-
-  const actionsContainer = findItemsDirectoryActionsContainer(itemsDir, document);
-  if (!actionsContainer) {
-    console.error('Fabricate | Items directory actions container not found');
-    return;
-  }
-
-  const craftExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
-    .some(btn =>
-      btn.dataset.fabricateAction === 'craft' ||
-      btn.textContent?.includes('Craft Item')
-    );
-  if (!craftExists) {
-    const craftButton = createHeaderButton('Craft Item', 'fas fa-hammer', 'craft', () => getFabricateAppClass().show('crafting'));
-    actionsContainer.insertBefore(craftButton, actionsContainer.firstChild);
-  }
-
-  syncGatheringDirectoryButton({
-    itemsDirectory: itemsDir,
-    enabled: hasGatheringEnabledSystems(),
-    createButton: () => createHeaderButton('Gathering', 'fas fa-leaf', 'gathering', () => getFabricateAppClass().show('gathering')),
-    documentRef: document
-  });
-
-  if (game.user?.isGM) {
-    const managerExists = Array.from(actionsContainer.querySelectorAll('button.create-document'))
-      .some(btn =>
-        btn.dataset.fabricateAction === 'manage' ||
-        btn.textContent?.includes('Manage Crafting Systems')
-      );
-    if (!managerExists) {
-      const managerButton = createHeaderButton(
-        'Manage Crafting Systems',
-        'fas fa-book',
-        'manage',
-        () => {
-          // SWALLOWING (issue 1565): nothing awaits a click handler, so the wrapper reports the
-          // failure rather than leaving an unhandled rejection as the user's only signal.
-          void openDeferredApp(showCraftingSystemManagerApp, reportManagerLoadFailure);
-        }
-      );
-      actionsContainer.insertBefore(managerButton, actionsContainer.firstChild);
-    }
-  }
-}
-
-function hasGatheringEnabledSystems() {
-  const systems = game.fabricate?.getCraftingSystemManager?.()?.getSystems?.() ?? [];
-  return Array.from(systems).some(system => system?.features?.gathering === true);
-}
-
-function createHeaderButton(labelText, iconClass, actionId, onClick) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'create-document';
-  button.dataset.tooltip = labelText;
-  button.dataset.fabricateAction = actionId;
-  button.setAttribute('aria-label', labelText);
-
-  const icon = document.createElement('i');
-  icon.className = iconClass;
-  button.appendChild(icon);
-
-  const label = document.createElement('span');
-  label.textContent = labelText;
-  button.appendChild(label);
-
-  button.addEventListener('click', (event) => {
-    event.preventDefault();
-    onClick();
-  });
-
-  return button;
-}
-
-Hooks.on('chatMessage', (chatLog, message, chatData) => {
-  if (message.startsWith('/craft')) {
-    const parts = message.split(' ');
-    if (parts.length < 2) {
-      ui.notifications.warn('Usage: /craft <recipe-name>');
-      return false;
-    }
-
-    const recipeName = parts.slice(1).join(' ');
-    const actor = game.user.character;
-
-    if (!actor) {
-      ui.notifications.error('No character selected');
-      return false;
-    }
-
-    const recipes = fabricate.recipeManager.getRecipes({ search: recipeName });
-    if (recipes.length === 0) {
-      ui.notifications.error(`Recipe "${recipeName}" not found`);
-      return false;
-    }
-
-    const recipe = recipes[0];
-
-    fabricate.craft(actor, recipe).then(result => {
-      if (result.success) {
-        ui.notifications.info(result.message);
-      } else {
-        ui.notifications.error(result.message);
-      }
-    }).catch(err => {
-      ui.notifications.error(err.message);
-      console.error('Fabricate | Crafting error:', err);
-    });
-
-    return false; // Prevent the message from being sent to chat
-  }
-});
+registerModuleHooks(io);
 
 // The macro-facing public surface.
 globalThis.fabricate = {

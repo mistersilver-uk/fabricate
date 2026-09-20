@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { collectSources } from './helpers/sourceScan.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 globalThis.foundry = { utils: { getProperty: () => undefined } };
@@ -196,11 +198,19 @@ test('never rewrites the descriptions it inspects', () => {
   );
 });
 
-// Production wiring. Both seams default to PASS-THROUGHS, so deleting the wiring in `src/main.js`
-// reverts the entire feature in production while every unit test — which constructs its own manager
-// with its own fakes — stays green.
-
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+// Production wiring. Both seams default to PASS-THROUGHS, so deleting the wiring reverts the entire
+// feature in production while every unit test — which constructs its own manager with its own fakes
+// — stays green. The entry composes the manager and `src/bootstrap/hooks.js` runs the detector, so
+// both are read here through ONE call (issue 1715).
+const entrySources = collectSources(resolve(__dirname, '..', 'src'), { extensions: ['.js'] });
+const mainSource = [
+  ...Object.keys(entrySources)
+    .filter((file) => file.startsWith('src/bootstrap/'))
+    .sort(),
+  'src/main.js',
+]
+  .map((file) => entrySources[file])
+  .join('\n');
 
 test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () => {
   assert.match(
@@ -226,6 +236,6 @@ test('src/main.js invokes the startup detector', () => {
   );
   assert.match(
     mainSource,
-    /import \{ notifyUnresolvedItemDescriptions \} from '\.\/config\/repairItemData\.js'/
+    /import \{ notifyUnresolvedItemDescriptions \} from '\.\.?\/config\/repairItemData\.js'/
   );
 });

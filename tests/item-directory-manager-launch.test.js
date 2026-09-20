@@ -9,11 +9,25 @@ import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainPath = resolve(__dirname, '../src/main.js');
+import { collectSources } from './helpers/sourceScan.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The module entry and the `src/bootstrap/` modules it split into (issue 1715), as one text: the
+ * deferred loader and `openRecipeManager` stay in the entry, while the Items Directory button
+ * moved to `src/bootstrap/hooks.js`. Read through ONE call, so the pin count does not rise.
+ */
 function mainSource() {
-  return readFileSync(mainPath, 'utf8');
+  const sources = collectSources(resolve(__dirname, '..', 'src'), { extensions: ['.js'] });
+  return [
+    ...Object.keys(sources)
+      .filter((file) => file.startsWith('src/bootstrap/'))
+      .sort(),
+    'src/main.js',
+  ]
+    .map((file) => sources[file])
+    .join('\n');
 }
 
 test('the deferred manager is opened through the memoized loader', () => {
@@ -43,7 +57,9 @@ test('the Items Directory manager button reports a failed load and swallows it',
   // SWALLOWING, and brace-bounded to this button's own handler: nothing awaits a click handler,
   // so a rethrow would land as the unhandled rejection that made this failure invisible.
   assert.ok(
-    /^[^}]*void openDeferredApp\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/.test(buttonSource),
+    /^[^}]*void openDeferredApp\(io\.showCraftingSystemManagerApp, io\.reportManagerLoadFailure\)/.test(
+      buttonSource
+    ),
     'the header button should dispatch through the swallowing wrapper'
   );
   assert.ok(
@@ -146,12 +162,13 @@ test('both module console lines are written at a level the published build keeps
 test('the stale-entry check is dispatched from the ready body, behind a typeof guard', () => {
   const source = mainSource();
 
-  // IN `ready`, NOT `initialize()`.
-  const readyStart = source.indexOf("Hooks.once('ready', async () => {");
-  assert.notEqual(readyStart, -1, 'main.js should register a ready hook');
+  // IN the `ready` startup sequence, NOT `initialize()` (issue 1715 moved the body into
+  // `src/bootstrap/hooks.js`; the entry still owns the check itself).
+  const readyStart = source.indexOf('async function runReadyStartupSequence(io) {');
+  assert.notEqual(readyStart, -1, 'the ready startup sequence should be declared');
   assert.ok(
-    /^[^}]*\n {2}reportStaleEntryScript\(\);/.test(source.slice(readyStart)),
-    'the stale-entry check should be dispatched from the ready body'
+    /^[^}]*\n {2}io\.reportStaleEntryScript\(\);/.test(source.slice(readyStart)),
+    'the stale-entry check should be dispatched first from the ready startup sequence'
   );
 
   // EVERY READ OF THE BUILD-TIME DEFINE IS GUARDED.

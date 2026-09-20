@@ -278,6 +278,6 @@ test('the default probe matches the injected one, so both seams see the operator
 test('src/main.js still routes the hook through the matcher it is filtered by', () => {
   // The filter is load-bearing: `updateActor` fires on every HP tick. An unfiltered hook
   // would be a performance defect, and a filter that never matches is this whole bug.
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+  const source = readFileSync(resolve(HERE, '..', 'src', 'bootstrap', 'hooks.js'), 'utf8');
   assert.match(source, /const changed = runContainersChanged\(changes, foundry\.utils\.hasProperty\);/);
 });

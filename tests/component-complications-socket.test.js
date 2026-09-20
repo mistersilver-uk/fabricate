@@ -557,7 +557,7 @@ test('the complication route is registered on the shared channel in its own guar
 
   const route = mainSource.indexOf('routeComplicationDeliveryMessage(payload, {');
   const guard = mainSource.lastIndexOf('try {', route);
-  const rescue = mainSource.indexOf('} catch (_error) {', route);
+  const rescue = mainSource.indexOf('} catch {', route);
   assert.ok(guard !== -1 && guard < route, 'the route should sit inside its own try block');
   assert.ok(rescue > route, 'a throw on one payload must not starve the others on this channel');
   assert.equal(

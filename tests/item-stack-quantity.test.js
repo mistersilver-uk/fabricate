@@ -1112,29 +1112,18 @@ describe('the item stack-quantity path setting', () => {
   });
 });
 
-// Criterion 10's wiring half. `src/main.js` is the module entry point and cannot be imported under
-// `node --test`, so its wiring is pinned against its SOURCE — the same shape the actor-type lane's
-// criterion-14 pins use.
+// Criterion 10's wiring half. `src/bootstrap/hooks.js` reaches Foundry globals at call time, so
+// its wiring is pinned against its SOURCE — the same shape the actor-type lane's criterion-14 pins
+// use. The ORDERING half — registerSettings, then the path, then the migration pass — is pinned
+// behaviourally by `tests/bootstrap/fabricate-boot-contract.test.js`'s composition log (issue
+// 1715), which a source-order comparison could not follow once the three sites left one file.
 
-describe('main.js wiring', () => {
+describe('bootstrap wiring', () => {
   const mainSource = (async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    return readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8');
+    return readFileSync(resolve(import.meta.dirname, '../src/bootstrap/hooks.js'), 'utf8');
   })();
-
-  it('configures the path during initialize(), after registerSettings and before migrations', async () => {
-    const source = await mainSource;
-    const register = source.indexOf('this.registerSettings();');
-    const configure = source.indexOf('applyItemStackQuantityPathSetting();');
-    const migrate = source.indexOf('await this._runMigrations();');
-    assert.ok(register >= 0 && configure >= 0 && migrate >= 0, 'all three call sites exist');
-    assert.ok(register < configure, 'the key is not readable until it is registered');
-    assert.ok(
-      configure < migrate,
-      'a migration may touch owned items, so the path must already be live'
-    );
-  });
 
   it('suggests the ACTIVE SYSTEM preset, not the built-in default', async () => {
     // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever `main.js`
@@ -1147,7 +1136,7 @@ describe('main.js wiring', () => {
     );
     assert.match(
       source,
-      /import \{ stackQuantityPathPresetFor } from '\.\/config\/stackQuantityPathPresets\.js';/
+      /import \{ stackQuantityPathPresetFor } from '\.\.\/config\/stackQuantityPathPresets\.js';/
     );
   });
 
@@ -1160,7 +1149,7 @@ describe('main.js wiring', () => {
     assert.equal(
       /'FABRICATE\.Settings\.ItemStackQuantityPath\.(Unresolved|SchemaDiscard)'/.test(source),
       false,
-      'main.js must not re-spell the advisory keys it no longer selects'
+      'the hooks edge must not re-spell the advisory keys it no longer selects'
     );
   });
 

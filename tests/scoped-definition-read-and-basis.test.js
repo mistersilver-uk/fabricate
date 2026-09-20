@@ -6,6 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
+import { resolve } from 'node:path';
+
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
+
 globalThis.foundry = {
   utils: { randomID: () => `rnd-${Math.random().toString(36).slice(2)}` },
 };
@@ -28,7 +32,16 @@ const MANAGER_SOURCE = readFileSync(
   new URL('../src/systems/CraftingSystemManager.js', import.meta.url),
   'utf8'
 );
-const MAIN_SOURCE = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
+const ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
+const MAIN_SOURCE = [
+  ...Object.keys(ENTRY_SOURCES)
+    .filter((file) => file.startsWith('src/bootstrap/'))
+    .sort(),
+  'src/main.js',
+]
+  .map((file) => ENTRY_SOURCES[file])
+  .join('\n');
 
 /** A manager with NO world stores at all — the unmigrated client every player boots as. */
 function unwiredManager() {

@@ -104,7 +104,7 @@ test('Fabricate bridges replicated crafting-data setting changes into local refr
   // same module cannot fail an assertion whose subject is the wiring.
   assert.match(
     mainSource,
-    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\/config\/settingChangeBridge\.js'/,
+    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\.?\/config\/settingChangeBridge\.js'/,
     'main.js should import the setting-change bridge'
   );
   assert.ok(
@@ -339,8 +339,10 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
 
 test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {
   const start = mainSource.indexOf('function createJournalCommandsForFabricate(');
-  const end = mainSource.indexOf('\n// The GM notice', start);
-  assert.ok(start >= 0 && end > start);
+  // Bounded at its own column-zero closing brace: the factory is the last declaration in
+  // `src/bootstrap/journalOperations.js`, so a following-comment bound would run into another file.
+  const end = mainSource.indexOf('\n}\n', start) + 2;
+  assert.ok(start >= 0 && end > start + 2, 'the journal command factory must be present');
   let composed;
   const received = [];
   // Foundry V13.351/V14.365 handleCustomSocket destructures this argument: a
@@ -406,7 +408,7 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
     'the constructed gathering engine should receive the journal authority adapter'
   );
   assert.ok(
-    mainSource.includes('fabricate.craft(actor, recipe).then(result => {'),
+    /fabricate\s*\.craft\(actor, recipe\)\s*\.then\(\(result\) => \{/.test(mainSource),
     'the /craft chat command should delegate through the public craft facade'
   );
   assert.ok(

@@ -88,9 +88,9 @@ function commandHarness({
 
 describe('journal run command protocol', () => {
   function loadCraftingOperations() {
-    const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/bootstrap/journalOperations.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');
-    const end = source.indexOf('function createJournalCommandsForFabricate(', start);
+    const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
       ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation'])(
@@ -1785,9 +1785,9 @@ describe('journal run command protocol', () => {
 
 describe('journal run pause lifecycle at the real command boundary', () => {
   function loadCraftingOperations() {
-    const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/bootstrap/journalOperations.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');
-    const end = source.indexOf('function createJournalCommandsForFabricate(', start);
+    const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`, [
       'resolveAlchemySubmissions',

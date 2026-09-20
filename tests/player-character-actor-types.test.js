@@ -885,7 +885,7 @@ describe('the player-character-types hook is wired at every consuming edge', () 
   it('main.js registers the shared setting handler on BOTH createSetting and updateSetting', () => {
     // The FIRST EVER write to a world setting is a create, not an update, so a GM ticking `robot`
     // for the first time — the exact reported journey — would otherwise propagate to nobody.
-    const main = read('src/main.js');
+    const main = read('src/bootstrap/hooks.js');
     assert.match(main, /Hooks\.on\('updateSetting', handleFabricateSettingDocumentChange\);/);
     assert.match(main, /Hooks\.on\('createSetting', handleFabricateSettingDocumentChange\);/);
     // One shared handler, taking the Setting DOCUMENT only: the two hooks do not share

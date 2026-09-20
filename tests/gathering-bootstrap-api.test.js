@@ -24,6 +24,7 @@ const mainSource = [
   'src/main.js',
   'src/bootstrap/gatheringFacade.js',
   'src/bootstrap/gatheringRuntime.js',
+  'src/bootstrap/hooks.js',
   'src/bootstrap/Fabricate.js',
   'src/bootstrap/composeServices.js',
 ]
@@ -303,14 +304,15 @@ test('world-time hooks dispatch gathering without coupling failures to existing 
   );
   assert.match(
     mainSource,
-    // The ready hook may first re-run the idempotent init backstop (bindFabricateGlobal)
-    // to recover from a missed `init`, then must await initialize() → world-time → ready.
-    /Hooks\.once\('ready', async \(\) => \{[\s\S]*?await fabricate\.initialize\(\);\s*await processFabricateWorldTime\(\);[\s\S]*Hooks\.callAll\('fabricate\.ready'\);/s,
-    'ready hook should await startup world-time processing before fabricate.ready'
+    // The ready startup sequence may first re-run the idempotent init backstop
+    // (bindFabricateGlobal) to recover from a missed `init`, then must await
+    // initialize() -> world-time; `fabricate.ready` fires after every registration.
+    /async function runReadyStartupSequence\(io\) \{[\s\S]*?await io\.fabricate\.initialize\(\);\s*await io\.processFabricateWorldTime\(\);[\s\S]*Hooks\.callAll\('fabricate\.ready'\);/s,
+    'ready startup should await world-time processing before fabricate.ready'
   );
   assert.match(
     mainSource,
-    /Hooks\.on\('updateWorldTime', \(worldTime\) => \{\s*void processFabricateWorldTime\(worldTime\);\s*\}\);/s,
+    /Hooks\.on\('updateWorldTime', \(worldTime\) => \{\s*void io\.processFabricateWorldTime\(worldTime\);\s*\}\);/s,
     'updateWorldTime hook should explicitly fire-and-forget the guarded dispatcher'
   );
   // Both halves in one pin: `src/bootstrap/gatheringRuntime.js` holds the only binding and the
