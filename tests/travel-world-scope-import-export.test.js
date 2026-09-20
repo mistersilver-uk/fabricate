@@ -80,23 +80,29 @@ function exportedEnvelope({ system = sourceSystem(), travelConfig = worldTravelC
 }
 
 /** A destination world with its own system and its own (optionally empty) realm library. */
-function destinationWorld(travelConfig = {}) {
-  return makeHarness({
-    system: {
-      id: 'sys-destination',
-      name: 'Destination',
-      gatheringRealmSettings: { enabled: true },
+function destinationWorld(travelConfig = {}, options) {
+  return makeHarness(
+    {
+      system: {
+        id: 'sys-destination',
+        name: 'Destination',
+        gatheringRealmSettings: { enabled: true },
+      },
+      recipes: [],
+      environments: [],
+      gatheringConfig: { systems: {}, vocabularies: {}, conditions: {} },
+      travelConfig,
     },
-    recipes: [],
-    environments: [],
-    gatheringConfig: { systems: {}, vocabularies: {}, conditions: {} },
-    travelConfig,
-  });
+    options
+  );
 }
 
 function importerInto(world) {
   return new CompendiumImporter(world.systemManager, world.recipeManager, {
     environmentStore: world.environmentStore,
+    // The seam `src/main.js` wires. The raw setting pair stays beside it, so the tests that hand
+    // the importer settings alone still cover the fallback.
+    travelStore: world.travelStore,
     getSetting: world.getSetting,
     setSetting: world.setSetting,
     isGM: () => true,
@@ -214,6 +220,26 @@ describe('the library survives the WHOLE import composition, not just the merge 
       'the gate survives the import rather than being rejected or silently pruned'
     );
     assert.ok(realmIds(persisted).includes(VALE_ID), 'and the place it names arrived with it');
+  });
+
+  it('lands the library and the realm-gated environment in a world with NO travelConfig hook', async () => {
+    // Ordering alone is not enough (issue 1858). T18 above passes on a SIMULATED `updateSetting`
+    // reload; a world where no such hook fires — a no-op replicated write, a headless world —
+    // leaves the realm store's cache holding the pre-import library, and the environment store
+    // resolves the library through that cache. So the merge writes THROUGH the store.
+    const world = destinationWorld({}, { simulateSettingChangeReload: false });
+    assert.deepEqual(world.travelStore.list(), [], 'the store starts on an empty library');
+
+    const { persisted } = await runWholeComposition(world, exportedEnvelope());
+
+    assert.ok(realmIds(persisted).includes(VALE_ID), 'the setting carries the merged library');
+    assert.ok(
+      world.travelStore.list().some((realm) => realm.id === VALE_ID),
+      'and so does the live store, without any hook having re-read the setting'
+    );
+    const imported = world.environmentStore.list().find((env) => env.name === 'Vale Foraging');
+    assert.ok(Boolean(imported), 'the realm-gated environment was not rejected');
+    assert.deepEqual(imported.includedRealmIds, [VALE_ID], 'and its gate survived intact');
   });
 
   it('lands BOTH libraries before an enabled automatic environment that needs them', async () => {
