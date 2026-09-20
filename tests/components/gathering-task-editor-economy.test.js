@@ -222,9 +222,10 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {
     // The hook rides the converted trigger now, so `gathering-task-editor-stepper-mounted` asserts
-    // its presence on the rendered DOM rather than this suite matching it in markup.
+    // its presence on the rendered DOM rather than this suite matching it in markup, and `clears the
+    // default environment back to the sentinel` there drives the empty-to-null coercion this used to
+    // pin as source text.
     assert.match(editorSource, /function setDefaultEnvironment/, 'has a default-environment setter');
-    assert.match(editorSource, /defaultEnvironmentId: id \|\| null/, 'the setter coerces empty to null');
     // The parent feeds the system environments into the editor.
     assert.match(rootSource, /selectedSystemEnvironmentOptions\s*=\s*\$derived/, 'parent derives the system environment options');
     assert.match(rootSource, /environmentOptions=\{selectedSystemEnvironmentOptions\}/, 'parent passes environmentOptions to the task editor');

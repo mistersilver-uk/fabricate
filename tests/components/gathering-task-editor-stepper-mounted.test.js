@@ -448,7 +448,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
       assert.equal(
         assertSelectHasResolvedName(root, control.trigger),
         control.name,
-        `${control.id} keeps the accessible name it had as a <select>`
+        `${control.id} resolves to its pinned accessible name`
       );
       assert.deepEqual(
         selectOptionValues(root, control.trigger),
@@ -477,6 +477,29 @@ describe('Gathering task editor steppers (issue 1050)', () => {
       hint.textContent.replaceAll(/\s+/gu, ' ').trim(),
       /tagged scene region/u,
       'and the element it names is the canvas-drop hint, not another caption'
+    );
+  });
+
+  it('clears the default environment back to the sentinel', async () => {
+    const { root, updates, sync } = await mountEditor();
+    const picker = '[data-gathering-task-field="defaultEnvironmentId"]';
+    const read = (patch) => patch.defaultEnvironmentId;
+    chooseSelectOption(root, picker, 'env-cave');
+    await sync();
+    assert.equal(lastWrite(updates, read), 'env-cave', 'choosing an environment persists its id');
+    assert.equal(selectTriggerText(root, picker), 'Deep Cave', 'and the trigger reads it back');
+
+    chooseSelectOption(root, picker, '__unchanged__');
+    await sync();
+    assert.equal(
+      lastWrite(updates, read),
+      null,
+      'choosing the sentinel row must clear the default environment, not persist an empty string'
+    );
+    assert.equal(
+      selectTriggerText(root, picker),
+      'None (ask on drop)',
+      'and the trigger reads the sentinel back'
     );
   });
 
