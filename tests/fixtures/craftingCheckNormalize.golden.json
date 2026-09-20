@@ -1,0 +1,5787 @@
+{
+  "entryPoints": {
+    "empty": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "modernRelative": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": false,
+          "breakToolsOnFail": true
+        },
+        "failureResultPolicy": "always",
+        "progressive": {
+          "awardMode": "partial",
+          "rollFormula": "2d6 + 1d20",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-progressive",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 12
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          },
+          "preview": {
+            "difficulties": [
+              4,
+              6,
+              9
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0001",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "relativeOutcomes": [
+            {
+              "id": "rel-close",
+              "name": "Close",
+              "success": true,
+              "breakTools": true,
+              "dc": 3
+            },
+            {
+              "id": "rid-0002",
+              "name": "Minted Relative",
+              "success": false,
+              "breakTools": false,
+              "dc": 0
+            }
+          ],
+          "fixedOutcomes": [
+            {
+              "id": "fix-band",
+              "name": "Band",
+              "success": false,
+              "breakTools": true,
+              "start": 1,
+              "end": 9
+            },
+            {
+              "id": "rid-0003",
+              "name": "Minted Fixed",
+              "success": false,
+              "breakTools": false,
+              "start": 0,
+              "end": 0
+            }
+          ],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0004",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "simple": {
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 17,
+          "thresholdMode": "exceed",
+          "dcMode": "dynamic",
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0005",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "macroUuid": "Macro.abcdef0123456789",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0006",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "bySubject",
+        "defaultModifierIds": [
+          "med",
+          "ath"
+        ],
+        "maxModifierPicks": 2
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": false,
+          "breakToolsOnFail": true
+        },
+        "failureResultPolicy": "always",
+        "simple": {
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 17,
+          "thresholdMode": "exceed",
+          "dcMode": "dynamic",
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0007",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "macroUuid": "Macro.abcdef0123456789",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0008",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0009",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "relativeOutcomes": [
+            {
+              "id": "rel-close",
+              "name": "Close",
+              "success": true,
+              "breakTools": true,
+              "dc": 3
+            },
+            {
+              "id": "rid-0010",
+              "name": "Minted Relative",
+              "success": false,
+              "breakTools": false,
+              "dc": 0
+            }
+          ],
+          "fixedOutcomes": [
+            {
+              "id": "fix-band",
+              "name": "Band",
+              "success": false,
+              "breakTools": true,
+              "start": 1,
+              "end": 9
+            },
+            {
+              "id": "rid-0011",
+              "name": "Minted Fixed",
+              "success": false,
+              "breakTools": false,
+              "start": 0,
+              "end": 0
+            }
+          ],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0012",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "progressive": {
+          "awardMode": "partial",
+          "rollFormula": "2d6 + 1d20",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-progressive",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 12
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          },
+          "preview": {
+            "difficulties": [
+              4,
+              6,
+              9
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "bySubject",
+        "defaultModifierIds": [
+          "med",
+          "ath"
+        ],
+        "maxModifierPicks": 2
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "always",
+        "progressive": {
+          "awardMode": "partial",
+          "rollFormula": "2d6 + 1d20",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-progressive",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 12
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          },
+          "preview": {
+            "difficulties": [
+              4,
+              6,
+              9
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0013",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "relativeOutcomes": [
+            {
+              "id": "rel-close",
+              "name": "Close",
+              "success": true,
+              "breakTools": true,
+              "dc": 3
+            },
+            {
+              "id": "rid-0014",
+              "name": "Minted Relative",
+              "success": false,
+              "breakTools": false,
+              "dc": 0
+            }
+          ],
+          "fixedOutcomes": [
+            {
+              "id": "fix-band",
+              "name": "Band",
+              "success": false,
+              "breakTools": true,
+              "start": 1,
+              "end": 9
+            },
+            {
+              "id": "rid-0015",
+              "name": "Minted Fixed",
+              "success": false,
+              "breakTools": false,
+              "start": 0,
+              "end": 0
+            }
+          ],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0016",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "bySubject",
+        "defaultModifierIds": [
+          "med",
+          "ath"
+        ],
+        "maxModifierPicks": 2
+      }
+    },
+    "modernRoutedFixedType": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "fixed",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0001",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "relativeOutcomes": [
+            {
+              "id": "rel-close",
+              "name": "Close",
+              "success": true,
+              "breakTools": true,
+              "dc": 3
+            },
+            {
+              "id": "rid-0002",
+              "name": "Minted Relative",
+              "success": false,
+              "breakTools": false,
+              "dc": 0
+            }
+          ],
+          "fixedOutcomes": [
+            {
+              "id": "fix-band",
+              "name": "Band",
+              "success": false,
+              "breakTools": true,
+              "start": 1,
+              "end": 9
+            },
+            {
+              "id": "rid-0003",
+              "name": "Minted Fixed",
+              "success": false,
+              "breakTools": false,
+              "start": 0,
+              "end": 0
+            }
+          ],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0004",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "fixed",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0005",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "relativeOutcomes": [
+            {
+              "id": "rel-close",
+              "name": "Close",
+              "success": true,
+              "breakTools": true,
+              "dc": 3
+            },
+            {
+              "id": "rid-0006",
+              "name": "Minted Relative",
+              "success": false,
+              "breakTools": false,
+              "dc": 0
+            }
+          ],
+          "fixedOutcomes": [
+            {
+              "id": "fix-band",
+              "name": "Band",
+              "success": false,
+              "breakTools": true,
+              "start": 1,
+              "end": 9
+            },
+            {
+              "id": "rid-0007",
+              "name": "Minted Fixed",
+              "success": false,
+              "breakTools": false,
+              "start": 0,
+              "end": 0
+            }
+          ],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0008",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "fixed",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [
+            {
+              "id": "tier-fine",
+              "name": "Fine",
+              "dc": 12
+            },
+            {
+              "id": "rid-0009",
+              "name": "Unnamed",
+              "dc": 0
+            }
+          ],
+          "relativeOutcomes": [
+            {
+              "id": "rel-close",
+              "name": "Close",
+              "success": true,
+              "breakTools": true,
+              "dc": 3
+            },
+            {
+              "id": "rid-0010",
+              "name": "Minted Relative",
+              "success": false,
+              "breakTools": false,
+              "dc": 0
+            }
+          ],
+          "fixedOutcomes": [
+            {
+              "id": "fix-band",
+              "name": "Band",
+              "success": false,
+              "breakTools": true,
+              "start": 1,
+              "end": 9
+            },
+            {
+              "id": "rid-0011",
+              "name": "Minted Fixed",
+              "success": false,
+              "breakTools": false,
+              "start": 0,
+              "end": 0
+            }
+          ],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0012",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-short-legacy",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 2
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "legacyNamedOutcomes": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": true
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "flawed",
+          "standard",
+          "fine",
+          "mythic"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": true
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "flawed",
+          "standard",
+          "fine",
+          "mythic"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "diceCritsOnEverySubCheck": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0001",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0002",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "simple": {
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0003",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0004",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0005",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0006",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0007",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + 2d6 + 3d6kh2 + @abilities.str.mod",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "crit-bare-die",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "crit-out-of-range",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0008",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "total",
+                  "operator": "==",
+                  "value": 4
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "natSteppingWithD20Group": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "2d6 + 1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "natstep-up",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "allDice",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "natstep-down",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "allDice",
+                  "operator": "==",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "down",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "2d6 + 1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "natstep-up",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "allDice",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "natstep-down",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "allDice",
+                  "operator": "==",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "down",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "2d6 + 1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "natstep-up",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "allDice",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "natstep-down",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 1,
+                  "aggregate": "allDice",
+                  "operator": "==",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "down",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "natSteppingWithoutD20Group": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "2d6",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "2d6",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "2d6",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "natSteppingOnFixedType": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "fixed",
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "fixed",
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "fixed",
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "routedRollExpressionOnly": {
+      "crafting": {
+        "enabled": true,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + @abilities.dex.mod",
+          "dc": 14,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": true,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + @abilities.dex.mod",
+          "dc": 14,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": true,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20 + @abilities.dex.mod",
+          "dc": 14,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "consumeCatalystsOnFailAlone": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": true
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": true
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "consumeCatalystsBesideCanonicalKey": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "triggerMatrixOnEverySubCheck": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "1d20",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0001",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0002",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "simple": {
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0003",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0004",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0005",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "1d20",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0006",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "1d20",
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0007",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": [
+              {
+                "id": "trig-roll-total",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": ">=",
+                  "value": 18
+                },
+                "outcome": "success",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "up",
+                  "steps": 2,
+                  "tierId": "tier-fine"
+                }
+              },
+              {
+                "id": "trig-progressive-value",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": "<",
+                  "value": 4
+                },
+                "outcome": "failure",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-outcome-tier",
+                "condition": {
+                  "type": "outcomeTier",
+                  "tierIds": [
+                    "tier-fine"
+                  ],
+                  "outcomeKeys": [
+                    "critical",
+                    "critical"
+                  ]
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "target",
+                  "steps": 1,
+                  "tierId": "tier-mythic"
+                }
+              },
+              {
+                "id": "trig-dice-group",
+                "condition": {
+                  "type": "diceGroup",
+                  "groupId": 0,
+                  "aggregate": "anyDie",
+                  "operator": "==",
+                  "value": 20
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "trig-legacy-break-only",
+                "condition": {
+                  "type": "rollTotal",
+                  "operator": "<=",
+                  "value": 3
+                },
+                "outcome": "none",
+                "breakTools": true,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              },
+              {
+                "id": "rid-0008",
+                "condition": {
+                  "type": "progressiveValue",
+                  "operator": ">",
+                  "value": 1
+                },
+                "outcome": "none",
+                "breakTools": false,
+                "tierStep": {
+                  "mode": "none",
+                  "steps": 1,
+                  "tierId": null
+                }
+              }
+            ]
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "failureResultPolicyNever": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "never",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "never",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "never",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "failureResultPolicyPerRecord": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "failureResultPolicyAlways": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "always",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "always",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "always",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "failureResultPolicyBogus": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "modifierBasisKnown": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "bySubject",
+        "defaultModifierIds": [
+          "med",
+          "ath"
+        ]
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "bySubject",
+        "defaultModifierIds": [
+          "med",
+          "ath"
+        ]
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "bySubject",
+        "defaultModifierIds": [
+          "med",
+          "ath"
+        ]
+      }
+    },
+    "modifierBasisEmpty": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "highest",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "highest",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "highest",
+        "defaultModifierIds": []
+      }
+    },
+    "modifierBasisNullSentinel": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "playerPicks",
+        "defaultModifierIds": [
+          "med",
+          "ghost"
+        ]
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "playerPicks",
+        "defaultModifierIds": [
+          "med",
+          "ghost"
+        ]
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "playerPicks",
+        "defaultModifierIds": [
+          "med",
+          "ghost"
+        ]
+      }
+    },
+    "modifierBasisOmittedArgument": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [
+          "med",
+          "ghost"
+        ]
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [
+          "med",
+          "ghost"
+        ]
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [
+          "med",
+          "ghost"
+        ]
+      }
+    },
+    "maxModifierPicksNull": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "maxModifierPicksZero": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "maxModifierPicksNegative": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "maxModifierPicksString": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [],
+        "maxModifierPicks": 3
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [],
+        "maxModifierPicks": 3
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [],
+        "maxModifierPicks": 3
+      }
+    },
+    "maxModifierPicksThree": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [],
+        "maxModifierPicks": 3
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [],
+        "maxModifierPicks": 3
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": [],
+        "maxModifierPicks": 3
+      }
+    },
+    "progressivePreviewAuthored": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "3d6",
+          "checkBreakage": {
+            "triggers": []
+          },
+          "preview": {
+            "difficulties": [
+              3,
+              8.5
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "3d6",
+          "checkBreakage": {
+            "triggers": []
+          },
+          "preview": {
+            "difficulties": [
+              3,
+              8.5
+            ]
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "3d6",
+          "checkBreakage": {
+            "triggers": []
+          },
+          "preview": {
+            "difficulties": [
+              3,
+              8.5
+            ]
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    },
+    "progressivePreviewAbsent": {
+      "crafting": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "exceed",
+          "rollFormula": "3d6",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvage": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "exceed",
+          "rollFormula": "3d6",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gathering": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "exceed",
+          "rollFormula": "3d6",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      }
+    }
+  },
+  "modifierSelection": {
+    "omittedBasisArgument": {
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "med",
+        "ath"
+      ]
+    },
+    "nonSetTruthyBasis": {
+      "defaultModifierPolicy": "addAll",
+      "defaultModifierIds": [
+        "med",
+        "ath"
+      ]
+    }
+  }
+}

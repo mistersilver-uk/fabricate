@@ -246,6 +246,8 @@ export class CompendiumImporter {
    * @param {object} recipeManager
    * @param {object} [seams]
    * @param {object} [seams.environmentStore] - GatheringEnvironmentStore seam (list/save)
+   * @param {object} [seams.travelStore] - GatheringRealmStore seam (get/save), preferred over the
+   *   raw setting pair for the world travel merge (issue 1858)
    * @param {(key: string) => *} [seams.getSetting] - World-setting reader (gatheringConfig)
    * @param {(key: string, value: *) => Promise<*>} [seams.setSetting] - World-setting writer
    * @param {() => boolean} [seams.isGM] - GM predicate (F3 fail-fast gate)
@@ -261,6 +263,7 @@ export class CompendiumImporter {
     this._craftingSystemManager = craftingSystemManager;
     this._recipeManager = recipeManager;
     this._environmentStore = seams.environmentStore ?? null;
+    this._travelStore = seams.travelStore ?? null;
     this._getSetting = seams.getSetting ?? null;
     this._setSetting = seams.setSetting ?? null;
     // Enforce the GM gate whenever a Foundry `game.user` is present; pure tests
@@ -699,8 +702,8 @@ export class CompendiumImporter {
 
   /**
    * Import the gathering-authoring bundle for the (possibly freshly-created)
-   * system: rebind container ids, resolve/report references, persist environments
-   * via replace-by-system-id (F1), and merge the gatheringConfig slice.
+   * system: rebind container ids, resolve/report references, merge the world realm library,
+   * persist environments via replace-by-system-id (F1), and merge the gatheringConfig slice.
    * @private
    */
   async _importGatheringAuthoring(packData, system, recipesData, summary) {
@@ -754,10 +757,14 @@ export class CompendiumImporter {
     // validates them against whatever the destination world already had. That ordering was
     // latent until issue 1315 closed the gate's mode-blind `enabledTaskIds` guard, which had
     // been answering "yes" for automatic environments without consulting the library at all.
+    // The realm library lands before them for the same reason: an imported environment gates on
+    // realms by id, and the environment store validates those ids against the world library on
+    // every write, so persisting the environments first rejects the whole import of a
+    // realm-gated system into a world that does not yet have those places (issue 1848).
+    await this._persistTravelConfig(resolved.travelConfig);
     await this._persistGatheringConfig(system.id, resolvedConfig);
     await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistCurrencyConfig(packData.currencyConfig);
-    await this._persistTravelConfig(resolved.travelConfig);
   }
 
   /**
@@ -985,13 +992,19 @@ export class CompendiumImporter {
    * The scalars (reveal mode, modifier visibility) are seeded ONLY into an unconfigured world.
    * A world that already has realms has already answered how it discloses its places, and an
    * imported system does not get to overrule it.
+   *
+   * Persists through the resolved `travelStore` seam when one resolves, otherwise through the
+   * raw setting pair (issue 1858). The store write publishes the merged library to its cache
+   * before the setting write resolves, so the environment writes that follow it read the merged
+   * library directly, with no dependence on a replicated-setting hook.
    * @private
    */
   async _persistTravelConfig(incoming) {
-    if (!this._getSetting || !this._setSetting) return;
     if (!incoming || typeof incoming !== 'object') return;
+    const store = this._resolveTravelStore();
+    if (!store && (!this._getSetting || !this._setSetting)) return;
 
-    const current = this._getSetting(TRAVEL_CONFIG_KEY) || {};
+    const current = (store ? store.get() : this._getSetting(TRAVEL_CONFIG_KEY)) || {};
     const currentRealms = Array.isArray(current.realms) ? current.realms : [];
     const incomingRealms = Array.isArray(incoming.realms) ? incoming.realms : [];
     if (incomingRealms.length === 0) return;
@@ -1019,12 +1032,37 @@ export class CompendiumImporter {
       if (incoming.modifierVisibility) next.modifierVisibility = incoming.modifierVisibility;
     }
 
+    if (store) {
+      // The store normalizes on write and publishes its cache BEFORE awaiting the setting, so the
+      // environment writes that follow validate against the merged library without waiting on a
+      // replicated-setting hook — which a hook-free world never fires at all (issue 1858).
+      await store.save(next);
+      return;
+    }
+
     // Normalize before writing, for the reason `_persistCurrencyConfig` does: every other
     // writer of this setting goes through `GatheringRealmStore`, which normalizes on write.
     // Without this a hand-edited export could persist a shape the readers only repair on read —
     // and a scene mapping that arrived without an id would be minted a FRESH id on every
     // `load()`, changing its identity from one reload to the next.
     await this._setSetting(TRAVEL_CONFIG_KEY, normalizeTravelConfig(next));
+  }
+
+  /**
+   * The realm store behind the `travelStore` seam, resolved PER CALL, or `null`.
+   *
+   * The decision is made on what the seam RESOLVES TO, never on the seam object: `src/main.js`
+   * wires a lazy delegator that is an object whatever the field behind it holds, so trusting the
+   * seam would route the merge into a `save` that resolves to `undefined` and report a phantom
+   * success instead of falling back to the raw setting write. `get()` answering a configuration
+   * is the liveness probe — the `scopeStoreDelegate` fail-closed rule, applied to a seam that
+   * has somewhere else to go.
+   * @private
+   */
+  _resolveTravelStore() {
+    const store = this._travelStore;
+    if (typeof store?.get !== 'function' || typeof store?.save !== 'function') return null;
+    return store.get() ? store : null;
   }
 
   /**
