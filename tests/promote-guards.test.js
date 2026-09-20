@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   assertHotfixMinimumNotRaised,
   evaluateRegistryLeadTarget,
+  evaluateTesterConfigDrift,
 } from '../scripts/lib/promoteGuards.js';
 
 // ── assertHotfixMinimumNotRaised (Gap 1, §Hotfix isolation) ────────────────────────────────────
@@ -232,4 +233,132 @@ test('an undefined head is treated as absent, not compared', () => {
   });
   assert.equal(verdict.decision, 'refuse');
   assert.equal(verdict.kind, 'absent');
+});
+
+// ── evaluateTesterConfigDrift (issue 1872, §Tester group identity) ──────────────────────────────
+
+/** A config declaring one channel's tester identity, plus the fields drift must ignore. */
+function configWith({ testerGroups, testerSecretEnv, bucket = 'bucket-a', baseUrl = 'https://a' }) {
+  return {
+    moduleId: 'fabricate',
+    bucket,
+    baseUrl,
+    channels: { 'early-access': { testerGroups, testerSecretEnv }, public: { testerGroups: [] } },
+  };
+}
+
+const ROTATED = {
+  testerGroups: ['guild-artisan-2026'],
+  testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET',
+};
+const PRE_ROTATION = {
+  testerGroups: ['patrons-2026'],
+  testerSecretEnv: 'S3_EARLY_ACCESS_PATH_SECRET',
+};
+
+test('identical tester identities on both refs are not drift', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: configWith(ROTATED),
+  });
+  assert.equal(drift.drifted, false);
+  assert.equal(drift.remedy, '');
+});
+
+test('a differing tester GROUP is drift, and the summary names both sides and the publisher ref', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: configWith({ ...ROTATED, testerGroups: ['patrons-2026'] }),
+  });
+  assert.equal(drift.drifted, true);
+  assert.match(drift.summary, /guild-artisan-2026/);
+  assert.match(drift.summary, /patrons-2026/);
+  assert.match(drift.summary, /origin\/release/);
+});
+
+test('a differing tester SECRET NAME is drift on its own — same group, different segment source', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: configWith({ ...ROTATED, testerSecretEnv: 'S3_EARLY_ACCESS_PATH_SECRET' }),
+  });
+  assert.equal(drift.drifted, true);
+  assert.match(drift.summary, /S3_GUILD_ARTISAN_PATH_SECRET/);
+  assert.match(drift.summary, /S3_EARLY_ACCESS_PATH_SECRET/);
+});
+
+test('bucket, baseUrl and moduleId differences are NOT tester-identity drift', () => {
+  // The two refs legitimately differ in plenty of ways; only the cohort's identity is the subject.
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: {
+      ...configWith({ ...ROTATED, bucket: 'bucket-b', baseUrl: 'https://b' }),
+      moduleId: 'fabricate-legacy',
+    },
+  });
+  assert.equal(drift.drifted, false);
+});
+
+test('group order carries no meaning — the names are compared as a SET', () => {
+  const groups = ['guild-artisan-2026', 'guild-patron-2026'];
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith({ ...ROTATED, testerGroups: groups }),
+    publisherConfig: configWith({ ...ROTATED, testerGroups: [...groups].reverse() }),
+  });
+  assert.equal(drift.drifted, false);
+});
+
+test('an absent channel on the publisher ref drifts against a declared one', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: { moduleId: 'fabricate' },
+  });
+  assert.equal(drift.drifted, true);
+  assert.match(drift.summary, /none/);
+});
+
+test('the remedy names the release-s3.yml dispatch and the ref that publishes the channel', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: configWith(PRE_ROTATION),
+  });
+  assert.match(drift.remedy, /release-s3\.yml/);
+  assert.match(drift.remedy, /workflow_dispatch/);
+  assert.match(drift.remedy, /early-access/);
+  assert.match(drift.remedy, /origin\/release/);
+});
+
+test('the publisher ref is named by the caller, not assumed', () => {
+  const drift = evaluateTesterConfigDrift({
+    channel: 'early-access',
+    dispatchConfig: configWith(ROTATED),
+    publisherConfig: configWith(PRE_ROTATION),
+    publisherRef: 'origin/1.9.x',
+  });
+  assert.match(drift.summary, /origin\/1\.9\.x/);
+  assert.match(drift.remedy, /origin\/1\.9\.x/);
+});
+
+test('no path SEGMENT reaches the summary or the remedy — only names are compared', () => {
+  // The segment is a secret. It is never read here, so the diagnosis is safe to print in a log
+  // even when a caller has it in the environment.
+  const segment = 'a-secret-segment-value';
+  process.env.S3_GUILD_ARTISAN_PATH_SECRET = segment;
+  try {
+    const drift = evaluateTesterConfigDrift({
+      channel: 'early-access',
+      dispatchConfig: configWith(ROTATED),
+      publisherConfig: configWith(PRE_ROTATION),
+    });
+    assert.ok(!drift.summary.includes(segment), 'the summary leaked the path segment');
+    assert.ok(!drift.remedy.includes(segment), 'the remedy leaked the path segment');
+  } finally {
+    delete process.env.S3_GUILD_ARTISAN_PATH_SECRET;
+  }
 });
