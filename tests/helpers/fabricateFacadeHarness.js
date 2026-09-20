@@ -46,14 +46,15 @@ import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js
 import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
 import { classMemberSource } from './boundedSource.js';
 import { collectSources, repoRoot } from './sourceScan.js';
+import { byCodePoint } from './ratchetBaseline.js';
 
 /**
- * The entry and the `src/bootstrap/` modules it composes, read through ONE call (issue 1715).
+ * The entry and the `src/bootstrap/` modules it composes, read through one call (issue 1715).
  * Every owner-gate suite pins its faithful copy above against this.
  */
 const ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
 
-export const MAIN_SOURCE = [...Object.keys(ENTRY_SOURCES).filter((file) => file.startsWith('src/bootstrap/')).sort(), 'src/main.js']
+export const MAIN_SOURCE = [...Object.keys(ENTRY_SOURCES).filter((file) => file.startsWith('src/bootstrap/')).sort(byCodePoint), 'src/main.js']
   .map((file) => ENTRY_SOURCES[file])
   .join('\n');
 
