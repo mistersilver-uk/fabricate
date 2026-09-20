@@ -242,6 +242,35 @@ const RENAMED = [
       "The gate is `runMigrations` in `src/bootstrap/migrations.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.",
     identifiers: [["`runMigrations` in `src/bootstrap/migrations.js`", "`_runMigrations` in `src/main.js`"]],
   },
+  // Four cites written as a bare `main.js` rather than `src/main.js`, repointed with the rest.
+  {
+    before:
+      "The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `main.js` (issue 656).",
+    after:
+      "The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `src/bootstrap/composeServices.js` (issue 656).",
+    identifiers: [["`src/bootstrap/composeServices.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.",
+    after:
+      "See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `src/bootstrap/hooks.js` wiring.",
+    identifiers: [["`src/bootstrap/hooks.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "**The player-path ownership gate lives in the `main.js` FACADE, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.",
+    after:
+      "**The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.",
+    identifiers: [["`src/bootstrap/craftingFacade.js` facade", "`main.js` FACADE"]],
+  },
+  {
+    before:
+      "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
+    after:
+      "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `src/bootstrap/socketRouter.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
+    identifiers: [["`src/bootstrap/socketRouter.js`", "`main.js`"]],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
