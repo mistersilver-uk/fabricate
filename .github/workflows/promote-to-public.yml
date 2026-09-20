@@ -146,11 +146,26 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Capture the publisher ref's deployment configuration
+        # early-access is published ONLY from `release` (release.yml resolves release-s3.yml at the
+        # CALLER's commit), so a promotion dispatched from `main` can evaluate a tester identity no
+        # publish has ever used — which surfaces as a 404 head and reads as a cohort risk rather
+        # than as configuration drift (issue 1872). Absent is tolerated with an empty object: the
+        # drift check then simply finds nothing to compare.
+        run: |
+          git fetch origin "+refs/heads/release:refs/remotes/origin/release" --force \
+            || echo "::notice::could not fetch origin/release; the tester-configuration drift check has nothing to compare."
+          git show origin/release:release.s3.config.json > "$RUNNER_TEMP/release.s3.publisher.config.json" 2>/dev/null || {
+            echo "::notice::origin/release carries no readable release.s3.config.json; the tester-configuration drift check has nothing to compare."
+            echo '{}' > "$RUNNER_TEMP/release.s3.publisher.config.json"
+          }
+
       - name: Verify source_channel, assert the source advertises the version, and read the registry-lead heads
         id: checks
         env:
           VERSION: ${{ inputs.version }}
           SOURCE_CHANNEL: ${{ inputs.source_channel }}
+          PUBLISHER_CONFIG: ${{ runner.temp }}/release.s3.publisher.config.json
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
           # Both tester secrets: the guard enumerates every private target of beta AND early-access,
@@ -162,7 +177,10 @@ jobs:
           import { readFile, appendFile } from 'node:fs/promises';
           import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
           import { deriveS3Layout, resolveChannelConfig } from './scripts/release-s3.js';
-          import { evaluateRegistryLeadTarget } from './scripts/lib/promoteGuards.js';
+          import {
+            evaluateRegistryLeadTarget,
+            evaluateTesterConfigDrift,
+          } from './scripts/lib/promoteGuards.js';
 
           const version = process.env.VERSION;
           const sourceChannel = process.env.SOURCE_CHANNEL;
@@ -173,6 +191,17 @@ jobs:
           const bucket = process.env.S3_RELEASE_BUCKET || config.bucket;
           const baseUrl = process.env.RELEASE_BASE_URL || config.baseUrl;
           const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+          // Tester identity is deployment configuration read from THIS ref, while early-access is
+          // published from `release`. DIAGNOSED, never an independent refusal: drift is why an
+          // early-access head can be absent, so the remedy belongs on that refusal.
+          const publisherConfig = JSON.parse(await readFile(process.env.PUBLISHER_CONFIG, 'utf8'));
+          const drift = evaluateTesterConfigDrift({
+            channel: 'early-access',
+            dispatchConfig: config,
+            publisherConfig,
+          });
+          if (drift.drifted) console.warn(`::warning::${drift.summary}`);
 
           const fail = (msg) => {
             console.error(`::error::${msg}`);
@@ -255,7 +284,11 @@ jobs:
                 head,
                 version,
               });
-              if (verdict.decision === 'refuse') fail(verdict.reason);
+              const driftsHere =
+                verdict.kind === 'absent' && channel === 'early-access' && drift.drifted;
+              if (verdict.decision === 'refuse') {
+                fail(verdict.reason + (driftsHere ? ` ${drift.remedy}` : ''));
+              }
               console.log(`registry-lead: ${verdict.reason}`);
             }
           }
@@ -347,7 +380,7 @@ jobs:
           if [ "$PREV_PUBLIC" = "$VERSION" ]; then
             echo "Would SKIP the public write: the public head already advertises v$VERSION (re-run)."
           else
-            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public)."
+            echo "Would RE-STAGE v$VERSION from the built dist and publish it to the 'public' channel (node scripts/release-s3.js --version $VERSION --channel public), under the deployment configuration this workflow ref carries."
           fi
           echo "Nothing is written to the beta or early-access channels."
 
@@ -386,8 +419,13 @@ jobs:
         run: |
           # Build from the tested commit, then re-stage per target (release-s3.js), NEVER an S3 copy.
           # 'public' has no tester group, so this is exactly one target: the public sources feed.
+          #
+          # Bytes from the tag, deployment configuration from the workflow ref (issue 1872). The
+          # checkout below moves the tree to v$VERSION, so the capture has to precede it.
+          git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
           git checkout "v$VERSION"
-          node scripts/release-s3.js --version "$VERSION" --channel public
+          node scripts/release-s3.js --version "$VERSION" --channel public \
+            --config "$RUNNER_TEMP/release.s3.config.json"
 
   # ── JOB 4: READBACK → PREFLIGHT → UN-DRAFT → REGISTER ───────────────────────────────────────────
   # The `if:` is VERBATIM from the issue: no `inputs.dry_run` disjunct, so a *skipped* job 2/3 (which

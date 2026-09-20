@@ -119,10 +119,28 @@ jobs:
             exit 1
           fi
 
+      - name: Capture the deployment configuration from the workflow ref
+        # Tester-group identity is DEPLOYMENT configuration, not a property of the released bytes
+        # (issue 1872): it must come from the ref this workflow runs at, never from the tag. The
+        # checkout below moves the tree to the tag, so the capture has to happen first. Without it
+        # a rotated group can never be populated for an already-minted version — every dispatch,
+        # whatever its --ref, would republish under the tag's own configuration.
+        run: git show "$GITHUB_SHA":release.s3.config.json > "$RUNNER_TEMP/release.s3.config.json"
+
       - name: Checkout release tag
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: git checkout "$RELEASE_TAG"
+
+      - name: The tag's publisher must accept --config
+        # release-s3.js's parseArgs IGNORES an unknown flag, so a tag predating --config would
+        # silently publish under its OWN configuration while this workflow believed it had passed
+        # the ref's. Named refusal rather than a silent wrong prefix.
+        run: |
+          grep -q -- "'--config'" scripts/release-s3.js || {
+            echo "::error::scripts/release-s3.js at this tag predates --config, so the deployment configuration captured from the workflow ref would be ignored. Publish a tag that carries --config support, or cut one by cherry-picking it onto that line."
+            exit 1
+          }
 
       # Shared Node + npm ci + OIDC preamble. npm ci runs AFTER the tag checkout above so it installs
       # the TAG's dependencies (which is why this workflow keeps its own checkout/tag steps rather
@@ -152,11 +170,16 @@ jobs:
           # It must NOT come from GITHUB_SHA: the "Checkout release tag" step above did
           # `git checkout "$tag"`, so GITHUB_SHA still names the ref that triggered the run, not the
           # commit whose bytes this zip carries. The provenance guard keys resume/overwrite on it.
+          #
+          # The two sources are deliberately different: the BYTES come from the tag (this tree),
+          # while the DEPLOYMENT CONFIGURATION — which tester groups exist and which secret each
+          # derives its segment from — comes from the workflow ref, captured before the checkout.
           SOURCE_SHA="$(git rev-parse HEAD)"
           node scripts/release-s3.js \
             --version "$VERSION" \
             --channel "$CHANNEL" \
             --source-sha "$SOURCE_SHA" \
+            --config "$RUNNER_TEMP/release.s3.config.json" \
             ${{ inputs.check_heads == true && '--check-heads' || '' }} \
             ${{ inputs.dry_run == true && '--dry-run' || '' }} \
             ${{ inputs.overwrite == true && '--overwrite' || '' }}
