@@ -18,6 +18,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -29,13 +30,19 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-browser-',
   // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied;
   // copied verbatim it throws `ReferenceError: $state is not defined`.
-  runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
+  // ... and the browse-list wiring is a second one (issue 1716), reached through the view.
+  runeModules: [
+    'src/ui/svelte/apps/manager/bulkSelection.svelte.js',
+    'src/ui/svelte/apps/manager/browserListState.svelte.js',
+  ],
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
+    // The lifted browse state's default page size, which the browse-list composable reads.
+    'src/ui/model/managerBrowserViewState.js',
     'src/ui/model/essenceBrowserModel.js',
     // ... which since issue 1688 runs on the shared adapter-driven pipeline.
     'src/ui/model/entityBrowserModel.js',
@@ -461,6 +468,24 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
 });
 
 // The THIRD studio on the shared multi-select contract. It declares no `grouped` fixture:
+// Issue 1716 — the essence half of the manager's crafting-system switch contract, as the shared
+// parameterised run in `browserListStateCases.js`.
+describeBrowserListState({
+  label: 'EssenceBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) =>
+    props(
+      Array.from({ length: rowCount }, (_, index) =>
+        makeEssenceRow({ id: `f${index + 1}`, name: `Flux ${index + 1}` })
+      ),
+      { selectedSystemId, browserState }
+    ),
+  // The search term and the source cohort both name this system's records.
+  resetAxes: { searchTerm: ['flux', ''], sourceFilter: ['world', 'all'] },
+  // Status, sort, view mode and page size are preferences the switch leaves alone.
+  preservedAxes: { statusFilter: 'disabled', sortKey: 'source', viewMode: 'grid', pageSize: 5 },
+});
+
 describeBrowserBulkSelection({
   label: 'EssenceBrowserView',
   prefix: 'essence',

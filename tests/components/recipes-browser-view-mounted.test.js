@@ -14,6 +14,7 @@ import { createRecipeBrowserState } from '../../src/ui/model/recipeBrowserModel.
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 // Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption } from '../helpers/select-control.js';
 // Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
@@ -35,6 +36,8 @@ const RECIPE_RAW_MODULES = [
   'src/utils/recipeCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
+  // The lifted browse state's default page size, which the browse-list composable reads.
+  'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
   // ... which since issue 1688 runs on the shared adapter-driven pipeline.
   'src/ui/model/entityBrowserModel.js',
@@ -74,7 +77,11 @@ const browser = createMountedComponentHarness({
   // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied.
   // The inspector harness below renders no selection at all, so it is named here rather than
   // hoisted into RECIPE_RAW_MODULES.
-  runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
+  // The browse-list wiring is a second runes composable (issue 1716), reached through the view.
+  runeModules: [
+    'src/ui/svelte/apps/manager/bulkSelection.svelte.js',
+    'src/ui/svelte/apps/manager/browserListState.svelte.js',
+  ],
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     ...SELECT_COMPILED_MODULES,
@@ -382,6 +389,29 @@ describeBrowserBulkSelection({
       'the row still carries exactly its three cluster buttons — lock, enable and edit — ' +
       'so the smoke walk that reaches Edit through them is undisturbed by the new control'
   }
+});
+
+// Issue 1716 — the recipe half of the manager's crafting-system switch contract, as the shared
+// parameterised run in `browserListStateCases.js`.
+describeBrowserListState({
+  label: 'RecipesBrowserView',
+  harness: browser,
+  props: ({ rowCount, selectedSystemId, browserState }) => {
+    const recipes = Array.from({ length: rowCount }, (_, index) =>
+      makeRecipe({ id: `s${index + 1}`, name: `Salve ${index + 1}`, category: 'general' })
+    );
+    return {
+      recipes,
+      showRecipeCategories: true,
+      recipeCategories: [{ name: 'general', count: recipes.length }],
+      selectedSystemId,
+      browserState
+    };
+  },
+  // The category names a vocabulary the new system does not share.
+  resetAxes: { categoryFilter: ['alchemy', 'all'] },
+  // Status and lock are preferences, and the page size with them.
+  preservedAxes: { statusFilter: 'off', lockFilter: 'locked', pageSize: 5 }
 });
 
 describe('RecipesBrowserView filtering and sorting', () => {
