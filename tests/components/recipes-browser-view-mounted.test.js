@@ -391,8 +391,6 @@ describeBrowserBulkSelection({
   }
 });
 
-// Issue 1716 — the recipe half of the manager's crafting-system switch contract, as the shared
-// parameterised run in `browserListStateCases.js`.
 describeBrowserListState({
   label: 'RecipesBrowserView',
   harness: browser,
@@ -409,7 +407,7 @@ describeBrowserListState({
     };
   },
   // The category names a vocabulary the new system does not share.
-  resetAxes: { categoryFilter: ['alchemy', 'all'] },
+  resetAxes: { categoryFilter: ['alchemy', 'all'], pageIndex: [1, 0] },
   // Status and lock are preferences, and the page size with them.
   preservedAxes: { statusFilter: 'off', lockFilter: 'locked', pageSize: 5 }
 });
