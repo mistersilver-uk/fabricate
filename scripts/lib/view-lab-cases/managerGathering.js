@@ -138,7 +138,7 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-smithing' },
-    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -171,7 +171,7 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-settings' },
@@ -500,15 +500,15 @@ export const CASES = Object.freeze([
       ],
     });
   }),
-  // The environment editor's first open-panel frame (issue 1510), and the first ticked one in the
-  // registry — so it is also where the tick gutter's bite out of the panel width is visible.
+  // The environment editor's first open-panel frame (issue 1510), and its ticked list, so the tick
+  // gutter's bite out of the panel width is read against a six-level vocabulary.
   managerCase({
     id: 'manager-environment-danger-level-list',
     label: 'Manager — Environment danger level list',
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
-    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
     steps: [
       'Gathering',
       {

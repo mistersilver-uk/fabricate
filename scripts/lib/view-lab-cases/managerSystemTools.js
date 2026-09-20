@@ -304,17 +304,19 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: {},
-    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-edit-rules]' },
       { selector: '[data-tool-preview-actor]' },
     ],
     expectView: 'tool-edit',
-    // Two claims a closed frame cannot make: the panel exists and it is the unticked list.
+    // Three claims a closed frame cannot make: the panel exists, it is the unticked list, and it
+    // holds a world actor rather than the `No actor` sentinel alone, which is the name the panel
+    // cap is being read against.
     expectSelector:
       '.fabricate-manager .fabricate-select-popover:not(.fabricate-select-popover-ticked)' +
-      ' [role="option"] .fabricate-select-label',
+      ' [data-popover-option="Actor.lab-actor-brenna"] .fabricate-select-label',
     // The panel sits inside the application root rather than clipped by the rail it opened from.
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     position: { width: 1280, height: 720 },

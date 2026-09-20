@@ -14006,7 +14006,7 @@
   font-weight: 600;
 }
 
-/* skin census (issue 1523): no longer a carrier of the target tuple at all — the class rides the picker root since issue 1510 and the `toolbar` rung paints the 34px box, the 9px corner, the `--fab-bg-1` fill and the type its own declarations used to state. Its sole emitter is `ToolBehaviorPreview.svelte:360` (issues 1501, 1371, 1510). What stays is the rail column's full width, which a trigger deliberately never declares. */
+/* The rail column's full width, which the `toolbar` rung's trigger deliberately never declares (issue 1510); the rung paints the 34px box, the 9px corner and the `--fab-bg-1` fill this rule used to state, at its own 0.72rem rather than the 0.68rem declared here. */
 .fabricate-manager .manager-tool-actor-select .fabricate-select-trigger {
   width: 100%;
 }

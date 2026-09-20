@@ -738,7 +738,7 @@ describe('environment composition editor structure', () => {
     { names: ['renderedDangerOptions'], calls: ['map'] }
   );
 
-  defineStructureContract('and handed to the picker as its option list', OVERVIEW, {
+  defineStructureContract('the derived list is handed to the shared picker as its option list', OVERVIEW, {
     renders: ['Select'],
     names: ['dangerSelectOptions'],
   });
