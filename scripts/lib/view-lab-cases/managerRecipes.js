@@ -367,6 +367,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      // The toolbar's three filter vocabularies (issue 1510), whose closed faces this frame draws.
+      /^src\/ui\/svelte\/apps\/manager\/booksScrollsSelectOptions\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
       // The inspector aside this route mounts (issue 1505).
       /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
@@ -393,6 +395,38 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'books-scrolls'],
     // The inspector only.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/],
+  }),
+  // The browse toolbars' first open-panel frame (issue 1510), and the tightest panel of the commit
+  // that converted them: `Limited learning` is 84px of the 128px an unticked row leaves once the
+  // panel resolves to the `toolbar` band's own floor. This filter's caption is also the only
+  // conditional one in the phase — `Uses` in item visibility mode, `Learning` in knowledge — so the
+  // frame reads the name the trigger takes from it rather than from an `aria-label` of its own.
+  managerCase({
+    id: 'manager-books-scrolls-cap-filter-list',
+    label: 'Manager — Books scrolls cap filter list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-cap-filter]' },
+    ],
+    expectView: 'books-scrolls',
+    // Three claims a closed frame cannot make: the panel exists, it is the UNTICKED list this
+    // filter asks for, and it draws the limits row in the mode's own words.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover:not(.fabricate-select-popover-ticked)' +
+      ' [data-popover-option="limited"] .fabricate-select-label',
+    // The panel sits inside the application root rather than clipped by the toolbar it opened from.
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/booksScrollsSelectOptions\.js$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   managerCase({
     id: 'manager-crafting-settings',

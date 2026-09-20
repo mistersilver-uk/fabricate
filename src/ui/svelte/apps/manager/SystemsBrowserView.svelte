@@ -11,6 +11,7 @@
   import ActionMenu from '../../components/ActionMenu.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createSystemsBrowserState,
@@ -111,6 +112,12 @@
     ui.statusFilter = 'all';
   }
 
+  const statusSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.StatusAll', 'All systems') },
+    { value: 'active', label: text('FABRICATE.Admin.Manager.StatusActive', 'Active') },
+    { value: 'disabled', label: text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') },
+  ]);
+
   // The two commands that left the row's three-button cluster for the overflow menu. Edit stays
   // an `<IconButton>` because it is the row's primary act; Export and Delete are built as data so
   // the shared `<ActionMenu>` owns the trigger, the portaled panel and the keyboard contract.
@@ -154,20 +161,20 @@
       )}
       ariaLabel={text('FABRICATE.Admin.Manager.SearchLabel', 'Search systems')}
     />
-    <label class="manager-filter">
+    <!-- A `<span>`, not the `<label>` it was: `Select.svelte`'s host invariant, and the trigger
+         keeps the `aria-label` the select carried rather than being named by the caption, which
+         was never its accessible name (issue 1510). -->
+    <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={statusFilter}
-        onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
-        aria-label={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}
-      >
-        <option value="all">{text('FABRICATE.Admin.Manager.StatusAll', 'All systems')}</option>
-        <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
-        <option value="disabled"
-          >{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option
-        >
-      </select>
-    </label>
+        options={statusSelectOptions}
+        showTick={false}
+        ariaLabel={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}
+        onChange={(next) => (ui.statusFilter = next)}
+      />
+    </span>
     <Chip
       >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
         .replace('{shown}', filteredSystems.length)

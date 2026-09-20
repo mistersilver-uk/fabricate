@@ -437,6 +437,46 @@ export function registerSystemsCases() {
     );
   });
 
+  // The library toolbar's status filter (issue 1510). It carries no `data-*` hook of its own — its
+  // toolbar holds one filter — so it is addressed by the `aria-label` its `<select>` carried and
+  // which the trigger keeps, the demoted caption never having been its accessible name.
+  it('narrows the systems library by status through the converted toolbar filter', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    const filter = '[aria-label="Filter systems by status"]';
+    assert.equal(assertSelectHasResolvedName(target, filter), 'Filter systems by status');
+    assert.deepEqual(selectOptionValues(target, filter), ['all', 'active', 'disabled']);
+    assert.deepEqual(selectOptionLabels(target, filter), ['All systems', 'Active', 'Disabled']);
+    assert.ok(
+      !target.querySelector(filter).closest('label'),
+      'the caption is a demoted `<span>`: inside a `<label>` its own mousedown would dismiss the ' +
+        'panel and the forwarded click would re-open it'
+    );
+
+    const rows = () =>
+      [...target.querySelectorAll('.manager-system-row')].map((row) =>
+        row.getAttribute('data-system-id')
+      );
+    assert.deepEqual(rows(), ['alchemy', 'smithing'], 'both fixture systems list unfiltered');
+
+    chooseSelectOption(target, filter, 'disabled');
+    await tick();
+    flushSync();
+    assert.deepEqual(rows(), ['smithing'], 'only the disabled system survives the filter');
+
+    chooseSelectOption(target, filter, 'active');
+    await tick();
+    flushSync();
+    assert.deepEqual(rows(), ['alchemy']);
+  });
+
   it('feature-gates selected-system placeholder navigation', () => {
     target = document.createElement('div');
     document.body.appendChild(target);

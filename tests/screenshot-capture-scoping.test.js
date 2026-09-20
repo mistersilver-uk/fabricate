@@ -1086,6 +1086,16 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   // attribute is on the rows and on three availability menus too.
   'data-environment-field="dangerLevel"',
   'data-tool-preview-actor',
+  // Issue 1510 phase 3, commit 3a — the systems, access and recipe-item browse toolbars. Each is
+  // spelled bare, checked rather than assumed: no entry here prefixes a hook on a native control
+  // that survives, and `data-access-filter` is not a prefix of `data-access-category-filter`. The
+  // systems status filter is deliberately absent — it carries no hook of its own, its own toolbar
+  // holding one filter, and the capture producer addresses it by `.manager-filter` instead.
+  'data-access-category-filter',
+  'data-access-filter',
+  'data-books-scrolls-status-filter',
+  'data-books-scrolls-type-filter',
+  'data-books-scrolls-cap-filter',
 ]);
 
 /**
@@ -1251,9 +1261,9 @@ const NATIVE_SELECT_ELEMENT_TOKEN = /(?<![\w-])select(?![\w-])/u;
 // Every element- or aria-typed locator a capture producer still drives a NATIVE select through,
 // with the issue that retires it. Shrink-only: an entry leaves when its control converts.
 const NATIVE_ELEMENT_TYPED_SELECT_LOCATORS = Object.freeze([
-  // Issue 1510 Phase 3 — the browse toolbars' `.manager-filter` lane filters and the four
-  // environment browser filters, which carry their names in `aria-label` rather than in a hook.
-  '.fabricate-manager .manager-filter select',
+  // Issue 1510 Phase 3 — the environment browser's filters, which carry their names in an
+  // `aria-label` rather than in a hook. The `.manager-filter` entry left with the browse toolbars'
+  // own lane filters, which the phase's first commit converted.
   '.fabricate-manager select[aria-label="Filter environments by status"]',
   '.fabricate-manager select[aria-label="Filter environments by selection mode"]',
 ]);

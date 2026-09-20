@@ -9,6 +9,13 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
+// Issue 1510: both toolbar filters are shared `<Select>`s.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -93,14 +100,63 @@ describe('AccessTabView (mounted)', () => {
     });
     assert.equal(root.querySelectorAll('[data-access-row]').length, 2);
 
-    const filter = root.querySelector('[data-access-filter]');
-    filter.value = 'none';
-    filter.dispatchEvent(new Event('change', { bubbles: true }));
+    const filter = '[data-access-filter]';
+    // THE NAME IS THE `aria-label` THE SELECT CARRIED, not the demoted caption: the wrapper was
+    // never this control's accessible name (issue 1510).
+    assert.equal(assertSelectHasResolvedName(root, filter), 'Filter recipes by access');
+    assert.deepEqual(selectOptionLabels(root, filter), ['All recipes', 'Granted', 'No access']);
+
+    chooseSelectOption(root, filter, 'none');
     flushSync();
+    assert.equal(selectTriggerText(root, filter), 'No access');
 
     const rows = root.querySelectorAll('[data-access-row]');
     assert.equal(rows.length, 1);
     assert.equal(rows[0].getAttribute('data-access-row'), 'open');
+  });
+
+  it('filters by recipe category, and the category rows keep their counted labels', async () => {
+    const root = await harness.mount({
+      recipes: [
+        makeRecipe({ id: 'alloy', name: 'Alloy Bronze', category: 'Smithing', characterCount: 1 }),
+        makeRecipe({ id: 'tincture', name: 'Tincture', category: 'Alchemy', playerCount: 1 })
+      ],
+      recipeCategories: [
+        { name: 'Smithing', count: 1 },
+        { name: 'Alchemy', count: 1 }
+      ]
+    });
+
+    const filter = '[data-access-category-filter]';
+    assert.equal(assertSelectHasResolvedName(root, filter), 'Filter recipes by category');
+    // The `name (count)` join is the `<option>` text the conversion carried over verbatim.
+    assert.deepEqual(selectOptionLabels(root, filter), [
+      'All categories',
+      'Smithing (1)',
+      'Alchemy (1)'
+    ]);
+
+    chooseSelectOption(root, filter, 'Alchemy');
+    flushSync();
+    const rows = root.querySelectorAll('[data-access-row]');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].getAttribute('data-access-row'), 'tincture');
+  });
+
+  // The demotion's accepted cost, at the one shape this view renders it in (issue 1510).
+  it('renders each filter caption as a span rather than a label around the trigger', async () => {
+    const root = await harness.mount({ recipes: [makeRecipe({ id: 'alloy' })] });
+
+    for (const hook of ['[data-access-category-filter]', '[data-access-filter]']) {
+      const trigger = root.querySelector(hook);
+      assert.ok(Boolean(trigger), `${hook} renders no converted trigger`);
+      assert.ok(
+        !trigger.closest('label'),
+        `${hook} sits inside a caller-rendered <label>, whose caption click would dismiss the ` +
+          'panel and then re-open it'
+      );
+      assert.equal(trigger.closest('.manager-filter').tagName, 'SPAN');
+    }
   });
 
   it('marks the selected row and fires onSelectRecipe on click', async () => {
