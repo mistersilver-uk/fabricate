@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'svelte/compiler';
 
+import { createManagerServices } from '../src/ui/managerServices.js';
+
 import {
   APP_CHROME,
   FOUNDRY_CHROME_SPEC,
@@ -2705,7 +2707,15 @@ const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 // The Manager application, read for ONE claim: that the stores the lab's settle pass waits on
 // are names its service bag does not declare, which is what makes that pass player-only.
-const MANAGER_APP_PATH = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
+/** The manager shell's collaborators, stubbed: nothing below calls one. */
+const STUB_MANAGER_IO = Object.freeze({
+  adminStore: () => null,
+  knowledgeSnapshot: () => null,
+  expendRecipeItemUse: () => null,
+  deleteOwnedRecipeItem: () => null,
+  eraseLearnedRecipe: () => null,
+  resetActorKnowledge: () => null,
+});
 const RUNNER_PATH = 'scripts/view-lab-screenshots.mjs';
 const sourceOf = (path) => readFileSync(resolve(ROOT, path), 'utf8').split('\n');
 const caseFileSources = new Map(VIEW_LAB_CASE_FILES.map(({ path }) => [path, sourceOf(path)]));
@@ -4632,23 +4642,14 @@ test('the player-only readership of the settle-stores region is still a fact abo
   const watched = [...watchedList[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
   assert.ok(watched.length > 0, 'the watch list must be non-empty or the claim is vacuous');
 
-  // Column-anchored on the ONE services literal, exactly as `parseCaseLineRegions` anchors its
-  // own spans: `_buildServices()` returns a single object and its own keys sit at one indent.
-  const managerSource = sourceOf(MANAGER_APP_PATH);
-  const open = managerSource.indexOf('    return {', managerSource.indexOf('  _buildServices() {'));
-  const close = managerSource.indexOf('    };', open);
-  assert.ok(
-    open > 0 && close > open,
-    `${MANAGER_APP_PATH} no longer shapes _buildServices this way`
-  );
-  const serviceKeys = managerSource
-    .slice(open + 1, close)
-    .map((line) => /^ {6}([A-Za-z_$][\w$]*):/.exec(line)?.[1])
-    .filter(Boolean);
+  // The bag itself, built with stub collaborators, rather than a slice of the shell's source
+  // (issue 1674). The services' import graph is `.svelte`-free, so this runs in a plain Node
+  // suite, and the answer is the real key set rather than whatever an indent regex could see.
+  const serviceKeys = Object.keys(createManagerServices(STUB_MANAGER_IO));
   assert.ok(
     serviceKeys.length > 20,
-    `only ${serviceKeys.length} manager service keys parsed, which is too few to be the real bag ` +
-      '— read that as a broken slice, not a shrunken Manager'
+    `only ${serviceKeys.length} manager service keys came back, which is too few to be the real ` +
+      'bag — read that as a broken build, not a shrunken Manager'
   );
 
   assert.deepEqual(

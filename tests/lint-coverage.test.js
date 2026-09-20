@@ -35,7 +35,7 @@ const LEGACY_GATE_FILE_COUNT = 329;
  */
 const DEBT_COUNTS = {
   scripts: { files: 14, pairs: 64 },
-  srcUi: { files: 58, pairs: 140 },
+  srcUi: { files: 58, pairs: 136 },
   // `srcRoot` GREW at issue 1677, which is the direction this pin exists to make expensive, so the
   // reason is recorded here rather than in a commit message. Issue 1715 paid fifteen of
   // `src/main.js`'s nineteen rules by moving the spans that violated them into `src/bootstrap/`,

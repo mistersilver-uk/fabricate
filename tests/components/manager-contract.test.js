@@ -107,6 +107,7 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
 }
 
 const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
+const MANAGER_SERVICES = 'src/ui/managerServices.js';
 const MAIN = 'src/main.js';
 
 /** Every module the entry composes; each carries the chunk-split claim in its own contract row. */
@@ -352,9 +353,9 @@ describe('CraftingSystemManager source contract', () => {
 
   // `Document#testUserPermission` short-circuits every GM to OWNER, so GMs are filtered first. No
   // other file states that `Users#players` is the roster this reads, so it stays asserted here.
-  defineStructureContract('derives the access rosters from the non-GM roster', APP_SHELL, {
+  defineStructureContract('derives the access rosters from the non-GM roster', MANAGER_SERVICES, {
     reads: ['game.users.players'],
-    calls: ['_playerUsers'],
+    calls: ['playerUsers'],
     readsNo: ['actor.isOwner'],
     namesNo: ['playedBy'],
   });
@@ -362,19 +363,19 @@ describe('CraftingSystemManager source contract', () => {
   // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
   defineStructureContract(
     'falls back to the same role floor the canonical roster applies',
-    { file: APP_SHELL, member: '_playerUsers' },
+    { file: MANAGER_SERVICES, fn: 'playerUsers' },
     { calls: ['hasRole'], spells: ['PLAYER'], reads: ['globalThis.CONST.USER_ROLES.PLAYER'] }
   );
 
   defineStructureContract(
     'labels only the roles a grantable user can hold',
-    { file: APP_SHELL, member: '_userRoleLabel' },
+    { file: MANAGER_SERVICES, fn: 'userRoleLabel' },
     { spells: ['USER.RolePlayer'], spellsNo: ['RoleGamemaster'] }
   );
 
   defineStructureContract(
     'models "who plays this character" as a SET, with the whole-table case explicit',
-    { file: APP_SHELL, member: '_describeAccessActor' },
+    { file: MANAGER_SERVICES, fn: 'describeAccessActor' },
     {
       reads: ['actor.testUserPermission', 'user.character.id', 'actor.ownership.default'],
       names: ['controlledBy', 'sharedWithAllPlayers'],
@@ -384,19 +385,19 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'resolves granted character ids over every world actor',
-    { file: APP_SHELL, member: '_buildServices', property: 'getAccessCharacterActors' },
+    { file: MANAGER_SERVICES, fn: 'rosterServices', property: 'getAccessCharacterActors' },
     { namesNo: ['isPlayerCharacterActor'] }
   );
 
   defineStructureContract(
     'defines the world Item projection in the service set',
-    { file: APP_SHELL, member: '_buildServices' },
+    { file: MANAGER_SERVICES, fn: 'actorProjectionServices' },
     { names: ['getWorldItemOptions'] }
   );
 
   defineStructureContract(
     'resolves a Tool source through the uuid seam, not the world roster',
-    { file: APP_SHELL, member: '_buildServices', property: 'resolveToolSource' },
+    { file: MANAGER_SERVICES, fn: 'actorProjectionServices', property: 'resolveToolSource' },
     { calls: ['resolveItemSourceSnapshot'] }
   );
 
@@ -409,7 +410,7 @@ describe('CraftingSystemManager source contract', () => {
   // Under the accessor name the adminStore's read and write legs already call (issue 1392).
   defineStructureContract(
     'hands the world VOCABULARY store to the manager, which nothing else can see',
-    { file: APP_SHELL, member: '_buildServices', property: 'getVocabularyScopeStore' },
+    { file: MANAGER_SERVICES, fn: 'worldStoreServices', property: 'getVocabularyScopeStore' },
     { reads: ['game.fabricate.getVocabularyScopeStore'] }
   );
 
@@ -432,7 +433,7 @@ describe('CraftingSystemManager source contract', () => {
   // by `tests/components/manager-launch-readiness.test.js`.
   defineStructureContract(
     'guards manager startup against unready Fabricate services',
-    { file: APP_SHELL, member: '_buildServices' },
+    { file: MANAGER_SERVICES, fn: 'readinessServices' },
     { names: ['isFabricateReady', 'onFabricateReady'] }
   );
 
@@ -2278,13 +2279,17 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'copies a UUID through the Foundry clipboard service',
-    { file: APP_SHELL, member: '_buildServices' },
+    { file: MANAGER_SERVICES, fn: 'dialogServices' },
     { reads: ['game.clipboard'], calls: ['copyPlainText'] }
   );
 
-  defineStructureContract('never bypasses the Foundry clipboard service anywhere in the shell', APP_SHELL, {
-    readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
-  });
+  // Asserted over BOTH halves of the shell, so moving the clipboard code out of the app module did
+  // not weaken the claim to the half it left behind.
+  for (const file of [APP_SHELL, MANAGER_SERVICES]) {
+    defineStructureContract(`never bypasses the Foundry clipboard service anywhere in ${file}`, file, {
+      readsNo: ['navigator.clipboard', 'foundry.utils.copyPlainText'],
+    });
+  }
 
   // The GM Knowledge surface (issue 785). Each wiring decision here fails silently at runtime: an
   // un-suppressed inspector holds a dead 300px strip open, an un-threaded `resolutionMode` hides
