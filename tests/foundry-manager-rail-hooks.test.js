@@ -10,7 +10,7 @@ import {
   railSelector,
 } from '../scripts/lib/managerRailEntries.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
-import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
+import { SMOKE_SOURCE, withinOneModule } from './helpers/interactablesSmokeLocators.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
 // Read as TEXT. `foundry-test-run.mjs` launches Chromium on import, so a suite that imported it
@@ -123,5 +123,7 @@ test('every label in the membership loop is authored beside its own rail id', ()
 test('railSelector scopes to the manager window', () => {
   // A bare `#id` would match the same id in any other open Foundry application.
   assert.equal(railSelector('manager-nav-tags'), '.fabricate-manager #manager-nav-tags');
-  assert.match(harness, /railSelector[\s\S]{0,120}?from '[^']*managerRailEntries\.js'/);
+  // Bounded to one module (issue 1692): a lazy `[\s\S]{0,120}?` scan over the whole
+  // concatenated harness could otherwise be satisfied across two unrelated modules.
+  assert.ok(withinOneModule(/railSelector[\s\S]{0,120}?from '[^']*managerRailEntries\.js'/));
 });

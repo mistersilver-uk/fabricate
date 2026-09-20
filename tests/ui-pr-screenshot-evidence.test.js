@@ -17,7 +17,11 @@ import { deflateSync } from 'node:zlib';
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
 import { byCodePoint } from './helpers/ratchetBaseline.js';
-import { SMOKE_SOURCE, SMOKE_SOURCE_SEGMENTS } from './helpers/interactablesSmokeLocators.js';
+import {
+  SMOKE_SOURCE,
+  SMOKE_SOURCE_SEGMENTS,
+  withinOneModule,
+} from './helpers/interactablesSmokeLocators.js';
 
 import {
   buildScreenshotMarkdown,
@@ -917,11 +921,14 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(harness.includes(`[data-shopping-acquire-components] [data-medallion="glyph"]`));
 
     // The alternatives picker is now the chooser ONE slot opens, so the walk must open
-    // that slot before waiting on the section.
-    assert.match(
-      harness,
-      /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-recipe-section="alternatives"\]/,
-      'the alternatives capture must open its slot before waiting on the chooser'
+    // that slot before waiting on the section. Bounded to one module (issue 1692): a lazy
+    // `[^]*?` scan over the whole concatenated harness could otherwise be satisfied by text
+    // spanning two unrelated modules.
+    assert.ok(
+      withinOneModule(
+        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-recipe-section="alternatives"\]/
+      ),
+      'the alternatives capture must open its slot before waiting on the chooser, in one module'
     );
 
     // Container-level waits, not deep leaf content: an over-specific wait that times out

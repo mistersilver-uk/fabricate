@@ -9,9 +9,6 @@ import { byCodePoint } from './ratchetBaseline.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
 
-/** A lazy `[\s\S]*?` scan must not cross a module, so a scanner that uses one splits on this. */
-export const SMOKE_SOURCE_BOUNDARY = '\n/* ==== fabricate smoke module boundary ==== */\n';
-
 const smokeModulesIn = (relativeDir) =>
   readdirSync(resolve(REPO_ROOT, relativeDir))
     .filter((entry) => entry.endsWith('.mjs'))
@@ -31,8 +28,23 @@ export const SMOKE_SOURCE_SEGMENTS = SMOKE_SOURCE_FILES.map((file) =>
   readFileSync(resolve(REPO_ROOT, file), 'utf8')
 );
 
-/** The Foundry smoke walk, whole, as one text. */
-export const SMOKE_SOURCE = SMOKE_SOURCE_SEGMENTS.join(SMOKE_SOURCE_BOUNDARY);
+/**
+ * The Foundry smoke walk, whole, as one text — a plain concatenation with no separator. An
+ * ordered or lazy-`[\s\S]`/`[^]` scan over it is unsafe (it can match across two unrelated
+ * modules); use `SMOKE_SOURCE_SEGMENTS` or `withinOneModule` instead (issue 1692).
+ */
+export const SMOKE_SOURCE = SMOKE_SOURCE_SEGMENTS.join('');
+
+/**
+ * Whether a lazy-`[\s\S]`/`[^]` pattern matches inside a SINGLE smoke module, so an ordered pin
+ * cannot be satisfied by text that spans two unrelated modules (issue 1692).
+ *
+ * @param {RegExp} pattern A non-global pattern; each segment is tested independently.
+ * @returns {boolean} True when at least one module's own text matches.
+ */
+export function withinOneModule(pattern) {
+  return SMOKE_SOURCE_SEGMENTS.some((segment) => pattern.test(segment));
+}
 
 /**
  * Read a Svelte root's source by repository-relative path.
