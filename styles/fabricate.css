@@ -16507,7 +16507,7 @@
   border-color: var(--fab-border-strong);
 }
 
-/* A `<button>` since issue 1512, so core's `button` reset is neutralised here: it pins a height, a fill and a centred content box. No `min-height` is declared — `height: auto` keeps the box the 38px realm icon and this padding already set, and a figure here would invent one. */
+/* A `<button>` since issue 1512, so core's `button` reset is neutralised here: it pins a height, a fill and a centred content box. No `min-height` is declared — `height: auto` keeps the box the 38px realm icon and this padding already set, and a figure here would invent one. `text-rendering` is inherited explicitly because `font: inherit` does not cover it and the UA sheet pins it on a form control, which re-measures every chip in the row. */
 .fabricate-manager .manager-travel-realms-header {
   appearance: none;
   -webkit-appearance: none;
@@ -16526,6 +16526,7 @@
   color: inherit;
   border-radius: 8px;
   font: inherit;
+  text-rendering: inherit;
 }
 
 .fabricate-manager .manager-travel-realms-header:focus-visible {

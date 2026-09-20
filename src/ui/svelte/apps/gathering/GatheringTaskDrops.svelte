@@ -251,6 +251,7 @@
     color: inherit;
     background: transparent;
     font: inherit;
+    text-rendering: inherit;
   }
 
   .gathering-task-drop-summary:focus-visible {
