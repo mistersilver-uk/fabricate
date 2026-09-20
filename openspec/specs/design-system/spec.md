@@ -933,10 +933,11 @@ A whole-row button nests the row's own grip, chevrons, delete and menu controls,
 The disclosure carries `aria-expanded` and an `aria-controls` pointing at the body region, and its accessible name is the record it opens.
 Where the disclosure is the whole header, that header is the one button, every other control of the row is its SIBLING, and the chevron inside it is decorative.
 Such a header takes its name from its OWN CONTENT plus a visually hidden phrase that states the disclosure and names the record, and never from an `aria-labelledby` pointing at that phrase: measured in Chromium, the referenced form replaced the content instead of appending to it, dropping a realm row's state chip and leaving a drop row with no record in its name at all.
-It emits `aria-controls` only while the body it names is mounted, because a whole-header row unmounts its body and a dangling IDREF is the defect "Naming, announcement and hit targets are component obligations" already forbids.
+It emits `aria-controls` only while the body it names is mounted, because a whole-header row unmounts its body and a dangling IDREF is the defect "The Foundry contract binds every primitive" already forbids.
 
 This requirement's subject is a row that OPENS.
-A whole-row control that only SELECTS a record into a panel beside it has no body, no disclosure and no region to point `aria-controls` at, so it is bound by the naming, focus and hit-target obligations and by the rule that a focusable element which is not a form control declares `data-keyboard-focus="true"`, and by nothing else here.
+A row whose whole area only SELECTS a record into a panel beside it has no body, no disclosure and no region to point `aria-controls` at, so nothing here binds it beyond the naming, focus and hit-target obligations.
+Its keyboard path is a real, named `<button>` INSIDE the row declaring `data-keyboard-focus="true"` in every branch, including the branch a newly added record is born in, while the row itself MAY stay a pointer-only target carrying the selection state — a row that already holds its own controls cannot become a button around them.
 
 A collection whose rows are compared DOWN a column stays a table under "A table is used only where columns are compared", and its reorder controls are held to the input and announcement obligations without adopting the list.
 A paginated table is the clearest case: a reorder callback expressed over a page cannot state a move within the whole ordered set.
@@ -990,7 +991,7 @@ A surface whose prototype pins the adder outside the list in the POPULATED state
 #### Scenario: A whole-row control only selects a record
 
 - **WHEN** a row's whole area selects a record into a panel beside it and opens no body
-- **THEN** it is a real button with an accessible name and a hit target, and it declares `data-keyboard-focus="true"`
+- **THEN** its keyboard path is a real button with an accessible name and a hit target, declaring `data-keyboard-focus="true"`, while the row itself carries the selection state
 - **AND** it is not held to the disclosure, retention or reorder rules above, because it discloses nothing
 
 ### Requirement: Set membership is edited through a bounded, staged picker
