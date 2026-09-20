@@ -35,7 +35,7 @@ The group is initially collapsed when the Crafting System Manager opens.
 
 | Concept | What it is |
 |:--------|:-----------|
-| **Realm** | Named geography (such as *The Verdant Expanse*) scoped to one crafting system. The single Fabricate geography concept, geography only. Distinct from a Foundry Scene Region |
+| **Realm** | Named geography (such as *The Verdant Expanse*) shared by every crafting system that enables Travel & Realms. The single Fabricate geography concept, geography only. Distinct from a Foundry Scene Region |
 | **Biome** | A descriptive terrain or ecology trait carried by a realm, such as forest, swamp, or coastal |
 | **Environment** | A reusable gathering place that can belong to one or more realms and declare location-availability rules |
 | **Party** | A world-level Fabricate record with actor members and exactly one travel actor |
@@ -85,7 +85,8 @@ An empty (or absent) list means "no rule":
 {: .note }
 > Included realms are chosen in the environment editor's multi-realm selector (toggle on).
 > The biome and exclusion rules are authored through the API or by system import and export.
-> Saving checks that the chosen realms exist on the owning crafting system.
+> Saving checks that the chosen realms exist in the world realm library.
+> A realm id an environment already carried whose realm has since been deleted is dropped from it on the next save rather than blocking that save.
 > These rules gate **location availability** only.
 > The old single free-text region on an environment is **inert**.
 > It is not a composition or availability input and is no longer shown in the editor.
@@ -157,9 +158,12 @@ See the [API Reference]({% link api/index.md %}) for exact signatures.
 
 | What | Where it lives | Contents |
 |:---------|:----|:---------|
-| Realms and realm settings | On each crafting system | The realms and realm behavior settings for that system |
+| Realm library, reveal mode, and modifier visibility | At the world level | The realms and realm-disclosure settings shared by every crafting system that enables Travel & Realms |
+| Enable Travel & Realms toggle | On each crafting system | Whether that system's environments are gated by realm (see [Enabling Travel & Realms](#enabling-travel--realms)) |
 | Parties | At the world level | Fabricate-managed parties, members, travel actors, and per-system overrides |
-| Realm discovery | On each actor | Which realms that character has discovered, per system |
+| Realm discovery | On each actor | Which realms that character has discovered; discovery is world-wide, so a place a character has found stays found whichever crafting system they were serving |
 
-Because realms live on the crafting system, they travel with the system when you export and import it (through the import dialog and the export API), automatically.
-Import checks the realm data, warns about unnamed realms, accepts older exports, and re-homes each imported realm to the system you are importing into.
+Because the realm library is a world setting, it travels along with any crafting-system export as that export's own travel configuration, and merges into the destination world when you import (through the import dialog and the export API), automatically.
+Importing into a world with no realms of its own adopts the whole library, its reveal mode, and its modifier visibility.
+Importing into a world that already has realms only adds a realm it does not already have, by id, so an existing realm is never replaced, and the destination keeps its own reveal mode and modifier visibility.
+See [Import & Export]({% link crafting-systems/import-export.md %}) for the rest of what an export carries.

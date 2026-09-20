@@ -643,7 +643,8 @@ CraftingSystem = {
 35. **Failure-result policy.** `failureResultPolicy` (`'never' | 'perRecord' | 'always'`) is present on ALL THREE activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — and answers exactly one question: may a FAILED check produce a result at all.
     It is the ORTHOGONAL axis to failure CONSUMPTION (`recipes-and-steps` §Failure Consumption Policy), which answers what a failed attempt costs; gathering carries the produce axis and no consume axis.
     It **SELECTS an authored failure output and never fabricates one**, so `always` on a record authoring none produces nothing — which is why `perRecord` and `always` share ONE runtime predicate and differ as declarations of intent rather than as a second branch.
-    All three normalizers emit it through ONE shared derivation (`_normalizeFailureResultPolicy`); because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
+    All three normalizers emit it through ONE shared derivation, `normalizeFailureResultPolicy` in `src/utils/failureResultPolicy.js`; because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
+    `CraftingSystemManager._normalizeFailureResultPolicy` is a thin delegate to that same derivation, retained for the `DOMAIN.md` **Failure Result Policy** code anchor and called from nowhere under `src/`.
     A newly-created system defaults to `perRecord`, and an absent or unrecognized value normalizes to `perRecord` on read (the `toolBreakage.authority` precedent, requirement 21).
     An UPGRADED world never reaches that default: the `1.25.0` migration seeds `never` onto every check block already on disk (`destructive-changes-and-migrations`), so no existing world changes behaviour.
 
@@ -878,6 +879,7 @@ type TravelConfig = {
 4. **Realm `id`s are stable and are never rewritten**, because environments (`includedRealmIds` / `excludedRealmIds`), party overrides (`currentRealmOverride.realmIds`) and the actor discovery flag all store realm ids, so a dropped or re-keyed realm orphans every reference to it.
    Every reconciliation of two libraries is therefore keyed by `id` and is reference-preserving: the `1.27.0` migration UNIONS realms by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
    Realm ids are `randomID()`, so reporting EVERY collision is informative here; the `1.28.0` character-library migration refines that to CONTENT-DIFFERING collisions only, because its preset ids are stable semantic slugs that collide by design (## CharacterLibraries requirement 8).
+   A GM-driven realm delete now cascades into environment realm membership (see `destructive-changes-and-migrations`); a merge or migration has no such cascade, which is why neither may ever drop or re-key an id.
 5. The store publishes its cache BEFORE awaiting the write.
    Callers read-modify-write, so a second edit starting while the first write is in flight would otherwise read the pre-first-edit config and clobber it.
    The per-system store this replaced was safe by construction because the system manager writes its map before its own await, so publishing late here would be a regression rather than a new limitation.

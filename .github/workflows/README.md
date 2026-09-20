@@ -39,8 +39,10 @@ Steps:
 2. Run the Foundry integration smoke test (via the reusable workflow, with `require_credentials: true` so the job fails rather than skipping green when Foundry credentials are unset).
 3. Run `semantic-release` to determine the version bump and inject a `-beta.N` version into the built `dist/module.json`.
 On `main` the config OMITS `@semantic-release/github` (see the allowlist in the Release pipeline section), so NO GitHub release object is created — that omission is what keeps the private beta channel private — and the config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT` as the version signal instead.
+That write fires on every `success` lifecycle, including the addChannel phase, which reports a tag it did not mint, so a `Classify what this run minted` step runs immediately afterwards and only forwards a tag absent from a pre-run snapshot (issue #1864).
 4. When `next_version` is non-empty, call `.github/workflows/release-s3.yml` with `channel: beta`, `tag: <next_tag>`, `dry_run: false`, and `overwrite: false`.
 When `next_version` is empty (a push with no releasing commits), skip S3 publishing without failing the run.
+The job's `next_version` and `next_tag` outputs are the classifier's, not `semantic-release`'s own, so they are also empty when `success` fired without minting anything, and that case is a `::notice::`, not a publish.
 
 ## Release workflow (early-access producer)
 
@@ -57,6 +59,13 @@ Nothing is made public: the release is a DRAFT and only a private channel receiv
 A hotfix line is semantic-release's `'maintenance'` branch *type*; in our vocabulary it is always a **hotfix line**, and its channel keeps **no cohort** (it exists only so a hotfix can be published, guarded, and promoted, with CI and smoke but no soak).
 
 A `workflow_dispatch(tag)` re-entry point exists because a push run can mint the tag and draft but then fail the S3 publish; without re-entry the channel would never carry the version and the promotion's guard would refuse it forever.
+
+**A run that mints nothing publishes nothing (issue #1864).**
+`semantic-release`'s `success` lifecycle also fires when its addChannel phase re-adds an already-released version to a newly-cut line's channel, and that case mints no new tag.
+Cutting a hotfix line from a published version's tag used to trip exactly this: pushing the freshly cut branch reported the base version "published to its channel" before any fix had landed.
+A `Snapshot the tags that exist before this run` step, placed after the tag fetch and before `semantic-release`, records `git tag --list`.
+A `Classify what this run minted` step right after `semantic-release` compares `$next_tag` against that snapshot and only forwards it, as the job's `next_version`/`next_tag` outputs, when it is absent from the snapshot.
+`publish-s3`, `verify-publish` and `forward-port` all read those outputs, so a run that minted nothing publishes nothing, skips every one of those jobs, and states the case as a `::notice::` instead of reporting a publish.
 
 **It also schedules the forward-port.**
 A final `forward-port` job calls the shared `.github/workflows/forward-port.yml`, gated on `if: always() && github.ref_name == 'release' && needs.verify-publish.result == 'success'`.
@@ -267,11 +276,14 @@ For a lagging `beta` head the remedy leads with the **forward-port** — bring t
 No amount of new work on `main` can raise it in that state, because every version `main` mints stays on the same line; only after the forward-port does the next prerelease number above the released version.
 Otherwise (the prerelease line is already numbered above it) push the feature work to `main` so `beta.yml` mints a newer beta.
 There is no bare-stable catch-up in either case, which would defect the cohort.
+Before that read, guard also diagnoses **tester-configuration drift** (issue #1872): it fetches `origin/release`'s `release.s3.config.json` and compares `early-access`'s tester group name and secret env-var name against the dispatch ref's own, logging a `::warning::` naming both sides when they disagree, because `early-access` is published only from `release` while this job may run from a different ref.
+When an absent-head refusal lands on an `early-access` target while that drift exists, the refusal's message is extended with the remedy: publish the current `early-access` head under the new prefix with a `release-s3.yml` dispatch from the ref carrying the new configuration, or land the rotation on `release`.
 2. **forward-port** — a **confirming backstop**, not the forward-port's scheduling point.
 It calls the shared `.github/workflows/forward-port.yml`, and because the forward-port is now performed at the *prerelease* promotion, `release` is normally already an ancestor of `main` by the time a release promotion runs, so this job takes the callee's ancestry no-op.
 It still performs the merge if it has not happened, which is what the **Version authority and promotion mechanics** requirement obliges a release promotion to do.
 It carries **no job-level `if:`** (a skipped job would report `skipped` and fail job 4's strict `if:`); the hotfix no-op runs through the callee's `enabled` input instead, and its `dry_run` is forwarded from the promotion's own input.
 3. **publish** — re-stages the `public` targets from the built `dist` (promotion is a **re-publish, never an S3 copy** — copying a private artefact would bake the secret cohort URL into the public build and sidegrade public installers onto the private feed).
+It captures `release.s3.config.json` from the workflow ref before checking out `v$VERSION`, for the reason `release-s3.yml` does below (deployment configuration comes from the ref, never from the tag), and refuses by name when that tag's `release-s3.js` predates `--config`.
 4. **readback-preflight-undraft-register** — reads back every written manifest, downloads the release assets to confirm both exist, **aggregates the notes of any superseded stable draft** strictly between the current public version and this one on the same line (without this the public changelog silently loses a whole feature set; the consumed drafts are left drafted as the record), builds and validates the registry payload (its `manifest` is CONSTRUCTED as the version-pinned `releases/download/v<version>/module.json`, never copied from the artefact), then performs the two irreversible steps LAST: `gh release edit --draft=false --latest` and the registry POST.
 
 Under `dry_run: true` all four jobs RUN and every mutating step no-ops and prints its plan — the un-draft and the POST included — so a dry run never publishes anything.
@@ -289,6 +301,9 @@ Triggers:
 - Reusable `workflow_call` from `beta.yml` and `release.yml` (and the promotion workflows), using the same inputs.
 
 The reusable publisher takes a release tag, derives its version, checks out that tagged commit, builds, and publishes to the requested channel's S3 targets from `release.s3.config.json`'s `channels` map (`beta` → the closed-tester group; `early-access` → the patron group; `public` → no tester group; a hotfix line is not declared, so its only target is its sources target).
+Since the #1763 rotation the early-access tester group is declared as `guild-artisan-2026` (previously `patrons-2026`), and the beta group as `closed-beta-2026`; the map's declared names are what the publisher reads.
+The bytes come from the tag, but that `channels` map does not: the workflow captures `release.s3.config.json` from the **workflow ref** (`git show "$GITHUB_SHA":…`) before the tag checkout and passes it as `--config`, because a tester group's identity is deployment configuration rather than a property of the released bytes.
+Reading it from the tag made a rotation impossible to apply to an already-minted version, so the new prefix could never be populated (issue #1872); a tag whose `release-s3.js` predates `--config` is refused by name instead of silently publishing under its own configuration.
 Before writing anything it runs the monotonic-head guard per target: a publish that would move a head to a version Foundry considers older fails closed and names the remedy — a higher version, not a downgrade override (the **Monotonic channel heads** requirement).
 The stall the guard catches is a **double-digit rollover in the part glued to the prerelease suffix** (`1.5.0-beta.10` vs `1.5.0-beta.9` compares fine, but `1.4.10-beta.1` vs `1.4.9-beta.1` string-compares `"10-beta"` below `"9-beta"`); its remedy is a version bump that **keeps** the prerelease identifier (`1.5.0-beta.1`), never a bare stable version, which would level the head with the registry and defect the cohort.
 A pure-stable channel like `public` can never stall this way.
@@ -307,6 +322,7 @@ Deliberately deleting a superseded segment, by contrast, makes its manifest URL 
 This module never deletes a tester segment, for exactly that reason.
 After rotating a secret, uninstall and reinstall the affected cohort from the new manifest URL, because it will never be offered an update on its own.
 `release-s3.js` withholds all S3 keys and install URLs from CI logs (they print only on local/`--dry-run` runs); GitHub also masks the secret value.
+A version already minted before the rotation is never republished automatically, so its own new prefix stays empty until someone back-fills it: dispatch `release-s3.yml` from the ref that carries the new configuration with `tag=<that version's tag>` and `channel=early-access`, which republishes the same bytes under the new segment because the workflow reads its tester-group identity from the dispatch ref rather than from the tag (issue #1872).
 
 **`--overwrite`.**
 The one legitimate use is re-staging a zip whose manifest never advertised the version (a failed first publish), so no client can already be pinned to it.

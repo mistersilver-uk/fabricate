@@ -5,6 +5,7 @@ import {
 } from '../config/settings.js';
 import { cloneJson, normalizeIdList, stringOrEmpty } from '../utils/scalars.js';
 
+import { createRealmMembership } from './environmentRealmMembership.js';
 import {
   environmentComposesRecord,
   resolveGatheringCompositionMode,
@@ -81,7 +82,10 @@ export class GatheringEnvironmentValidationError extends Error {
  * lists), so a targeted/blind environment is only valid when it has at least one
  * such library task source. Validation failures throw before persistence,
  * leaving callers' draft state intact; UI layers map error strings to inline
- * field targets and summary links.
+ * field targets and summary links. Realm membership is the one field a save REWRITES rather
+ * than rejects: environments persist as a single world list, so a realm id the record already
+ * carried and the world library has lost is pruned rather than allowed to make every
+ * environment in the world unsaveable (issue 1848).
  */
 export class GatheringEnvironmentStore extends SettingsBackedStore {
   constructor({
@@ -92,14 +96,20 @@ export class GatheringEnvironmentStore extends SettingsBackedStore {
     travelStore = null,
     randomID = null,
     runCleanup = null,
+    warn = console.warn,
   } = {}) {
     super({ getSetting, setSetting, settingKey: SETTING_KEYS.GATHERING_ENVIRONMENTS });
     this.systemManager = systemManager;
     this.getSystems = getSystems;
-    this.travelStore = travelStore;
     this.randomID = randomID || (() => foundry.utils.randomID());
     this.runCleanup = runCleanup;
+    this.warn = warn;
     this.environments = [];
+    this._realmMembership = createRealmMembership({
+      travelStore,
+      warn: (...args) => this.warn(...args),
+      findPersisted: (id) => this.environments.find((env) => env.id === id) ?? null,
+    });
   }
 
   _setCache(value) {
@@ -140,9 +150,10 @@ export class GatheringEnvironmentStore extends SettingsBackedStore {
     return this._persistEnvironmentList(environments);
   }
 
-  async _persistEnvironmentList(environments) {
+  async _persistEnvironmentList(environments, { baselineById = null } = {}) {
     const original = Array.isArray(environments) ? cloneJson(environments) : [];
     const normalized = this._normalizeEnvironmentList(original);
+    this._realmMembership.prune(normalized, { baselineById });
     const errors = this._validateAll(normalized, original);
     if (errors.length > 0) {
       throw new GatheringEnvironmentValidationError(errors);
@@ -183,12 +194,19 @@ export class GatheringEnvironmentStore extends SettingsBackedStore {
       id: environmentId,
     };
     const environment = this._normalizeEnvironment(merged);
-    const errors = this._validateEnvironment(environment, merged);
+    // Validate a copy with the persisted record's own stale realm ids already pruned: a manager
+    // patch re-sends the whole record, so the patch mentioning an id cannot be what marks it as
+    // newly introduced. The persist below re-prunes and reports across the whole list.
+    const errors = this._validateEnvironment(this._realmMembership.prunedCopy(environment), merged);
     if (errors.length > 0) {
       throw new GatheringEnvironmentValidationError(errors);
     }
-    await this._persistEnvironmentList(replaceAt(this.environments, index, environment));
-    return cloneJson(environment);
+    // Return what was PERSISTED, not what was submitted: the persist may have pruned realm ids
+    // off this record, and a caller handed the submitted copy would re-send them.
+    const persisted = await this._persistEnvironmentList(
+      replaceAt(this.environments, index, environment)
+    );
+    return persisted.find((env) => env.id === environmentId) ?? cloneJson(environment);
   }
 
   async duplicate(environmentId, overrides = {}) {
@@ -202,12 +220,19 @@ export class GatheringEnvironmentStore extends SettingsBackedStore {
       id: this.randomID(),
       nodeRuntime: {}, // a copy starts with full pools
     });
-    const errors = this._validateEnvironment(duplicate);
+    // A copy has no persisted counterpart under its own id, so its baseline is the record it
+    // was copied FROM: it inherits that record's stale ids, and owns anything `overrides` names.
+    const baselineById = new Map([[duplicate.id, source]]);
+    const errors = this._validateEnvironment(
+      this._realmMembership.prunedCopy(duplicate, { baselineById })
+    );
     if (errors.length > 0) {
       throw new GatheringEnvironmentValidationError(errors);
     }
-    await this._persistEnvironmentList([...this.environments, duplicate]);
-    return cloneJson(duplicate);
+    const persisted = await this._persistEnvironmentList([...this.environments, duplicate], {
+      baselineById,
+    });
+    return persisted.find((env) => env.id === duplicate.id) ?? cloneJson(duplicate);
   }
 
   async reorder(systemId, orderedEnvironmentIds = []) {
@@ -372,24 +397,7 @@ export class GatheringEnvironmentStore extends SettingsBackedStore {
     // rather than the owning system's copy. That makes it strictly more resolvable than it
     // was: an environment citing a realm another system happened to author was previously
     // invalid-but-inert, and is now simply valid.
-    const worldRealms = this.travelStore?.list?.();
-    if (Array.isArray(worldRealms)) {
-      const realmIds = new Set(worldRealms.map((realm) => realm?.id).filter(Boolean));
-      for (const realmId of normalized.includedRealmIds) {
-        if (!realmIds.has(realmId)) {
-          errors.push(
-            `Environment "${label}" includedRealmIds references unknown realm "${realmId}"`
-          );
-        }
-      }
-      for (const realmId of normalized.excludedRealmIds) {
-        if (!realmIds.has(realmId)) {
-          errors.push(
-            `Environment "${label}" excludedRealmIds references unknown realm "${realmId}"`
-          );
-        }
-      }
-    }
+    errors.push(...this._realmMembership.unknownRealmErrors(normalized, label));
 
     if (!VALID_SELECTION_MODES.has(original?.selectionMode)) {
       errors.push(`Environment "${label}" selectionMode must be targeted or blind`);
