@@ -5,10 +5,10 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 207 repeated selectors
- * rather than these 113, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
+ * rather than these 111, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,051 `(at-context, selector)` keys, of which 2,938 appear exactly
+ * Unfiltered, the sheet holds 3,037 `(at-context, selector)` keys, of which 2,926 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,8 +19,22 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,567 rules at that head, 113 repeated keys and 231 appearances
+ * printed from. The sheet holds 2,559 rules at that head, 111 repeated keys and 227 appearances
  * between them; five keys appear three times and none appears four or more.
+ * ISSUE 1512 DELETES TWO REPEATED ROWS AND ADDS NONE. The progressive recipe stage row renders
+ * through `SortableList`, so `.fabricate-manager .manager-recipe-result-row.is-reorderable` and
+ * its `.manager-recipe-option-controls` descendant have no carrier left: the shared list's row
+ * draws the box the first stated and the second is written once, against the row class the
+ * conversion emits, rather than twice. `pinnedTotal` goes 231 -> 227 across 111 rows, and the
+ * three contextual figures fall with the retired stage-row, steps-row, grip, rocker and
+ * composition-pip families: 2,567 -> 2,555 rules, 3,051 -> 3,032 keys, 2,938 -> 2,921 singletons,
+ * and 207 -> 205 selectors keyed alone. Its review round then adds four rules and one selector list
+ * of two — the Included row's `.is-selected` and `.is-unavailable` state paint, the rocker's bare
+ * icon-button override and the always-open body gate — so 2,555 -> 2,559 rules, 3,032 -> 3,037 keys
+ * and 2,921 -> 2,926 singletons; the Checks studio's remove rule keeps both its selectors, because
+ * `CraftingCheckEditor.svelte`'s unconverted outcome list still draws `.manager-checks-tier-remove`.
+ * None of the five is a repeated selector, so the 111 rows, the 227 appearances and the 205
+ * selectors keyed alone are unmoved. Re-derived by running the census twice, not subtracted.
  * ISSUE 1515 PHASE 9 MOVES THE THREE CONTEXTUAL FIGURES AND RE-KEYS ONE REPEATED ROW, and the two
  * halves are unrelated to one another. RE-KEYED: the rail's premium chip stops riding the
  * record-count vehicle, so `.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium`
@@ -115,6 +129,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  * The SUM of the counts, not the number of rows.
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 231 across 113 rows.
+ * measured commit it is 227 across 111 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

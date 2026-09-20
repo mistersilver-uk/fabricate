@@ -201,6 +201,19 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-crafting-modifier-cap-reached',
     'manager-system-edit-lists',
   ]),
+  // The product's ONE ordered list (issue 1512). It draws nothing of its own on a browse screen, so
+  // the representative pair would publish two frames that do not contain it; these three are the
+  // AFTER frames for the surfaces whose row geometry moved, and each draws the full row set — grip,
+  // badge, rocker — that the primitive is judged on.
+  'src/ui/svelte/components/SortableList.svelte': Object.freeze([
+    'manager-recipe-edit-step-open',
+    'manager-checks-crafting-recipe-tiers-narrow',
+    'manager-environment-edit-blind-weights-narrow',
+  ]),
+  // The product's ONE row disclosure (issue 1512), promoted on its second importer. Its own frame is
+  // the open step row: the disclosure is the sole opener there, and `aria-expanded="true"` with the
+  // body visible is the only state in which the control is more than a chevron.
+  'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
   // open. The recipe studio's kind list adds the `inline` rung (issue 1510).
   'src/ui/svelte/components/Select.svelte': Object.freeze([

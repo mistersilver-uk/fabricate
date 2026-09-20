@@ -189,13 +189,17 @@ test('every manifest library name resolves to a library entry', () => {
   }
 });
 
-/** The 27 library entries with no shipped implementation (issue 1505). */
+/**
+ * The 26 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * rather than carried forward: `SortableList` left it at issue 1512, when the specified primitive
+ * shipped, and the count this docblock states is the array's own length.
+ */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
   'DataTable', 'InfoStrip', 'LogList', 'Menu',
   'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
   'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
-  'SortableList', 'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
+  'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
   'ViewToggle', 'Well', 'XrefList',
 ];
 
@@ -447,6 +451,7 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];
@@ -532,9 +537,9 @@ test('every re-rooted family carries a shared scope and an entry in the gate tha
   const byPath = new Map(DESIGN_SYSTEM_PRIMITIVES.map((row) => [row.path, row]));
   const entries = areaScopeGateComponents();
   assert.ok(
-    entries.size >= 21,
-    `the area-scope gate reader found only ${entries.size} component paths, against the 23 that ` +
-      'file holds across 21 entries. The reader has stopped matching and the clause below passes ' +
+    entries.size >= 22,
+    `the area-scope gate reader found only ${entries.size} component paths, against the 24 that ` +
+      'file holds across 22 entries. The reader has stopped matching and the clause below passes ' +
       'on nothing.'
   );
 
