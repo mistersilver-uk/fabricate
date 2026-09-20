@@ -422,6 +422,53 @@ export function registerGatheringCases() {
     assert.ok(target.querySelector('[data-economy-mode-card]'));
   });
 
+  it('picks a task default environment through the converted picker and saves it', async () => {
+    // The route's own proof of issue 1510's conversion: the editor-only suite mounts the component
+    // directly, so nothing else shows the panel portaling into the real manager application root
+    // and the choice surviving a save.
+    const calls = [];
+    mountManager(calls);
+    await tick();
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const picker = '[data-gathering-task-field="defaultEnvironmentId"]';
+    assert.equal(
+      selectTriggerText(target, picker),
+      'None (ask on drop)',
+      'a task with no default environment reads as the sentinel, not as the first environment'
+    );
+    chooseSelectOption(target, picker, 'env-cavern');
+    await tick();
+    flushSync();
+    assert.equal(
+      selectTriggerText(target, picker),
+      'Quiet Cavern',
+      'the trigger reads back the chosen environment by name'
+    );
+
+    headerSaveButton(target).click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(
+        (call) =>
+          call[0] === 'updateGatheringLibraryTask' &&
+          call[2] === 'task-herbs' &&
+          call[3].defaultEnvironmentId === 'env-cavern'
+      ),
+      'the chosen environment reaches the store on save'
+    );
+  });
+
   it('edits gathering task drop rules from unresolved row through inspector modifiers', async () => {
     const calls = [];
     target = document.createElement('div');

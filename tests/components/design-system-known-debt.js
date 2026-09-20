@@ -98,7 +98,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // (2) convert onto `Select`, so the total falls 64 -> 59 across 24 rows to 22.
 // #1510: the checks studio converts eight more native selects onto `Select`, taking the total
 // 59 -> 51 and the file rows 22 -> 18.
-export const KNOWN_NATIVE_SELECT_TOTAL = 51;
+// #1510: the gathering task editor's seven convert onto `Select`, so the total falls 51 -> 44
+// across 18 rows to 17.
+export const KNOWN_NATIVE_SELECT_TOTAL = 44;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

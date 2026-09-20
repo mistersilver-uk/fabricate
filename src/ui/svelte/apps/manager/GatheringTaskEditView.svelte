@@ -9,10 +9,20 @@
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import Select from '../../components/Select.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import { formatList, localize } from '../../util/foundryBridge.js';
+  import {
+    defaultEnvironmentOptions,
+    depletionTimingOptions,
+    respawnGainModeOptions,
+    respawnIntervalUnitOptions,
+    respawnPolicyOptions,
+    staminaModifierOptions,
+    STAMINA_MODIFIER_OPERATORS,
+  } from './gatheringTaskSelectOptions.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
@@ -312,6 +322,26 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  // The four caption ids the converted pickers are named by, per instance (issue 1510).
+  const instanceId = $props.id();
+  const captionIds = {
+    defaultEnvironment: `${instanceId}-default-environment`,
+    deplete: `${instanceId}-node-deplete`,
+    respawn: `${instanceId}-node-respawn`,
+    gainMode: `${instanceId}-node-gain-mode`,
+  };
+
+  // The seven converted option lists, from the studio's own leaf. Six drop the tick because the
+  // trigger states the value and no two of their rows are cousins; the modifier list keeps it.
+  const environmentSelectOptions = $derived(
+    defaultEnvironmentOptions(environmentOptions || [], text)
+  );
+  const depleteOptions = $derived(depletionTimingOptions(text));
+  const respawnPolicySelectOptions = $derived(respawnPolicyOptions(text));
+  const intervalUnitOptions = $derived(respawnIntervalUnitOptions(text));
+  const gainModeOptions = $derived(respawnGainModeOptions(text));
+  const modifierSelectOptions = $derived(staminaModifierOptions(characterModifierLibrary || []));
 
   function uniqueSorted(values) {
     return Array.from(
@@ -1076,28 +1106,23 @@
               oninput={(event) => onUpdateTask({ description: event.currentTarget.value })}
             ></textarea>
           </Field>
-          <Field as="label">
-            <span
+          <!-- A `<div>`, not a `<label>`: `Select.svelte`'s host invariant (issue 1510). -->
+          <Field as="div">
+            <span id={captionIds.defaultEnvironment}
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironment',
                 'Default environment (canvas drop)'
               )}</span
             >
-            <select
-              data-gathering-task-field="defaultEnvironmentId"
+            <Select
+              class="manager-task-field-select"
               value={task.defaultEnvironmentId || ''}
-              onchange={(event) => setDefaultEnvironment(event.currentTarget.value)}
-            >
-              <option value=""
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironmentNone',
-                  'None (ask on drop)'
-                )}</option
-              >
-              {#each environmentOptions as environment (environment.id)}
-                <option value={environment.id}>{environment.name}</option>
-              {/each}
-            </select>
+              options={environmentSelectOptions}
+              showTick={false}
+              ariaLabelledBy={captionIds.defaultEnvironment}
+              triggerData={{ 'data-gathering-task-field': 'defaultEnvironmentId' }}
+              onChange={(next) => setDefaultEnvironment(next)}
+            />
             <span class="manager-muted"
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DefaultEnvironmentHint',
@@ -1252,31 +1277,28 @@
                   class="manager-task-stamina-modifier-row"
                   data-gathering-stamina-modifier={ref.id}
                 >
-                  <select
+                  <!-- Both keep their own `aria-label`: the row renders no caption at all. -->
+                  <Select
+                    size="inline"
                     value={ref.modifierId}
-                    onchange={(event) =>
-                      updateStaminaCostModifier(index, { modifierId: event.currentTarget.value })}
-                    aria-label={text(
+                    options={modifierSelectOptions}
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.Economy.TaskStaminaModifiers',
                       'Per-actor cost modifiers'
                     )}
-                  >
-                    {#each characterModifierLibrary as entry (entry.id)}
-                      <option value={entry.id}>{entry.label || entry.id}</option>
-                    {/each}
-                  </select>
-                  <select
+                    onChange={(next) => updateStaminaCostModifier(index, { modifierId: next })}
+                  />
+                  <Select
+                    size="inline"
                     value={ref.operator}
-                    onchange={(event) =>
-                      updateStaminaCostModifier(index, { operator: event.currentTarget.value })}
-                    aria-label={text(
+                    options={STAMINA_MODIFIER_OPERATORS}
+                    showTick={false}
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierOperator',
                       'Operator'
                     )}
-                  >
-                    <option value="-">−</option>
-                    <option value="+">+</option>
-                  </select>
+                    onChange={(next) => updateStaminaCostModifier(index, { operator: next })}
+                  />
                   <Stepper
                     value={ref.min}
                     allowUnset
@@ -1432,51 +1454,40 @@
             />
           </Field>
 
-          <Field as="label">
-            <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
-            <select
-              value={nodes.depletionTiming}
-              onchange={(event) => updateNodes({ depletionTiming: event.currentTarget.value })}
-              data-gathering-task-node-deplete
+          <Field as="div">
+            <span id={captionIds.deplete}
+              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span
             >
-              <option value="onStart"
-                >{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option
-              >
-              <option value="onSuccess"
-                >{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option
-              >
-            </select>
+            <Select
+              class="manager-task-field-select"
+              value={nodes.depletionTiming}
+              options={depleteOptions}
+              showTick={false}
+              ariaLabelledBy={captionIds.deplete}
+              triggerData={{ 'data-gathering-task-node-deplete': '' }}
+              onChange={(next) => updateNodes({ depletionTiming: next })}
+            />
           </Field>
 
-          <Field as="label">
-            <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
-            <select
-              value={respawn.policy}
-              onchange={(event) => setRespawnPolicy(event.currentTarget.value)}
-              data-gathering-task-node-respawn
+          <Field as="div">
+            <span id={captionIds.respawn}
+              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span
             >
-              <option value="manual"
-                >{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option
-              >
-              <option value="overTime"
-                >{text(
-                  'FABRICATE.Admin.Manager.Economy.RespawnOverTime',
-                  'Over world time'
-                )}</option
-              >
-              <option value="nonRegenerating"
-                >{text(
-                  'FABRICATE.Admin.Manager.Economy.RespawnNone',
-                  'Does not regenerate'
-                )}</option
-              >
-            </select>
+            <Select
+              class="manager-task-field-select"
+              value={respawn.policy}
+              options={respawnPolicySelectOptions}
+              showTick={false}
+              ariaLabelledBy={captionIds.respawn}
+              triggerData={{ 'data-gathering-task-node-respawn': '' }}
+              onChange={(next) => setRespawnPolicy(next)}
+            />
           </Field>
 
           {#if respawnIsOverTime}
             <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The Stepper
-                 precedes the unit `<select>`, so the caption bound to the Stepper's `−` button
-                 rather than to either control the reader would expect. -->
+                 precedes the unit picker, so the caption bound to the Stepper's `−` button rather
+                 than to either control. "Every" names neither, so the picker states its own name. -->
             <Field as="div" class="manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">
@@ -1489,49 +1500,34 @@
                   inputProps={{ 'data-gathering-task-node-interval': '' }}
                   onChange={(next) => setRespawnInterval(next, intervalParts.unit)}
                 />
-                <select
+                <Select
+                  size="inline"
                   value={intervalParts.unit}
-                  onchange={(event) =>
-                    setRespawnInterval(intervalParts.value, event.currentTarget.value)}
-                  data-gathering-task-node-interval-unit
-                >
-                  <option value="minutes"
-                    >{text('FABRICATE.Admin.Manager.Economy.Unit.minutes', 'minutes')}</option
-                  >
-                  <option value="hours"
-                    >{text('FABRICATE.Admin.Manager.Economy.Unit.hours', 'hours')}</option
-                  >
-                  <option value="days"
-                    >{text('FABRICATE.Admin.Manager.Economy.Unit.days', 'days')}</option
-                  >
-                  <option value="weeks"
-                    >{text('FABRICATE.Admin.Manager.Economy.Unit.weeks', 'weeks')}</option
-                  >
-                </select>
+                  options={intervalUnitOptions}
+                  showTick={false}
+                  ariaLabel={text(
+                    'FABRICATE.Admin.Manager.Economy.RespawnIntervalUnit',
+                    'Respawn interval unit'
+                  )}
+                  triggerData={{ 'data-gathering-task-node-interval-unit': '' }}
+                  onChange={(next) => setRespawnInterval(intervalParts.value, next)}
+                />
               </div>
             </Field>
 
-            <Field as="label">
-              <span>{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span
+            <Field as="div">
+              <span id={captionIds.gainMode}
+                >{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span
               >
-              <select
+              <Select
+                class="manager-task-field-select"
                 value={respawnGainMode}
-                onchange={(event) => setRespawnGainMode(event.currentTarget.value)}
-                data-gathering-task-node-gain-mode
-              >
-                <option value="guaranteed"
-                  >{text('FABRICATE.Admin.Manager.Economy.GainGuaranteed', 'Add one node')}</option
-                >
-                <option value="chance"
-                  >{text('FABRICATE.Admin.Manager.Economy.GainChance', 'Chance to add one')}</option
-                >
-                <option value="expression"
-                  >{text(
-                    'FABRICATE.Admin.Manager.Economy.GainExpression',
-                    'Roll an amount'
-                  )}</option
-                >
-              </select>
+                options={gainModeOptions}
+                showTick={false}
+                ariaLabelledBy={captionIds.gainMode}
+                triggerData={{ 'data-gathering-task-node-gain-mode': '' }}
+                onChange={(next) => setRespawnGainMode(next)}
+              />
             </Field>
           {/if}
 
@@ -2715,15 +2711,16 @@
     gap: var(--fab-space-2);
   }
 
-  /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from the
-     blanket `.fabricate-field.manager-field select` rule.
-
-     The `[data-…-unit]` qualifier is LOAD-BEARING, not a second way of saying `select`. Svelte 5
-     emits its scoping class as `:where(.svelte-hash)` on every compound after the first, and
-     `:where()` contributes ZERO specificity — so a plain `.manager-task-node-interval-row select`
-     compiles to (0,2,1) and merely TIES the blanket rule, resolving on the source order of two
-     separately loaded stylesheets. The attribute lifts the class column to 3. */
-  .manager-task-node-interval-row select[data-gathering-task-node-interval-unit] {
+  /* Size the unit picker to its content: this field's standing refusal of the `width: 100%` the
+     other four converted fields ask for by class, answered against `.manager-field select` before
+     the conversion and against a caller rule now. `:global()` is LOAD-BEARING and so is the
+     attribute — the trigger is a `<button>` a child component renders and Svelte stamps no scoping
+     hash on one, so the scoped spelling would match nothing and die silently, while the scoping
+     class it does emit is `:where(.svelte-hash)`, which contributes ZERO. The class column is 2
+     here and 3 with the attribute, out-ranking a two-class caller rule rather than tying it on the
+     source order of two separately loaded stylesheets. */
+  .manager-task-node-interval-row
+    :global(.fabricate-select-trigger[data-gathering-task-node-interval-unit]) {
     width: auto;
   }
 

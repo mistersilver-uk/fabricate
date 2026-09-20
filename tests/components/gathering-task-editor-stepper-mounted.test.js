@@ -9,6 +9,14 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
+// The editor's seven converted pickers are opened and clicked through the shared helper (issue 1510).
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
@@ -48,6 +56,8 @@ const harness = createMountedComponentHarness({
     'src/gatheringImageDefaults.js',
     'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
+    // The seven converted option vocabularies (issue 1510).
+    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
@@ -120,7 +130,15 @@ async function mountEditor(resolutionMode = 'routed') {
     // (`dcOverrideEnabled`) — under `d100` the field this suite's headline case drives does not
     // exist at all.
     resolutionMode,
-    characterModifierLibrary: [{ id: 'mod-a', label: 'Herbalism' }],
+    characterModifierLibrary: [
+      { id: 'mod-a', label: 'Herbalism' },
+      { id: 'mod-b', label: 'Prospecting' },
+    ],
+    // The converted default-environment picker has rows only when the parent feeds it some.
+    environmentOptions: [
+      { id: 'env-forest', name: 'Old Forest' },
+      { id: 'env-cave', name: 'Deep Cave' },
+    ],
     onUpdateTask: (patch) => {
       updates.push(patch);
       task = { ...task, ...patch };
@@ -324,32 +342,134 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     stepNativeNumberInput(input, 'down');
     await sync();
 
-    const unit = root.querySelector('[data-gathering-task-node-interval-unit]');
-    assert.equal(unit.tagName, 'SELECT');
-    unit.value = 'minutes';
-    unit.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    const unit = '[data-gathering-task-node-interval-unit]';
+    assert.equal(root.querySelector(unit).tagName, 'BUTTON', 'the unit control is a trigger now');
+    chooseSelectOption(root, unit, 'minutes');
     await sync();
     assert.equal(lastWrite(updates, read).intervalUnit, 'minutes');
     assert.equal(lastWrite(updates, read).intervalAmount, 1440);
     assert.equal(input.value, '1440');
-    assert.equal(unit.value, 'minutes');
+    // The harness localizes to the key, so every label here is the call site's own fallback.
+    assert.equal(selectTriggerText(root, unit), 'minutes', 'and the trigger reads the chosen unit');
   });
 
-  it('lets the respawn unit select size to its content, on specificity not source order', () => {
-    // The attribute qualifier in that rule is what makes it work.
+  it('lets the respawn unit picker size to its content, on specificity not source order', () => {
+    // The attribute qualifier makes it win; `:global()` is what lets it reach the trigger at all.
     const compiled = scopedComponentCss(resolve(repoRoot, EDITOR_PATH)).css;
-    const rule = /\.manager-task-node-interval-row[^{]*select[^{]*\{[^}]*\}/.exec(
-      compiled.replace(/\/\*[\s\S]*?\*\//g, '')
-    );
-    assert.ok(Boolean(rule), 'the interval-row select rule survives compilation');
+    const rule =
+      /\.manager-task-node-interval-row[^{]*\.fabricate-select-trigger\[data-gathering-task-node-interval-unit\][^{]*\{[^}]*\}/.exec(
+        compiled.replace(/\/\*[\s\S]*?\*\//g, '')
+      );
+    assert.ok(Boolean(rule), 'the interval-row trigger rule survives compilation');
     const selector = rule[0].split('{')[0];
     // `:where()` is free, so it is excluded from the count on purpose.
     const classColumn = selector.replace(/:where\([^)]*\)/g, '').match(/\.[\w-]+|\[[^\]]+\]/g);
     assert.ok(
       classColumn.length > 2,
-      `${selector.trim()} must out-specify \`.fabricate-field.manager-field select\` (0,2,1), `
+      `${selector.trim()} must out-specify a two-class caller rule, `
         + `but its class column is ${classColumn.length}`
     );
     assert.match(rule[0], /width: auto/, 'and it is the width that is being released');
+  });
+
+  // ── The seven converted pickers (issue 1510), each DRIVEN rather than read.
+  const CONVERTED = [
+    {
+      id: 'default environment',
+      trigger: '[data-gathering-task-field="defaultEnvironmentId"]',
+      name: 'Default environment (canvas drop)',
+      offers: ['__unchanged__', 'env-forest', 'env-cave'],
+      choose: 'env-cave',
+      read: (patch) => patch.defaultEnvironmentId,
+      expected: 'env-cave',
+    },
+    {
+      id: 'stamina cost modifier',
+      trigger: '.fabricate-select-trigger[aria-label="Per-actor cost modifiers"]',
+      name: 'Per-actor cost modifiers',
+      offers: ['mod-a', 'mod-b'],
+      choose: 'mod-b',
+      read: (patch) => patch.staminaCostModifiers?.[0]?.modifierId,
+      expected: 'mod-b',
+    },
+    {
+      id: 'stamina modifier sign',
+      trigger: '.fabricate-select-trigger[aria-label="Operator"]',
+      name: 'Operator',
+      offers: ['-', '+'],
+      choose: '-',
+      read: (patch) => patch.staminaCostModifiers?.[0]?.operator,
+      expected: '-',
+    },
+    {
+      id: 'deplete',
+      trigger: '[data-gathering-task-node-deplete]',
+      name: 'Deplete',
+      offers: ['onStart', 'onSuccess'],
+      choose: 'onSuccess',
+      read: (patch) => patch.nodes?.depletionTiming,
+      expected: 'onSuccess',
+    },
+    {
+      id: 'respawn policy',
+      trigger: '[data-gathering-task-node-respawn]',
+      name: 'Respawn',
+      offers: ['manual', 'overTime', 'nonRegenerating'],
+      choose: 'nonRegenerating',
+      read: (patch) => patch.nodes?.respawn?.policy,
+      expected: 'nonRegenerating',
+    },
+    {
+      id: 'respawn interval unit',
+      trigger: '[data-gathering-task-node-interval-unit]',
+      name: 'Respawn interval unit',
+      offers: ['minutes', 'hours', 'days', 'weeks'],
+      choose: 'days',
+      read: (patch) => patch.nodes?.respawn?.intervalUnit,
+      expected: 'days',
+    },
+    {
+      id: 'gain mode',
+      trigger: '[data-gathering-task-node-gain-mode]',
+      name: 'Each interval',
+      offers: ['guaranteed', 'chance', 'expression'],
+      choose: 'expression',
+      read: (patch) => patch.nodes?.respawn?.gainMode,
+      expected: 'expression',
+    },
+  ];
+
+  it('renders every converted picker as a named trigger, offering the rows it used to', async () => {
+    const { root } = await mountEditor();
+    for (const control of CONVERTED) {
+      const trigger = root.querySelector(control.trigger);
+      assert.ok(Boolean(trigger), `${control.id}: no trigger matches ${control.trigger}`);
+      assert.equal(trigger.tagName, 'BUTTON', `${control.id} renders the shared picker's trigger`);
+      assert.equal(
+        assertSelectHasResolvedName(root, control.trigger),
+        control.name,
+        `${control.id} keeps the accessible name it had as a <select>`
+      );
+      assert.deepEqual(
+        selectOptionValues(root, control.trigger),
+        control.offers,
+        `${control.id} offers the rows its <option> list did`
+      );
+      // One panel at a time: a list left open is the one the next lookup would find.
+      closeSelectPanel(root, control.trigger);
+    }
+  });
+
+  it('forwards the chosen value of every converted picker to the update function', async () => {
+    for (const control of CONVERTED) {
+      const { root, updates } = await mountEditor();
+      chooseSelectOption(root, control.trigger, control.choose);
+      assert.equal(
+        lastWrite(updates, control.read),
+        control.expected,
+        `${control.id}: choosing ${control.choose} must reach the update function`
+      );
+      harness.remount();
+    }
   });
 });

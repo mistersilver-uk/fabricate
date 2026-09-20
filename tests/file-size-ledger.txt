@@ -142,7 +142,7 @@ src/ui/svelte/apps/manager/GatheringEconomyView.svelte	837
 src/ui/svelte/apps/manager/GatheringEventEditView.svelte	700
 src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte	584
 src/ui/svelte/apps/manager/GatheringPartiesTab.svelte	502
-src/ui/svelte/apps/manager/GatheringTaskEditView.svelte	2819
+src/ui/svelte/apps/manager/GatheringTaskEditView.svelte	2816
 src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte	561
 src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte	530
 src/ui/svelte/apps/manager/PartyExpandedBody.svelte	563

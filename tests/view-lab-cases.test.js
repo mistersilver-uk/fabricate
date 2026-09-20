@@ -38,6 +38,7 @@ import {
   WORLD_TOOL_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
+import { chooseSelectOption } from '../scripts/lib/view-lab-cases/caseFactories.js';
 import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
 import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
@@ -1094,14 +1095,18 @@ test('resource-node interval evidence reaches over-time controls at both require
     assert.equal(viewCase.expectView, 'gathering-task-edit');
     assert.deepEqual(viewCase.position, { width, height });
     assert.ok(viewCase.steps.some((step) => step.selector?.includes('sm-task-prospect')));
-    assert.deepEqual(viewCase.steps.slice(-3), [
-      { selector: '[data-gathering-task-node-respawn]', select: 'overTime' },
+    // CHOSEN, not `select:`ed, since issue 1510 converted the control: the step is the factory's
+    // own pair rather than two selectors spelled here, which would pin the panel's internals.
+    assert.deepEqual(viewCase.steps.slice(-4), [
+      ...chooseSelectOption('[data-gathering-task-node-respawn]', 'overTime'),
       { selector: '[data-gathering-task-node-interval]', fill: '1440' },
       { selector: '[data-gathering-task-nodes]', scroll: true },
     ]);
+    // A trigger has no `:checked`, and the row click shuts the panel, so the choice is claimed by
+    // what it unlocks: the interval row renders only under `overTime`.
     assert.equal(
       viewCase.expectSelector,
-      '[data-gathering-task-node-respawn] option[value="overTime"]:checked'
+      '.manager-task-node-interval-row .fabricate-select-trigger[data-gathering-task-node-interval-unit]'
     );
     assert.equal(viewCase.expectVisible, '[data-gathering-task-node-interval]');
     assert.equal(viewCase.expectCenterHit, '[data-gathering-task-node-interval]');
@@ -2354,15 +2359,16 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty-three frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty-four frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
 // and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first to twenty-third at issue 1510, which are the recipe studio's
-// kind list, the component studio's category list and the checks studio's trigger comparison list
-// — the first three converted MANAGER selects whose panels have a frame at all, and the third the
-// first opened from inside a card the walk has to author before it exists).
+// option panels, and the twenty-first to twenty-fourth at issue 1510, which are the recipe studio's
+// kind list, the component studio's category list, the checks studio's trigger comparison list and
+// the gathering studio's respawn policy list — the first four converted MANAGER selects whose panels
+// have a frame at all, the third the first opened from inside a card the walk has to author before
+// it exists, and the fourth the first in an editor the rail reaches through a submenu).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -2371,6 +2377,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
+  'manager-gathering-task-node-respawn-list',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',

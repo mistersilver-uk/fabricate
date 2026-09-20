@@ -4,6 +4,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The node card's two vocabularies are DATA since issue 1510 converted its selects: read from the
+// module that declares them rather than matched in the editor's markup.
+import {
+  respawnGainModeOptions,
+  respawnPolicyOptions
+} from '../../src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
@@ -80,17 +87,29 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     ]) {
       assert.ok(editorSource.includes(attr), `node card should expose ${attr}`);
     }
-    // The three respawn policies are offered (issue 301 adds nonRegenerating).
-    for (const policy of ['"manual"', '"overTime"', '"nonRegenerating"']) {
-      assert.ok(editorSource.includes(`value=${policy}`), `respawn select should offer policy ${policy}`);
-    }
+    // The three respawn policies are offered, in order (issue 301 adds nonRegenerating).
+    const fallback = (key, text) => text;
+    assert.deepEqual(
+      respawnPolicyOptions(fallback).map((option) => option.value),
+      ['manual', 'overTime', 'nonRegenerating'],
+      'the respawn picker offers the three shipped policies'
+    );
     // The three over-time gain modes are offered.
-    for (const gainMode of ['"guaranteed"', '"chance"', '"expression"']) {
-      assert.ok(editorSource.includes(`value=${gainMode}`), `gain-mode select should offer ${gainMode}`);
-    }
-    // The removed legacy policies are gone.
-    for (const policy of ['"none"', '"elapsedTime"', '"probability"', '"manualAndElapsedTime"']) {
-      assert.ok(!editorSource.includes(`value=${policy}`), `respawn select should no longer offer policy ${policy}`);
+    assert.deepEqual(
+      respawnGainModeOptions(fallback).map((option) => option.value),
+      ['guaranteed', 'chance', 'expression'],
+      'the gain-mode picker offers the three shipped modes'
+    );
+    // The removed legacy policies are gone — from the vocabulary AND from the editor.
+    for (const policy of ['none', 'elapsedTime', 'probability', 'manualAndElapsedTime']) {
+      assert.ok(
+        !respawnPolicyOptions(fallback).some((option) => option.value === policy),
+        `respawn picker should no longer offer policy ${policy}`
+      );
+      assert.ok(
+        !editorSource.includes(`value="${policy}"`),
+        `the editor should spell no ${policy} option`
+      );
     }
   });
 
@@ -202,7 +221,8 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('authors the optional defaultEnvironmentId select wired from the parent', () => {
-    assert.ok(editorSource.includes('data-gathering-task-field="defaultEnvironmentId"'), 'a default-environment select is present');
+    // The hook rides the converted trigger now, so `gathering-task-editor-stepper-mounted` asserts
+    // its presence on the rendered DOM rather than this suite matching it in markup.
     assert.match(editorSource, /function setDefaultEnvironment/, 'has a default-environment setter');
     assert.match(editorSource, /defaultEnvironmentId: id \|\| null/, 'the setter coerces empty to null');
     // The parent feeds the system environments into the editor.
