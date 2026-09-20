@@ -1,0 +1,780 @@
+{
+  "manager.typeof": {
+    "choiceDialog": "function",
+    "confirmDialog": "function",
+    "copyToClipboard": "function",
+    "deleteOwnedRecipeItem": "function",
+    "downloadFile": "function",
+    "enrichToHtml": "function",
+    "eraseLearnedRecipe": "function",
+    "expendRecipeItemUse": "function",
+    "getAccessCharacterActors": "function",
+    "getActorOptions": "function",
+    "getActorRollData": "function",
+    "getActorUuidsInSceneRegion": "function",
+    "getCharacterLibrariesStore": "function",
+    "getComponentScopeStore": "function",
+    "getCraftingSystemManager": "function",
+    "getCurrencyConfigStore": "function",
+    "getCurrentSceneRegions": "function",
+    "getEssenceScopeStore": "function",
+    "getFoundrySystemId": "function",
+    "getGatheringEnvironmentStore": "function",
+    "getGatheringLocationService": "function",
+    "getGatheringPartyStore": "function",
+    "getGatheringRealmStore": "function",
+    "getKnowledgeSnapshot": "function",
+    "getModuleVersion": "function",
+    "getPlayerCharacterActors": "function",
+    "getRecipeManager": "function",
+    "getSceneOptions": "function",
+    "getScriptMacros": "function",
+    "getSetting": "function",
+    "getToolScopeStore": "function",
+    "getVocabularyScopeStore": "function",
+    "getWorldActors": "function",
+    "getWorldItemOptions": "function",
+    "getWorldUsers": "function",
+    "isFabricateReady": "function",
+    "localize": "function",
+    "notify": "object",
+    "onFabricateDataChanged": "function",
+    "onFabricateReady": "function",
+    "pickImagePath": "function",
+    "renderImportDialog": "function",
+    "renderSystemImportDialog": "function",
+    "resetActorKnowledge": "function",
+    "resolveToolSource": "function",
+    "setGatheringConditions": "function",
+    "setSetting": "function",
+    "subscribeSceneChange": "function",
+    "subscribeTravelMarkerMove": "function"
+  },
+  "manager.data": {
+    "enrichToHtml": "<enriched><p>@UUID[Item.hammer]</p></enriched>",
+    "getAccessCharacterActors": [
+      {
+        "controlledBy": [
+          {
+            "assigned": false,
+            "avatar": "alice.webp",
+            "id": "alice",
+            "name": "Alice"
+          }
+        ],
+        "id": "pc-arden",
+        "img": "icons/arden.webp",
+        "name": "Arden",
+        "sharedWithAllPlayers": false
+      },
+      {
+        "controlledBy": [],
+        "id": "pc-brisa",
+        "img": "",
+        "name": "Brisa",
+        "sharedWithAllPlayers": true
+      },
+      {
+        "controlledBy": [],
+        "id": "npc-grond",
+        "img": "icons/grond.webp",
+        "name": "Grond",
+        "sharedWithAllPlayers": false
+      }
+    ],
+    "getActorOptions": [
+      {
+        "id": "pc-arden",
+        "img": "icons/arden.webp",
+        "isPlayerCharacter": true,
+        "name": "Arden",
+        "uuid": "Actor.pc-arden"
+      },
+      {
+        "id": "pc-brisa",
+        "img": "",
+        "isPlayerCharacter": true,
+        "name": "Brisa",
+        "uuid": "Actor.pc-brisa"
+      },
+      {
+        "id": "npc-grond",
+        "img": "icons/grond.webp",
+        "isPlayerCharacter": false,
+        "name": "Grond",
+        "uuid": "Actor.npc-grond"
+      }
+    ],
+    "getActorRollData": {
+      "abilities": {
+        "str": 14
+      }
+    },
+    "getActorUuidsInSceneRegion": [
+      "Actor.pc-arden"
+    ],
+    "getCurrentSceneRegions": {
+      "regions": [
+        {
+          "color": "#112233",
+          "name": "Grove",
+          "sceneRegionUuid": "Scene.stage.Region.grove"
+        }
+      ],
+      "sceneUuid": "Scene.stage"
+    },
+    "getFoundrySystemId": "dnd5e",
+    "getKnowledgeSnapshot": {
+      "characters": [
+        {
+          "id": "pc-arden",
+          "img": "icons/arden.webp",
+          "learnedRecipes": [
+            {
+              "craftingSystemId": "sys-1",
+              "granted": "<undefined>",
+              "grantedBy": "<undefined>",
+              "learnedAt": 11,
+              "recipeCategory": "metal",
+              "recipeId": "recipe-alpha",
+              "recipeImg": "a.webp",
+              "recipeName": "Alpha",
+              "sourceCapped": false,
+              "sourceDefinitionName": "Bound Primer",
+              "sourceItemName": "Arden Primer",
+              "sourceItemUuid": "Item.owned-modern",
+              "sourceOwned": true
+            },
+            {
+              "craftingSystemId": "sys-1",
+              "granted": "<undefined>",
+              "grantedBy": "<undefined>",
+              "learnedAt": 12,
+              "recipeCategory": "",
+              "recipeId": "recipe-shared",
+              "recipeImg": "",
+              "recipeName": "Shared",
+              "sourceCapped": true,
+              "sourceDefinitionName": "Bound Primer",
+              "sourceItemName": "Claimed Folio",
+              "sourceItemUuid": "Item.owned-identity",
+              "sourceOwned": true
+            },
+            {
+              "craftingSystemId": "sys-1",
+              "granted": "<undefined>",
+              "grantedBy": "<undefined>",
+              "learnedAt": 13,
+              "recipeCategory": "wood",
+              "recipeId": "recipe-beta",
+              "recipeImg": "b.webp",
+              "recipeName": "Beta",
+              "sourceCapped": false,
+              "sourceDefinitionName": "Weathered Folio",
+              "sourceItemName": "",
+              "sourceItemUuid": "Item.vanished",
+              "sourceOwned": false
+            },
+            {
+              "craftingSystemId": "sys-1",
+              "granted": "yes",
+              "grantedBy": "Wren",
+              "learnedAt": 14,
+              "recipeCategory": "cloth",
+              "recipeId": "recipe-gamma",
+              "recipeImg": "",
+              "recipeName": "Gamma",
+              "sourceCapped": false,
+              "sourceDefinitionName": "Weathered Folio",
+              "sourceItemName": "",
+              "sourceItemUuid": null,
+              "sourceOwned": false
+            }
+          ],
+          "name": "Arden",
+          "orphanCount": 1,
+          "otherSystemCount": 1,
+          "ownedCopies": [
+            {
+              "definitionId": "def-modern",
+              "definitionName": "Bound Primer",
+              "img": "icons/book.webp",
+              "inert": false,
+              "itemId": "owned-modern",
+              "itemUuid": "Item.owned-modern",
+              "learnScope": "perInstance",
+              "limitUses": true,
+              "matchTier": "uuid",
+              "maxUses": 3,
+              "name": "Arden Primer",
+              "quantity": 2,
+              "recipeCount": 2,
+              "timesUsed": 1
+            },
+            {
+              "definitionId": "def-legacy",
+              "definitionName": "Weathered Folio",
+              "img": "icons/book.webp",
+              "inert": true,
+              "itemId": "owned-identity",
+              "itemUuid": "Item.owned-identity",
+              "learnScope": "perInstance",
+              "limitUses": true,
+              "matchTier": "identity",
+              "maxUses": 1,
+              "name": "Claimed Folio",
+              "quantity": 1,
+              "recipeCount": 3,
+              "timesUsed": 4
+            },
+            {
+              "definitionId": "def-legacy",
+              "definitionName": "Weathered Folio",
+              "img": "icons/book.webp",
+              "inert": false,
+              "itemId": "owned-compendium",
+              "itemUuid": "Item.owned-compendium",
+              "learnScope": "perInstance",
+              "limitUses": true,
+              "matchTier": "compendium",
+              "maxUses": 1,
+              "name": "Imported Folio",
+              "quantity": 3,
+              "recipeCount": 3,
+              "timesUsed": "<undefined>"
+            },
+            {
+              "definitionId": "def-modern",
+              "definitionName": "Bound Primer",
+              "img": "icons/book.webp",
+              "inert": false,
+              "itemId": "owned-duplicate",
+              "itemUuid": "Item.owned-duplicate",
+              "learnScope": "perInstance",
+              "limitUses": true,
+              "matchTier": "duplicate",
+              "maxUses": 3,
+              "name": "Copied Primer",
+              "quantity": 1,
+              "recipeCount": 2,
+              "timesUsed": "<undefined>"
+            }
+          ]
+        },
+        {
+          "id": "pc-brisa",
+          "img": "",
+          "learnedRecipes": [],
+          "name": "Brisa",
+          "orphanCount": 0,
+          "otherSystemCount": 0,
+          "ownedCopies": []
+        }
+      ],
+      "definitionCount": 2,
+      "systemId": "sys-1"
+    },
+    "getModuleVersion": "9.9.9",
+    "getPlayerCharacterActors": [
+      {
+        "controlledBy": [
+          {
+            "assigned": false,
+            "avatar": "alice.webp",
+            "id": "alice",
+            "name": "Alice"
+          }
+        ],
+        "id": "pc-arden",
+        "img": "icons/arden.webp",
+        "name": "Arden",
+        "sharedWithAllPlayers": false
+      },
+      {
+        "controlledBy": [],
+        "id": "pc-brisa",
+        "img": "",
+        "name": "Brisa",
+        "sharedWithAllPlayers": true
+      }
+    ],
+    "getSceneOptions": [
+      {
+        "img": "scenes/stage.webp",
+        "name": "Stage",
+        "thumbnail": "scenes/stage-thumb.webp",
+        "uuid": "Scene.stage"
+      },
+      {
+        "img": "scenes/wings.webp",
+        "name": "Wings",
+        "thumbnail": "",
+        "uuid": "Scene.wings"
+      }
+    ],
+    "getScriptMacros": [
+      {
+        "name": "Abe",
+        "uuid": "Macro.abe"
+      },
+      {
+        "name": "Zed",
+        "uuid": "Macro.zed"
+      }
+    ],
+    "getSetting": "on",
+    "getWorldItemOptions": [
+      {
+        "description": "",
+        "img": "",
+        "name": "Anvil",
+        "type": "tool",
+        "uuid": "Item.anvil"
+      },
+      {
+        "description": "",
+        "img": "icons/hammer.webp",
+        "name": "Hammer",
+        "type": "tool",
+        "uuid": "Item.hammer"
+      }
+    ],
+    "getWorldUsers": [
+      {
+        "avatar": "alice.webp",
+        "color": "var(--player-one)",
+        "id": "alice",
+        "name": "Alice",
+        "role": "[USER.RolePlayer]"
+      },
+      {
+        "avatar": "bram.webp",
+        "color": "plain-colour-string",
+        "id": "bram",
+        "name": "Bram",
+        "role": "[USER.RoleTrusted]"
+      }
+    ],
+    "isFabricateReady": true,
+    "localize": "[FABRICATE.Key:{\"count\":2}]",
+    "resolveToolSource": {
+      "description": "",
+      "img": "icons/hammer.webp",
+      "name": "Hammer",
+      "type": "tool",
+      "uuid": "Item.hammer"
+    }
+  },
+  "manager.journal": [
+    [
+      "settings.set",
+      "fabricate",
+      "craftingHints",
+      "off"
+    ],
+    [
+      "gathering.setConditions",
+      {
+        "weather": "rain"
+      }
+    ],
+    [
+      "notify.info",
+      "info line"
+    ],
+    [
+      "notify.warn",
+      "warn line"
+    ],
+    [
+      "notify.error",
+      "error line"
+    ],
+    [
+      "clipboard.copyPlainText",
+      "Item.hammer"
+    ],
+    [
+      "FilePicker.construct",
+      "image",
+      "worlds/current.webp"
+    ],
+    [
+      "FilePicker.render",
+      true
+    ],
+    [
+      "DialogV2.confirm",
+      "gone?"
+    ],
+    [
+      "DialogV2.construct",
+      "which?",
+      [
+        "keep",
+        "drop"
+      ]
+    ],
+    [
+      "DialogV2.render",
+      true
+    ],
+    [
+      "DialogV2.prompt",
+      "Import Recipes",
+      false
+    ],
+    [
+      "recipeManager.importRecipes",
+      [
+        {
+          "craftingSystemId": "sys-1",
+          "id": "r1"
+        }
+      ],
+      true
+    ],
+    [
+      "adminStore.refresh"
+    ],
+    [
+      "DialogV2.prompt",
+      "Import Crafting System",
+      false
+    ],
+    [
+      "fabricate.resetActorKnowledge",
+      {
+        "actorId": "pc-arden",
+        "systemId": "sys-1"
+      },
+      "<undefined>"
+    ],
+    [
+      "Hooks.on",
+      "canvasReady"
+    ],
+    [
+      "Hooks.on",
+      "updateToken"
+    ],
+    [
+      "Hooks.on",
+      "createToken"
+    ],
+    [
+      "Hooks.on",
+      "deleteToken"
+    ],
+    [
+      "Hooks.off",
+      "canvasReady",
+      true
+    ],
+    [
+      "Hooks.off",
+      "updateToken",
+      true
+    ],
+    [
+      "Hooks.off",
+      "createToken",
+      true
+    ],
+    [
+      "Hooks.off",
+      "deleteToken",
+      true
+    ],
+    [
+      "Hooks.on",
+      "fabricate.craftingSystemsChanged"
+    ],
+    [
+      "Hooks.on",
+      "fabricate.recipesChanged"
+    ],
+    [
+      "Hooks.on",
+      "fabricate.playerCharacterTypesChanged"
+    ],
+    [
+      "data.changed",
+      "systems"
+    ],
+    [
+      "data.changed",
+      "recipes"
+    ],
+    [
+      "data.changed",
+      "playerCharacterTypes"
+    ],
+    [
+      "Hooks.off",
+      "fabricate.craftingSystemsChanged",
+      true
+    ],
+    [
+      "Hooks.off",
+      "fabricate.recipesChanged",
+      true
+    ],
+    [
+      "Hooks.off",
+      "fabricate.playerCharacterTypesChanged",
+      true
+    ]
+  ],
+  "manager.download.present": [
+    [
+      "saveDataToFile",
+      "{\"a\":1}",
+      "application/json",
+      "system.json"
+    ]
+  ],
+  "manager.download.absent": [
+    [
+      "Blob.construct",
+      "{\"a\":1}",
+      "application/json"
+    ],
+    [
+      "URL.createObjectURL"
+    ],
+    [
+      "document.body.insert",
+      "A",
+      "system.json"
+    ],
+    [
+      "anchor.click"
+    ],
+    [
+      "document.body.detach",
+      "A",
+      "system.json"
+    ],
+    [
+      "URL.revokeObjectURL",
+      "blob:fabricate"
+    ]
+  ],
+  "player.answers": {
+    "adjustGatheringStamina": {
+      "answeredBy": "adjustGatheringStamina"
+    },
+    "advanceCraftingRun": {
+      "answeredBy": "advanceCraftingRun"
+    },
+    "cancelCraftingRun": {
+      "answeredBy": "cancelCraftingRun"
+    },
+    "confirmDialog": false,
+    "craftErrorMessage": "[FABRICATE.App.Crafting.Notify.CraftFailed]",
+    "craftRecipe": {
+      "answeredBy": "craftRecipe"
+    },
+    "createProgressReporter": "<function>",
+    "destroyComponents": {
+      "answeredBy": "destroyComponents"
+    },
+    "dismissJournalRun": {
+      "answeredBy": "dismissJournalRun"
+    },
+    "evaluateSelectedSet": {
+      "answeredBy": "evaluateSelectedSet"
+    },
+    "executeJournalRunCommand": {
+      "answeredBy": "executeJournalRunCommand"
+    },
+    "getActiveCanvasTool": null,
+    "getCraftingComponentSourceIds": {
+      "answeredBy": "getCraftingComponentSourceIds"
+    },
+    "getCraftingSourceActors": {
+      "answeredBy": "getCraftingSourceActors"
+    },
+    "getCraftingSystemManager": {
+      "answeredBy": "getCraftingSystemManager"
+    },
+    "getDismissedJournalRunKeys": {
+      "answeredBy": "getDismissedJournalRunKeys"
+    },
+    "getFavouriteRecipeIds": {
+      "answeredBy": "getFavouriteRecipeIds"
+    },
+    "getGatheringConditions": {
+      "answeredBy": "getGatheringConditions"
+    },
+    "getGatheringDropBreakdown": {
+      "answeredBy": "getGatheringDropBreakdown"
+    },
+    "getGatheringEconomy": {
+      "answeredBy": "getGatheringEconomy"
+    },
+    "getGatheringStaminaState": {
+      "answeredBy": "getGatheringStaminaState"
+    },
+    "getHideUnavailableEnvironments": {
+      "answeredBy": "getHideUnavailableEnvironments"
+    },
+    "getJournalRunAuthorityAvailability": {
+      "answeredBy": "getJournalRunAuthorityAvailability"
+    },
+    "getProgressiveResultOrder": {
+      "answeredBy": "getProgressiveResultOrder"
+    },
+    "getRecipeManager": {
+      "answeredBy": "getRecipeManager"
+    },
+    "getSelectedActorId": {
+      "answeredBy": "getSelectedGatheringActorId"
+    },
+    "getSelectedAlchemySystemId": {
+      "answeredBy": "getSelectedAlchemySystemId"
+    },
+    "getSelectedCraftingActorId": {
+      "answeredBy": "getSelectedCraftingActorId"
+    },
+    "getWorldTime": {
+      "answeredBy": "getWorldTime"
+    },
+    "getWorldTimeComponents": {
+      "answeredBy": "getWorldTimeComponents"
+    },
+    "hydrateCraftingRecipe": {
+      "answeredBy": "hydrateCraftingRecipe"
+    },
+    "isTravelMarkerActor": true,
+    "learnRecipeFromInventory": {
+      "answeredBy": "learnRecipeFromInventory"
+    },
+    "listAlchemyForActor": {
+      "answeredBy": "listAlchemyForActor"
+    },
+    "listCraftingForActor": {
+      "answeredBy": "listCraftingForActor"
+    },
+    "listCraftingSourceActors": {
+      "answeredBy": "listCraftingSourceActors"
+    },
+    "listGatheringForActor": {
+      "answeredBy": "listGatheringForActor"
+    },
+    "listInventoryForActor": {
+      "answeredBy": "listInventoryForActor"
+    },
+    "listJournalForActor": {
+      "answeredBy": "listJournalForActor"
+    },
+    "listSelectableActors": {
+      "answeredBy": "listSelectableActors"
+    },
+    "localize": "[FABRICATE.Key]",
+    "navigateToCraftingRecipe": "<undefined>",
+    "notify": "<undefined>",
+    "progressiveOrderRevertMessage": "[FABRICATE.App.Crafting.Detail.StageOrderSaveFailed]",
+    "reconcileJournalRunAuthority": {
+      "answeredBy": "reconcileJournalRunAuthority"
+    },
+    "restockGatheringNode": {
+      "answeredBy": "restockGatheringNode"
+    },
+    "salvageComponent": {
+      "answeredBy": "salvageComponent"
+    },
+    "salvageComponents": {
+      "answeredBy": "salvageComponents"
+    },
+    "setCraftingComponentSourceIds": {
+      "answeredBy": "setCraftingComponentSourceIds"
+    },
+    "setGatheringEconomy": {
+      "answeredBy": "setGatheringEconomy"
+    },
+    "setGatheringStamina": {
+      "answeredBy": "setGatheringStamina"
+    },
+    "setHideUnavailableEnvironments": {
+      "answeredBy": "setHideUnavailableEnvironments"
+    },
+    "setProgressiveResultOrder": {
+      "answeredBy": "setProgressiveResultOrder"
+    },
+    "setSelectedActorId": {
+      "answeredBy": "setSelectedGatheringActorId"
+    },
+    "setSelectedAlchemySystemId": {
+      "answeredBy": "setSelectedAlchemySystemId"
+    },
+    "setSelectedCraftingActorId": {
+      "answeredBy": "setSelectedCraftingActorId"
+    },
+    "startGatheringAttempt": {
+      "answeredBy": "startGatheringAttempt"
+    },
+    "submitAlchemyAttempt": {
+      "answeredBy": "submitAlchemyAttempt"
+    },
+    "toggleFavouriteRecipe": {
+      "answeredBy": "toggleFavouriteRecipe"
+    }
+  },
+  "player.reached": [
+    "fabricate.adjustGatheringStamina",
+    "fabricate.advanceCraftingRun",
+    "fabricate.cancelCraftingRun",
+    "fabricate.craftRecipe",
+    "fabricate.destroyComponents",
+    "fabricate.dismissJournalRun",
+    "fabricate.evaluateSelectedSet",
+    "fabricate.executeJournalRunCommand",
+    "fabricate.getCraftingComponentSourceIds",
+    "fabricate.getCraftingSourceActors",
+    "fabricate.getCraftingSystemManager",
+    "fabricate.getDismissedJournalRunKeys",
+    "fabricate.getFavouriteRecipeIds",
+    "fabricate.getGatheringConditions",
+    "fabricate.getGatheringDropBreakdown",
+    "fabricate.getGatheringEconomy",
+    "fabricate.getGatheringStaminaState",
+    "fabricate.getHideUnavailableEnvironments",
+    "fabricate.getJournalRunAuthorityAvailability",
+    "fabricate.getProgressiveResultOrder",
+    "fabricate.getRecipeManager",
+    "fabricate.getSelectedGatheringActorId",
+    "fabricate.getSelectedAlchemySystemId",
+    "fabricate.getSelectedCraftingActorId",
+    "fabricate.getWorldTime",
+    "fabricate.getWorldTimeComponents",
+    "fabricate.hydrateCraftingRecipe",
+    "fabricate.learnRecipeFromInventory",
+    "fabricate.listAlchemyForActor",
+    "fabricate.listCraftingForActor",
+    "fabricate.listCraftingSourceActors",
+    "fabricate.listGatheringForActor",
+    "fabricate.listInventoryForActor",
+    "fabricate.listJournalForActor",
+    "fabricate.listSelectableActors",
+    "fabricate.getSelectedCraftingActorId",
+    "fabricate.hydrateCraftingRecipe",
+    "notify.warn",
+    "fabricate.reconcileJournalRunAuthority",
+    "fabricate.restockGatheringNode",
+    "fabricate.salvageComponent",
+    "fabricate.salvageComponents",
+    "fabricate.setCraftingComponentSourceIds",
+    "fabricate.setGatheringEconomy",
+    "fabricate.setGatheringStamina",
+    "fabricate.setHideUnavailableEnvironments",
+    "fabricate.setProgressiveResultOrder",
+    "fabricate.setSelectedGatheringActorId",
+    "fabricate.setSelectedAlchemySystemId",
+    "fabricate.setSelectedCraftingActorId",
+    "fabricate.startGatheringAttempt",
+    "fabricate.submitAlchemyAttempt",
+    "fabricate.toggleFavouriteRecipe"
+  ]
+}
