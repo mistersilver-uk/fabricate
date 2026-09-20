@@ -256,7 +256,7 @@ describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', (
   });
 
   defineStructureContract(
-    'treats the character->player relation as a SET, with the whole-table case distinct',
+    'treats the character->player relation as a set, with the whole-table case distinct',
     ACCESS_TAB,
     {
       names: ['controlledBy', 'sharedWithAllPlayers'],
@@ -445,7 +445,7 @@ describe('the progressive reorder announcement', () => {
   // the clicked mounted case in `recipe-edit-mounted.test.js`, which round-trips the patch the way
   // the root does and reads the announced sentence. What stays here is the sentence's shape.
   defineStructureContract(
-    'announces through ONE localized key with placeholders, not a concatenation',
+    'announces through one localized key with placeholders, not a concatenation',
     { file: RESULT_GROUP_CARD, fn: 'moveItem' },
     {
       calls: ['componentNameFor', 'reorderItem', 'format'],
