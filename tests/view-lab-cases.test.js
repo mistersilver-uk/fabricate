@@ -2330,18 +2330,20 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty frames a change to the shared positioning seam must publish (issue 1500; the eleventh
-// joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the twelfth and
-// thirteenth at issue 1504, when `Select`'s option list got two — one of them in the PLAYER window,
-// which is a second application root for the seam to clamp against — and the fourteenth and
-// fifteenth at issue 1520's second review round, which is the two GM canvas windows' open option
-// panels).
+// The twenty-one frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
+// twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
+// PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
+// and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
+// option panels, and the twenty-first at issue 1510, which is the recipe studio's kind list, the
+// first converted MANAGER select whose panel has a frame at all).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
+  'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',

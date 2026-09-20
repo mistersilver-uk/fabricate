@@ -23,6 +23,7 @@ import {
   OR_MENU_KINDS,
   OR_MENU_LABELS,
   assertOneTrackPerGridChild,
+  kindPickerFixture,
   orMenuGroupCardSource,
 } from './manager-layout-recipes-fixtures.js';
 
@@ -387,9 +388,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
     stamp(`
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
       <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
-      <select class="manager-recipe-option-kind" data-recipe-option-kind>
-        <option value="tags" selected>Tag</option>
-      </select>
+      ${kindPickerFixture('Tag')}
       <span class="manager-recipe-option-tags" data-recipe-option-tags>
         <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>${chips}
         <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
@@ -406,9 +405,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
   const componentRow = stamp(`
     <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option data-case="component">
       <span class="manager-recipe-option-lead is-component"><i class="fas fa-cube"></i></span>
-      <select class="manager-recipe-option-kind" data-recipe-option-kind>
-        <option value="component" selected>Component</option>
-      </select>
+      ${kindPickerFixture('Component')}
       <span class="manager-recipe-option-name-field">
         <span class="manager-recipe-option-chosen" data-recipe-option-chosen><i class="fas fa-cube manager-recipe-option-mark is-component"></i><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
       </span>${controls}
@@ -930,7 +927,7 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
     const rowFor = (kind, icon) => `
       <div class="manager-recipe-ingredient-option-row is-${kind}" data-recipe-option>
         <span class="manager-recipe-option-lead is-${kind}" data-plate="${kind}"><i class="${icon}"></i></span>
-        <select class="manager-recipe-option-kind"><option>${kind}</option></select>
+        ${kindPickerFixture(kind)}
         <span class="manager-recipe-option-name-field">
           <span class="manager-recipe-option-chosen" data-recipe-option-chosen>
             <i class="${icon} manager-recipe-option-mark is-${kind}" data-mark="${kind}"></i>
@@ -995,6 +992,23 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
   } finally {
     await context.close();
   }
+});
+
+test('kindPickerFixture spells classes Select.svelte still emits, not dead markup', () => {
+  const selectSource = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
+    'utf8'
+  );
+  for (const spelled of ['fabricate-select-trigger', 'fabricate-select-value']) {
+    assert.ok(
+      selectSource.includes(spelled),
+      `${spelled} (from the kind picker fixture) is no longer in Select.svelte's source`
+    );
+  }
+  assert.ok(
+    selectSource.includes('fabricate-select-trigger-') && selectSource.includes('inline'),
+    'the `inline` rung and its trigger-class template are no longer in Select.svelte'
+  );
 });
 
 test('the Books & Scrolls route names one grid track per section and grows the table', () => {

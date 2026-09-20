@@ -216,6 +216,51 @@ const CONVERTED_SITES = Object.freeze([
     values: ['hours', 'minutes'],
     column: true,
   }),
+  // ISSUE 1510 COMMIT 2a — the recipe studio. Its cells sit in `.manager-recipe-field` rather than
+  // in a `Field` column, and their width came from `.manager-recipe-field select`, so the
+  // counterpart is a sheet rule off the same wrapper class.
+  Object.freeze({
+    subject: 'recipe-overview',
+    name: 'the recipe check tier',
+    hook: '[data-recipe-field="checkTierId"]',
+    values: ['tier-easy', 'tier-legendary'],
+    column: true,
+    columnSelector: '.manager-recipe-field',
+  }),
+  Object.freeze({
+    subject: 'recipe-overview',
+    name: 'the recipe category',
+    hook: '[data-recipe-category-select]',
+    values: ['Metal', 'Alchemical reagent'],
+    column: true,
+    columnSelector: '.manager-recipe-field',
+  }),
+  Object.freeze({
+    subject: 'recipe-overview',
+    name: 'the recipe minimum success tier',
+    hook: '[data-recipe-field="minSuccessOutcomeId"]',
+    values: ['tier-easy', 'tier-legendary'],
+    column: true,
+    columnSelector: '.manager-recipe-field',
+  }),
+  Object.freeze({
+    subject: 'recipe-overview',
+    name: 'the eligible modifier set',
+    hook: '[data-recipe-field="craftingModifierSet"]',
+    values: ['inherit', 'custom'],
+    column: true,
+    columnSelector: '.manager-recipe-modifier-set-field',
+  }),
+  // The one 2a site whose row hugs by design: the kind picker states 132px on the picker ROOT and
+  // the trigger fills it, so both option words measure the same fixed slot.
+  Object.freeze({
+    subject: 'recipe-option',
+    name: 'the requirement kind',
+    hook: '[data-recipe-option-kind]',
+    values: ['component', 'tags'],
+    column: false,
+    floor: 132,
+  }),
 ]);
 
 /**
@@ -249,14 +294,14 @@ function readOpenPanel(page) {
  * @param {string} value
  * @returns {Promise<{shipped: number, unfloored: number, face: string, column: number}>}
  */
-async function measureTrigger(subject, hook, value) {
+async function measureTrigger(subject, hook, value, columnSelector = '.manager-field') {
   const page = await openFixture(subject, value);
   try {
-    return await page.evaluate((selector) => {
+    return await page.evaluate(([selector, column_]) => {
       const trigger = document.querySelector(selector);
       const shipped = trigger.getBoundingClientRect().width;
       const face = globalThis.getComputedStyle(trigger).fontFamily;
-      const column = trigger.closest('.manager-field')?.getBoundingClientRect().width ?? 0;
+      const column = trigger.closest(column_)?.getBoundingClientRect().width ?? 0;
       trigger.style.width = 'auto';
       trigger.style.minWidth = '0px';
       const unfloored = trigger.getBoundingClientRect().width;
@@ -266,7 +311,7 @@ async function measureTrigger(subject, hook, value) {
         column: Number(column.toFixed(2)),
         face,
       };
-    }, hook);
+    }, [hook, columnSelector]);
   } finally {
     await page.close();
   }
@@ -290,8 +335,8 @@ describe('a converted manager trigger keeps the width its native select had (iss
       : `holds ${site.name} at or above its ${site.floor}px floor across its rows`;
     it(claim, async () => {
       const [shortest, longest] = await Promise.all([
-        measureTrigger(site.subject, site.hook, site.values[0]),
-        measureTrigger(site.subject, site.secondHook ?? site.hook, site.values[1]),
+        measureTrigger(site.subject, site.hook, site.values[0], site.columnSelector),
+        measureTrigger(site.subject, site.secondHook ?? site.hook, site.values[1], site.columnSelector),
       ]);
 
       if (site.column) {
@@ -306,7 +351,8 @@ describe('a converted manager trigger keeps the width its native select had (iss
           `${site.name} measured ${shortest.shipped}px inside a ${shortest.column}px field ` +
             'column. Its native `<select>` took `width: 100%` from `.fabricate-field.manager-' +
             'field select`, which is element-typed and reaches no `<button>`, so the caller ' +
-            'states the width itself.'
+            'states the width itself. The recipe studio pays the same regression through ' +
+            '`.manager-recipe-field select`.'
         );
       } else {
         // A FLOOR, NOT AN EQUALITY. The row hugs its value by design.
