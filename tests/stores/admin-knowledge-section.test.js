@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  assertConvergent,
   assertStatePatch,
   createSectionHarness,
   makeCorpusSystem,
@@ -142,6 +143,19 @@ describe('adminStore knowledge section corpus', () => {
       assert.deepStrictEqual(seamCalls(harness.drain(), 'getKnowledgeSnapshot'), [['sys1']]);
       assert.equal(harness.state().knowledge.defaultTab, 'recipeItems');
       assert.equal(harness.state().knowledge.systemId, 'sys1');
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a repeated forced refresh converges on one snapshot read per call', async () => {
+    const harness = await createSectionHarness(knowledgeWorld());
+    try {
+      await harness.store.setKnowledgeActive(true);
+      harness.drain();
+      await assertConvergent(harness, () => harness.store.refreshKnowledge({ force: true }), [
+        'getKnowledgeSnapshot',
+      ]);
     } finally {
       harness.dispose();
     }

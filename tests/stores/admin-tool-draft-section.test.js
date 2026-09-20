@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  assertConvergent,
   assertStatePatch,
   createSectionHarness,
   makeCorpusSystem,
@@ -149,6 +150,35 @@ describe('adminStore tool draft section corpus', () => {
         seamCalls(harness.drain(), 'systemManager.upsertTool'),
         [],
         'and writes nothing'
+      );
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a repeated save converges, and only a staged source reaches the persist extras', async () => {
+    const harness = await createSectionHarness({ systems: twoSystems() });
+    try {
+      harness.store.openToolDraft('t1');
+      harness.store.patchToolDraft({ name: 'Warhammer' });
+      harness.drain();
+      await harness.store.saveToolDraft();
+      const [[, , extras]] = seamCalls(harness.drain(), 'systemManager.upsertTool');
+      assert.deepStrictEqual(extras, {}, 'an unstaged save carries no item uuid');
+
+      harness.store.stageToolDraftSource('Item.abc');
+      harness.drain();
+      await harness.store.saveToolDraft();
+      const [[, , staged]] = seamCalls(harness.drain(), 'systemManager.upsertTool');
+      assert.deepStrictEqual(staged, { itemUuid: 'Item.abc' });
+
+      harness.store.patchToolDraft({ name: 'Sledge' });
+      harness.drain();
+      await assertConvergent(
+        harness,
+        () => harness.store.saveToolDraft(),
+        ['systemManager.upsertTool'],
+        { repeat: 'silent' }
       );
     } finally {
       harness.dispose();

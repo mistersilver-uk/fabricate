@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  assertConvergent,
   assertStatePatch,
   createSectionHarness,
   makeCorpusSystem,
@@ -171,14 +172,16 @@ describe('adminStore environment draft section corpus', () => {
     const harness = await createSectionHarness(world());
     try {
       harness.store.updateEnvironmentDraft({ name: 'Riverbank North', dangerLevel: 'unsafe' });
+      // Captured BEFORE the save: afterwards the draft is re-seeded from what the store answered,
+      // so comparing against it would be circular and a corrupted payload would pass.
+      const draftBefore = harness.state().environmentDraft;
       harness.drain();
       const result = await harness.store.saveEnvironmentDraft();
       const entries = harness.drain();
       assert.equal(result.ok, true);
       const [[id, payload]] = seamCalls(entries, 'environments.update');
       assert.equal(id, 'env1');
-      assert.equal(payload.name, 'Riverbank North');
-      assert.equal(payload.dangerLevel, 'unsafe');
+      assert.deepStrictEqual(payload, draftBefore, 'the payload is the draft the GM saw, field for field');
       assert.equal(harness.state().environmentDraftDirty, false);
       assert.equal(harness.state().environmentSaveError, null);
 
@@ -187,6 +190,29 @@ describe('adminStore environment draft section corpus', () => {
         harness.state().environmentDraft.name,
         'Riverbank North',
         'the returned environment is a clone, so mutating it cannot reach the draft'
+      );
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('an in-flight save publishes the saving flag and clears it', async () => {
+    const harness = await createSectionHarness(world());
+    try {
+      harness.store.updateEnvironmentDraft({ name: 'Riverbank North' });
+      const seen = [];
+      const unsubscribe = harness.store.viewState.subscribe((state) =>
+        seen.push(state.environmentSaving)
+      );
+      seen.length = 0;
+      await harness.store.saveEnvironmentDraft();
+      unsubscribe();
+      // `buildState` always republishes `environmentSaving: false`, so only the in-flight `true`
+      // depends on the out-of-band patch — and it is what disables Save against a double submit.
+      assert.deepStrictEqual(
+        [...new Set(seen)],
+        [true, false],
+        'the save publishes in-flight, then settles'
       );
     } finally {
       harness.dispose();
@@ -345,6 +371,20 @@ describe('adminStore environment draft section corpus', () => {
       assert.equal(await harness.store.toggleEnvironmentEnabled('env1', true), true);
       assert.equal(harness.state().environmentDraft.enabled, true);
       assert.equal(await harness.store.toggleEnvironmentEnabled('ghost', true), false);
+    } finally {
+      harness.dispose();
+    }
+  });
+
+  it('a repeated realm-membership write converges on one persisted environment', async () => {
+    const harness = await createSectionHarness(world());
+    try {
+      await assertConvergent(
+        harness,
+        () => harness.store.setEnvironmentRealmMembership('env1', 'realm1', true),
+        ['environments.update'],
+        { repeat: 'silent' }
+      );
     } finally {
       harness.dispose();
     }

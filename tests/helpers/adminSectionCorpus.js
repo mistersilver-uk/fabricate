@@ -284,22 +284,35 @@ export async function createSectionHarness(options = {}) {
 }
 
 /**
- * The whole published object must equal the previous one with exactly `patch` applied. This is what
- * catches a key a section's out-of-band publish drops while `refresh()` still sets it, and a
- * collision between two sections' keys in the composed publish.
+ * The whole published object must equal the previous one with exactly `patch` applied. For every
+ * key a row exercises, that catches one a section's out-of-band publish drops while `refresh()`
+ * still sets it, and a collision between two sections' keys in the composed publish. A key no row
+ * moves is invisible to it, which is why the corpora drive each publish key explicitly.
  */
 export function assertStatePatch(before, after, patch, message) {
   assert.deepStrictEqual(after, { ...before, ...patch }, message);
 }
 
 /**
- * Run `operation` twice and assert the repeat converges: the same write seams carrying the same
- * arguments, so a second identical act cannot move the world on further.
+ * Run `operation` twice and assert the repeat cannot move the world on. An op that re-writes takes
+ * the default `identical` shape; one that short-circuits once satisfied takes `silent`, which also
+ * asserts the first run did write, so the row cannot pass by the op writing nothing at all.
  */
-export async function assertConvergent(harness, operation, writeSeams) {
+export async function assertConvergent(
+  harness,
+  operation,
+  writeSeams,
+  { repeat = 'identical' } = {}
+) {
+  const drainWrites = () => harness.drain().filter((entry) => writeSeams.includes(entry.seam));
   await operation();
-  const first = harness.drain().filter((entry) => writeSeams.includes(entry.seam));
+  const first = drainWrites();
   await operation();
-  const second = harness.drain().filter((entry) => writeSeams.includes(entry.seam));
+  const second = drainWrites();
+  if (repeat === 'silent') {
+    assert.notDeepStrictEqual(first, [], 'the first run wrote, so the repeat is not vacuous');
+    assert.deepStrictEqual(second, [], 'a repeat of a satisfied operation writes nothing further');
+    return;
+  }
   assert.deepStrictEqual(second, first, 'a repeat of the same operation converges on one result');
 }
