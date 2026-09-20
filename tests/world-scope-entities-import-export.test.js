@@ -8,15 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 import { destinationWorld, emptySeededScope } from './helpers/worldScopeImportHarness.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 
 installFoundryUtilsEnv();
@@ -1254,7 +1246,7 @@ test('11: both prepareForImport call sites pass every parameter the exporter dec
     'prepareForImport gained or lost a parameter — pin it in BOTH call-site guards below first'
   );
 
-  const mainSource = FABRICATE_ENTRY_SOURCE;
+  const mainSource = entrySources['src/bootstrap/publicApi.js'];
   const importStart = mainSource.indexOf('function buildImportSystem(fabricate) {');
   assert.notEqual(importStart, -1, 'located the public-API import builder');
   const publicApi = mainSource.slice(importStart, mainSource.indexOf('\n}\n', importStart));
@@ -1340,7 +1332,7 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
   );
 
   const sites = {
-    'src/bootstrap/composeServices.js': FABRICATE_ENTRY_SOURCE,
+    'src/bootstrap/composeServices.js': entrySources['src/bootstrap/composeServices.js'],
     'src/ui/SvelteCraftingSystemManagerApp.svelte.js': readFileSync(
       resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
       'utf8'

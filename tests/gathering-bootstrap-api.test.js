@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSelectableActorsGetter,
@@ -14,17 +13,19 @@ import {
 } from '../src/gatheringBootstrapAdapters.js';
 import { createGatheringToolAvailability } from '../src/gatheringToolRuntime.js';
 import { GatheringGateAndCheckEvaluator } from '../src/systems/GatheringGateAndCheckEvaluator.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const toolRuntimePath = resolve(__dirname, '../src/gatheringToolRuntime.js');
 const adaptersPath = resolve(__dirname, '../src/gatheringBootstrapAdapters.js');
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const mainSource = Object.keys(entrySources)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => entrySources[file])
-  .join('\n');
+const mainSource = [
+  entrySources['src/main.js'],
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/gatheringRuntime.js'],
+  entrySources['src/bootstrap/gatheringFacade.js'],
+  entrySources['src/bootstrap/hooks.js'],
+  entrySources['src/bootstrap/Fabricate.js'],
+].join('\n');
 const toolRuntimeSource = readFileSync(toolRuntimePath, 'utf8');
 const adaptersSource = readFileSync(adaptersPath, 'utf8');
 

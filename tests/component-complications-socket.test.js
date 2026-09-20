@@ -24,14 +24,10 @@ import {
   routeComplicationDeliveryMessage,
   validateComplicationDeliveryPayload,
 } from '../src/systems/complicationSocket.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const mainSource = ['src/main.js', ...Object.keys(entrySources).filter((file) => file.startsWith('src/bootstrap/')).sort()]
-  .map((file) => entrySources[file])
-  .join('\n');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 function entry(overrides = {}) {
   return {

@@ -6,22 +6,14 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 /** Normalise line endings before scanning. */
 function normaliseEndings(text) {
   return text.split(String.fromCharCode(13) + '\n').join('\n');
 }
 
-// The facade spans the entry and its `src/bootstrap/` slices (issue 1715), read through ONE call;
-// a slice member is method shorthand at a class member's indentation, so `METHOD` scans both.
-const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-
-const mainSource = normaliseEndings(
-  ['src/main.js', ...Object.keys(entrySources).filter((file) => file.startsWith('src/bootstrap/')).sort()]
-    .map((file) => entrySources[file])
-    .join('\n')
-);
+const mainSource = normaliseEndings(FABRICATE_ENTRY_SOURCE);
 
 /** A method declared at class-body indentation, with its parameter list and body. */
 const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\},?\n/g;

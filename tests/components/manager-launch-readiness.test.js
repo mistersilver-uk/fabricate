@@ -9,23 +9,18 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { collectSources, repoRoot } from '../helpers/sourceScan.js';
+import { entrySources } from '../helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
   resolve(__dirname, '../../src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
   'utf8'
 );
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
 const mainSource = [
-  ...Object.keys(entrySources)
-    .filter((file) => file.startsWith('src/bootstrap/'))
-    .sort(),
-  'src/main.js',
-]
-  .map((file) => entrySources[file])
-  .join('\n');
+  entrySources['src/bootstrap/publicApi.js'],
+  entrySources['src/bootstrap/Fabricate.js'],
+  entrySources['src/bootstrap/composeServices.js'],
+].join('\n');
 
 /** A faithful harness mirroring the static `show()` deferred-open decision. */
 function makeHarness({ readyAtStart = false } = {}) {

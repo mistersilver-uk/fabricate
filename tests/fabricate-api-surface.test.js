@@ -6,19 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { compileFunction } from 'node:vm';
 
 import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const entrySources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const mainSource = [
-  ...Object.keys(entrySources)
-    .filter((file) => file.startsWith('src/bootstrap/'))
-    .sort(),
-  'src/main.js',
-]
-  .map((file) => entrySources[file])
-  .join('\n');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 /**
  * Assert one public hook namespace is on the aggregate, correctly named, and documented.

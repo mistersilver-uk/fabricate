@@ -11,15 +11,7 @@ import {
   describeWorldIdentityDrift,
 } from '../src/systems/worldScopeEntityNotice.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
 
 import {
   resolvedComponentsFor,
@@ -36,7 +28,7 @@ import {
 installFoundryStubs();
 
 /** `src/main.js` statically imports CSS and cannot load under `node --test`. */
-const MAIN_SOURCE = FABRICATE_ENTRY_SOURCE;
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/composeServices.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 const SYSTEM_ID = 'sys-a';

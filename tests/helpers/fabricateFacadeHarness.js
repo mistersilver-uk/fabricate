@@ -44,19 +44,14 @@ import {
 } from '../../src/systems/currencyAffordance.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
 import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js';
+import { FABRICATE_ENTRY_SOURCE } from './bootstrapEntrySource.js';
 import { classMemberSource } from './boundedSource.js';
-import { collectSources, repoRoot } from './sourceScan.js';
-import { byCodePoint } from './ratchetBaseline.js';
 
 /**
- * The entry and the `src/bootstrap/` modules it composes, read through one call (issue 1715).
- * Every owner-gate suite pins its faithful copy above against this.
+ * The entry and the `src/bootstrap/` modules it composes, joined (issue 1715). Every owner-gate
+ * suite pins its faithful copy above against this.
  */
-const ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-
-export const MAIN_SOURCE = [...Object.keys(ENTRY_SOURCES).filter((file) => file.startsWith('src/bootstrap/')).sort(byCodePoint), 'src/main.js']
-  .map((file) => ENTRY_SOURCES[file])
-  .join('\n');
+export const MAIN_SOURCE = FABRICATE_ENTRY_SOURCE;
 
 /**
  * THIS FILE as text, so a "faithful copy" claim can be checked rather than trusted (issue 1202).

@@ -5,15 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { findCuratedIconRecord, listCuratedIconVocabulary } from '../src/utils/iconVocabulary.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
 
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
@@ -21,7 +13,7 @@ import {
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = FABRICATE_ENTRY_SOURCE;
+const mainSource = entryModuleSource('src/bootstrap/Fabricate.js');
 const apiDocs = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
 
 describe('the published icon vocabulary (issue 1269)', () => {

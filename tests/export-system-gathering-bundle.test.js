@@ -17,19 +17,11 @@ import {
 } from './helpers/authoringExportHarness.js';
 import { buildExportPayload } from '../src/systems/CraftingSystemExporter.js';
 import { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } from './helpers/fullAuthoringFixture.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
 
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = FABRICATE_ENTRY_SOURCE;
+const mainSource = entryModuleSource('src/bootstrap/publicApi.js');
 const adminStoreSource = readFileSync(
   resolve(__dirname, '../src/ui/svelte/stores/adminStore.js'),
   'utf8'

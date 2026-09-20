@@ -12,15 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 
 const { makeHarness, exportCurrent } = await import('./helpers/authoringExportHarness.js');
@@ -30,7 +22,10 @@ const { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } =
   await import('./helpers/fullAuthoringFixture.js');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = FABRICATE_ENTRY_SOURCE;
+const mainSource = [
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/publicApi.js'],
+].join('\n');
 
 // A thin delegating environment store that resolves its target lazily, reproducing
 // the exact seam `src/main.js` passes when the real store does not exist yet.

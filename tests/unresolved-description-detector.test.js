@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { collectSources } from './helpers/sourceScan.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -202,15 +202,10 @@ test('never rewrites the descriptions it inspects', () => {
 // feature in production while every unit test — which constructs its own manager with its own fakes
 // — stays green. The entry composes the manager and `src/bootstrap/hooks.js` runs the detector, so
 // both are read here through ONE call (issue 1715).
-const entrySources = collectSources(resolve(__dirname, '..', 'src'), { extensions: ['.js'] });
 const mainSource = [
-  ...Object.keys(entrySources)
-    .filter((file) => file.startsWith('src/bootstrap/'))
-    .sort(),
-  'src/main.js',
-]
-  .map((file) => entrySources[file])
-  .join('\n');
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/hooks.js'],
+].join('\n');
 
 test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () => {
   assert.match(

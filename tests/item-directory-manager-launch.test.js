@@ -9,7 +9,7 @@ import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { collectSources } from './helpers/sourceScan.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -19,15 +19,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * moved to `src/bootstrap/hooks.js`. Read through ONE call, so the pin count does not rise.
  */
 function mainSource() {
-  const sources = collectSources(resolve(__dirname, '..', 'src'), { extensions: ['.js'] });
   return [
-    ...Object.keys(sources)
-      .filter((file) => file.startsWith('src/bootstrap/'))
-      .sort(),
-    'src/main.js',
-  ]
-    .map((file) => sources[file])
-    .join('\n');
+    entrySources['src/main.js'],
+    entrySources['src/bootstrap/hooks.js'],
+    entrySources['src/bootstrap/publicApi.js'],
+  ].join('\n');
 }
 
 test('the deferred manager is opened through the memoized loader', () => {

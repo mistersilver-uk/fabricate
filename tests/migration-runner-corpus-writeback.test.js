@@ -12,15 +12,7 @@ import test from 'node:test';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from '../src/migration/MigrationRunner.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
 
 
 /** A recipe the 0.6.0 catalyst-to-tool migration transforms. */
@@ -194,7 +186,7 @@ test('only the write-failure notice instructs a reload', () => {
 test('main.js reports a deferred pass before it reports an aborted one', () => {
   // A source scan, and deliberately so: `main.js` cannot be imported under `node --test`, and
   // a unit test that hand-injects the collaborator cannot observe the wiring at all.
-  const source = FABRICATE_ENTRY_SOURCE;
+  const source = entryModuleSource('src/bootstrap/migrations.js');
 
   assert.match(
     source,

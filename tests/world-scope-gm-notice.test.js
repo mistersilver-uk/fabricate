@@ -11,15 +11,7 @@ import {
   MigrationRunner,
 } from '../src/migration/MigrationRunner.js';
 import { buildWorldEssenceMergeRemapNotice } from '../src/systems/remapWorldScopeIdentityFlags.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
 import {
   buildWorldEssenceMergeNotice,
@@ -29,7 +21,7 @@ import {
 } from '../src/systems/worldScopeEntityNotice.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = FABRICATE_ENTRY_SOURCE;
+const MAIN = [entrySources['src/bootstrap/migrations.js'], entrySources['src/main.js']].join('\n');
 const LANG = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
 const EMPTY = Object.freeze({ message: '', detail: '' });
 

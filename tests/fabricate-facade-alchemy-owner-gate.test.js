@@ -7,15 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { createFabricateFacadeHarness, makeFacadeActor } from './helpers/fabricateFacadeHarness.js';
-import { collectSources, repoRoot } from './helpers/sourceScan.js';
-
-// The entry and the `src/bootstrap/` modules it split into (issue 1715), read through ONE call.
-const FABRICATE_ENTRY_SOURCES = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-const FABRICATE_ENTRY_SOURCE = Object.keys(FABRICATE_ENTRY_SOURCES)
-  .filter((file) => file.startsWith('src/bootstrap/') || file === 'src/main.js')
-  .sort()
-  .map((file) => FABRICATE_ENTRY_SOURCES[file])
-  .join('\n');
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
 
 
 // Fixtures — a single alchemy system with two recipes so a non-GM owner sees one learned recipe (+
@@ -249,7 +241,7 @@ test('submitAlchemyAttempt: GM viewer reaches the engine (bypass)', async () => 
 // SOURCE-CONTRACT guard — pin the real src/main.js gate.
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAIN_SOURCE = FABRICATE_ENTRY_SOURCE;
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/craftingFacade.js');
 
 test('SOURCE CONTRACT: _resolveCraftingActor gates a non-GM viewer through the real ownership predicate', () => {
   assert.ok(
