@@ -16,6 +16,7 @@
     DEFAULT_BROWSER_PAGE_SIZE,
     createGatheringEventsBrowserState,
   } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserListState, createBrowserPageWindow } from './browserListState.svelte.js';
 
   let {
     events = [],
@@ -107,24 +108,23 @@
       biomeFilter !== 'all' ||
       dangerFilter !== 'all'
   );
-  const paginatedEvents = $derived(
-    filteredEvents.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
-
-  $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.searchTerm = '';
-    ui.statusFilter = 'all';
-    ui.biomeFilter = 'all';
-    ui.dangerFilter = 'all';
-    ui.pageIndex = 0;
-    ui.systemId = selectedSystemId;
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredEvents });
+  const paginatedEvents = $derived(page.pageRows);
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: {
+      searchTerm: '',
+      statusFilter: 'all',
+      biomeFilter: 'all',
+      dangerFilter: 'all',
+      pageIndex: 0,
+    },
   });
-
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredEvents.length) {
-      ui.pageIndex = 0;
-    }
+    list.syncSystem(selectedSystemId);
+  });
+  $effect(() => {
+    page.clampPage();
   });
 
   function text(key, fallback) {

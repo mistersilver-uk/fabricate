@@ -21,6 +21,7 @@
     DEFAULT_BROWSER_PAGE_SIZE,
     createEnvironmentsBrowserState,
   } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserListState, createBrowserPageWindow } from './browserListState.svelte.js';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import IconButton from '../../components/IconButton.svelte';
@@ -123,16 +124,11 @@
     gatheringEventsBrowserState = $bindable(null),
   } = $props();
 
-  // ── THE BROWSE VIEW-STATE IS LIFTED (issue 1438) ──────────────────────────────────────
-  // Search, the four filter axes, the page AND the system-switch sentinel live on one object
-  // the manager root owns and binds through `browserState`. Opening an environment, a task or
-  // an encounter switches `currentView` to that editor route, which unmounts this component;
-  // held locally, every control was reset by the trip out and back. The SENTINEL comes too: a
-  // component-local one re-initialises to '' on the remount, so the effect below would read
-  // the return as a system switch and wipe the state the lift exists to preserve.
-  //
-  // The vocabulary ADD-FORM inputs below are deliberately NOT lifted. A half-typed biome name
-  // is one sitting's work, not a filter, and it is still cleared by a system switch.
+  // The browse view-state is lifted (issue 1438): search, the four filter axes, the page and the
+  // system-switch sentinel live on one object the root owns and binds, because opening an editor
+  // route unmounts this component and a component-local sentinel would re-initialise to '' and
+  // read the return as a switch. The vocabulary add-form drafts below stay local — a half-typed
+  // biome name is one sitting's work — and `onSystemSwitch` clears them.
   let ownBrowserState = $state(createEnvironmentsBrowserState());
   const ui = $derived(browserState ?? ownBrowserState);
 
@@ -203,23 +199,30 @@
     },
   ];
 
+  // `pageIndex` is absent from `resetAxes`: these resets only widen the corpus, so a GM stays put.
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: {
+      searchTerm: '',
+      statusFilter: 'all',
+      selectionFilter: 'all',
+      riskFilter: 'all',
+      biomeFilter: 'all',
+    },
+    onSystemSwitch: () => {
+      weatherInput = '';
+      timeOfDayInput = '';
+      biomeInput = '';
+      weatherIconInput = defaultConditionIcon('weather');
+      timeOfDayIconInput = defaultConditionIcon('timeOfDay');
+      biomeIconInput = 'fas fa-tree';
+      biomeColorTokenInput = 'sage';
+      biomeCustomColorInput = '';
+      openBiomeColorPickerId = '';
+    },
+  });
   $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.searchTerm = '';
-    ui.statusFilter = 'all';
-    ui.selectionFilter = 'all';
-    ui.riskFilter = 'all';
-    ui.biomeFilter = 'all';
-    weatherInput = '';
-    timeOfDayInput = '';
-    biomeInput = '';
-    weatherIconInput = defaultConditionIcon('weather');
-    timeOfDayIconInput = defaultConditionIcon('timeOfDay');
-    biomeIconInput = 'fas fa-tree';
-    biomeColorTokenInput = 'sage';
-    biomeCustomColorInput = '';
-    openBiomeColorPickerId = '';
-    ui.systemId = selectedSystemId;
+    list.syncSystem(selectedSystemId);
   });
 
   const environmentList = $derived(environments || []);
@@ -297,14 +300,11 @@
       riskFilter !== 'all' ||
       biomeFilter !== 'all'
   );
-  const paginatedEnvironments = $derived(
-    filteredEnvironments.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredEnvironments });
+  const paginatedEnvironments = $derived(page.pageRows);
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredEnvironments.length) {
-      ui.pageIndex = 0;
-    }
+    page.clampPage();
   });
 
   function text(key, fallback) {
