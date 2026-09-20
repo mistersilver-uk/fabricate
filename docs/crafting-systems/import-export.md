@@ -21,7 +21,7 @@ Fabricate saves all of a system's recipes together in a single write at the end 
 
 A system export carries every supported GM-authored record type for that system:
 
-- The crafting system itself: metadata, feature flags, components (with categories, tags, difficulty, and source-item references), essences, recipe-item definitions, tools, item tags, and realms.
+- The crafting system itself: metadata, feature flags, components (with categories, tags, difficulty, and source-item references), essences, recipe-item definitions, tools, and item tags.
 - Its recipes: identity, steps, ingredients (including grouped and alternative options), outputs, checks, tools, and outcomes.
 - Its gathering environments: identity, enabled state, selection and composition mode, scene gate, realm membership, biomes, danger, the manual include list and the automatic exclude and force lists, and local adjustments.
   An automatic environment's force list survives an export and import unchanged; a manual one is folded into its include list on the way in, because manual composition is that list and has no force add.
@@ -29,6 +29,10 @@ A system export carries every supported GM-authored record type for that system:
 - Your world's currency configuration: the currency units, the spend strategy, the provider, and the currency macros.
 This is carried along with every export because currency is a world setting shared by every crafting system, not something each system configures on its own.
 See [World Currency]({% link world/rules/currency.md %}) for how it merges into the destination world on import.
+- Your world's travel configuration: the realm library, the reveal mode, and the modifier visibility.
+This is carried along with every export because travel is a world setting shared by every crafting system that enables Travel & Realms, not something each system configures on its own.
+Realms merge into the destination world by id, with the destination winning a collision, so an import never overwrites a realm the destination GM already authored.
+See [Gathering Realms & Travel]({% link world/travel/index.md %}) for how the realm library is authored.
 
 Every export records a version marker so future format changes stay backward compatible.
 Older exports still import.

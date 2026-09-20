@@ -35,7 +35,7 @@ The group is initially collapsed when the Crafting System Manager opens.
 
 | Concept | What it is |
 |:--------|:-----------|
-| **Realm** | Named geography (such as *The Verdant Expanse*) scoped to one crafting system. The single Fabricate geography concept, geography only. Distinct from a Foundry Scene Region |
+| **Realm** | Named geography (such as *The Verdant Expanse*) shared by every crafting system that enables Travel & Realms. The single Fabricate geography concept, geography only. Distinct from a Foundry Scene Region |
 | **Biome** | A descriptive terrain or ecology trait carried by a realm, such as forest, swamp, or coastal |
 | **Environment** | A reusable gathering place that can belong to one or more realms and declare location-availability rules |
 | **Party** | A world-level Fabricate record with actor members and exactly one travel actor |
