@@ -137,7 +137,7 @@ describe('RecipeEditView identity-only single column', () => {
   );
 
   defineStructureContract(
-    'carries no recipe-item AUTHORING state, props, or drop zone in the view',
+    'carries no recipe-item authoring state, props, or drop zone in the view',
     EDIT,
     {
       namesNo: ['knowledgeMode', 'onAddRecipeItem', 'onSetRecipeItem', 'dragDrop', 'resolveDropData'],
@@ -282,7 +282,7 @@ describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', (
 
 describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (issue 676)', () => {
   defineStructureContract(
-    'is MODE-CONDITIONAL off craftingEffect, and offers neither tab under global',
+    'is mode-conditional off craftingEffect, and offers neither tab under global',
     TABS,
     {
       reads: ['visibilityEffect.showAccess', 'visibilityEffect.showBooksScrolls'],
@@ -355,7 +355,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
   });
 
   defineStructureContract(
-    'states that the mode is SYSTEM-level and routes to Crafting Settings',
+    'states that the mode is system-level and routes to Crafting Settings',
     BANNER,
     {
       defaults: [['actionDataAttr', 'data-recipe-mode-banner-settings']],
@@ -418,7 +418,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
     { renders: ['RecipeModeBanner'], rendersBefore: [['RecipeEditorTabs', 'RecipeModeBanner']] }
   );
 
-  defineStructureContract('reads as an INFO banner with an icon medallion, not one more card', BANNER, {
+  defineStructureContract('reads as an info banner with an icon medallion, not one more card', BANNER, {
     attributes: [['class', 'manager-recipe-mode-banner-medallion']],
     styleDeclares: [
       [['manager-recipe-mode-banner'], 'background', 'var(--fab-info-soft)'],
@@ -427,7 +427,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
   });
 
   defineStructureContract(
-    'lets the description WRAP — it is the one sentence the banner exists to deliver',
+    'lets the description wrap — it is the one sentence the banner exists to deliver',
     BANNER,
     {
       // It was `white-space: nowrap` + ellipsis.
@@ -1102,7 +1102,7 @@ describe('the editor enable-toggle gate is named apart from the activation gate 
   // The other half. Renaming the projection instead of the editor local would satisfy the negative
   // assertions above while leaving the two concepts merged under one name.
   defineStructureContract(
-    'keeps the ACTIVATION gate projected and read as `enableBlocked`',
+    'keeps the activation gate projected and read as `enableBlocked`',
     ROW_PROJECTION,
     { keys: ['enableBlocked'], calls: ['_isRecipeEnableBlocked'] }
   );

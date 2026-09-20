@@ -522,7 +522,7 @@ describe('environment composition editor structure', () => {
   );
 
   defineStructureContract(
-    'the AUTOMATIC-mode Non-matching menu is where a task force-add lives (issue #1315)',
+    'the automatic-mode Non-matching menu is where a task force-add lives (issue #1315)',
     { file: LIST, fn: 'nonMatchingMenuItems' },
     { property: [['data-action', 'force-include']], compares: ['notMatching', 'libraryDisabled'] }
   );
@@ -854,7 +854,7 @@ describe('environment composition editor structure', () => {
   );
 
   defineStructureContract(
-    'and the primitive still builds BOTH ids from this caller`s one stem',
+    'and the primitive still builds both ids from this caller`s one stem',
     EDITOR_TABS,
     { names: ['buttonIdStem', 'panelIdStem', 'idStem'], spellsExactly: ['-tab', '-panel'] }
   );
