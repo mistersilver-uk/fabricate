@@ -70,13 +70,24 @@ import {
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import {
-  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
   ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
   conditionSettingsToCurrent,
-  environmentComposesRecord,
-  resolveGatheringCompositionMode,
 } from '../../../systems/gatheringComposition.js';
-import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
+import {
+  buildEnvironmentCompositionViewModel,
+  DEFAULT_GATHERING_CONDITIONS,
+  environmentComposesGatheringRecord as _environmentComposesGatheringRecord,
+} from '../../model/environmentComposition.js';
+import {
+  buildEnvironmentValidationState as _buildEnvironmentValidationState,
+  emptyEnvironmentState as _emptyEnvironmentState,
+  environmentErrorMessage as _environmentErrorMessage,
+  normalizeDraftBlindSelection as _normalizeDraftBlindSelection,
+  normalizeDraftDropRateAdjustmentMap as _normalizeDraftDropRateAdjustmentMap,
+  normalizeDraftEventDropRateAdjustmentsEnabled as _normalizeDraftEventDropRateAdjustmentsEnabled,
+  normalizeDraftTaskDropRateAdjustments as _normalizeDraftTaskDropRateAdjustments,
+  normalizeDraftTaskDropRateAdjustmentsEnabled as _normalizeDraftTaskDropRateAdjustmentsEnabled,
+} from '../../model/environmentValidation.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Result } from '../../../models/Result.js';
@@ -194,7 +205,6 @@ const GATHERING_CONFIG_SETTING = 'gatheringConfig';
 // out because this file does not import `src/config/settings.js`. Guarded by
 // `tests/essence-world-scope-screens.test.js`, which drives the store with a double keyed on it.
 const WORLD_ESSENCE_MERGE_MAP_SETTING = 'worldEssenceMergeMap';
-const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   biomes: [
     'forest',
@@ -1063,22 +1073,6 @@ function _graphSearchMatches(index, lowerSearchTerm) {
   return matches;
 }
 
-function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
-  return {
-    canShowEnvironmentsTab,
-    environmentsLoading: false,
-    environmentsError: error,
-    environments: [],
-    selectedEnvironmentId: '',
-    environmentDraft: null,
-    environmentDraftDirty: false,
-    environmentDraftIsNew: false,
-    environmentSaving: false,
-    environmentSaveError: null,
-    environmentValidationState: null,
-  };
-}
-
 // The WORLD currency projection (issue 1278). A top-level sibling, never hung off
 // `selectedSystem`: the config is world scope, and hanging it there would make the same ladder
 // appear to change when the GM merely clicks a different crafting system.
@@ -1161,213 +1155,6 @@ function _travelErrorState(err, localizeFn = null, fieldContext = null) {
         localizeFn?.('FABRICATE.Admin.Manager.Travel.Error') ||
         'Travel update failed.';
   return { travelError: summary, travelFieldErrors: fieldErrors };
-}
-
-function _environmentErrorMessage(err) {
-  if (!err) return null;
-  if (Array.isArray(err.errors) && err.errors.length > 0) {
-    return err.errors.join('\n');
-  }
-  return err.message || String(err);
-}
-
-function _environmentValidationMessages(err) {
-  if (!err) return [];
-  if (Array.isArray(err.errors)) {
-    return err.errors
-      .map((error) => (typeof error === 'string' ? error : error?.message))
-      .filter(Boolean);
-  }
-  const message = _environmentErrorMessage(err);
-  return message ? [message] : [];
-}
-
-function _fieldSelectorForPath(path) {
-  if (!path) return null;
-  const escaped = String(path)
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', String.raw`\"`);
-  return `[data-environment-field="${escaped}"]`;
-}
-
-function _validationSummary(count, localizeFn) {
-  const key =
-    count === 1
-      ? 'FABRICATE.Admin.Environments.ValidationSummaryOne'
-      : 'FABRICATE.Admin.Environments.ValidationSummary';
-  return (
-    localizeFn?.(key, { count }) ||
-    (count === 1
-      ? 'Resolve 1 validation issue before saving.'
-      : `Resolve ${count} validation issues before saving.`)
-  );
-}
-
-function _buildEnvironmentValidationState(err, draft, localizeFn, attempt) {
-  const messages = _environmentValidationMessages(err);
-  if (messages.length === 0) return null;
-
-  const structuredErrors = Array.isArray(err?.fieldErrors) ? err.fieldErrors : [];
-  const inferenceContext = _createEnvironmentValidationInferenceContext();
-  const errors = messages.map((message, index) => {
-    const structured = structuredErrors[index] || {};
-    const inferred = _inferEnvironmentValidationTarget(message, draft, inferenceContext);
-    const path =
-      structured.path || structured.fieldPath || structured.field || inferred?.path || null;
-    const taskId = structured.taskId || inferred?.taskId || null;
-    const fieldSelector = structured.fieldSelector || _fieldSelectorForPath(path);
-    return {
-      message,
-      path,
-      taskId,
-      fieldSelector,
-      id: path
-        ? `environment-validation-${_domIdFromPath(path)}-${index}`
-        : `environment-validation-${index}`,
-    };
-  });
-
-  return {
-    summary: _validationSummary(errors.length, localizeFn),
-    errors,
-    firstInvalidField: errors.find((error) => error.fieldSelector) || errors[0] || null,
-    attempt,
-  };
-}
-
-function _createEnvironmentValidationInferenceContext() {
-  return {
-    groupNameOccurrences: new Map(),
-  };
-}
-
-function _inferEnvironmentValidationTarget(
-  message,
-  draft,
-  context = _createEnvironmentValidationInferenceContext()
-) {
-  const task = _findTaskForValidationMessage(message, draft);
-  const lower = String(message || '').toLowerCase();
-
-  if (/at least one task before it can be enabled/.test(lower)) return { path: 'enabled' };
-  if (/selection requires|selectionmode/.test(lower)) return { path: 'environment.selectionMode' };
-  if (/craftingsystemid/.test(lower)) return { path: 'environment.craftingSystemId' };
-
-  if (!task) return null;
-  const prefix = `task.${task.id}`;
-
-  if (/routed resolution requires resultselection|resultselection\.provider/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.resultSelection.provider` };
-  }
-
-  if (/visibility gate requires formula and threshold/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.visibility.formula` };
-  }
-
-  const timeUnit = lower.match(/timerequirement\.(minutes|hours|days|months|years)/)?.[1];
-  if (timeUnit) return { taskId: task.id, path: `${prefix}.timeRequirement.${timeUnit}` };
-  if (/timerequirement must include a positive duration/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.timeRequirement.minutes` };
-  }
-
-  if (/failureoutcome\.mode/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.failureOutcome.mode` };
-  }
-  if (/failureoutcome text mode requires text/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.failureOutcome.text` };
-  }
-  if (/failureoutcome macro mode requires macrouuid/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.failureOutcome.macroUuid` };
-  }
-
-  const resultGroupName = message.match(/result group "([^"]+)"/)?.[1];
-  if (resultGroupName) {
-    const group = _resolveResultGroupValidationTarget({
-      task,
-      groupName: resultGroupName,
-      duplicate: / duplicates "/i.test(message),
-      context,
-    });
-    return {
-      taskId: task.id,
-      path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups`,
-    };
-  }
-  if (/result groups require names/.test(lower)) {
-    const group = _resolveResultGroupValidationTarget({
-      task,
-      groupName: '',
-      context,
-    });
-    return {
-      taskId: task.id,
-      path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups`,
-    };
-  }
-  if (/requires at least one result group|exactly one result group/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.resultGroups` };
-  }
-  if (/progressive result group requires at least one result/.test(lower)) {
-    const group = Array.isArray(task.resultGroups) ? task.resultGroups[0] : null;
-    return {
-      taskId: task.id,
-      path: group ? `${prefix}.resultGroups.${group.id}.results` : `${prefix}.resultGroups`,
-    };
-  }
-
-  const resultId = message.match(/progressive result "([^"]+)"/)?.[1];
-  if (resultId) return { taskId: task.id, path: `${prefix}.result.${resultId}.componentId` };
-
-  return { taskId: task.id, path: `${prefix}.name` };
-}
-
-function _resolveResultGroupValidationTarget({ task, groupName, duplicate = false, context }) {
-  const groups = Array.isArray(task?.resultGroups) ? task.resultGroups : [];
-  const normalizedName = _normalizeValidationGroupName(groupName);
-  const matches = groups.filter(
-    (group) => _normalizeValidationGroupName(group?.name) === normalizedName
-  );
-  if (matches.length === 0) return null;
-
-  const occurrenceKey = `${task?.id || 'task'}:${duplicate ? 'duplicate' : 'named'}:${normalizedName}`;
-  const previous = context.groupNameOccurrences.get(occurrenceKey);
-  const defaultIndex = duplicate && matches.length > 1 ? 1 : 0;
-  const index = previous === undefined ? defaultIndex : previous + 1;
-  context.groupNameOccurrences.set(occurrenceKey, index);
-  return matches[Math.min(index, matches.length - 1)] || matches[0];
-}
-
-function _normalizeValidationGroupName(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase();
-}
-
-function _findTaskForValidationMessage(message, draft) {
-  const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
-  const taskName = String(message || '').match(/Task "([^"]+)"/)?.[1];
-  if (taskName) {
-    return tasks.find((task) => task?.name === taskName) || tasks[0] || null;
-  }
-  return tasks[0] || null;
-}
-
-function _domIdFromPath(path) {
-  return String(path || 'field').replaceAll(/[^a-zA-Z0-9_-]+/g, '-');
-}
-
-function _taskCopyName(name, localizeFn) {
-  const sourceName = String(name || '').trim() || 'Gather';
-  return (
-    localizeFn?.('FABRICATE.Admin.Environments.TaskCopySuffix', { name: sourceName }) ||
-    `${sourceName} Copy`
-  );
-}
-
-function _normalizePositiveQuantity(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return 1;
-  return Math.max(1, Math.floor(numeric));
 }
 
 function _normalizeNullablePositiveInteger(value) {
@@ -3280,79 +3067,21 @@ export function createAdminStore(services) {
     return Array.isArray(values) ? values.filter(Boolean) : [];
   }
 
-  function _gatheringLibraryRecordMatchesEnvironment(
-    record,
-    environment,
-    conditions,
-    includeDanger = false,
-    conditionSettings = null
-  ) {
-    return evaluateEnvironmentMatch(record, environment, conditions, {
-      includeDanger,
-      conditionSettings,
-    }).matches;
-  }
-
   /**
-   * Classify every library task/event for the environment into a `CompositionState` +
-   * `RuntimeState` plus match evidence, honoring `compositionMode`.
+   * The composition projection for one environment, over this store's collaborators; the
+   * derivation itself lives in `src/ui/model/environmentComposition.js`.
    */
   function _buildEnvironmentCompositionViewModel(environment) {
-    const empty = {
-      compositionMode: 'automatic',
-      conditions: { ...DEFAULT_GATHERING_CONDITIONS },
-      tasks: [],
-      events: [],
-      counts: _emptyCompositionCounts(),
-    };
-    if (!environment || typeof environment !== 'object') return empty;
-    const systemId = String(environment.craftingSystemId || get(selectedSystemId) || '');
-    if (!systemId) return empty;
-
-    const config = _currentGatheringConfig();
-    const system = config.systems?.[systemId] || {};
-    const craftingSystem = services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
-    const managedItemById = new Map(
-      _buildManagedItemOptions(_getManagedItems(craftingSystem)).map((item) => [
-        String(item.id || ''),
-        item,
-      ])
-    );
-    const conditionSettings = system.conditions || null;
-    const conditions = conditionSettingsToCurrent(conditionSettings);
-    const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
-
-    const tasks = _classifyCompositionRecords({
-      records: Array.isArray(system.tasks) ? system.tasks : [],
-      environment,
-      conditions,
-      conditionSettings,
-      compositionMode,
-      kind: 'task',
-      includeDanger: false,
-      order: environment.taskOrder,
-      managedItemById,
+    return buildEnvironmentCompositionViewModel(environment, {
+      defaultSystemId: get(selectedSystemId),
+      gatheringConfig: _currentGatheringConfig,
+      managedItemOptionsFor: (systemId) =>
+        _buildManagedItemOptions(
+          _getManagedItems(services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null)
+        ),
+      localize: services.localize,
     });
-    const events = _classifyCompositionRecords({
-      records: Array.isArray(system.events) ? system.events : [],
-      environment,
-      conditions,
-      conditionSettings,
-      compositionMode,
-      kind: 'event',
-      includeDanger: true,
-      order: environment.eventOrder,
-    });
-
-    return {
-      compositionMode,
-      conditions,
-      tasks,
-      events,
-      counts: _compositionCounts(tasks, events),
-    };
   }
-
   /**
    * Build the derived `evaluateSystemValidation` report for the selected system, assembling the
    * collaborators the pure aggregator needs. Pure and synchronous.
@@ -3406,294 +3135,6 @@ export function createAdminStore(services) {
     if (!candidate) return [];
 
     return recipeManager.getSignatureConflicts?.(candidate, { systemId: sysId }) || [];
-  }
-
-  function _classifyCompositionRecords({
-    records,
-    environment,
-    conditions,
-    conditionSettings,
-    compositionMode,
-    kind,
-    includeDanger,
-    order,
-    managedItemById = new Map(),
-  }) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey])
-      ? environment[enabledKey].map(String)
-      : [];
-    const disabled = Array.isArray(environment?.[disabledKey])
-      ? environment[disabledKey].map(String)
-      : [];
-    const forced = Array.isArray(environment?.[forcedKey])
-      ? environment[forcedKey].map(String)
-      : [];
-    const orderIndex = new Map(
-      (Array.isArray(order) ? order : []).map((id, index) => [String(id), index])
-    );
-
-    const classified = (Array.isArray(records) ? records : []).map((record, index) => {
-      const id = String(record?.id || '');
-      const libraryEnabled = record?.enabled !== false;
-      const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(
-        record,
-        environment,
-        conditions,
-        { includeDanger, conditionSettings }
-      );
-      // Exclude and force are automatic-mode overrides of the match filter (maintainer ruling,
-      // issue 1315); manual mode has no filter to override, so it has neither.
-      const excluded = compositionMode !== 'manual' && disabled.includes(id);
-      const explicitlyIncluded = enabled.includes(id);
-      const forceIncluded = compositionMode !== 'manual' && forced.includes(id);
-
-      let compositionState;
-      if (!libraryEnabled) compositionState = 'libraryDisabled';
-      // Exclude is checked before force so the two can collide on the same record without a
-      // branch order bug deciding it silently: exclude wins.
-      else if (excluded) compositionState = 'excluded';
-      else if (forceIncluded) compositionState = 'forceIncluded';
-      // Manual mode composes exactly `enabled*Ids` with no match filter (maintainer ruling), so a
-      // picked non-matching record still composes as `includedNotMatching` — distinct from
-      // `notMatching` so the Included list can flag it.
-      else if (!matches)
-        compositionState =
-          compositionMode === 'manual' && explicitlyIncluded
-            ? 'includedNotMatching'
-            : 'notMatching';
-      else if (compositionMode === 'manual')
-        compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
-      else compositionState = 'includedByMatch';
-
-      // A record is runtime-available only when its composition state would compose it AND current
-      // weather/time satisfy its required conditions. `composed` projects `environmentComposesRecord`
-      // onto the shared four-state vocabulary in `gatheringComposition.js`.
-      const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
-      const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
-      const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
-      const dropRateAdjustment = _dropRateAdjustmentSummary({
-        kind,
-        record,
-        environment,
-        managedItemById,
-      });
-      return {
-        id,
-        record,
-        kind,
-        libraryEnabled,
-        matches,
-        conditionsMet,
-        evidence,
-        excluded,
-        explicitlyIncluded,
-        compositionState,
-        runtimeState,
-        orderRank,
-        _index: index,
-        ...dropRateAdjustment,
-      };
-    });
-
-    return classified.sort((a, b) =>
-      a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank
-    );
-  }
-
-  function _effectiveDropRate(baseDropRate, adjustment) {
-    const base = Number.isFinite(Number(baseDropRate)) ? Math.floor(Number(baseDropRate)) : 0;
-    const delta = Number.isFinite(Number(adjustment)) ? Math.floor(Number(adjustment)) : 0;
-    return Math.min(100, Math.max(0, base + delta));
-  }
-
-  function _dropRowDisplay(row, managedItemById = new Map()) {
-    const componentId = String(row?.componentId || row?.systemItemId || '');
-    const item = componentId ? managedItemById.get(componentId) : null;
-    const itemUuid = String(row?.itemUuid || '');
-    const unresolvedKey = 'FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop';
-    const unresolved = services.localize?.(unresolvedKey);
-    const fallbackName =
-      unresolved && unresolved !== unresolvedKey ? unresolved : 'Unresolved drop';
-    return {
-      name: String(row?.name || item?.name || itemUuid || fallbackName),
-      img: String(row?.img || item?.img || 'icons/svg/item-bag.svg'),
-    };
-  }
-
-  function _dropRateAdjustmentSummary({ kind, record, environment, managedItemById = new Map() }) {
-    const id = String(record?.id || '');
-    if (!id)
-      return {
-        hasDropRateAdjustment: false,
-        dropRateAdjustment: 0,
-        dropRateAdjustmentsEnabled: true,
-        dropRateAdjustmentRows: [],
-      };
-    if (kind === 'event') {
-      const adjustments = _normalizeDraftDropRateAdjustmentMap(
-        environment?.eventDropRateAdjustments
-      );
-      const adjustment = adjustments[id] || 0;
-      const eventEnabledMap = _normalizeDraftEventDropRateAdjustmentsEnabled(
-        environment?.eventDropRateAdjustmentsEnabled
-      );
-      const dropRateAdjustmentsEnabled = eventEnabledMap[id] !== false;
-      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
-      const baseDropRate = Number.isFinite(Number(record?.dropRate))
-        ? Math.floor(Number(record.dropRate))
-        : 1;
-      return {
-        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
-        hasStoredDropRateAdjustment: adjustment !== 0,
-        dropRateAdjustment: adjustment,
-        dropRateAdjustmentsEnabled,
-        baseDropRate,
-        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
-        dropRateAdjustmentRows: [],
-      };
-    }
-
-    const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(
-      environment?.taskDropRateAdjustments
-    );
-    const taskAdjustmentEnabledMap = _normalizeDraftTaskDropRateAdjustmentsEnabled(
-      environment?.taskDropRateAdjustmentsEnabled
-    );
-    const dropRateAdjustmentsEnabled = taskAdjustmentEnabledMap[id] !== false;
-    const rowAdjustments = taskAdjustments[id] || {};
-    const rows = (
-      Array.isArray(record?.dropRows ?? record?.itemDrops)
-        ? (record.dropRows ?? record.itemDrops)
-        : []
-    ).map((row) => {
-      const rowId = String(row?.id || '');
-      const adjustment = rowAdjustments[rowId] || 0;
-      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
-      const baseDropRate = Number.isFinite(Number(row?.dropRate))
-        ? Math.floor(Number(row.dropRate))
-        : 1;
-      const display = _dropRowDisplay(row, managedItemById);
-      return {
-        id: rowId,
-        name: display.name,
-        img: display.img,
-        componentId: String(row?.componentId || row?.systemItemId || ''),
-        itemUuid: String(row?.itemUuid || ''),
-        quantity:
-          Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0
-            ? Number(row.quantity)
-            : 1,
-        baseDropRate,
-        adjustment,
-        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
-        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
-        hasStoredDropRateAdjustment: adjustment !== 0,
-      };
-    });
-    const hasStoredDropRateAdjustment = rows.some((row) => row.hasStoredDropRateAdjustment);
-    return {
-      hasDropRateAdjustment: dropRateAdjustmentsEnabled && hasStoredDropRateAdjustment,
-      hasStoredDropRateAdjustment,
-      dropRateAdjustmentsEnabled,
-      dropRateAdjustment: dropRateAdjustmentsEnabled
-        ? rows.reduce((sum, row) => sum + row.adjustment, 0)
-        : 0,
-      dropRateAdjustmentRows: rows,
-    };
-  }
-
-  function _emptyCompositionCounts() {
-    return {
-      availableTasks: 0,
-      excludedTasks: 0,
-      candidateTasks: 0,
-      includedNotMatchingTasks: 0,
-      availableEvents: 0,
-      excludedEvents: 0,
-      candidateEvents: 0,
-      includedNotMatchingEvents: 0,
-      diagnosticTasks: 0,
-      diagnosticEvents: 0,
-      requiredTools: 0,
-    };
-  }
-
-  /**
-   * Distinct tool ids required by the tasks available right now — the same
-   * `runtimeState === 'available'` population `availableTasks` counts, so the fact is weather- and
-   * time-dependent exactly like its neighbours (issue 1321, a deliberate trade).
-   */
-  function _requiredToolCount(tasks) {
-    const toolIds = new Set();
-    for (const row of tasks) {
-      if (row.runtimeState !== 'available') continue;
-      for (const toolId of Array.isArray(row.record?.toolIds) ? row.record.toolIds : []) {
-        // Trim before counting, matching the helper this replaced: an untrimmed pair would count
-        // ' pick ' and 'pick' as two distinct required tools.
-        const trimmed = String(toolId ?? '').trim();
-        if (trimmed) toolIds.add(trimmed);
-      }
-    }
-    return toolIds.size;
-  }
-
-  function _compositionCounts(tasks, events) {
-    const tally = (records) => {
-      const available = records.filter((r) => r.runtimeState === 'available').length;
-      const excluded = records.filter((r) => r.compositionState === 'excluded').length;
-      const candidate = records.filter((r) => r.compositionState === 'candidate').length;
-      // `includedNotMatching` composes (ruling 2), so this counts records that ARE runtime available
-      // whenever conditions are met. The field was `unavailable*` behind a fact labelled "Included but
-      // unavailable" — inverted against its own label — so producer, consumers and label were renamed.
-      const includedNotMatching = records.filter(
-        (r) => r.compositionState === 'includedNotMatching'
-      ).length;
-      const diagnostic = records.filter(
-        (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'
-      ).length;
-      return { available, excluded, candidate, includedNotMatching, diagnostic };
-    };
-    const t = tally(tasks);
-    const h = tally(events);
-    return {
-      availableTasks: t.available,
-      excludedTasks: t.excluded,
-      candidateTasks: t.candidate,
-      includedNotMatchingTasks: t.includedNotMatching,
-      diagnosticTasks: t.diagnostic,
-      availableEvents: h.available,
-      excludedEvents: h.excluded,
-      candidateEvents: h.candidate,
-      includedNotMatchingEvents: h.includedNotMatching,
-      diagnosticEvents: h.diagnostic,
-      requiredTools: _requiredToolCount(tasks),
-    };
-  }
-
-  /**
-   * Whether `environment` currently composes the library task/event `record`, through the shared
-   * `environmentComposesRecord` predicate, so it mirrors the runtime chain by construction.
-   */
-  function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
-    if (!record?.id) return false;
-    const includeDanger = kind === 'event';
-    const matches = _gatheringLibraryRecordMatchesEnvironment(
-      record,
-      environment,
-      {},
-      includeDanger,
-      conditionSettings
-    );
-    return environmentComposesRecord(
-      environment,
-      record,
-      kind,
-      resolveGatheringCompositionMode(environment),
-      matches
-    );
   }
 
   /**
@@ -5878,68 +5319,6 @@ export function createAdminStore(services) {
     });
     _patchEnvironmentViewState();
     return _clonePlain(get(environmentDraft));
-  }
-
-  function _normalizeDraftBlindSelection(value) {
-    if (!value || typeof value !== 'object') return null;
-    const weights =
-      value.weights && typeof value.weights === 'object'
-        ? Object.fromEntries(
-            Object.entries(value.weights)
-              .map(([key, weight]) => [String(key), Number(weight)])
-              .filter(([, weight]) => Number.isFinite(weight))
-          )
-        : {};
-    if (Object.keys(weights).length === 0) return null;
-    return { weights };
-  }
-
-  function _normalizeDraftDropRateAdjustmentValue(value) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return null;
-    return number;
-  }
-
-  function _normalizeDraftDropRateAdjustmentMap(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([id, adjustment]) => [
-          String(id || '').trim(),
-          _normalizeDraftDropRateAdjustmentValue(adjustment),
-        ])
-        .filter(([id, adjustment]) => id && adjustment !== null)
-    );
-  }
-
-  function _normalizeDraftTaskDropRateAdjustments(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([taskId, rowAdjustments]) => [
-          String(taskId || '').trim(),
-          _normalizeDraftDropRateAdjustmentMap(rowAdjustments),
-        ])
-        .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0)
-    );
-  }
-
-  function _normalizeDraftTaskDropRateAdjustmentsEnabled(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([taskId, enabled]) => [String(taskId || '').trim(), enabled])
-        .filter(([taskId, enabled]) => taskId && enabled === false)
-    );
-  }
-
-  function _normalizeDraftEventDropRateAdjustmentsEnabled(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([eventId, enabled]) => [String(eventId || '').trim(), enabled])
-        .filter(([eventId, enabled]) => eventId && enabled === false)
-    );
   }
 
   function updateEnvironmentDraft(updates = {}) {

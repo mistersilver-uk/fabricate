@@ -485,7 +485,7 @@ describe('site 2 — adminStore._classifyCompositionRecords, through viewState',
     // Claim two: the store projects the state through the same set this suite does. What this
     // second claim can and cannot prove, stated honestly (issue 1321).
     const storeSource = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js'),
+      resolve(repoRoot, 'src/ui/model/environmentComposition.js'),
       'utf8'
     );
     assert.ok(
