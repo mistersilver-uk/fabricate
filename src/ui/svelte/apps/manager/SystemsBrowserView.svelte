@@ -15,6 +15,7 @@
     DEFAULT_BROWSER_PAGE_SIZE,
     createSystemsBrowserState,
   } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserPageWindow } from './browserListState.svelte.js';
 
   let {
     systems = [],
@@ -64,14 +65,11 @@
     })
   );
   const filtersActive = $derived(normalizedSearchTerm.length > 0 || statusFilter !== 'all');
-  const paginatedSystems = $derived(
-    filteredSystems.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredSystems });
+  const paginatedSystems = $derived(page.pageRows);
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredSystems.length) {
-      ui.pageIndex = 0;
-    }
+    page.clampPage();
   });
 
   function text(key, fallback) {
