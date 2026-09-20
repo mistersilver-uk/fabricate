@@ -91,7 +91,7 @@ Changing the current gathering conditions to one of the required values flips th
 
 {% include screenshot.html case="manager-environment-edit-events" caption="An automatic environment Events tab, with everything matching and nothing excluded." %}
 
-When the system's **Events** rule under [Gathering Rules]({% link gathering/settings.md %}#gathering-rules) is set to **Highest ranked successful event**, the Events tab's included list becomes an ordered list.
+When the system's **Events** rule under [Gathering Rules]({% link gathering/settings.md %}#gathering-rules) is set to **Highest ranked triggered event**, the Events tab's included list becomes an ordered list.
 Each row gains a drag handle and up and down buttons beside it.
 Drag a row's handle, or focus it and use the arrow keys, to move that event.
 Moving a row announces its new position, so a keyboard or screen reader user can follow the change.
