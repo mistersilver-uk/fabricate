@@ -1,5 +1,5 @@
 /**
- * The manager rail's expansion and collapse model (issue 1717). Both inputs are reactive here — a
+ * The manager rail's expansion and collapse model (issue 1717). Both route inputs are reactive here — a
  * `SvelteMap` per thunk — because the model's deriveds must be invalidated by the caller's own
  * source, as the root's route `$derived`s are; a plain object is read once and cached forever,
  * which would make every liveness assertion below vacuous. Two of the six mutation controls can be
@@ -44,10 +44,10 @@ describe('navRailModel', () => {
     const railLock = new SvelteMap([['locked', railLocked === true]]);
     const writes = [];
     const model = createNavRailModel({
-      services: {
+      services: () => ({
         getSetting: (key) => (key === 'managerRailCollapsed' ? stored : undefined),
         setSetting: (key, value) => writes.push([key, value]),
-      },
+      }),
       groupLocks: () => Object.fromEntries(groupLocks),
       railLocked: () => railLock.get('locked') === true,
     });

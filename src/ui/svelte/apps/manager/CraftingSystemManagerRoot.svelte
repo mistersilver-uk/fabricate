@@ -112,8 +112,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
-  import ManagerSystemNav from './ManagerSystemNav.svelte';
-  import ManagerWorldNav from './ManagerWorldNav.svelte';
+  import ManagerNavRail from './ManagerNavRail.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -160,6 +159,7 @@
     runRouteExitGuard,
   } from './routeExitGuards.js';
   import { createBulkSelectionOwner } from './bulkSelection.svelte.js';
+  import { createNavRailModel } from './navRailModel.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -375,23 +375,6 @@
   let activeTravelTab = $state('parties');
   // World > Travel's destination: `realms` or `map`. Realms is the landing tab.
   let worldTravelTab = $state('realms');
-  // ── Rail group expansion: USER INTENT only (issue 1185) ──────────────────────────────
-  const RAIL_GROUP_IDS = Object.freeze([
-    'crafting',
-    'checks',
-    'gathering',
-    'worldTravel',
-    'worldRules',
-    'worldDowntime',
-  ]);
-  let railGroupUserExpanded = $state({
-    crafting: false,
-    checks: false,
-    gathering: false,
-    worldTravel: false,
-    worldRules: false,
-    worldDowntime: false,
-  });
   // The selected Downtime preview is owned here rather than inside the extension host
   // because the rail, the page header and the breadcrumb all name it.
   let worldDowntimeTabId = $state('tracking');
@@ -420,17 +403,6 @@
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
   // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere.
   let componentAddFromCatalogueOpen = $state(false);
-  // svelte-ignore state_referenced_locally
-  let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
-
-  function toggleManagerRail() {
-    // Belt and braces beside the `disabled` attribute, exactly as `toggleRailGroup` does it:
-    // the rail lock (issue 1213) is a rule about state, not about one control.
-    if (railLockedOpen) return;
-    railCollapsed = !railCollapsed;
-    services?.setSetting?.('managerRailCollapsed', railCollapsed);
-  }
-
   let selectedGatheringTaskId = $state('');
   let selectedGatheringEventId = $state('');
   let selectedGatheringDropId = $state('');
@@ -3013,72 +2985,28 @@
   const isChecksRoute = $derived(isChecksView(currentView));
   const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
 
-  // ── Rail group expansion: the LOCK, and what the rail actually renders (issue 1185) ───
-  const railGroupLockedOpen = $derived({
-    crafting: isCraftingRoute,
-    checks: isChecksRoute,
-    gathering: isActiveGatheringChildRoute,
-    worldTravel: isWorldTravelRoute,
-    worldRules: isWorldRulesRoute,
-    worldDowntime: isWorldDowntimeRoute,
+  // ── Rail group expansion, and the collapse seam (issue 1185, extracted by issue 1717) ───
+  // Both inputs are thunks: the model reads them inside its own `$derived.by` to subscribe to
+  // these route deriveds across the module boundary.
+  const navRail = createNavRailModel({
+    services: () => services,
+    groupLocks: () => ({
+      crafting: isCraftingRoute,
+      checks: isChecksRoute,
+      gathering: isActiveGatheringChildRoute,
+      worldTravel: isWorldTravelRoute,
+      worldRules: isWorldRulesRoute,
+      worldDowntime: isWorldDowntimeRoute,
+    }),
+    // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
+    railLocked: () => isWorldDowntimeRoute && !downtimeCoreFallback,
   });
-  const railGroupExpanded = $derived({
-    crafting: railGroupUserExpanded.crafting || railGroupLockedOpen.crafting,
-    checks: railGroupUserExpanded.checks || railGroupLockedOpen.checks,
-    gathering: railGroupUserExpanded.gathering || railGroupLockedOpen.gathering,
-    worldTravel: railGroupUserExpanded.worldTravel || railGroupLockedOpen.worldTravel,
-    worldRules: railGroupUserExpanded.worldRules || railGroupLockedOpen.worldRules,
-    worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
-  });
-  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later navigates
-  // away instead of snapping shut behind them.
-  $effect(() => {
-    const locked = railGroupLockedOpen;
-    for (const group of RAIL_GROUP_IDS) {
-      if (locked[group]) railGroupUserExpanded[group] = true;
-    }
-  });
+  $effect(() => navRail.syncLocks());
   // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its breadcrumb
   // reads "<system> › Crafting › Tools" — so entering it opens the Crafting group.
   $effect(() => {
-    if (isToolStudioRoute) railGroupUserExpanded.crafting = true;
+    if (isToolStudioRoute) navRail.expandGroup('crafting');
   });
-  function toggleRailGroup(group, event) {
-    event?.stopPropagation?.();
-    // Belt and braces beside the `disabled` attribute: the lock is a rule about state, not
-    // about one control, so it holds for a programmatic call too.
-    if (railGroupLockedOpen[group]) return;
-    railGroupUserExpanded[group] = !railGroupUserExpanded[group];
-  }
-  // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
-  const railLockedOpen = $derived(isWorldDowntimeRoute && !downtimeCoreFallback);
-  // DISPLAY-ONLY.
-  const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
-  // INTERIM (issue 1717): `createNavRailModel` is built here once the rail's own unit lands; the
-  // units extracted ahead of it read the root's existing rail state through the model's surface.
-  const navRail = $derived({
-    expanded: railGroupExpanded,
-    lockedOpen: railGroupLockedOpen,
-    collapsedDisplay: railCollapsedDisplay,
-    railLockedOpen,
-    toggleGroup: toggleRailGroup,
-  });
-  // Every rail-toggle attribute reads the DISPLAY value, never the stored one.
-  const railToggleLabel = $derived(
-    railCollapsedDisplay
-      ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-      : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')
-  );
-  // Its own string, not the group lock's: `Nav.LockedOpen` is section-worded and wrong for the
-  // whole sidebar.
-  const railToggleTitle = $derived(
-    railLockedOpen
-      ? text('FABRICATE.Admin.Manager.Nav.RailLockedOpen', 'The sidebar stays open on this page.')
-      : railToggleLabel
-  );
-  const railToggleIcon = $derived(
-    railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
-  );
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off `selectedSystem`
   // (issue 785).
   const knowledgeState = $derived($viewState.knowledge || null);
@@ -3501,7 +3429,7 @@
     gatheringEventDraftBaseline = null;
     gatheringEventSaving = false;
     gatheringEventSaveError = '';
-    railGroupUserExpanded.gathering = isGatheringRoute;
+    navRail.setGroupExpanded('gathering', isGatheringRoute);
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -4783,7 +4711,7 @@
   // Activating the PARENT opens the group and routes to the first available child, which is
   // what makes the retained `checks` id a redirect rather than a dead route.
   function activateChecksParent() {
-    railGroupUserExpanded.checks = true;
+    navRail.expandGroup('checks');
     setView(resolveChecksRedirect(checksNavArgs));
   }
 
@@ -4796,7 +4724,7 @@
   function backToEnvironmentsBrowse() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
-      if (canShowEnvironments) railGroupUserExpanded.gathering = true;
+      if (canShowEnvironments) navRail.expandGroup('gathering');
     });
   }
 
@@ -5923,7 +5851,7 @@
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'gathering-task-edit';
   }
 
@@ -5936,7 +5864,7 @@
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'tasks';
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
@@ -5997,7 +5925,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'environments';
   }
 
@@ -6059,7 +5987,7 @@
     gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringEventSaveError = '';
     activeGatheringTab = 'encounters';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'gathering-event-edit';
   }
 
@@ -6073,7 +6001,7 @@
   function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'encounters';
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
@@ -6139,7 +6067,7 @@
     if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
     clearGatheringEventDraft();
     activeGatheringTab = 'encounters';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'environments';
   }
 
@@ -6664,7 +6592,7 @@
     activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
       ? tabId
       : 'environments';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
   }
 
   function openWorldParties() {
@@ -6684,13 +6612,13 @@
     const view = WORLD_RULES_ROUTES[destination];
     if (!view) return;
     return afterTruthyResult(confirmRouteExit(view, destination), () => {
-      railGroupUserExpanded.worldRules = true;
+      navRail.expandGroup('worldRules');
       activeView = view;
     });
   }
 
   function activateWorldRulesParent() {
-    railGroupUserExpanded.worldRules = true;
+    navRail.expandGroup('worldRules');
     if (isWorldRulesRoute) return;
     openWorldRulesDestination('currency');
   }
@@ -6733,7 +6661,7 @@
     // Issue 1257.
     if (!worldDowntimeAvailable) return;
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
-      railGroupUserExpanded.worldDowntime = true;
+      navRail.expandGroup('worldDowntime');
       activeView = 'world-downtime';
     });
   }
@@ -6754,7 +6682,7 @@
     // the "same view token, different subject" case that parameter exists for.
     return afterTruthyResult(confirmRouteExit('world-downtime', tabId), () => {
       worldDowntimeTabId = tabId;
-      railGroupUserExpanded.worldDowntime = true;
+      navRail.expandGroup('worldDowntime');
       activeView = 'world-downtime';
     });
   }
@@ -6784,13 +6712,13 @@
     if (!['realms', 'map'].includes(destination)) return;
     return afterTruthyResult(confirmRouteExit('world-travel', destination), () => {
       worldTravelTab = destination;
-      railGroupUserExpanded.worldTravel = true;
+      navRail.expandGroup('worldTravel');
       activeView = 'world-travel';
     });
   }
 
   function activateWorldTravelParent() {
-    railGroupUserExpanded.worldTravel = true;
+    navRail.expandGroup('worldTravel');
     if (isWorldTravelRoute) return;
     openWorldTravelDestination('realms');
   }
@@ -6802,7 +6730,7 @@
       : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
@@ -6877,7 +6805,7 @@
 
   function activateGatheringParent() {
     if (isActiveGatheringChildRoute) {
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       return;
     }
     openGatheringSection('environments');
@@ -6889,13 +6817,13 @@
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
       activeView = nextView;
-      railGroupUserExpanded.crafting = true;
+      navRail.expandGroup('crafting');
     });
   }
 
   function activateCraftingParent() {
     if (isCraftingRoute) {
-      railGroupUserExpanded.crafting = true;
+      navRail.expandGroup('crafting');
       return;
     }
     openCraftingSection('recipes');
@@ -6966,7 +6894,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(source);
       recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       activeView = 'recipe-item-edit';
-      railGroupUserExpanded.crafting = true;
+      navRail.expandGroup('crafting');
       Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
         worldItemOptions = options || [];
       });
@@ -8859,174 +8787,68 @@
     </header>
   {/if}
 
-  <div class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}>
-    <aside
-      class="manager-rail"
-      aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}
-    >
-      <!--
-        Name the workspace before its scope controls. Every manager route.
-      -->
-      <p class="manager-rail-title" data-manager-rail-section>
-        {text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}
-      </p>
-
-      <!--
-        The rail's crafting-system card.
-      -->
-      <section
-        class="manager-rail-block"
-        aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}
-      >
-        {#if selectedSystem}
-          <div class="manager-scope-card">
-            <div class="manager-scope-card-head">
-              <p class="manager-kicker">
-                {text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}
-              </p>
-              <button
-                type="button"
-                class="manager-rail-toggle manager-scope-collapse"
-                data-manager-rail-toggle
-                aria-pressed={railCollapsedDisplay}
-                aria-label={railToggleLabel}
-                title={railToggleTitle}
-                disabled={railLockedOpen}
-                aria-disabled={railLockedOpen}
-                onclick={toggleManagerRail}
-              >
-                <i class={railToggleIcon} aria-hidden="true"></i>
-              </button>
-            </div>
-            <select
-              class="manager-scope-select"
-              data-manager-scope-select
-              value={selectedSystem.id}
-              aria-label={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-              onchange={(event) => changeScopeSystem(event.currentTarget.value)}
-            >
-              {#each $viewState.systems || [] as system (system.id)}
-                <option value={system.id}>{system.name}</option>
-              {/each}
-            </select>
-            <!--
-              The systems browser IS the destination this link returns to.
-            -->
-            <button
-              type="button"
-              class={`manager-scope-return ${currentView === 'systems' ? 'is-disabled' : ''}`}
-              disabled={currentView === 'systems'}
-              aria-disabled={currentView === 'systems'}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
-                'Return to System Library'
-              )}
-              title={text(
-                'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
-                'Return to System Library'
-              )}
-              onclick={backToSystemsBrowser}
-            >
-              <i class="fas fa-arrow-left-long" aria-hidden="true"></i>
-              <span
-                >{text('FABRICATE.Admin.Manager.AllCraftingSystems', 'All crafting systems')}</span
-              >
-            </button>
-          </div>
-        {:else}
-          <div class="manager-scope-card">
-            <div class="manager-scope-card-head">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
-              <button
-                type="button"
-                class="manager-rail-toggle manager-scope-collapse"
-                data-manager-rail-toggle
-                aria-pressed={railCollapsedDisplay}
-                aria-label={railToggleLabel}
-                title={railToggleTitle}
-                disabled={railLockedOpen}
-                aria-disabled={railLockedOpen}
-                onclick={toggleManagerRail}
-              >
-                <i class={railToggleIcon} aria-hidden="true"></i>
-              </button>
-            </div>
-            <h2 class="manager-title">
-              {text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}
-            </h2>
-          </div>
-        {/if}
-      </section>
-
-      <nav
-        class="manager-nav"
-        aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}
-      >
-        <ManagerSystemNav
-          {navRail}
-          {selectedSystem}
-          {currentView}
-          {setView}
-          {editSystem}
-          {systemOverviewCount}
-          {isCraftingRoute}
-          {activateCraftingParent}
-          {craftingNavCount}
-          {craftingNavItems}
-          {activeCraftingTab}
-          {openCraftingSection}
-          {selectedCounts}
-          {tagCategoryCounts}
-          {canShowEssences}
-          {toolsNavCount}
-          {isChecksRoute}
-          {activateChecksParent}
-          {checksNavCount}
-          {checksNavItems}
-          {canShowEnvironments}
-          {isGatheringRoute}
-          {activateGatheringParent}
-          {gatheringNavCounts}
-          {visibleGatheringNavItems}
-          {displayedGatheringTab}
-          {openGatheringSection}
-          {experimentalFeaturesEnabled}
-        />
-        <ManagerWorldNav
-          {navRail}
-          {currentView}
-          {setView}
-          {worldScopedCounts}
-          {isWorldRoute}
-          {openWorldParties}
-          {travelParties}
-          {isWorldTravelRoute}
-          {activateWorldTravelParent}
-          {worldRealms}
-          {worldTravelTab}
-          {openWorldTravelDestination}
-          {isWorldRulesRoute}
-          {activateWorldRulesParent}
-          {selectedCurrencyUnits}
-          {selectedCharacterPrerequisites}
-          {selectedSystemModifiers}
-          {isWorldCurrencyRoute}
-          {isWorldPrerequisitesRoute}
-          {isWorldModifiersRoute}
-          {openWorldRulesDestination}
-          {worldDowntimeAvailable}
-          {isWorldDowntimeRoute}
-          {downtimeCoreFallback}
-          {downtimeTabs}
-          {downtimeNavTabBadges}
-          {downtimeTabText}
-          {downtimeNavLabelId}
-          {worldDowntimeTabId}
-          {openWorldDowntime}
-          {openWorldDowntimePreview}
-        />
-      </nav>
-    </aside>
+  <div class={`manager-body ${navRail.collapsedDisplay ? 'is-rail-collapsed' : ''}`}>
+    <ManagerNavRail
+      {navRail}
+      systems={$viewState.systems || []}
+      {selectedSystem}
+      {currentView}
+      {changeScopeSystem}
+      {backToSystemsBrowser}
+      {setView}
+      {editSystem}
+      {systemOverviewCount}
+      {isCraftingRoute}
+      {activateCraftingParent}
+      {craftingNavCount}
+      {craftingNavItems}
+      {activeCraftingTab}
+      {openCraftingSection}
+      {selectedCounts}
+      {tagCategoryCounts}
+      {canShowEssences}
+      {toolsNavCount}
+      {isChecksRoute}
+      {activateChecksParent}
+      {checksNavCount}
+      {checksNavItems}
+      {canShowEnvironments}
+      {isGatheringRoute}
+      {activateGatheringParent}
+      {gatheringNavCounts}
+      {visibleGatheringNavItems}
+      {displayedGatheringTab}
+      {openGatheringSection}
+      {experimentalFeaturesEnabled}
+      {worldScopedCounts}
+      {isWorldRoute}
+      {openWorldParties}
+      {travelParties}
+      {isWorldTravelRoute}
+      {activateWorldTravelParent}
+      {worldRealms}
+      {worldTravelTab}
+      {openWorldTravelDestination}
+      {isWorldRulesRoute}
+      {activateWorldRulesParent}
+      {selectedCurrencyUnits}
+      {selectedCharacterPrerequisites}
+      {selectedSystemModifiers}
+      {isWorldCurrencyRoute}
+      {isWorldPrerequisitesRoute}
+      {isWorldModifiersRoute}
+      {openWorldRulesDestination}
+      {worldDowntimeAvailable}
+      {isWorldDowntimeRoute}
+      {downtimeCoreFallback}
+      {downtimeTabs}
+      {downtimeNavTabBadges}
+      {downtimeTabText}
+      {downtimeNavLabelId}
+      {worldDowntimeTabId}
+      {openWorldDowntime}
+      {openWorldDowntimePreview}
+    />
 
     {#if currentView === 'world-components'}
       <!--

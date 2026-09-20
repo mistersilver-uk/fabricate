@@ -111,6 +111,8 @@ const MAIN = 'src/main.js';
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
+const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
+const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
@@ -523,15 +525,21 @@ describe('CraftingSystemManager source contract', () => {
   // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
   // `data-manager-view` are not here: every route module reads them off the mounted shell
   // (`target.querySelector('.fabricate-manager').dataset.managerView`).
+  // `manager-rail` is `ManagerNavRail`'s own identity since issue 1717; `is-rail-collapsed` is
+  // still the shell's, because it is on `.manager-body`.
+  defineStructureContract('names the rail aside', MANAGER_NAV_RAIL, {
+    attributes: [['class', 'manager-rail']],
+  });
+
   defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
     attributes: [
       ['class', 'manager-header'],
       ['class', 'manager-breadcrumbs'],
-      ['class', 'manager-rail'],
       ['class', 'manager-inspector'],
     ],
     spells: ['is-rail-collapsed', 'manager-environment-edit-main'],
     renders: [
+      'ManagerNavRail',
       'ComponentsBrowserView',
       'EnvironmentsBrowserView',
       'EssenceBrowserView',
@@ -991,7 +999,10 @@ describe('CraftingSystemManager source contract', () => {
 
   // The rail card selects (issue 643): the static name span, the x clear icon and the inline count
   // cluster are retired rather than merely hidden.
-  defineStructureContract('renders the selected system in a rail card that selects', MANAGER_ROOT, {
+  defineStructureContract(
+    'renders the selected system in a rail card that selects',
+    MANAGER_NAV_RAIL,
+    {
     writes: ['data-manager-scope-select', 'data-manager-rail-section'],
     spells: ['manager-scope-return'],
     spellsExactly: [
@@ -1007,20 +1018,23 @@ describe('CraftingSystemManager source contract', () => {
       'FABRICATE.Admin.Manager.Workspace',
       'FABRICATE.Admin.Manager.QuickActions',
     ],
-  });
+    }
+  );
 
   // Three claims a whole-file search cannot make: which element carries which hook, what order two
   // rail regions render in, and that the gathering parent takes no selected-pill class.
-  it('labels the rail before the scope card, and keeps Import on the library header', () => {
-    const root = componentAstOf(MANAGER_ROOT);
-    const nodes = templateNodes(root);
+  it('labels the rail before the scope card', () => {
+    const nodes = templateNodes(componentAstOf(MANAGER_NAV_RAIL));
     const label = nodes.findIndex((node) =>
       declaresAttribute(node, 'data-manager-rail-section', { directives: false })
     );
     const block = nodes.findIndex((node) => attributeValue(node, 'class') === 'manager-rail-block');
     assert.ok(label >= 0 && block >= 0, 'both rail regions still render');
     assert.ok(label < block, 'GM management labels the rail before the crafting-system scope card');
+  });
 
+  it('keeps Import on the library header', () => {
+    const nodes = templateNodes(componentAstOf(MANAGER_ROOT));
     // The legacy system-library header rendered an admin launch button beside Import, so the
     // `openCurrentAdmin` absence above is vacuous against a header that no longer exists.
     const [importButton] = nodes.filter((node) =>
@@ -2493,21 +2507,24 @@ describe('CraftingSystemManager source contract', () => {
   // `railCollapsed` is the stored preference; the body renders `railCollapsedDisplay`, so the
   // Downtime rail lock forces the sidebar open without un-collapsing every other route. The
   // rendered half is mounted through `assertRailLockedOpen` and `assertRailLockSurvivesPresses`.
-  defineStructureContract('wires a collapsible left rail persisted via the manager setting seam', MANAGER_ROOT, {
+  defineStructureContract('wires a collapsible left rail persisted via the manager setting seam', NAV_RAIL_MODEL, {
+    spells: ['managerRailCollapsed'],
+    reads: ['services.getSetting', 'services.setSetting'],
+    names: ['toggleRail'],
+    declares: ['collapsedDisplay'],
+  });
+
+  defineStructureContract('names the rail toggle for both states', MANAGER_NAV_RAIL, {
     spells: [
-      'managerRailCollapsed',
       'FABRICATE.Admin.Manager.Nav.CollapseRail',
       'FABRICATE.Admin.Manager.Nav.ExpandRail',
     ],
-    reads: ['services.getSetting', 'services.setSetting'],
-    names: ['toggleManagerRail'],
-    declares: ['railCollapsedDisplay'],
   });
 
   // Counted, not merely present (issue 1213 review): a mounted case renders one of the two sites,
   // so the branch it does not reach would lose the lock silently.
   it('writes the rail toggle twice, and both sites carry the same state attributes', () => {
-    const sites = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
+    const sites = templateNodes(componentAstOf(MANAGER_NAV_RAIL)).filter((node) =>
       declaresAttribute(node, 'data-manager-rail-toggle', { directives: false })
     );
     assert.equal(sites.length, 2, 'the scope card renders the rail toggle once per branch');

@@ -1,10 +1,11 @@
 /**
- * The manager navigation rail's group expansion and its collapse seam (issue 1717). Both inputs
- * are THUNKS, because each caller value is itself a `$derived` and must be read inside this
- * module's own `$derived.by` to subscribe across the boundary. `expanded` is user intent OR the
- * route lock, so a locked group renders open before `syncLocks()` has recorded that intent; and
- * `collapsedDisplay` is display-only, so a locked-open rail reads expanded without ever
- * overwriting the stored `managerRailCollapsed` preference.
+ * The manager navigation rail's group expansion and its collapse seam (issue 1717). Every input is
+ * a THUNK: the two route inputs because each caller value is itself a `$derived` and must be read
+ * inside this module's own `$derived.by` to subscribe across the boundary, and `services` because
+ * reading the root's prop in the call expression would capture its initial value under
+ * `state_referenced_locally`. `expanded` is user intent OR the route lock, so a locked group
+ * renders open before `syncLocks()` has recorded that intent; and `collapsedDisplay` is
+ * display-only, so a locked-open rail reads expanded without overwriting the stored preference.
  */
 const RAIL_GROUP_IDS = Object.freeze([
   'crafting',
@@ -15,7 +16,8 @@ const RAIL_GROUP_IDS = Object.freeze([
   'worldDowntime',
 ]);
 
-export function createNavRailModel({ services, groupLocks, railLocked } = {}) {
+export function createNavRailModel({ services: servicesSeam, groupLocks, railLocked } = {}) {
+  const services = servicesSeam?.();
   const userExpanded = $state({
     crafting: false,
     checks: false,

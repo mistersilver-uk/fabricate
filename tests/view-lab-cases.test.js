@@ -223,18 +223,21 @@ function navDeclarationScope(sources, template) {
   // component builds the id, from a table the component that renders it owns and passes in. So
   // the roots are the builders plus whatever renders one, and the scope is those and their
   // relative imports.
-  const roots = [
-    ...builders,
-    ...[...sources].filter(
-      ([file, text]) =>
-        !builders.some(([builder]) => builder === file) &&
-        relativeImportsOf(sources, file, text).some((resolved) =>
-          builders.some(([builder]) => builder === resolved)
-        )
-    ),
-  ];
+  // Transitive, and through components only: the rail's entry unit is rendered by the rail unit,
+  // which the shell renders, and the shell is where the item tables are imported.
+  const roots = new Map(builders);
+  for (let added = true; added; ) {
+    added = false;
+    for (const [file, text] of sources) {
+      if (roots.has(file) || !file.endsWith('.svelte')) continue;
+      if (relativeImportsOf(sources, file, text).some((resolved) => roots.has(resolved))) {
+        roots.set(file, text);
+        added = true;
+      }
+    }
+  }
   const scope = new Map(roots);
-  for (const [file, text] of roots) {
+  for (const [file, text] of [...roots]) {
     for (const resolved of relativeImportsOf(sources, file, text)) {
       if (sources.has(resolved)) scope.set(resolved, sources.get(resolved));
     }
