@@ -12,11 +12,15 @@ export function storeMemberKinds(store) {
   return Object.fromEntries(entries);
 }
 
-/** The same map from a hand-written roster split by kind. */
-export function expectedMemberKinds({ getters, methods }) {
+/**
+ * The same map from a hand-written roster split by kind. `stores` is the Svelte-writable bucket a
+ * store exposes as an input, which reads as a plain `object` through its descriptor.
+ */
+export function expectedMemberKinds({ getters = [], methods = [], stores = [] }) {
   const entries = [
     ...getters.map((key) => [key, 'getter']),
     ...methods.map((key) => [key, 'function']),
+    ...stores.map((key) => [key, 'object']),
   ].sort(([left], [right]) => byCodePoint(left, right));
   return Object.fromEntries(entries);
 }
