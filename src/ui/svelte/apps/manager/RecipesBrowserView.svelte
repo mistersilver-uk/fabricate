@@ -72,14 +72,13 @@
 
   // A category names a vocabulary the new system does not share; status and lock are preferences
   // and are not reset. The search term is the store's to clear, on a switch and on leaving this
-  // route alike (issue 1462), because an active term changes counts on screens with no search
-  // box. The sentinel is persisted on the lifted state, or a round-trip would read as a switch.
+  // route alike (issue 1462), because an active term changes counts on screens with no search box.
   const list = createBrowserListState({
     state: () => ui,
     resetAxes: { categoryFilter: 'all', pageIndex: 0 },
     onSystemSwitch: () => {
       ui.collapsedCategories = new Set();
-      // The selection is scoped to this system, and the root drops the staged draft at zero (1010).
+      // The selection is scoped to this system; the root drops the staged draft at zero (issue 1010).
       selection.reset();
     },
   });

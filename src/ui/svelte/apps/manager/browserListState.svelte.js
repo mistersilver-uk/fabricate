@@ -7,8 +7,9 @@
 import { DEFAULT_BROWSER_PAGE_SIZE } from '../../../model/managerBrowserViewState.js';
 
 /**
- * The crafting-system switch sentinel. `state().systemId` is written last so `onSystemSwitch`
- * observes the outgoing system; `resetAxes` names only the axes a caller's effect resets.
+ * The crafting-system switch sentinel. The equality guard is what keeps a remount at the same
+ * system from reading as a switch (issue 806); `state().systemId` is written last so
+ * `onSystemSwitch` observes the outgoing system, and `resetAxes` names only the axes to reset.
  */
 export function createBrowserListState({ state, resetAxes = {}, onSystemSwitch } = {}) {
   function syncSystem(selectedSystemId) {

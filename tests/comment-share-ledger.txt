@@ -69,7 +69,7 @@ tests/fixtures/manager-select	21
 tests/fixtures/overlay-host	25
 tests/fixtures/player-select	22
 tests/fixtures/searchable-popover	52
-tests/helpers	18
+tests/helpers	19
 tests/helpers/manager	13
 tests/helpers/scale	18
 tests/journal	5
