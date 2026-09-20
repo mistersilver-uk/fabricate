@@ -84,6 +84,21 @@ test('a group scenario runs its children in declared order, inside its own run',
   ]);
 });
 
+test('every real group scenario awaits runChildren, so its declared children are not inert', () => {
+  const groups = [...flatten(SMOKE_SCENARIOS)].filter((scenario) => scenario.children?.length);
+  assert.ok(groups.length >= 2, `only ${groups.length} group scenarios found; this guard would be vacuous`);
+  for (const scenario of groups) {
+    const file = SCENARIO_FILES.find((candidate) => sourceOf(candidate).includes(`id: '${scenario.id}'`));
+    assert.ok(file, `${scenario.id} has no owning scenario module`);
+    assert.match(
+      sourceOf(file),
+      /await runChildren\(\)/,
+      `${scenario.id} declares ${scenario.children.length} children but never awaits runChildren(), ` +
+        'so they are registered, flattened into SMOKE_SCENARIO_IDS, and never run'
+    );
+  }
+});
+
 test('a child whose section is skipped never has its run called', async () => {
   const ctx = fakeContext({ skippedSections: ['tools'] });
   const group = fakeScenario('group', {
