@@ -31,6 +31,7 @@ const harness = createMountedComponentHarness({
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/bookRecipeBrowse.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The pure yield projection the bulk sub-store reads (issue 1695).
     'src/ui/svelte/util/salvageYieldRows.js',

@@ -215,7 +215,7 @@ describe('design system: a programmatic focus target declares itself focused to 
 
     assert.ok(
       formlessButtons.length >= 200,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 266 ` +
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 261 ` +
         'this tree holds'
     );
     assert.ok(

@@ -1,8 +1,7 @@
 /**
  * The whole-header disclosure shape issue 1512 repaired at three sites: one real header button, a
- * decorative chevron, an `aria-controls` that resolves while the row is open, and an accessible name
- * taken from a visually hidden phrase rather than the header's concatenated copy. One helper, not
- * three copies, because three near-identical blocks fail the new-code duplication gate.
+ * decorative chevron, an `aria-controls` emitted only while the body it names is mounted, and an
+ * accessible name that is the header's own copy plus a visually hidden phrase.
  */
 import assert from 'node:assert/strict';
 
@@ -21,8 +20,8 @@ export function assertWholeHeaderDisclosure({
 }) {
   const why = (clause) => `${site}: ${clause}`;
 
-  // A `div role="button" tabindex="0"` is what this replaced: Foundry's `KeyboardManager#hasFocus`
-  // reads one property and a div fails it, so Space paused the game behind the open window.
+  // Foundry's `KeyboardManager#hasFocus` reads one property no `div role="button"` satisfies, so
+  // the header has to be the element itself (issue 1512).
   assert.equal(header.tagName, 'BUTTON', why('the whole header is the button'));
   assert.equal(header.getAttribute('type'), 'button', why('it submits no enclosing form'));
   assert.equal(
@@ -50,28 +49,35 @@ export function assertWholeHeaderDisclosure({
     why('and the chevron is decorative, so it adds nothing to the name')
   );
 
-  const phraseId = header.getAttribute('aria-labelledby');
-  assert.ok(Boolean(phraseId), why('the name is delegated to a phrase'));
-  const phrase = root.querySelector(`[id="${phraseId}"]`);
-  assert.ok(Boolean(phrase), why('and that phrase resolves'));
+  // `aria-labelledby` would REPLACE name-from-content, dropping the record copy the header draws
+  // (its chips, its chance figure) from the name; the phrase appends to that copy instead.
   assert.ok(
-    phrase.classList.contains('visually-hidden'),
-    why('the phrase is hidden rather than drawn')
+    !header.hasAttribute('aria-labelledby'),
+    why('the name is the header copy plus the phrase, not the phrase alone')
   );
+  const phrase = header.querySelector('.visually-hidden');
+  assert.ok(Boolean(phrase), why('the header carries a hidden phrase inside its own name'));
   const expectedKey = expanded ? COLLAPSE_PHRASE_KEY : EXPAND_PHRASE_KEY;
   assert.ok(
     phrase.textContent.includes(expectedKey),
     why(`the phrase is ${expectedKey}, so the state is read as well as the record`)
   );
   assert.ok(phrase.textContent.includes(recordName), why('and the phrase names the record'));
+  assert.ok(
+    header.textContent.includes(recordName),
+    why('and the header announces the record from its own content')
+  );
 
-  const controls = header.getAttribute('aria-controls');
-  assert.ok(Boolean(controls), why('it points at the region it opens'));
-  const body = root.querySelector(`[id="${controls}"]`);
   if (!expanded) {
-    assert.ok(!body, why('a collapsed whole-header row renders no body, so nothing carries the id'));
+    assert.ok(
+      !header.hasAttribute('aria-controls'),
+      why('a collapsed row renders no body, so it points at no id rather than at a dangling one')
+    );
     return null;
   }
+  const controls = header.getAttribute('aria-controls');
+  assert.ok(Boolean(controls), why('an open header points at the region it opened'));
+  const body = root.querySelector(`[id="${controls}"]`);
   assert.ok(Boolean(body), why('aria-controls resolves to an element carrying that exact id'));
   assert.ok(
     body !== header && !header.contains(body),
