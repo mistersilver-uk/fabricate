@@ -162,6 +162,43 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  // The stamina row's two pickers reached no frame at all until this case (issue 1510), and they
+  // are the only converted controls in this editor whose panel is TICKED. The row exists only under
+  // the stamina economy, so the state is driven: enable the mode in Settings, then author a row.
+  managerCase({
+    id: 'manager-gathering-task-stamina-modifier-list',
+    label: 'Manager — Gathering task stamina modifier list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '[data-economy-mode-option="stamina"]' },
+      { selector: '[data-economy-stamina-max]', fill: '12' },
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-add-stamina-modifier]' },
+      // The row renders no caption, so its own accessible name is the address (issue 1510).
+      { selector: '.fabricate-select-trigger[aria-label="Per-actor cost modifiers"]' },
+    ],
+    expectView: 'gathering-task-edit',
+    // Three claims a closed frame cannot make: the panel exists, it is the ticked list, and the
+    // world's longest modifier name renders whole in it rather than ellipsised.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="hb-mod-weather"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   ...[
     { suffix: 'normal', width: 1280, height: 820 },
     { suffix: 'narrow', width: 1000, height: 720 },

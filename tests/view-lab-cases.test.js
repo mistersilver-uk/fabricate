@@ -2378,6 +2378,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
   'manager-gathering-task-node-respawn-list',
+  'manager-gathering-task-stamina-modifier-list',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
