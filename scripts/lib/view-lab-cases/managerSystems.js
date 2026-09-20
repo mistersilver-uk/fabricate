@@ -119,6 +119,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
     ],
   }),
@@ -133,6 +135,8 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
     ],
   }),

@@ -112,6 +112,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './KnowledgeView.svelte',
   // Added by issue 1717: the rail's WORLD section is its own unit, and it took the nav-tab badge
   // helpers with it, so `../../../navTabBadgeStore.js` left this list in the same commit.
+  './ManagerSystemNav.svelte',
   './ManagerWorldNav.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',

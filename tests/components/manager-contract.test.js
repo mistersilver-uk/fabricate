@@ -111,8 +111,13 @@ const MAIN = 'src/main.js';
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
+const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
+const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
   'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte';
+// The rail's three entry units answer together for a claim over the entries they share; a claim
+// narrowed to one of them would drop most of its population (issue 1717).
+const MANAGER_NAV_UNITS = [MANAGER_SYSTEM_NAV, MANAGER_WORLD_NAV, MANAGER_WORLD_DOWNTIME_NAV_GROUP];
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
@@ -598,7 +603,7 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
-  defineStructureContract('uses manager localization keys rather than hard-coded copy', MANAGER_ROOT, {
+  defineStructureContract('uses manager localization keys rather than hard-coded copy', [MANAGER_ROOT, MANAGER_SYSTEM_NAV], {
     // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted cases
     // render this copy, which `text(key, fallback)` still produces under a renamed key.
     spellsExactly: [
@@ -893,7 +898,7 @@ describe('CraftingSystemManager source contract', () => {
 
   // The heading is the selected system's name, falling back to the route name only when nothing
   // is selected, rather than rendering an empty heading (#429).
-  defineStructureContract('titles the page after the record it edits', MANAGER_ROOT, {
+  defineStructureContract('titles the page after the record it edits', [MANAGER_ROOT, MANAGER_SYSTEM_NAV], {
     reads: ['selectedSystem.name'],
     spellsExactly: [
       'FABRICATE.Admin.Manager.SystemEdit.Nav',
@@ -938,7 +943,10 @@ describe('CraftingSystemManager source contract', () => {
   // Issue 745: the Crafting group is unconditional (v1.3 headline), so the recipes-route
   // experimental gate is gone and the disabled Recipes placeholder with it. Essences and Tags are
   // real routes now, which is why neither may reappear in the placeholder list either.
-  defineStructureContract('derives the placeholder rail from selection and feature gates', MANAGER_ROOT, {
+  defineStructureContract(
+    'derives the placeholder rail from selection and feature gates',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV],
+    {
     names: ['visiblePlaceholderViews', 'selectSystemAndShowBrowser'],
     declares: ['experimentalFeaturesEnabled'],
     reads: ['$viewState.experimentalFeaturesEnabled'],
@@ -954,11 +962,12 @@ describe('CraftingSystemManager source contract', () => {
       ['setView', 'systems'],
       ['selectSystem', ''],
     ],
-  });
+    }
+  );
 
   defineStructureContract(
     'advertises the Graph placeholder as the only one, behind the experimental toggle',
-    { file: MANAGER_ROOT, constant: 'placeholderViews' },
+    { file: MANAGER_SYSTEM_NAV, constant: 'placeholderViews' },
     {
       property: [
         ['id', 'graph'],
@@ -976,7 +985,7 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'and gates it on the experimental toggle rather than on a system feature',
-    { file: MANAGER_ROOT, fn: 'isViewAvailableForSystem' },
+    { file: MANAGER_SYSTEM_NAV, fn: 'isViewAvailableForSystem' },
     { compares: ['graph'], names: ['experimentalFeaturesEnabled'] }
   );
 
@@ -1021,10 +1030,17 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(importButton.name, 'ManagerButton', 'through the shared button primitive');
     assert.equal(attributeExpression(importButton, 'onclick')?.name, 'importSystem');
 
-    const parentClasses = [...walkNodes(root.fragment)].filter(
-      (node) =>
-        node.type === 'TemplateLiteral' &&
-        literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
+  });
+
+  // A universal over every composition site, which is why it reads all three entry units: the
+  // sites are spread across them and narrowing it to one would drop most of its population.
+  it('never takes the selected pill class from the route a nav parent groups', () => {
+    const parentClasses = MANAGER_NAV_UNITS.flatMap((file) =>
+      [...walkNodes(componentAstOf(file).fragment)].filter(
+        (node) =>
+          node.type === 'TemplateLiteral' &&
+          literalStrings(node).some((literal) => literal.includes('manager-nav-parent'))
+      )
     );
     assert.ok(parentClasses.length > 0, 'the gathering parent still composes its class');
     assert.ok(
@@ -1035,9 +1051,11 @@ describe('CraftingSystemManager source contract', () => {
 
   // The gathering rail is one submenu group with its own expand/collapse control and a rollup
   // count summarising the three sections beneath it.
-  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_ROOT, {
+  defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_SYSTEM_NAV, {
     spells: ['manager-nav-group '],
-    reads: ['railGroupExpanded.gathering'],
+    // The member path the unit reads through its `navRail` prop, which is what replaced the
+    // root's own `railGroupExpanded` (issue 1717).
+    reads: ['navRail.expanded.gathering'],
     spellsExactly: [
       'manager-nav-submenu',
       'manager-nav-toggle',
@@ -1045,6 +1063,11 @@ describe('CraftingSystemManager source contract', () => {
       'FABRICATE.Admin.Manager.Nav.ExpandGathering',
       'FABRICATE.Admin.Manager.Nav.CollapseGathering',
     ],
+  });
+
+  // The tab the submenu reads is the ROOT's still; the placeholder it routes into moved to the
+  // gathering inspector rail with issue 1707, whose own contract claims the write.
+  defineStructureContract("keeps the gathering rail's active tab on the shell", MANAGER_ROOT, {
     names: ['activeGatheringTab'],
   });
 
@@ -1955,7 +1978,10 @@ describe('CraftingSystemManager source contract', () => {
   // entry is driven by `tests/components/manager-rail-mounted.js`, which presses it, reads the
   // route and asserts the badge is absent at zero; which derivation each span renders is not.
   it('renders each rail count as the derived number inside the shared count span', () => {
-    const rendered = classRenderedExpressions(componentAstOf(MANAGER_ROOT), 'manager-nav-count');
+    const rendered = classRenderedExpressions(
+      componentAstOf(MANAGER_SYSTEM_NAV),
+      'manager-nav-count'
+    );
     const read = rendered.flatMap((expression) => [
       ...memberPaths(expression),
       ...identifierNames(expression),

@@ -190,7 +190,7 @@ tests/systems/gatheringComposition.test.js	2
 tests/systems/pooledAllocation.test.js	3
 tests/token-generation-gate.test.js	2
 tests/unresolved-description-detector.test.js	7
-tests/view-lab-cases.test.js	16
+tests/view-lab-cases.test.js	15
 tests/world-scope-consumer-sweep.test.js	24
 tests/world-scope-entities-import-export.test.js	11
 tests/world-scope-flag-stamp-version-gate.test.js	4

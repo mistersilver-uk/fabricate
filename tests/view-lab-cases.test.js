@@ -209,14 +209,33 @@ function railRenderingFiles(sources) {
   return [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
 }
 
+function relativeImportsOf(sources, file, text) {
+  const found = [];
+  for (const match of text.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
+    found.push(normalizePath(relative(ROOT, resolve(dirname(resolve(ROOT, file)), match[1]))));
+  }
+  return found;
+}
+
 function navDeclarationScope(sources, template) {
   const builders = [...sources].filter(([, text]) => text.includes(template));
-  const scope = new Map(builders);
-  for (const [file, text] of builders) {
-    for (const match of text.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
-      const resolved = normalizePath(
-        relative(ROOT, resolve(dirname(resolve(ROOT, file)), match[1]))
-      );
+  // The id template and the item table can sit in DIFFERENT units (issue 1717): a rail entry
+  // component builds the id, from a table the component that renders it owns and passes in. So
+  // the roots are the builders plus whatever renders one, and the scope is those and their
+  // relative imports.
+  const roots = [
+    ...builders,
+    ...[...sources].filter(
+      ([file, text]) =>
+        !builders.some(([builder]) => builder === file) &&
+        relativeImportsOf(sources, file, text).some((resolved) =>
+          builders.some(([builder]) => builder === resolved)
+        )
+    ),
+  ];
+  const scope = new Map(roots);
+  for (const [file, text] of roots) {
+    for (const resolved of relativeImportsOf(sources, file, text)) {
       if (sources.has(resolved)) scope.set(resolved, sources.get(resolved));
     }
   }
@@ -4865,10 +4884,16 @@ test('the capture workflow renders and publishes the one id list it computed', (
 // `tests/view-lab-cases.test.js` asserted only that a case DECLARING `expectView` is a manager
 // case; the VALUE was never matched against any route id.
 function buildExpectViewPredicate() {
-  const rootSource = readFileSync(
-    resolve(ROOT, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
-    'utf8'
-  );
+  // The rail's entries are their own units since issue 1717, and a route literal is asserted
+  // wherever it is compared — so the scan reads the shell and the three entry units as one.
+  const rootSource = [
+    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
+    'src/ui/svelte/apps/manager/ManagerWorldNav.svelte',
+    'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte',
+  ]
+    .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
+    .join('\n');
   const rendered = new Set(
     [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map((match) => match[1])
   );

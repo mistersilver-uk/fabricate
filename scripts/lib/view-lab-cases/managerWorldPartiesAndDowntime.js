@@ -358,6 +358,7 @@ export const CASES = Object.freeze([
       kinds: ['manager', 'world', 'downtime'],
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
         /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       ],
     })
@@ -422,6 +423,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -470,6 +472,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
@@ -555,6 +558,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
@@ -619,6 +623,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/svelte\/components\/Chip\.svelte$/,
@@ -657,6 +662,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/managerExtensions\.js$/,
       /^src\/ui\/navTabBadgeStore\.js$/,
       /^styles\/fabricate\.css$/,
@@ -704,6 +710,7 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerWorldDowntimeNavGroup\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
       /^src\/ui\/managerExtensions\.js$/,
       /^styles\/fabricate\.css$/,
