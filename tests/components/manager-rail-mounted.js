@@ -1604,6 +1604,53 @@ export function registerRailCases() {
     );
   });
 
+  // The gathering reset is the ONE expansion writer that carries a value rather than an open, and
+  // it is reached by a SYSTEM SWITCH, not by a route move: the effect returns early unless the
+  // selected system changed. Normalised to an unconditional open it would leave the group standing
+  // open on a route that is not its own, which nothing else in this suite observes (issue 1717).
+  it('closes the Gathering group when the GM switches to another system off a gathering route', async () => {
+    useShippedLocalization();
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      experimentalFeaturesEnabled: true,
+      // Both systems offer Gathering, so the group is still rendered after the switch and the
+      // assertion is about its STATE rather than about its absence.
+      smithingFeatures: { gathering: true, itemTags: true, recipeCategories: true, salvage: true },
+    });
+
+    const settle = async () => {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+    };
+    const gatheringParent = () => target.querySelector('#manager-nav-gathering');
+    const submenu = () => target.querySelector('#manager-gathering-submenu');
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'systems',
+      'pre-condition: the route is outside the Gathering group, so nothing locks it open'
+    );
+    assert.ok(!submenu(), 'and the group starts collapsed');
+
+    target.querySelector('#manager-nav-gathering + .manager-nav-toggle').click();
+    await settle();
+    assert.ok(Boolean(submenu()), 'the GM opened the group by its own disclosure');
+    assert.equal(gatheringParent().getAttribute('aria-expanded'), 'true');
+
+    const scope = target.querySelector('[data-manager-scope-select]');
+    scope.value = 'smithing';
+    scope.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await settle();
+    await settle();
+
+    assert.ok(
+      !submenu(),
+      'switching system resets the group to the route, and this route is not a gathering one'
+    );
+    assert.equal(gatheringParent().getAttribute('aria-expanded'), 'false');
+  });
+
   describe('route-scoped library search clear', () => {
     function clearCallCount(calls) {
       return calls.filter((call) => call[0] === 'clearLibrarySearches').length;
