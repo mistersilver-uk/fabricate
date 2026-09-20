@@ -471,6 +471,22 @@
       "evidence": "targeted",
       "scope": "manager-only",
       "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
+    },
+    {
+      "path": "src/ui/svelte/components/RowDisclosure.svelte",
+      "library": "<RowDisclosure>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "PROMOTED at issue 1512 on a SECOND independent importer. It had one, `apps/manager/ComplicationSummaryRow.svelte`, which is what kept it in the non-member register; `components/SortableList.svelte` renders it as the sole opener of every ordered row, over five converted manager surfaces, so the two-importer bar is met by a real consumer rather than by a fixture. Its `library.html` entry flips to `shipped` by CORRECTING the specimen in both API and geometry — the third stage unit drew a bare 11x11 chevron and its notes said \"the ROW is the control\", which contradicts both the canonical requirement and this component's own invariant that it renders a real `<button>` and must not be placed inside another one. The shipped control is the 24x24 / radius 6 / `--fab-text-muted` chevron beside the row's content, and shipped props are the specification. ONE non-conformance stands and is recorded in `openspec/specs/ui-integration/spec.md` rather than deleted: this component writes its family in a scoped `<style>` block, prefixed `fab-row-disclosure` rather than at a `fabricate-` root, and it already paints in the PLAYER window through `ComplicationSummaryRow`'s own importers. Re-rooting it is the successor and is deliberately out of this change's scope."
+    },
+    {
+      "path": "src/ui/svelte/components/SortableList.svelte",
+      "library": "<SortableList>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1512 ships the specified `<SortableList>` as the one LIST implementation of `design-system/spec.md`'s requirement \"An ordered row opens in place to its editing body\". FIVE independent importers on landing, which is the widest arrival in this programme: `RecipeStepAccordion`, `environment/CompositionList`, `recipe/RecipeResultGroupCard`, `ComponentEditView`'s progressive salvage stages and `checks/CheckRecipeTiers`. Each of the five hand-rolled the pattern, and the five copies had already drifted into five row geometries, three reorder affordances and two answers to what happens to a collapsed body. The family is rooted at `fabricate-sortable-list` in `styles/fabricate.css` and it portals nothing, so it needs one root; it declares one `mirrored` fixture pair, because `tests/components/manager-layout-tools-fixtures.js` hand-writes the tier row and the fixture census requires the anchor's root to travel with it."
     }
   ],
   "notAPrimitive": [
@@ -509,15 +525,6 @@
         "src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte`. The `<TintPicker>` entry is carried by its sibling `ManagerColorPopover.svelte`, which clears the bar and is a member of the set."
-    },
-    {
-      "path": "src/ui/svelte/components/RowDisclosure.svelte",
-      "library": "<RowDisclosure>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte"
-      ],
-      "why": "ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:1016`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, cited by construct rather than by line because the line cited here had rotted onto an unrelated entry, for a reason the caller count cannot express: omitting it there CANCELS every test in the mounted suite — `# cancelled N`, never `# fail` — rather than hanging it, which is what that guard's own header states in as many words. That is why that list is not derived from this manifest."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",

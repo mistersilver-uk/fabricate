@@ -65,7 +65,7 @@ export const KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL = 7;
 export const KNOWN_HEAVY_MONO_WEIGHTS = knownDebt('heavyMonoWeights');
 
 /** @see KNOWN_HEAVY_MONO_WEIGHTS */
-export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 33;
+export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 31;
 
 /** A `box-shadow` that is neither an elevation token, `none`, nor an inset ring. */
 export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
@@ -127,7 +127,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 276;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 272;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
@@ -156,7 +156,7 @@ export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 9;
 export const KNOWN_EMPTY_NAME_BINDINGS = knownDebt('unguardedEmptyNameBindings');
 
 /** @see KNOWN_EMPTY_NAME_BINDINGS */
-export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
+export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 1;
 
 /**
  * A non-form element with `tabindex="0"` and an interactive role, keyed `file`.
@@ -166,7 +166,7 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 17;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 11;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
