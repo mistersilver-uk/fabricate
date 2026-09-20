@@ -115,7 +115,10 @@ function collectKnowledgeLearnedEntries(actor, items, context) {
 }
 
 function describeKnowledgeActor(actor, context) {
-  const items = [...(actor.items || [])];
+  // `Array.from`, never a spread: an `EmbeddedCollection` is iterable, but a non-iterable stand-in
+  // answers `[]` here and throws under a spread. The identity projection keeps that spelling under
+  // `unicorn/prefer-spread`, which reports only the single-argument call.
+  const items = Array.from(actor.items || [], (item) => item);
   return {
     id: actor.id,
     name: actor.name,

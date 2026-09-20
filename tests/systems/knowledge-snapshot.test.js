@@ -136,6 +136,15 @@ describe('buildKnowledgeSnapshot', () => {
     assert.equal(character.learnedRecipes[0].grantedBy, 7);
   });
 
+  // `Array.from` over `actor.items`, never a spread: an `EmbeddedCollection` is iterable, but a
+  // non-iterable stand-in answers `[]` under `Array.from` and throws under a spread.
+  it('answers an empty copy list for a non-iterable item collection', () => {
+    const actor = flagged({ id: 'pc-2', name: 'Bare', img: '' }, { learnedRecipes: {} });
+    actor.items = { size: 0 };
+    const [character] = snapshotOf({ actors: [actor] }).characters;
+    assert.deepStrictEqual(character.ownedCopies, []);
+  });
+
   it('names the member definition as the second rung of the learned-source ladder', () => {
     const [character] = snapshotOf({
       actors: roster({ learned: { 'recipe-shared': { sourceItemUuid: 'Item.gone' } } }),

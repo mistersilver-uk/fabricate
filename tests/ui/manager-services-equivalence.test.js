@@ -182,6 +182,15 @@ describe('the manager shell services bag', () => {
     );
   });
 
+  it('forwards the enricher options rather than only the raw text', async () => {
+    const world = buildManagerWorld();
+    const journal = await withManager(constructShell, world, async ({ services }) => {
+      await services.enrichToHtml('<p>@UUID[Item.hammer]</p>', { relativeTo: 'Item.hammer' });
+      return [...world.journal];
+    });
+    expectGolden('manager.enrich', journal);
+  });
+
   it('answers the same data for the full world, twice over', async () => {
     const readData = async () => {
       const world = buildManagerWorld();
@@ -296,17 +305,49 @@ describe('the manager shell services bag', () => {
     });
   });
 
+  // Two live subscribers over every channel. A handler constructed once per BAG rather than once
+  // per subscribing call routes both registrations at whichever callback subscribed last, so the
+  // first subscriber silently stops receiving that channel while the delivery count stays right.
+  it('gives each subscriber its own handler on every channel', async () => {
+    const world = buildManagerWorld();
+    const seen = await withManager(constructShell, world, ({ services, fire }) => {
+      const received = [];
+      services.onFabricateDataChanged((channel) => received.push(`a:${channel}`));
+      services.onFabricateDataChanged((channel) => received.push(`b:${channel}`));
+      fire('fabricate.craftingSystemsChanged');
+      fire('fabricate.recipesChanged');
+      fire('fabricate.playerCharacterTypesChanged');
+      return received.sort();
+    });
+    assert.deepStrictEqual(seen, [
+      'a:playerCharacterTypes',
+      'a:recipes',
+      'a:systems',
+      'b:playerCharacterTypes',
+      'b:recipes',
+      'b:systems',
+    ]);
+  });
+
   it('keeps every later subscriber live when an earlier one unsubscribes', async () => {
     const world = buildManagerWorld();
     const seen = await withManager(constructShell, world, ({ services, fire }) => {
       const received = [];
-      const unsubscribeA = services.onFabricateDataChanged((channel) => received.push(`a:${channel}`));
+      const unsubscribeA = services.onFabricateDataChanged((channel) =>
+        received.push(`a:${channel}`)
+      );
       services.onFabricateDataChanged((channel) => received.push(`b:${channel}`));
       unsubscribeA();
+      fire('fabricate.craftingSystemsChanged');
       fire('fabricate.recipesChanged');
+      fire('fabricate.playerCharacterTypesChanged');
       return received;
     });
-    assert.deepStrictEqual(seen, ['b:recipes'], 'the second subscriber stopped receiving');
+    assert.deepStrictEqual(
+      seen,
+      ['b:systems', 'b:recipes', 'b:playerCharacterTypes'],
+      'a subscriber stopped receiving a channel when an unrelated one unsubscribed'
+    );
   });
 
   it('writes the download through the DOM anchor when saveDataToFile is absent', async () => {
@@ -406,9 +447,17 @@ describe('the manager shell services bag', () => {
           'Actor.pc-arden',
           'Actor.pc-brisa',
           'Compendium.fab.actors.Actor.a.Item.b',
+          // Malformed, which `parseUuid` refuses whatever `strict` says — so only a `catch`
+          // covers it, and `{strict: false}` is not a substitute for one.
+          'Actor.',
         ]),
         ['Actor.pc-arden'],
         'an actor uuid that throws must be skipped, not abort the filter'
+      );
+      assert.deepStrictEqual(
+        services.getActorUuidsInSceneRegion('Scene.', ['Actor.pc-arden']),
+        [],
+        'a malformed region uuid answers [] rather than throwing out of the service'
       );
     });
   });
@@ -424,6 +473,18 @@ describe('the manager shell services bag', () => {
       return Object.keys(services).sort();
     });
     assert.deepStrictEqual(keys, [...MANAGER_SERVICE_KEYS]);
+  });
+
+  // A fresh bag per call, not a memoised one. The player shell CREATES six stores in its bag, so
+  // a cached bag there would hand a second window the first one's selection state; the manager
+  // shell answers the same contract so the two shells cannot drift on it.
+  it('answers a distinct bag on every call', async () => {
+    const world = buildManagerWorld();
+    await withManager(constructShell, world, ({ app, services }) => {
+      const second = app._buildServices();
+      assert.ok(second !== services, 'the bag was memoised on the instance');
+      assert.deepStrictEqual(Object.keys(second).sort(), [...MANAGER_SERVICE_KEYS]);
+    });
   });
 
   it('reads the world at call time rather than at build time', async () => {
@@ -491,7 +552,9 @@ async function callDataService(services, key, world) {
     case 'localize':
       return services.localize('FABRICATE.Key', { count: 2 });
     case 'enrichToHtml':
-      return await services.enrichToHtml('<p>@UUID[Item.hammer]</p>', { relativeTo: null });
+      return await services.enrichToHtml('<p>@UUID[Item.hammer]</p>', {
+        relativeTo: 'Item.hammer',
+      });
     case 'isFabricateReady':
       return services.isFabricateReady();
     default:

@@ -112,6 +112,14 @@ const RENAMED = [
       "**Player listing counts are a separate, engine-owned surface.** The player-facing listing is produced by `GatheringEngine.listForActor` — a thin delegator to the engine's injected `GatheringListingBuilder` collaborator, whose `_buildEnvironmentListing` in `src/ui/presenters/GatheringListingBuilder.js` does the construction — not the admin store.",
     identifiers: [['src/ui/presenters/GatheringListingBuilder.js', 'src/systems/GatheringListingBuilder.js']],
   },
+  // Issue #1674 moved the world Item projection out of the manager shell into its services module.
+  {
+    before:
+      '`getWorldItemOptions` in `src/ui/SvelteCraftingSystemManagerApp.svelte.js` is `Array.from(game.items.contents)`, the world Item collection alone, and a `Compendium.` address is never in it.',
+    after:
+      '`getWorldItemOptions` in `src/ui/managerServices.js` is `Array.from(game.items.contents)`, the world Item collection alone, and a `Compendium.` address is never in it.',
+    identifiers: [['src/ui/managerServices.js', 'src/ui/SvelteCraftingSystemManagerApp.svelte.js']],
+  },
   // Issue #1671 moved the cases into one file per surface, so these three sentences name the directory.
   {
     before: 'Cases live in `scripts/lib/viewLabCases.js`.',
@@ -274,7 +282,7 @@ const RENAMED = [
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 25;
+const RENAMED_COUNT = 26;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {

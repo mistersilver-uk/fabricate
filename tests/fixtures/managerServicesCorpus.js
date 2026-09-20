@@ -557,13 +557,18 @@ export function buildManagerWorld(options = {}) {
   actorDocuments[0].getActiveTokens = () => [tokenFor(scenes.stage, { x: 100, y: 100 })];
   actorDocuments[1].getActiveTokens = () => [tokenFor(scenes.stage, { x: 900, y: 900 })];
 
-  const resolveUuid = (uuid) => {
-    // `fromUuidSync` defaults to `strict: true` and throws for an embedded document inside a
-    // compendium, which is a reachable party-member shape.
-    if (String(uuid).startsWith('Compendium.') && String(uuid).split('.').length > 4) {
+  // `fromUuidSync` throws two different ways. `strict: true` (the default) throws for an embedded
+  // document inside a compendium, which a compendium-sourced party member reaches, and
+  // `strict: false` answers null there instead. `parseUuid` throws for a MALFORMED uuid whatever
+  // `strict` says, which is why only a `try`/`catch` covers both.
+  const resolveUuid = (uuid, { strict = true } = {}) => {
+    const text = String(uuid);
+    if (text === '' || text.endsWith('.')) throw new Error(`Invalid UUID: ${text}`);
+    if (text.startsWith('Compendium.') && text.split('.').length > 4) {
+      if (!strict) return null;
       throw new Error('You are attempting to resolve an embedded document synchronously');
     }
-    return uuidTargets.get(String(uuid)) ?? null;
+    return uuidTargets.get(text) ?? null;
   };
 
   const dialogV2 = class RecordingDialogV2 {
@@ -611,7 +616,16 @@ export function buildManagerWorld(options = {}) {
         TextEditor: {
           implementation: {
             enrichHTML: async (text, options) => {
-              record('enrichHTML', text, options.secrets, options.rolls, options.embeds);
+              // `relativeTo` is recorded because it is the only argument the forward can silently
+              // drop: `enrichToHtml` defaults it to null, so a one-argument call still answers.
+              record(
+                'enrichHTML',
+                text,
+                options.secrets,
+                options.rolls,
+                options.embeds,
+                options.relativeTo
+              );
               return `<enriched>${text}</enriched>`;
             },
           },
@@ -664,7 +678,7 @@ export function installWorld(world) {
   });
   set('canvas', { scene: world.scenes.stage });
   set('fromUuid', async (uuid) => world.resolveUuid(uuid));
-  set('fromUuidSync', (uuid) => world.resolveUuid(uuid));
+  set('fromUuidSync', (uuid, options) => world.resolveUuid(uuid, options));
   set('document', anchorDom(world.record));
   set('Blob', class RecordingBlob {
     constructor(parts, options) {

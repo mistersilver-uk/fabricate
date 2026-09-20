@@ -50,6 +50,16 @@
     "subscribeSceneChange": "function",
     "subscribeTravelMarkerMove": "function"
   },
+  "manager.enrich": [
+    [
+      "enrichHTML",
+      "<p>@UUID[Item.hammer]</p>",
+      false,
+      false,
+      false,
+      "Item.hammer"
+    ]
+  ],
   "manager.data": {
     "enrichToHtml": "<enriched><p>@UUID[Item.hammer]</p></enriched>",
     "getAccessCharacterActors": [
