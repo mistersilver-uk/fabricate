@@ -57,7 +57,7 @@ A hotfix cut from a hotfix line is the one exception to the ordering: it does no
 That carve-out is safe only because the promotion verifies, per target, that every private channel already advertises a version Foundry considers newer than the hotfix; if one does not, the promotion fails before the registry publication.
 A hotfix cut from the release line — possible only when that line already equals the public version — traverses `early-access` like any other stable version.
 A run of the release automation that mints no new version MUST publish nothing: no channel head moves and no artefact is written, because the only version such a run could publish is one already published by the run that minted it.
-A channel MUST advertise only a version minted for the line that channel serves, so cutting a hotfix line MUST NOT itself publish anything.
+A version reaches a channel only by being minted for that channel's line or by an explicit promotion into it, so cutting a hotfix line MUST NOT itself publish the version it was cut from.
 
 #### Scenario: promoting a tested commit into the release line
 
@@ -73,7 +73,8 @@ A channel MUST advertise only a version minted for the line that channel serves,
 #### Scenario: cutting a hotfix line from a published version
 
 - **WHEN** a hotfix line is cut from a published version's tag and no fix has yet been committed to it
-- **THEN** nothing is published, that line's channel has no head, and no channel advertises a version minted on another line
+- **THEN** nothing is published, and that line's channel has no head until a fix is minted on it
+- **AND** the published version the line was cut from is not re-published to that line's channel
 
 #### Scenario: a push that mints no version
 
@@ -165,6 +166,10 @@ Rotating a group's segment MUST rotate it for every repository publishing into t
 A tester group's identity is deployment configuration: its name and the environment-variable name its segment is derived from.
 A publish MUST resolve that identity from the configuration current at publish time, never from the configuration recorded in the source of the version being published.
 Otherwise a rotation can never take effect for an already-minted version, the new prefix can never be populated, and the cohort stays split across two prefixes.
+A publish that cannot apply the configuration current at publish time MUST refuse and name that as the reason, rather than fall back to the configuration recorded in the version's source.
+A verification that evaluates a tester group's identity from configuration other than the configuration the channel is published under MUST report a difference between the two as configuration drift, naming both declarations.
+A publisher-side declaration it cannot read MUST be treated as a difference rather than as agreement, because a verification that cannot see what the channel was published under has established nothing.
+Drift is a diagnosis and MUST NOT be an independent refusal, but it MUST be named in a refusal it explains, because an absent head under a newly declared identity is a configuration fault rather than a cohort risk.
 
 #### Scenario: rotating a tester group shared by two repositories
 
@@ -176,7 +181,13 @@ Otherwise a rotation can never take effect for an already-minted version, the ne
 
 - **WHEN** an already-minted version is republished after its tester group's identity has changed
 - **THEN** it is published under the group identity the publish is configured with now, not the one recorded in that version's source
-- **AND** the cohort holds one prefix
+- **AND** the prefix that identity resolves to carries that version, rather than returning 404 while the superseded prefix serves its last pre-rotation manifest
+
+#### Scenario: a promotion evaluated under a tester identity the channel was not published under
+
+- **WHEN** a promotion evaluates a tester group identity that differs from the identity the channel is published under, or cannot read the identity it is published under
+- **THEN** the difference is reported as configuration drift naming both declarations, and the promotion is not refused for the drift alone
+- **AND** a refusal that the channel has no published head carries the drift remedy as well as the publish-that-head remedy
 
 ### Requirement: Monotonic channel heads
 
