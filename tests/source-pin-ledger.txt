@@ -50,7 +50,7 @@ tests/components/gathering-environments-source.test.js	133
 tests/components/gathering-event-editor.test.js	79
 tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
-tests/components/gathering-realm-toggle.test.js	37
+tests/components/gathering-realm-toggle.test.js	36
 tests/components/gathering-task-browser-redesign.test.js	24
 tests/components/gathering-task-editor-economy.test.js	44
 tests/components/gathering-task-editor-summary.test.js	44
@@ -163,7 +163,7 @@ tests/manager-button-source-contract.test.js	4
 tests/manager-color-tokens.test.js	2
 tests/manager-extensions.test.js	10
 tests/manager-full-width-gate.test.js	5
-tests/manager-scoped-prop-contract.test.js	7
+tests/manager-scoped-prop-contract.test.js	8
 tests/migrate-retire-crafting-mod-token.test.js	8
 tests/migration-runner-corpus-writeback.test.js	4
 tests/mutation-time-valid-id-basis.test.js	2

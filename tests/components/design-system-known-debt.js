@@ -87,7 +87,7 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
  * @see KNOWN_NATIVE_SELECT_ELEMENTS
  */
 // #1707: the root's 16 became 12 and `GatheringModifierEditor.svelte` took 2 (71 - 2). The other
-// two were DE-DUPLICATED by writing that panel once, not converted.
+// two were de-duplicated by writing that panel once, not converted.
 // #1707 phase 2: the root's 12 became 2 and `GatheringRulesInspector.svelte` took 10, so the
 // total is unchanged and only the file count moves, 25 rows to 26. The two the root keeps are its
 // nav scope and the systems-list condition; neither is in an inspector branch.
@@ -211,7 +211,7 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  */
 // #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
 // #1707: the root's 70 became 60 and `GatheringModifierEditor.svelte` took 5 (225 - 5). The other
-// five were DE-DUPLICATED by writing that panel once, not converted.
+// five were de-duplicated by writing that panel once, not converted.
 // Issue 1512: five rows leave whole (220 - 14). The two recipe rows and `RowDisclosure` are paid
 // by the shared list rendering their reorder controls; the other two declare the attribute in place.
 export const KNOWN_FORMLESS_BUTTON_TOTAL = 206;

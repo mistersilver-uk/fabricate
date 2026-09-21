@@ -315,6 +315,29 @@ test('every sourceMatches pattern resolves to at least one source file', () => {
   );
 });
 
+/** The four gathering/travel leaves the rail renders, moved out of the root by issue 1707. */
+const GATHERING_INSPECTOR_LEAF_PATHS = Object.freeze([
+  'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+  'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
+  'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte',
+  'src/ui/svelte/apps/manager/world/TravelInspector.svelte',
+]);
+
+const GATHERING_INSPECTOR_RAIL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
+
+test('every case claiming a gathering/travel leaf also claims the rail that renders it', () => {
+  // A case that claims a leaf but not the rail asks for no photograph when the rail's own branch
+  // chain breaks — the defect phase 3's post-implementation review found (issue 1707 phase 3).
+  const drifted = VIEW_LAB_CASES.filter(
+    (viewCase) =>
+      GATHERING_INSPECTOR_LEAF_PATHS.some((leaf) =>
+        viewCase.sourceMatches.some((pattern) => pattern.test(leaf))
+      ) && !viewCase.sourceMatches.some((pattern) => pattern.test(GATHERING_INSPECTOR_RAIL_PATH))
+  ).map((viewCase) => viewCase.id);
+  assert.deepEqual(drifted, [], 'these cases claim a leaf without also claiming its rail');
+});
+
 /** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
 const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
