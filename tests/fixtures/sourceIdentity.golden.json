@@ -1,0 +1,2487 @@
+{
+  "snapshots/clean-world-source": {
+    "first": {
+      "result": {
+        "component": {
+          "name": "Embercap Mushroom",
+          "img": "icons/svg/mushroom.svg",
+          "description": "A faintly glowing cap.",
+          "registeredItemUuid": "Item.embercap-src",
+          "originItemUuid": "Item.embercap-src",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.embercap-src"
+          ]
+        },
+        "recipeItem": {
+          "name": "Embercap Mushroom",
+          "img": "icons/svg/mushroom.svg",
+          "description": "A faintly glowing cap.",
+          "registeredItemUuid": "Item.embercap-src",
+          "originItemUuid": "Item.embercap-src",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": "Embercap Mushroom",
+          "img": "icons/svg/mushroom.svg",
+          "description": "A faintly glowing cap.",
+          "registeredItemUuid": "Item.embercap-src",
+          "originItemUuid": "Item.embercap-src",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.embercap-src": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "A faintly glowing cap.",
+            {
+              "relativeTo": {
+                "document": "Item.embercap-src"
+              }
+            }
+          ],
+          [
+            "A faintly glowing cap.",
+            {
+              "relativeTo": {
+                "document": "Item.embercap-src"
+              }
+            }
+          ],
+          [
+            "A faintly glowing cap.",
+            {
+              "relativeTo": {
+                "document": "Item.embercap-src"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.embercap-src",
+            {
+              "document": "Item.embercap-src"
+            }
+          ],
+          [
+            "Item.embercap-src",
+            {
+              "document": "Item.embercap-src"
+            }
+          ],
+          [
+            "Item.embercap-src",
+            {
+              "document": "Item.embercap-src"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "component": {
+          "name": "Embercap Mushroom",
+          "img": "icons/svg/mushroom.svg",
+          "description": "A faintly glowing cap.",
+          "registeredItemUuid": "Item.embercap-src",
+          "originItemUuid": "Item.embercap-src",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.embercap-src"
+          ]
+        },
+        "recipeItem": {
+          "name": "Embercap Mushroom",
+          "img": "icons/svg/mushroom.svg",
+          "description": "A faintly glowing cap.",
+          "registeredItemUuid": "Item.embercap-src",
+          "originItemUuid": "Item.embercap-src",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": "Embercap Mushroom",
+          "img": "icons/svg/mushroom.svg",
+          "description": "A faintly glowing cap.",
+          "registeredItemUuid": "Item.embercap-src",
+          "originItemUuid": "Item.embercap-src",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.embercap-src": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "A faintly glowing cap.",
+            {
+              "relativeTo": {
+                "document": "Item.embercap-src"
+              }
+            }
+          ],
+          [
+            "A faintly glowing cap.",
+            {
+              "relativeTo": {
+                "document": "Item.embercap-src"
+              }
+            }
+          ],
+          [
+            "A faintly glowing cap.",
+            {
+              "relativeTo": {
+                "document": "Item.embercap-src"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.embercap-src",
+            {
+              "document": "Item.embercap-src"
+            }
+          ],
+          [
+            "Item.embercap-src",
+            {
+              "document": "Item.embercap-src"
+            }
+          ],
+          [
+            "Item.embercap-src",
+            {
+              "document": "Item.embercap-src"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "snapshots/clone-carrying-duplicate-source": {
+    "first": {
+      "result": {
+        "component": {
+          "name": "Embercap Mushroom (Copy)",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.embercap-copy",
+          "originItemUuid": "Item.embercap-copy",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.embercap-copy"
+          ]
+        },
+        "recipeItem": {
+          "name": "Embercap Mushroom (Copy)",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.embercap-copy",
+          "originItemUuid": "Item.embercap-copy",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": "Embercap Mushroom (Copy)",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.embercap-copy",
+          "originItemUuid": "Item.embercap-copy",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.embercap-copy": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.embercap-copy",
+            {
+              "document": "Item.embercap-copy"
+            }
+          ],
+          [
+            "Item.embercap-copy",
+            {
+              "document": "Item.embercap-copy"
+            }
+          ],
+          [
+            "Item.embercap-copy",
+            {
+              "document": "Item.embercap-copy"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "component": {
+          "name": "Embercap Mushroom (Copy)",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.embercap-copy",
+          "originItemUuid": "Item.embercap-copy",
+          "aliasItemUuids": [],
+          "sourceFallbacks": [],
+          "references": [
+            "Item.embercap-copy"
+          ]
+        },
+        "recipeItem": {
+          "name": "Embercap Mushroom (Copy)",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.embercap-copy",
+          "originItemUuid": "Item.embercap-copy",
+          "aliasItemUuids": []
+        },
+        "tool": {
+          "name": "Embercap Mushroom (Copy)",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.embercap-copy",
+          "originItemUuid": "Item.embercap-copy",
+          "aliasItemUuids": []
+        }
+      },
+      "journals": {
+        "Item.embercap-copy": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.embercap-copy",
+            {
+              "document": "Item.embercap-copy"
+            }
+          ],
+          [
+            "Item.embercap-copy",
+            {
+              "document": "Item.embercap-copy"
+            }
+          ],
+          [
+            "Item.embercap-copy",
+            {
+              "document": "Item.embercap-copy"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "snapshots/broken-compendium-source": {
+    "first": {
+      "result": {
+        "component": {
+          "name": "Sunken Relic",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.relic-src",
+          "originItemUuid": "Item.relic-src",
+          "aliasItemUuids": [
+            "Compendium.gone.kit.Item.relic"
+          ],
+          "sourceFallbacks": [
+            {
+              "itemName": "Sunken Relic",
+              "brokenUuid": "Compendium.gone.kit.Item.relic",
+              "fallbackUuid": "Item.relic-src"
+            }
+          ],
+          "references": [
+            "Item.relic-src",
+            "Compendium.gone.kit.Item.relic"
+          ]
+        },
+        "recipeItem": {
+          "name": "Sunken Relic",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.relic-src",
+          "originItemUuid": "Item.relic-src",
+          "aliasItemUuids": [
+            "Compendium.gone.kit.Item.relic"
+          ]
+        },
+        "tool": {
+          "name": "Sunken Relic",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.relic-src",
+          "originItemUuid": "Item.relic-src",
+          "aliasItemUuids": [
+            "Compendium.gone.kit.Item.relic"
+          ]
+        }
+      },
+      "journals": {
+        "Item.relic-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.relic-src",
+            {
+              "document": "Item.relic-src"
+            }
+          ],
+          [
+            "Item.relic-src",
+            {
+              "document": "Item.relic-src"
+            }
+          ],
+          [
+            "Item.relic-src",
+            {
+              "document": "Item.relic-src"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "component": {
+          "name": "Sunken Relic",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.relic-src",
+          "originItemUuid": "Item.relic-src",
+          "aliasItemUuids": [
+            "Compendium.gone.kit.Item.relic"
+          ],
+          "sourceFallbacks": [
+            {
+              "itemName": "Sunken Relic",
+              "brokenUuid": "Compendium.gone.kit.Item.relic",
+              "fallbackUuid": "Item.relic-src"
+            }
+          ],
+          "references": [
+            "Item.relic-src",
+            "Compendium.gone.kit.Item.relic"
+          ]
+        },
+        "recipeItem": {
+          "name": "Sunken Relic",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.relic-src",
+          "originItemUuid": "Item.relic-src",
+          "aliasItemUuids": [
+            "Compendium.gone.kit.Item.relic"
+          ]
+        },
+        "tool": {
+          "name": "Sunken Relic",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "registeredItemUuid": "Item.relic-src",
+          "originItemUuid": "Item.relic-src",
+          "aliasItemUuids": [
+            "Compendium.gone.kit.Item.relic"
+          ]
+        }
+      },
+      "journals": {
+        "Item.relic-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": [
+          [
+            "Item.relic-src",
+            {
+              "document": "Item.relic-src"
+            }
+          ],
+          [
+            "Item.relic-src",
+            {
+              "document": "Item.relic-src"
+            }
+          ],
+          [
+            "Item.relic-src",
+            {
+              "document": "Item.relic-src"
+            }
+          ]
+        ]
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "descriptions/label-less-uuid-link": {
+    "first": {
+      "result": "Component Pouch",
+      "journals": {
+        "Item.supplies": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "@UUID[Compendium.dnd5e.items.Item.pouch]",
+            {
+              "relativeTo": {
+                "document": "Item.supplies"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": "Component Pouch",
+      "journals": {
+        "Item.supplies": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "@UUID[Compendium.dnd5e.items.Item.pouch]",
+            {
+              "relativeTo": {
+                "document": "Item.supplies"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "descriptions/object-description-fields": {
+    "first": {
+      "result": "Nested & enriched",
+      "journals": {
+        "Item.nested": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "<p>Nested &amp; enriched</p>",
+            {
+              "relativeTo": {
+                "document": "Item.nested"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": "Nested & enriched",
+      "journals": {
+        "Item.nested": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "<p>Nested &amp; enriched</p>",
+            {
+              "relativeTo": {
+                "document": "Item.nested"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "descriptions/no-description-at-all": {
+    "first": {
+      "result": "",
+      "journals": {
+        "Item.bare": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": "",
+      "journals": {
+        "Item.bare": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "stamp/unlocked-pack-source-directly": {
+    "first": {
+      "result": "<undefined>",
+      "journals": {
+        "Compendium.world.kit.Item.ore": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": "<undefined>",
+      "journals": {
+        "Compendium.world.kit.Item.ore": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/unlocked-pack-source": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 1,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 1,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 1,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Compendium.world.kit.Item.ore": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.recipeItemDefinitionId",
+            "value": "sys1-recipe-item"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.componentId",
+            "value": "sys1-comp"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.toolId",
+            "value": "sys1-tool"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Compendium.world.kit.Item.ore": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/locked-pack-source": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 1,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 1,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 1,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Compendium.world.kit.Item.ore": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 1,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 1,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 1,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Compendium.world.kit.Item.ore": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/source-without-setflag": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/unresolvable-source-uuid": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        }
+      },
+      "journals": {},
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 1
+        }
+      },
+      "journals": {},
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/source-registered-in-two-systems": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 2,
+          "stamped": 2,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 2,
+          "stamped": 2,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 2,
+          "stamped": 2,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.recipeItemDefinitionId",
+            "value": "sys1-recipe-item"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys2.recipeItemDefinitionId",
+            "value": "sys2-recipe-item"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.componentId",
+            "value": "sys1-comp"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys2.componentId",
+            "value": "sys2-comp"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.toolId",
+            "value": "sys1-tool"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys2.toolId",
+            "value": "sys2-tool"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 2,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 2,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 2,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/dotted-system-id": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/registered-uuid-only": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 1,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 1,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.componentId",
+            "value": "sys1-comp"
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.toolId",
+            "value": "sys1-tool"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 0,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "autostamp/source-already-stamped": {
+    "first": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "recipeItems": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "components": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        },
+        "tools": {
+          "scanned": 1,
+          "stamped": 0,
+          "stripped": 0,
+          "skippedLocked": 0,
+          "skippedMissing": 0
+        }
+      },
+      "journals": {
+        "Item.ore-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/self-corrupting-clone-source": {
+    "first": {
+      "result": {
+        "scanned": 2,
+        "skippedLocked": 0,
+        "stamped": 1,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 1,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.embercap-src": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.componentId",
+            "value": "comp-embercap"
+          }
+        ],
+        "Item.embercap-copy": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 2,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.embercap-src": [],
+        "Item.embercap-copy": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/world-item-flagged-for-a-vanished-definition": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 1,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 1
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.stale": [
+          {
+            "op": "unsetFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.componentId"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.stale": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/owned-copy-whose-name-is-ambiguous": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 1,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 2,
+          "skippedUnresolved": 2,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.tome": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 1,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 2,
+          "skippedUnresolved": 2,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.tome": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/owned-copy-flagged-for-an-unresolvable-definition": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.mystery": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.mystery": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/owned-copy-repointed-by-name": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 1,
+        "stripped": 1,
+        "cleared": 0,
+        "repointed": 1,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 1,
+          "stripped": 1,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 2,
+          "skippedUnresolved": 2,
+          "skippedEmpty": 0
+        },
+        "repointLog": [
+          {
+            "itemUuid": "Actor.hero.Item.scroll",
+            "oldDuplicateSourceTarget": "Item.scroll-sparks",
+            "newlyStampedDefinitionId": "ri-embers"
+          }
+        ]
+      },
+      "journals": {
+        "Actor.hero.Item.scroll": [
+          {
+            "op": "update",
+            "patch": {
+              "_stats.duplicateSource": null
+            }
+          },
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.recipeItemDefinitionId",
+            "value": "ri-embers"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 2,
+          "skippedUnresolved": 2,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.scroll": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/owned-copy-without-a-duplicate-source": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 1,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 1,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.primer": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.recipeItemDefinitionId",
+            "value": "ri-primer"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.primer": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/owned-copy-carrying-only-the-legacy-scalar": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 1,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 1,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.ledger": [
+          {
+            "op": "setFlag",
+            "scope": "fabricate",
+            "key": "fabricate.roles.sys1.recipeItemDefinitionId",
+            "value": "ri-legacy"
+          }
+        ]
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.ledger": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/tool-without-source-refs-matching-an-owned-name": {
+    "first": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 0,
+          "skippedUnresolved": 0,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.hammer": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 1,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 0,
+          "skippedUnresolved": 0,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Actor.hero.Item.hammer": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/definition-sourced-from-a-locked-pack": {
+    "first": {
+      "result": {
+        "scanned": 0,
+        "skippedLocked": 1,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 1,
+          "unchanged": 0,
+          "skipped": 0,
+          "skippedUnresolved": 0,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Compendium.dnd5e.equipment24.Item.supplies": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "@UUID[Compendium.dnd5e.equipment24.Item.pouch]",
+            {
+              "relativeTo": {
+                "document": "Compendium.dnd5e.equipment24.Item.supplies"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [
+          [
+            [
+              "@UUID[Compendium.dnd5e.equipment24.Item.pouch]"
+            ]
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 1,
+        "notify": 1
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 0,
+        "skippedLocked": 1,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 1,
+          "skipped": 0,
+          "skippedUnresolved": 0,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Compendium.dnd5e.equipment24.Item.supplies": []
+      },
+      "calls": {
+        "enrichToHtml": [
+          [
+            "@UUID[Compendium.dnd5e.equipment24.Item.pouch]",
+            {
+              "relativeTo": {
+                "document": "Compendium.dnd5e.equipment24.Item.supplies"
+              }
+            }
+          ]
+        ],
+        "primeEnricherCache": [
+          [
+            [
+              "@UUID[Compendium.dnd5e.equipment24.Item.pouch]"
+            ]
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/definition-whose-source-carries-no-description": {
+    "first": {
+      "result": {
+        "scanned": 0,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 0,
+          "skippedEmpty": 1
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.blank-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 0,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 0,
+          "skippedEmpty": 1
+        },
+        "repointLog": []
+      },
+      "journals": {
+        "Item.blank-src": []
+      },
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  },
+  "repair/definition-whose-source-is-gone": {
+    "first": {
+      "result": {
+        "scanned": 0,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {},
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    },
+    "second": {
+      "result": {
+        "scanned": 0,
+        "skippedLocked": 0,
+        "stamped": 0,
+        "stripped": 0,
+        "cleared": 0,
+        "repointed": 0,
+        "skippedAmbiguous": 0,
+        "components": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "tools": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "recipeItems": {
+          "stamped": 0,
+          "stripped": 0,
+          "cleared": 0
+        },
+        "descriptions": {
+          "refreshed": 0,
+          "unchanged": 0,
+          "skipped": 1,
+          "skippedUnresolved": 1,
+          "skippedEmpty": 0
+        },
+        "repointLog": []
+      },
+      "journals": {},
+      "calls": {
+        "enrichToHtml": [],
+        "primeEnricherCache": [
+          [
+            []
+          ]
+        ],
+        "resolveImportedComponentSourceData": []
+      },
+      "persistence": {
+        "save": 0,
+        "notify": 0
+      }
+    }
+  }
+}
