@@ -8879,9 +8879,14 @@
   font-weight: 600;
 }
 
-.fabricate-manager .manager-salvage-routing-row .manager-input {
+/* `proto:1419`'s 14rem target column, on the shared `<Select>`'s root since issue 1510: the slot is stated on the picker and the trigger fills it. Left hugging, every routing row would be a different width and re-flow as the GM routed an outcome. */
+.fabricate-manager .manager-salvage-route-select {
   flex: 0 1 14rem;
   min-width: 0;
+}
+
+.fabricate-manager .manager-salvage-route-select .fabricate-select-trigger {
+  width: 100%;
 }
 
 /* The set-level "OR", the within-requirement "OR", and the between-requirement "AND" dividers share one label-flanked-by-rules treatment; only the label differs. */
@@ -20229,17 +20234,10 @@
   color: var(--fab-purple);
 }
 
-/* `proto:1324`: ONE full-width select, 38px, radius 9, behind a `border-strong` hairline. */
-.fabricate-manager .manager-component-category-select {
+/* `proto:1324`: one full-width control, 38px, radius 9, behind a `border-strong` hairline. It is the shared `<Select>` since issue 1510, so the class rides the picker root and the `form` rung paints the 38px box, the corner, the `surface-soft` fill and the type; what is left here is the width a trigger deliberately never declares — its box belongs to the row it sits in — and the strong hairline the rung does not give. Left hugging, the one control under this card head would resize every time the GM chose a longer category name. */
+.fabricate-manager .manager-component-category-select .fabricate-select-trigger {
   width: 100%;
-  height: 38px;
-  min-height: 38px;
   border-color: var(--fab-border-strong);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  color: var(--fab-text);
-  font-weight: 500;
-  font-size: 12px;
 }
 
 /* `proto:1327`: the note sits DIRECTLY under the select, glyph-led, at 10px/1.45 weight 500, in the ink of the state it names. */
@@ -20298,6 +20296,141 @@
   }
 }
 
+/* `components/SortableList.svelte`'s family (issue 1512), in the global sheet because a Svelte-scoped rule is injected unlayered against this sheet's `layer(modules)` import and out-ranks it at any specificity. The geometry is the `<SortableList>` specimen's. */
+.fabricate-sortable-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. skin census (issue 1523): an unpinned carrier of the border/radius/fill tuple — nothing reads this selector by name, so it adopts `.fab-field-skin` once that class ships and its blocker walk is done. */
+.fabricate-sortable-list-row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  overflow: hidden;
+}
+
+.fabricate-sortable-list-row.is-expanded {
+  border-color: var(--fab-accent-border);
+}
+
+/* The travelling row, so a GM can see which one is in the air. */
+.fabricate-sortable-list-row.is-dragging {
+  border-style: dashed;
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+/* Never wraps: a long record name would push the trailing cluster onto a second line and double the row's height, so the content line is what flexes instead. */
+.fabricate-sortable-list-line {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-3);
+}
+
+.fabricate-sortable-list-content {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* The ordinal badge, after the grip: what makes order legible once the list scrolls, which a bare mono pip beside a handle never was. */
+.fabricate-sortable-list-ordinal {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--fab-text-secondary);
+  background: var(--fab-surface-raised);
+  font-family: var(--fab-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-sortable-list-row.is-expanded .fabricate-sortable-list-ordinal {
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+}
+
+/* The grip takes `IconButton`'s `is-size-24` box; only its cursor and colour are this family's. Compounded on the composed root because `.fabricate-icon-button.manager-icon-button` is (0,2,0) and a bare family class would lose to it — `fabricate-icon-button` is a namespace root of the primitive this one composes, never an application root. */
+.fabricate-icon-button.fabricate-sortable-list-grip {
+  border-color: transparent;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  cursor: grab;
+}
+
+.fabricate-sortable-list-grip i {
+  font-size: 14px;
+}
+
+.fabricate-sortable-list-row.is-dragging .fabricate-icon-button.fabricate-sortable-list-grip {
+  color: var(--fab-accent);
+  cursor: grabbing;
+}
+
+/* The rocker: two 24x24 hit areas stacked in the trailing cluster, each meeting the target minimum on its own. At the ends the unavailable chevron dims rather than hiding, because the range is only legible while both are drawn. */
+.fabricate-sortable-list-rocker {
+  display: grid;
+  flex: 0 0 auto;
+  gap: var(--fab-space-2xs);
+}
+
+/* Bare, like the grip beside it: the rocker is a pair of chevrons in the trailing cluster, not two
+   filled chips. Compounded on the composed root for the same reason the grip's rule is. */
+.fabricate-icon-button.fabricate-sortable-list-move {
+  border-color: transparent;
+  color: var(--fab-text-subtle);
+  background: transparent;
+}
+
+.fabricate-sortable-list-move i {
+  font-size: 9px;
+}
+
+.fabricate-sortable-list-remove {
+  flex: 0 0 auto;
+}
+
+/* A collapsed body stays in the DOM (maintainer ruling, 2026-09-09) and is hidden here; `display: none` is declared explicitly because Foundry's own reset sets `display` on generic elements and the UA `[hidden]` rule loses to it. */
+.fabricate-sortable-list-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 var(--fab-space-3) var(--fab-space-3);
+}
+
+.fabricate-sortable-list-body[hidden] {
+  display: none;
+}
+
+/* A stage whose component authors no crafting complication renders nothing into the band, so its
+   body box is dropped rather than drawing 12px of dead height on every row of an always-open list
+   (issue 1512). Keyed on the callers' own family classes: a bare `:not(.has-band)` would hide the
+   editing body of every other caller, which is a body the caller always fills. */
+.fabricate-sortable-list-row.manager-recipe-stage-row:not(.has-band) .fabricate-sortable-list-body,
+.fabricate-sortable-list-row.manager-salvage-stage-row:not(.has-band)
+  .fabricate-sortable-list-body {
+  display: none;
+}
+
 /* ── D6. THE SALVAGE BODIES ──────────────────────────────────────────────────────────────── */
 
 /* `proto:1404`: one `--fab-bg-1` card per result group behind a hairline at radius 9. It was a `manager-recipe-ingredient-set-item`, which is the RECIPE studio's own set card. */
@@ -20333,7 +20466,7 @@
   background: var(--fab-bg-1);
 }
 
-/* `proto:1429`: `Salvage check DC` is a title over a note, with the preset select at the trailing edge — 32px snapped to the 34 rung, radius 9, `surface-soft` behind a `border-strong` hairline. */
+/* `proto:1429`: `Salvage check DC` is a title over a note, radius 9, `surface-soft` behind a `border-strong` hairline. Its 34px snapped the reference's 32, and it now uses the shared control's `toolbar` rung (issue 1510), which matches without an override. */
 .fabricate-manager .manager-salvage-dc-card {
   display: flex;
   flex-wrap: wrap;
@@ -20362,18 +20495,17 @@
   line-height: 1.45;
 }
 
-.fabricate-manager .manager-salvage-dc-card .manager-input {
+/* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, `0.72rem`, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
+.fabricate-manager .manager-salvage-dc-select {
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
-  height: 34px;
-  min-height: 34px;
   margin-left: auto;
+}
+
+.fabricate-manager .manager-salvage-dc-select .fabricate-select-trigger {
   border-color: var(--fab-border-strong);
-  border-radius: 9px;
   background: var(--fab-surface-soft);
-  font-weight: 500;
-  font-size: 0.72rem;
 }
 
 /* ══ THE WORLD COMPONENT ENTRY, SECOND PARITY PASS (issue 1371, r5a) ══ The second parity pass over Part A, measured with `scripts/visual-parity` against `artifacts/proto-markup.txt` rather than read off the frames. */
@@ -20625,139 +20757,4 @@
   .fabricate-manager .manager-component-entry-essences .manager-component-essence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-/* `components/SortableList.svelte`'s family (issue 1512), in the global sheet because a Svelte-scoped rule is injected unlayered against this sheet's `layer(modules)` import and out-ranks it at any specificity. The geometry is the `<SortableList>` specimen's. */
-.fabricate-sortable-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* The row is a column and its line carries the padding, so a body drawing an edge-to-edge strip meets the row's own border; `overflow: hidden` stops the strip squaring off outside the radius. skin census (issue 1523): an unpinned carrier of the border/radius/fill tuple — nothing reads this selector by name, so it adopts `.fab-field-skin` once that class ships and its blocker walk is done. */
-.fabricate-sortable-list-row {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  background: var(--fab-bg-1);
-  overflow: hidden;
-}
-
-.fabricate-sortable-list-row.is-expanded {
-  border-color: var(--fab-accent-border);
-}
-
-/* The travelling row, so a GM can see which one is in the air. */
-.fabricate-sortable-list-row.is-dragging {
-  border-style: dashed;
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-}
-
-/* Never wraps: a long record name would push the trailing cluster onto a second line and double the row's height, so the content line is what flexes instead. */
-.fabricate-sortable-list-line {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--fab-space-3);
-  min-width: 0;
-  padding: var(--fab-space-3);
-}
-
-.fabricate-sortable-list-content {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: var(--fab-space-3);
-  min-width: 0;
-}
-
-/* The ordinal badge, after the grip: what makes order legible once the list scrolls, which a bare mono pip beside a handle never was. */
-.fabricate-sortable-list-ordinal {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  box-sizing: border-box;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  color: var(--fab-text-secondary);
-  background: var(--fab-surface-raised);
-  font-family: var(--fab-font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-.fabricate-sortable-list-row.is-expanded .fabricate-sortable-list-ordinal {
-  color: var(--fab-on-accent);
-  background: var(--fab-accent);
-}
-
-/* The grip takes `IconButton`'s `is-size-24` box; only its cursor and colour are this family's. Compounded on the composed root because `.fabricate-icon-button.manager-icon-button` is (0,2,0) and a bare family class would lose to it — `fabricate-icon-button` is a namespace root of the primitive this one composes, never an application root. */
-.fabricate-icon-button.fabricate-sortable-list-grip {
-  border-color: transparent;
-  color: var(--fab-text-subtle);
-  background: transparent;
-  cursor: grab;
-}
-
-.fabricate-sortable-list-grip i {
-  font-size: 14px;
-}
-
-.fabricate-sortable-list-row.is-dragging .fabricate-icon-button.fabricate-sortable-list-grip {
-  color: var(--fab-accent);
-  cursor: grabbing;
-}
-
-/* The rocker: two 24x24 hit areas stacked in the trailing cluster, each meeting the target minimum on its own. At the ends the unavailable chevron dims rather than hiding, because the range is only legible while both are drawn. */
-.fabricate-sortable-list-rocker {
-  display: grid;
-  flex: 0 0 auto;
-  gap: var(--fab-space-2xs);
-}
-
-/* Bare, like the grip beside it: the rocker is a pair of chevrons in the trailing cluster, not two
-   filled chips. Compounded on the composed root for the same reason the grip's rule is. */
-.fabricate-icon-button.fabricate-sortable-list-move {
-  border-color: transparent;
-  color: var(--fab-text-subtle);
-  background: transparent;
-}
-
-.fabricate-sortable-list-move i {
-  font-size: 9px;
-}
-
-.fabricate-sortable-list-remove {
-  flex: 0 0 auto;
-}
-
-/* A collapsed body stays in the DOM (maintainer ruling, 2026-09-09) and is hidden here; `display: none` is declared explicitly because Foundry's own reset sets `display` on generic elements and the UA `[hidden]` rule loses to it. */
-.fabricate-sortable-list-body {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 0 var(--fab-space-3) var(--fab-space-3);
-}
-
-.fabricate-sortable-list-body[hidden] {
-  display: none;
-}
-
-/* A stage whose component authors no crafting complication renders nothing into the band, so its
-   body box is dropped rather than drawing 12px of dead height on every row of an always-open list
-   (issue 1512). Keyed on the callers' own family classes: a bare `:not(.has-band)` would hide the
-   editing body of every other caller, which is a body the caller always fills. */
-.fabricate-sortable-list-row.manager-recipe-stage-row:not(.has-band) .fabricate-sortable-list-body,
-.fabricate-sortable-list-row.manager-salvage-stage-row:not(.has-band)
-  .fabricate-sortable-list-body {
-  display: none;
 }

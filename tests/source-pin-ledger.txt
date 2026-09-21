@@ -34,6 +34,7 @@ tests/components/component-complications-section-mounted.test.js	18
 tests/components/component-editor-layout.test.js	8
 tests/components/component-identity-strip-mounted.test.js	4
 tests/components/component-sources-bar-mounted.test.js	8
+tests/components/component-studio-font-size.test.js	2
 tests/components/crafting-view-mounted.test.js	9
 tests/components/design-system-debt-ratchets.test.js	4
 tests/components/empty-state-mounted.test.js	1

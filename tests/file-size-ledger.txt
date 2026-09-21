@@ -132,7 +132,7 @@ src/ui/svelte/apps/journal/RunDetail.svelte	818
 src/ui/svelte/apps/journal/StepDetails.svelte	569
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	547
-src/ui/svelte/apps/manager/ComponentEditView.svelte	2433
+src/ui/svelte/apps/manager/ComponentEditView.svelte	2429
 src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	832
 src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	11575
 src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte::viewSubtitle	230
@@ -159,7 +159,7 @@ src/ui/svelte/apps/manager/checks/ChecksView.svelte	1878
 src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte	662
 src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte	672
 src/ui/svelte/apps/manager/checks/checksReadiness.js::evaluateCheckReadiness	118
-src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte	1324
+src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte	1322
 src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte	970
 src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte	546
 src/ui/svelte/apps/manager/downtime/routeChromeChannel.js::createRouteChromeChannel	189

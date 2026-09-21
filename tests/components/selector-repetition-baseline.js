@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
  * rather than these 111, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,037 `(at-context, selector)` keys, of which 2,926 appear exactly
+ * Unfiltered, the sheet holds 3,039 `(at-context, selector)` keys, of which 2,928 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,8 +19,15 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,559 rules at that head, 111 repeated keys and 227 appearances
+ * printed from. The sheet holds 2,561 rules at that head, 111 repeated keys and 227 appearances
  * between them; five keys appear three times and none appears four or more.
+ * ISSUE 1510 PHASE 2 moves the three contextual figures and none of the repeated ones. Converting
+ * the component studio's five selects replaces three element-and-class skin rules with five: a
+ * class rule on a select becomes a descendant rule on a picker trigger, and two sites also need a
+ * root-slot rule that the native element used to carry itself. Against current main that moves
+ * 2,559 -> 2,561 rules, 3,037 -> 3,039 keyed selectors and 2,926 -> 2,928 singletons.
+ * The repeated ledger stays 227 appearances across 111 rows, and the selector-only count stays 205.
+ * Re-derived from the combined sheet rather than treating either branch's contextual figures as final.
  * ISSUE 1512 DELETES TWO REPEATED ROWS AND ADDS NONE. The progressive recipe stage row renders
  * through `SortableList`, so `.fabricate-manager .manager-recipe-result-row.is-reorderable` and
  * its `.manager-recipe-option-controls` descendant have no carrier left: the shared list's row

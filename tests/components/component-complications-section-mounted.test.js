@@ -26,6 +26,19 @@ import {
   COMPONENT_EDIT_VIEW_RAW_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+// The trigger clause and the dice-condition comparator are the shared `<Select>` since issue 1510,
+// so their option lists are read off a panel portaled onto the mount target.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+const TRIGGER_PICKER = '[data-complication-trigger]';
+const COMPARATOR = '[data-complication-roll-condition-cmp]';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sectionPath = 'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte';
@@ -45,6 +58,14 @@ function blockIn(source, selector) {
   assert.notEqual(start, -1, `expected a \`${selector}\` rule`);
   const end = source.indexOf('}', start);
   return source.slice(start, end);
+}
+
+function selectTagContaining(source, marker) {
+  const markerIndex = source.indexOf(marker);
+  assert.notEqual(markerIndex, -1, `expected \`${marker}\``);
+  const tagStart = source.lastIndexOf('<Select', markerIndex);
+  const tagEnd = source.indexOf('/>', markerIndex);
+  return source.slice(tagStart, tagEnd);
 }
 
 const harness = createMountedComponentHarness({
@@ -77,6 +98,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+    // The trigger clause and the dice-condition comparator render `Select.svelte` (issue 1510); an
+    // unregistered rendered component hangs its harness rather than failing it.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
@@ -575,13 +600,21 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       ],
     });
     await openFirstRow(target);
-    const select = target.querySelector('[data-complication-roll-condition-cmp]');
-    assert.ok(Boolean(select), 'the condition-roll row reveals its comparator');
+    assert.ok(
+      Boolean(target.querySelector(COMPARATOR)),
+      'the condition-roll row reveals its comparator'
+    );
+    assert.equal(
+      assertSelectHasResolvedName(target, COMPARATOR),
+      'Comparison',
+      'and it still announces the name the native control did'
+    );
     assert.deepEqual(
-      [...select.options].map((option) => option.value),
+      selectOptionValues(target, COMPARATOR),
       ['eq', 'neq', 'gt', 'gte', 'lt', 'lte'],
       'a dice total has no boolean or existence reading, and `exists` would always fire'
     );
+    closeSelectPanel(target, COMPARATOR);
   });
 
   /** Open the one row and reveal the dice-condition strip, which renders only while it is ON. */
@@ -658,6 +691,47 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       /--fab-stepper-fill-height:\s*34px/,
       'the Stepper takes the row height from its layout context — 34px, the inputs beside it'
     );
+    // And the converted comparator uses the shared `toolbar` rung (issue 1510), which already
+    // stands at 34 — the row's shared height without a per-site override.
+    assert.match(
+      selectTagContaining(sectionSource, 'class="fab-complication-comparator"'),
+      /size="toolbar"/,
+      'the picker trigger stands at the height of the fields either side of it'
+    );
+  });
+
+  it('forwards the chosen comparator row as rollCondition.cmp', async () => {
+    const { target, emitted } = await openRollCondition();
+    chooseSelectOption(target, COMPARATOR, 'lte');
+    assert.equal(
+      emitted.at(-1)[0].rollCondition.cmp,
+      'lte',
+      'choosing a comparator row stages the operator, not just renders the six options'
+    );
+  });
+
+  it('forwards the chosen trigger row as when.checkTrigger', async () => {
+    // Persisted ON from the start: the section is a CONTROLLED component (`patch` only calls
+    // `onChange`, never mutates local state), so ticking the checkbox here would stage a value
+    // no re-render ever shows — the picker must already be revealed to be driven.
+    const { target, emitted } = await mountSection({
+      complications: [
+        complication({
+          when: { stageAwarded: false, stagePartial: false, stageMissed: true, checkTrigger: 't1' },
+        }),
+      ],
+      triggerOptions: [
+        { id: 't1', label: 'Trigger One' },
+        { id: 't2', label: 'Trigger Two' },
+      ],
+    });
+    await openFirstRow(target);
+    chooseSelectOption(target, TRIGGER_PICKER, 't2');
+    assert.equal(
+      emitted.at(-1)[0].when.checkTrigger,
+      't2',
+      'choosing a trigger row stages that id, not just the persisted default'
+    );
   });
 
   it('mutes the trigger clause and makes it UNINTERACTABLE when the system names no triggers', async () => {
@@ -720,7 +794,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.equal(box.checked, true, 'the row shows the persisted value rather than reading unset');
     assert.equal(box.disabled, false, 'and stays operable, so the stale value can be cleared');
     assert.match(
-      target.querySelector('[data-complication-trigger]').textContent,
+      selectTriggerText(target, TRIGGER_PICKER),
       /Trigger no longer exists/,
       'the dangling id is named rather than silently rewritten'
     );
@@ -744,8 +818,8 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       ],
     });
     await openFirstRow(target);
-    const select = target.querySelector('[data-complication-trigger]');
-    const labels = [...select.options].map((option) => option.textContent.trim());
+    const labels = selectOptionLabels(target, TRIGGER_PICKER);
+    closeSelectPanel(target, TRIGGER_PICKER);
     assert.deepEqual(
       labels.slice(0, 2),
       ['On a natural 1 · Salvage', 'On a natural 1 · Crafting'],

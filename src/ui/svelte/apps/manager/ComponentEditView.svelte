@@ -14,6 +14,7 @@
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
+  import Select from '../../components/Select.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   // The progressive-complications section (issue 1286). It owns its own visibility gate, so it is
   // placed unconditionally rather than behind a second predicate that could drift out of step.
@@ -42,10 +43,14 @@
   import { visibleEssenceOptions } from '../../../model/essenceValidation.js';
   import {
     SALVAGE_DC_CUSTOM,
-    buildSalvageDcOptions,
     resolveSalvageDcSelection,
     salvageDcOverrideForSelection,
   } from './component/salvageDcPresets.js';
+  import {
+    buildComponentCategoryOptions,
+    buildSalvageDcSelectOptions,
+    buildSalvageRouteOptions,
+  } from './component/componentEditSelectOptions.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
   import IconButton from '../../components/IconButton.svelte';
   import {
@@ -129,6 +134,10 @@
     // The deep link, through the banner's own exit. Called with the ROUTE TOKEN and the entity id.
     onOpenWorldEntry = () => {},
   } = $props();
+
+  // Minted per instance (issue 1510), because the salvage routing rows' captions name their own
+  // triggers by id and two editors can be open at once — a fixed literal would name both.
+  const instanceId = $props.id();
 
   // The world layer this system's rules sit over, read off the world projection's JOIN — the only
   // place the INHERIT state lives. The in-system record carries only the RESOLVED value.
@@ -445,6 +454,15 @@
       'FABRICATE.Admin.Manager.Component.Category.InheritOption',
       'Inherit from world · {category}',
       { category: categoryLabel(worldCategory) }
+    )
+  );
+  // The one control's option list (issue 1510), mapped beside this file.
+  const categorySelectOptions = $derived(
+    buildComponentCategoryOptions(
+      categoryInheritOffered ? INHERIT_OPTION : '',
+      categoryInheritLabel,
+      effectiveCategoryOptions,
+      categoryLabel
     )
   );
 
@@ -895,27 +913,7 @@
   );
 
   const salvageDcOptions = $derived(
-    buildSalvageDcOptions({
-      tiers: salvageCheckTiers,
-      dcMode: salvageCheckDcMode,
-      systemDc: salvageCheckDc,
-      systemDefaultLabel: (dc) =>
-        text(
-          'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefault',
-          'System default — DC {dc}'
-        ).replace('{dc}', String(dc)),
-      systemDefaultDynamicLabel: () =>
-        text(
-          'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefaultDynamic',
-          'System default — set by macro'
-        ),
-      tierLabel: (name, dc) =>
-        text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}')
-          .replace('{name}', name)
-          .replace('{dc}', String(dc)),
-      customLabel: () =>
-        text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustom', 'Custom…'),
-    })
+    buildSalvageDcSelectOptions(salvageCheckTiers, salvageCheckDcMode, salvageCheckDc, text)
   );
   // The PERSISTED value derives the selection — never an `$effect` that writes back. An off-tier
   // `dcOverride: 14` selects Custom… and displays 14 verbatim, never snapping to a tier, and
@@ -1036,6 +1034,20 @@
     results.splice(to, 0, moved);
     updateSalvageGroupResults(salvageStageGroup.id, () => results);
   }
+
+  // The routing rows' shared option list (issue 1510), under the same numbered group fallback the
+  // group headers use.
+  const salvageRouteOptions = $derived(
+    buildSalvageRouteOptions(
+      salvageDraft.resultGroups,
+      text('FABRICATE.Admin.Manager.Component.SalvageEditor.Unrouted', 'Unrouted'),
+      (n) =>
+        text(
+          'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
+          'Group {n}'
+        ).replace('{n}', String(n))
+    )
+  );
 
   function setSalvageRoute(outcomeName, groupId) {
     const next = { ...salvageDraft.outcomeRouting };
@@ -1289,25 +1301,27 @@
                 </p>
               </div>
             </div>
-            <select
-              class="manager-input manager-component-category-select"
+            <!-- The shared one-of-N picker since issue 1510, so the app draws the list. Both hooks
+            ride `triggerData` onto the trigger button; `class` lands on the picker root, which is
+            where the sheet hangs the trigger's width and its `border-strong` hairline. No tick: the
+            trigger states the value and the six rows are distinct names (design-system/spec.md, the
+            configurable tick). -->
+            <Select
+              class="manager-component-category-select"
               value={categorySelectValue}
-              data-component-edit-category
-              data-component-edit-category-locked={categoryLocked}
-              aria-label={text(
+              options={categorySelectOptions}
+              showTick={false}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Component.Category.Label',
                 'Component category'
               )}
-              onchange={(event) => setCategorySelection(event.currentTarget.value)}
               disabled={saving}
-            >
-              {#if categoryInheritOffered}
-                <option value={INHERIT_OPTION}>{categoryInheritLabel}</option>
-              {/if}
-              {#each effectiveCategoryOptions as option (option)}
-                <option value={option}>{categoryLabel(option)}</option>
-              {/each}
-            </select>
+              triggerData={{
+                'data-component-edit-category': '',
+                ...(categoryLocked ? { 'data-component-edit-category-locked': '' } : {}),
+              }}
+              onChange={setCategorySelection}
+            />
             <!--
             THE NOTE IS DIRECTLY UNDER THE SELECT, with the model's own glyph and tone: `info` while
             inheriting, `warning` while overriding, subtle where the world authored nothing. The
@@ -2162,35 +2176,22 @@
                   )}
                 </p>
                 {#if salvageOutcomeNames.length > 0}
+                  <!-- A `<div>`, not a `<label>`: `Select.svelte`'s host invariant. The caption names the trigger with `aria-labelledby` (issue 1510). -->
                   <div class="manager-salvage-routing-list">
-                    {#each salvageOutcomeNames as outcomeName (outcomeName)}
-                      <label class="manager-salvage-routing-row">
-                        <span>{outcomeName}</span>
-                        <select
-                          class="manager-input"
+                    {#each salvageOutcomeNames as outcomeName, routeIndex (outcomeName)}
+                      <div class="manager-salvage-routing-row">
+                        <span id={`${instanceId}-salvage-route-${routeIndex}`}>{outcomeName}</span>
+                        <Select
+                          size="inline"
+                          class="manager-salvage-route-select"
                           value={salvageDraft.outcomeRouting[outcomeName] || ''}
-                          data-salvage-route={outcomeName}
-                          onchange={(event) =>
-                            setSalvageRoute(outcomeName, event.currentTarget.value)}
+                          options={salvageRouteOptions}
+                          ariaLabelledBy={`${instanceId}-salvage-route-${routeIndex}`}
                           disabled={saving}
-                        >
-                          <option value=""
-                            >{text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.Unrouted',
-                              'Unrouted'
-                            )}</option
-                          >
-                          {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
-                            <option value={group.id}
-                              >{group.name ||
-                                text(
-                                  'FABRICATE.Admin.Manager.Component.SalvageEditor.GroupNamePlaceholder',
-                                  'Group {n}'
-                                ).replace('{n}', String(groupIndex + 1))}</option
-                            >
-                          {/each}
-                        </select>
-                      </label>
+                          triggerData={{ 'data-salvage-route': outcomeName }}
+                          onChange={(next) => setSalvageRoute(outcomeName, next)}
+                        />
+                      </div>
                     {/each}
                   </div>
                 {:else}
@@ -2227,7 +2228,7 @@
                come from. -->
               <Field as="div" class="manager-salvage-dc-card" data-salvage-dc-override="">
                 <div class="manager-salvage-dc-copy">
-                  <span class="manager-salvage-dc-title"
+                  <span id={`${instanceId}-salvage-dc-title`} class="manager-salvage-dc-title"
                     >{text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride',
                       'Salvage check DC'
@@ -2242,21 +2243,16 @@
                 </div>
                 <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7), never a
                  hard-coded DC list. Storage is unchanged: null = system default, else an integer. -->
-                <select
-                  class="manager-input"
+                <Select
+                  size="toolbar"
+                  class="manager-salvage-dc-select"
                   value={salvageDcSelection}
-                  data-salvage-dc-preset
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride',
-                    'DC override'
-                  )}
-                  onchange={(event) => setSalvageDcSelection(event.currentTarget.value)}
+                  options={salvageDcOptions}
+                  ariaLabelledBy={`${instanceId}-salvage-dc-title`}
                   disabled={saving}
-                >
-                  {#each salvageDcOptions as option (option.value)}
-                    <option value={option.value}>{option.label}</option>
-                  {/each}
-                </select>
+                  triggerData={{ 'data-salvage-dc-preset': '' }}
+                  onChange={setSalvageDcSelection}
+                />
                 {#if salvageDcShowCustomInput}
                   <!-- `allowUnset`: a cleared field is "inherit the system salvage check DC", the
                    same `dcOverride: null` the preset select writes. `min={0}` because an unset field
