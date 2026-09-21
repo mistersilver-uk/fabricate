@@ -13,7 +13,11 @@ import {
   createManagerQueries,
   waitForQueuedAnnouncement,
 } from '../helpers/manager/managerQueries.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  assertDropComponentCellKeyboardPath,
+  managerComponents,
+  settleBetweenTests,
+} from './manager-mounted-shared.js';
 
 let Component;
 let EnvironmentEditViewComponent;
@@ -36,7 +40,7 @@ const {
 
 /**
  * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
- * PERSISTS a picked character modifier before the panel is rendered again (issue 1707).
+ * persists a picked character modifier before the panel is rendered again (issue 1707).
  */
 function modifierEditorShell(subject, attached = []) {
   const picked = [];
@@ -519,6 +523,12 @@ export function registerEnvironmentsCases() {
       '.manager-drop-component-button'
     );
     assert.ok(populatedComponentButton);
+    // The FILLED branch of the row's keyboard path (issue 1512); the empty branch is asserted in
+    // `manager-gathering-mounted.js`, where a freshly added row renders it.
+    assertDropComponentCellKeyboardPath(populatedDropRow, {
+      empty: false,
+      label: 'Nightshade With An Exceptionally Long Localized Component Name',
+    });
     const populatedComponentThumb = populatedComponentCell.querySelector(
       '.manager-gathering-task-thumb'
     );
@@ -2953,7 +2963,7 @@ export function registerEnvironmentsCases() {
     );
   });
 
-  // The DOM half of what `gathering-event-editor.test.js` pinned as root TEXT: the panel is one
+  // The DOM half of what `gathering-event-editor.test.js` pinned as root text: the panel is one
   // component now, so only rendering both subjects can prove their hooks stayed distinct.
   for (const subject of ['drop', 'event']) {
     it(`renders the shared modifier panel under its own ${subject} hook prefix`, async () => {
@@ -3159,4 +3169,119 @@ export function registerEnvironmentsCases() {
       'the event has never drawn one, and gains none from sharing the panel'
     );
   });
+
+  // The two states the rail draws itself (issue 1707 phase 3): the selected environment's
+  // summary card and the empty-library setup card, neither of which had a DOM assertion.
+  it('draws the selected environment summary in the rail, and follows the row that is picked', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const rail = () => target.querySelector('.manager-inspector');
+    const facts = () =>
+      Array.from(rail().querySelectorAll('[data-environment-fact]')).map((fact) => [
+        fact.dataset.environmentFact,
+        fact.querySelector('strong').textContent.trim(),
+      ]);
+    const chips = () =>
+      Array.from(rail().querySelectorAll('.manager-chip-row .manager-chip')).map((chip) =>
+        chip.textContent.trim()
+      );
+
+    assert.equal(rail().querySelector('.manager-kicker').textContent.trim(), 'Selected environment');
+    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Moonlit Forest');
+    assert.deepEqual(chips(), ['Active', 'Targeted', 'Linked scene']);
+    assert.deepEqual(facts(), [
+      ['tasks', '1'],
+      ['events', '0'],
+      ['required-tools', '0'],
+      ['mode', 'Targeted'],
+      // The hook the smoke harness reads as `.manager-inspector [data-environment-fact="scene"]`.
+      ['scene', 'Moonlit Forest'],
+    ]);
+    assert.equal(
+      rail().querySelector('.manager-environment-preview').classList.contains('is-fallback'),
+      false,
+      'the linked scene supplies the preview, so the fallback modifier stays off'
+    );
+
+    target
+      .querySelector('[data-environment-id="env-cavern"] .manager-environment-identity')
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Quiet Cavern');
+    assert.deepEqual(chips(), ['Disabled', 'Blind', 'Scene unresolved']);
+    assert.deepEqual(facts(), [
+      ['tasks', '1'],
+      ['events', '0'],
+      ['required-tools', '0'],
+      ['mode', 'Blind'],
+      ['scene', 'Scene.missing'],
+    ]);
+    assert.ok(
+      rail().querySelector('.manager-environment-preview').classList.contains('is-fallback'),
+      'and an unresolved scene with no image of its own falls back'
+    );
+  });
+
+  it('draws the empty-library setup card in the rail, with its published gathering-docs link', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyEnvironments: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const card = target.querySelector('.manager-inspector .manager-setup-card');
+    assert.ok(Boolean(card), 'an empty library draws the setup card rather than a row summary');
+    assert.equal(card.getAttribute('aria-label'), 'Plan gathering content');
+    assert.equal(card.querySelector('.manager-kicker').textContent.trim(), 'Gathering setup');
+    assert.equal(card.querySelector('h3').textContent.trim(), 'Plan gathering content');
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('.manager-setup-list li')).map((step) =>
+        step.textContent.trim()
+      ),
+      [
+        'Define gathering tasks with their checks, timing, result groups, and failure outcomes.',
+        'Prepare event options that can be reused across your locations.',
+        'Create environments after the gathering task and event libraries are ready to attach.',
+      ]
+    );
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('.manager-setup-links a')).map((link) => [
+        link.getAttribute('href'),
+        link.textContent.trim(),
+      ]),
+      [
+        ['https://mistersilver-uk.github.io/fabricate/gathering/environments', 'Gathering docs'],
+        ['https://mistersilver-uk.github.io/fabricate/help/quickstart', 'Quickstart'],
+      ]
+    );
+    assert.equal(
+      Boolean(target.querySelector('.manager-inspector [data-environment-fact]')),
+      false,
+      'and no summary fact, since there is no row to summarise'
+    );
+  });
+
 }

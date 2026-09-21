@@ -23,6 +23,7 @@
   // shape, and SonarCloud's copy-paste detector reads `.svelte`.
   import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
   import { complicationSummary } from '../../../model/complicationSummary.js';
+  import SortableList from '../../components/SortableList.svelte';
   // The shared essence quantity card (issue 772). It lives under `components/` because the
   // browser's bulk-edit panel renders it too, and the screenshot evidence map names it there.
   import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
@@ -1021,30 +1022,17 @@
   }
 
   // Reorder is the AUTHORING act in progressive mode — the list order is the spend order. Clamped
-  // at the ends rather than wrapping.
-  function moveSalvageStage(index, delta) {
-    const target = index + delta;
+  // at the ends rather than wrapping. The list owns both inputs, the announcement and the transient
+  // drag state (issue 1512), and that state stays outside the draft, so picking a row up and
+  // dropping it where it started still cannot mark the editor dirty.
+  function moveSalvageStage(from, to) {
     if (!salvageStageGroup) return;
-    if (target < 0 || target >= salvageStages.length) return;
+    if (from < 0 || from >= salvageStages.length) return;
+    if (to < 0 || to >= salvageStages.length) return;
     const results = [...salvageStages];
-    const [moved] = results.splice(index, 1);
-    results.splice(target, 0, moved);
+    const [moved] = results.splice(from, 1);
+    results.splice(to, 0, moved);
     updateSalvageGroupResults(salvageStageGroup.id, () => results);
-  }
-
-  // Drag-reorder. `draggingStageIndex` is transient UI state and deliberately outside the draft:
-  // picking a row up and dropping it where it started must not mark the editor dirty.
-  let draggingStageIndex = $state(null);
-
-  function onStageDragStart(index) {
-    draggingStageIndex = index;
-  }
-
-  function onStageDrop(index) {
-    const from = draggingStageIndex;
-    draggingStageIndex = null;
-    if (from === null || from === index) return;
-    moveSalvageStage(from, index - from);
   }
 
   // The routing rows' shared option list (issue 1510), under the same numbered group fallback the
@@ -1618,6 +1606,30 @@
          suite. NOT a `<select>`: the native control can show the NAME but never the IMAGE, and the
          popover is portaled to `.fabricate-manager` so it escapes the panel's `overflow: hidden`.
          No "clear" entry, matching `RecipeResultItemRow`: the row's × removes it properly. -->
+        <!-- `data-add-salvage-group` rides this button only while there is no backing group,
+             because in that state this IS the add-group control: it takes a progressive component
+             from zero groups to one, which the normalizer's clamp requires before `enabled` can
+             ever be true. One definition, rendered as the list's footer while there are stages and
+             under the empty message otherwise (issue 1512). -->
+        {#snippet salvageStageAdder()}
+          <ManagerButton
+            role="dashed"
+            fullWidth
+            data-add-salvage-result
+            data-add-salvage-group={salvageStageGroup ? undefined : ''}
+            onclick={() => addSalvageStage()}
+            disabled={saving}
+          >
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
+                'Add result'
+              )}</span
+            >
+          </ManagerButton>
+        {/snippet}
+
         {#snippet salvageComponentPicker(groupId, result)}
           {@const selected = salvageComponentOption(result.componentId)}
           <span class="manager-salvage-component-field" data-salvage-result-component>
@@ -1792,81 +1804,135 @@
                     )}</span
                   >
                 </span>
+                <!-- The ordered salvage stage list is the shared one (issue 1512): the grip, the
+                     ordinal badge, the rocker, the delete, the drag source and the announcement are
+                     all the list's. Every control it draws is an `IconButton`, so each carries
+                     `type="button"` — this is the one converted site inside a `<form>`, where a
+                     control without it submits the draft on a keyboard move. The complication band
+                     is the list's body because it is full-bleed, and `has-band` is what stops a
+                     stage with no complication drawing an empty padded one. `removeData` keeps
+                     `data-remove-salvage-result`, the hook the mounted suite addresses a stage by,
+                     and its `disabled: saving`. -->
                 {#if salvageStages.length > 0}
-                  <ul class="manager-salvage-stage-list">
-                    {#each salvageStages as result, stageIndex (result.id)}
-                      {@const stageComplications = salvageComplicationsFor(result.componentId)}
-                      <li
-                        class={`manager-salvage-stage-row ${draggingStageIndex === stageIndex ? 'is-dragging' : ''}`}
-                        data-salvage-result={result.id}
-                        data-salvage-stage={String(stageIndex + 1)}
-                        draggable={saving ? 'false' : 'true'}
-                        ondragstart={() => onStageDragStart(stageIndex)}
-                        ondragover={(event) => event.preventDefault()}
-                        ondrop={(event) => {
-                          event.preventDefault();
-                          onStageDrop(stageIndex);
-                        }}
-                        ondragend={() => {
-                          draggingStageIndex = null;
-                        }}
+                  <SortableList
+                    items={salvageStages}
+                    itemLabel={(result) => salvageComponentName(result.componentId)}
+                    numbered
+                    alwaysOpen
+                    reorderable={!saving}
+                    onReorder={(from, to) => moveSalvageStage(from, to)}
+                    removable
+                    onRemove={(result) => removeSalvageStage(result.id)}
+                    rowClass={(result) =>
+                      salvageComplicationsFor(result.componentId).length > 0
+                        ? 'manager-salvage-stage-row has-band'
+                        : 'manager-salvage-stage-row'}
+                    rowData={(result) => ({
+                      'data-salvage-result': result.id,
+                      'data-salvage-stage': String(salvageStages.indexOf(result) + 1),
+                    })}
+                    removeData={() => ({
+                      'data-remove-salvage-result': '',
+                      ariaLabel: text(
+                        'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
+                        'Remove result'
+                      ),
+                      disabled: saving,
+                    })}
+                  >
+                    {#snippet row(result)}
+                      {@render salvageComponentPicker(salvageStageGroup.id, result)}
+
+                      <!-- No quantity here (issue 676): progressive awards one entry at a time, so
+                           "two of X" is authored by listing X twice.
+                           `CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1` on
+                           every awarded progressive entry, so this hides nothing awardable. -->
+
+                      <!-- Read-only: `difficulty` belongs to the result component, whose own editor
+                           owns its save lifecycle. The "Edit" link is the way to change it. -->
+                      <span
+                        class="manager-salvage-result-difficulty"
+                        data-salvage-result-difficulty={salvageResultDifficulty(
+                          result.componentId
+                        ) === null
+                          ? ''
+                          : String(salvageResultDifficulty(result.componentId))}
+                        ><!-- The fallback must match the lang value, or the two disagree and the
+                           fallback describes a string nobody sees: `DifficultyUnset` resolves to
+                           "No difficulty". The recipe stage row reads the same. -->
+                        {salvageResultDifficulty(result.componentId) === null
+                          ? text(
+                              'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
+                              'No difficulty'
+                            )
+                          : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
                       >
-                        <!-- The stage's own LINE (issue 1286): `display: contents` unless this row
-                       draws a complication band, so every other stage keeps the grip, ordinal,
-                       picker and trailing cluster as the ROW's flex items. With a band the line
-                       becomes the real row and takes the padding the row gives up. -->
-                        <div class="manager-salvage-stage-line">
-                          <span class="manager-salvage-stage-grip" aria-hidden="true"
-                            ><i class="fas fa-grip-vertical"></i></span
-                          >
+
+                      {#if result.componentId}
+                        <!-- Opens the referenced yield component's editor. The navigation is
+                             guarded (the `component-edit` row of `ROUTE_EXIT_GUARDS` waives no
+                             navigation), so a dirty draft prompts rather than being discarded. -->
+                        <button
+                          type="button"
+                          class="manager-salvage-stage-edit"
+                          data-salvage-result-edit={result.componentId}
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
+                            'Edit {name}'
+                          ).replace('{name}', salvageComponentName(result.componentId))}
+                          title={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
+                            'Set on this component in its editor'
+                          )}
+                          onclick={() => onOpenComponent(result.componentId)}
+                          disabled={saving}
+                        >
                           <span
-                            class="manager-salvage-result-ordinal"
-                            data-salvage-result-ordinal={String(stageIndex + 1)}
-                            aria-hidden="true">{stageIndex + 1}</span
+                            >{text(
+                              'FABRICATE.Admin.Manager.Component.SalvageEditor.Edit',
+                              'Edit'
+                            )}</span
                           >
-                          {@render salvageComponentPicker(salvageStageGroup.id, result)}
-
-                          <!-- NO QUANTITY HERE (issue 676): progressive awards one entry at a
-                       time, so "two of X" is authored by listing X twice.
-                       `CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1` on every
-                       awarded progressive entry, so this hides nothing awardable. -->
-
-                          <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own
-                       editor owns its save lifecycle. The "Edit" link is the way to change it. -->
-                          <span
-                            class="manager-salvage-result-difficulty"
-                            data-salvage-result-difficulty={salvageResultDifficulty(
-                              result.componentId
-                            ) === null
-                              ? ''
-                              : String(salvageResultDifficulty(result.componentId))}
-                            ><!-- The fallback must MATCH the lang value, or the two disagree and the
-                       fallback describes a string nobody sees: `DifficultyUnset` resolves to "No
-                       difficulty". The recipe stage row reads the same. -->
-                            {salvageResultDifficulty(result.componentId) === null
-                              ? text(
-                                  'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
-                                  'No difficulty'
-                                )
-                              : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
-                          >
-
-                          {#if result.componentId}
-                            <!-- Opens the referenced yield component's editor. The navigation is
-                          guarded (the `component-edit` row of `ROUTE_EXIT_GUARDS` waives no
-                          navigation), so a dirty draft prompts rather than being discarded. -->
+                          <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                        </button>
+                      {/if}
+                    {/snippet}
+                    {#snippet body(result)}
+                      {@const stageComplications = salvageComplicationsFor(result.componentId)}
+                      <!-- The read-only complication strip (issue 1286), the list's body and
+                           therefore full-bleed, as the Recipe Studio draws the same band: row and
+                           band are one card, with the band's `border-top` as the divider. This
+                           OVERRIDES the Component Studio prototype on a maintainer ruling. The
+                           `:has()` rules that bought the shape by hand are gone with the
+                           hand-rolled row (issue 1512). `role="presentation"` stays: the band
+                           annotates the stage above it and must never be announced as one. -->
+                      {#if stageComplications.length > 0}
+                        <div
+                          class="manager-salvage-stage-complications"
+                          role="presentation"
+                          data-salvage-stage-complications={result.componentId}
+                        >
+                          <div class="manager-salvage-stage-complications-head">
+                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span class="manager-salvage-stage-complications-title"
+                              >{stripTitle(stageComplications.length, result.componentId)}</span
+                            >
+                            <!-- The only route to changing any of this: a complication belongs to
+                                 the referenced component, whose own editor owns its save lifecycle.
+                                 Its label names complications, so it differs from the row's Edit
+                                 link. -->
                             <button
                               type="button"
                               class="manager-salvage-stage-edit"
-                              data-salvage-result-edit={result.componentId}
+                              data-salvage-stage-complications-edit={result.componentId}
                               aria-label={text(
-                                'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
-                                'Edit {name}'
+                                'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
+                                'Edit complications on {name}'
                               ).replace('{name}', salvageComponentName(result.componentId))}
                               title={text(
-                                'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
-                                'Set on this component in its editor'
-                              )}
+                                'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
+                                'Edit complications on {name}'
+                              ).replace('{name}', salvageComponentName(result.componentId))}
                               onclick={() => onOpenComponent(result.componentId)}
                               disabled={saving}
                             >
@@ -1878,125 +1944,36 @@
                               >
                               <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
                             </button>
-                          {/if}
-
-                          <!-- Drag is an ENHANCEMENT; the chevrons are the accessible reorder path
-                       and are what a keyboard user gets. Disabled at the ends. -->
-                          <span class="manager-salvage-stage-reorder">
-                            <button
-                              type="button"
-                              class="manager-salvage-stage-move"
-                              data-salvage-stage-up
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Component.SalvageEditor.MoveUp',
-                                'Move up'
-                              )}
-                              disabled={saving || stageIndex === 0}
-                              onclick={() => moveSalvageStage(stageIndex, -1)}
-                              ><i class="fas fa-chevron-up" aria-hidden="true"></i></button
-                            >
-                            <button
-                              type="button"
-                              class="manager-salvage-stage-move"
-                              data-salvage-stage-down
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Component.SalvageEditor.MoveDown',
-                                'Move down'
-                              )}
-                              disabled={saving || stageIndex === salvageStages.length - 1}
-                              onclick={() => moveSalvageStage(stageIndex, 1)}
-                              ><i class="fas fa-chevron-down" aria-hidden="true"></i></button
-                            >
-                          </span>
-
-                          <IconButton
-                            class="is-danger"
-                            ariaLabel={text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
-                              'Remove result'
-                            )}
-                            data-remove-salvage-result=""
-                            onclick={() => removeSalvageStage(result.id)}
-                            disabled={saving}
-                          >
-                            <i class="fas fa-xmark" aria-hidden="true"></i>
-                          </IconButton>
-                        </div>
-
-                        <!-- THE READ-ONLY COMPLICATION STRIP (issue 1286), INSIDE the stage row
-                     and FULL-BLEED, as the Recipe Studio draws the same band: row and band are ONE
-                     card, with the band's `border-top` as the divider. This OVERRIDES the Component
-                     Studio prototype on a maintainer ruling. `.manager-salvage-stage-row` is JOINED
-                     with `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, so
-                     instead of relaxing that rule the row hands its padding to
-                     `.manager-salvage-stage-line` and becomes a column only under
-                     `:has(.manager-salvage-stage-complications)`. `role="presentation"` stays: the
-                     band annotates the stage above it and must never be announced as one. -->
-                        {#if stageComplications.length > 0}
-                          <div
-                            class="manager-salvage-stage-complications"
-                            role="presentation"
-                            data-salvage-stage-complications={result.componentId}
-                          >
-                            <div class="manager-salvage-stage-complications-head">
-                              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                              <span class="manager-salvage-stage-complications-title"
-                                >{stripTitle(stageComplications.length, result.componentId)}</span
-                              >
-                              <!-- The ONLY route to changing any of this: a complication belongs to
-                             the referenced component, whose own editor owns its save lifecycle. Its
-                             label names complications, so it differs from the row's Edit link. -->
-                              <button
-                                type="button"
-                                class="manager-salvage-stage-edit"
-                                data-salvage-stage-complications-edit={result.componentId}
-                                aria-label={text(
-                                  'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
-                                  'Edit complications on {name}'
-                                ).replace('{name}', salvageComponentName(result.componentId))}
-                                title={text(
-                                  'FABRICATE.Admin.Manager.Component.Complications.StripEdit',
-                                  'Edit complications on {name}'
-                                ).replace('{name}', salvageComponentName(result.componentId))}
-                                onclick={() => onOpenComponent(result.componentId)}
-                                disabled={saving}
-                              >
-                                <span
-                                  >{text(
-                                    'FABRICATE.Admin.Manager.Component.SalvageEditor.Edit',
-                                    'Edit'
-                                  )}</span
-                                >
-                                <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                              </button>
-                            </div>
-                            <!-- No `severityLabel`: this prototype draws severity as the coloured
-                           dot alone. The Recipe Studio's strip draws the word too, and passes it. -->
-                            {#each stageComplications as complication (complication.id)}
-                              <ComplicationSummaryRow
-                                variant="readonly-gm"
-                                nameEmphasis="inline"
-                                name={complication.name}
-                                severity={complication.severity}
-                                visibility={complication.visibility}
-                                playerLabel={text(
-                                  'FABRICATE.Admin.Manager.Component.Complications.PlayerPill',
-                                  'Player'
-                                )}
-                                playerTitle={text(
-                                  'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
-                                  'Shown to the player when it fires.'
-                                )}
-                                triggerSentence={complicationStripSummary(complication)}
-                                dataAttr="data-salvage-stage-complication"
-                                dataValue={complication.id}
-                              />
-                            {/each}
                           </div>
-                        {/if}
-                      </li>
-                    {/each}
-                  </ul>
+                          <!-- No `severityLabel`: this prototype draws severity as the coloured dot
+                               alone. The Recipe Studio's strip draws the word too, and passes it. -->
+                          {#each stageComplications as complication (complication.id)}
+                            <ComplicationSummaryRow
+                              variant="readonly-gm"
+                              nameEmphasis="inline"
+                              name={complication.name}
+                              severity={complication.severity}
+                              visibility={complication.visibility}
+                              playerLabel={text(
+                                'FABRICATE.Admin.Manager.Component.Complications.PlayerPill',
+                                'Player'
+                              )}
+                              playerTitle={text(
+                                'FABRICATE.Admin.Manager.Component.Complications.PlayerPillTitle',
+                                'Shown to the player when it fires.'
+                              )}
+                              triggerSentence={complicationStripSummary(complication)}
+                              dataAttr="data-salvage-stage-complication"
+                              dataValue={complication.id}
+                            />
+                          {/each}
+                        </div>
+                      {/if}
+                    {/snippet}
+                    {#snippet footer()}
+                      <li class="manager-salvage-stage-add">{@render salvageStageAdder()}</li>
+                    {/snippet}
+                  </SortableList>
                 {:else}
                   <p class="manager-muted">
                     {text(
@@ -2004,26 +1981,11 @@
                       'No results yet.'
                     )}
                   </p>
+                  <!-- The adder follows the empty message (issue 1512): with no stages there is no
+                       list to be a footer of, and an empty state that says "add one" with nothing
+                       to press is a dead end. -->
+                  {@render salvageStageAdder()}
                 {/if}
-                <!-- `data-add-salvage-group` rides this button ONLY while there is no backing
-               group, because in that state this IS the add-group control — Ruling A's invariant in
-               progressive mode. -->
-                <ManagerButton
-                  role="dashed"
-                  fullWidth
-                  data-add-salvage-result
-                  data-add-salvage-group={salvageStageGroup ? undefined : ''}
-                  onclick={() => addSalvageStage()}
-                  disabled={saving}
-                >
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span
-                    >{text(
-                      'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                      'Add result'
-                    )}</span
-                  >
-                </ManagerButton>
                 <!-- The reference closes the progressive body with this component's own DC row.
                  See the snippet's declaration for why it is rendered here. -->
                 {#if showDifficulty}
@@ -2418,36 +2380,9 @@
      prototype on a maintainer ruling: what goes is the margin, the surrounding border and the
      right-hand radii; every value the parity spec measures stands. */
 
-  /* Scoped by `:has()` to rows that actually draw a band, so it moves no stage row in either studio:
-     `.manager-salvage-stage-row` is JOINED with `.manager-recipe-result-row.is-reorderable` in
-     styles/fabricate.css. The row sheds its padding onto its own line and clips itself, so the band
-     runs edge to edge and its warning fill stays inside the card's radius; it cannot clip the
-     component picker, which `SearchablePopover` portals to the manager host. */
-  .manager-salvage-stage-row:has(.manager-salvage-stage-complications) {
-    flex-direction: column;
-    align-items: stretch;
-    /* `gap: 0` is load-bearing: the joined rule's 12px is BETWEEN a stage's controls, and turning
-       the row into a column re-aims it at the seam, floating the band's `border-top`. */
-    gap: 0;
-    overflow: hidden;
-    padding: 0;
-  }
-
-  /* `display: contents` in the common case, so the grip, ordinal, picker and trailing cluster stay
-     the ROW's flex items exactly as they were before this wrapper existed. */
-  .manager-salvage-stage-line {
-    display: contents;
-  }
-
-  /* With a band the line becomes the real row and takes the padding and 12px gap the joined rule
-     gave up. Its `align-items: center` centres the grip and ordinal against the line, not the card. */
-  .manager-salvage-stage-row:has(.manager-salvage-stage-complications) .manager-salvage-stage-line {
-    display: flex;
-    gap: var(--fab-space-3);
-    align-items: center;
-    min-width: 0;
-    padding: var(--fab-space-chip) var(--fab-space-2);
-  }
+  /* The three `:has()` rules that bought this shape by hand are gone (issue 1512): the list's row
+     is already a column whose line carries the padding and which clips itself, so a band rendered
+     as the row's body meets the row's own border by construction. */
 
   /* NO margin and NO radius: the `border-top` IS the divider, and a divider only reads as one when
      the two surfaces meet. The 2px `--fab-warning` left rule marks the stage's warning annotation. */

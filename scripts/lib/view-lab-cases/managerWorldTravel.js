@@ -69,6 +69,8 @@ export const CASES = Object.freeze([
       // Issue 1707 moved this column's markup out of the root; `world/` has no directory regex,
       // so each travel case claims the leaf by name or it stops being photographed.
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -88,6 +90,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -110,6 +114,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -133,6 +139,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -153,6 +161,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringMapLinksTab)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -174,6 +184,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/TravelInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
       /^styles\/fabricate\.css$/,
     ],
   }),
@@ -196,6 +208,10 @@ export const CASES = Object.freeze([
       // The only frame that draws the Gathering Rules rail, which issue 1707 moved out of the
       // root: this is the case that has to fire when its ten selects change.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringRulesInspector\.svelte$/,
+      // And the rail that picks that arm, which phase 3 moved out of the root. On a maintainer
+      // ruling this frame now asks for one when the chain changes, since it is the only case that
+      // photographs the settings arm at all.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -264,6 +280,33 @@ export const CASES = Object.freeze([
     ],
     expectView: 'environment-edit',
     kinds: ['manager', 'environments'],
+    sourceMatches: [
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-environment-edit-blind-weights-narrow',
+    label: 'Manager — Environment edit blind task weights at the declared floor',
+    // The composition list's AFTER frame (issue 1512): the column strip's lead track is the shared
+    // list's own cluster, so every label has to sit over the column it names at the narrow
+    // container as well as at the default one.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+    ],
+    expectView: 'environment-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-record-id] .manager-environment-comp-cells',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,

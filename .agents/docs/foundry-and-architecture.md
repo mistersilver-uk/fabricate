@@ -345,8 +345,8 @@ Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/f
 
 ### Extracted normalizer clusters under `src/systems/`
 
-`src/systems/normalize/` is the first subdirectory `src/systems/` has had, and it holds normalizer logic extracted out of `CraftingSystemManager` as free functions, starting with `src/systems/normalize/craftingCheck.js`.
-Each cluster stays private to the `CraftingSystemManager` aggregate: nothing outside `CraftingSystemManager.js` imports it, and callers still reach it only through the manager's own delegate methods.
+`src/systems/normalize/` is the first subdirectory `src/systems/` has had, and it holds normalizer logic extracted out of `CraftingSystemManager` as free functions, starting with `src/systems/normalize/craftingCheck.js` and joined by six more clusters (issue #1713): `tools.js`, `systemFields.js`, `essences.js`, `recipeItems.js`, `salvage.js`, and `components.js`.
+Each cluster stays private to the `CraftingSystemManager` aggregate: nothing outside `CraftingSystemManager.js` and the two paired equivalence/delegate test suites per cluster imports it, and callers still reach it only through the manager's own delegate methods.
 
 ### Versioned Journal authority and recovery
 

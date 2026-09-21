@@ -315,6 +315,29 @@ test('every sourceMatches pattern resolves to at least one source file', () => {
   );
 });
 
+/** The four gathering/travel leaves the rail renders, moved out of the root by issue 1707. */
+const GATHERING_INSPECTOR_LEAF_PATHS = Object.freeze([
+  'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+  'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
+  'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte',
+  'src/ui/svelte/apps/manager/world/TravelInspector.svelte',
+]);
+
+const GATHERING_INSPECTOR_RAIL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
+
+test('every case claiming a gathering/travel leaf also claims the rail that renders it', () => {
+  // A case that claims a leaf but not the rail asks for no photograph when the rail's own branch
+  // chain breaks — the defect phase 3's post-implementation review found (issue 1707 phase 3).
+  const drifted = VIEW_LAB_CASES.filter(
+    (viewCase) =>
+      GATHERING_INSPECTOR_LEAF_PATHS.some((leaf) =>
+        viewCase.sourceMatches.some((pattern) => pattern.test(leaf))
+      ) && !viewCase.sourceMatches.some((pattern) => pattern.test(GATHERING_INSPECTOR_RAIL_PATH))
+  ).map((viewCase) => viewCase.id);
+  assert.deepEqual(drifted, [], 'these cases claim a leaf without also claiming its rail');
+});
+
 /** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
 const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
@@ -2295,6 +2318,36 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
       'manager-world-parties-realm-override-picker',
       'player-actor-picker',
       'player-crafting-sources-picker',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
+    ]
+  );
+});
+
+test('the broad SearchablePopoverPanel signal captures every deliberate picker state (issue 1719)', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  ]).map((viewCase) => viewCase.id);
+
+  // The representative pair plus the panel's fifteen overrides.
+  assert.deepEqual(
+    selected.sort((a, b) => a.localeCompare(b)),
+    [
+      'fabricate-app-shell',
+      'interactables-manager-region-open',
+      'manager-components-normal',
+      'manager-essences-source-picker',
+      'manager-gathering-task-availability-menu',
+      'manager-recipe-edit-crafting-modifier-cap-reached',
+      'manager-recipe-edit-ingredients-or-menu',
+      'manager-recipe-edit-tag-picker',
+      'manager-recipe-item-contents-picker',
+      'manager-recipes-bulk-edit-check-tier',
+      'manager-system-edit-lists',
+      'manager-world-parties-actor-picker',
+      'manager-world-parties-realm-override-picker',
+      'player-actor-picker',
+      'player-crafting-sources-picker',
+      'player-inventory-page-size',
       'world-tool-entry-on-break-repair-tag-picker-empty',
     ]
   );

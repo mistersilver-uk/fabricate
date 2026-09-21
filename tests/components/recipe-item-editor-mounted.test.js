@@ -47,6 +47,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',

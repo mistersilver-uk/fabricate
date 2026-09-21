@@ -547,6 +547,7 @@
                              a `<span>`: neither a button nor a heading may sit inside a button. -->
             <button
               type="button"
+              data-keyboard-focus="true"
               class="manager-checks-trigger-disclosure"
               data-trigger-disclosure={trigger.id}
               aria-expanded={expanded}
@@ -680,6 +681,7 @@
                       {#each outcomeOptions as option (option.id)}
                         <button
                           type="button"
+                          data-keyboard-focus="true"
                           class={`manager-checks-state-pill ${isOutcomeSelected(condition, option.id) ? 'is-positive' : 'is-negative'}`}
                           data-trigger-tier={option.id}
                           aria-pressed={isOutcomeSelected(condition, option.id)}

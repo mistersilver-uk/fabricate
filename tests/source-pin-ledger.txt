@@ -51,7 +51,7 @@ tests/components/gathering-environments-source.test.js	133
 tests/components/gathering-event-editor.test.js	79
 tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
-tests/components/gathering-realm-toggle.test.js	37
+tests/components/gathering-realm-toggle.test.js	36
 tests/components/gathering-task-browser-redesign.test.js	24
 tests/components/gathering-task-editor-economy.test.js	44
 tests/components/gathering-task-editor-summary.test.js	44
@@ -130,7 +130,7 @@ tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
 tests/foundry-perf-profile.test.js	1
 tests/gathering-bootstrap-api.test.js	36
-tests/gathering-harvesting-boundary.test.js	4
+tests/gathering-harvesting-boundary.test.js	3
 tests/gathering-image-defaults.test.js	8
 tests/helpers/chipTone.js	1
 tests/helpers/essenceFixtures.js	1
@@ -164,7 +164,7 @@ tests/manager-button-source-contract.test.js	4
 tests/manager-color-tokens.test.js	2
 tests/manager-extensions.test.js	10
 tests/manager-full-width-gate.test.js	5
-tests/manager-scoped-prop-contract.test.js	7
+tests/manager-scoped-prop-contract.test.js	8
 tests/migrate-retire-crafting-mod-token.test.js	8
 tests/migration-runner-corpus-writeback.test.js	4
 tests/mutation-time-valid-id-basis.test.js	2
@@ -181,6 +181,7 @@ tests/scoped-entity-list-model.test.js	8
 tests/screenshot-capture-scoping.test.js	9
 tests/select-element-typed-legs.test.js	1
 tests/setting-change-bridge.test.js	9
+tests/sortable-list-source-contract.test.js	16
 tests/source-scan.test.js	1
 tests/status-toggle-source-contract.test.js	4
 tests/stores/actor-bar-store.test.js	1

@@ -475,6 +475,29 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
+    id: 'manager-component-edit-salvage-narrow',
+    label: 'Manager — Component edit progressive salvage at the declared floor',
+    // Anchored to `hb-cracked-alembic`, the fixture world's one progressive salvage: the stage rows
+    // are the shared list's now, and this selector is satisfied only by the converted state.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-result-groups]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-salvage-result] [data-sortable-move="up"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-component-edit-salvage-off',
     label: 'Manager — Component edit salvage off',
     smokeLabels: ['manager-component-edit-salvage-off'],

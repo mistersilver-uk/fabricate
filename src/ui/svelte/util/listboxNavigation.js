@@ -3,7 +3,9 @@
 // drive selection with `aria-activedescendant`, so "which row is current" is arithmetic — with
 // wrap-around, an out-of-range guard, a grid form and a sentinel — whose only honest test is a table
 // of inputs and outputs. THE SENTINEL `-1` means NOTHING IS ACTIVE, which is a different state from
-// "the first row is active": it is what makes Enter a no-op on a freshly opened panel.
+// "the first row is active": it is what makes Enter a no-op on a freshly opened panel. It answers
+// which keys the cursor owns at all too, because the holder is sometimes a query field whose caret
+// owns some of them and sometimes a closed trigger a few of them open the panel from.
 
 // A leaf, but every importer's mounted harness must list this file in `rawModules`; one that does
 // not throws in `before()`, or HANGS, reported either way as `# cancelled` rather than `# fail`.
@@ -152,6 +154,33 @@ function prefixMatch(text, labels, current, isDisabled) {
     }
   }
   return null;
+}
+
+const CARET_EDGE = new Map([
+  ['ArrowLeft', 'start'],
+  ['Home', 'start'],
+  ['ArrowRight', 'end'],
+  ['End', 'end'],
+]);
+
+/** Whether the key belongs to the caret in the holder's query field rather than to the list. */
+export function caretOwnsKey(event) {
+  const field = event.target;
+  if (typeof field?.selectionStart !== 'number') return false;
+  const edge = CARET_EDGE.get(event.key);
+  if (!edge) return false;
+  if (field.selectionStart !== field.selectionEnd) return true;
+  return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
+}
+
+const OPENING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End']);
+
+/** What a closed select-only holder opens on this key, or `null`; `altOpen` moves no cursor. */
+export function openingKeyOwns(event) {
+  if (event.ctrlKey || event.metaKey || event.shiftKey) return null;
+  const altOpen = Boolean(event.altKey && event.key === 'ArrowDown');
+  if (!altOpen && (event.altKey || !OPENING_KEYS.has(event.key))) return null;
+  return { altOpen };
 }
 
 // One function for the row id AND the holder's `aria-activedescendant`, so the two cannot drift.

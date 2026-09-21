@@ -587,6 +587,9 @@ if (ess) {
 These methods are called automatically by `createSystem`, `updateSystem`, `createItem`, `addItemFromUuid`, `addItemsFromPack`, and `updateItem`.
 You do not call them directly, but understanding them helps when inspecting or migrating stored data.
 
+The bodies of `_normalizeSalvage`, `_normalizeToolIds`, `_normalizeSalvageResult`, `_normalizeSalvageResultGroup`, `_normalizeTimeRequirement`, and `_normalizeCurrencyRequirement` live in `src/systems/normalize/salvage.js` as free functions.
+They are reached only through these manager delegates, so they remain documented here as manager methods.
+
 ### _normalizeCraftingCheck(check)
 
 Normalises the `craftingCheck` object on a crafting system.
@@ -594,7 +597,7 @@ Applies defaults for all fields including `enabled`, `consumption`, `outcomes`, 
 `enabled` is the on/off toggle for the optional simple-mode check.
 A check becomes usable only when its resolution-mode sub-object carries an authored `rollFormula`.
 
-### _normalizeSalvage(salvage)
+### _normalizeSalvage(salvage = {}, options = {})
 
 Normalises the `salvage` sub-object for a single component.
 Called by `_normalizeComponent` when `features.salvage` is `true` on the system.
