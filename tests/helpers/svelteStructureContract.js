@@ -255,3 +255,118 @@ export function readsGlobal({ ast, scopeManager }, name) {
   }
   return false;
 }
+
+const BLOCK_TYPES = Object.freeze(
+  new Set(['EachBlock', 'IfBlock', 'KeyBlock', 'AwaitBlock', 'SnippetBlock'])
+);
+
+/** Components, raw elements and blocks in one `start`-sorted list, so order can cross kinds. */
+function orderedTemplateNodes(ast) {
+  const nodes = [];
+  for (const node of walkNodes(ast.fragment ?? ast)) {
+    const kind = node.type;
+    if (kind === 'Component' || kind === 'RegularElement' || kind === 'SvelteElement') {
+      nodes.push(node);
+    } else if (BLOCK_TYPES.has(kind)) {
+      nodes.push(node);
+    }
+  }
+  return nodes.sort((left, right) => left.start - right.start);
+}
+
+function classTokens(node) {
+  return String(attributeValue(node, 'class') ?? '').split(/\s+/).filter(Boolean);
+}
+
+/** A node address: a component name, a tag name, a block type, `{ class }` or `{ attribute }`. */
+function matchesTemplateToken(node, token) {
+  if (typeof token === 'string') {
+    if (node.type === 'Component') return node.name === token;
+    if (node.type === 'RegularElement') return node.name.toLowerCase() === token.toLowerCase();
+    return node.type === token;
+  }
+  if (token.class !== undefined) return classTokens(node).includes(token.class);
+  const [name, value] = token.attribute ?? [];
+  if (value === undefined) return Boolean(attributeNamed(node, name));
+  return attributeValue(node, name) === value;
+}
+
+/** Whether the first node `before` addresses is drawn earlier than the first `after` addresses. */
+export function rendersBefore(ast, [before, after]) {
+  const nodes = orderedTemplateNodes(ast);
+  const left = nodes.findIndex((node) => matchesTemplateToken(node, before));
+  const right = nodes.findIndex((node) => matchesTemplateToken(node, after));
+  return left !== -1 && right !== -1 && left < right;
+}
+
+function* rulesIn(children) {
+  for (const node of children ?? []) {
+    if (node.type === 'Rule') {
+      yield node;
+      yield* rulesIn(node.block?.children);
+    } else if (node.type === 'Atrule') {
+      yield* rulesIn(node.block?.children);
+    }
+  }
+}
+
+/** Every rule a component's own `<style>` states, inside an at-rule block as well as beside one. */
+export function styleRules(ast) {
+  return [...rulesIn(ast.css?.children)];
+}
+
+const unquoted = (value) => String(value ?? '').replace(/^['"]|['"]$/g, '');
+
+function matchesSelectorToken(selectors, token) {
+  if (typeof token === 'string') {
+    return selectors.some((node) => node.type === 'ClassSelector' && node.name === token);
+  }
+  if (token.attribute) {
+    const [name, value] = token.attribute;
+    return selectors.some(
+      (node) =>
+        node.type === 'AttributeSelector' &&
+        node.name === name &&
+        (value === undefined || unquoted(node.value) === value)
+    );
+  }
+  return selectors.some(
+    (node) =>
+      node.type === 'PseudoClassSelector' &&
+      node.name === 'global' &&
+      (node.args?.children ?? []).some((complex) => matchesChain(complex, chainOf(token.global)))
+  );
+}
+
+const chainOf = (spec) => (Array.isArray(spec) ? spec : [spec]);
+const stepTokens = (step) => (Array.isArray(step) ? step : [step]);
+
+function matchesChain(complex, chain) {
+  const steps = complex.children ?? [];
+  if (steps.length !== chain.length) return false;
+  return chain.every((step, index) =>
+    stepTokens(step).every((token) => matchesSelectorToken(steps[index].selectors ?? [], token))
+  );
+}
+
+/**
+ * The one rule a structured selector names. The modern CSS AST carries no selector text, so a spec
+ * is a descendant chain of steps — a class token, `{ attribute: [name, value] }`, `{ global: spec }`,
+ * or an array of those for a compound. Throws when nothing matches, so an absent rule cannot pass.
+ */
+export function styleRule(ast, spec) {
+  const chain = chainOf(spec);
+  for (const rule of styleRules(ast)) {
+    if ((rule.prelude?.children ?? []).some((complex) => matchesChain(complex, chain))) return rule;
+  }
+  throw new Error(`no scoped rule for ${JSON.stringify(chain)}`);
+}
+
+/** Whether that rule declares `property`, with exactly `value` when one is given. */
+export function styleDeclares(ast, [spec, property, value]) {
+  const declared = (styleRule(ast, spec).block?.children ?? []).filter(
+    (node) => node.type === 'Declaration' && node.property === property
+  );
+  if (declared.length === 0) return false;
+  return value === undefined || declared.some((node) => node.value === value);
+}

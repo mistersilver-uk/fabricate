@@ -5,6 +5,16 @@
 import assert from 'node:assert/strict';
 
 import { byTokenName } from './interactablesSmokeLocators.js';
+import { walkNodes } from './moduleAst.js';
+import { componentAstOf } from './parsedSource.js';
+import {
+  attributeNames,
+  attributeValue,
+  importsModule,
+  rendersComponent,
+  styleRules,
+} from './svelteStructureContract.js';
+import { templateNodes } from './structureContract.js';
 
 /**
  * The rich GM config panel. `Stepper` is deliberately absent from its primitives: it converted
@@ -120,34 +130,58 @@ export const MANAGE_PANEL_CONTRACT = Object.freeze({
   ]),
 });
 
+/** Every class token a component's own `<style>` rules select on. */
+function styleClassTokens(ast) {
+  const names = [];
+  for (const rule of styleRules(ast)) {
+    for (const node of walkNodes(rule.prelude)) {
+      if (node.type === 'ClassSelector') names.push(node.name);
+    }
+  }
+  return names;
+}
+
+/** Every token the template writes as a static attribute value — a class, an id, a group name. */
+function templateValueTokens(ast) {
+  return templateNodes(ast).flatMap((node) =>
+    (node.attributes ?? []).flatMap((attribute) =>
+      String(attributeValue(node, attribute.name) ?? '')
+        .split(/\s+/u)
+        .filter(Boolean)
+    )
+  );
+}
+
 /**
  * Assert a window renders the shared control primitives and keeps only its own layout classes.
+ * The residue comes from what the component draws — attribute names, static attribute values and
+ * the classes its own `<style>` selects — so a token surviving only in a comment stops counting,
+ * and an orphan style rule for a retired class still fails.
  *
- * @param {string} params.rootSource The root component's own source text.
+ * @param {string} params.componentFile The root component's repository-relative path.
  * @param {object} params.contract One of the exported per-window contracts.
  */
-export function assertWindowContract({ rootSource, contract }) {
+export function assertWindowContract({ componentFile, contract }) {
   const { rootClass, classPrefix, residueDescription, primitives, layoutClasses } = contract;
+  const ast = componentAstOf(componentFile);
 
   assert.ok(
-    rootSource.includes(`class="${rootClass}"`),
+    templateNodes(ast).some((node) => attributeValue(node, 'class') === rootClass),
     `the root element carries the namespaced ${rootClass} class`
   );
 
   for (const [primitive, importPath] of primitives) {
-    assert.ok(
-      rootSource.includes(`import ${primitive} from '${importPath}'`),
-      `${primitive} is imported from ${importPath}`
-    );
-    assert.ok(
-      new RegExp(`<${primitive}[\\s/>]`).test(rootSource),
-      `${primitive} is rendered by the window`
-    );
+    assert.ok(importsModule(ast, importPath), `${primitive} is imported from ${importPath}`);
+    assert.ok(rendersComponent(ast, primitive), `${primitive} is rendered by the window`);
   }
 
-  const residue = [...new Set(rootSource.match(new RegExp(`${classPrefix}[a-z-]+`, 'g')) ?? [])];
+  const tokens = [
+    ...attributeNames(ast),
+    ...templateValueTokens(ast),
+    ...styleClassTokens(ast),
+  ].filter((token) => token.startsWith(classPrefix));
   assert.deepEqual(
-    residue.sort(byTokenName),
+    [...new Set(tokens)].sort(byTokenName),
     [...layoutClasses],
     `the surviving ${classPrefix}* names are exactly ${residueDescription}`
   );

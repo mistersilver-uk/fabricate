@@ -38,7 +38,6 @@ tests/components/component-studio-font-size.test.js	2
 tests/components/crafting-view-mounted.test.js	9
 tests/components/design-system-debt-ratchets.test.js	4
 tests/components/empty-state-mounted.test.js	1
-tests/components/environment-editor.test.js	50
 tests/components/essence-chip-mounted.test.js	1
 tests/components/essence-pool-panel-mounted.test.js	10
 tests/components/essence-source-selector-keyboard-mounted.test.js	9
@@ -58,7 +57,6 @@ tests/components/gathering-task-editor-summary.test.js	44
 tests/components/gathering-view-actor-bar.test.js	31
 tests/components/icon-picker-layout.test.js	4
 tests/components/interactable-browser-app.test.js	86
-tests/components/interactable-config-app.test.js	141
 tests/components/interactables-manager-app.test.js	57
 tests/components/inventory-view-salvage-reload.test.js	3
 tests/components/inventory-view.test.js	24
@@ -86,7 +84,6 @@ tests/components/pill-family-routing.test.js	1
 tests/components/portal-host-app-root.test.js	3
 tests/components/re-rooted-controls-host-independence.test.js	19
 tests/components/recipe-browser-mounted.test.js	5
-tests/components/recipe-edit-editor.test.js	261
 tests/components/recipe-edit-placeholder.test.js	37
 tests/components/recipe-studio-primitives.test.js	5
 tests/components/recipes-browser-view-mounted.test.js	3
@@ -135,7 +132,6 @@ tests/gathering-image-defaults.test.js	8
 tests/helpers/chipTone.js	1
 tests/helpers/essenceFixtures.js	1
 tests/helpers/fabricateFacadeHarness.js	1
-tests/helpers/interactablesWindowContract.js	2
 tests/helpers/manager-button-cascade.js	2
 tests/helpers/manager/managerQueries.js	1
 tests/helpers/primitiveAdoptionContract.js	3

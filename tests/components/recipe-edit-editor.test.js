@@ -1,108 +1,63 @@
+/**
+ * The recipe editor's structure contract (issue 1697 retired this file's source-text pins). Every
+ * claim about a `src/` file is a row of the shared table; the `lang/en.json` catalogue and the
+ * shipped global stylesheet are not `src/` text and keep their reads.
+ */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
 
-// The one place the aside/column pairing is asked.
-import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
-import { openingTagsNamed } from '../helpers/svelteTagScan.js';
 import { ROUTE_EXIT_GUARDS } from '../../src/ui/svelte/apps/manager/routeExitGuards.js';
+import { calledName, identifierNames } from '../helpers/moduleAst.js';
+import { componentAstOf } from '../helpers/parsedSource.js';
+import {
+  attributeExpression,
+  attributeValue,
+  rendersElement,
+} from '../helpers/svelteStructureContract.js';
+import { defineStructureContract, renderedNodes } from '../helpers/structureContract.js';
+import { repoRoot } from '../helpers/sourceScan.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(__dirname, '../..');
-const editPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipeEditView.svelte');
-const overviewPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'
-);
-// Issue 676 deleted RecipeContextRail.
-const accessTabPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte');
-const booksTabPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte'
-);
-const tabsPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte');
-const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
-const browserInspectorPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
-);
+const MANAGER = 'src/ui/svelte/apps/manager';
+const EDIT = `${MANAGER}/RecipeEditView.svelte`;
+const OVERVIEW = `${MANAGER}/recipe/RecipeOverviewTab.svelte`;
+// Issue 676 deleted RecipeContextRail; these two are its content sections, rehomed as real tabs.
+const ACCESS_TAB = `${MANAGER}/recipe/RecipeAccessTab.svelte`;
+const BOOKS_TAB = `${MANAGER}/recipe/RecipeBooksScrollsTab.svelte`;
+const TABS = `${MANAGER}/recipe/RecipeEditorTabs.svelte`;
+const ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
+const BROWSER = `${MANAGER}/RecipesBrowserView.svelte`;
+const BROWSER_INSPECTOR = `${MANAGER}/recipes/RecipeBrowserInspector.svelte`;
 // The Access SURFACE (the Crafting nav's grant list + its inspector).
-const accessSurfacePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/AccessTabView.svelte');
-const grantAccessInspectorPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'
-);
-const storePath = resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js');
-// The GM browser row and inspector projection left `adminStore.js` for pure modules in
-// issue 1090. The assertions below that pin a PROJECTED field therefore read the
-// projection module, not the store — the store is reactive wiring now — and
-// `projectionSource` is the two concatenated so a field that migrates between them
-// stays covered.
-const recipeRowProjectionPath = resolve(
-  repoRoot,
-  'src/ui/svelte/stores/adminRecipeRowProjection.js'
-);
-const systemInspectorProjectionPath = resolve(
-  repoRoot,
-  'src/ui/svelte/stores/adminSystemInspectorProjection.js'
-);
-const modelPath = resolve(repoRoot, 'src/models/Recipe.js');
-const managerPath = resolve(repoRoot, 'src/systems/RecipeManager.js');
-const graphPath = resolve(repoRoot, 'src/ui/svelte/util/recipeGraphBuilder.js');
-const iconsPath = resolve(repoRoot, 'src/ui/svelte/util/recipeImageIcons.js');
-const langPath = resolve(repoRoot, 'lang/en.json');
-const cssPath = resolve(repoRoot, 'styles/fabricate.css');
-const routingAssignmentPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte'
-);
-const resultGroupCardPath = resolve(
-  repoRoot,
-  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte'
-);
+const ACCESS_SURFACE = `${MANAGER}/AccessTabView.svelte`;
+const GRANT_ACCESS_INSPECTOR = `${MANAGER}/GrantAccessInspector.svelte`;
+const STORE = 'src/ui/svelte/stores/adminStore.js';
+// The GM browser row and inspector projection left `adminStore.js` for pure modules in issue 1090,
+// so a claim about a projected field is asked of the projection rather than of the store.
+const ROW_PROJECTION = 'src/ui/svelte/stores/adminRecipeRowProjection.js';
+const SYSTEM_PROJECTION = 'src/ui/svelte/stores/adminSystemInspectorProjection.js';
+const MODEL = 'src/models/Recipe.js';
+const RECIPE_MANAGER = 'src/systems/RecipeManager.js';
+const GRAPH = 'src/ui/svelte/util/recipeGraphBuilder.js';
+const ICONS = 'src/ui/svelte/util/recipeImageIcons.js';
+const BANNER = `${MANAGER}/recipe/RecipeModeBanner.svelte`;
+const ROUTING_ASSIGNMENT = `${MANAGER}/recipe/RecipeRoutingAssignment.svelte`;
+const RESULT_GROUP_CARD = `${MANAGER}/recipe/RecipeResultGroupCard.svelte`;
 
-const editSource = readFileSync(editPath, 'utf8');
-// The identity card + locked image-picker markup live in the Overview tab. The
-// editor is fully controlled: the root holds the recipe draft and the shell forwards
-// identity edits via onUpdateRecipe / onToggleEnabled (no form, no local draft state).
-const overviewSource = readFileSync(overviewPath, 'utf8');
-const accessTabSource = readFileSync(accessTabPath, 'utf8');
-const booksTabSource = readFileSync(booksTabPath, 'utf8');
-const tabsSource = readFileSync(tabsPath, 'utf8');
-const rootSource = readFileSync(rootPath, 'utf8');
-const browserSource = readFileSync(browserPath, 'utf8');
-const browserInspectorSource = readFileSync(browserInspectorPath, 'utf8');
-const accessSurfaceSource = readFileSync(accessSurfacePath, 'utf8');
-const grantAccessInspectorSource = readFileSync(grantAccessInspectorPath, 'utf8');
-const storeSource = readFileSync(storePath, 'utf8');
-const recipeRowProjectionSource = readFileSync(recipeRowProjectionPath, 'utf8');
-const systemInspectorProjectionSource = readFileSync(systemInspectorProjectionPath, 'utf8');
-const projectionSource = `${recipeRowProjectionSource}\n${systemInspectorProjectionSource}`;
-const modelSource = readFileSync(modelPath, 'utf8');
-const managerSource = readFileSync(managerPath, 'utf8');
-const graphSource = readFileSync(graphPath, 'utf8');
-const iconsSource = readFileSync(iconsPath, 'utf8');
-const lang = JSON.parse(readFileSync(langPath, 'utf8'));
-const css = readFileSync(cssPath, 'utf8');
-const routingAssignmentSource = readFileSync(routingAssignmentPath, 'utf8');
-const resultGroupCardSource = readFileSync(resultGroupCardPath, 'utf8');
+const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
 const recipeLang = lang.FABRICATE.Admin.Manager.Recipe;
 const BLUEPRINT_DEFAULT = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 
-// Extract a single scoped-`<style>` rule block by its selector and assert it (a) carries
-// each required fragment and (b) no longer sets `max-width` (the issue-796 cap on both the
-// grid list and the empty panel). The selector must be given VERBATIM — for the grid rule
-// pass the COMPOUND `.manager-recipe-books-tab .manager-recipe-item-links` rather than the
-// bare class, so the match stays pinned to the grid rule and is robust to future reordering
-// of the style blocks (the file also carries a bare `.manager-recipe-item-links { margin }`
-// rule that a bare-class regex could latch onto).
-function assertScopedRuleHasNoMaxWidth(source, selector, { mustContain = [] } = {}) {
+/**
+ * The global sheet's leg of the issue-796 cap. A component's own `<style>` is asked through the
+ * `styleDeclares` claim instead; this reads `styles/fabricate.css`, which is not `src/` text.
+ */
+function assertGlobalRuleHasNoMaxWidth(selector, { mustContain = [] } = {}) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const rule = source.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
+  const rule = css.match(new RegExp(`${escaped}\\s*\\{[^}]*\\}`));
   assert.ok(rule, `scoped rule for "${selector}" exists`);
   for (const fragment of mustContain) {
     assert.ok(rule[0].includes(fragment), `"${selector}" declares ${fragment}`);
@@ -110,553 +65,403 @@ function assertScopedRuleHasNoMaxWidth(source, selector, { mustContain = [] } = 
   assert.equal(/max-width/.test(rule[0]), false, `"${selector}" no longer carries the cap`);
 }
 
+/** The identifier one rendered component gives a prop, so a wiring claim names the handler. */
+function propIdentifier(file, component, prop) {
+  const [node] = renderedNodes(componentAstOf(file), component);
+  assert.ok(node, `${file} still renders <${component}>`);
+  return attributeExpression(node, prop)?.name;
+}
+
 describe('RecipeEditView identity-only single column', () => {
-  it('renders the identity card in the standard manager-main, with no bespoke workspace', () => {
-    // The editor is fully controlled now: no <form> wrapper.
-    assert.equal(
-      editSource.includes('manager-recipe-edit-form'),
-      false,
-      'no recipe-edit form wrapper in the controlled view'
-    );
-    assert.equal(
-      /<form\b/.test(editSource),
-      false,
-      'the controlled editor renders no form element'
-    );
-    assert.ok(editSource.includes('manager-recipe-edit-main'), 'reuses the recipe-edit main class');
-    assert.equal(
-      editSource.includes('manager-recipe-workspace'),
-      false,
-      'no bespoke workspace grid'
-    );
-    assert.equal(
-      editSource.includes('manager-recipe-edit-panel'),
-      false,
-      'no bespoke editing panel'
-    );
-    assert.equal(
-      editSource.includes('manager-recipe-inspector'),
-      false,
-      'no view-internal inspector column'
-    );
-    assert.equal(editSource.includes('is-inspector-hidden'), false, 'no inspector-hidden toggle');
+  defineStructureContract(
+    'renders the identity card in the standard manager-main, with no bespoke workspace',
+    EDIT,
+    {
+      // The editor is fully controlled now: no <form> wrapper.
+      spellsNo: [
+        'manager-recipe-edit-form',
+        'manager-recipe-workspace',
+        'manager-recipe-edit-panel',
+        'manager-recipe-inspector',
+        'is-inspector-hidden',
+      ],
+      spells: ['manager-recipe-edit-main'],
+    }
+  );
+
+  it('the controlled editor renders no form element', () => {
+    assert.equal(rendersElement(componentAstOf(EDIT), 'form'), false);
   });
 
-  it('rebuilds the Overview tab to the prototype (micro-labels, select row, status cards, inline duration)', () => {
-    // The card-stack chrome is gone: micro-labels over unwrapped fields (issue 643).
-    assert.equal(
-      overviewSource.includes('manager-task-core-card'),
-      false,
-      'no reused task core card wrapper'
-    );
-    assert.ok(
-      overviewSource.includes('manager-recipe-micro-label'),
-      'uppercase micro-labels over fields'
-    );
-    assert.ok(
-      overviewSource.includes('manager-task-image-picker'),
-      'keeps the shared image picker (capability)'
-    );
-    assert.ok(
-      overviewSource.includes('ToggleCard'),
-      'reuses the shared ToggleCard for the status toggles (issue 658 retrofit)'
-    );
-    // Category authored on Overview (prototype §5.1), not the rail.
-    assert.ok(
-      overviewSource.includes('data-recipe-category-select'),
-      'category select lives on Overview'
-    );
-    // Two side-by-side status cards (Enabled + Locked) now render through the shared
-    // ToggleCard extracted in issue 651; the issue-658 retrofit is a byte-faithful DOM
-    // no-op, so the section/field markers move from inlined attributes onto props.
-    assert.ok(
-      overviewSource.includes('variant="is-enabled"'),
-      'enabled status card via ToggleCard'
-    );
-    assert.ok(overviewSource.includes('variant="is-locked"'), 'locked status card via ToggleCard');
-    assert.ok(
-      overviewSource.includes('section="enabled-status"'),
-      'enabled status card section marker'
-    );
-    assert.ok(
-      overviewSource.includes('section="locked-status"'),
-      'locked status card section marker'
-    );
-    // Always-visible inline duration steppers replace the popover on the tab.
-    assert.ok(
-      overviewSource.includes('RecipeDurationSteppers'),
-      'inline duration steppers on the Duration card'
-    );
-    assert.ok(overviewSource.includes('data-recipe-field="name"'), 'name field bound');
-    assert.ok(
-      overviewSource.includes('data-recipe-field="description"'),
-      'description field bound'
-    );
-    assert.ok(overviewSource.includes('field="enabled"'), 'enabled toggle bound');
-    assert.ok(overviewSource.includes('field="locked"'), 'locked toggle bound');
-    assert.ok(overviewSource.includes('data-recipe-field="img"'), 'image picker bound');
+  defineStructureContract(
+    'rebuilds the Overview tab to the prototype (micro-labels, select row, status cards, inline duration)',
+    OVERVIEW,
+    {
+      // The card-stack chrome is gone: micro-labels over unwrapped fields (issue 643).
+      spellsNo: ['manager-task-core-card'],
+      spells: ['manager-recipe-micro-label', 'manager-task-image-picker'],
+      renders: ['ToggleCard', 'RecipeDurationSteppers', 'Select'],
+      // The category control became a `Select` call site at issue 1847, so the hook this row used
+      // to find as a WRITTEN attribute is handed to the primitive as trigger data instead. The
+      // clause moves with it rather than being dropped: the hook is what every other suite finds
+      // the control by.
+      passesProps: [['Select', 'triggerData']],
+      spellsExactly: ['data-recipe-category-select'],
+      // The issue-658 retrofit is a byte-faithful DOM no-op, so the section/field markers moved
+      // from inlined attributes onto props.
+      attributes: [
+        ['variant', 'is-enabled'],
+        ['variant', 'is-locked'],
+        ['section', 'enabled-status'],
+        ['section', 'locked-status'],
+        ['field', 'enabled'],
+        ['field', 'locked'],
+        ['data-recipe-field', 'name'],
+        ['data-recipe-field', 'description'],
+        ['data-recipe-field', 'img'],
+      ],
+    }
+  );
+
+  defineStructureContract('keeps the empty select-a-recipe state', EDIT, {
+    spells: ['FABRICATE.Admin.Manager.Recipe.SelectRecipe'],
   });
 
-  it('keeps the empty select-a-recipe state', () => {
-    assert.ok(
-      editSource.includes('FABRICATE.Admin.Manager.Recipe.SelectRecipe'),
-      'empty state copy retained'
-    );
-  });
+  defineStructureContract(
+    'is fully controlled: identity edits stage via onUpdateRecipe and enabled via onToggleEnabled',
+    EDIT,
+    {
+      // No local identity state / dirty / save machinery survives in the view.
+      namesNo: ['onDirtyChange', 'onDraftChange', 'onSave', 'buildDraftSummary'],
+      writesNo: ['onDirtyChange', 'onDraftChange', 'onSave'],
+      names: ['onUpdateRecipe', 'onToggleEnabled'],
+      keys: ['name', 'description', 'img'],
+      callsWith: [['onUpdateRecipe', 'value']],
+      passesProps: [['RecipeEditorTabs', 'activeTab']],
+    }
+  );
 
-  it('is fully controlled: identity edits stage via onUpdateRecipe and enabled via onToggleEnabled', () => {
-    // No local identity state / dirty / save machinery survives in the view.
-    assert.equal(editSource.includes('onDirtyChange'), false, 'no onDirtyChange prop/emit');
-    assert.equal(editSource.includes('onDraftChange'), false, 'no onDraftChange prop/emit');
-    assert.equal(editSource.includes('onSave'), false, 'no onSave prop/emit');
-    assert.equal(editSource.includes('buildDraftSummary'), false, 'no draft summary builder');
-    assert.equal(/let name = \$state/.test(editSource), false, 'no local name state');
-    assert.equal(/let enabled = \$state/.test(editSource), false, 'no local enabled state');
-    // Identity edits emit onUpdateRecipe; the enabled toggle emits onToggleEnabled.
-    assert.ok(
-      editSource.includes('onUpdateRecipe({ name: value })'),
-      'name input stages via onUpdateRecipe'
-    );
-    assert.ok(
-      editSource.includes('onUpdateRecipe({ description: value })'),
-      'description input stages via onUpdateRecipe'
-    );
-    assert.ok(
-      editSource.includes('onUpdateRecipe({ img: value })'),
-      'image picker stages via onUpdateRecipe'
-    );
-    assert.ok(
-      editSource.includes('{onToggleEnabled}'),
-      'the enabled toggle forwards onToggleEnabled'
-    );
-  });
+  defineStructureContract(
+    'carries no recipe-item authoring state, props, or drop zone in the view',
+    EDIT,
+    {
+      namesNo: ['knowledgeMode', 'onAddRecipeItem', 'onSetRecipeItem', 'dragDrop', 'resolveDropData'],
+      spellsNo: ['manager-environment-scene-dropzone', 'manager-environment-scene-linked'],
+      // The read-only summary props are expected, and are forwarded to the tab.
+      names: ['recipeItemDefinitions', 'onRemoveRecipeItem'],
+    }
+  );
 
-  // The view threads `recipeItemDefinitions` to the read-only Books & Scrolls TAB
-  // (issue 676 rehomed it here from the deleted rail). What must never come back is the
-  // AUTHORING path: adding a recipe to a book is owned by the book's own editor, and a
-  // recipe-side add would be a second writer for the same many-to-many.
-  it('carries no recipe-item AUTHORING state, props, or drop zone in the view', () => {
-    assert.equal(editSource.includes('knowledgeMode'), false, 'no knowledgeMode prop');
-    assert.equal(editSource.includes('onAddRecipeItem'), false, 'no add-recipe-item prop');
-    assert.equal(editSource.includes('onSetRecipeItem'), false, 'no set-recipe-item prop');
-    assert.equal(
-      editSource.includes('manager-environment-scene-dropzone'),
-      false,
-      'no recipe-item dropzone'
-    );
-    assert.equal(
-      editSource.includes('manager-environment-scene-linked'),
-      false,
-      'no recipe-item linked card'
-    );
-    assert.equal(editSource.includes('dragDrop'), false, 'no dragDrop import/usage');
-    assert.equal(editSource.includes('resolveDropData'), false, 'no resolveDropData import/usage');
-    // The read-only summary props ARE expected, and are forwarded to the tab.
-    assert.ok(
-      editSource.includes('recipeItemDefinitions'),
-      'forwards the definition library to the books tab'
-    );
-    assert.ok(
-      editSource.includes('onRemoveRecipeItem'),
-      'forwards the per-row unlink (a removal, not authoring)'
-    );
-  });
-
-  it('does not render a draft-state card', () => {
-    assert.equal(editSource.includes('DraftState'), false, 'no draft-state card copy');
-    assert.equal(editSource.includes('draft-state'), false, 'no draft-state element');
+  defineStructureContract('does not render a draft-state card', EDIT, {
+    spellsNo: ['DraftState', 'draft-state'],
   });
 });
 
-// Issue 676 deleted RecipeContextRail. Its two content sections became real tabs and
-// its Step-mode control moved to Overview; its validation summary + mini check list
-// were dropped as duplicates of the Validation tab, which reads the same evaluator.
 describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rail)', () => {
-  it('renders the frozen recipe-item section marker', () => {
-    assert.ok(
-      booksTabSource.includes('data-recipe-section="recipe-item"'),
-      'recipe-item section marker (FROZEN: the smoke harness waits on it)'
-    );
-    assert.ok(
-      booksTabSource.includes('data-recipe-tab="books-scrolls"'),
-      'carries the tab marker, like every other recipe tab'
-    );
+  defineStructureContract('renders the frozen recipe-item section marker', BOOKS_TAB, {
+    attributes: [
+      ['data-recipe-section', 'recipe-item'],
+      ['data-recipe-tab', 'books-scrolls'],
+    ],
   });
 
-  // The book rows must NOT borrow the gathering environment editor's vocabulary.
-  it('uses its own row vocabulary, not the gathering scene-widget classes', () => {
-    assert.equal(
-      booksTabSource.includes('manager-environment-scene-linked'),
-      false,
-      'no borrowed gathering scene-row class'
-    );
-    assert.equal(
-      booksTabSource.includes('manager-environment-scene-thumb'),
-      false,
-      'no borrowed gathering scene-thumb class'
-    );
-    assert.ok(booksTabSource.includes('manager-recipe-book-link'), 'owns its row class');
-    assert.ok(booksTabSource.includes('manager-recipe-book-thumb'), 'owns its thumb class');
+  defineStructureContract(
+    'uses its own row vocabulary, not the gathering scene-widget classes',
+    BOOKS_TAB,
+    {
+      spellsNo: [
+        'manager-environment-scene-linked',
+        'manager-environment-scene-thumb',
+        'manager-environment-scene-name',
+      ],
+      spells: ['manager-recipe-book-link', 'manager-recipe-book-thumb'],
+    }
+  );
+
+  defineStructureContract(
+    'carries NO book drop zone and NO "link another" — adding to a book lives on Books & Scrolls',
+    BOOKS_TAB,
+    {
+      namesNo: ['dragDrop', 'onAddRecipeItem', 'deleteRecipeItemDefinition', 'linkedRecipeItemUuid'],
+      writesNo: ['data-recipe-item-dropzone'],
+      spellsNo: ['RecipeItemLinkAnother'],
+      // Removing this recipe from a book it already appears in is still allowed.
+      names: ['onRemoveRecipeItem', 'recipeItemId'],
+      writes: ['data-recipe-open-books'],
+    }
+  );
+
+  defineStructureContract('uses item iconography and the shared image constant', BOOKS_TAB, {
+    spells: ['fa-suitcase'],
+    imports: ['../../../util/recipeImageIcons.js'],
+    names: ['DEFAULT_RECIPE_IMAGE'],
+    spellsExactlyNo: ['icons/svg/item-bag.svg'],
+    spellsNo: ['fa-map'],
   });
 
-  it('carries NO book drop zone and NO "link another" — adding to a book lives on Books & Scrolls', () => {
-    assert.equal(booksTabSource.includes('use:dragDrop'), false, 'no drop action');
-    assert.equal(booksTabSource.includes('data-recipe-item-dropzone'), false, 'no drop zone');
-    assert.equal(booksTabSource.includes('onAddRecipeItem'), false, 'no add-recipe-item path');
-    assert.equal(
-      booksTabSource.includes('RecipeItemLinkAnother'),
-      false,
-      'no link-another affordance'
-    );
-    // Removing THIS recipe from a book it already appears in is still allowed.
-    assert.ok(booksTabSource.includes('onRemoveRecipeItem('), 'per-row removal retained');
-    assert.ok(booksTabSource.includes('data-recipe-open-books'), 'deep-links to Books & Scrolls');
+  defineStructureContract('resolves each linked book in a cancelled-guarded $effect', BOOKS_TAB, {
+    reads: ['globalThis.fromUuid'],
+    names: ['cancelled'],
+    assigns: [['cancelled', true]],
   });
 
-  it('uses item iconography and the shared image constant', () => {
-    assert.ok(booksTabSource.includes('fa-suitcase'), 'missing thumb uses a suitcase icon');
-    assert.ok(
-      booksTabSource.includes(
-        "import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"
-      ),
-      'image fallback uses the shared DEFAULT_RECIPE_IMAGE constant'
-    );
-    assert.equal(booksTabSource.includes("'icons/svg/item-bag.svg'"), false, 'no bag-SVG literal');
-    assert.equal(booksTabSource.includes('fa-map'), false, 'no map icon');
+  defineStructureContract('carries the linked-list a11y contract and the missing state', BOOKS_TAB, {
+    writes: ['data-recipe-item-links', 'aria-label'],
+    renders: ['IconButton'],
+    passesValues: [['IconButton', 'class', 'is-danger']],
+    names: ['onOpenItem'],
+    spells: ['FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'],
   });
 
-  it('uses the canonical recipeItemId, never the legacy linkedRecipeItemUuid', () => {
-    assert.ok(booksTabSource.includes('recipeItemId'), 'references recipeItemId');
-    assert.equal(
-      booksTabSource.includes('linkedRecipeItemUuid'),
-      false,
-      'never references the legacy alias'
-    );
+  // Issue 796: the linked-book list tiles into a fixed three-column grid (widened from the earlier
+  // auto-fill 220px tracks, which truncated long titles), dropping the old `max-width: 520px` cap.
+  // The compound chain keeps the claim pinned to the grid rule; the file also carries a bare
+  // `.manager-recipe-item-links { margin }` rule a bare-class claim could latch onto.
+  defineStructureContract(
+    'tiles the linked-book list into an uncapped three-column grid (Access-tab parity)',
+    BOOKS_TAB,
+    {
+      styleDeclares: [
+        [['manager-recipe-books-tab', 'manager-recipe-item-links'], 'display', 'grid'],
+        [
+          ['manager-recipe-books-tab', 'manager-recipe-item-links'],
+          'grid-template-columns',
+          'repeat(3, minmax(0, 1fr))',
+        ],
+      ],
+      styleDeclaresNo: [[['manager-recipe-books-tab', 'manager-recipe-item-links'], 'max-width']],
+    }
+  );
+
+  defineStructureContract('and hands the empty panel its container class', BOOKS_TAB, {
+    passesValues: [['EmptyState', 'contextClass', 'manager-recipe-tab-empty']],
   });
 
-  it('does not delete the shared recipe-item definition on unlink', () => {
-    assert.equal(
-      booksTabSource.includes('deleteRecipeItemDefinition'),
-      false,
-      'unlink must not delete the shared definition'
-    );
-  });
-
-  it('resolves each linked book in a cancelled-guarded $effect', () => {
-    assert.ok(booksTabSource.includes('globalThis.fromUuid'), 'resolves via fromUuid');
-    assert.ok(booksTabSource.includes('let cancelled = false'), 'effect carries a cancelled guard');
-    assert.ok(booksTabSource.includes('cancelled = true'), 'cleanup flips the cancelled guard');
-  });
-
-  it('carries the linked-list a11y contract and the missing state', () => {
-    assert.ok(booksTabSource.includes('data-recipe-item-links'), 'renders the linked-items list');
-    assert.ok(booksTabSource.includes('aria-label='), 'the list has an aria-label');
-    // `<IconButton class="is-danger">` since issue 1422.
-    assert.ok(
-      /<IconButton\s+class="is-danger"/.test(booksTabSource),
-      'visible danger unlink button'
-    );
-    assert.ok(booksTabSource.includes('onOpenItem('), 'open wired');
-    assert.ok(
-      booksTabSource.includes('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing'),
-      'missing state copy'
-    );
-  });
-
-  // Issue 796: the linked-book list tiles into a fixed three-column grid (widened from the
-  // earlier auto-fill 220px tracks, which truncated long titles), dropping the old
-  // `max-width: 520px` cap. The cascade win over the shared flex rule and the tiled fill
-  // are verified live in the smoke frame; this pins the rule SHAPE so a re-cap or a revert
-  // to narrow tracks regresses at test time. The COMPOUND selector is extracted so the
-  // match stays pinned to the grid rule (robust to future style-block reordering; the file
-  // also carries a bare `.manager-recipe-item-links { margin }` rule).
-  it('tiles the linked-book list into an uncapped three-column grid (Access-tab parity)', () => {
-    assertScopedRuleHasNoMaxWidth(
-      booksTabSource,
-      '.manager-recipe-books-tab .manager-recipe-item-links',
-      { mustContain: ['display: grid', 'repeat(3, minmax(0, 1fr)'] }
-    );
-  });
-
-  // The original bug capped BOTH the list and the empty state. Without this symmetric
-  // guard a re-cap of only the empty panel would ship green.
+  // The original bug capped both the list and the empty state. Without this symmetric guard a
+  // re-cap of only the empty panel would ship green.
   it('keeps the empty state a full-width uncapped panel', () => {
-    assert.ok(
-      booksTabSource.includes('contextClass="manager-recipe-tab-empty"'),
-      'the tab hands the panel its container class'
-    );
-    assertScopedRuleHasNoMaxWidth(css, '.fabricate-manager .manager-recipe-tab-empty', {
+    assertGlobalRuleHasNoMaxWidth('.fabricate-manager .manager-recipe-tab-empty', {
       mustContain: ['width: 100%'],
     });
   });
 });
 
 describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', () => {
-  it('renders the frozen access section marker', () => {
-    assert.ok(
-      accessTabSource.includes('data-recipe-section="access"'),
-      'access section marker (FROZEN: the smoke harness waits on it)'
-    );
-    assert.ok(accessTabSource.includes('data-recipe-tab="access"'), 'carries the tab marker');
+  defineStructureContract('renders the frozen access section marker', ACCESS_TAB, {
+    attributes: [
+      ['data-recipe-section', 'access'],
+      ['data-recipe-tab', 'access'],
+    ],
   });
 
-  it('never resolves access ids itself and never mutates the grant', () => {
-    // The store resolves (over EVERY world actor, not the PC roster).
-    assert.ok(accessTabSource.includes('accessPlayers'), 'takes resolved players');
-    assert.ok(accessTabSource.includes('accessCharacters'), 'takes resolved characters');
-    assert.equal(
-      accessTabSource.includes('characterIds'),
-      false,
-      'the tab never touches grant ids'
-    );
-    assert.equal(accessTabSource.includes('playerIds'), false, 'the tab never touches grant ids');
-    assert.equal(accessTabSource.includes('saveRecipeAccess'), false, 'the tab is read-only');
-    assert.ok(
-      accessTabSource.includes('data-recipe-open-access'),
-      'deep-links to the Access screen'
-    );
+  defineStructureContract('never resolves access ids itself and never mutates the grant', ACCESS_TAB, {
+    names: ['accessPlayers', 'accessCharacters'],
+    namesNo: ['characterIds', 'playerIds', 'saveRecipeAccess'],
+    writes: ['data-recipe-open-access'],
   });
 
-  it('treats the character->player relation as a SET, with the whole-table case distinct', () => {
-    assert.ok(accessTabSource.includes('controlledBy'), 'reads the controller SET');
-    assert.ok(
-      accessTabSource.includes('sharedWithAllPlayers'),
-      'ownership.default >= OWNER reaches the whole table'
-    );
-    assert.ok(
-      accessTabSource.includes('AccessTab.SharedWithAllPlayers'),
-      'the whole-table case has its OWN string, never "Played by <one name>"'
-    );
-    assert.equal(accessTabSource.includes('playedBy'), false, 'no lossy singular playedBy field');
-  });
+  defineStructureContract(
+    'treats the character->player relation as a set, with the whole-table case distinct',
+    ACCESS_TAB,
+    {
+      names: ['controlledBy', 'sharedWithAllPlayers'],
+      namesNo: ['playedBy'],
+      spells: ['AccessTab.SharedWithAllPlayers'],
+    }
+  );
 
-  // Issue 796: the access list widened from auto-fill 220px tracks (which truncated long
-  // names) to a fixed three-column grid, kept in visual parity with the Books & Scrolls
-  // grid. Access has no shared-rule collision, so no ancestor specificity guard is needed —
-  // pin the bare class rule.
-  it('tiles the access list into a three-column grid (Books & Scrolls parity)', () => {
-    assertScopedRuleHasNoMaxWidth(accessTabSource, '.manager-recipe-access-list', {
-      mustContain: ['display: grid', 'repeat(3, minmax(0, 1fr)'],
-    });
-  });
+  // Issue 796: the access list widened from auto-fill 220px tracks to a fixed three-column grid,
+  // in visual parity with the Books & Scrolls grid.
+  defineStructureContract(
+    'tiles the access list into a three-column grid (Books & Scrolls parity)',
+    ACCESS_TAB,
+    {
+      styleDeclares: [
+        [['manager-recipe-access-list'], 'display', 'grid'],
+        [['manager-recipe-access-list'], 'grid-template-columns', 'repeat(3, minmax(0, 1fr))'],
+      ],
+      styleDeclaresNo: [[['manager-recipe-access-list'], 'max-width']],
+    }
+  );
 });
 
 describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (issue 676)', () => {
-  it('is MODE-CONDITIONAL off craftingEffect, and offers neither tab under global', () => {
-    assert.ok(tabsSource.includes('visibilityEffect?.showAccess'), 'restricted branch');
-    assert.ok(tabsSource.includes('visibilityEffect?.showBooksScrolls'), 'item/knowledge branch');
-    // The prop must NOT be called `effect`.
-    assert.equal(
-      /^\s*effect = /m.test(tabsSource),
-      false,
-      'the craftingEffect prop is never named `effect` (it would shadow the $effect rune)'
-    );
+  defineStructureContract(
+    'is mode-conditional off craftingEffect, and offers neither tab under global',
+    TABS,
+    {
+      reads: ['visibilityEffect.showAccess', 'visibilityEffect.showBooksScrolls'],
+      // The prop must not be called `effect` — it would shadow the $effect rune.
+      declaresProp: ['visibilityEffect'],
+    }
+  );
+
+  it('and the craftingEffect prop is never named `effect`', () => {
+    const subject = componentAstOf(TABS);
+    const declared = [];
+    for (const node of [subject.instance?.content, subject.module?.content]) {
+      for (const name of identifierNames(node ?? {})) declared.push(name);
+    }
+    assert.equal(declared.includes('effect'), false, 'a prop named `effect` would shadow the rune');
   });
 
   // The gate is on the tab BUTTON, not just the panel.
-  it('derives the editor TAB_IDS from the same visibilityEffect the strip reads', () => {
-    assert.ok(
-      editSource.includes("visibilityEffect?.showAccess ? ['access'] : []"),
-      'TAB_IDS gates access on the same effect'
-    );
-    assert.ok(
-      editSource.includes("visibilityEffect?.showBooksScrolls ? ['books-scrolls'] : []"),
-      'TAB_IDS gates books-scrolls on the same effect'
-    );
-    assert.ok(
-      editSource.includes("if (!TAB_IDS.includes(activeTab)) activeTab = 'overview'"),
-      'a mode change that retires the active tab falls back to Overview'
-    );
-  });
+  defineStructureContract(
+    'derives the editor TAB_IDS from the same visibilityEffect the strip reads',
+    { file: EDIT, constant: 'TAB_IDS' },
+    {
+      reads: ['visibilityEffect.showAccess', 'visibilityEffect.showBooksScrolls'],
+      spellsExactly: ['access', 'books-scrolls', 'overview'],
+    }
+  );
+
+  defineStructureContract(
+    'and a mode change that retires the active tab falls back to Overview',
+    EDIT,
+    { reads: ['TAB_IDS.includes'], assigns: [['activeTab', 'overview']] }
+  );
 });
 
 describe('Step mode lives on the Overview tab (issue 676: rehomed from the deleted rail)', () => {
-  it('renders Step mode as a real SegmentedControl beside the steps it governs', () => {
-    assert.ok(
-      overviewSource.includes(
-        "import SegmentedControl from '../../../components/SegmentedControl.svelte'"
-      )
-    );
-    assert.ok(overviewSource.includes('optionDataAttr="data-recipe-step-mode-option"'));
-    assert.ok(
-      overviewSource.includes('data-recipe-section="recipe-step-mode"'),
-      'carries the step-mode section marker'
-    );
-    // The rail was the ONLY consumer of these two handlers.
-    assert.ok(overviewSource.includes('onEnterMultiStep'), 'wires the enter-multi-step handler');
-    assert.ok(overviewSource.includes('onRevertToSingleStep'), 'wires the revert handler');
-    assert.ok(overviewSource.includes('multiStepEnabled'), 'gated on the system feature');
-  });
+  defineStructureContract(
+    'renders Step mode as a real SegmentedControl beside the steps it governs',
+    OVERVIEW,
+    {
+      imports: ['../../../components/SegmentedControl.svelte'],
+      renders: ['SegmentedControl'],
+      attributes: [
+        ['optionDataAttr', 'data-recipe-step-mode-option'],
+        ['data-recipe-section', 'recipe-step-mode'],
+      ],
+      // The rail was the only consumer of these two handlers.
+      names: ['onEnterMultiStep', 'onRevertToSingleStep', 'multiStepEnabled'],
+    }
+  );
 
   // Recipe complexity is emergent from the ingredient-set count (issue 643).
-  it('carries NO Recipe mode toggle', () => {
-    assert.equal(
-      overviewSource.includes('data-recipe-mode-option'),
-      false,
-      'no Recipe mode segmented control'
-    );
-    assert.equal(
-      overviewSource.includes('data-recipe-section="recipe-mode"'),
-      false,
-      'no Recipe mode section'
-    );
-    assert.equal(overviewSource.includes('onSetComplexity'), false, 'no complexity setter');
+  defineStructureContract('carries NO Recipe mode toggle', OVERVIEW, {
+    writesNo: ['data-recipe-mode-option'],
+    attributesNo: [['data-recipe-section', 'recipe-mode']],
+    namesNo: ['onSetComplexity'],
   });
 });
 
 describe('RecipeModeBanner (issue 643 §5)', () => {
-  const bannerSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeModeBanner.svelte'),
-    'utf8'
+  // Retargeted for issue 1055: the banner is now FULLY PROP-DRIVEN.
+  defineStructureContract(
+    'reuses the canonical resolution-mode option list rather than re-authoring one',
+    EDIT,
+    { imports: ['./resolutionModeOptions.js'], names: ['resolutionModeOptions'] }
   );
 
-  // Retargeted for issue 1055: the banner is now FULLY PROP-DRIVEN.
-  it('reuses the canonical resolution-mode option list rather than re-authoring one', () => {
-    assert.ok(
-      editSource.includes("import { resolutionModeOptions } from './resolutionModeOptions.js'"),
-      'the resolution-mode call site reads the canonical { value, icon, labelKey, descKey } list'
-    );
-    assert.equal(
-      /import\s*\{[^}]*resolutionModeOptions/.test(bannerSource),
-      false,
-      'the banner itself no longer imports the mode table — it authors no copy at all now'
-    );
-    assert.equal(
-      bannerSource.includes('MODE_INFO'),
-      false,
-      'no second, drifting copy of the table'
-    );
+  defineStructureContract('and the banner itself authors no copy at all now', BANNER, {
+    namesNo: ['resolutionModeOptions', 'MODE_INFO', 'onChange'],
+    spellsNo: ['ModeBanner.'],
   });
 
-  it('states that the mode is SYSTEM-level and routes to Crafting Settings', () => {
-    assert.ok(bannerSource.includes('data-recipe-mode-banner-settings'), 'a settings deep-link');
-    // Retargeted (issue 1055): `ModeBanner.SettingsHint` names the RESOLUTION MODE, which
-    // is the wrong sentence on the modifier banner, so it became an `actionHint` prop
-    // supplied per call site. It must still reach the shipped resolution-mode banner.
-    assert.ok(
-      editSource.includes('ModeBanner.SettingsHint'),
-      'the resolution-mode call site still says the mode is system-wide'
-    );
-    assert.ok(
-      bannerSource.includes('actionHint'),
-      'the hint is a per-call-site prop — a hardcoded one mislabels the second instance'
-    );
-    assert.equal(
-      bannerSource.includes('ModeBanner.'),
-      false,
-      'the banner hardcodes none of the resolution-mode copy'
-    );
-    // A per-recipe resolution mode does not exist; the banner must not offer one.
-    assert.equal(bannerSource.includes('onChange'), false, 'no per-recipe mode control');
-  });
-
-  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the
-  // reported VALUE, so a shared hook would resolve to whichever rendered first, and the
-  // two value spaces (`simple`/`progressive`/… vs `noCheck`/`noFormula`/…) are disjoint.
-  it('takes its capture hook as a prop so two banners on one tab cannot collide', () => {
-    assert.ok(bannerSource.includes('dataAttr'), 'the container hook is a prop');
-    assert.ok(bannerSource.includes('actionDataAttr'), 'so is the action chip hook');
-    assert.ok(
-      bannerSource.includes("dataAttr = 'data-recipe-mode-banner'"),
-      'defaulting to the shipped resolution-mode hooks, so that call site restates nothing'
-    );
-    const overviewSourceLocal = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'),
-      'utf8'
-    );
-    for (const attr of ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks']) {
-      assert.ok(overviewSourceLocal.includes(attr), `the Overview tab passes its own ${attr}`);
-      assert.equal(
-        bannerSource.includes(attr),
-        false,
-        `${attr} belongs to the call site, not the component`
-      );
+  defineStructureContract(
+    'states that the mode is system-level and routes to Crafting Settings',
+    BANNER,
+    {
+      defaults: [['actionDataAttr', 'data-recipe-mode-banner-settings']],
+      names: ['actionHint'],
+      declaresProp: ['actionHint'],
     }
-    // The rejected design's neutral "the system decides" banner is GONE.
-    for (const retired of ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner=']) {
-      assert.equal(
-        overviewSourceLocal.includes(retired),
-        false,
-        `${retired} is not emitted anywhere on the Overview tab`
-      );
+  );
+
+  defineStructureContract(
+    'and the resolution-mode call site still says the mode is system-wide',
+    EDIT,
+    { spells: ['ModeBanner.SettingsHint'] }
+  );
+
+  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the reported value,
+  // so a shared hook would resolve to whichever rendered first.
+  defineStructureContract(
+    'takes its capture hook as a prop so two banners on one tab cannot collide',
+    BANNER,
+    {
+      declaresProp: ['dataAttr', 'actionDataAttr'],
+      defaults: [['dataAttr', 'data-recipe-mode-banner']],
+      spellsNo: [
+        'data-recipe-modifier-inert',
+        'data-recipe-modifier-inert-checks',
+      ],
     }
+  );
+
+  defineStructureContract('and the Overview tab passes its own hooks', OVERVIEW, {
+    spells: ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks'],
+    // The rejected design's neutral "the system decides" banner is gone.
+    spellsNo: ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner'],
   });
 
-  // Visual differentiation was promised by the design and is delivered as COLOUR ONLY:
-  it('differentiates a second banner by tone without moving its geometry', () => {
-    assert.ok(bannerSource.includes("tone = 'info'"), 'tone defaults to the primary reading');
-    for (const toneClass of ['is-neutral', 'is-warning']) {
-      assert.ok(bannerSource.includes(toneClass), `${toneClass} is a real tone`);
+  // Visual differentiation was promised by the design and is delivered as colour only.
+  defineStructureContract(
+    'differentiates a second banner by tone without moving its geometry',
+    BANNER,
+    {
+      defaults: [['tone', 'info']],
+      styleDeclares: [
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'border-color', 'var(--fab-border)'],
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'background', 'var(--fab-surface-soft)'],
+        [[['manager-recipe-mode-banner', 'is-warning']], 'border-color', 'var(--fab-warning-border)'],
+      ],
+      styleDeclaresNo: [
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'padding'],
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'width'],
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'height'],
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'gap'],
+        [[['manager-recipe-mode-banner', 'is-neutral']], 'font-size'],
+      ],
     }
-    const toneBlock = bannerSource.slice(
-      bannerSource.indexOf('.manager-recipe-mode-banner.is-neutral')
-    );
-    const firstRule = toneBlock.slice(0, toneBlock.indexOf('}'));
-    for (const geometry of ['padding', 'width', 'height', 'gap', 'font-size']) {
-      assert.equal(
-        firstRule.includes(`${geometry}:`),
-        false,
-        `tone must not change ${geometry} — the two banners stay the same shape`
-      );
+  );
+
+  defineStructureContract(
+    'is rendered by the editor shell below the tab strip so the tabs stay attached (§4.2)',
+    EDIT,
+    { renders: ['RecipeModeBanner'], rendersBefore: [['RecipeEditorTabs', 'RecipeModeBanner']] }
+  );
+
+  defineStructureContract('reads as an info banner with an icon medallion, not one more card', BANNER, {
+    attributes: [['class', 'manager-recipe-mode-banner-medallion']],
+    styleDeclares: [
+      [['manager-recipe-mode-banner'], 'background', 'var(--fab-info-soft)'],
+      [['manager-recipe-mode-banner'], 'border', '1px solid var(--fab-info-border)'],
+    ],
+  });
+
+  defineStructureContract(
+    'lets the description wrap — it is the one sentence the banner exists to deliver',
+    BANNER,
+    {
+      // It was `white-space: nowrap` + ellipsis.
+      styleDeclares: [
+        [['manager-recipe-mode-banner-desc'], '-webkit-line-clamp', '2'],
+        [['manager-recipe-mode-banner-desc'], 'line-height', '1.45'],
+        [['manager-recipe-mode-banner-desc'], 'white-space', 'normal'],
+      ],
     }
-  });
-
-  it('is rendered by the editor shell below the tab strip so the tabs stay attached to the header (§4.2)', () => {
-    assert.ok(editSource.includes('<RecipeModeBanner'), 'the shell renders the banner');
-    assert.ok(
-      editSource.indexOf('<RecipeEditorTabs') < editSource.indexOf('<RecipeModeBanner'),
-      'header → tabs → banner → content: the banner sits below the tab strip'
-    );
-  });
-
-  it('reads as an INFO banner with an icon medallion, not as one more card', () => {
-    assert.ok(
-      bannerSource.includes('manager-recipe-mode-banner-medallion'),
-      'the icon sits in a medallion'
-    );
-    assert.ok(
-      bannerSource.includes('background: var(--fab-info-soft);') &&
-        bannerSource.includes('border: 1px solid var(--fab-info-border);'),
-      'the banner is info-toned — it explains why the editor below it has the shape it has'
-    );
-  });
-
-  it('lets the description WRAP — it is the one sentence the banner exists to deliver', () => {
-    // It was `white-space: nowrap` + ellipsis.
-    const desc = bannerSource.slice(bannerSource.indexOf('.manager-recipe-mode-banner-desc'));
-    const block = desc.slice(0, desc.indexOf('}'));
-    assert.equal(block.includes('white-space: nowrap;'), false, 'the sentence is not truncated');
-    assert.ok(block.includes('-webkit-line-clamp: 2;'), 'it wraps, clamped to two lines');
-    assert.ok(block.includes('line-height: 1.45;'));
-  });
+  );
 });
 
 describe('the progressive reorder announcement', () => {
   // Both halves moved into the shared ordered list at issue 1512, and both are asserted where they
   // live now: `tests/sortable-list-source-contract.test.js` holds the read-the-name-first ordering
   // against `SortableList.svelte`, and `tests/components/sortable-list-mounted.test.js` reads the
-  // sentence out of the rendered live region. What this surface still owns is the array move.
-  const cardSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte'),
-    'utf8'
+  // sentence out of the rendered live region. What this card still owns is the array move.
+  defineStructureContract(
+    'hands the shared list the move and keeps no announcement of its own',
+    RESULT_GROUP_CARD,
+    {
+      renders: ['SortableList'],
+      passesProps: [['SortableList', 'onReorder']],
+      namesNo: ['moveItem'],
+      spellsNo: ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount'],
+    }
   );
 
-  it('hands the shared list the move and keeps no announcement of its own', () => {
-    assert.ok(
-      cardSource.includes('onReorder={(from, to) => reorderItem(from, to)}'),
-      'the list calls this surface with the two indices'
-    );
-    for (const retired of ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount', 'announcement']) {
-      assert.equal(
-        cardSource.includes(retired),
-        false,
-        `${retired} belonged to this card's own copy of the announcement and is gone`
-      );
-    }
-  });
-
-  it('announces through ONE localized key with placeholders, not a concatenation', () => {
-    // The shared helper's key, which every ordered list in the product now announces through.
+  it('the shared key takes the three placeholders every ordered list supplies', () => {
     const announcement = lang.FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement;
     for (const token of ['{name}', '{position}', '{total}']) {
       assert.ok(announcement.includes(token), `the key takes ${token}`);
@@ -665,165 +470,110 @@ describe('the progressive reorder announcement', () => {
 });
 
 describe('adminStore recipe-item projections + API', () => {
-  it('exports updateRecipe and addRecipeItemFromUuid', () => {
-    assert.ok(/async function updateRecipe\(/.test(storeSource), 'updateRecipe defined');
-    assert.ok(
-      /async function addRecipeItemFromUuid\(/.test(storeSource),
-      'addRecipeItemFromUuid defined'
-    );
-    assert.ok(/\n[ \t]*updateRecipe,/.test(storeSource), 'updateRecipe exported');
-    assert.ok(/\n[ \t]*addRecipeItemFromUuid,/.test(storeSource), 'addRecipeItemFromUuid exported');
+  defineStructureContract('exports updateRecipe and addRecipeItemFromUuid', STORE, {
+    keys: ['updateRecipe', 'addRecipeItemFromUuid', 'confirmRecipeAction'],
   });
 
-  it('projects recipeItemId on recipes and recipeItemDefinitions on the selected system', () => {
-    assert.ok(
-      recipeRowProjectionSource.includes('recipeItemId,'),
-      'recipeItemId projected onto recipe rows'
-    );
-    assert.ok(
-      /recipeItemDefinitions:\s*Array\.isArray\(selectedSystem\.recipeItemDefinitions\)/.test(
-        systemInspectorProjectionSource
-      ),
-      'recipeItemDefinitions projected'
-    );
-    // What this pins is that the legacy uuid alias is never a FIELD the store or the
-    // projections read or emit. It was a bare substring match until issue 1155, which is
-    // no longer the same claim: the row's book membership now resolves through the shared
-    // `utils/recipeItemMembership.js`, whose legacy leg reads that alias, and the
-    // projection names it in the comment explaining why. Matching the identifier as a
-    // property read or an object key keeps the real guard — a row that carried the alias
-    // would be seeded into the editor draft and posted back on save — without pinning
-    // prose.
-    const legacyAliasAsField =
-      /linkedRecipeItemUuid\s*:|[.?]\s*linkedRecipeItemUuid|\[\s*['"`]linkedRecipeItemUuid['"`]\s*\]|[{,]\s*linkedRecipeItemUuid/;
-    assert.equal(
-      legacyAliasAsField.test(storeSource),
-      false,
-      'the store never projects the legacy alias'
-    );
-    assert.equal(legacyAliasAsField.test(projectionSource), false, 'nor does either projection');
+  defineStructureContract('and defines each of them', { file: STORE, fn: 'updateRecipe' }, {
+    names: ['recipeId', 'updates'],
+    calls: ['getRecipeManager'],
   });
+
+  defineStructureContract('the uuid adder too', { file: STORE, fn: 'addRecipeItemFromUuid' }, {
+    names: ['itemUuid'],
+    calls: ['getCraftingSystemManager'],
+  });
+
+  defineStructureContract(
+    'projects recipeItemId on recipe rows',
+    { file: ROW_PROJECTION },
+    { keys: ['recipeItemId', 'recipeItemIds', 'recipeItemName', 'recipeItemSourceUuid'] }
+  );
+
+  defineStructureContract(
+    'and recipeItemDefinitions on the selected system',
+    { file: SYSTEM_PROJECTION },
+    {
+      keys: ['recipeItemDefinitions'],
+      reads: ['selectedSystem.recipeItemDefinitions', 'Array.isArray'],
+    }
+  );
+
+  // The legacy uuid alias is never a field the store or the projections read or emit. The row's
+  // book membership resolves through the shared `utils/recipeItemMembership.js`, whose legacy leg
+  // reads that alias, and the projection names it in the comment explaining why — so the claim is
+  // about a key and a member read, which a comment cannot satisfy.
+  defineStructureContract(
+    'and never projects the legacy linkedRecipeItemUuid alias',
+    [STORE, ROW_PROJECTION, SYSTEM_PROJECTION],
+    { keysNo: ['linkedRecipeItemUuid'], namesNo: ['linkedRecipeItemUuid'] }
+  );
 });
 
 describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
-  it('owns the root-held recipe draft and its staging handlers', () => {
-    assert.ok(/async function saveRecipeDraft\(/.test(rootSource), 'saveRecipeDraft defined');
-    assert.ok(/function backToRecipesBrowse\(/.test(rootSource), 'backToRecipesBrowse defined');
-    assert.ok(
-      /async function deleteRecipeFromEdit\(/.test(rootSource),
-      'deleteRecipeFromEdit defined'
-    );
-    assert.ok(
-      /function patchRecipeDraft\(/.test(rootSource),
-      'patchRecipeDraft stages edits into the draft'
-    );
+  defineStructureContract('owns the root-held recipe draft and its staging handlers', ROOT, {
+    names: [
+      'saveRecipeDraft',
+      'backToRecipesBrowse',
+      'deleteRecipeFromEdit',
+      'patchRecipeDraft',
+      'handleRemoveRecipeItem',
+      'handleToggleRecipeEnabled',
+      'recipeDraft',
+      'recipeDraftBaseline',
+      'canSaveRecipeEdit',
+    ],
     // Adding a recipe to a book is authored on Books & Scrolls (issue 643 §2c).
-    assert.equal(rootSource.includes('handleAddRecipeItem'), false, 'no recipe-side book-add path');
-    assert.equal(
-      rootSource.includes('handleSetRecipeItem'),
-      false,
-      'no recipe-side book-link path'
-    );
-    assert.ok(
-      /async function handleRemoveRecipeItem\(/.test(rootSource),
-      'handleRemoveRecipeItem retained'
-    );
-    assert.ok(
-      /async function handleToggleRecipeEnabled\(/.test(rootSource),
-      'handleToggleRecipeEnabled defined'
-    );
-    // The draft + baseline + JSON-diff dirty flag are the source of truth.
-    assert.ok(/let recipeDraft = \$state\(null\)/.test(rootSource), 'recipeDraft state declared');
-    assert.ok(
-      /let recipeDraftBaseline = \$state\(null\)/.test(rootSource),
-      'recipeDraftBaseline state declared'
-    );
-    assert.ok(
-      rootSource.includes('JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline)'),
-      'dirty derives from a JSON diff'
-    );
-    // The editor no longer calls the immediate-persist store methods.
-    assert.equal(
-      rootSource.includes('store.deleteRecipeStep?.('),
-      false,
-      'editor no longer calls store.deleteRecipeStep'
-    );
-    assert.equal(
-      rootSource.includes('store.setRecipeComplexity?.('),
-      false,
-      'editor no longer calls store.setRecipeComplexity'
-    );
-    assert.equal(
-      rootSource.includes('store.revertRecipeToSingleStep?.('),
-      false,
-      'editor no longer calls store.revertRecipeToSingleStep'
-    );
-    assert.ok(rootSource.includes('canSaveRecipeEdit'), 'canSaveRecipeEdit derived');
-    // The rail's composition keys off the CANONICAL visibilityMode matrix.
-    assert.equal(
-      rootSource.includes('recipeKnowledgeMode'),
-      false,
-      'the legacy knowledge-mode gate is gone'
-    );
+    namesNo: ['handleAddRecipeItem', 'handleSetRecipeItem', 'recipeKnowledgeMode'],
+    readsNo: [
+      'store.deleteRecipeStep',
+      'store.setRecipeComplexity',
+      'store.revertRecipeToSingleStep',
+    ],
   });
 
-  it('stages destructive in-draft actions through the confirm-only store helper', () => {
-    assert.ok(
-      rootSource.includes('store.confirmRecipeAction?.('),
-      'destructive actions confirm via store.confirmRecipeAction'
-    );
-    assert.ok(
-      /async function confirmRecipeAction\(/.test(storeSource),
-      'store defines confirmRecipeAction'
-    );
-    assert.ok(
-      /\n[ \t]*confirmRecipeAction,/.test(storeSource),
-      'store exports confirmRecipeAction'
-    );
+  defineStructureContract(
+    'and the dirty flag derives from a JSON diff of the draft against its baseline',
+    { file: ROOT, constant: 'recipeEditDirty' },
+    { reads: ['JSON.stringify'], names: ['recipeDraft', 'recipeDraftBaseline'] }
+  );
+
+  defineStructureContract(
+    'stages destructive in-draft actions through the confirm-only store helper',
+    ROOT,
+    { reads: ['store.confirmRecipeAction'] }
+  );
+
+  defineStructureContract('which the store defines and exports', STORE, {
+    keys: ['confirmRecipeAction', 'confirmDiscardDirtyRecipeDraft'],
+    spells: ['FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent'],
   });
 
-  it('never seeds an alchemy routing provider on Complex (the per-recipe provider is retired)', () => {
-    // Alchemy now routes on the system-level alchemy.checkMode.
-    assert.ok(
-      !rootSource.includes('chooseSeedProvider('),
-      'root no longer seeds an alchemy resultSelection.provider'
-    );
-    // The Simple/Complex toggle is gone entirely (issue 643).
-    assert.equal(
-      rootSource.includes('hideComplexToggle'),
-      false,
-      'no hideComplexToggle prop threaded from the root'
-    );
-    assert.equal(
-      overviewSource.includes('hideComplexToggle'),
-      false,
-      'Overview declares no hideComplexToggle prop'
-    );
-    // Alchemy forbids adding ingredient sets.
-    assert.ok(
-      rootSource.includes("recipeMultiSetAllowed && selectedSystem?.resolutionMode !== 'alchemy'"),
-      'recipeCanAddSet excludes alchemy from the add-ingredient-set affordance'
-    );
+  defineStructureContract(
+    'never seeds an alchemy routing provider on Complex (the per-recipe provider is retired)',
+    ROOT,
+    { namesNo: ['chooseSeedProvider', 'hideComplexToggle'] }
+  );
+
+  defineStructureContract('nor does the Overview tab declare one', OVERVIEW, {
+    namesNo: ['hideComplexToggle'],
   });
+
+  defineStructureContract(
+    'and alchemy is excluded from the add-ingredient-set affordance',
+    { file: ROOT, constant: 'recipeCanAddSet' },
+    { names: ['recipeMultiSetAllowed'], reads: ['selectedSystem.resolutionMode'], compares: ['alchemy'] }
+  );
 
   it('sources the destructive recipe confirm titles + content from lang keys', () => {
-    // Keys exist with the expected English copy and HTML-preserving interpolation.
     assert.equal(recipeLang.RevertToSingleStepTitle, 'Switch to single-step?');
     assert.ok(
       recipeLang.RevertToSingleStepContent.includes('<strong>{name}</strong>'),
       'revert content keeps the bold name placeholder'
     );
-    // The Simple/Complex toggle (and its Switch-to-simple confirm) is gone (issue 643):
-    assert.equal(
-      recipeLang.SwitchToSimpleTitle,
-      undefined,
-      'the retired switch-to-simple title key is removed'
-    );
-    assert.equal(
-      recipeLang.SwitchToSimpleContent,
-      undefined,
-      'the retired switch-to-simple content key is removed'
-    );
+    // The Simple/Complex toggle (and its Switch-to-simple confirm) is gone (issue 643).
+    assert.equal(recipeLang.SwitchToSimpleTitle, undefined, 'the retired title key is removed');
+    assert.equal(recipeLang.SwitchToSimpleContent, undefined, 'and its content key');
     assert.equal(recipeLang.DeleteStepTitle, 'Delete step?');
     assert.ok(
       recipeLang.DeleteStepContent.includes('<strong>{name}</strong>'),
@@ -842,206 +592,114 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       assert.equal(typeof recipeLang[key], 'string', `${key} fragment defined`);
     }
     assert.equal(recipeLang.UnnamedStep, 'this step');
+  });
 
-    // The handlers localize these keys rather than embedding hardcoded English.
-    assert.ok(
-      rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle')"),
-      'revert title localized'
-    );
-    assert.ok(
-      rootSource.includes(
-        "localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name })"
-      ),
-      'revert content localized with name'
-    );
-    assert.equal(
-      rootSource.includes('SwitchToSimple'),
-      false,
-      'the retired switch-to-simple confirm is gone from the root'
-    );
-    assert.ok(
-      rootSource.includes("localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle')"),
-      'delete-step title localized'
-    );
-    assert.ok(
-      rootSource.includes(
-        "localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted })"
-      ),
-      'delete-step content localized with name + alsoDeleted'
-    );
+  defineStructureContract(
+    'and the handlers localize those keys rather than embedding hardcoded English',
+    ROOT,
+    {
+      callsLiteral: [
+        ['localize', 'FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'],
+        ['localize', 'FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent'],
+        ['localize', 'FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'],
+        ['localize', 'FABRICATE.Admin.Manager.Recipe.DeleteStepContent'],
+      ],
+      spellsNo: ['SwitchToSimple'],
+      spellsExactlyNo: ['Switch to single-step?', 'Switch to simple?', 'Delete step?'],
+    }
+  );
 
-    // No hardcoded English confirm copy lingers in the handlers.
+  defineStructureContract(
+    'wires the recipe-edit header chip + Back/Delete/Save and the controlled view props',
+    ROOT,
+    {
+      names: ['saveRecipeDraft', 'backToRecipesBrowse', 'deleteRecipeFromEdit'],
+      spells: [
+        'FABRICATE.Admin.Manager.Recipe.Dirty',
+        'FABRICATE.Admin.Manager.Recipe.BackToBrowse',
+        'FABRICATE.Admin.Manager.Recipe.Delete',
+      ],
+      attributesNo: [['form', 'manager-recipe-edit-form']],
+      namesNo: ['cancelRecipeEdit'],
+      passesProps: [
+        ['RecipeEditView', 'recipe'],
+        ['RecipeEditView', 'onUpdateRecipe'],
+        ['RecipeEditView', 'onToggleEnabled'],
+        ['RecipeEditView', 'onPickImagePath'],
+        ['RecipeEditView', 'recipeItemDefinitions'],
+        ['RecipeEditView', 'onRemoveRecipeItem'],
+        ['RecipeEditView', 'visibilityEffect'],
+      ],
+      // Scoped to the RecipeEditView mount: the essence/component editors still use these.
+      passesPropsNo: [
+        ['RecipeEditView', 'onSave'],
+        ['RecipeEditView', 'onDraftChange'],
+        ['RecipeEditView', 'onDirtyChange'],
+        ['RecipeEditView', 'knowledgeMode'],
+        ['RecipeEditView', 'onAddRecipeItem'],
+        ['RecipeEditView', 'onSetRecipeItem'],
+        ['RecipeEditView', 'linkedItemImage'],
+      ],
+    }
+  );
+
+  it('and the controlled view takes the root-held draft and the named staging handlers', () => {
+    assert.equal(propIdentifier(ROOT, 'RecipeEditView', 'recipe'), 'recipeDraft');
     assert.equal(
-      rootSource.includes("title: 'Switch to single-step?'"),
-      false,
-      'no hardcoded revert title'
+      propIdentifier(ROOT, 'RecipeEditView', 'onToggleEnabled'),
+      'handleToggleRecipeEnabled'
     );
     assert.equal(
-      rootSource.includes("title: 'Switch to simple?'"),
-      false,
-      'no hardcoded switch-to-simple title'
+      propIdentifier(ROOT, 'RecipeEditView', 'onRemoveRecipeItem'),
+      'handleRemoveRecipeItem'
     );
     assert.equal(
-      rootSource.includes("title: 'Delete step?'"),
-      false,
-      'no hardcoded delete-step title'
+      propIdentifier(ROOT, 'RecipeEditView', 'visibilityEffect'),
+      'recipeVisibilityEffect'
     );
   });
 
-  it('wires the recipe-edit header chip + Back/Delete/Save and the controlled view props', () => {
-    assert.ok(
-      rootSource.includes('onclick={saveRecipeDraft}'),
-      'header Save commits via a plain onclick'
+  it('renders Delete as a ManagerButton carrying the danger destructive role', () => {
+    const [deleteButton] = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter(
+      (node) => attributeExpression(node, 'onclick')?.name === 'deleteRecipeFromEdit'
     );
-    assert.equal(
-      rootSource.includes('form="manager-recipe-edit-form"'),
-      false,
-      'header Save no longer submits a form'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Recipe.Dirty'),
-      'dirty chip uses Recipe.Dirty'
-    );
-    assert.ok(rootSource.includes('onclick={backToRecipesBrowse}'), 'header Back to recipes wired');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Recipe.BackToBrowse'),
-      'Back button uses Recipe.BackToBrowse'
-    );
-    assert.ok(rootSource.includes('onclick={deleteRecipeFromEdit}'), 'header Delete recipe wired');
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Recipe.Delete'),
-      'Delete button uses Recipe.Delete'
-    );
-    // The destructive role, read off THE Delete element rather than off a source slice.
-    // `onclick={deleteRecipeFromEdit}` occurs exactly once in the component and names this
-    // control and no other, so it addresses the element without needing a slice at all. The
-    // open tag is bounded by `[^<>]`, so the match stops at this element's own `>` and
-    // cannot reach the Save button's attributes; when it stops resolving, `deleteTag` is
-    // null and the first assertion fails by name rather than the check going quiet.
-    const deleteTag = /<ManagerButton[^<>]*\bonclick=\{deleteRecipeFromEdit\}[^<>]*>/.exec(
-      rootSource
-    );
-    assert.ok(deleteTag, 'the recipe-edit header renders Delete as a ManagerButton');
-    assert.ok(
-      deleteTag[0].includes('role="danger"'),
-      'Delete button carries the danger destructive role'
-    );
-    assert.ok(
-      !rootSource.includes('cancelRecipeEdit'),
-      'recipe-edit header no longer renders Cancel'
-    );
-    assert.ok(
-      rootSource.includes('onPickImagePath={services?.pickImagePath}'),
-      'passes onPickImagePath'
-    );
-    assert.ok(rootSource.includes('recipe={recipeDraft}'), 'passes the root-held draft as recipe');
-    assert.ok(
-      rootSource.includes('onUpdateRecipe={(patch) => patchRecipeDraft(patch)}'),
-      'onUpdateRecipe stages into the draft'
-    );
-    assert.ok(
-      rootSource.includes('onToggleEnabled={handleToggleRecipeEnabled}'),
-      'passes the immediate enabled toggle'
-    );
-    // Scope the removed-prop assertions to the RecipeEditView mount (essence/component
-    // editors still use onDraftChange/onDirtyChange of their own).
-    const recipeViewMount = rootSource.slice(
-      rootSource.indexOf('<RecipeEditView'),
-      rootSource.indexOf('/>', rootSource.indexOf('<RecipeEditView'))
-    );
-    assert.equal(
-      recipeViewMount.includes('onSave='),
-      false,
-      'no onSave prop on the controlled view'
-    );
-    assert.equal(
-      recipeViewMount.includes('onDraftChange='),
-      false,
-      'no onDraftChange prop on the controlled view'
-    );
-    assert.equal(
-      recipeViewMount.includes('onDirtyChange='),
-      false,
-      'no onDirtyChange prop on the controlled view'
-    );
+    assert.ok(deleteButton, 'the recipe-edit header renders Delete as a ManagerButton');
+    assert.equal(attributeValue(deleteButton, 'role'), 'danger');
   });
 
-  it('renders NO context rail on recipe-edit — the tabs take the released column (issue 676)', () => {
-    assert.equal(
-      rootSource.includes('RecipeContextRail'),
-      false,
-      'the rail component is gone entirely'
-    );
-    assert.equal(
-      rootSource.includes('recipeInspectorVisible'),
-      false,
-      'no conditional-hide gate remains'
-    );
-    assert.ok(
-      /recipeVisibilityEffect = \$derived\(\s*craftingEffect\(/.test(rootSource),
-      'the conditional tabs are driven by the canonical craftingEffect matrix'
-    );
-    assert.ok(
-      rootSource.includes('store.resolveRecipeAccess?.('),
-      'access ids are resolved in the STORE, never in the tab'
-    );
-    // Issue 676: the aside IS suppressed on recipe-edit now.
-    assertFullWidthRoute({ rootSource, css, routeId: 'recipe-edit' });
-  });
+  defineStructureContract(
+    'renders NO context rail on recipe-edit — the tabs take the released column (issue 676)',
+    ROOT,
+    {
+      rendersNo: ['RecipeContextRail'],
+      namesNo: ['recipeInspectorVisible'],
+      calls: ['craftingEffect'],
+      reads: ['store.resolveRecipeAccess'],
+    }
+  );
 
-  it('passes the read-only recipe-item summary props to RecipeEditView, but no authoring path', () => {
-    const start = rootSource.indexOf('<RecipeEditView');
-    const end = rootSource.indexOf('/>', start);
-    const block = rootSource.slice(start, end);
-    assert.equal(block.includes('knowledgeMode'), false, 'no knowledgeMode prop on the view');
-    assert.equal(block.includes('onAddRecipeItem'), false, 'no add-recipe-item prop on the view');
-    assert.equal(block.includes('onSetRecipeItem'), false, 'no set-recipe-item prop on the view');
-    // The Books & Scrolls tab (issue 676) needs the library + the unlink.
-    assert.ok(
-      block.includes('{recipeItemDefinitions}'),
-      'the definition library reaches the books tab'
-    );
-    assert.ok(
-      block.includes('onRemoveRecipeItem={handleRemoveRecipeItem}'),
-      'the per-row unlink is wired'
-    );
-    assert.ok(block.includes('visibilityEffect={recipeVisibilityEffect}'), 'the tab gate is wired');
-  });
+  defineStructureContract(
+    'and the conditional tabs are driven by the canonical craftingEffect matrix',
+    { file: ROOT, constant: 'recipeVisibilityEffect' },
+    { calls: ['craftingEffect'] }
+  );
 
   it('wires the recipe row into the route-exit chain via the services discard seam', () => {
     const guard = ROUTE_EXIT_GUARDS.find((row) => row.view === 'recipe-edit');
     assert.ok(Boolean(guard), 'the cascade carries a recipe-edit route-exit guard');
     assert.equal(guard.skip, 'same-view', 'and waives a same-view re-entry, nothing wider');
-    assert.ok(
-      rootSource.includes('store.confirmDiscardDirtyRecipeDraft?.()'),
-      'recipe route exit confirms through the services discard-dirty seam'
-    );
-    // Anchored on the row, and asserted to have found it: a slice from `-1` reads the whole file
-    // and would pass whatever the guard said.
-    const guardStart = rootSource.indexOf("'recipe-edit': {");
-    assert.ok(guardStart > -1, 'the manager states the recipe row of the guard table');
-    const guardBody = rootSource.slice(guardStart, rootSource.indexOf('\n    },', guardStart));
-    // The window has to reach the row's body: an end anchor that matched too early leaves a slice
-    // that says nothing about the guard, and the assertion below then reads an empty string.
-    const seamAt = rootSource.indexOf('store.confirmDiscardDirtyRecipeDraft?.()');
-    assert.ok(
-      seamAt > guardStart && seamAt - guardStart < guardBody.length,
-      'the recipe row falls outside the window this test slices'
-    );
-    assert.equal(
-      guardBody.includes('globalThis.confirm'),
-      false,
-      'recipe route exit must not fall back to globalThis.confirm'
-    );
-    assert.ok(
-      /function confirmDiscardDirtyRecipeDraft\(/.test(storeSource),
-      'store exposes confirmDiscardDirtyRecipeDraft'
-    );
-    assert.ok(
-      storeSource.includes('FABRICATE.Admin.Manager.Recipe.DiscardDirtyContent'),
-      'discard prompt uses the DiscardDirty content key'
-    );
   });
+
+  defineStructureContract(
+    'and the row itself confirms through the discard-dirty seam, never globalThis.confirm',
+    { file: ROOT, constant: 'routeExitGuards', property: 'recipe-edit' },
+    {
+      reads: ['store.confirmDiscardDirtyRecipeDraft'],
+      readsNo: ['globalThis.confirm'],
+      calls: ['saveRecipeDraft', 'cloneRecipeDraft'],
+      compares: ['recipe-edit', 'cancel', 'save'],
+    }
+  );
 });
 
 describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () => {
@@ -1152,15 +810,6 @@ describe('linked scene/recipe-item name truncation (shared class)', () => {
     assert.match(block[0], /white-space:\s*nowrap/, 'single line');
     assert.match(block[0], /text-align:\s*left/, 'stays left-aligned');
   });
-
-  // Issue 676: the recipe's book rows no longer borrow this gathering class.
-  it('is not borrowed by the recipe Books & Scrolls tab', () => {
-    assert.equal(
-      booksTabSource.includes('manager-environment-scene-name'),
-      false,
-      'the books tab owns its row vocabulary rather than borrowing the gathering scene widget'
-    );
-  });
 });
 
 describe('recipe-edit localization', () => {
@@ -1209,268 +858,169 @@ describe('recipe-edit localization', () => {
 });
 
 describe('recipe default image is the blueprint, sourced from one canonical literal', () => {
-  it('defines the canonical default in the lowest shared layer (the model)', () => {
-    assert.ok(
-      modelSource.includes(`export const DEFAULT_RECIPE_IMAGE = '${BLUEPRINT_DEFAULT}'`),
-      'Recipe.js exports the canonical DEFAULT_RECIPE_IMAGE'
-    );
-    assert.equal(
-      modelSource.includes("data.img || 'icons/svg/item-bag.svg'"),
-      false,
-      'constructor no longer defaults to the bag SVG'
-    );
-    assert.ok(
-      modelSource.includes('this.img = data.img || DEFAULT_RECIPE_IMAGE'),
-      'constructor defaults via the constant'
-    );
+  defineStructureContract(
+    'defines the canonical default in the lowest shared layer (the model)',
+    MODEL,
+    {
+      exports: ['DEFAULT_RECIPE_IMAGE'],
+      spellsExactly: [BLUEPRINT_DEFAULT],
+      spellsExactlyNo: ['icons/svg/item-bag.svg'],
+      reads: ['data.img', 'this.img'],
+      names: ['DEFAULT_RECIPE_IMAGE'],
+    }
+  );
+
+  defineStructureContract(
+    'and recipeImageIcons re-exports the constant rather than redeclaring the literal',
+    ICONS,
+    {
+      imports: ['../../../models/Recipe.js'],
+      exports: ['DEFAULT_RECIPE_IMAGE'],
+      spellsExactlyNo: [BLUEPRINT_DEFAULT],
+    }
+  );
+
+  defineStructureContract('routes RecipeManager defaults through the imported constant', RECIPE_MANAGER, {
+    imports: ['../models/Recipe.js'],
+    declares: ['DEFAULT_RECIPE_IMG'],
+    names: ['DEFAULT_RECIPE_IMAGE'],
   });
 
-  it('keeps a single source-of-truth literal (no duplicated blueprint string in new code)', () => {
-    // The only places the literal path appears: the model definition.
-    const inModel = (modelSource.match(/blueprint-recipe-alchemical\.webp/g) || []).length;
-    assert.equal(inModel, 1, 'exactly one literal in the model');
-    // recipeImageIcons re-exports the constant rather than redeclaring the literal.
-    assert.ok(
-      iconsSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../../models/Recipe.js'") &&
-        iconsSource.includes('export { DEFAULT_RECIPE_IMAGE }'),
-      'recipeImageIcons re-exports the model constant'
-    );
-    assert.equal(
-      iconsSource.includes(`= '${BLUEPRINT_DEFAULT}'`),
-      false,
-      'recipeImageIcons does not redeclare the literal default'
-    );
-  });
+  defineStructureContract(
+    'and its recipe default is the constant rather than the bag SVG',
+    { file: RECIPE_MANAGER, constant: 'DEFAULT_RECIPE_IMG' },
+    { names: ['DEFAULT_RECIPE_IMAGE'], spellsExactlyNo: ['icons/svg/item-bag.svg'] }
+  );
 
-  it('routes RecipeManager defaults through the imported constant', () => {
-    assert.ok(
-      managerSource.includes("import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js'"),
-      'RecipeManager imports the constant'
-    );
-    assert.ok(
-      managerSource.includes('const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE'),
-      'DEFAULT_RECIPE_IMG uses the constant'
-    );
-    assert.equal(
-      managerSource.includes("const DEFAULT_RECIPE_IMG = 'icons/svg/item-bag.svg'"),
-      false,
-      'no bag-SVG recipe default'
-    );
-  });
+  defineStructureContract(
+    'uses the constant (not the bag SVG) in the recipe graph node fallback',
+    GRAPH,
+    {
+      imports: ['./recipeImageIcons.js'],
+      names: ['DEFAULT_RECIPE_IMAGE'],
+      reads: ['recipe.img'],
+      keys: ['img'],
+      spellsExactlyNo: ['icons/svg/item-bag.svg'],
+    }
+  );
 
-  it('uses the constant (not the bag SVG) in the recipe graph node fallback', () => {
-    assert.ok(
-      graphSource.includes("import { DEFAULT_RECIPE_IMAGE } from './recipeImageIcons.js'"),
-      'graph builder imports the constant'
-    );
-    assert.ok(
-      graphSource.includes('img: recipe.img || DEFAULT_RECIPE_IMAGE'),
-      'node img falls back to the constant'
-    );
-    assert.equal(
-      graphSource.includes("recipe.img || 'icons/svg/item-bag.svg'"),
-      false,
-      'no bag-SVG recipe-node fallback'
-    );
-  });
-
-  it('uses the constant in the recipe-edit view and inspector via import (no local literal)', () => {
-    assert.ok(
-      editSource.includes("import { DEFAULT_RECIPE_IMAGE } from '../../util/recipeImageIcons.js'"),
-      'RecipeEditView imports the constant'
-    );
-    assert.equal(
-      editSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"),
-      false,
-      'no local bag-SVG literal in the view'
-    );
-    assert.ok(
-      booksTabSource.includes(
-        "import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js'"
-      ),
-      'RecipeBooksScrollsTab imports the constant'
-    );
-    assert.equal(
-      booksTabSource.includes("const DEFAULT_RECIPE_IMAGE = 'icons/svg/item-bag.svg'"),
-      false,
-      'no local bag-SVG literal in the books tab'
-    );
-  });
+  defineStructureContract(
+    'uses the constant in the recipe-edit view via import (no local literal)',
+    EDIT,
+    {
+      imports: ['../../util/recipeImageIcons.js'],
+      names: ['DEFAULT_RECIPE_IMAGE'],
+      spellsExactlyNo: ['icons/svg/item-bag.svg'],
+    }
+  );
 });
 
-// Issue 884 — a recipe's icon is its OWN `img` and nothing else. The four GM readers
-// used to prefix a book image the store projected from the FIRST definition CONTAINING
-// the recipe; membership being many-to-many, that made the rendered icon a function of
-// definition order rather than of anything the GM authored. They now share ONE
-// chokepoint, `resolveRecipeImage`, which is also the only one of the old four chains
-// that treated the generic item bag as "no image".
+// Issue 884 — a recipe's icon is its own `img` and nothing else. The four GM readers used to
+// prefix a book image the store projected from the first definition containing the recipe;
+// membership being many-to-many, that made the rendered icon a function of definition order. They
+// now share one chokepoint, `resolveRecipeImage`.
 describe('recipe image readers resolve the recipe own image through the shared helper', () => {
   const READERS = [
-    ['RecipesBrowserView', browserSource, '../../util/craftingImageDefaults.js'],
-    ['RecipeBrowserInspector', browserInspectorSource, '../../../util/craftingImageDefaults.js'],
-    ['AccessTabView', accessSurfaceSource, '../../util/craftingImageDefaults.js'],
-    ['GrantAccessInspector', grantAccessInspectorSource, '../../util/craftingImageDefaults.js'],
+    ['RecipesBrowserView', BROWSER, '../../util/craftingImageDefaults.js', 'recipe'],
+    [
+      'RecipeBrowserInspector',
+      BROWSER_INSPECTOR,
+      '../../../util/craftingImageDefaults.js',
+      'selectedRecipe',
+    ],
+    ['AccessTabView', ACCESS_SURFACE, '../../util/craftingImageDefaults.js', 'recipe'],
+    ['GrantAccessInspector', GRANT_ACCESS_INSPECTOR, '../../util/craftingImageDefaults.js', 'recipe'],
   ];
 
-  it('imports the shared resolver in all four readers, and owns no single-use wrapper', () => {
-    for (const [name, source, specifier] of READERS) {
-      assert.ok(
-        source.includes(`import { resolveRecipeImage } from '${specifier}'`),
-        `${name} imports the shared resolver`
-      );
-      assert.equal(
-        /function\s+recipeImage\s*\(/.test(source),
-        false,
-        `${name} no longer owns a single-use image wrapper`
-      );
-      assert.equal(
-        source.includes('recipeItemImg'),
-        false,
-        `${name} never prefers a containing book's image`
-      );
-      assert.equal(
-        source.includes('icons/svg/item-bag.svg'),
-        false,
-        `${name} carries no bag-SVG fallback of its own`
-      );
-    }
-  });
+  for (const [name, file, specifier] of READERS) {
+    defineStructureContract(
+      `${name} imports the shared resolver and owns no single-use wrapper`,
+      file,
+      {
+        imports: [specifier],
+        names: ['resolveRecipeImage'],
+        namesNo: ['recipeImage', 'recipeItemImg'],
+        spellsExactlyNo: ['icons/svg/item-bag.svg'],
+      }
+    );
+  }
 
   // The Access pair imported DEFAULT_CRAFTING_IMAGE for the deleted wrapper ALONE.
-  it('leaves no dead DEFAULT_CRAFTING_IMAGE import behind in the Access pair', () => {
-    for (const [name, source] of [
-      ['AccessTabView', accessSurfaceSource],
-      ['GrantAccessInspector', grantAccessInspectorSource],
-    ]) {
-      assert.equal(
-        source.includes('DEFAULT_CRAFTING_IMAGE'),
-        false,
-        `${name} no longer names the constant its deleted wrapper used`
-      );
+  defineStructureContract(
+    'and the Access pair leaves no dead DEFAULT_CRAFTING_IMAGE import behind',
+    [ACCESS_SURFACE, GRANT_ACCESS_INSPECTOR],
+    { namesNo: ['DEFAULT_CRAFTING_IMAGE'] }
+  );
+
+  it('calls the resolver at each render site with that surface own identifier', () => {
+    for (const [name, file, , expression] of READERS) {
+      const bound = renderedNodes(componentAstOf(file), 'Medallion')
+        .map((node) => attributeExpression(node, 'art'))
+        .filter((node) => calledName(node) === 'resolveRecipeImage')
+        .filter((node) => identifierNames(node).has(expression));
+      assert.ok(bound.length > 0, `${name} resolves ${expression} through the chokepoint`);
     }
   });
 
-  // Each call passes the identifier that surface actually binds.
-  it('calls the resolver at each existing render site with that surface own identifier', () => {
-    const bindsArtThrough = (source, expression) =>
-      openingTagsNamed(source, 'Medallion').some((tag) =>
-        tag.includes(`art={resolveRecipeImage(${expression})}`)
-      );
-    assert.ok(
-      bindsArtThrough(browserSource, 'recipe'),
-      'the row medallion resolves the row recipe'
-    );
-    assert.ok(
-      bindsArtThrough(browserInspectorSource, 'selectedRecipe'),
-      'the library inspector hero resolves its selectedRecipe prop'
-    );
-    assert.ok(
-      bindsArtThrough(accessSurfaceSource, 'recipe'),
-      'the Access row resolves the row recipe through the same chokepoint'
-    );
-    assert.ok(
-      bindsArtThrough(grantAccessInspectorSource, 'recipe'),
-      'and so does the Grant Access header'
-    );
-  });
+  defineStructureContract(
+    'leaves the store with no book image for any reader to prefer, membership intact',
+    [STORE, ROW_PROJECTION, SYSTEM_PROJECTION],
+    { namesNo: ['recipeItemImg'] }
+  );
 
-  it('leaves the store with no book image for any reader to prefer, membership intact', () => {
-    assert.equal(
-      `${storeSource}\n${projectionSource}`.includes('recipeItemImg'),
-      false,
-      'the projection no longer derives an image from the first containing book'
-    );
-    for (const field of [
-      'recipeItemIds',
-      'recipeItemId',
-      'recipeItemName',
-      'recipeItemSourceUuid',
-    ]) {
-      assert.ok(recipeRowProjectionSource.includes(field), `the projection keeps ${field}`);
-    }
-  });
-
-  // The root imports the shared resolver for the editor header's medallion, but must
-  // never re-own a local image-resolution helper.
-  it('keeps the manager root free of a recipe image helper of its own', () => {
-    assert.equal(
-      /function\s+recipeImage\s*\(/.test(rootSource),
-      false,
-      'the root no longer owns a recipe image helper'
-    );
+  // The root imports the shared resolver for the editor header's medallion, but must never
+  // re-own a local image-resolution helper.
+  defineStructureContract('keeps the manager root free of a recipe image helper of its own', ROOT, {
+    namesNo: ['recipeImage'],
   });
 });
 
 describe('RecipeEditView keeps the recipe image always editable', () => {
   // A recipe can belong to many books & scrolls (recipeIds[] is many-to-many).
-  it('drops the linked-state derivation and the linkedItemImage prop', () => {
-    assert.equal(editSource.includes('isRecipeItemLinked'), false, 'no linked-state derivation');
-    assert.equal(editSource.includes('linkedItemImage'), false, 'no linkedItemImage prop');
+  defineStructureContract('drops the linked-state derivation and the linkedItemImage prop', EDIT, {
+    namesNo: ['isRecipeItemLinked', 'linkedItemImage'],
   });
 
-  it('renders only the editable image picker button — no locked span, lock icon, or marker', () => {
-    assert.equal(
-      overviewSource.includes('{#if isRecipeItemLinked}'),
-      false,
-      'no linked-state branch'
-    );
-    assert.equal(
-      overviewSource.includes('is-recipe-item-linked'),
-      false,
-      'no recipe-item locked class'
-    );
-    assert.equal(
-      overviewSource.includes('data-recipe-item-locked-image'),
-      false,
-      'no locked-image marker'
-    );
-    assert.ok(
-      overviewSource.includes('data-recipe-field="img"'),
-      'keeps the editable image picker button'
-    );
-    assert.ok(overviewSource.includes('onclick={onChooseImage}'), 'the picker button is clickable');
+  defineStructureContract(
+    'renders only the editable image picker button — no locked span, lock icon, or marker',
+    OVERVIEW,
+    {
+      namesNo: ['isRecipeItemLinked'],
+      spellsNo: ['is-recipe-item-linked'],
+      writesNo: ['data-recipe-item-locked-image'],
+      attributes: [['data-recipe-field', 'img']],
+      names: ['onChooseImage'],
+    }
+  );
+
+  defineStructureContract(
+    'guards chooseImage only on the pick handler, never on a linked state',
+    { file: EDIT, fn: 'chooseImage' },
+    { names: ['onPickImagePath'], namesNo: ['isRecipeItemLinked'], compares: ['function'] }
+  );
+
+  defineStructureContract('does not thread a linked recipe-item image through the root', ROOT, {
+    namesNo: ['linkedItemImage', 'recipeDraftLinkedItemImage'],
   });
 
-  it('guards chooseImage only on the pick handler, never on a linked state', () => {
-    assert.ok(
-      editSource.includes("if (typeof onPickImagePath !== 'function') return;"),
-      'chooseImage early-returns only when there is no pick handler'
+  defineStructureContract(
+    'resolves the editor header image through the shared bag-to-blueprint resolver',
+    ROOT,
+    { imports: ['../../util/craftingImageDefaults.js'], names: ['resolveRecipeImage'] }
+  );
+
+  it('and the header medallion and the Overview picker both route through it', () => {
+    const [medallion] = renderedNodes(componentAstOf(ROOT), 'Medallion').filter(
+      (node) =>
+        calledName(attributeExpression(node, 'art')) === 'resolveRecipeImage' &&
+        identifierNames(attributeExpression(node, 'art')).has('recipeDraft')
     );
-    assert.equal(
-      editSource.includes('isRecipeItemLinked) return'),
-      false,
-      'chooseImage no longer early-returns on a linked recipe item'
-    );
+    assert.ok(medallion, 'the header medallion resolves the generic bag to the blueprint default');
   });
 
-  it('does not thread a linked recipe-item image through the root', () => {
-    assert.equal(
-      rootSource.includes('linkedItemImage'),
-      false,
-      'root passes no linkedItemImage prop'
-    );
-    assert.equal(
-      rootSource.includes('recipeDraftLinkedItemImage'),
-      false,
-      'root derives no locked image'
-    );
-  });
-
-  it('resolves the editor header + picker image through the shared bag→blueprint resolver', () => {
-    assert.ok(
-      rootSource.includes(
-        "import { resolveRecipeImage } from '../../util/craftingImageDefaults.js'"
-      ),
-      'root imports the shared resolver for the header medallion'
-    );
-    assert.ok(
-      rootSource.includes('art={resolveRecipeImage(recipeDraft)}'),
-      'the header medallion resolves the generic bag to the blueprint default'
-    );
-    assert.ok(
-      overviewSource.includes('resolveRecipeImage({ img: value })'),
-      'the overview picker resolves the generic bag to the blueprint default'
-    );
+  defineStructureContract('and the overview picker does the same', OVERVIEW, {
+    names: ['resolveRecipeImage'],
+    callsWith: [['resolveRecipeImage', 'value']],
   });
 });
 
@@ -1484,47 +1034,32 @@ describe('routed result-set head anchors the add-trigger to the right (issue 643
     );
   });
 
-  it('keeps the reusable routing hooks intact on both routed heads', () => {
-    // The add-trigger carries the routing-option add marker and chips carry the chip
-    // hook — both are relied on by the mounted routing tests and the smoke harness.
-    assert.ok(
-      routingAssignmentSource.includes('triggerAddMarker="routing-option"'),
-      'the add-trigger keeps its routing-option marker'
-    );
-    assert.ok(
-      routingAssignmentSource.includes('data-routing-chip={chip.id}'),
-      'each assigned chip keeps its data-routing-chip hook'
-    );
-    // The trigger (SearchablePopover wrapper) carries the routing-picker class the
-    // right-anchor rule targets, and it is the LAST flow child after the chips.
-    assert.ok(
-      routingAssignmentSource.includes('manager-recipe-routing-picker'),
-      'the add-trigger wrapper carries the routing-picker class'
-    );
-    assert.ok(
-      routingAssignmentSource.indexOf('{#each chips') <
-        routingAssignmentSource.indexOf('manager-recipe-routing-picker'),
-      'the add-trigger renders after the chips so the auto margin pushes only it right'
-    );
-  });
+  defineStructureContract(
+    'keeps the reusable routing hooks intact on both routed heads',
+    ROUTING_ASSIGNMENT,
+    {
+      passesValues: [['SearchablePopover', 'triggerAddMarker', 'routing-option']],
+      writes: ['data-routing-chip'],
+      spells: ['manager-recipe-routing-picker'],
+      // The trigger is the last flow child, so the auto margin pushes only it right.
+      rendersBefore: [['EachBlock', 'SearchablePopover']],
+    }
+  );
 
-  it('places the delete button immediately after the routing head in the result-set head', () => {
-    // The head reads [routing assignment (label + chips + right-anchored add)] [trash],
-    // so the add-trigger lands next to the delete (result-set remove) button.
-    assert.ok(
-      resultGroupCardSource.includes('data-recipe-remove="result-set"'),
-      'the result-set head keeps its delete hook'
-    );
-    assert.ok(
-      resultGroupCardSource.indexOf('<RecipeRoutingAssignment') <
-        resultGroupCardSource.indexOf('data-recipe-remove="result-set"'),
-      'the delete button follows the routing assignment in the head'
-    );
-  });
+  defineStructureContract(
+    'places the delete button immediately after the routing head in the result-set head',
+    RESULT_GROUP_CARD,
+    {
+      writes: ['data-recipe-remove'],
+      rendersBefore: [
+        ['RecipeRoutingAssignment', { attribute: ['data-recipe-remove', 'result-set'] }],
+      ],
+    }
+  );
 });
 
 describe('recipe image picker no longer reuses the scene-locked visuals', () => {
-  it('drops the is-recipe-item-linked locked-picker rules (the recipe image is always editable)', () => {
+  it('drops the is-recipe-item-linked locked-picker rules (the image is always editable)', () => {
     assert.equal(
       css.includes('is-recipe-item-linked'),
       false,
@@ -1535,53 +1070,47 @@ describe('recipe image picker no longer reuses the scene-locked visuals', () => 
 
 // Issue 1018. Two DIFFERENT predicates used to share the name `enableBlocked`.
 describe('the editor enable-toggle gate is named apart from the activation gate (issue 1018)', () => {
-  it('leaves no `enableBlocked` anywhere in the editor pair', () => {
-    // Substring, not word-boundary: `enableToggleBlocked` does not contain `enableBlocked`,
-    // so a bare `includes` cannot false-positive on the new name.
-    assert.equal(
-      editSource.includes('enableBlocked'),
-      false,
-      'RecipeEditView must not reuse the activation gate name for its own predicate'
-    );
-    assert.equal(
-      overviewSource.includes('enableBlocked'),
-      false,
-      'RecipeOverviewTab must not reuse the activation gate name for its own prop'
+  defineStructureContract('leaves no `enableBlocked` anywhere in the editor pair', [EDIT, OVERVIEW], {
+    // `enableToggleBlocked` is a different identifier, so the name claim cannot false-positive.
+    namesNo: ['enableBlocked'],
+  });
+
+  defineStructureContract(
+    'keeps the editor predicate declared as `enableToggleBlocked`',
+    { file: EDIT, constant: 'enableToggleBlocked' },
+    { calls: ['blocksEnable'], reads: ['readiness.issues'], names: ['enabled'] }
+  );
+
+  defineStructureContract('and forwards it to the Overview tab', EDIT, {
+    passesProps: [['RecipeOverviewTab', 'enableToggleBlocked']],
+  });
+
+  defineStructureContract(
+    'which declares it with its off-by-default value and disables the toggle from it',
+    OVERVIEW,
+    { declaresProp: ['enableToggleBlocked'], defaults: [['enableToggleBlocked', false]] }
+  );
+
+  it('and the Overview enable toggle is disabled from enableToggleBlocked', () => {
+    const disabled = renderedNodes(componentAstOf(OVERVIEW), 'ToggleCard')
+      .map((node) => attributeExpression(node, 'disabled'))
+      .filter((node) => node && identifierNames(node).has('enableToggleBlocked'));
+    assert.equal(disabled.length, 1, 'exactly one toggle card is gated on the editor predicate');
+    assert.ok(
+      identifierNames(disabled[0]).has('saving'),
+      'and it is also gated while the editor is saving'
     );
   });
 
-  it('keeps the editor predicate declared and forwarded as `enableToggleBlocked`', () => {
-    // The declaration, not just the identifier.
-    assert.ok(
-      editSource.includes(
-        'const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues))'
-      ),
-      'RecipeEditView derives enableToggleBlocked from the readiness issues'
-    );
-    assert.ok(
-      editSource.includes('{enableToggleBlocked}'),
-      'RecipeEditView forwards enableToggleBlocked to the Overview tab'
-    );
-    assert.ok(
-      overviewSource.includes('enableToggleBlocked = false,'),
-      'RecipeOverviewTab declares the enableToggleBlocked prop with its off-by-default value'
-    );
-    assert.ok(
-      overviewSource.includes('disabled={saving || enableToggleBlocked}'),
-      'the Overview enable toggle is disabled from enableToggleBlocked'
-    );
-  });
+  // The other half. Renaming the projection instead of the editor local would satisfy the negative
+  // assertions above while leaving the two concepts merged under one name.
+  defineStructureContract(
+    'keeps the activation gate projected and read as `enableBlocked`',
+    ROW_PROJECTION,
+    { keys: ['enableBlocked'], calls: ['_isRecipeEnableBlocked'] }
+  );
 
-  it('keeps the ACTIVATION gate projected and read as `enableBlocked`', () => {
-    // The other half. Renaming the projection instead of the editor local would satisfy
-    // the negative assertions above while leaving the two concepts merged under one name.
-    assert.ok(
-      recipeRowProjectionSource.includes('enableBlocked: _isRecipeEnableBlocked('),
-      'the row projection still projects the activation gate onto GM recipe rows as enableBlocked'
-    );
-    assert.ok(
-      browserInspectorSource.includes('selectedRecipe.enableBlocked'),
-      'the browser inspector pill still reads the projected enableBlocked'
-    );
+  defineStructureContract('and the browser inspector pill still reads it', BROWSER_INSPECTOR, {
+    reads: ['selectedRecipe.enableBlocked'],
   });
 });

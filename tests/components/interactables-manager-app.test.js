@@ -285,7 +285,7 @@ describe('InteractablesManagerRoot body', () => {
   // own allow-list both live in `tests/helpers/interactablesWindowContract.js`, shared with the
   // browser's and the config panel's copies of this clause.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
-    assertWindowContract({ rootSource, contract: MANAGE_PANEL_CONTRACT });
+    assertWindowContract({ componentFile: 'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte', contract: MANAGE_PANEL_CONTRACT });
   });
 
   // THE PROMOTE CARD IS ONE COLUMN OF ONE CONTROL WIDTH (issue 1520 review).

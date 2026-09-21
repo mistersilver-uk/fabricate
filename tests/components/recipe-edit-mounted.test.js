@@ -2787,6 +2787,16 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // The name is read before the array moves (issue 1697, replacing a statement-order pin). The
+  // root writes each patch straight back into the draft, so `results` changes under the card
+  // inside the same click; a name read after `reorderItem` would announce the item that swapped
+  // into the slot. This case round-trips the patch the way the root does, which is what makes the
+  // announced name able to be wrong at all.
+  // The clicked witness for this claim moved to the primitive at issue 1512: the move-up and
+  // move-down buttons this case used to click are the shared list's grip now, and
+  // `sortable-list-mounted.test.js` reads the announced sentence out of the live region there,
+  // naming the row that MOVED rather than the one that arrived. Retired here rather than
+  // repointed, because the surface it acted on no longer exists.
   it('non-progressive: result rows expose no move buttons', async () => {
     const { target } = await mountProgressiveResults(
       [
