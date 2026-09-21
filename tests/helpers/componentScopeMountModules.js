@@ -63,6 +63,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/overlayHost.js',
 ]);

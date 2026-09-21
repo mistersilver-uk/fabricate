@@ -137,9 +137,36 @@ export const CASES = Object.freeze([
       { selector: '[data-tier-row]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The row, not the card: a card keeping its old table still satisfies a selector aimed at the section.
-    expectSelector: '.fabricate-manager .manager-checks-tier-list [data-tier-row]',
+    // The row, not the card: a card keeping its old table still satisfies a selector aimed at the section. The `role="list"` wrapper this used to name is the shared list's own `<ul>` as of issue 1512.
+    expectSelector: '.fabricate-manager .fabricate-sortable-list-row[data-tier-row]',
     kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-recipe-tiers-narrow',
+    label: 'Manager — Checks crafting recipe tiers at the declared floor',
+    // The tier row's AFTER frame (issue 1512): it gains the numbered badge and the chevron rocker
+    // issue 1096 refused, and the rocker has to stay on the row's one line at 1024x640.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-add-tier]' },
+      { selector: '[data-add-tier]' },
+      { selector: ':nth-match([data-tier-name], 1)', fill: 'Apprentice work' },
+      { selector: ':nth-match([data-tier-name], 2)', fill: 'Masterwork' },
+      { selector: '[data-tier-row]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-tier-row] [data-sortable-move="up"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'checks', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,

@@ -305,6 +305,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
     'src/ui/model/complicationSummary.js',
@@ -321,6 +322,10 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+    // The result group card renders the product's ONE ordered list (issue 1512) and the stage's
+    // complication band through it.
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',

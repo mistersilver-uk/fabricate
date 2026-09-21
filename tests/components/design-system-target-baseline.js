@@ -40,7 +40,9 @@ function rows(table) {
 export const TARGET_LIBRARY_NAMES = rows('libraryTargetNames');
 
 /** @see TARGET_LIBRARY_NAMES */
-export const TARGET_LIBRARY_NAME_TOTAL = 58;
+// Measured over the library at issue 1512, which shipped the ordered list and the row disclosure
+// it promoted.
+export const TARGET_LIBRARY_NAME_TOTAL = 56;
 
 /**
  * Every manifest row whose `status` reads `target`, keyed on the implementation path, measured at
@@ -49,4 +51,6 @@ export const TARGET_LIBRARY_NAME_TOTAL = 58;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-export const TARGET_MANIFEST_ROW_TOTAL = 46;
+// 46 -> 47 (issue 1707 phase 4): `environment/GatheringModifierEditor.svelte` crossed the two-caller
+// bar, and the row it is owed arrives at `target` because it names no specimen to be faithful to.
+export const TARGET_MANIFEST_ROW_TOTAL = 47;

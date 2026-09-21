@@ -2,7 +2,11 @@
  * System scope: the component browser, its bulk sets, the component editor and its complications.
  */
 
-import { BULK_DELETE_CARD_PATTERN, BULK_EDIT_CHROME_PATTERN } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  BULK_DELETE_CARD_PATTERN,
+  BULK_EDIT_CHROME_PATTERN,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -102,6 +106,36 @@ export const CASES = Object.freeze([
     expectCenterHit: '[data-scoped-inherit-toggle="essences"]',
     kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  // The first open-panel frame in the component studio (issue 1510): the option list exists only
+  // while the panel is open, so a closed-state frame cannot double for it (the portal occludes
+  // the screen behind it). The category card's control is the widest `form` trigger, and its
+  // list is unticked, the polarity the ticked recipe frame beside it does not draw.
+  managerCase({
+    id: 'manager-component-edit-category-list',
+    label: 'Manager — Component edit category list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    // The walk stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-search] input', fill: 'Iron Ingot' },
+      { selector: '[data-component-edit]' },
+      { selector: '[data-component-edit-category]' },
+    ],
+    expectView: 'component-edit',
+    // Three claims a closed-state frame fails: the panel exists, it is the unticked list, and its inherit row — the one option that is not a category at all — is drawn inside it.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover:not(.fabricate-select-popover-ticked) ' +
+      '[data-popover-option="__inherit"] .fabricate-select-label',
+    // The panel sits inside the application root rather than clipped by it.
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   managerCase({
     // The rules editor's read-only world tag card (issue 1371, round 3), which no frame reached.
@@ -438,6 +472,29 @@ export const CASES = Object.freeze([
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-component-edit-salvage-narrow',
+    label: 'Manager — Component edit progressive salvage at the declared floor',
+    // Anchored to `hb-cracked-alembic`, the fixture world's one progressive salvage: the stage rows
+    // are the shared list's now, and this selector is satisfied only by the converted state.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-result-groups]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector:
+      '.fabricate-manager .fabricate-sortable-list-row[data-salvage-result] [data-sortable-move="up"]',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'components', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({

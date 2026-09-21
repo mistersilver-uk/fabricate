@@ -56,32 +56,37 @@
     {onDeleteStep}
   >
     {#snippet body(step)}
-      {#if timeRequirementsEnabled}
-        <div class="manager-recipe-step-durations">
-          <RecipeDurationSteppers
-            timeRequirement={step.timeRequirement || null}
-            showLabel={false}
-            onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
+      <!-- A caller-owned wrapper inside the list's body (issue 1512): the body element is the
+           primitive's, and a rule keyed on it behind this card's class would put an application
+           root in front of a class the primitive writes. -->
+      <div class="manager-recipe-steps-editor">
+        {#if timeRequirementsEnabled}
+          <div class="manager-recipe-step-durations">
+            <RecipeDurationSteppers
+              timeRequirement={step.timeRequirement || null}
+              showLabel={false}
+              onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
+            />
+          </div>
+        {/if}
+        <Field as="label">
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>
+          <input
+            type="text"
+            data-recipe-step-field="name"
+            value={step.name || ''}
+            onchange={(event) => onUpdateStep(step.id, { name: event.currentTarget.value })}
           />
-        </div>
-      {/if}
-      <Field as="label">
-        <span>{text('FABRICATE.Admin.Manager.Recipe.Name', 'Name')}</span>
-        <input
-          type="text"
-          data-recipe-step-field="name"
-          value={step.name || ''}
-          onchange={(event) => onUpdateStep(step.id, { name: event.currentTarget.value })}
-        />
-      </Field>
-      <Field as="label">
-        <span>{text('FABRICATE.Admin.Manager.Recipe.Description', 'Description')}</span>
-        <textarea
-          data-recipe-step-field="description"
-          value={step.description || ''}
-          onchange={(event) => onUpdateStep(step.id, { description: event.currentTarget.value })}
-        ></textarea>
-      </Field>
+        </Field>
+        <Field as="label">
+          <span>{text('FABRICATE.Admin.Manager.Recipe.Description', 'Description')}</span>
+          <textarea
+            data-recipe-step-field="description"
+            value={step.description || ''}
+            onchange={(event) => onUpdateStep(step.id, { description: event.currentTarget.value })}
+          ></textarea>
+        </Field>
+      </div>
     {/snippet}
 
     {#snippet footer()}

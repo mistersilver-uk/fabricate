@@ -67,13 +67,16 @@ const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique tool/receipt reads in two engines; #1666 and #1665 relocated ten files.
   // #1701 moved nine of `CraftingEngine.js`'s validated-tool reads into `craftPipeline.js`, and
   // #1714 moved five more into `salvagePipeline.js`, so only the per-file keying moved: no read
-  // was added or removed, which is why `matches` and `lines` hold.
+  // was added or removed, which is why `matches` and `lines` hold. #1699 moved four reads into
+  // the new `SourceIdentityService.js` (`files` 20 -> 21) and retired two auto-stamp loop headers
+  // for two per-arm selectors (`pairs` 127 -> 128, and the component-loop collision group 5 -> 4,
+  // so `collisionSites` 43 -> 42); `matches` and `lines` are conserved, because nothing was added.
   matches: 168,
   lines: 153,
-  files: 20,
-  pairs: 127,
+  files: 21,
+  pairs: 128,
   collisionGroups: 17,
-  collisionSites: 43,
+  collisionSites: 42,
 });
 
 /**
@@ -157,10 +160,14 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 5, 'writer'],
   ['src/systems/CraftingSystemManager.js', "(system.components || []).find((item) => {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 5, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (const tool of system.tools || []) {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "definitions: system.components || [],", 1, 'restamp'],
-  ['src/systems/CraftingSystemManager.js', "definitions: (system.tools || []).filter(", 1, 'restamp'],
+  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 4, 'writer'],
+  // #1699: the stamping and repair clusters moved to `SourceIdentityService.js`, and the three
+  // auto-stamps collapsed onto one parameterised body whose per-arm `entriesOf` selectors replace
+  // the two retired loop headers.
+  ['src/systems/SourceIdentityService.js', "entriesOf: (system) => system.components || [],", 1, 'restamp'],
+  ['src/systems/SourceIdentityService.js', "entriesOf: (system) => system.tools || [],", 1, 'restamp'],
+  ['src/systems/SourceIdentityService.js', "definitions: system.components || [],", 1, 'restamp'],
+  ['src/systems/SourceIdentityService.js', "definitions: (system.tools || []).filter(", 1, 'restamp'],
   ['src/systems/CraftingSystemManager.js', "const idx = system.components.findIndex((i) => i.id === itemId);", 2, 'writer'],
   ['src/systems/CraftingSystemManager.js', "const existing = system.components[idx];", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "system.components[idx] = updatedItem;", 2, 'writer'],

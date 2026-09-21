@@ -315,6 +315,29 @@ test('every sourceMatches pattern resolves to at least one source file', () => {
   );
 });
 
+/** The four gathering/travel leaves the rail renders, moved out of the root by issue 1707. */
+const GATHERING_INSPECTOR_LEAF_PATHS = Object.freeze([
+  'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
+  'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',
+  'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte',
+  'src/ui/svelte/apps/manager/world/TravelInspector.svelte',
+]);
+
+const GATHERING_INSPECTOR_RAIL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
+
+test('every case claiming a gathering/travel leaf also claims the rail that renders it', () => {
+  // A case that claims a leaf but not the rail asks for no photograph when the rail's own branch
+  // chain breaks — the defect phase 3's post-implementation review found (issue 1707 phase 3).
+  const drifted = VIEW_LAB_CASES.filter(
+    (viewCase) =>
+      GATHERING_INSPECTOR_LEAF_PATHS.some((leaf) =>
+        viewCase.sourceMatches.some((pattern) => pattern.test(leaf))
+      ) && !viewCase.sourceMatches.some((pattern) => pattern.test(GATHERING_INSPECTOR_RAIL_PATH))
+  ).map((viewCase) => viewCase.id);
+  assert.deepEqual(drifted, [], 'these cases claim a leaf without also claiming its rail');
+});
+
 /** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
 const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
@@ -2300,18 +2323,52 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The twenty frames a change to the shared positioning seam must publish (issue 1500; the eleventh
-// joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the twelfth and
-// thirteenth at issue 1504, when `Select`'s option list got two — one of them in the PLAYER window,
-// which is a second application root for the seam to clamp against — and the fourteenth and
-// fifteenth at issue 1520's second review round, which is the two GM canvas windows' open option
-// panels).
+test('the broad SearchablePopoverPanel signal captures every deliberate picker state (issue 1719)', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  ]).map((viewCase) => viewCase.id);
+
+  // The representative pair plus the panel's fifteen overrides.
+  assert.deepEqual(
+    selected.sort((a, b) => a.localeCompare(b)),
+    [
+      'fabricate-app-shell',
+      'interactables-manager-region-open',
+      'manager-components-normal',
+      'manager-essences-source-picker',
+      'manager-gathering-task-availability-menu',
+      'manager-recipe-edit-crafting-modifier-cap-reached',
+      'manager-recipe-edit-ingredients-or-menu',
+      'manager-recipe-edit-tag-picker',
+      'manager-recipe-item-contents-picker',
+      'manager-recipes-bulk-edit-check-tier',
+      'manager-system-edit-lists',
+      'manager-world-parties-actor-picker',
+      'manager-world-parties-realm-override-picker',
+      'player-actor-picker',
+      'player-crafting-sources-picker',
+      'player-inventory-page-size',
+      'world-tool-entry-on-break-repair-tag-picker-empty',
+    ]
+  );
+});
+
+// The twenty-two frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
+// twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
+// PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
+// and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
+// option panels, and the twenty-first and twenty-second at issue 1510, which are the recipe
+// studio's kind list and the component studio's category list — the first two converted MANAGER
+// selects whose panels have a frame at all, one ticked and one not).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
+  'manager-component-edit-category-list',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
+  'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',

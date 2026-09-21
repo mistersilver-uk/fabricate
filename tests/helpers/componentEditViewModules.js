@@ -32,6 +32,8 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // `worldVocabulary.js` asks it whether a name is the general bucket and every tree spreading that
   // tier now needs it.
   'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
+  // The three converted selects' option vocabularies (issue 1510), mapped beside the view.
+  'src/ui/svelte/apps/manager/component/componentEditSelectOptions.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
   // check' for the persisted 'routed' token. Import-free leaf.
   'src/ui/svelte/apps/manager/resolutionModeOptions.js',
@@ -43,6 +45,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   // `ActionMenu`'s own placement helper (issue 1477).
   'src/ui/svelte/util/actionMenuLayout.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -76,6 +79,12 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // Rendered by the salvage block.
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  // THE SHARED ONE-OF-N PICKER (issue 1510). The category card, the outcome-routing rows, the
+  // salvage DC presets and the complications section's two clause controls all render it, and a
+  // `.svelte` the tree renders but this list omits HANGS the suite (# cancelled) rather than
+  // failing it — so this one entry is what keeps six suites alive.
+  'src/ui/svelte/components/Select.svelte',
   // The salvage result quantity + the progressive DC are the shared Stepper (issue 676).
   // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite hangs.
   'src/ui/svelte/components/Stepper.svelte',
@@ -105,6 +114,8 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // The product's ONE ordered list (issue 1512): the progressive salvage stage list renders it.
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
   // THE PART D REBUILD'S FOUR NEW LEAVES (issue 1371, parity round 4).
   'src/ui/svelte/components/EditorTabs.svelte',

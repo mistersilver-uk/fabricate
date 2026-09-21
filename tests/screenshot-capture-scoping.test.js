@@ -1014,6 +1014,25 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-prerequisite-operator',
   'data-economy-regen-policy',
   'data-economy-regen-unit',
+  // ISSUE 1510 PHASE 2, COMMIT 2a — the recipe studio. `data-recipe-field` is spelled WITH its
+  // value at the three cells that carry it, because the bare attribute is shared with the tab's
+  // inputs and textareas and a bare entry would ban driving those natively too.
+  'data-recipe-category-select',
+  'data-recipe-field="checkTierId"',
+  'data-recipe-field="minSuccessOutcomeId"',
+  'data-recipe-field="craftingModifierSet"',
+  'data-recipe-option-kind',
+  // Issue 1510 phase 2, commit 2b — the component studio. Each is spelled bare, checked rather than
+  // assumed: `data-component-edit-category` and `data-complication-trigger` are each a prefix of
+  // two further hooks, but both of those name a state paragraph and a clause wrapper rather than a
+  // control, so no bare entry here bans driving a native control that survives. `data-salvage-route`
+  // carries the outcome name as its value, so it has no fixed value to spell; and of the container
+  // hook `data-salvage-routing`, which wraps no native control.
+  'data-component-edit-category',
+  'data-salvage-route',
+  'data-salvage-dc-preset',
+  'data-complication-trigger',
+  'data-complication-roll-condition-cmp',
 ]);
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
@@ -1092,9 +1111,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 14,
+    replacements.length >= 17,
     `only ${replacements.length} \`chooseSelectOption(\` call sites remain in the registry, ` +
-      'against a floor of 14. Converted steps were reverted to the native `select:` verb, or the ' +
+      'against a floor of 17. Converted steps were reverted to the native `select:` verb, or the ' +
       'helper was renamed and this clause is now judging an empty set.'
   );
   assert.deepEqual(
@@ -1243,7 +1262,7 @@ test('no suite drives a converted select by an inline open-then-click of its own
 
 test('the option list a capture producer clicks is rooted where the portal puts it', () => {
   const primitive = readFileSync('src/ui/svelte/components/Select.svelte', 'utf8');
-  const popover = readFileSync('src/ui/svelte/components/SearchablePopover.svelte', 'utf8');
+  const popover = readFileSync('src/ui/svelte/components/SearchablePopoverPanel.svelte', 'utf8');
   // Name-level, like the Checks guard below: the VALUES are option identities that vary per
   // world, and the names are what a rename would take away.
   assert.ok(
@@ -1253,8 +1272,8 @@ test('the option list a capture producer clicks is rooted where the portal puts 
   );
   assert.ok(
     popover.includes('data-popover-option'),
-    '`SearchablePopover.svelte` no longer writes `data-popover-option`, so the identity handle ' +
-      'every converted driver clicks by is on no row at all'
+    '`SearchablePopoverPanel.svelte` no longer writes `data-popover-option`, so the identity ' +
+      'handle every converted driver clicks by is on no row at all'
   );
 
   // HARNESS-ONLY, on the `interpolationSafeTrap` precedent above.

@@ -141,6 +141,8 @@ const WORLD_TOOL_ENTRY = 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.s
 const CHANCE_SLIDER = 'src/ui/svelte/components/ChanceSlider.svelte';
 const ENVIRONMENT_EDIT = 'src/ui/svelte/apps/manager/EnvironmentEditView.svelte';
 // The reward and event limit counts are one shared component (issue 1050).
+const GATHERING_INSPECTOR_RAIL =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
 const GATHERING_RULES_INSPECTOR =
   'src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte';
 const GATHERING_TASK_INSPECTOR =
@@ -1034,7 +1036,6 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('groups the gathering sections into a rail submenu', MANAGER_ROOT, {
     spells: ['manager-nav-group '],
     reads: ['railGroupExpanded.gathering'],
-    writes: ['data-gathering-inspector-placeholder'],
     spellsExactly: [
       'manager-nav-submenu',
       'manager-nav-toggle',
@@ -1105,11 +1106,9 @@ describe('CraftingSystemManager source contract', () => {
     // effect-transfer URL one card away, which leaves a moved link green.
     spellsExactly: [
       'FABRICATE.Admin.Manager.EmptySetup.Title',
-      'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
       'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
       'FABRICATE.Admin.Manager.Essence.EmptySetup.Title',
       'https://mistersilver-uk.github.io/fabricate/help/quickstart',
-      'https://mistersilver-uk.github.io/fabricate/gathering/environments',
       'https://mistersilver-uk.github.io/fabricate/components/',
       'https://mistersilver-uk.github.io/fabricate/essences',
     ],
@@ -1495,10 +1494,11 @@ describe('CraftingSystemManager source contract', () => {
   // Global conditions and vocabularies are authored from the gathering workspace browser (settings
   // tab); library task/event authoring and rules live on their own routes, so those store actions
   // are invoked by root-owned functions rather than passed into the composition editor.
-  // The rules card and its limit steppers moved into `environment/GatheringRulesInspector.svelte`
-  // (issue 1707 phase 2), so the root renders the rules leaf rather than the stepper itself.
+  // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2)
+  // and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
+  // the root renders the rail.
   defineStructureContract('wires the Manager gathering libraries and global conditions', MANAGER_ROOT, {
-    renders: ['GatheringRulesInspector'],
+    renders: ['GatheringInspectorRail'],
     passesProps: [
       ['EnvironmentsBrowserView', 'gatheringConfig'],
       ['EnvironmentsBrowserView', 'onUpdateGatheringConditions'],
@@ -1541,6 +1541,17 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [
       ['rule', 'rewardLimit'],
       ['rule', 'eventLimit'],
+    ],
+  });
+
+  // The rail's own states moved with the branch chain (issue 1707 phase 3): the placeholder hook
+  // (an unreachable arm, kept byte-faithful — deletion is a follow-up) and the empty-library setup
+  // card's title key are that file's own.
+  defineStructureContract('draws the gathering inspector rail', GATHERING_INSPECTOR_RAIL, {
+    writes: ['data-gathering-inspector-placeholder'],
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
+      'https://mistersilver-uk.github.io/fabricate/gathering/environments',
     ],
   });
 
@@ -1617,10 +1628,11 @@ describe('CraftingSystemManager source contract', () => {
   // What the library, its inspector and the focused editor draw and do — rows, drop rules,
   // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
   // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
-  // The drop inspector's slider moved into `environment/GatheringTaskInspector.svelte` (issue 1707
-  // phase 2), so the root renders the task leaf rather than the slider itself.
+  // The drop inspector moved into `environment/GatheringTaskInspector.svelte` (issue 1707 phase
+  // 2) and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
+  // the root renders the editor and the rail.
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
-    renders: ['GatheringTaskEditView', 'GatheringTaskInspector'],
+    renders: ['GatheringTaskEditView', 'GatheringInspectorRail'],
     names: [
       'selectedGatheringTaskId',
       'selectGatheringTask',

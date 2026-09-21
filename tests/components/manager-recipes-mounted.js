@@ -5,7 +5,11 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
 // Issue 1504: a converted control is a shared `<Select>`.
-import { chooseSelectOption } from '../helpers/select-control.js';
+import {
+  chooseSelectOption,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
   createManagerQueries,
@@ -66,53 +70,50 @@ export function registerRecipesCases() {
   it('recipe overview shows the check-tier dropdown only when tiers exist and emits checkTierId', () => {
     const emitted = [];
     // No tiers ⇒ no dropdown.
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(RecipeOverviewTabComponent, {
-      target,
-      props: {
-        recipe: { id: 'r1', checkTierId: null },
-        checkTierOptions: [],
-        onUpdateRecipe: () => {},
-      },
+    mountRecipeOverview({
+      recipe: { id: 'r1', checkTierId: null },
+      checkTierOptions: [],
+      onUpdateRecipe: () => {},
     });
-    flushSync();
-    assert.equal(target.querySelector('[data-recipe-check-tier]'), null);
+    assert.ok(!target.querySelector('[data-recipe-check-tier]'), 'no tiers, no dropdown');
     unmount(mounted);
     mounted = null;
     target.remove();
 
     // Tiers present ⇒ dropdown with the recipe's current selection.
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(RecipeOverviewTabComponent, {
-      target,
-      props: {
-        recipe: { id: 'r1', checkTierId: 'tier1' },
-        checkTierOptions: [
-          { id: 'tier1', name: 'Hard', dc: 18 },
-          { id: 'tier2', name: 'Easy', dc: 8 },
-        ],
-        onUpdateRecipe: (patch) => emitted.push(patch),
-      },
+    mountRecipeOverview({
+      recipe: { id: 'r1', checkTierId: 'tier1' },
+      checkTierOptions: [
+        { id: 'tier1', name: 'Hard', dc: 18 },
+        { id: 'tier2', name: 'Easy', dc: 8 },
+      ],
+      onUpdateRecipe: (patch) => emitted.push(patch),
     });
-    flushSync();
-    const select = target.querySelector('[data-recipe-check-tier] select');
-    assert.ok(select, 'dropdown renders when tiers exist');
-    assert.equal(select.value, 'tier1', 'reflects the recipe selection');
-    assert.equal(select.querySelectorAll('option').length, 3, 'Default + two tiers');
+    // The cell is the shared `<Select>` since issue 1510, so the chosen tier is the trigger's own
+    // text and the offers are rows in its panel — and the blank Default row takes the primitive's
+    // `__unchanged__` handle, because a `data-popover-option` cannot be empty.
+    const tier = '[data-recipe-check-tier] [data-recipe-field="checkTierId"]';
+    assert.ok(target.querySelector(tier), 'dropdown renders when tiers exist');
+    assert.equal(selectTriggerText(target, tier), 'Hard (DC 18)', 'reflects the recipe selection');
+    assert.deepEqual(
+      selectOptionValues(target, tier),
+      ['__unchanged__', 'tier1', 'tier2'],
+      'Default + two tiers'
+    );
 
-    select.value = 'tier2';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, tier, 'tier2');
     assert.deepEqual(emitted.at(-1), { checkTierId: 'tier2' });
 
-    select.value = '';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, tier, '__unchanged__');
     assert.deepEqual(emitted.at(-1), { checkTierId: null }, 'Default clears the tier');
   });
 
+  // THE HOST CARRIES `.fabricate-manager` (issue 1510), because the tab's converted select portals
+  // its panel to the nearest application root and falls back to `<body>` without one — so a bare
+  // `<div>` host would put the option list outside the element every assertion here reads.
   function mountRecipeOverview(props) {
     target = document.createElement('div');
+    target.className = 'fabricate-manager';
     document.body.appendChild(target);
     mounted = mount(RecipeOverviewTabComponent, { target, props });
     flushSync();

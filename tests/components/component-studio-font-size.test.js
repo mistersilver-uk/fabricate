@@ -253,7 +253,21 @@ const FIXTURE = `
                 <h3 data-m="panel-title">Category</h3>
                 <p class="manager-muted" data-m="panel-sub">Groups this component in the browser.</p>
               </div>
-              <select class="manager-input manager-component-category-select" data-m="field-select"><option>General</option></select>
+              <!-- The shared Select since issue 1510, drawn as the bulk axis above is: the picker
+                   root carries the caller's class and the trigger carries the rung, so the rule
+                   this role measures has to reach a button rather than a select. (No backticks in
+                   here: this markup is a template literal.) -->
+              <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-select">
+                <button
+                  type="button"
+                  class="fabricate-select-trigger fabricate-select-trigger-form"
+                  data-m="field-select"
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-label="Component category"
+                ><span class="manager-travel-picker-value fabricate-select-value">General</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+              </div>
             </div>
           </section>
           <section class="manager-component-panel" data-salvage-section>
@@ -267,9 +281,11 @@ const FIXTURE = `
             </div>
             <div class="fabricate-field manager-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
-              <ul class="manager-salvage-stage-list">
-                <li class="manager-salvage-stage-row">
-                  <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
+              <ul class="fabricate-sortable-list">
+                <li class="fabricate-sortable-list-row manager-salvage-stage-row">
+                 <div class="fabricate-sortable-list-line">
+                  <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+                  <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
                   <span class="manager-salvage-component-field">
                     <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
                       <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
@@ -281,9 +297,10 @@ const FIXTURE = `
                   </span>
                   <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
                   <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
-                  <span class="manager-salvage-stage-reorder">
-                    <button class="manager-salvage-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
+                  <span class="fabricate-sortable-list-rocker">
+                    <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
                   </span>
+                 </div>
                 </li>
               </ul>
             </div>
@@ -400,15 +417,13 @@ const EXPECTED = {
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans
   'readonly-label': 13.12, // 0.82rem — a section micro-label inside a panel
-  // 12px, RETARGETED (issue 1371). The role used to measure a
-  // `.manager-component-inline-control` floated into the panel's heading row, and the
-  // reference gives the Category select a card of its own (`proto:1322`), so the D-parts
-  // rebuild moved it into the card body as `.manager-component-category-select` and the old
-  // class is emitted nowhere. The role follows the control rather than the retired markup:
-  // the fixture names what `ComponentEditView` renders today, and the new rule states 12px
-  // itself, so the anti-bleed loop below still proves the size is stated and not inherited.
-  // (px, not rem: a font size is a literal — `design-system/spec.md:218-222`.)
-  'field-select': 12,
+  // 12.5px, the shared `<Select>`'s `form` rung, and a REAL change (issue 1510). It was 12 — the
+  // literal `.manager-component-category-select` stated for the native control it painted, which
+  // has no carrier now that the card's one control is the shared picker. The role still follows
+  // the control rather than the markup: the fixture draws the trigger the product draws, and the
+  // rung states the size itself, so the anti-bleed loop below still proves it is stated rather
+  // than inherited. (px, not rem: a font size is a literal — `design-system/spec.md:218-222`.)
+  'field-select': 12.5,
   // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form.
   'identity-name': 15.04,
   // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`.
@@ -416,7 +431,8 @@ const EXPECTED = {
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
-  'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
+  // The ordinal badge is the shared ordered list's as of issue 1512, at the specimen's 10px mono.
+  'stage-ordinal': 10,
   // The yield picker replaced the stage row's native <select> (issue 676). It measures the
   // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
   // native control for a popover trigger re-typed nothing. That is the point of checking:
@@ -429,7 +445,9 @@ const EXPECTED = {
   // again from 0.72rem: it now MATCHES `stage-dc`, so the read-only fact and the control
   // that changes it read as one pair rather than a number with a speck beside it.
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
-  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph; reorder IS the authoring act
+  // The rocker and the grip are the list's controls too: 9px for the chevron, 14px for the grip — the specimen draws its grip at 14px and the rocker and ordinal ship in px, so a rem grip alone would rescale under Foundry's font-size setting.
+  'stage-move': 9,
+  'stage-grip': 14,
   // The editor's tag pill converged on the shared `Chip` (issue 772), so it MOVED from
   // 11.2 (its own 0.7rem, near-exact against the prototype's 11px pill) to the one chip
   // scale it now shares with every other chip on this screen. That is the declared cost of
@@ -517,8 +535,10 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     }
 
     // Every studio role except the deliberate baseline must be free of the bleed.
+    // The grip is the one studio role whose declared figure IS 14px (the specimen's, issue
+    // 1512), so the guard cannot tell its rule from the base and the pin above carries it.
     for (const [role, box] of Object.entries(measured)) {
-      if (role === 'bleed-baseline') continue;
+      if (role === 'bleed-baseline' || role === 'stage-grip') continue;
       assert.notEqual(
         box.fontSize,
         14,
@@ -552,4 +572,21 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
   } finally {
     await browser.close();
   }
+});
+
+test('the category fixture spells `-form`, matching the product Select that declares no size', () => {
+  const editViewSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
+    'utf8'
+  );
+  const tagStart = editViewSource.indexOf('class="manager-component-category-select"');
+  assert.notEqual(tagStart, -1, 'the category `<Select>` call site moved or was renamed');
+  const openStart = editViewSource.lastIndexOf('<Select', tagStart);
+  const openEnd = editViewSource.indexOf('>', tagStart);
+  const tag = editViewSource.slice(openStart, openEnd);
+  assert.ok(
+    !/\bsize=/.test(tag),
+    'the category `<Select>` must declare no `size`, so it falls to the `form` rung the ' +
+      '`field-select` fixture (12.5px, `-form`) actually measures'
+  );
 });

@@ -10,6 +10,8 @@ import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const ADMIN_STORE_PATH = 'src/ui/svelte/stores/adminStore.js';
+const GATHERING_INSPECTOR_RAIL_PATH =
+  'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte';
 
 const rootLines = readFileSync(resolve(repoRoot, ROOT_PATH), 'utf8').split('\n');
 
@@ -132,14 +134,11 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './downtime/WorldDowntimeExtensionHost.svelte',
   './downtime/routeChromeChannel.js',
   './downtime/worldDowntimePreviewProvider.js',
-  // Added by issue 1707, which moved the gathering, event, rules and travel branches of the
-  // inspector chain into four leaves. Each one took its own imports with it, so the root no
-  // longer renders `GatheringModifierEditor` (the task and event leaves render it),
-  // `GatheringRuleLimitStepper`, `ChanceSlider`, `RealmNameField` or
-  // `CharacterModifierBoundsRow`, and no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
-  './environment/GatheringEventInspector.svelte',
-  './environment/GatheringRulesInspector.svelte',
-  './environment/GatheringTaskInspector.svelte',
+  // Added by issue 1707, which moved the gathering, travel and environment inspector branch out
+  // of the root. The rail owns the whole chain, so it — not the root — imports the four leaves,
+  // `GatheringModifierEditor`, `GatheringRuleLimitStepper`, `ChanceSlider`, `RealmNameField` and
+  // `CharacterModifierBoundsRow`, and the root no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
+  './environment/GatheringInspectorRail.svelte',
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
   './essences/EssenceBulkEditPanel.svelte',
@@ -166,7 +165,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4).
   './scoped/scopedEntryRoutes.js',
   './tools/ToolBrowserInspector.svelte',
-  './world/TravelInspector.svelte',
   './world/WorldCurrencyTab.svelte',
   './world/WorldModifiersTab.svelte',
   './world/WorldPrerequisitesTab.svelte',
@@ -433,5 +431,48 @@ test('the world-scope write path is supplied FOUR store legs', () => {
     adminStore,
     /const worldScope = Object\.fromEntries\(\s*Object\.entries\(\{[\s\S]*?\}\)\.map\(\(\[entityType, family\]\) => \[entityType, _republishingFamily\(family\)\]\)\s*\);/,
     'every world-scope family is published through the republishing wrapper'
+  );
+});
+
+/** Every name the rail's own `let { ... } = $props();` destructures, defaults stripped. */
+function railDestructuredPropNames() {
+  const source = readFileSync(resolve(repoRoot, GATHERING_INSPECTOR_RAIL_PATH), 'utf8');
+  const start = source.indexOf('let {');
+  const end = source.indexOf('} = $props();', start);
+  assert.ok(start >= 0 && end > start, 'the rail declares its props via one $props() destructure');
+  return [...source.slice(start + 'let {'.length, end).matchAll(/^\s*([A-Za-z_$][\w$]*)/gm)].map(
+    (match) => match[1]
+  );
+}
+
+/** The rail's own two `bind:name` shorthand attributes; `siteProps` requires a `=` after `bind:`. */
+function railBoundShorthandNames() {
+  return attributeLines('GatheringInspectorRail')
+    .map((line) => /^bind:([A-Za-z][A-Za-z0-9_$]*)$/.exec(line.trim())?.[1])
+    .filter(Boolean);
+}
+
+test('the rail declares exactly the props the root hands it, in both directions', () => {
+  // 13 unpinned writers survived a deletion undetected (post-implementation review, issue 1707
+  // phase 3) because no guard compared the rail's own prop contract against the root's one call
+  // site. This is that guard, symmetric: an extra prop on either side is as much a defect as a
+  // missing one.
+  const declared = railDestructuredPropNames();
+  assert.ok(declared.length > 50, 'the rail declares a substantial prop surface, not a stub');
+  const { names: passed, spreads } = siteProps('GatheringInspectorRail');
+  assert.equal(spreads.length, 0, 'the root passes the rail no bundle spread');
+  const passedBare = [
+    ...passed.map((name) => name.replace(/^bind:/, '')),
+    ...railBoundShorthandNames(),
+  ];
+  assert.deepEqual(
+    declared.filter((name) => !passedBare.includes(name)),
+    [],
+    'every prop the rail declares is passed by the root'
+  );
+  assert.deepEqual(
+    passedBare.filter((name) => !declared.includes(name)),
+    [],
+    'the root passes the rail no prop the rail does not declare'
   );
 });

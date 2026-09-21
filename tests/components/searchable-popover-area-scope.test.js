@@ -31,12 +31,19 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Twenty-one shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Twenty-two shared primitives, each with the namespace roots it writes and the class family it owns.
  */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
     name: 'SearchablePopover',
-    components: Object.freeze(['src/ui/svelte/components/SearchablePopover.svelte']),
+    // The picker and its portaled panel are one entry (issue 1719), because the family they write
+    // between them is one family: the trigger's two rules stay in the picker and the panel's
+    // twenty-one moved with the markup they root on, so `roots`, `family` and `anchors` apply to
+    // the pair unchanged and every floor below is measured over their union.
+    components: Object.freeze([
+      'src/ui/svelte/components/SearchablePopover.svelte',
+      'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+    ]),
     roots: Object.freeze(['fabricate-picker', 'fabricate-picker-popover']),
     family: 'manager-travel-[\\w-]+',
     anchors: Object.freeze([
@@ -613,6 +620,40 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'manager-availability-multi', root: 'fabricate-pill-select' }),
     ]),
   }),
+  Object.freeze({
+    // `SortableList` (issue 1512), the first entry here whose family was NEVER application-rooted:
+    // `namespacedFamily` is what tells this gate that a class matching the family pattern is a
+    // namespace class rather than an application root.
+    name: 'SortableList',
+    components: Object.freeze(['src/ui/svelte/components/SortableList.svelte']),
+    roots: Object.freeze(['fabricate-sortable-list']),
+    family: 'fabricate-sortable-list[\\w-]*',
+    namespacedFamily: true,
+    // `IconButton`'s own root, inherited because the grip and rocker rules are compounded on it:
+    // `.fabricate-icon-button.manager-icon-button` is (0,2,0) and pins a 34px box. It is a namespace
+    // root of the primitive this one composes, never an application root.
+    inheritedRoots: Object.freeze(['fabricate-icon-button']),
+    anchors: Object.freeze([
+      'fabricate-sortable-list',
+      'fabricate-sortable-list-row',
+      'fabricate-sortable-list-line',
+      'fabricate-sortable-list-content',
+      'fabricate-sortable-list-ordinal',
+      'fabricate-sortable-list-grip',
+      'fabricate-sortable-list-rocker',
+      'fabricate-sortable-list-move',
+      'fabricate-sortable-list-remove',
+      'fabricate-sortable-list-body',
+    ]),
+    // Measured at this commit: 10 written, 16 family selectors, 16 owned.
+    writtenFloor: 9,
+    familyFloor: 15,
+    ownedFloor: 15,
+    // No pair, measured rather than omitted: the only class a hand-written fixture of a converted
+    // list carries is `manager-checks-tier-row`, which `checks/CraftingCheckEditor.svelte` writes
+    // too, so a mirror keyed on it would demand this row class on rows this list does not render.
+    mirrored: Object.freeze([]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -1127,10 +1168,11 @@ test('a composed root is another primitive’s, and both new exemptions stay ent
   }
   assert.equal(
     inheritedChecked,
-    2,
+    3,
     `${inheritedChecked} inherited roots were resolved against their owner, against the two ` +
-      '`Select` declares. A different number means an entry gained or lost a composed root ' +
-      'without this clause being read.'
+      '`Select` declares plus the one `SortableList` declares on `IconButton` (issue 1512). A ' +
+      'different number means an entry gained or lost a composed root without this clause being ' +
+      'read.'
   );
 
   const select = PRIMITIVES.find((entry) => entry.name === 'Select');
@@ -2015,15 +2057,19 @@ test('each primitive’s own scoped styles name no application root either', () 
   }
 
   assert.ok(
-    blocks >= 5,
-    `only ${blocks} of the twenty component files hold a REAL scoped \`<style>\` block — one ` +
-      'opened after `</script>`. FIVE do today: `SearchablePopover`, `ManagerColorPopover` and ' +
+    blocks >= 7,
+    `only ${blocks} of the twenty-three component files hold a REAL scoped \`<style>\` block — one ` +
+      'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
+      '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
+      '`ManagerColorPopover` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
       '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation ' +
       'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
-      'rule that types the inline second datum on an option`s name line, and `ItemDropZone`, ' +
+      'rule that types the inline second datum on an option`s name line, `ItemDropZone`, ' +
       'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +
-      'and the mono address line under the name. All three blocks STAY ' +
+      'and the mono address line under the name, and `ModifierPillSelect`, whose block is the ' +
+      'disabled-trigger tint and the visually-hidden status span its multi-select cap announces. ' +
+      'All seven blocks STAY ' +
       'where they are: a scoped block is injected unlayered and this sheet is ' +
       'loaded into `layer(modules)`, so moving those rules into the sheet would be a layer ' +
       'change and would move a frame. The rest name a `<style>` only in DOCBLOCK PROSE, ' +

@@ -133,6 +133,10 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/components/IconButton.svelte',
       // THE shared overflow action menu (issue 1477).
       'src/ui/svelte/components/ActionMenu.svelte',
+      // The product's one ordered list and the disclosure it renders (issue 1512). This loop has no
+      // dependency validator, so omitting either reports the file as `# cancelled`.
+      'src/ui/svelte/components/RowDisclosure.svelte',
+      'src/ui/svelte/components/SortableList.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
@@ -287,6 +291,45 @@ describe('CompositionList mounted layout', () => {
     assert.deepEqual(calls.at(-1), ['openSource', 'task', 'disabled']);
   });
 
+  it('the selected and unavailable included rows keep their state paint through the primitive', async () => {
+    // Issue 1512 renamed this row's family class, and a rename with no matching rule is a silent
+    // loss of paint that only the capture selector reds — so both halves are asserted, the class the
+    // row emits and the rule that paints it.
+    await renderComposition({ selectedId: 'included' });
+
+    const row = target.querySelector('[data-record-id="included"]');
+    assert.ok(
+      row.classList.contains('manager-environment-comp-entry'),
+      'the included row carries its own family class beside the primitive`s row class'
+    );
+    assert.ok(row.classList.contains('is-selected'), 'and the selected row says so');
+    assert.ok(
+      row.classList.contains('is-unavailable') === false,
+      'while an available record is not marked unavailable'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    await renderComposition({
+      records: sampleRecords().map((entry) =>
+        entry.id === 'included' ? { ...entry, runtimeState: 'unavailable' } : entry
+      ),
+    });
+    assert.ok(
+      target.querySelector('[data-record-id="included"]').classList.contains('is-unavailable'),
+      'and an unavailable record says so'
+    );
+
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    for (const state of ['is-selected', 'is-unavailable']) {
+      assert.ok(
+        sheet.includes(`.manager-environment-comp-entry.${state} {`),
+        `styles/fabricate.css paints \`.manager-environment-comp-entry.${state}\`. The class the ` +
+          'row emits with no rule behind it is exactly the defect this clause exists to catch.'
+      );
+    }
+  });
+
   it('task automatic mode retains Excluded and standalone Non-matching sections, and force-adds from the row menu', async () => {
     const calls = [];
     await renderComposition({
@@ -348,7 +391,7 @@ describe('CompositionList mounted layout', () => {
     assert.equal(target.querySelector('[data-section="candidates"]'), null);
     assert.equal(target.querySelector('[data-section="excluded"]'), null);
     assert.equal(target.querySelector('[data-section="non-matching"]'), null);
-    assert.equal(target.querySelector('.manager-environment-comp-handle'), null, 'all-drops event mode does not render rank handles');
+    assert.ok(!target.querySelector('[data-sortable-grip]'), 'all-drops event mode does not render rank handles');
     assert.equal(target.querySelector('[data-record-id="included"]').getAttribute('draggable'), null, 'all-drops event rows are not draggable');
 
     const removeQuick = quickAction('included', 'exclude');
@@ -410,35 +453,44 @@ describe('CompositionList mounted layout', () => {
       onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to])
     });
 
+    // The included rows are the shared list's as of issue 1512, so the grip, badge and rocker carry
+    // its hooks and `has-rank-controls` is gone: `reorderable` decides whether a row is ranked.
+    const dragSource = (row) => row.querySelector('[data-sortable-grip][draggable="true"]');
     const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
-    assert.ok(includedRow.classList.contains('has-rank-controls'), 'included ranked event rows opt into the handle grid');
-    assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked event rows are draggable');
-    assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked event rows render the grip handle');
-    assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked event rows render the rank number');
+    assert.ok(Boolean(dragSource(includedRow)), 'included ranked event rows have a drag source');
+    assert.ok(includedRow.querySelector('[data-sortable-grip] .fa-grip-vertical'), 'included ranked event rows render the grip handle');
+    assert.ok(includedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('1'), 'included ranked event rows render the rank number');
+    // Rendered rather than pinned in source (issue 1512), and the drag source is the list's GRIP —
+    // not the whole row, whose expanded body is not something a GM drags.
+    assert.ok(
+      [...target.querySelectorAll('[data-section="included"] [data-record-id]')].every(
+        (row) => Boolean(dragSource(row))
+      ),
+      'reorder drag is enabled only when event rank controls are active, and then on every row'
+    );
+    assert.ok(
+      [...target.querySelectorAll('[data-section="included"] [data-record-id]')].every(
+        (row) => !row.hasAttribute('draggable')
+      ),
+      'and the row itself is not a drag source'
+    );
     const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
-    assert.ok(forcedRow.classList.contains('has-rank-controls'), 'force-included event rows also opt into rank controls');
-    assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked event rows are draggable');
-    assert.ok(forcedRow.querySelector('.manager-environment-comp-order').textContent.includes('4'), 'force-included rows receive their visible rank');
+    assert.ok(Boolean(dragSource(forcedRow)), 'force-included ranked event rows have a drag source');
+    assert.ok(forcedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('4'), 'force-included rows receive their visible rank');
     const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
-    assert.ok(blockedRow.classList.contains('has-rank-controls'), 'condition-blocked included event rows opt into rank controls');
-    assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included event rows are draggable');
-    assert.ok(blockedRow.querySelector('.manager-environment-comp-order').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
+    assert.ok(Boolean(dragSource(blockedRow)), 'condition-blocked included event rows have a drag source');
+    assert.ok(blockedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
 
-    assert.equal(
-      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-handle'),
-      null,
+    assert.ok(
+      !target.querySelector('[data-section="available-to-add"] [data-sortable-grip]'),
       'available-to-add events do not reserve a blank handle placeholder'
     );
-    assert.equal(
-      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-row.has-rank-controls'),
-      null,
-      'available-to-add events keep the non-handle grid'
-    );
 
+    // The rocker replaces the menu's two hidden copies of the same act (issue 1512).
     const menu = await openRowMenu('first');
-    assert.ok(menu.textContent.includes('Move up'), 'ranked event menus include move up');
-    assert.ok(menu.textContent.includes('Move down'), 'ranked event menus include move down');
-    menu.querySelectorAll('button').item(1).click();
+    assert.ok(!menu.textContent.includes('Move up'), 'the ranked menu no longer duplicates the move');
+    assert.ok(!menu.textContent.includes('Move down'), 'in either direction');
+    includedRow.querySelector('[data-sortable-move="down"]').click();
     assert.deepEqual(calls.at(-1), ['reorder', 'event', 0, 1]);
   });
 
@@ -452,10 +504,10 @@ describe('CompositionList mounted layout', () => {
       ]
     });
 
-    assert.equal(target.querySelector('.manager-environment-comp-head.has-rank-controls'), null);
-    assert.equal(target.querySelector('.manager-environment-comp-row.has-rank-controls'), null);
-    assert.equal(target.querySelector('.manager-environment-comp-handle'), null);
-    assert.equal(target.querySelector('[draggable="true"]'), null);
+    assert.ok(!target.querySelector('.manager-environment-comp-head.has-rank-controls'));
+    assert.ok(!target.querySelector('[data-sortable-grip]'), 'no grip where the list does not order');
+    assert.ok(!target.querySelector('[data-sortable-move]'), 'and no rocker either');
+    assert.ok(!target.querySelector('[draggable="true"]'));
 
     const menu = await openRowMenu('included');
     assert.equal(menu.textContent.includes('Move up'), false);
@@ -474,7 +526,7 @@ describe('CompositionList mounted layout', () => {
     });
 
     assert.deepEqual(rowIds('included'), ['included', 'blocked', 'forced']);
-    assert.equal(target.querySelector('.manager-environment-comp-handle'), null);
+    assert.ok(!target.querySelector('[data-sortable-grip]'));
     assert.equal(target.querySelector('[data-record-id="forced"]').getAttribute('draggable'), null);
     assert.equal(target.querySelector('[data-record-id="blocked"]').getAttribute('draggable'), null);
   });
@@ -492,8 +544,8 @@ describe('CompositionList mounted layout', () => {
     assert.ok(!target.querySelector('[data-section="candidates"]'), 'nor a separate candidates list');
     assert.deepEqual(rowIds('excluded'), ['excluded-nonmatching', 'excluded-matching']);
     assert.deepEqual(rowIds('non-matching'), ['disabled', 'nonmatching']);
-    assert.ok(!target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'), 'excluded rows reserve no rank handle');
-    assert.ok(!target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'), 'non-matching rows reserve no rank handle');
+    assert.ok(!target.querySelector('[data-section="excluded"] [data-sortable-grip]'), 'excluded rows reserve no rank handle');
+    assert.ok(!target.querySelector('[data-section="non-matching"] [data-sortable-grip]'), 'non-matching rows reserve no rank handle');
 
     // THE `warning` role's first reachable call site (issues 1118 and #1315).
     const forceAdd = target.querySelector('[data-record-id="nonmatching"] .manager-environment-force-include');

@@ -398,16 +398,24 @@ describe('environment composition editor structure', () => {
     }
   );
 
+  // The Included list renders through `SortableList` as of issue 1512, so the row it draws is the
+  // primitive's — the `role="button"` head this row used to pin is written there now — and the
+  // caller contributes the state classes only. The other three lists keep
+  // `manager-environment-comp-row`, which is why that clause stays.
   defineStructureContract('renders Tasks/Events as a column-headed table', LIST, {
-    attributes: [
-      ['class', 'manager-environment-comp-head'],
-      ['role', 'button'],
-    ],
+    attributes: [['class', 'manager-environment-comp-head']],
     attributesNo: [['role', 'menu']],
-    spells: ['ColTask', 'ColEvent', 'ColOverride', 'ColRuntime', 'ColWeight'],
+    spells: [
+      'ColTask',
+      'ColEvent',
+      'ColOverride',
+      'ColRuntime',
+      'ColWeight',
+      'manager-environment-comp-entry',
+    ],
     spellsNo: ['ColEvidence'],
     rendersNo: ['MatchingEvidenceChips'],
-    renders: ['OverrideIndicator', 'ActionMenu'],
+    renders: ['OverrideIndicator', 'ActionMenu', 'SortableList'],
     passesProps: [['OverrideIndicator', 'active']],
     passesPropsNo: [['OverrideIndicator', 'compositionState']],
     reads: ['entry.hasDropRateAdjustment'],
@@ -543,7 +551,10 @@ describe('environment composition editor structure', () => {
     'one dispatcher serves all four menus, and each verb reaches the prop it always did',
     { file: LIST, fn: 'runMenuAction' },
     {
-      calls: ['onInclude', 'onForceInclude', 'onExclude', 'onRestore', 'onOpenSource', 'onReorder'],
+      // `onReorder` left this list when issue 1512 gave the Included rows to `SortableList`: the
+      // move-up and move-down verbs the dispatcher used to carry are the primitive's drag now, so
+      // the dispatcher reaches five props rather than six and spells neither verb.
+      calls: ['onInclude', 'onForceInclude', 'onExclude', 'onRestore', 'onOpenSource'],
       compares: ['include', 'force-include', 'exclude', 'restore', 'open-source'],
       callsWith: [
         ['onInclude', 'kind'],

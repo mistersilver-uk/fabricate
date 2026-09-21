@@ -100,8 +100,13 @@ describe('RecipeEditView identity-only single column', () => {
       // The card-stack chrome is gone: micro-labels over unwrapped fields (issue 643).
       spellsNo: ['manager-task-core-card'],
       spells: ['manager-recipe-micro-label', 'manager-task-image-picker'],
-      renders: ['ToggleCard', 'RecipeDurationSteppers'],
-      writes: ['data-recipe-category-select'],
+      renders: ['ToggleCard', 'RecipeDurationSteppers', 'Select'],
+      // The category control became a `Select` call site at issue 1847, so the hook this row used
+      // to find as a WRITTEN attribute is handed to the primitive as trigger data instead. The
+      // clause moves with it rather than being dropped: the hook is what every other suite finds
+      // the control by.
+      passesProps: [['Select', 'triggerData']],
+      spellsExactly: ['data-recipe-category-select'],
       // The issue-658 retrofit is a byte-faithful DOM no-op, so the section/field markers moved
       // from inlined attributes onto props.
       attributes: [
@@ -441,25 +446,23 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
 });
 
 describe('the progressive reorder announcement', () => {
-  // The statement order inside `moveItem` — the name read before the array moves — is proved by
-  // the clicked mounted case in `recipe-edit-mounted.test.js`, which round-trips the patch the way
-  // the root does and reads the announced sentence. What stays here is the sentence's shape.
+  // Both halves moved into the shared ordered list at issue 1512, and both are asserted where they
+  // live now: `tests/sortable-list-source-contract.test.js` holds the read-the-name-first ordering
+  // against `SortableList.svelte`, and `tests/components/sortable-list-mounted.test.js` reads the
+  // sentence out of the rendered live region. What this card still owns is the array move.
   defineStructureContract(
-    'announces through one localized key with placeholders, not a concatenation',
-    { file: RESULT_GROUP_CARD, fn: 'moveItem' },
+    'hands the shared list the move and keeps no announcement of its own',
+    RESULT_GROUP_CARD,
     {
-      calls: ['componentNameFor', 'reorderItem', 'format'],
-      spellsExactly: ['FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement'],
-      keys: ['name', 'position', 'total'],
+      renders: ['SortableList'],
+      passesProps: [['SortableList', 'onReorder']],
+      namesNo: ['moveItem'],
+      spellsNo: ['ResultMoveAnnouncement', 'MovedToPosition', 'OfCount'],
     }
   );
 
-  defineStructureContract('and the fragments it replaced are gone', RESULT_GROUP_CARD, {
-    spellsNo: ['MovedToPosition', 'OfCount'],
-  });
-
-  it('the key takes the three placeholders the component supplies', () => {
-    const announcement = recipeLang.ResultMoveAnnouncement;
+  it('the shared key takes the three placeholders every ordered list supplies', () => {
+    const announcement = lang.FABRICATE.Admin.Manager.ListErgonomics.ReorderedAnnouncement;
     for (const token of ['{name}', '{position}', '{total}']) {
       assert.ok(announcement.includes(token), `the key takes ${token}`);
     }

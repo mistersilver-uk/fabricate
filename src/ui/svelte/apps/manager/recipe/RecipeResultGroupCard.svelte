@@ -13,6 +13,8 @@
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import SortableList from '../../../components/SortableList.svelte';
+  import RecipeStageComplicationBand from './RecipeStageComplicationBand.svelte';
 
   let {
     group = {},
@@ -58,14 +60,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function format(key, fallback, replacements) {
-    let result = text(key, fallback);
-    for (const [token, value] of Object.entries(replacements)) {
-      result = result.replace(`{${token}}`, value);
-    }
-    return result;
-  }
-
   // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
   // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as
   // `result-group-<id>` — the same literal on both sides, held together behaviourally by the pair
@@ -74,10 +68,7 @@
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
-  // Drag-reorder state (progressive only), local so it survives the store refresh that follows
-  // every persisted edit. Native HTML5 drag: the card is both source and target.
-  let dragIndex = $state(-1);
-
+  // A splice emits the reordered group; the drag and keyboard halves are the list's (issue 1512).
   function reorderItem(from, to) {
     if (from === to || from < 0 || to < 0 || from >= results.length || to >= results.length) return;
     const next = results.slice();
@@ -86,38 +77,23 @@
     onChange({ ...group, results: next });
   }
 
-  function handleResultDrop(targetIndex) {
-    if (dragIndex >= 0 && dragIndex !== targetIndex) reorderItem(dragIndex, targetIndex);
-    dragIndex = -1;
-  }
-
-  // Order is load-bearing in progressive mode, so reorder cannot be drag-only: these are real
-  // buttons, disabled at the ends, and the position change is announced through the aria-live
-  // region below.
-  let announcement = $state('');
-
+  // Both halves of reorder are the list's now (issue 1512), and so are the read-the-name-first
+  // rule this file established, the focus move and the polite live region.
   function componentNameFor(item) {
     const match = (componentOptions || []).find((option) => option.id === item?.componentId);
     return match?.name || text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
   }
 
-  function moveItem(index, delta) {
-    const target = index + delta;
-    if (target < 0 || target >= results.length) return;
-
-    // Read the name BEFORE the move: once the parent round-trips, `results[index]` is the item
-    // that swapped INTO this slot, so announcing afterwards can name the wrong result.
-    const name = componentNameFor(results[index]);
-    const total = results.length;
-    reorderItem(index, target);
-
-    // ONE key with three placeholders rather than a concatenation: a sentence assembled from
-    // fragments cannot be translated.
-    announcement = format(
-      'FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement',
-      '{name} moved to position {position} of {total}',
-      { name, position: target + 1, total }
-    );
+  // The band's content, decided here because the same filter decides whether the row draws a body
+  // at all (issue 1512): `alwaysOpen` renders the body snippet for every row, so a stage whose
+  // component authors no crafting complication would otherwise draw an empty padded box. The
+  // unredacted authored list off the projection the difficulty badge reads, filtered to crafting
+  // because a salvage-only complication says nothing about a recipe stage.
+  function stageComplicationsFor(item) {
+    const match = (componentOptions || []).find((option) => option.id === item?.componentId);
+    return Array.isArray(match?.complications)
+      ? match.complications.filter((complication) => complication?.activities?.crafting === true)
+      : [];
   }
 
   // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
@@ -303,133 +279,99 @@
       </p>
     </div>
   {:else}
-    <div class="manager-recipe-ingredient-set-groups">
-      {#each results as item, index (item?.id || index)}
-        {#if progressive}
-          <!-- Progressive: the whole card is the drag SOURCE, so the ghost is the full row, and
-               the drop TARGET. Drag is a mouse-only enhancement, and a progressive row carries
-               no quantity field and no text input, so dragging from anywhere on it is safe. -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="manager-recipe-result-row is-reorderable"
-            data-recipe-result-row
-            draggable="true"
-            ondragstart={() => {
-              dragIndex = index;
-            }}
-            ondragend={() => {
-              dragIndex = -1;
-            }}
-            ondragover={(event) => event.preventDefault()}
-            ondrop={(event) => {
-              event.preventDefault();
-              handleResultDrop(index);
-            }}
-          >
-            <RecipeResultItemRow
-              {item}
-              {componentOptions}
-              {progressive}
-              {onOpenComponent}
-              onChange={(nextItem) => updateItem(index, nextItem)}
-              onRemove={() => removeItem(index)}
-            >
-              {#snippet leadingControls()}
-                <!-- Grip, then a SEPARATE order badge, the salvage stage row's shape: stacked
-                     inside one handle it read as a decorated grip rather than as the stage
-                     number the award loop spends down. A SNIPPET rather than the card's own
-                     first two children, so a stage carrying a complication band can put them on
-                     the band's line — as the card's leading flex items they pushed the
-                     full-bleed band ~58px in. -->
-                <span
-                  class="manager-recipe-stage-grip"
-                  aria-hidden="true"
-                  title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
-                  ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
-                >
-                <span
-                  class="manager-recipe-stage-ordinal"
-                  data-recipe-result-ordinal={String(index + 1)}
-                  aria-hidden="true">{index + 1}</span
-                >
-              {/snippet}
-              {#snippet reorderControls()}
-                <!-- Reorder lives to the RIGHT of the component's DC, after the DC + Edit pair
-                     and before the remove control. Drag is an ENHANCEMENT; these chevrons are
-                     the accessible path, disabled at the ends, and they share the salvage stage
-                     row's rocker geometry — see the shared rule in styles/fabricate.css. -->
-                <span class="manager-recipe-stage-reorder" data-recipe-result-move>
-                  <button
-                    type="button"
-                    class="manager-recipe-stage-move"
-                    data-recipe-result-move-up
-                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
-                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
-                    disabled={index === 0}
-                    onclick={() => moveItem(index, -1)}
-                    ><i class="fas fa-chevron-up" aria-hidden="true"></i></button
-                  >
-                  <button
-                    type="button"
-                    class="manager-recipe-stage-move"
-                    data-recipe-result-move-down
-                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
-                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
-                    disabled={index === results.length - 1}
-                    onclick={() => moveItem(index, 1)}
-                    ><i class="fas fa-chevron-down" aria-hidden="true"></i></button
-                  >
-                </span>
-              {/snippet}
-            </RecipeResultItemRow>
-          </div>
-        {:else}
+    {#if progressive}
+      <!-- Progressive is an ordered list, so it is the shared one (issue 1512). The band is the
+           list's body rather than part of the row's content, because it is full-bleed, and
+           `alwaysOpen` renders it with no disclosure since a stage's band is not something a GM
+           opens. The delete is the list's own, so it trails the rocker as the specimen states;
+           `removeData` keeps `data-recipe-remove="result-item"`, the hook the mounted suites and
+           the smoke harness address a stage's delete by. -->
+      <SortableList
+        items={results}
+        itemLabel={componentNameFor}
+        numbered
+        alwaysOpen
+        removable
+        onReorder={(from, to) => reorderItem(from, to)}
+        onRemove={(item) => removeItem(results.indexOf(item))}
+        removeData={() => ({
+          'data-recipe-remove': 'result-item',
+          ariaLabel: text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item'),
+          title: text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item'),
+        })}
+        rowClass={(item) =>
+          stageComplicationsFor(item).length > 0
+            ? 'manager-recipe-stage-row has-band'
+            : 'manager-recipe-stage-row'}
+        rowData={() => ({ 'data-recipe-result-row': '' })}
+      >
+        {#snippet row(item, index)}
+          <RecipeResultItemRow
+            {item}
+            {componentOptions}
+            {progressive}
+            {onOpenComponent}
+            onChange={(nextItem) => updateItem(index, nextItem)}
+          />
+        {/snippet}
+        {#snippet body(item)}
+          <RecipeStageComplicationBand
+            complications={stageComplicationsFor(item)}
+            componentId={item?.componentId || ''}
+          />
+        {/snippet}
+        {#snippet footer()}
+          <li class="manager-recipe-ingredient-set-add">{@render resultAdder()}</li>
+        {/snippet}
+      </SortableList>
+    {:else}
+      <div class="manager-recipe-ingredient-set-groups">
+        {#each results as item, index (item?.id || index)}
           <RecipeResultItemRow
             {item}
             {componentOptions}
             onChange={(nextItem) => updateItem(index, nextItem)}
             onRemove={() => removeItem(index)}
           />
-        {/if}
-      {/each}
-    </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 
-  {#if progressive}
-    <p class="visually-hidden" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
+  <!-- The adder follows the empty message (issue 1512): a footer of a list that is not rendered
+       cannot render, so at zero results and on every non-progressive set it is this sibling. -->
+  {#if !progressive || results.length === 0}
+    <div class="manager-recipe-ingredient-set-add">{@render resultAdder()}</div>
   {/if}
-
-  <div class="manager-recipe-ingredient-set-add">
-    <SearchablePopover
-      options={componentPickerOptions}
-      pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="fabricate-button manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
-      triggerIcon="fas fa-plus"
-      triggerLabel={progressive
-        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-      triggerAriaLabel={progressive
-        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-      triggerAddMarker="result-item"
-      dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-      searchPlaceholder={text(
-        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-        'Search components...'
-      )}
-      searchAriaLabel={text(
-        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-        'Search components...'
-      )}
-      emptyHint={text(
-        'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
-        'No components defined'
-      )}
-      showChevron={false}
-      onChoose={(id) => addItem(id)}
-    />
-  </div>
 </div>
+
+{#snippet resultAdder()}
+  <SearchablePopover
+    options={componentPickerOptions}
+    pickerClass="manager-recipe-component-picker manager-recipe-add-component"
+    triggerClass="fabricate-button manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+    triggerIcon="fas fa-plus"
+    triggerLabel={progressive
+      ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+      : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+    triggerAriaLabel={progressive
+      ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+      : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+    triggerAddMarker="result-item"
+    dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+    searchPlaceholder={text(
+      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+      'Search components...'
+    )}
+    searchAriaLabel={text(
+      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+      'Search components...'
+    )}
+    emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+    showChevron={false}
+    onChoose={(id) => addItem(id)}
+  />
+{/snippet}
 
 <style>
   .manager-recipe-ingredient-set.is-reserved {

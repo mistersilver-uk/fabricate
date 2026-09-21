@@ -660,6 +660,28 @@ const RUNEWORK_COMPONENTS = [
     tags: ['ingot'],
     difficulty: 3,
     essences: { earth: 2 },
+    // The world's one named `checkTrigger` (issue 1510): `ROUTED_CHECK.checkBreakage.triggers`
+    // authors two ids, and this is the only complication that names one, so the trigger picker
+    // has a photographable frame instead of always rendering unavailable.
+    complications: [
+      {
+        id: 'rw-comp-cross-thread',
+        name: 'Cross-threaded rune',
+        description: 'The etching catches wrong and the bar hums a half-tone flat.',
+        severity: 'minor',
+        visibility: 'gmOnly',
+        activities: { crafting: true, salvage: false, gathering: false },
+        match: 'any',
+        when: {
+          stageAwarded: false,
+          stagePartial: true,
+          stageMissed: false,
+          checkTrigger: 'rw-trig-step-target',
+        },
+        rollCondition: { enabled: false, expr: '1d20', cmp: 'eq', value: '1' },
+        effectRoll: { enabled: false, expr: '1d4', label: '' },
+      },
+    ],
   }),
   component('rw-chalk', 'Binding Chalk', 'commodities/materials/bowl-powder-grey.webp', {
     categories: ['Stock'],

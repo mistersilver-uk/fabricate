@@ -65,7 +65,7 @@ export const KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL = 7;
 export const KNOWN_HEAVY_MONO_WEIGHTS = knownDebt('heavyMonoWeights');
 
 /** @see KNOWN_HEAVY_MONO_WEIGHTS */
-export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 33;
+export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 31;
 
 /** A `box-shadow` that is neither an elevation token, `none`, nor an inset ring. */
 export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
@@ -87,11 +87,15 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
  * @see KNOWN_NATIVE_SELECT_ELEMENTS
  */
 // #1707: the root's 16 became 12 and `GatheringModifierEditor.svelte` took 2 (71 - 2). The other
-// two were DE-DUPLICATED by writing that panel once, not converted.
+// two were de-duplicated by writing that panel once, not converted.
 // #1707 phase 2: the root's 12 became 2 and `GatheringRulesInspector.svelte` took 10, so the
 // total is unchanged and only the file count moves, 25 rows to 26. The two the root keeps are its
 // nav scope and the systems-list condition; neither is in an inspector branch.
-export const KNOWN_NATIVE_SELECT_TOTAL = 69;
+// #1510: the recipe studio's `RecipeOverviewTab` (4) and `RecipeIngredientOption` (1) convert
+// onto `Select`, so the total falls 69 -> 64 across 26 rows to 24.
+// #1510: the component studio's `ComponentEditView` (3) and `ComponentComplicationsSection`
+// (2) convert onto `Select`, so the total falls 64 -> 59 across 24 rows to 22.
+export const KNOWN_NATIVE_SELECT_TOTAL = 59;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
@@ -125,7 +129,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 276;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 272;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
@@ -154,7 +158,7 @@ export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 9;
 export const KNOWN_EMPTY_NAME_BINDINGS = knownDebt('unguardedEmptyNameBindings');
 
 /** @see KNOWN_EMPTY_NAME_BINDINGS */
-export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
+export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 1;
 
 /**
  * A non-form element with `tabindex="0"` and an interactive role, keyed `file`.
@@ -164,7 +168,7 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 17;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 11;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
@@ -209,8 +213,10 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  */
 // #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
 // #1707: the root's 70 became 60 and `GatheringModifierEditor.svelte` took 5 (225 - 5). The other
-// five were DE-DUPLICATED by writing that panel once, not converted.
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 220;
+// five were de-duplicated by writing that panel once, not converted.
+// Issue 1512: five rows leave whole (220 - 14). The two recipe rows and `RowDisclosure` are paid
+// by the shared list rendering their reorder controls; the other two declare the attribute in place.
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 206;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */
@@ -240,5 +246,7 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
 // already states.
 // 47 -> 48 (issue 1707 phase 2): `GatheringModifierEditor.svelte` arrived with 2 importers (the
-// task/event leaves); the promote-or-`notAPrimitive` call is deferred to the design-system pass.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
+// task/event leaves).
+// 48 -> 47 (issue 1707 phase 4): adjudicated. At two callers `notAPrimitive` is closed to it, so it
+// entered the member table as a manager-only composition, the only way a path leaves this register.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

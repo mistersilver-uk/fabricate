@@ -1,4 +1,4 @@
-// Where the keyboard cursor goes next, and what to call the row it lands on (issues 1503, 1504).
+// Where the keyboard cursor goes next, which intent a holder key carries, and what to call the row it lands on (issues 1503, 1504).
 // `openspec/specs/design-system/spec.md` requires a listbox to hold DOM focus on ONE element and
 // drive selection with `aria-activedescendant`, so "which row is current" is arithmetic — with
 // wrap-around, an out-of-range guard, a grid form and a sentinel — whose only honest test is a table
@@ -152,6 +152,83 @@ function prefixMatch(text, labels, current, isDisabled) {
     }
   }
   return null;
+}
+
+const CARET_EDGE = new Map([
+  ['ArrowLeft', 'start'],
+  ['Home', 'start'],
+  ['ArrowRight', 'end'],
+  ['End', 'end'],
+]);
+
+/** Whether the key belongs to the caret in the holder's query field rather than to the list. */
+export function caretOwnsKey(event) {
+  const field = event.target;
+  if (typeof field?.selectionStart !== 'number') return false;
+  const edge = CARET_EDGE.get(event.key);
+  if (!edge) return false;
+  if (field.selectionStart !== field.selectionEnd) return true;
+  return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
+}
+
+const OPENING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End']);
+
+/** What a closed select-only holder opens on this key, or `null`; `altOpen` moves no cursor. */
+export function openingKeyOwns(event) {
+  if (event.ctrlKey || event.metaKey || event.shiftKey) return null;
+  const altOpen = Boolean(event.altKey && event.key === 'ArrowDown');
+  if (!altOpen && (event.altKey || !OPENING_KEYS.has(event.key))) return null;
+  return { altOpen };
+}
+
+/** What type-ahead does with this key on a select-only holder, or `null` when it owns none of it. */
+export function typeAheadOwnsKey(event, context = {}) {
+  if (context.showSearch || context.holderDisabled) return null;
+  if (event.ctrlKey || event.metaKey || event.altKey) return null;
+  return typeAheadCursor(context.current, context.labels, event.key, {
+    buffer: context.buffer,
+    isDisabled: context.isDisabled,
+    now: context.now,
+    resetAfter: context.resetAfter,
+  });
+}
+
+const PASS_THROUGH = Object.freeze({ kind: 'pass-through' });
+
+function cursorMove(from, event, context) {
+  return nextActiveIndex(from, context.count, event.key, {
+    columns: context.columns,
+    isDisabled: context.isDisabled,
+  });
+}
+
+function typeAheadIntent(typed) {
+  return { kind: 'type-ahead', buffer: typed.buffer, index: typed.index };
+}
+
+function closedHolderIntent(event, context) {
+  const opening = context.showSearch || context.holderDisabled ? null : openingKeyOwns(event);
+  if (opening) {
+    return { kind: 'open', index: opening.altOpen ? null : cursorMove(-1, event, context) };
+  }
+  const typed = typeAheadOwnsKey(event, context);
+  return typed ? typeAheadIntent(typed) : PASS_THROUGH;
+}
+
+/** One intent per holder key: its kind, the landing index or `null`, and type-ahead's next buffer. */
+export function holderKeyIntent(event, context = {}) {
+  if (!context.open) return closedHolderIntent(event, context);
+  if (event.key === 'Enter') {
+    return isUsableIndex(context.current, rowCount(context.count))
+      ? { kind: 'choose', index: context.current }
+      : PASS_THROUGH;
+  }
+  const typed = typeAheadOwnsKey(event, context);
+  if (typed) return typeAheadIntent(typed);
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return PASS_THROUGH;
+  if (caretOwnsKey(event)) return PASS_THROUGH;
+  const index = cursorMove(context.current, event, context);
+  return index === null ? PASS_THROUGH : { kind: 'move-cursor', index };
 }
 
 // One function for the row id AND the holder's `aria-activedescendant`, so the two cannot drift.
