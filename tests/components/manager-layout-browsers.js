@@ -348,7 +348,8 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     // preserved because changing it would be a change, and issue 1509 re-roots this family
     // without moving a frame. The rendering defect the old reason implies is issue 1507's.
     '.fabricate-tabs .manager-chip.manager-editor-tab-badge',
-    '.fabricate-manager .manager-environment-comp-order',
+    // The composition list's mono pip is the shared ordered list's ordinal badge (issue 1512).
+    '.fabricate-sortable-list-ordinal',
     '.fabricate-manager .manager-nav-count',
   ];
   for (const selector of MONO) {
@@ -935,11 +936,40 @@ test('manager environments browser and edit route define compact responsive geom
     'and the note rule and its icon-column spacer are gone rather than left behind matching ' +
       'nothing, which is what a class that moves onto a component tag otherwise leaves in a sheet'
   );
+  // The included rows are the shared ordered list's as of issue 1512, so the ranked grid is not a
+  // row variant any more: the strip's LEAD track is the list's own cluster, the record's cells are a
+  // grid of their own on the same template, and `--fab-env-comp-grid-ranked` is retired with the
+  // row variant that read it.
   assert.ok(
-    compBlock.includes('--fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;') &&
-      css.includes('.fabricate-manager .manager-environment-comp-head.has-rank-controls') &&
-      css.includes('.fabricate-manager .manager-environment-comp-row.has-rank-controls'),
-    'ranked events opt into a leading 30px handle column ahead of the task/override/runtime cells'
+    !css.includes('--fab-env-comp-grid-ranked'),
+    'the ranked grid variable is retired with the row variant that read it'
+  );
+  assert.ok(
+    compBlock.includes('--fab-env-comp-lead: 22px;') &&
+      compBlock.includes('--fab-env-comp-lead-ranked: 58px;'),
+    "the strip's lead track is declared from the list's own badge, grip and gap"
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-environment-comp-head').includes(
+      'grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);'
+    ),
+    'the column strip reads the lead track ahead of the record cells'
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-environment-comp-head.has-rank-controls').includes(
+      'grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid) 24px;'
+    ),
+    'and a ranked strip widens that lead and adds a track under the trailing rocker'
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-environment-comp-cells').includes(
+      'grid-template-columns: var(--fab-env-comp-grid);'
+    ),
+    'while the record cells read the SAME template, so a label sits over the column it names'
+  );
+  assert.ok(
+    !css.includes('.manager-environment-comp-row.has-rank-controls'),
+    'and the row variant is gone rather than left matching nothing'
   );
   assert.ok(
     !compBlock.includes('minmax(150px'),

@@ -128,9 +128,8 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const panel = await openPanel();
       const holder = panel.querySelector('.manager-travel-popover-search input');
       assert.ok(Boolean(holder), 'the panel renders a query field');
-      assert.equal(
-        document.activeElement,
-        holder,
+      assert.ok(
+        document.activeElement === holder,
         'the query field takes focus on open, so it is the element the arrows are pressed on'
       );
       assert.equal(holder.getAttribute('role'), 'combobox');
@@ -338,7 +337,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         'a printable character belongs to the query field; consuming it would make the search ' +
           'field unusable while the panel is open'
       );
-      assert.equal(document.activeElement, holder);
+      assert.ok(document.activeElement === holder, 'DOM focus stayed on the query field');
       harness.remount();
     });
 
@@ -382,7 +381,10 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         'without this a click would focus the row, re-arm the canvas bindings and draw a second ' +
           'accent ring at a positive offset around the keyboard cursor'
       );
-      assert.equal(document.activeElement, holder);
+      assert.ok(
+        document.activeElement === holder,
+        'a mousedown inside the panel must not move DOM focus off the holder'
+      );
 
       row.click();
       flushSync();
@@ -393,7 +395,10 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
     it('returns focus to the trigger on Escape', async () => {
       await mountPicker({});
       const panel = await openPanel();
-      assert.equal(document.activeElement, panel.querySelector('input'));
+      assert.ok(
+        document.activeElement === panel.querySelector('input'),
+        'the query field takes focus on open'
+      );
 
       pressKey('Escape');
       await settle();
@@ -401,9 +406,8 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         !harness.target.querySelector('.fabricate-picker-popover'),
         'Escape closes the panel'
       );
-      assert.equal(
-        document.activeElement,
-        trigger(),
+      assert.ok(
+        document.activeElement === trigger(),
         'and focus lands back on the control the GM opened, not on the document body'
       );
       harness.remount();
@@ -469,9 +473,8 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         button.getAttribute('aria-controls'),
         panel.querySelector('[role="listbox"]').id
       );
-      assert.equal(
-        document.activeElement,
-        button,
+      assert.ok(
+        document.activeElement === button,
         'the trigger, not the panel, is the element focus stays on in this shape'
       );
 
@@ -672,7 +675,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         'Escape closes the panel it typed open'
       );
       assert.deepEqual(chosen, [], 'and nothing was chosen on the way out');
-      assert.equal(document.activeElement, trigger(), 'focus returns to the trigger');
+      assert.ok(document.activeElement === trigger(), 'focus returns to the trigger');
 
       // The outside click, which dismisses through the same path.
       pressKeyAt('p', 2000);
@@ -768,9 +771,8 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
 
       pressKeyAt('s', 1000);
       assert.equal(announcedLabel(button), 'Simple', 'the prefix moved the cursor');
-      assert.equal(
-        document.activeElement,
-        button,
+      assert.ok(
+        document.activeElement === button,
         'and DOM focus is still on the holder, exactly as it is under the arrow keys'
       );
       assert.equal(
@@ -857,7 +859,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
       const typed = pressKeyAt('p', 1000);
       assert.ok(!typed.defaultPrevented, 'the character falls through to the field');
       assert.equal(activeDescendant(holder), null, 'and moves no cursor');
-      assert.equal(document.activeElement, holder);
+      assert.ok(document.activeElement === holder, 'DOM focus stayed on the query field');
       harness.remount();
     });
 
@@ -901,7 +903,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         !inert.defaultPrevented,
         'with nothing to move a cursor over, the arrows are left to the field'
       );
-      assert.equal(document.activeElement, holder);
+      assert.ok(document.activeElement === holder, 'DOM focus stayed on the query field');
       assert.equal(holder.getAttribute('aria-activedescendant'), null);
       harness.remount();
     });
@@ -1129,7 +1131,7 @@ describe('1503 SearchablePopover — the listbox focus model', () => {
         onPanel.defaultPrevented,
         'without this the panel takes focus off the holder and the whole keyboard model dies'
       );
-      assert.equal(document.activeElement, holder);
+      assert.ok(document.activeElement === holder, 'DOM focus stayed on the query field');
 
       // AND THE EXCEPTION IS REAL. Suppressing the field`s own `mousedown` would break caret
       // placement and text selection in the one control the GM types into.

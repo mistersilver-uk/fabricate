@@ -43,6 +43,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   // `ActionMenu`'s own placement helper (issue 1477).
   'src/ui/svelte/util/actionMenuLayout.js',
   'src/ui/svelte/util/overlayHost.js',
@@ -76,6 +77,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // Rendered by the salvage block.
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   // The salvage result quantity + the progressive DC are the shared Stepper (issue 676).
   // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite hangs.
   'src/ui/svelte/components/Stepper.svelte',
@@ -105,6 +107,8 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // The product's ONE ordered list (issue 1512): the progressive salvage stage list renders it.
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte',
   // THE PART D REBUILD'S FOUR NEW LEAVES (issue 1371, parity round 4).
   'src/ui/svelte/components/EditorTabs.svelte',

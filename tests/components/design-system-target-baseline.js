@@ -40,7 +40,9 @@ function rows(table) {
 export const TARGET_LIBRARY_NAMES = rows('libraryTargetNames');
 
 /** @see TARGET_LIBRARY_NAMES */
-export const TARGET_LIBRARY_NAME_TOTAL = 58;
+// Measured over the library at issue 1512, which shipped the ordered list and the row disclosure
+// it promoted.
+export const TARGET_LIBRARY_NAME_TOTAL = 56;
 
 /**
  * Every manifest row whose `status` reads `target`, keyed on the implementation path, measured at

@@ -153,26 +153,37 @@ export async function checksRollEdges(page, tiersWrapperClass) {
         <div><h3 class="manager-checks-card-title">Recipe difficulty tiers</h3></div>
       </div>
       <div class="manager-checks-card-body is-stack">
-        <div class="manager-checks-tier-list" role="list" aria-label="Recipe difficulty tiers">
-          <div class="manager-checks-tier-row" role="listitem" data-tier-row="t1">
-            <button type="button" class="manager-checks-tier-grip"><i class="fas fa-grip-vertical"></i></button>
-            <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
-            <span class="manager-checks-tier-unit">DC</span>
-            <div class="manager-checks-tier-stepper is-narrow">
-              <div class="fab-stepper is-fill">
-                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
-                <input type="number" class="fab-stepper-input" data-tier-dc value="8">
-                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+        <ul class="fabricate-sortable-list">
+          <li class="fabricate-sortable-list-row manager-checks-tier-row" data-tier-row="t1">
+            <div class="fabricate-sortable-list-line">
+              <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip" data-keyboard-focus="true" data-sortable-grip="t1"><i class="fas fa-grip-vertical"></i></button>
+              <span class="fabricate-sortable-list-ordinal" data-sortable-ordinal="t1">1</span>
+              <div class="fabricate-sortable-list-content">
+                <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
+                <span class="manager-checks-tier-unit">DC</span>
+                <div class="manager-checks-tier-stepper is-narrow">
+                  <div class="fab-stepper is-fill">
+                    <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+                    <input type="number" class="fab-stepper-input" data-tier-dc value="8">
+                    <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+                  </div>
+                </div>
+                <button type="button" class="fabricate-button manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+                  <i class="fas fa-trash"></i>
+                </button>
               </div>
+              <span class="fabricate-sortable-list-rocker">
+                <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move" data-keyboard-focus="true" data-sortable-move="up" disabled><i class="fas fa-chevron-up"></i></button>
+                <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move" data-keyboard-focus="true" data-sortable-move="down" disabled><i class="fas fa-chevron-down"></i></button>
+              </span>
             </div>
-            <button type="button" class="fabricate-button manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
-              <i class="fas fa-trash"></i>
+          </li>
+          <li class="manager-checks-tier-add">
+            <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-add-tier>
+              <i class="fas fa-plus"></i><span>Add difficulty tier</span>
             </button>
-          </div>
-        </div>
-        <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-add-tier>
-          <i class="fas fa-plus"></i><span>Add difficulty tier</span>
-        </button>
+          </li>
+        </ul>
       </div>
     </section>`;
   await page.setContent(
@@ -196,6 +207,10 @@ export async function checksRollEdges(page, tiersWrapperClass) {
       radioRight: round(lastOption.right),
       rowLeft: round(row.left),
       rowRight: round(row.right),
+      listPaddingLeft: getComputedStyle(document.querySelector('.fabricate-sortable-list'))
+        .paddingLeft,
+      listPaddingRight: getComputedStyle(document.querySelector('.fabricate-sortable-list'))
+        .paddingRight,
       addTierLeft: round(addTier.left),
       addTierRight: round(addTier.right),
     };

@@ -67,6 +67,11 @@ const harness = createMountedComponentHarness({
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+    // The tier card renders the product's ONE ordered list (issue 1512), which draws its controls
+    // through the icon button and its opener through the row disclosure.
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.

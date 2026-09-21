@@ -10,17 +10,21 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { parse } from 'svelte/compiler';
 
 import { measureImporters } from '../../scripts/lib/componentImporters.js';
 import { repoRoot } from '../helpers/sourceScan.js';
+import { declaredPropNames } from '../helpers/sveltePropsDeclaration.js';
 import {
+  SOURCES,
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
 
 const POPOVER_PATH = 'src/ui/svelte/components/SearchablePopover.svelte';
+const PANEL_PATH = 'src/ui/svelte/components/SearchablePopoverPanel.svelte';
 
 /** The primitive itself, and it is the WHOLE allowlist. */
 const RAW_ALLOWLIST = Object.freeze([
@@ -192,6 +196,46 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
   );
 });
 
+/**
+ * The primitive's `$props()` destructure, verbatim — the opening `let {` through the closing
+ * `} = $props();`.
+ */
+function propsBlock() {
+  const source = SOURCES[POPOVER_PATH] ?? '';
+  const closer = '} = $props();';
+  const start = source.indexOf('  let {');
+  const end = source.indexOf(closer, start);
+  assert.ok(start !== -1 && end > start, `${POPOVER_PATH} declares no \`let { … } = $props()\``);
+  return source.slice(start, end + closer.length);
+}
+
+/** The destructure as it stood before the panel was extracted (issue 1719). */
+const PROPS_BLOCK_DIGEST = 'e01ee104cdd7442f362b3e569cdf14c3d62d2fccf399b176bdf72181ea0d69c0';
+const PROPS_BLOCK_NAMES = 59;
+
+test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
+  // Why a digest and not a list. The decomposition at issue 1719 moved two thirds of this
+  // component out of it, and the one thing it must not have moved is what its 24 importers pass:
+  // a name, an order or a default silently changed here is a behaviour change at every one of
+  // them, and the mounted suites would keep passing because they pass their props by name. A
+  // names-only assertion cannot see a changed default and a sorted one cannot see a reordering,
+  // so the whole block is compared; the count below is the readable half of the same claim.
+  const block = propsBlock();
+  assert.equal(
+    declaredPropNames(block + '\n').length,
+    PROPS_BLOCK_NAMES,
+    'the number of declared props changed, so the public surface changed'
+  );
+  assert.equal(
+    createHash('sha256').update(block).digest('hex'),
+    PROPS_BLOCK_DIGEST,
+    'the `$props()` destructure is no longer byte-identical to the block this component shipped ' +
+      'before its panel was extracted. A decomposition must not touch it. If the surface is ' +
+      'meant to change, re-derive this digest in the same commit and say which name, order or ' +
+      `default moved and why. The block read:\n${block}`
+  );
+});
+
 test('the snippet-trigger naming route reads the element the spread lands on', () => {
   // NON-VACUITY, and it is the whole reason this route can be trusted.
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
@@ -252,6 +296,32 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
     snippetTriggerName({ snippetSource: () => named }),
     'the reader does not find an `aria-label` on the spread target either, so the control above ' +
       'measured a reader that never works rather than one that discriminates'
+  );
+});
+
+test('the anchor the picker hands its panel is what the panel positions against', () => {
+  // One chain across two files (issue 1719). The picker owns the trigger element and the panel owns
+  // the attachment, so the fact `anchoredPopover` is measured against the trigger — not the picker
+  // root, and not a `triggerButton` options object — is now two spellings that have to agree. A
+  // mounted assertion cannot see the difference: happy-dom returns a zero-valued
+  // `getBoundingClientRect` for either node, so the panel lands at the same place when it is wrong.
+  const picker = SOURCES[POPOVER_PATH] ?? '';
+  const panel = SOURCES[PANEL_PATH] ?? '';
+  assert.match(
+    picker,
+    /anchor=\{triggerElement \?\? pickerRoot\}/,
+    `${POPOVER_PATH} no longer hands the panel the trigger element, falling back to its own root`
+  );
+  assert.match(
+    panel,
+    /trigger: anchor,/,
+    `${PANEL_PATH} no longer positions against the anchor it was handed, so the panel would be ` +
+      'measured against whatever the attachment defaults to'
+  );
+  assert.ok(
+    declaredPropNames(panel).includes('anchor'),
+    `${PANEL_PATH} no longer declares an \`anchor\` prop, so the regex above could match a ` +
+      'renamed local rather than the prop the picker actually passes'
   );
 });
 
