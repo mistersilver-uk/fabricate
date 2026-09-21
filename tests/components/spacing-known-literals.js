@@ -120,7 +120,7 @@ export function isExemptSpacingPixels(pixels) {
 // loses one occupancy each of `gap 10`, `gap 2`, `padding 11` and `padding 8`. The band's three
 // literals are a pure move from `RecipeResultItemRow` to `RecipeStageComplicationBand`, net zero.
 // Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 807;
+export const KNOWN_RAW_SPACING_TOTAL = 806;
 
 /** The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST. */
 export const FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS = 1445;
