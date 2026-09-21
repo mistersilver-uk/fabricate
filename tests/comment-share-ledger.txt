@@ -53,11 +53,11 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1239
 src/utils	944
 styles	1054
-tests	19946
+tests	19947
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
-tests/components	15357
+tests/components	15361
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	25

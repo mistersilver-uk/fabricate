@@ -246,5 +246,7 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
 // already states.
 // 47 -> 48 (issue 1707 phase 2): `GatheringModifierEditor.svelte` arrived with 2 importers (the
-// task/event leaves); the promote-or-`notAPrimitive` call is deferred to the design-system pass.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 48;
+// task/event leaves).
+// 48 -> 47 (issue 1707 phase 4): adjudicated. At two callers `notAPrimitive` is closed to it, so it
+// entered the member table as a manager-only composition, the only way a path leaves this register.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

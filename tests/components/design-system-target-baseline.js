@@ -51,4 +51,6 @@ export const TARGET_LIBRARY_NAME_TOTAL = 56;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-export const TARGET_MANIFEST_ROW_TOTAL = 46;
+// 46 -> 47 (issue 1707 phase 4): `environment/GatheringModifierEditor.svelte` crossed the two-caller
+// bar, and the row it is owed arrives at `target` because it names no specimen to be faithful to.
+export const TARGET_MANIFEST_ROW_TOTAL = 47;
