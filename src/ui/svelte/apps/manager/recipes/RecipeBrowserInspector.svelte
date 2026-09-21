@@ -285,6 +285,8 @@
   const activeSuccessEmpty = $derived(
     isMultiStep ? !currentStepHasSuccess : successRows.length === 0
   );
+  // Only the terminal step must produce, so an earlier empty step is authored intent (issue 1907).
+  const isTerminalStep = $derived(!isMultiStep || currentStepIndex === stepModel.length - 1);
   // Produces grouped by result group (routed-by-check only); flat list otherwise.
   const producedGroups = $derived(
     isRoutedByCheck ? groupProduceRowsByResultGroup(visibleProduceRows) : []
@@ -640,7 +642,14 @@
           {@render produceRow(row, true)}
         {/each}
       {/if}
-      {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
+      {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep) && !isTerminalStep}
+        <p class="manager-muted" data-recipe-produces-empty>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.NoResultsIntermediateStep',
+            'This step produces nothing — it only advances the craft.'
+          )}
+        </p>
+      {:else if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
         <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that
              makes nothing — true even when a failure group is listed above. (Two-outcome
              modes show a per-section "No results" instead, so skip the global note.) -->

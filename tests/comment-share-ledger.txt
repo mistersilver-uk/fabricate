@@ -41,9 +41,9 @@ src/ui/svelte/apps/manager/environment	578
 src/ui/svelte/apps/manager/essences	633
 src/ui/svelte/apps/manager/knowledge	200
 src/ui/svelte/apps/manager/library	59
-src/ui/svelte/apps/manager/recipe	1135
+src/ui/svelte/apps/manager/recipe	1141
 src/ui/svelte/apps/manager/recipe-item	335
-src/ui/svelte/apps/manager/recipes	379
+src/ui/svelte/apps/manager/recipes	380
 src/ui/svelte/apps/manager/scoped	2434
 src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	772
@@ -57,7 +57,7 @@ tests	19987
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
-tests/components	15253
+tests/components	15257
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	25

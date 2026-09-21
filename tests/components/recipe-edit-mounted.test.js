@@ -5517,6 +5517,59 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // Issue 1907: an empty result group on a non-terminal step is a legal authored state, so the
+  // card explains it instead of flagging a gap. The terminal step's panel is untouched.
+  it('tones the empty result panel neutral on an intermediate step and danger on the terminal one', async () => {
+    const recipe = {
+      ...RECIPE,
+      steps: [
+        { id: 'step-1', name: 'Fold', ingredientSets: [], resultGroups: [{ id: 'rg-1', results: [] }] },
+        { id: 'step-2', name: 'Finish', ingredientSets: [], resultGroups: [{ id: 'rg-2', results: [] }] },
+      ],
+    };
+    const target = await editHarness.mount(
+      identityProps({ recipe, multiStepEnabled: true, onUpdateStep: () => {} })
+    );
+    clickTab(target, 'results');
+    await flushRender();
+
+    const panelFor = (stepId) =>
+      target
+        .querySelector(`[data-recipe-section="step-${stepId}-results"]`)
+        ?.querySelector('[data-recipe-result-empty]');
+
+    const intermediate = panelFor('step-1');
+    assert.ok(Boolean(intermediate), 'the intermediate step still explains its empty group');
+    assert.match(intermediate.textContent, /only advances the craft/);
+    assert.ok(
+      !intermediate.classList.contains('manager-recipe-result-empty'),
+      'and drops the danger-bordered panel'
+    );
+
+    const terminal = panelFor('step-2');
+    assert.ok(Boolean(terminal), 'the terminal step keeps its empty panel');
+    assert.match(terminal.textContent, /Nothing produced on this outcome/);
+    assert.ok(
+      terminal.classList.contains('manager-recipe-result-empty'),
+      'in the unchanged danger tone'
+    );
+    editHarness.remount();
+
+    // The recipe scope passes no `isTerminalStep` at all, so it rides the prop's `true` default —
+    // the same path every step-less caller of the section takes.
+    const single = await mountResultGroups([{ id: 'rg-only', name: 'On success', results: [] }], {
+      recipe: { steps: [] },
+    });
+    const recipeScope = single.target.querySelector('[data-recipe-result-empty]');
+    assert.ok(Boolean(recipeScope), 'a step-less recipe still shows the empty panel');
+    assert.match(recipeScope.textContent, /Nothing produced on this outcome/);
+    assert.ok(
+      recipeScope.classList.contains('manager-recipe-result-empty'),
+      'and keeps the danger tone by default'
+    );
+    editHarness.remount();
+  });
+
   // Collapsed chain editor presentation (issue 710). With the system's multi-step
   // feature OFF, a multi-step recipe presents as single-step: Overview shows the
   // preserved steps read-only (no revert control), and the Results tab edits the

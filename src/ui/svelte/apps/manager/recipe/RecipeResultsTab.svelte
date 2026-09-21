@@ -191,6 +191,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            isTerminalStep={step.id === steps.at(-1)?.id}
             {onOpenComponent}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}
