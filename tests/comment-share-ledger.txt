@@ -1,7 +1,7 @@
-scripts	2665
+scripts	2670
 scripts/foundry	13
 scripts/lib	1712
-scripts/lib/view-lab-cases	1017
+scripts/lib/view-lab-cases	1026
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
 src	1251
@@ -73,4 +73,4 @@ tests/systems	430
 tests/util	386
 tests/view-lab	413
 tests/view-lab/foundry	269
-tests/view-lab/world	933
+tests/view-lab/world	945

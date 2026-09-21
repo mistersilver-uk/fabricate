@@ -580,6 +580,30 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipe-edit-results-empty-step',
+    label: 'Manager — Recipe edit results, empty intermediate step',
+    // Issue 1907: `sm-r-pattern-blade` steps 1 and 2 carry authored empty result groups, and the
+    // card explains them instead of flagging a gap. The terminal step keeps the danger panel.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-section="step-sm-step-draw-results"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager [data-recipe-section="step-sm-step-draw-results"]' +
+      ' p[data-recipe-result-empty].manager-muted',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-multistep-disable-confirm',
     label: 'Manager — Multistep disable confirm',
     smokeLabels: ['manager-multistep-disable-confirm'],

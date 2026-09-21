@@ -28,6 +28,10 @@ const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 // The recipe editor's frames (overview/ingredients/validation/multi-step/tools/access/ results)
 // share the same trigger files, so any recipe editor / tab / sub-component change republishes all
 // of them.
+// The read-side builder behind every player crafting frame: it resolves the Produces row, the
+// per-set products and the per-step projection the detail bodies render.
+const CRAFTING_LISTING_BUILDER_PATTERN = /^src\/ui\/presenters\/CraftingListingBuilder\.js$/;
+
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/(?!RecipeTools(?:Tab|Section)\.svelte$).*\.svelte$/,
@@ -741,7 +745,10 @@ export const VIEW_RECIPES = Object.freeze([
       'player-crafting-routed-by-check',
       'player-crafting-run-summary',
     ],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+    // The presenter builds every row these frames render, including the headline Produces row a
+    // multi-step recipe resolves from its terminal step (issue 1907), so a change to it belongs
+    // here rather than in the `theme-or-global-ui` fallback.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, CRAFTING_LISTING_BUILDER_PATTERN],
   },
   {
     id: 'player-crafting-roll-prompt',
@@ -829,7 +836,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-multistep',
     label: 'Player crafting — explicit multi-step simple recipe detail',
     smokeLabels: ['player-crafting-multistep'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\//],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\//, CRAFTING_LISTING_BUILDER_PATTERN],
   },
   // The requirement-rail redesign (issue 917).
   requirementRailFrame(
