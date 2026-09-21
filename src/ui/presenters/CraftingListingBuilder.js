@@ -515,29 +515,15 @@ export class CraftingListingBuilder {
     // whenever they differ.
     const activeStep = this._activeStepState(recipe, craftingActor);
 
-    // Per-set craftability (essences + per-set tools + actor-bound currency probe
-    // all folded in by evaluateCraftability's per-set pass).
-    const ingredientSets = firstStepSets.map((set, idx) => ({
-      id: stringOrNull(set.id),
-      label:
-        stringOrEmpty(set.name) ||
-        this.localize('FABRICATE.App.Crafting.IngredientSetFallback', {
-          index: idx + 1,
-        }),
-      craftability: this._evaluateSet({
-        recipe,
-        set,
-        step: firstStep,
-        craftSources,
-        craftingActor,
-      }),
-      // The products this set routes to (routed-by-ingredients). Empty for
-      // routedByCheck, whose output is per outcome tier, not per set.
-      products:
-        mode === 'routedByCheck'
-          ? []
-          : this._productsForSet({ recipe, system, set, step: firstStep }),
-    }));
+    const ingredientSets = this._buildIngredientSetRows({
+      recipe,
+      system,
+      mode,
+      sets: firstStepSets,
+      step: firstStep,
+      craftSources,
+      craftingActor,
+    });
 
     // Craft-button craftability evaluates the first step's sets over the UNION of
     // recipe-level and step-level tool ids (the same view the engine crafts against),
@@ -590,6 +576,10 @@ export class CraftingListingBuilder {
       activeStepId: stringOrNull(activeStep.step?.id),
       displayedStepId: stringOrNull(firstStep?.id),
       activeStepTimeGateArmed: activeStep.timeGateArmed,
+      // How many execution steps this recipe runs. A body branches on `> 1` to read the
+      // terminal-step product rather than a first-step set, whose group may legally be empty
+      // (issue 1907); `steps[]` above cannot answer it because it is `simple`-only.
+      stepCount: this._executionSteps(recipe).length,
       check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       duration: this._buildDuration({ recipe, system, mode }),
@@ -608,6 +598,23 @@ export class CraftingListingBuilder {
       // the mode. See `_buildProgressiveStages`.
       progressiveAwardMode: this._progressiveAwardMode(system, mode),
     };
+  }
+
+  /**
+   * One row per first-step ingredient set: its label, its per-set craftability (essences, tools and
+   * the currency probe, folded in by `evaluateCraftability`) and the products it routes to.
+   * `routedByCheck` awards per outcome tier, not per set, so its rows carry no products.
+   * @private
+   */
+  _buildIngredientSetRows({ recipe, system, mode, sets, step, craftSources, craftingActor }) {
+    return sets.map((set, idx) => ({
+      id: stringOrNull(set.id),
+      label:
+        stringOrEmpty(set.name) ||
+        this.localize('FABRICATE.App.Crafting.IngredientSetFallback', { index: idx + 1 }),
+      craftability: this._evaluateSet({ recipe, set, step, craftSources, craftingActor }),
+      products: mode === 'routedByCheck' ? [] : this._productsForSet({ recipe, system, set, step }),
+    }));
   }
 
   /**
@@ -1092,25 +1099,26 @@ export class CraftingListingBuilder {
   }
 
   /**
-   * The recipe's top-level expected output rows. `routedByCheck` is per outcome tier
-   * (empty top-level list). In `simple` mode the output is the recipe's FINAL product,
-   * so it resolves against the terminal execution step and that step's own set (simple
-   * resolution ignores the set, yielding the terminal step's success group). Every
-   * other mode resolves the first step against `defaultSet`, unchanged.
+   * The recipe's top-level expected output rows. `routedByCheck` is per outcome tier (empty
+   * top-level list). For a recipe with more than one execution step, every other mode resolves the
+   * terminal step's own first ingredient set — the step the collapse path and Journal already treat
+   * as product-bearing — so a legal empty non-terminal step (issue 1907) never drives the headline
+   * row. A single-step recipe keeps today's per-mode behaviour: `simple` resolves its own set,
+   * ignoring it, and every other mode resolves `defaultSet` against the first/only step.
    * @private
    */
   _resultItems({ recipe, system, mode, defaultSet }) {
     if (mode === 'routedByCheck') return [];
-    if (mode === 'simple') {
-      const terminalStep = this._terminalStep(recipe);
-      return this._productsForSet({
-        recipe,
-        system,
-        set: terminalStep?.ingredientSets?.[0] ?? null,
-        step: terminalStep,
-      });
+    if (mode !== 'simple' && this._executionSteps(recipe).length <= 1) {
+      return this._productsForSet({ recipe, system, set: defaultSet });
     }
-    return this._productsForSet({ recipe, system, set: defaultSet });
+    const terminalStep = this._terminalStep(recipe);
+    return this._productsForSet({
+      recipe,
+      system,
+      set: terminalStep?.ingredientSets?.[0] ?? null,
+      step: terminalStep,
+    });
   }
 
   /**

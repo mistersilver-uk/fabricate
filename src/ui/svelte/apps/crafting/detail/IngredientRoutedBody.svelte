@@ -3,7 +3,8 @@
   IngredientRoutedBody renders a routed-by-ingredients recipe. The chosen
   ingredient set determines the output, so the set selector is the primary control
   here; the IO table reflects the selected set's Have/Need/Missing and its routed
-  outputs. Shared composition lives in RecipeBodyShell.
+  outputs — except on a multi-step recipe, whose Produces row is the terminal step's
+  product. Shared composition lives in RecipeBodyShell.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -23,18 +24,21 @@
     rail = {},
   } = $props();
 
-  // The chosen ingredient set determines the output, so the "Produces" list must
-  // follow the selected route's products (not the builder's static default-set
-  // result). Keep the recipe result's time/xp metadata.
+  // The chosen ingredient set determines the output, so the "Produces" list follows the
+  // selected route's products. Every projected set resolves against the FIRST step, whose
+  // result group may legally be empty on a multi-step recipe (issue 1907), so there the
+  // builder's terminal-step product is the headline instead. Keep the result's time/xp.
   const selectedSet = $derived(
     Array.isArray(recipe?.ingredientSets)
       ? (recipe.ingredientSets.find((set) => set?.id === selectedSetId) ?? null)
       : null
   );
+  const isMultiStep = $derived(Number(recipe?.stepCount ?? 0) > 1);
   const routedResult = $derived({
-    items: Array.isArray(selectedSet?.products)
-      ? selectedSet.products
-      : (recipe?.result?.items ?? []),
+    items:
+      !isMultiStep && Array.isArray(selectedSet?.products)
+        ? selectedSet.products
+        : (recipe?.result?.items ?? []),
     time: recipe?.result?.time ?? null,
     timeLabel: recipe?.result?.timeLabel ?? null,
     xp: recipe?.result?.xp ?? null,
