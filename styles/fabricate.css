@@ -2018,19 +2018,20 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-checks-preview-against select {
+/* The record control's slot, on the shared `<Select>`'s ROOT since issue 1510: the picker is the row's flex child and the trigger fills it. The `inline` rung paints the box — 30px, radius 7, 11.5px, weight 500 — so what stays here is the growing-but-capped column the row owes it. Left hugging, the row would re-flow every time the GM previewed against a longer record name. */
+.fabricate-manager .manager-checks-preview-against .fabricate-select {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 260px;
-  height: 30px;
-  padding: 0 9px;
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-size: 11.5px;
-  font-weight: 500;
-  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-preview-against .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The simple editor's half of the same control, a stacked `.manager-field` column rather than an inline row, so the full width is stated on the trigger the `toolbar` rung leaves hugging (issue 1510). `.fabricate-field.manager-field select` supplied it until the conversion and is element-typed, so it reaches no `<button>`. */
+.fabricate-manager .manager-checks-band-record .fabricate-select-trigger {
+  width: 100%;
 }
 
 /* ── The tier list ── A FLEX ROW, not a subgrid table. */
@@ -2432,10 +2433,14 @@
 }
 
 /* ── The rail's CONTROLS ── `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two controls were the one part of it nothing had measured: a `.manager-field` control takes that wrapper's 0.82rem/700 by INHERITANCE, and inheritance is invisible to a per-region parity comparison because no rule declares it anywhere. */
-.fabricate-manager .manager-checks-rail .manager-field select,
 .fabricate-manager .manager-checks-rail .manager-field input {
   font-size: 11.5px;
   font-weight: 500;
+}
+
+/* The record control is the shared `<Select>` since issue 1510, so the rule above no longer reaches it: the `toolbar` rung states its type and fill, and what stays here is the rail column's full width, which a trigger deliberately never declares. */
+.fabricate-manager .manager-checks-preview-record-select .fabricate-select-trigger {
+  width: 100%;
 }
 
 /* The "Preview as" ACTOR PICKER is a `SearchablePopover` rather than a native `<select>` (issue 1097 follow-up), because the list is a world's player characters and a flat native list of them is unusable past a handful. */
@@ -2928,7 +2933,6 @@
   gap: 5px;
 }
 
-.fabricate-manager .manager-checks-trigger-body .manager-field select,
 .fabricate-manager
   .manager-checks-trigger-body
   .manager-field
@@ -2940,11 +2944,6 @@
   background: var(--fab-surface-soft);
   font-size: 11.5px;
   font-weight: 500;
-}
-
-/* …but the SELECT takes an OPAQUE fill, and this is a rendering fact rather than a preference (maintainer report, Firefox). */
-.fabricate-manager .manager-checks-trigger-body .manager-field select {
-  background: var(--fab-bg-1);
 }
 
 /* The threshold is the one number on this row a GM reads back, so it takes the heavier reading the prototype gives it. */
@@ -3025,8 +3024,9 @@
   flex: 0 0 160px;
 }
 
-.fabricate-manager .manager-checks-trigger-step-operand.is-invalid select {
-  border-color: var(--fab-danger);
+/* The tier control is the shared `<Select>` since issue 1510, and a trigger hugs its value, so the pinned slot is stated on it: measured, the box shrank 160px → 106px → 67px as the GM chose a tier. WIDTH ONLY: the slot's own 32px is a retired control height, so the height stays the `inline` rung's 30, which is the ladder's nearest rung. */
+.fabricate-manager .manager-checks-trigger-step-operand .fabricate-select-trigger {
+  width: 100%;
 }
 
 .fabricate-manager .manager-checks-trigger-step-operand input:disabled {

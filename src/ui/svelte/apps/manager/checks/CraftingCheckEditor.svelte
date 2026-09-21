@@ -26,6 +26,8 @@
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import Select from '../../../components/Select.svelte';
+  import { previewRecordSelectOptions } from './checksSelectOptions.js';
 
   // `showTiers` (default true) renders the per-recipe tier table, relative type only;
   // salvage/gathering reuse this editor with it off, having no records to pick a tier from.
@@ -196,17 +198,17 @@
 
   const previewAgainstOptions = $derived(
     routeOwnsPreview
-      ? previewRecords
+      ? previewRecordSelectOptions(previewRecords)
       : [
           {
-            id: '',
+            value: '',
             label: text(
               'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainstDefault',
               'Default · DC {dc}'
             ).replace('{dc}', String(Number(value?.dc ?? 0) || 0)),
           },
           ...recipeTiers.map((tier) => ({
-            id: tier.id,
+            value: tier.id,
             label: `${tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier')} · ${text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')} ${Number(tier.dc ?? 0) || 0}`,
           })),
         ]
@@ -462,16 +464,14 @@
             <span class="manager-checks-preview-against-label" id="checks-preview-against-label">
               {text('FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainst', 'Preview against')}
             </span>
-            <select
-              data-preview-against-select
-              aria-labelledby="checks-preview-against-label"
+            <Select
+              size="inline"
               value={selectedPreviewRecordId}
-              onchange={(event) => selectPreviewRecord(event.currentTarget.value)}
-            >
-              {#each previewAgainstOptions as option (option.id)}
-                <option value={option.id}>{option.label}</option>
-              {/each}
-            </select>
+              options={previewAgainstOptions}
+              ariaLabelledBy="checks-preview-against-label"
+              triggerData={{ 'data-preview-against-select': '' }}
+              onChange={selectPreviewRecord}
+            />
           </div>
         {/if}
         <!-- THE STRIP AND ITS HINT ARE FOR A CHECK THAT HAS TIERS: rendered unconditionally both say

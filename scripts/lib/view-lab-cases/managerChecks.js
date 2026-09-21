@@ -2,6 +2,7 @@
  * System scope: the Checks rail, its modifier panels, and the tags and categories route.
  */
 
+import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -152,6 +153,34 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
     kinds: ['manager', 'checks', 'responsive'],
+  }),
+  // The first open-panel frame in the checks studio (issue 1510), and the only way to photograph a
+  // converted control's own subject: the list exists only while the panel is open, and an open panel
+  // cannot double as this route's closed-state frame. Its list is ticked and it opens from inside a
+  // trigger card the walk has to author first, which no other panel frame draws.
+  managerCase({
+    id: 'manager-checks-trigger-operator-list',
+    label: 'Manager — Checks trigger comparison list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    // The walk stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-add-trigger]' },
+      { selector: '[data-trigger-operator]' },
+    ],
+    expectView: 'checks-crafting',
+    // Three claims a closed-state frame fails: the panel exists, it is the ticked list, and it draws the comparison a GM says out loud rather than the operator symbol the model stores.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option=">="] .fabricate-select-label',
+    // The panel sits inside the application root rather than clipped by the card it opened from.
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//, ...ANCHORED_POPOVER_SOURCES],
   }),
   managerCase({
     id: 'manager-checks-crafting-consumption',

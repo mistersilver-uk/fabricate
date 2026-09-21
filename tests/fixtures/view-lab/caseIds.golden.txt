@@ -152,6 +152,7 @@ manager-checks-rail-dirty
 manager-checks-section-badged-and-dotted
 manager-checks-off
 manager-checks-stacked-floor
+manager-checks-trigger-operator-list
 manager-checks-crafting-consumption
 manager-checks-salvage-on-failure
 manager-checks-gathering-on-failure

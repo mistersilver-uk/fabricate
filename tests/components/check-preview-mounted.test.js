@@ -9,6 +9,13 @@ import {
   CHECKS_TREE_COMPILED_MODULES,
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
+// The three record controls are driven by open-then-click on a portaled panel (issue 1510).
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -180,10 +187,14 @@ async function settle() {
   flushSync();
 }
 
-/** Set a `<select>`'s value the way a GM does, then let Svelte settle. */
-async function choose(select, value) {
-  select.value = value;
-  select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+// The three converted record controls, each by the hook that rode onto its trigger (issue 1510).
+const RAIL_RECORD = '[data-checks-preview-record]';
+const CARD_RECORD = '[data-preview-against-select]';
+const SIMPLE_RECORD = '[data-simple-band-record]';
+
+/** Choose a record on one of the three converted controls, then let Svelte settle. */
+async function choose(root, triggerSelector, value) {
+  chooseSelectOption(root, triggerSelector, value);
   await settle();
 }
 
@@ -274,18 +285,23 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
 
   it('offers the check default and every authored recipe tier as records', async () => {
     const root = await mountChecks();
-    const select = root.querySelector('[data-checks-preview-record]');
-    assert.deepEqual(
-      [...select.options].map((option) => option.textContent.trim()),
-      ['Default · DC 12', 'Uncommon Craft · DC 12', 'Rare Craft · DC 20']
+    assert.equal(
+      assertSelectHasResolvedName(root, RAIL_RECORD),
+      'Preview against record',
+      'the screen-reader-only caption it had is the trigger’s own name now'
     );
+    assert.deepEqual(selectOptionLabels(root, RAIL_RECORD), [
+      'Default · DC 12',
+      'Uncommon Craft · DC 12',
+      'Rare Craft · DC 20',
+    ]);
   });
 });
 
 describe('the previewed record drives the band strip, not the check’s own DC', () => {
   it('names the record in the strip’s GROUP label', async () => {
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
-    await choose(root.querySelector('[data-checks-preview-record]'), 'rare');
+    await choose(root, RAIL_RECORD, 'rare');
     const track = root.querySelector('[data-band-strip-track]');
     assert.match(
       track.getAttribute('aria-label'),
@@ -296,7 +312,7 @@ describe('the previewed record drives the band strip, not the check’s own DC',
 
   it('carries BOTH readings in aria-valuetext, absolute and offset', async () => {
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
-    await choose(root.querySelector('[data-checks-preview-record]'), 'rare');
+    await choose(root, RAIL_RECORD, 'rare');
     const handle = root.querySelector('[data-band-strip-handle="0"]');
     assert.equal(
       handle.getAttribute('aria-valuetext'),
@@ -311,9 +327,9 @@ describe('the previewed record drives the band strip, not the check’s own DC',
       [...root.querySelectorAll('[data-band-strip-handle]')].map((handle) =>
         handle.getAttribute('aria-valuenow')
       );
-    await choose(root.querySelector('[data-checks-preview-record]'), 'uncommon');
+    await choose(root, RAIL_RECORD, 'uncommon');
     const atTwelve = ticks();
-    await choose(root.querySelector('[data-checks-preview-record]'), 'rare');
+    await choose(root, RAIL_RECORD, 'rare');
     assert.deepEqual(atTwelve, ['7', '12', '17']);
     assert.deepEqual(ticks(), ['15', '20', '25'], 'the same offsets against a DC of 20');
   });
@@ -321,10 +337,15 @@ describe('the previewed record drives the band strip, not the check’s own DC',
   it('is ONE selection: the Outcomes card’s own PREVIEW AGAINST writes the rail’s', async () => {
     // The Outcomes card ships its own record selector.
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
-    await choose(root.querySelector('[data-preview-against-select]'), 'rare');
     assert.equal(
-      root.querySelector('[data-checks-preview-record]').value,
-      'rare',
+      assertSelectHasResolvedName(root, CARD_RECORD),
+      'Preview against',
+      'and the card’s control keeps its ONE pointer at the caption beside it'
+    );
+    await choose(root, CARD_RECORD, 'rare');
+    assert.equal(
+      selectTriggerText(root, RAIL_RECORD),
+      'Rare Craft · DC 20',
       'two controls, one state — the simulator and the strip cannot read different records'
     );
   });
@@ -334,8 +355,8 @@ describe('the previewed record drives the band strip, not the check’s own DC',
     // driving both ends: a card that merely reported upward without reading back would pass
     // the case above and still drift the moment the rail was used.
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
-    await choose(root.querySelector('[data-checks-preview-record]'), 'rare');
-    assert.equal(root.querySelector('[data-preview-against-select]').value, 'rare');
+    await choose(root, RAIL_RECORD, 'rare');
+    assert.equal(selectTriggerText(root, CARD_RECORD), 'Rare Craft · DC 20');
   });
 });
 
@@ -388,7 +409,7 @@ describe('the outcome-preview readout', () => {
     await settle();
     await settle();
     assert.ok(root.querySelector('[data-checks-simulator-readout]'));
-    await choose(root.querySelector('[data-checks-preview-record]'), 'rare');
+    await choose(root, RAIL_RECORD, 'rare');
     assert.ok(
       !root.querySelector('[data-checks-simulator-readout]'),
       'a total no current configuration produces must not stay on screen'
@@ -512,6 +533,29 @@ describe('the simple check’s two-band strip', () => {
     // The HANDLE's range is the track inset by one on each side.
     assert.equal(handle.getAttribute('aria-valuemin'), '5', 'a track floored at the total 4');
     assert.equal(handle.getAttribute('aria-valuemax'), '22', 'and ceilinged at the total 23');
+  });
+
+  it('shares ONE previewed record with the rail, written from the card’s own control', async () => {
+    // Its own control renders only where there is more than one record to choose, so this mount
+    // authors the two recipe tiers `SIMPLE_CHECK` deliberately has none of.
+    const root = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: { ...SIMPLE_CHECK, tiers: ROUTED_CHECK.tiers },
+      requestedSection: 'outcomes',
+      requestedSectionNonce: 1,
+    });
+    assert.equal(
+      assertSelectHasResolvedName(root, SIMPLE_RECORD),
+      'Preview against',
+      'the demoted wrapper’s caption still names the control'
+    );
+    await choose(root, SIMPLE_RECORD, 'rare');
+    assert.equal(
+      selectTriggerText(root, RAIL_RECORD),
+      'Rare Craft · DC 20',
+      'the simulator and the strip cannot read different records'
+    );
   });
 
   it('writes the check’s own DC when the handle is keyed', async () => {

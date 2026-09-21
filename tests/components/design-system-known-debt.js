@@ -95,7 +95,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // onto `Select`, so the total falls 69 -> 64 across 26 rows to 24.
 // #1510: the component studio's `ComponentEditView` (3) and `ComponentComplicationsSection`
 // (2) convert onto `Select`, so the total falls 64 -> 59 across 24 rows to 22.
-export const KNOWN_NATIVE_SELECT_TOTAL = 59;
+// #1510: the checks studio converts eight more native selects onto `Select`, taking the total
+// 59 -> 51 and the file rows 22 -> 18.
+export const KNOWN_NATIVE_SELECT_TOTAL = 51;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
@@ -129,7 +131,8 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 272;
+// #1510: the checks conversion removes one remaining 8px radius occurrence from the module sheet.
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 271;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');

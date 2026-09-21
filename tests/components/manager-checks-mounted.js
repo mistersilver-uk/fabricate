@@ -15,6 +15,8 @@ import {
   settleRouteExit,
   compareStrings,
 } from './manager-mounted-shared.js';
+// A converted control's value is read off its trigger rather than off a `.value` (issue 1510).
+import { assertSelectHasResolvedName, selectTriggerText } from '../helpers/select-control.js';
 
 let Component;
 let ChecksRightMenuComponent;
@@ -2767,8 +2769,8 @@ export function registerChecksCases() {
       'cloneCheckBreakage reads the persisted tierStep back into the draft'
     );
     assert.equal(
-      card.querySelector('[data-trigger-tier-step-target]').value,
-      'o1',
+      selectTriggerText(target, '[data-trigger="c1"] [data-trigger-tier-step-target]'),
+      'Success',
       'and the authored target tier survives the clone'
     );
 
@@ -3568,6 +3570,14 @@ export function registerChecksCases() {
     const recordSelect = previewAs.querySelector('[data-checks-preview-record]');
     assert.ok(actorPicker, 'the actor picker is a real control now that a simulator reads it');
     assert.ok(recordSelect, 'so is the record selector');
+    // The record control is the shared `<Select>` since issue 1510, so its hook has to land on the
+    // TRIGGER for the same reason the actor picker's does.
+    assert.equal(recordSelect.tagName, 'BUTTON', 'and its hook is on the picker trigger too');
+    assert.equal(
+      assertSelectHasResolvedName(target, '[data-checks-preview-record]'),
+      'Preview against record',
+      'and the screen-reader-only caption it lost is its own name at route level'
+    );
     // The actor control is a `SearchablePopover` rather than a `<select>` (the issue 1097
     // follow-up): the list is filtered to player characters and searched, because a world's
     // actor directory is mostly bestiary. Its options exist only while it is open, so what

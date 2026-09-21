@@ -112,10 +112,6 @@
     "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 2",
     "src/ui/svelte/apps/manager/SystemsBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 1",
-    "src/ui/svelte/apps/manager/checks/CheckTriggers.svelte | 5",
-    "src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte | 1",
-    "src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte | 1",
-    "src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte | 1",
     "src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte | 3",
     "src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte | 2",
     "src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte | 10",
@@ -254,7 +250,7 @@
     "styles/fabricate.css | border-radius | 3px | 2",
     "styles/fabricate.css | border-radius | 4px | 19",
     "styles/fabricate.css | border-radius | 5px | 13",
-    "styles/fabricate.css | border-radius | 8px | 69"
+    "styles/fabricate.css | border-radius | 8px | 68"
   ],
   "areaScopedStyleReads": [
     "src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte | --fab-recipe-control-font | 4",

@@ -152,8 +152,8 @@ src/ui/svelte/apps/manager/RecipeItemEditor.svelte::$derived.by#4	103
 src/ui/svelte/apps/manager/RecipesBrowserView.svelte	839
 src/ui/svelte/apps/manager/SystemEditView.svelte	564
 src/ui/svelte/apps/manager/ToolsBrowserView.svelte	868
-src/ui/svelte/apps/manager/checks/CheckTriggers.svelte	913
-src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte	581
+src/ui/svelte/apps/manager/checks/CheckTriggers.svelte	834
+src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte	580
 src/ui/svelte/apps/manager/checks/ChecksView.svelte	1878
 src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte	662
 src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte	672
