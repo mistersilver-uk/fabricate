@@ -280,12 +280,10 @@
     "src/ui/svelte/apps/alchemy/Workbench.svelte | 1",
     "src/ui/svelte/apps/crafting/RecipeListRow.svelte | 1",
     "src/ui/svelte/apps/gathering/GatheringEventRow.svelte | 1",
-    "src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte | 1",
     "src/ui/svelte/apps/gathering/GatheringTaskRow.svelte | 1",
     "src/ui/svelte/apps/journal/HistoryRow.svelte | 1",
     "src/ui/svelte/apps/journal/RunCard.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte | 1",
-    "src/ui/svelte/apps/manager/GatheringRealmsTab.svelte | 1",
     "src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte | 1"
   ],
   "formlessButtons": [
@@ -311,7 +309,6 @@
     "src/ui/svelte/apps/gathering/LinkedScene.svelte | 1",
     "src/ui/svelte/apps/inventory/InventoryItemCard.svelte | 1",
     "src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte | 5",
-    "src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | 4",
     "src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte | 3",
     "src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte | 2",
     "src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte | 2",

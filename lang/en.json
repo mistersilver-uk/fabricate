@@ -13,6 +13,10 @@
       "SortableList": {
         "Reorder": "Reorder {name} — use the up and down arrow keys",
         "Remove": "Remove {name}"
+      },
+      "Disclosure": {
+        "Expand": "Show details for {name}",
+        "Collapse": "Hide details for {name}"
       }
     },
     "Migration": {

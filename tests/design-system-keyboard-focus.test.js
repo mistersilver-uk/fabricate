@@ -186,9 +186,9 @@ describe('design system: a programmatic focus target declares itself focused to 
     const undeclared = undeclaredIn(roleZero);
 
     assert.ok(
-      roleZero.length >= 11,
+      roleZero.length >= 9,
       `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
-        'role, against the 13 this tree holds. An absence check over an empty population passes ' +
+        'role, against the 11 this tree holds. An absence check over an empty population passes ' +
         'forever.'
     );
 
@@ -215,7 +215,7 @@ describe('design system: a programmatic focus target declares itself focused to 
 
     assert.ok(
       formlessButtons.length >= 200,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 272 ` +
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 261 ` +
         'this tree holds'
     );
     assert.ok(

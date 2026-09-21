@@ -102,6 +102,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/ingredientOptionStatus.js',
     'src/ui/svelte/util/recipeDuration.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     'src/ui/svelte/util/requirementSlots.js',
     'src/ui/svelte/util/sceneImages.js',

@@ -74,6 +74,34 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-world-travel-realm-open',
+    label: 'Manager — World Travel realm row open',
+    // A new case, `manager-world-travel-realms-normal` left as it was: that panel auto-selects its
+    // first realm, so only this one activates a repaired header from the keyboard (issue 1512).
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-realms', press: 'Enter' },
+      {
+        selector:
+          '[data-manager-travel-realm-id="hb-realm-frostmark"] .manager-travel-realms-header',
+        press: 'Enter',
+      },
+    ],
+    expectView: 'world-travel',
+    expectSelector:
+      '.fabricate-manager [data-manager-travel-realm-id="hb-realm-frostmark"]' +
+      ':has(.manager-travel-realms-header[aria-expanded="true"][aria-controls])' +
+      ' [data-manager-realm-editor]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringRealmsTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-world-travel-realms-stacked',
     label: 'Manager — World Travel Realms stacked',
     smokeLabels: ['manager-world-travel-realms-stacked'],
