@@ -576,9 +576,8 @@ export class CraftingListingBuilder {
       activeStepId: stringOrNull(activeStep.step?.id),
       displayedStepId: stringOrNull(firstStep?.id),
       activeStepTimeGateArmed: activeStep.timeGateArmed,
-      // How many execution steps this recipe runs. A body branches on `> 1` to read the
-      // terminal-step product rather than a first-step set, whose group may legally be empty
-      // (issue 1907); `steps[]` above cannot answer it because it is `simple`-only.
+      // How many execution steps this recipe runs; `steps[]` above is `simple`-only and cannot
+      // answer it. A body branches on `> 1` to follow {@link _productStep} (issue 1907).
       stepCount: this._executionSteps(recipe).length,
       check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
@@ -653,6 +652,7 @@ export class CraftingListingBuilder {
       activeStepIndex: 0,
       activeStepId: null,
       displayedStepId: null,
+      stepCount: 0,
       activeStepTimeGateArmed: false,
       // Timing is always spoiler detail for a Discovery-Mode teaser, independent
       // of the configurable result-field redaction list.
@@ -788,6 +788,7 @@ export class CraftingListingBuilder {
     if (mode !== 'simple') return [];
     const steps = this._executionSteps(recipe);
     if (steps.length <= 1) return [];
+    const rowContext = { recipe, system, mode, craftSources, craftingActor };
     return steps.map((step, index) => {
       const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
       return {
@@ -797,14 +798,7 @@ export class CraftingListingBuilder {
           system?.requirements?.time?.enabled === false
             ? null
             : this._durationOrNull(step?.timeRequirement),
-        ingredientSets: sets.map((set, setIdx) => ({
-          id: stringOrNull(set.id),
-          label:
-            stringOrEmpty(set.name) ||
-            this.localize('FABRICATE.App.Crafting.IngredientSetFallback', { index: setIdx + 1 }),
-          craftability: this._evaluateSet({ recipe, set, step, craftSources, craftingActor }),
-          products: this._productsForSet({ recipe, system, set, step }),
-        })),
+        ingredientSets: this._buildIngredientSetRows({ ...rowContext, sets, step }),
         // Retained deliberately as groundwork for a future non-`simple` step renderer
         // (intermediate yields are meaningful there) and to keep the entry shape
         // symmetric with `ingredientSets[]`; not rendered under the inputs-only body.
@@ -1037,7 +1031,7 @@ export class CraftingListingBuilder {
     const routed = system?.craftingCheck?.routed ?? null;
     const tiers = routed?.type === 'fixed' ? routed.fixedOutcomes : routed?.relativeOutcomes;
     if (!Array.isArray(tiers)) return [];
-    const step = this._firstStep(recipe);
+    const step = this._productStep(recipe);
     const groups = [];
     const byKey = new Map();
     for (const tier of tiers) {
@@ -1100,11 +1094,9 @@ export class CraftingListingBuilder {
 
   /**
    * The recipe's top-level expected output rows. `routedByCheck` is per outcome tier (empty
-   * top-level list). For a recipe with more than one execution step, every other mode resolves the
-   * terminal step's own first ingredient set — the step the collapse path and Journal already treat
-   * as product-bearing — so a legal empty non-terminal step (issue 1907) never drives the headline
-   * row. A single-step recipe keeps today's per-mode behaviour: `simple` resolves its own set,
-   * ignoring it, and every other mode resolves `defaultSet` against the first/only step.
+   * top-level list); every other mode resolves {@link _productStep} and that step's own first set.
+   * A SINGLE-step recipe outside `simple` keeps resolving `defaultSet` instead, which is the one
+   * case where the player's chosen route, not the step, decides the row.
    * @private
    */
   _resultItems({ recipe, system, mode, defaultSet }) {
@@ -1112,13 +1104,8 @@ export class CraftingListingBuilder {
     if (mode !== 'simple' && this._executionSteps(recipe).length <= 1) {
       return this._productsForSet({ recipe, system, set: defaultSet });
     }
-    const terminalStep = this._terminalStep(recipe);
-    return this._productsForSet({
-      recipe,
-      system,
-      set: terminalStep?.ingredientSets?.[0] ?? null,
-      step: terminalStep,
-    });
+    const step = this._productStep(recipe);
+    return this._productsForSet({ recipe, system, set: step?.ingredientSets?.[0] ?? null, step });
   }
 
   /**
@@ -1156,13 +1143,15 @@ export class CraftingListingBuilder {
   }
 
   /**
-   * The terminal (final) execution step — the recipe's product-bearing step. For a
-   * single-step recipe this is the same synthesized implicit step as `_firstStep`.
+   * The step a PRODUCT read resolves against: the terminal step once a recipe runs more than one,
+   * which is the step the collapse path and the Journal already treat as product-bearing, so a
+   * legal empty non-terminal step (issue 1907) never drives a product surface. One rule, shared by
+   * the headline row and the `routedByCheck` tier table, because they must not disagree.
    * @private
    */
-  _terminalStep(recipe) {
+  _productStep(recipe) {
     const steps = this._executionSteps(recipe);
-    return steps.length > 0 ? steps.at(-1) : null;
+    return steps.length > 1 ? steps.at(-1) : (steps[0] ?? null);
   }
 
   /**

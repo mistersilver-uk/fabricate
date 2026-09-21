@@ -4,7 +4,7 @@
   ingredient set determines the output, so the set selector is the primary control
   here; the IO table reflects the selected set's Have/Need/Missing and its routed
   outputs — except on a multi-step recipe, whose Produces row is the terminal step's
-  product. Shared composition lives in RecipeBodyShell.
+  product and whose routing hint says so. Shared composition lives in RecipeBodyShell.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -49,7 +49,11 @@
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet selectorIntro()}
       <p class="crafting-routing-hint" data-recipe-section="routing-hint">
-        {localize('FABRICATE.App.Crafting.Detail.IngredientRoutingHint')}
+        {localize(
+          isMultiStep
+            ? 'FABRICATE.App.Crafting.Detail.IngredientRoutingHintMultiStep'
+            : 'FABRICATE.App.Crafting.Detail.IngredientRoutingHint'
+        )}
       </p>
     {/snippet}
     {#snippet results()}

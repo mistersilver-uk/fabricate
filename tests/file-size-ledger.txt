@@ -93,9 +93,9 @@ src/ui/extensionRegistry.js::createExtensionRegistry	142
 src/ui/model/scopedEntityListModel.js::createScopedEntityListModel	118
 src/ui/navTabBadgeStore.js::createNavTabBadgeStore	114
 src/ui/presenters/AlchemyListingBuilder.js::buildListing	120
-src/ui/presenters/CraftingListingBuilder.js	1293
+src/ui/presenters/CraftingListingBuilder.js	1282
 src/ui/presenters/CraftingListingBuilder.js::_buildCheck	111
-src/ui/presenters/CraftingListingBuilder.js::_buildRecipeModel	155
+src/ui/presenters/CraftingListingBuilder.js::_buildRecipeModel	154
 src/ui/presenters/GatheringListingBuilder.js	1074
 src/ui/presenters/GatheringListingBuilder.js::_buildEnvironmentListing	225
 src/ui/presenters/GatheringListingBuilder.js::listForActor	108
@@ -171,7 +171,7 @@ src/ui/svelte/apps/manager/essences/essenceStudio.js::projectEssenceBehaviourFac
 src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte	950
 src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte	663
 src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte	847
-src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte	810
+src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte	825
 src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte	1249
 src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte	953
 src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte	1391

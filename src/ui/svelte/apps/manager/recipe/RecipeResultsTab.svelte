@@ -183,7 +183,7 @@
       </p>
     {:else}
       <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
-        {#snippet body(step)}
+        {#snippet body(step, index)}
           <RecipeResultsSection
             idPrefix={`step-${step.id}-`}
             resultGroups={stepResultGroups(step)}
@@ -191,7 +191,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
-            isTerminalStep={step.id === steps.at(-1)?.id}
+            isTerminalStep={index === steps.length - 1}
             {onOpenComponent}
             ingredientSets={stepIngredientSets(step)}
             {outcomeTierOptions}

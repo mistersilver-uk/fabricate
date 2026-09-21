@@ -793,6 +793,7 @@
           "TierSuccess": "Awards on this result",
           "TierNoAward": "No award",
           "IngredientRoutingHint": "The ingredient option you choose determines what you craft.",
+          "IngredientRoutingHintMultiStep": "The ingredient option you choose determines what this step consumes. Produces shows the recipe's final product, awarded on the last step.",
           "ProgressiveHint": "This recipe is crafted over multiple steps.",
           "MultiStepHint": "This recipe is made in {count} steps — craft each in order.",
           "StepLabel": "Step {index}: {name}",

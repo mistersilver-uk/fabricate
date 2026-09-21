@@ -54,6 +54,8 @@
     onAddComponents = () => {},
   } = $props();
 
+  const PRODUCES_EMPTY = { 'data-recipe-produces-empty': '' };
+
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -285,8 +287,27 @@
   const activeSuccessEmpty = $derived(
     isMultiStep ? !currentStepHasSuccess : successRows.length === 0
   );
-  // Only the terminal step must produce, so an earlier empty step is authored intent (issue 1907).
+  // Only the terminal step must produce, so an earlier empty step is authored intent (issue 1907),
+  // but ONLY when it declares a group at all: a step with none is still `stepMissingResultGroup`
+  // and keeps the danger note.
   const isTerminalStep = $derived(!isMultiStep || currentStepIndex === stepModel.length - 1);
+  const stepAwardsNothingDeliberately = $derived(
+    !isTerminalStep && (selectedRecipe?.steps?.[currentStepIndex]?.resultGroups?.length ?? 0) > 0
+  );
+  const outcomeNoResults = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.OutcomeNoResults', 'No results')
+  );
+  const producesEmptyLabel = $derived(
+    stepAwardsNothingDeliberately
+      ? text(
+          'FABRICATE.Admin.Manager.Recipe.NoResultsIntermediateStep',
+          'This step produces nothing — it only advances the craft.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Recipe.NoResults',
+          'No results — a successful craft makes nothing.'
+        )
+  );
   // Produces grouped by result group (routed-by-check only); flat list otherwise.
   const producedGroups = $derived(
     isRoutedByCheck ? groupProduceRowsByResultGroup(visibleProduceRows) : []
@@ -513,6 +534,18 @@
         <span class="manager-recipe-flow-qty">{requirementQuantity(row)}</span>
       </div>
     {/snippet}
+    <!-- The ONE empty-outcome note this panel draws, in both tones: danger, because an outcome that
+       awards nothing is a gap, and neutral for a step that only advances the craft (issue 1907). -->
+    {#snippet emptyNote(hook, label, neutral = false)}
+      {#if neutral}
+        <p class="manager-muted" {...hook}>{label}</p>
+      {:else}
+        <p class="manager-recipe-flow-empty" {...hook}>
+          <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+          <span>{label}</span>
+        </p>
+      {/if}
+    {/snippet}
     {#if activeRequirementRows.length === 0}
       <p class="manager-muted" data-recipe-requires-empty>
         {text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}
@@ -592,10 +625,7 @@
               >{section.label}</span
             >
             {#if section.rows.length === 0}
-              <p class="manager-recipe-flow-empty" data-recipe-outcome-empty={section.key}>
-                <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Recipe.OutcomeNoResults', 'No results')}</span>
-              </p>
+              {@render emptyNote({ 'data-recipe-outcome-empty': section.key }, outcomeNoResults)}
             {:else}
               {#each section.rows as row (row.id)}
                 {@render produceRow(row, false)}
@@ -642,26 +672,11 @@
           {@render produceRow(row, true)}
         {/each}
       {/if}
-      {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep) && !isTerminalStep}
-        <p class="manager-muted" data-recipe-produces-empty>
-          {text(
-            'FABRICATE.Admin.Manager.Recipe.NoResultsIntermediateStep',
-            'This step produces nothing — it only advances the craft.'
-          )}
-        </p>
-      {:else if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
-        <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that
-             makes nothing — true even when a failure group is listed above. (Two-outcome
-             modes show a per-section "No results" instead, so skip the global note.) -->
-        <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
-          <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-          <span
-            >{text(
-              'FABRICATE.Admin.Manager.Recipe.NoResults',
-              'No results — a successful craft makes nothing.'
-            )}</span
-          >
-        </p>
+      <!-- Not "unfinished": a recipe with no SUCCESS results is a successful craft that makes
+           nothing — true even when a failure group is listed above. (Two-outcome modes show a
+           per-section "No results" instead, so skip the global note.) -->
+      {#if activeSuccessEmpty && !(isTwoOutcome && !isMultiStep)}
+        {@render emptyNote(PRODUCES_EMPTY, producesEmptyLabel, stepAwardsNothingDeliberately)}
       {/if}
     </div>
 

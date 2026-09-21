@@ -382,10 +382,6 @@ export class Recipe {
   }
 
   /**
-   * Validate one scope's result groups: unique ids, non-empty contents, each result valid.
-   * `requireResults` is false for a non-terminal step, whose groups may award nothing (issue 1907).
-   */
-  /**
    * One result-validation scope per step, or a single `Recipe` scope when there are none.
    * `requireResults` marks the terminal scope, the only one that must award something (issue 1907).
    */
@@ -402,6 +398,10 @@ export class Recipe {
     }));
   }
 
+  /**
+   * Validate one scope's result groups: unique ids, non-empty contents, each result valid.
+   * `requireResults` is false for a non-terminal step, whose groups may award nothing (issue 1907).
+   */
   _validateResultGroups(
     resultGroups,
     location,

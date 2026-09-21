@@ -20,6 +20,7 @@ globalThis.game = { user: { isGM: true }, fabricate: {} };
 globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
 
 const { Recipe } = await import('../src/models/Recipe.js');
+const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
 const ingredientSets = (index) => [
   {
@@ -124,6 +125,34 @@ describe('empty result groups on a non-terminal step (issue 1907)', () => {
     assert.deepEqual(codesAt(intermediate, 'resultGroupEmpty'), []);
     const terminal = recipe([step(1), step(2, { results: false, ...routed })]).validate();
     assert.deepEqual(codesAt(terminal, 'resultGroupEmpty'), ['Step "Step 2"']);
+  });
+
+  it('still validates a non-terminal step for everything EXCEPT emptiness', () => {
+    // Only the CONTENTS rule is relaxed on an earlier step. If the validator stopped visiting
+    // non-terminal steps altogether this duplicate would go unreported.
+    const clash = {
+      ...step(1, { results: false }),
+      resultGroups: [
+        { id: 'rg-clash', name: 'One', results: [] },
+        { id: 'rg-clash', name: 'Two', results: [] },
+      ],
+    };
+    const validation = recipe([clash, step(2)]).validate();
+    assert.deepEqual(codesAt(validation, 'resultGroupDuplicate'), ['Step "Step 1"']);
+    assert.deepEqual(codesAt(validation, 'resultGroupEmpty'), [], 'emptiness is still waived');
+  });
+
+  it('lets RecipeManager ACTIVATE a recipe whose first step awards nothing', () => {
+    const manager = new RecipeManager();
+    const accepted = manager.canActivateRecipe(recipe([step(1, { results: false }), step(2)]));
+    assert.ok(accepted.valid, `expected activation, got: ${accepted.errors.join(' | ')}`);
+
+    const refused = manager.canActivateRecipe(recipe([step(1), step(2, { results: false })]));
+    assert.equal(refused.valid, false, 'an empty TERMINAL group still refuses activation');
+    assert.ok(
+      refused.issues.some((issue) => issue.code === 'resultGroupEmpty'),
+      'and says why'
+    );
   });
 
   it('still reports an empty group on an explicit one-step recipe', () => {
