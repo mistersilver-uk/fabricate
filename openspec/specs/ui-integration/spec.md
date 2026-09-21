@@ -1609,6 +1609,7 @@ The reserved `role: 'failure'` group — the failure output for plain `simple` r
 In a routed mode the list renders a failure-toned row for a result group assigned to a failure-marked outcome tier **when the system's `craftingCheck.failureResultPolicy` permits results on failure**, and renders none when it does not — matching what the engine will actually do.
 The successful-craft-makes-nothing warning still keys on the SUCCESS rows only: a recipe whose only group is a failure output still makes nothing when the craft succeeds, and says so.
 When the empty group belongs to a non-terminal step of a multi-step recipe, both this inspector pager and the recipe editor's result-group card render a neutral note that the step only advances the craft, without danger styling; the terminal-step and single-step cases keep the danger panel (issue 1907).
+The neutral tone additionally requires the step to DECLARE a result group: a step carrying none at all is an incomplete shell (`stepMissingResultGroup`), so the inspector keeps the danger note there rather than reporting an authored intent the recipe does not have (issue 1907).
 
 ### The On-failure section
 
@@ -3388,6 +3389,7 @@ The GM component surfaces: the component browser and the component editor.
     The set delete exists because the panel swap at requirement 10 otherwise removes the only delete affordance at exactly the moment the GM has selected the rows they want removed; unlink and copy-source-UUID stay inspector-only, because neither is destructive.
     The delete states its impact BEFORE it is armed and recomputes it when the selection changes: the control's label carries how many components will be removed, and the note states that their rules are dropped in this system only with their catalogue entries and every other system untouched, then how many recipes will be rewritten, and how many of those recipes will be left with no ingredient sets or no results and clamped to disabled.
     It refuses per record on the store's own resolution: a selection this system holds none of reads an uncounted `Remove from {system}…`, arms to `Cannot remove`, and writes nothing, with the note saying why.
+    The strip behind those numbers retains a result group that ARRIVED empty and drops only one it emptied itself, so a non-terminal step's deliberately empty group and the reserved `role: 'failure'` group both survive a component delete and neither inflates the disabled count (issue 1907).
     The two recipe numbers are counts of DISTINCT recipes, so neither exceeds what the cascade will touch: a recipe naming two selected components is rewritten once, never counted once per component.
     The disabled number counts only recipes going from enabled to disabled, because it warns about craftability the GM is about to lose rather than restating what was already off, and it is worded as that transition rather than as the resulting state, so its exclusion of already-disabled recipes cannot read as an undercount.
     A recipe number of zero is omitted rather than stated as zero; the scope sentence always renders, because the note is what the armed confirmation is paired with and a control stating nothing has lost that pairing.
@@ -3925,9 +3927,20 @@ The player app is a single shared window with a full-height left navigation rail
   never surfaced to the UI), `browseStatus`, per-set `ingredientSets[].craftability`,
   an optional `check` descriptor, `outcomeTiers`, a presentation-only `duration`,
   and `result`.
-  `result` reflects the recipe's terminal execution step in `simple` mode, and a
-  `simple` multi-step model additionally carries a `steps[]` per-step requirement
-  projection (empty for single-step recipes and outside `simple` mode).
+  `result` reflects the recipe's PRODUCT STEP (see the Multi-Step Recipe Presentation
+  section below), and a `simple` multi-step model additionally carries a `steps[]`
+  per-step requirement projection (empty for single-step recipes and outside `simple`
+  mode).
+  Each model also carries `stepCount`, the number of steps `Recipe.getExecutionSteps()`
+  resolves, which is the field a detail body branches on to tell a multi-step recipe from
+  a single-step one outside `simple` mode, where `steps[]` is empty either way (issue
+  1907).
+  `stepCount` counts AUTHORED structure and is independent of `features.multiStepRecipes`,
+  so a collapsed feature-off chain still reports its real count — unlike the Journal run
+  model's `multiStep`, which follows the enabled feature (`data-models` CraftingRun
+  requirements).
+  A Discovery-Mode teaser reports `stepCount: 0`, redacted exactly as `steps: []` is, so a
+  redacted recipe never leaks how many steps it runs.
   `duration` is separate from the terminal `result` projection and never changes
   persisted recipe or run data.
 - The `check` descriptor's `dc` is resolved per-recipe, not per-system: the
@@ -3971,8 +3984,7 @@ The player app is a single shared window with a full-height left navigation rail
   Each entry also carries its effective authored `duration` when the step is timed.
   The `simple`-mode detail body renders these as an ordered list of per-step requirement blocks — a static preview of the whole recipe, not a live run-progress tracker.
   Each block renders inputs only; intermediate step yields are not shown.
-  For a recipe with more than one execution step, the headline Produces row resolves against the terminal execution step in every mode except `routedByCheck`, and the `routedByIngredients` body reads that terminal-step product rather than the selected first-step set's products (issue 1907).
-  A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
+  A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders no per-step block list; what its PRODUCES row resolves against is governed by the product-step rule below rather than by this projection (issue 1907).
   A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
 - Only the **active** execution step's requirement block is interactive; every other step stays a read-only preview, consistent with the static-preview contract above.
   The active step is derived the way the engine derives it — the recipe's active run's `currentStepIndex` (`0` when there is no active run) indexed into `Recipe.getExecutionSteps()` — and is baked onto the projected model as `activeStepId` / `activeStepIndex`, so the rendered rail and the executing engine resolve the same step from the same reads.
@@ -3996,9 +4008,15 @@ The player app is a single shared window with a full-height left navigation rail
   contains time requirements.
   A Discovery-Mode teaser always exposes `duration: null` and `steps: []`, so timing
   cannot leak through either the aggregate or a step.
-- In `simple` mode the listing's top-level expected output (`result`) is resolved from the recipe's **terminal** execution step's result groups (against that step's own set), so a multi-step recipe's PRODUCES is its final product rather than the first step's intermediate output.
+- Every PRODUCT read on the listing resolves against ONE step, the **product step**: the recipe's **terminal** execution step once it resolves more than one, and its only step otherwise.
+  A multi-step recipe's PRODUCES is therefore its final product rather than an earlier step's intermediate output, and a legally empty non-terminal result group (issue 1907) never drives a product surface.
+  The rule is single-sourced (`CraftingListingBuilder._productStep`) and is shared by the top-level expected output (`result`) and the `routedByCheck` outcome-tier table, which must not disagree about what the recipe makes (issue 1907).
   Single-step recipes are unaffected (their only step is both first and terminal).
-  `routedByCheck` continues to emit an empty top-level `result` (its output is per outcome tier); `routedByIngredients` and `progressive` multi-step PRODUCES is unchanged and must not be mis-routed.
+  `routedByCheck` continues to emit an empty top-level `result`, because its output is per outcome tier rather than one row.
+  Outside `simple` mode a recipe with more than one execution step resolves `result` against the product step's own FIRST authored ingredient set rather than `defaultSet`, because `IngredientSet.resultGroupId` is step-scoped and the first step's default set cannot route against the terminal step's groups (issue 1907).
+  A single-step recipe outside `simple` keeps resolving `defaultSet`, which is the one case where the player's chosen route rather than the step decides the row.
+  That first authored set is a REPRESENTATIVE headline only: a product step routing several sets to different groups shows the first set's group in the one PRODUCES row, while the per-set product grid beneath it stays exact (issue 1907).
+  The `routedByIngredients` detail body follows the same rule: on a recipe with more than one execution step it renders the projected product-step `result` instead of the selected set's products, and swaps its routing hint for one saying the chosen option decides what THIS STEP consumes while PRODUCES is the recipe's final product (issue 1907).
 - The crafting-check descriptor is not surfaced (the projection yields `null`) when the mode's check is optional, has no authored roll formula, and checks are not enabled (`craftingCheck.enabled !== true` and `features.craftingChecks !== true`).
   A mandatory-by-mode check, an authored formula, or an enabled-but-unformulated check still surface (the last keeps the "no roll formula configured" GM misconfiguration note).
 
@@ -4203,6 +4221,10 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   service so success-only routing, the single-result-group exemption, and the
   `checkOutcomeIds → name-match → unrouted` precedence are honoured identically to
   a real attempt.
+- The tier table resolves against the recipe's **product step**, the same step the
+  headline PRODUCES row reads, so a `routedByCheck` recipe with more than one execution
+  step lists what its terminal step awards rather than what its first step awards (issue
+  1907).
 - A failure tier (`success === false`) never routes and awards nothing (empty
   `awardedResults`).
 
