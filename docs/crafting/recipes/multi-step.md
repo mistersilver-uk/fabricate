@@ -58,7 +58,8 @@ Instant steps do not show a duration.
 The intermediate items a step produces along the way are not listed as separate results.
 Only the recipe's final product is shown, as a single **Produces** row beneath the steps.
 This keeps the focus on what the whole recipe makes rather than on the parts made on the way there.
-That **Produces** row always reads the recipe's last step, so a recipe whose early steps award nothing still shows the player what it makes.
+The headline **Produces** row reads the recipe's last step, so a recipe whose early steps award nothing still shows the player what it makes.
+Routed-by-check recipes have no single Produces row — they list an outcome per check result instead — and that outcome table reads the last step for the same reason.
 
 The **Craft** button reflects the first step.
 A later step showing missing materials never stops a player from starting the recipe, so players can gather what a later step needs before it comes up in the run.
