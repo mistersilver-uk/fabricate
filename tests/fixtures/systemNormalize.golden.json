@@ -1,0 +1,3524 @@
+{
+  "members": {
+    "toolEmpty": {
+      "id": "rid-0001",
+      "enabled": true,
+      "componentId": null,
+      "label": "",
+      "name": null,
+      "img": null,
+      "description": "",
+      "registeredItemUuid": null,
+      "originItemUuid": null,
+      "aliasItemUuids": [],
+      "requirement": null,
+      "prerequisites": {
+        "enabled": false,
+        "ids": [],
+        "gateMode": "usability"
+      },
+      "bonus": {
+        "enabled": false,
+        "expression": ""
+      },
+      "breakage": {
+        "mode": "limitedUses",
+        "maxUses": null
+      },
+      "checkBreakable": true,
+      "onBreak": {
+        "mode": "destroy"
+      },
+      "repairRequirements": []
+    },
+    "toolFullyAuthored": {
+      "id": "tool-full",
+      "enabled": false,
+      "componentId": "comp-hammer",
+      "label": "Master Hammer",
+      "name": "Hammer",
+      "img": "icons/svg/hammer.svg",
+      "description": "A well-worn hammer",
+      "registeredItemUuid": "Item.registered",
+      "originItemUuid": "Item.origin",
+      "aliasItemUuids": [
+        "Item.alias"
+      ],
+      "requirement": {
+        "formula": "1d4"
+      },
+      "prerequisites": {
+        "enabled": true,
+        "ids": [
+          "p1"
+        ],
+        "gateMode": "bonus"
+      },
+      "bonus": {
+        "enabled": false,
+        "expression": ""
+      },
+      "breakage": {
+        "mode": "limitedUses",
+        "maxUses": 5
+      },
+      "checkBreakable": true,
+      "onBreak": {
+        "mode": "replaceWith",
+        "replacementTarget": {
+          "type": "component",
+          "componentId": "comp-replacement"
+        }
+      },
+      "repairRequirements": [
+        {
+          "id": "group-authored",
+          "name": "Authored",
+          "options": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "comp-nail"
+              },
+              "componentId": "comp-nail",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "id": "rid-0001",
+          "name": "Minted",
+          "options": [
+            {
+              "match": {
+                "type": "component",
+                "componentId": "comp-plank"
+              },
+              "componentId": "comp-plank",
+              "quantity": 2
+            }
+          ]
+        }
+      ]
+    },
+    "toolLegacySpellings": {
+      "id": "rid-0001",
+      "enabled": true,
+      "componentId": "comp-legacy",
+      "label": "",
+      "name": null,
+      "img": null,
+      "description": "",
+      "registeredItemUuid": "Item.legacy",
+      "originItemUuid": "Item.legacyItem",
+      "aliasItemUuids": [
+        "Item.fallback"
+      ],
+      "requirement": null,
+      "prerequisites": {
+        "enabled": false,
+        "ids": [],
+        "gateMode": "usability"
+      },
+      "bonus": {
+        "enabled": false,
+        "expression": ""
+      },
+      "breakage": {
+        "mode": "limitedUses",
+        "maxUses": null
+      },
+      "checkBreakable": false,
+      "onBreak": {
+        "mode": "destroy"
+      },
+      "repairRequirements": []
+    },
+    "toolUnknownPrerequisiteBasis": {
+      "id": "rid-0001",
+      "enabled": true,
+      "componentId": "c",
+      "label": "",
+      "name": null,
+      "img": null,
+      "description": "",
+      "registeredItemUuid": null,
+      "originItemUuid": null,
+      "aliasItemUuids": [],
+      "requirement": null,
+      "prerequisites": {
+        "enabled": true,
+        "ids": [
+          "p1",
+          "zz"
+        ],
+        "gateMode": "usability"
+      },
+      "bonus": {
+        "enabled": false,
+        "expression": ""
+      },
+      "breakage": {
+        "mode": "limitedUses",
+        "maxUses": null
+      },
+      "checkBreakable": true,
+      "onBreak": {
+        "mode": "destroy"
+      },
+      "repairRequirements": []
+    },
+    "toolNonObject": {
+      "id": "rid-0001",
+      "enabled": true,
+      "componentId": null,
+      "label": "",
+      "name": null,
+      "img": null,
+      "description": "",
+      "registeredItemUuid": null,
+      "originItemUuid": null,
+      "aliasItemUuids": [],
+      "requirement": null,
+      "prerequisites": {
+        "enabled": false,
+        "ids": [],
+        "gateMode": "usability"
+      },
+      "bonus": {
+        "enabled": false,
+        "expression": ""
+      },
+      "breakage": {
+        "mode": "limitedUses",
+        "maxUses": null
+      },
+      "checkBreakable": true,
+      "onBreak": {
+        "mode": "destroy"
+      },
+      "repairRequirements": []
+    },
+    "prerequisitesBasisOmitted": {
+      "enabled": true,
+      "ids": [
+        "p1",
+        "zz"
+      ],
+      "gateMode": "bonus"
+    },
+    "prerequisitesNonSetBasis": {
+      "enabled": true,
+      "ids": [
+        "p1",
+        "zz"
+      ],
+      "gateMode": "usability"
+    },
+    "prerequisitesKnownBasis": {
+      "enabled": true,
+      "ids": [
+        "p1",
+        "p2"
+      ],
+      "gateMode": "usability"
+    },
+    "prerequisitesEnabledWithNoIds": {
+      "enabled": false,
+      "ids": [],
+      "gateMode": "usability"
+    },
+    "prerequisitesBogusGateMode": {
+      "enabled": true,
+      "ids": [
+        "p1"
+      ],
+      "gateMode": "usability"
+    },
+    "prerequisitesNonObject": {
+      "enabled": false,
+      "ids": [],
+      "gateMode": "usability"
+    },
+    "requirementString": null,
+    "requirementNumericFormula": {
+      "formula": ""
+    },
+    "requirementAuthored": {
+      "formula": "1d6"
+    },
+    "requirementNull": null,
+    "breakageLegacyImmune": {
+      "mode": "limitedUses",
+      "maxUses": null
+    },
+    "breakageMaxUsesAbsent": {
+      "mode": "limitedUses",
+      "maxUses": null
+    },
+    "breakageMaxUsesNull": {
+      "mode": "limitedUses",
+      "maxUses": null
+    },
+    "breakageMaxUsesBlank": {
+      "mode": "limitedUses",
+      "maxUses": null
+    },
+    "breakageMaxUsesString": {
+      "mode": "limitedUses",
+      "maxUses": 5
+    },
+    "breakageMaxUsesNumber": {
+      "mode": "limitedUses",
+      "maxUses": 5
+    },
+    "breakageChanceNumeric": {
+      "mode": "breakageChance",
+      "breakageChance": 25
+    },
+    "breakageChanceNonNumeric": {
+      "mode": "breakageChance",
+      "breakageChance": 0
+    },
+    "breakageDiceWithThreshold": {
+      "mode": "diceExpression",
+      "formula": "1d20",
+      "threshold": 5
+    },
+    "breakageDiceWithoutThreshold": {
+      "mode": "diceExpression",
+      "formula": "1d20",
+      "threshold": 0
+    },
+    "breakageBogusMode": {
+      "mode": "limitedUses",
+      "maxUses": 2
+    },
+    "onBreakFlagBroken": {
+      "mode": "flagBroken"
+    },
+    "onBreakLegacyReplacementComponentId": {
+      "mode": "replaceWith",
+      "replacementTarget": {
+        "type": "component",
+        "componentId": "comp-1"
+      }
+    },
+    "onBreakNull": {
+      "mode": "destroy"
+    },
+    "featuresAbsent": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "featuresEmpty": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "featuresMultiStepAgreesWithLegacy": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "featuresMultiStepDisagreesWithLegacy": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "featuresLegacyComplexOnly": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": false,
+      "multiStepRecipes": true,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "featuresDefaultOnTogglesExplicitlyFalse": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": false,
+      "propertyMacros": true,
+      "craftingChecks": true,
+      "outcomeRouting": true,
+      "effectTransfer": true,
+      "gathering": true,
+      "salvage": false,
+      "chatOutput": false,
+      "itemPiles": true,
+      "refundOnPlayerCancel": false
+    },
+    "featuresEssencesFromSystemFlag": {
+      "recipeCategories": true,
+      "categories": true,
+      "itemTags": true,
+      "essences": true,
+      "multiStepRecipes": false,
+      "propertyMacros": false,
+      "craftingChecks": false,
+      "outcomeRouting": false,
+      "effectTransfer": false,
+      "gathering": false,
+      "salvage": true,
+      "chatOutput": true,
+      "itemPiles": false,
+      "refundOnPlayerCancel": true
+    },
+    "visibilityModeGlobal": "global",
+    "visibilityModeRestricted": "restricted",
+    "visibilityModeItem": "item",
+    "visibilityModeKnowledge": "knowledge",
+    "visibilityModeNull": "knowledge",
+    "visibilityModeBogus": "knowledge",
+    "recipeVisibilityAbsent": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "recipeVisibilityTeaserLearned": {
+      "listMode": "teaser",
+      "knowledge": {
+        "mode": "learned",
+        "learn": {
+          "dragDropEnabled": false
+        }
+      }
+    },
+    "recipeVisibilityPlayerItem": {
+      "listMode": "player",
+      "knowledge": {
+        "mode": "item",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "recipeVisibilityKnowledgeItemOrLearned": {
+      "listMode": "knowledge",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "recipeVisibilityBogusTokens": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "recipeVisibilityGlobalDragDropAbsent": {
+      "listMode": "global",
+      "knowledge": {
+        "mode": "itemOrLearned",
+        "learn": {
+          "dragDropEnabled": true
+        }
+      }
+    },
+    "teaserConfigNonObject": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "teaserConfigAbsent": {
+      "enabled": false,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "teaserConfigBlankAndValidFragments": {
+      "enabled": true,
+      "discoveryMode": "both",
+      "fragments": [
+        {
+          "id": "frag-1",
+          "name": "Whisper",
+          "linkedItemUuid": "Item.frag",
+          "recipeIds": [
+            "r1",
+            "r2"
+          ],
+          "progressValue": 100
+        },
+        {
+          "id": "frag-2",
+          "name": "Fragment",
+          "linkedItemUuid": null,
+          "recipeIds": [],
+          "progressValue": 0
+        }
+      ]
+    },
+    "teaserConfigBogusDiscoveryMode": {
+      "enabled": true,
+      "discoveryMode": "threshold",
+      "fragments": []
+    },
+    "requirementsAbsent": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": false
+      }
+    },
+    "requirementsTimeDisabled": {
+      "time": {
+        "enabled": false
+      },
+      "currency": {
+        "enabled": true
+      }
+    },
+    "requirementsTimeEnabledAbsent": {
+      "time": {
+        "enabled": true
+      },
+      "currency": {
+        "enabled": true
+      }
+    },
+    "currencyConfigPre1278Siblings": {
+      "enabled": true
+    },
+    "currencyConfigAbsent": {
+      "enabled": false
+    },
+    "currencyConfigNonObject": {
+      "enabled": false
+    },
+    "stringListDuplicatesAndBlanks": [
+      "alpha",
+      "beta",
+      "7"
+    ],
+    "stringListNonArray": [],
+    "alchemyConfigCanonicalMode": {
+      "checkMode": "tiered",
+      "learnOnCraft": false,
+      "consumeOnFail": false,
+      "showAttemptHistoryToPlayers": false
+    },
+    "alchemyConfigLegacyCauldron": {
+      "checkMode": "simple",
+      "learnOnCraft": true,
+      "consumeOnFail": true,
+      "showAttemptHistoryToPlayers": true
+    },
+    "alchemyConfigBogusCheckMode": {
+      "checkMode": "none",
+      "learnOnCraft": true,
+      "consumeOnFail": true,
+      "showAttemptHistoryToPlayers": true
+    },
+    "alchemyConfigNonAlchemyMode": null,
+    "alchemyConfigFlagsAbsent": {
+      "checkMode": "none",
+      "learnOnCraft": true,
+      "consumeOnFail": true,
+      "showAttemptHistoryToPlayers": true
+    },
+    "essenceDefinitionsMixedCorpus": [
+      {
+        "id": "fire",
+        "name": "Fire",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "fire-2",
+        "name": "fire-2",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "fire-3",
+        "name": "Fire",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "2024",
+        "name": "2024",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "water",
+        "name": "water",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": "blue",
+        "enabled": true,
+        "propertyMacroUuid": "Macro.abcdef",
+        "sourceComponentId": "comp-1",
+        "sourceItemUuid": null,
+        "associatedSystemItemId": "comp-1"
+      },
+      {
+        "id": "air",
+        "name": "air",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": "green",
+        "enabled": false,
+        "propertyMacroUuid": null,
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      },
+      {
+        "id": "earth",
+        "name": "earth",
+        "description": "",
+        "icon": "fas fa-mortar-pestle",
+        "colorToken": null,
+        "enabled": true,
+        "propertyMacroUuid": "Compendium.mod.macros.xyz",
+        "sourceComponentId": null,
+        "sourceItemUuid": null,
+        "associatedSystemItemId": null
+      }
+    ],
+    "essenceDefinitionsNonArray": [],
+    "essenceDefinitionStringColliding": {
+      "id": "molten-fire-2",
+      "name": "Molten Fire",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionBlankString": null,
+    "essenceDefinitionMixedCaseId": {
+      "id": "mixed-case",
+      "name": "mixed-case",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionNameOnly": {
+      "id": "verdant-ichor",
+      "name": "Verdant Ichor",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionNeitherIdNorName": null,
+    "essenceDefinitionDigitOnlyId": {
+      "id": "2024",
+      "name": "2024",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionEnabledStringFalse": {
+      "id": "e1",
+      "name": "e1",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionEnabledFalse": {
+      "id": "e2",
+      "name": "e2",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": false,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionPrefixedColorToken": {
+      "id": "e3",
+      "name": "e3",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": "crimson",
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionBareColorToken": {
+      "id": "e4",
+      "name": "e4",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": "crimson",
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionLegacyCompendiumMacro": {
+      "id": "e5",
+      "name": "e5",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": "Compendium.mod.macros.abc123",
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionBareWordMacro": {
+      "id": "e6",
+      "name": "e6",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": null,
+      "sourceItemUuid": null,
+      "associatedSystemItemId": null
+    },
+    "essenceDefinitionAssociatedWithoutSource": {
+      "id": "e7",
+      "name": "e7",
+      "description": "",
+      "icon": "fas fa-mortar-pestle",
+      "colorToken": null,
+      "enabled": true,
+      "propertyMacroUuid": null,
+      "sourceComponentId": "comp-7",
+      "sourceItemUuid": "Item.seven",
+      "associatedSystemItemId": "comp-7"
+    },
+    "essenceDefinitionNonObject": null,
+    "looksLikeDocumentUuidItem": true,
+    "looksLikeDocumentUuidCompendium": true,
+    "looksLikeDocumentUuidBareWord": false,
+    "looksLikeDocumentUuidNull": false,
+    "toKeyMixedCase": "molten-fire",
+    "toKeyDigits": "2024",
+    "toKeyEdgeSeparators": "a-b",
+    "toKeyEmpty": "",
+    "essenceQuantitiesBasisOmitted": {
+      "fire": 2,
+      "water": 1
+    },
+    "essenceQuantitiesBasisNull": {
+      "fire": 2,
+      "water": 1
+    },
+    "essenceQuantitiesBasisEmptySet": {},
+    "essenceQuantitiesBasisNonSet": {
+      "fire": 2,
+      "water": 1
+    },
+    "essenceQuantitiesBasisPopulated": {
+      "fire": 2,
+      "water": 2,
+      "wind": 3
+    },
+    "essenceQuantitiesNonObject": {},
+    "recipeItemDefinitionsCollidingIds": [
+      {
+        "id": "book",
+        "name": "Recipe Item",
+        "description": "",
+        "img": "icons/svg/item-bag.svg",
+        "originItemUuid": null,
+        "registeredItemUuid": null,
+        "aliasItemUuids": [],
+        "enabled": true,
+        "recipeIds": [],
+        "caps": {
+          "item": {
+            "limitUses": false,
+            "maxUses": "__system-normalize-undefined__",
+            "destroyWhenExhausted": true,
+            "whenSpent": "destroyed"
+          },
+          "learn": {
+            "consumeOnLearn": true,
+            "limitRecipes": false,
+            "limitLearning": false,
+            "maxRecipes": "__system-normalize-undefined__",
+            "learnsAllowed": "__system-normalize-undefined__",
+            "learnScope": "perInstance",
+            "learningMode": "once",
+            "prerequisiteIds": [],
+            "characterPrerequisiteIds": [],
+            "destroyWhenSpent": false
+          }
+        }
+      },
+      {
+        "id": "rid-0001",
+        "name": "Recipe Item",
+        "description": "",
+        "img": "icons/svg/item-bag.svg",
+        "originItemUuid": null,
+        "registeredItemUuid": null,
+        "aliasItemUuids": [],
+        "enabled": true,
+        "recipeIds": [],
+        "caps": {
+          "item": {
+            "limitUses": false,
+            "maxUses": "__system-normalize-undefined__",
+            "destroyWhenExhausted": true,
+            "whenSpent": "destroyed"
+          },
+          "learn": {
+            "consumeOnLearn": true,
+            "limitRecipes": false,
+            "limitLearning": false,
+            "maxRecipes": "__system-normalize-undefined__",
+            "learnsAllowed": "__system-normalize-undefined__",
+            "learnScope": "perInstance",
+            "learningMode": "once",
+            "prerequisiteIds": [],
+            "characterPrerequisiteIds": [],
+            "destroyWhenSpent": false
+          }
+        }
+      },
+      {
+        "id": "rid-0002",
+        "name": "No id",
+        "description": "",
+        "img": "icons/svg/item-bag.svg",
+        "originItemUuid": null,
+        "registeredItemUuid": null,
+        "aliasItemUuids": [],
+        "enabled": true,
+        "recipeIds": [],
+        "caps": {
+          "item": {
+            "limitUses": false,
+            "maxUses": "__system-normalize-undefined__",
+            "destroyWhenExhausted": true,
+            "whenSpent": "destroyed"
+          },
+          "learn": {
+            "consumeOnLearn": true,
+            "limitRecipes": false,
+            "limitLearning": false,
+            "maxRecipes": "__system-normalize-undefined__",
+            "learnsAllowed": "__system-normalize-undefined__",
+            "learnScope": "perInstance",
+            "learningMode": "once",
+            "prerequisiteIds": [],
+            "characterPrerequisiteIds": [],
+            "destroyWhenSpent": false
+          }
+        }
+      }
+    ],
+    "recipeItemDefinitionsNonArray": [],
+    "capsAbsent": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": false,
+        "limitLearning": false,
+        "maxRecipes": "__system-normalize-undefined__",
+        "learnsAllowed": "__system-normalize-undefined__",
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsAuthoredWhenSpentContradictsLegacy": {
+      "item": {
+        "limitUses": true,
+        "maxUses": 3,
+        "destroyWhenExhausted": false,
+        "whenSpent": "inert"
+      },
+      "learn": {
+        "consumeOnLearn": false,
+        "limitRecipes": true,
+        "limitLearning": true,
+        "maxRecipes": 2,
+        "learnsAllowed": 2,
+        "learnScope": "total",
+        "learningMode": "party",
+        "prerequisiteIds": [
+          "r1"
+        ],
+        "characterPrerequisiteIds": [
+          "cp1"
+        ],
+        "destroyWhenSpent": true
+      }
+    },
+    "capsLegacyDestroyWhenExhaustedFalse": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": false,
+        "whenSpent": "inert"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": false,
+        "limitLearning": false,
+        "maxRecipes": "__system-normalize-undefined__",
+        "learnsAllowed": "__system-normalize-undefined__",
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLimitLearningWithNoCount": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": true,
+        "limitLearning": true,
+        "maxRecipes": 1,
+        "learnsAllowed": 1,
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLimitLearningZero": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": true,
+        "limitLearning": true,
+        "maxRecipes": 1,
+        "learnsAllowed": 1,
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLimitLearningNegative": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": true,
+        "limitLearning": true,
+        "maxRecipes": 1,
+        "learnsAllowed": 1,
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLegacyLimitRecipes": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": true,
+        "limitLearning": true,
+        "maxRecipes": 4,
+        "learnsAllowed": 4,
+        "learnScope": "perInstance",
+        "learningMode": "ntimes",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLegacyLearningModeParty": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": false,
+        "limitLearning": false,
+        "maxRecipes": "__system-normalize-undefined__",
+        "learnsAllowed": "__system-normalize-undefined__",
+        "learnScope": "total",
+        "learningMode": "party",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLegacySinglePrerequisite": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": false,
+        "limitLearning": false,
+        "maxRecipes": "__system-normalize-undefined__",
+        "learnsAllowed": "__system-normalize-undefined__",
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [
+          "r9"
+        ],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsLegacyPrerequisiteBesideIds": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": false,
+        "limitLearning": false,
+        "maxRecipes": "__system-normalize-undefined__",
+        "learnsAllowed": "__system-normalize-undefined__",
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [
+          "r1"
+        ],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "capsAuthoredLearnScopeBeatsLegacyMode": {
+      "item": {
+        "limitUses": false,
+        "maxUses": "__system-normalize-undefined__",
+        "destroyWhenExhausted": true,
+        "whenSpent": "destroyed"
+      },
+      "learn": {
+        "consumeOnLearn": true,
+        "limitRecipes": false,
+        "limitLearning": false,
+        "maxRecipes": "__system-normalize-undefined__",
+        "learnsAllowed": "__system-normalize-undefined__",
+        "learnScope": "perInstance",
+        "learningMode": "once",
+        "prerequisiteIds": [],
+        "characterPrerequisiteIds": [],
+        "destroyWhenSpent": false
+      }
+    },
+    "recipeItemDefinitionFullyAuthored": {
+      "id": "rid-0001",
+      "name": "Tome of Iron",
+      "description": "Bound in leather",
+      "img": "icons/svg/item-bag.svg",
+      "originItemUuid": "Item.origin",
+      "registeredItemUuid": "Item.registered",
+      "aliasItemUuids": [
+        "Item.alias"
+      ],
+      "enabled": false,
+      "recipeIds": [
+        "r1",
+        "r2"
+      ],
+      "caps": {
+        "item": {
+          "limitUses": true,
+          "maxUses": 3,
+          "destroyWhenExhausted": false,
+          "whenSpent": "inert"
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "limitRecipes": true,
+          "limitLearning": true,
+          "maxRecipes": 2,
+          "learnsAllowed": 2,
+          "learnScope": "total",
+          "learningMode": "party",
+          "prerequisiteIds": [
+            "r9"
+          ],
+          "characterPrerequisiteIds": [],
+          "destroyWhenSpent": false
+        }
+      }
+    },
+    "recipeItemDefinitionLabelFromDottedUuid": {
+      "id": "rid-x",
+      "name": "TheTome",
+      "description": "",
+      "img": "icons/svg/item-bag.svg",
+      "originItemUuid": "Compendium.mod.pack.TheTome",
+      "registeredItemUuid": "Compendium.mod.pack.TheTome",
+      "aliasItemUuids": [],
+      "enabled": true,
+      "recipeIds": [],
+      "caps": {
+        "item": {
+          "limitUses": false,
+          "maxUses": "__system-normalize-undefined__",
+          "destroyWhenExhausted": true,
+          "whenSpent": "destroyed"
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "limitRecipes": false,
+          "limitLearning": false,
+          "maxRecipes": "__system-normalize-undefined__",
+          "learnsAllowed": "__system-normalize-undefined__",
+          "learnScope": "perInstance",
+          "learningMode": "once",
+          "prerequisiteIds": [],
+          "characterPrerequisiteIds": [],
+          "destroyWhenSpent": false
+        }
+      }
+    },
+    "recipeItemDefinitionNoId": {
+      "id": "rid-0001",
+      "name": "Fresh",
+      "description": "",
+      "img": "icons/svg/item-bag.svg",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "enabled": true,
+      "recipeIds": [],
+      "caps": {
+        "item": {
+          "limitUses": false,
+          "maxUses": "__system-normalize-undefined__",
+          "destroyWhenExhausted": true,
+          "whenSpent": "destroyed"
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "limitRecipes": false,
+          "limitLearning": false,
+          "maxRecipes": "__system-normalize-undefined__",
+          "learnsAllowed": "__system-normalize-undefined__",
+          "learnScope": "perInstance",
+          "learningMode": "once",
+          "prerequisiteIds": [],
+          "characterPrerequisiteIds": [],
+          "destroyWhenSpent": false
+        }
+      }
+    },
+    "recipeItemDefinitionLegacyRefs": {
+      "id": "legacy",
+      "name": "legacy",
+      "description": "",
+      "img": "icons/svg/item-bag.svg",
+      "originItemUuid": "Item.legacy",
+      "registeredItemUuid": "Item.legacy",
+      "aliasItemUuids": [
+        "Item.fallback"
+      ],
+      "enabled": true,
+      "recipeIds": [],
+      "caps": {
+        "item": {
+          "limitUses": false,
+          "maxUses": "__system-normalize-undefined__",
+          "destroyWhenExhausted": true,
+          "whenSpent": "destroyed"
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "limitRecipes": false,
+          "limitLearning": false,
+          "maxRecipes": "__system-normalize-undefined__",
+          "learnsAllowed": "__system-normalize-undefined__",
+          "learnScope": "perInstance",
+          "learningMode": "once",
+          "prerequisiteIds": [],
+          "characterPrerequisiteIds": [],
+          "destroyWhenSpent": false
+        }
+      }
+    },
+    "recipeItemDefinitionEnricherDescription": {
+      "id": "enricher",
+      "name": "Recipe Item",
+      "description": "Prone",
+      "img": "icons/svg/item-bag.svg",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "enabled": true,
+      "recipeIds": [],
+      "caps": {
+        "item": {
+          "limitUses": false,
+          "maxUses": "__system-normalize-undefined__",
+          "destroyWhenExhausted": true,
+          "whenSpent": "destroyed"
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "limitRecipes": false,
+          "limitLearning": false,
+          "maxRecipes": "__system-normalize-undefined__",
+          "learnsAllowed": "__system-normalize-undefined__",
+          "learnScope": "perInstance",
+          "learningMode": "once",
+          "prerequisiteIds": [],
+          "characterPrerequisiteIds": [],
+          "destroyWhenSpent": false
+        }
+      }
+    },
+    "recipeItemDefinitionFoundryDescription": {
+      "id": "foundry-shape",
+      "name": "Recipe Item",
+      "description": "Bound in leather",
+      "img": "icons/svg/item-bag.svg",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "enabled": true,
+      "recipeIds": [],
+      "caps": {
+        "item": {
+          "limitUses": false,
+          "maxUses": "__system-normalize-undefined__",
+          "destroyWhenExhausted": true,
+          "whenSpent": "destroyed"
+        },
+        "learn": {
+          "consumeOnLearn": true,
+          "limitRecipes": false,
+          "limitLearning": false,
+          "maxRecipes": "__system-normalize-undefined__",
+          "learnsAllowed": "__system-normalize-undefined__",
+          "learnScope": "perInstance",
+          "learningMode": "once",
+          "prerequisiteIds": [],
+          "characterPrerequisiteIds": [],
+          "destroyWhenSpent": false
+        }
+      }
+    },
+    "recipeItemDefinitionNonObject": null,
+    "labelFromUuidDotted": "TheTome",
+    "labelFromUuidBareWord": "TheTome",
+    "labelFromUuidEmpty": "",
+    "labelFromUuidNull": "",
+    "componentFullyAuthoredSimpleMode": {
+      "id": "comp-1",
+      "name": "Iron Ore",
+      "img": "icons/svg/item-bag.svg",
+      "description": "Raw iron",
+      "originItemUuid": "Item.origin",
+      "registeredItemUuid": "Item.registered",
+      "aliasItemUuids": [
+        "Item.alias"
+      ],
+      "tier": "common",
+      "category": "Metals",
+      "tags": [
+        "ore"
+      ],
+      "essences": {
+        "fire": 2,
+        "water": 2
+      },
+      "difficulty": 4,
+      "complications": [
+        {
+          "id": "rid-0001",
+          "name": "",
+          "description": "",
+          "severity": "minor",
+          "visibility": "gmOnly",
+          "activities": {
+            "crafting": false,
+            "salvage": false,
+            "gathering": false
+          },
+          "match": "any",
+          "when": {
+            "stageAwarded": false,
+            "stagePartial": false,
+            "stageMissed": false,
+            "checkTrigger": null
+          },
+          "rollCondition": {
+            "enabled": false,
+            "expr": "",
+            "cmp": "",
+            "value": ""
+          },
+          "effectRoll": {
+            "enabled": false,
+            "expr": "",
+            "label": ""
+          }
+        }
+      ],
+      "salvage": {
+        "enabled": true,
+        "allowPlayerResultReorder": false,
+        "ingredientQuantity": 2,
+        "dcOverride": 12,
+        "toolIds": [
+          "t1",
+          "t2"
+        ],
+        "resultGroups": [
+          {
+            "id": "rid-0003",
+            "name": "Success",
+            "results": [
+              {
+                "id": "res-1",
+                "componentId": "c1",
+                "systemItemId": "c1",
+                "quantity": 3,
+                "quantityFormula": "1d4",
+                "propertyMacroUuid": null
+              }
+            ]
+          },
+          {
+            "id": "g-fail",
+            "name": "Result Group",
+            "role": "failure",
+            "results": [
+              {
+                "id": "rid-0002",
+                "componentId": "c-scrap",
+                "systemItemId": "c-scrap",
+                "quantity": 1,
+                "propertyMacroUuid": null
+              }
+            ]
+          }
+        ],
+        "checkModifierIds": [
+          "m1",
+          "m2"
+        ],
+        "outcomeRouting": {
+          "mode": "byRole"
+        },
+        "timeRequirement": {
+          "minutes": 30
+        },
+        "currencyRequirement": {
+          "unit": "gp",
+          "amount": 5
+        }
+      }
+    },
+    "componentLegacyPositionalEssenceSet": {
+      "id": "c1",
+      "name": "Unnamed Item",
+      "img": "icons/svg/item-bag.svg",
+      "description": "",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "tier": null,
+      "category": "general",
+      "tags": [],
+      "essences": {
+        "fire": 2
+      },
+      "difficulty": "__system-normalize-undefined__",
+      "salvage": {
+        "enabled": false,
+        "allowPlayerResultReorder": true,
+        "ingredientQuantity": 1,
+        "dcOverride": null,
+        "toolIds": [],
+        "resultGroups": []
+      }
+    },
+    "componentEnricherDescription": {
+      "id": "c-ref",
+      "name": "Unnamed Item",
+      "img": "icons/svg/item-bag.svg",
+      "description": "Prone",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "tier": null,
+      "category": "general",
+      "tags": [],
+      "essences": {},
+      "difficulty": "__system-normalize-undefined__",
+      "salvage": {
+        "enabled": false,
+        "allowPlayerResultReorder": true,
+        "ingredientQuantity": 1,
+        "dcOverride": null,
+        "toolIds": [],
+        "resultGroups": []
+      }
+    },
+    "componentFoundryDescription": {
+      "id": "c-desc",
+      "name": "Unnamed Item",
+      "img": "icons/svg/item-bag.svg",
+      "description": "Iron ore",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "tier": null,
+      "category": "general",
+      "tags": [],
+      "essences": {},
+      "difficulty": "__system-normalize-undefined__",
+      "salvage": {
+        "enabled": false,
+        "allowPlayerResultReorder": true,
+        "ingredientQuantity": 1,
+        "dcOverride": null,
+        "toolIds": [],
+        "resultGroups": []
+      }
+    },
+    "componentComplicationsAuthored": {
+      "id": "c-comp",
+      "name": "Unnamed Item",
+      "img": "icons/svg/item-bag.svg",
+      "description": "",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "tier": null,
+      "category": "general",
+      "tags": [],
+      "essences": {},
+      "difficulty": "__system-normalize-undefined__",
+      "complications": [
+        {
+          "id": "rid-0001",
+          "name": "",
+          "description": "",
+          "severity": "minor",
+          "visibility": "gmOnly",
+          "activities": {
+            "crafting": false,
+            "salvage": false,
+            "gathering": false
+          },
+          "match": "any",
+          "when": {
+            "stageAwarded": false,
+            "stagePartial": false,
+            "stageMissed": false,
+            "checkTrigger": null
+          },
+          "rollCondition": {
+            "enabled": false,
+            "expr": "",
+            "cmp": "",
+            "value": ""
+          },
+          "effectRoll": {
+            "enabled": false,
+            "expr": "",
+            "label": ""
+          }
+        }
+      ],
+      "salvage": {
+        "enabled": false,
+        "allowPlayerResultReorder": true,
+        "ingredientQuantity": 1,
+        "dcOverride": null,
+        "toolIds": [],
+        "resultGroups": []
+      }
+    },
+    "componentCategoryAbsent": {
+      "id": "rid-0001",
+      "name": "Unnamed Item",
+      "img": "icons/svg/item-bag.svg",
+      "description": "",
+      "originItemUuid": null,
+      "registeredItemUuid": null,
+      "aliasItemUuids": [],
+      "tier": null,
+      "category": "general",
+      "tags": [],
+      "essences": {},
+      "difficulty": "__system-normalize-undefined__",
+      "salvage": {
+        "enabled": false,
+        "allowPlayerResultReorder": true,
+        "ingredientQuantity": 1,
+        "dcOverride": null,
+        "toolIds": [],
+        "resultGroups": []
+      }
+    },
+    "salvageContextSimpleWithFormula": {
+      "salvageResolutionMode": "simple",
+      "salvageSimpleCheckHasFormula": true
+    },
+    "salvageContextLegacyTiered": {
+      "salvageResolutionMode": "routed",
+      "salvageSimpleCheckHasFormula": false
+    },
+    "salvageContextBogusMode": {
+      "salvageResolutionMode": "simple",
+      "salvageSimpleCheckHasFormula": false
+    },
+    "salvageContextAbsent": {
+      "salvageResolutionMode": "simple",
+      "salvageSimpleCheckHasFormula": false
+    },
+    "salvageContextBlankFormula": {
+      "salvageResolutionMode": "simple",
+      "salvageSimpleCheckHasFormula": false
+    },
+    "salvageNonObject": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "toolIds": [],
+      "resultGroups": [],
+      "dcOverride": null
+    },
+    "salvageDisabledNoGroups": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "salvageEnabledZeroGroups": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "salvageSimpleFailureFirstWithFormula": {
+      "enabled": true,
+      "allowPlayerResultReorder": false,
+      "ingredientQuantity": 2,
+      "dcOverride": 12,
+      "toolIds": [
+        "t1",
+        "t2"
+      ],
+      "resultGroups": [
+        {
+          "id": "rid-0002",
+          "name": "Success",
+          "results": [
+            {
+              "id": "res-1",
+              "componentId": "c1",
+              "systemItemId": "c1",
+              "quantity": 3,
+              "quantityFormula": "1d4",
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "g-fail",
+          "name": "Result Group",
+          "role": "failure",
+          "results": [
+            {
+              "id": "rid-0001",
+              "componentId": "c-scrap",
+              "systemItemId": "c-scrap",
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "checkModifierIds": [
+        "m1",
+        "m2"
+      ],
+      "outcomeRouting": {
+        "mode": "byRole"
+      },
+      "timeRequirement": {
+        "minutes": 30
+      },
+      "currencyRequirement": {
+        "unit": "gp",
+        "amount": 5
+      }
+    },
+    "salvageSimpleFailureFirstWithoutFormula": {
+      "enabled": true,
+      "allowPlayerResultReorder": false,
+      "ingredientQuantity": 2,
+      "dcOverride": 12,
+      "toolIds": [
+        "t1",
+        "t2"
+      ],
+      "resultGroups": [
+        {
+          "id": "rid-0002",
+          "name": "Success",
+          "results": [
+            {
+              "id": "res-1",
+              "componentId": "c1",
+              "systemItemId": "c1",
+              "quantity": 3,
+              "quantityFormula": "1d4",
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "checkModifierIds": [
+        "m1",
+        "m2"
+      ],
+      "outcomeRouting": {
+        "mode": "byRole"
+      },
+      "timeRequirement": {
+        "minutes": 30
+      },
+      "currencyRequirement": {
+        "unit": "gp",
+        "amount": 5
+      }
+    },
+    "salvageSimpleFailureOnly": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": [
+        {
+          "id": "g-fail",
+          "name": "Result Group",
+          "role": "failure",
+          "results": [
+            {
+              "id": "rid-0001",
+              "componentId": "c1",
+              "systemItemId": "c1",
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ]
+    },
+    "salvageRoutedMode": {
+      "enabled": true,
+      "allowPlayerResultReorder": false,
+      "ingredientQuantity": 2,
+      "dcOverride": 12,
+      "toolIds": [
+        "t1",
+        "t2"
+      ],
+      "resultGroups": [
+        {
+          "id": "g-fail",
+          "name": "Result Group",
+          "role": "failure",
+          "results": [
+            {
+              "id": "rid-0001",
+              "componentId": "c-scrap",
+              "systemItemId": "c-scrap",
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "rid-0002",
+          "name": "Success",
+          "results": [
+            {
+              "id": "res-1",
+              "componentId": "c1",
+              "systemItemId": "c1",
+              "quantity": 3,
+              "quantityFormula": "1d4",
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "checkModifierIds": [
+        "m1",
+        "m2"
+      ],
+      "outcomeRouting": {
+        "mode": "byRole"
+      },
+      "timeRequirement": {
+        "minutes": 30
+      },
+      "currencyRequirement": {
+        "unit": "gp",
+        "amount": 5
+      }
+    },
+    "salvageProgressiveMode": {
+      "enabled": true,
+      "allowPlayerResultReorder": false,
+      "ingredientQuantity": 2,
+      "dcOverride": 12,
+      "toolIds": [
+        "t1",
+        "t2"
+      ],
+      "resultGroups": [
+        {
+          "id": "g-fail",
+          "name": "Result Group",
+          "role": "failure",
+          "results": [
+            {
+              "id": "rid-0001",
+              "componentId": "c-scrap",
+              "systemItemId": "c-scrap",
+              "quantity": 1,
+              "propertyMacroUuid": null
+            }
+          ]
+        },
+        {
+          "id": "rid-0002",
+          "name": "Success",
+          "results": [
+            {
+              "id": "res-1",
+              "componentId": "c1",
+              "systemItemId": "c1",
+              "quantity": 3,
+              "quantityFormula": "1d4",
+              "propertyMacroUuid": null
+            }
+          ]
+        }
+      ],
+      "checkModifierIds": [
+        "m1",
+        "m2"
+      ],
+      "outcomeRouting": {
+        "mode": "byRole"
+      },
+      "timeRequirement": {
+        "minutes": 30
+      },
+      "currencyRequirement": {
+        "unit": "gp",
+        "amount": 5
+      }
+    },
+    "salvageDcOverrideNull": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "salvageDcOverrideBlank": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "salvageDcOverrideNumeric": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": 12,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "salvageCheckModifierIdsAbsent": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "salvageCheckModifierIdsEmpty": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": [],
+      "checkModifierIds": []
+    },
+    "salvageCheckModifierIdsPopulated": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": [],
+      "checkModifierIds": [
+        "m1",
+        "m2"
+      ]
+    },
+    "salvageRequirementsNonObject": {
+      "enabled": false,
+      "allowPlayerResultReorder": true,
+      "ingredientQuantity": 1,
+      "dcOverride": null,
+      "toolIds": [],
+      "resultGroups": []
+    },
+    "toolIdsDuplicatesAndBlanks": [
+      "t1",
+      "t2"
+    ],
+    "toolIdsNonArray": [],
+    "salvageResultFullyAuthored": {
+      "id": "res-1",
+      "componentId": "c1",
+      "systemItemId": "c1",
+      "quantity": 3,
+      "quantityFormula": "1d4",
+      "propertyMacroUuid": "Macro.abc"
+    },
+    "salvageResultSystemItemIdOnly": {
+      "id": "rid-0001",
+      "componentId": "c9",
+      "systemItemId": "c9",
+      "quantity": 1,
+      "propertyMacroUuid": null
+    },
+    "salvageResultBlankFormula": {
+      "id": "rid-0001",
+      "componentId": "c1",
+      "systemItemId": "c1",
+      "quantity": 1,
+      "propertyMacroUuid": null
+    },
+    "salvageResultNonObject": null,
+    "salvageResultGroupFailureRole": {
+      "id": "g1",
+      "name": "Result Group",
+      "role": "failure",
+      "results": [
+        {
+          "id": "rid-0001",
+          "componentId": "c1",
+          "systemItemId": "c1",
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ]
+    },
+    "salvageResultGroupMintedId": {
+      "id": "rid-0002",
+      "name": "Success",
+      "results": [
+        {
+          "id": "rid-0001",
+          "componentId": "c2",
+          "systemItemId": "c2",
+          "quantity": 1,
+          "propertyMacroUuid": null
+        }
+      ]
+    },
+    "salvageResultGroupNonObject": null,
+    "timeRequirementZeroAndNegative": {
+      "minutes": 30,
+      "months": 2
+    },
+    "timeRequirementNonObject": {},
+    "currencyRequirementBlankUnit": {
+      "unit": "gp",
+      "amount": 5
+    },
+    "currencyRequirementNegativeAmount": {
+      "unit": "sp",
+      "amount": 0
+    },
+    "currencyRequirementNonObject": {}
+  },
+  "systems": {
+    "systemMinimal": {
+      "id": "rid-0001",
+      "name": "New Crafting System",
+      "description": "",
+      "enabled": true,
+      "resolutionMode": "simple",
+      "features": {
+        "recipeCategories": true,
+        "categories": true,
+        "itemTags": true,
+        "essences": false,
+        "multiStepRecipes": false,
+        "propertyMacros": false,
+        "craftingChecks": false,
+        "outcomeRouting": false,
+        "effectTransfer": false,
+        "gathering": false,
+        "salvage": true,
+        "chatOutput": true,
+        "itemPiles": false,
+        "refundOnPlayerCancel": true
+      },
+      "itemTags": [],
+      "visibilityMode": "knowledge",
+      "recipeVisibility": {
+        "listMode": "global",
+        "knowledge": {
+          "mode": "itemOrLearned",
+          "learn": {
+            "dragDropEnabled": true
+          }
+        }
+      },
+      "requirements": {
+        "time": {
+          "enabled": true
+        },
+        "currency": {
+          "enabled": false
+        }
+      },
+      "essenceDefinitions": [],
+      "recipeItemDefinitions": [],
+      "membershipResolvesByRecipeIds": false,
+      "craftingCheck": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvageResolutionMode": "simple",
+      "salvageCraftingCheck": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gatheringCraftingCheck": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "alchemy": null,
+      "teaserConfig": {
+        "enabled": false,
+        "discoveryMode": "threshold",
+        "fragments": []
+      },
+      "componentCategories": [],
+      "categoryIcons": {},
+      "componentCategoryIcons": {},
+      "categories": [],
+      "tags": [],
+      "essences": [],
+      "enableTags": true,
+      "enableEssences": false,
+      "enableCategories": true,
+      "enableMultiStepRecipes": false,
+      "components": [],
+      "tools": [],
+      "gatheringRealmSettings": {
+        "enabled": false
+      }
+    },
+    "systemFullyAuthored": {
+      "id": "sys-1",
+      "name": "Forge",
+      "description": "",
+      "enabled": true,
+      "resolutionMode": "progressive",
+      "features": {
+        "recipeCategories": true,
+        "categories": true,
+        "itemTags": true,
+        "essences": true,
+        "multiStepRecipes": true,
+        "propertyMacros": false,
+        "craftingChecks": false,
+        "outcomeRouting": false,
+        "effectTransfer": false,
+        "gathering": false,
+        "salvage": true,
+        "chatOutput": true,
+        "itemPiles": false,
+        "refundOnPlayerCancel": true
+      },
+      "itemTags": [
+        "metal"
+      ],
+      "visibilityMode": "restricted",
+      "recipeVisibility": {
+        "listMode": "teaser",
+        "knowledge": {
+          "mode": "learned",
+          "learn": {
+            "dragDropEnabled": false
+          }
+        }
+      },
+      "requirements": {
+        "time": {
+          "enabled": false
+        },
+        "currency": {
+          "enabled": true
+        }
+      },
+      "essenceDefinitions": [
+        {
+          "id": "fire",
+          "name": "Fire",
+          "description": "",
+          "icon": "fas fa-mortar-pestle",
+          "colorToken": null,
+          "enabled": true,
+          "propertyMacroUuid": null,
+          "sourceComponentId": null,
+          "sourceItemUuid": null,
+          "associatedSystemItemId": null
+        },
+        {
+          "id": "fire-2",
+          "name": "fire-2",
+          "description": "",
+          "icon": "fas fa-mortar-pestle",
+          "colorToken": null,
+          "enabled": true,
+          "propertyMacroUuid": null,
+          "sourceComponentId": null,
+          "sourceItemUuid": null,
+          "associatedSystemItemId": null
+        },
+        {
+          "id": "water",
+          "name": "water",
+          "description": "",
+          "icon": "fas fa-mortar-pestle",
+          "colorToken": "blue",
+          "enabled": true,
+          "propertyMacroUuid": null,
+          "sourceComponentId": null,
+          "sourceItemUuid": null,
+          "associatedSystemItemId": null
+        }
+      ],
+      "recipeItemDefinitions": [
+        {
+          "id": "book-1",
+          "name": "Tome of Iron",
+          "description": "Bound in leather",
+          "img": "icons/svg/item-bag.svg",
+          "originItemUuid": "Item.origin",
+          "registeredItemUuid": "Item.registered",
+          "aliasItemUuids": [
+            "Item.alias"
+          ],
+          "enabled": false,
+          "recipeIds": [
+            "r1",
+            "r2"
+          ],
+          "caps": {
+            "item": {
+              "limitUses": true,
+              "maxUses": 3,
+              "destroyWhenExhausted": false,
+              "whenSpent": "inert"
+            },
+            "learn": {
+              "consumeOnLearn": true,
+              "limitRecipes": true,
+              "limitLearning": true,
+              "maxRecipes": 2,
+              "learnsAllowed": 2,
+              "learnScope": "total",
+              "learningMode": "party",
+              "prerequisiteIds": [
+                "r9"
+              ],
+              "characterPrerequisiteIds": [],
+              "destroyWhenSpent": false
+            }
+          }
+        },
+        {
+          "id": "rid-0001",
+          "name": "Unbound",
+          "description": "",
+          "img": "icons/svg/item-bag.svg",
+          "originItemUuid": null,
+          "registeredItemUuid": null,
+          "aliasItemUuids": [],
+          "enabled": true,
+          "recipeIds": [],
+          "caps": {
+            "item": {
+              "limitUses": false,
+              "maxUses": "__system-normalize-undefined__",
+              "destroyWhenExhausted": true,
+              "whenSpent": "destroyed"
+            },
+            "learn": {
+              "consumeOnLearn": true,
+              "limitRecipes": false,
+              "limitLearning": false,
+              "maxRecipes": "__system-normalize-undefined__",
+              "learnsAllowed": "__system-normalize-undefined__",
+              "learnScope": "perInstance",
+              "learningMode": "once",
+              "prerequisiteIds": [],
+              "characterPrerequisiteIds": [],
+              "destroyWhenSpent": false
+            }
+          }
+        }
+      ],
+      "membershipResolvesByRecipeIds": true,
+      "craftingCheck": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvageResolutionMode": "routed",
+      "salvageCraftingCheck": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gatheringCraftingCheck": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "alchemy": null,
+      "teaserConfig": {
+        "enabled": true,
+        "discoveryMode": "both",
+        "fragments": [
+          {
+            "id": "frag-1",
+            "name": "Fragment",
+            "linkedItemUuid": null,
+            "recipeIds": [],
+            "progressValue": 100
+          }
+        ]
+      },
+      "componentCategories": [
+        "Metals"
+      ],
+      "categoryIcons": {},
+      "componentCategoryIcons": {},
+      "categories": [
+        "Weapons"
+      ],
+      "tags": [
+        "metal"
+      ],
+      "essences": [
+        "fire",
+        "fire-2",
+        "water"
+      ],
+      "enableTags": true,
+      "enableEssences": true,
+      "enableCategories": true,
+      "enableMultiStepRecipes": true,
+      "components": [
+        {
+          "id": "comp-1",
+          "name": "Iron Ore",
+          "img": "icons/svg/item-bag.svg",
+          "description": "Raw iron",
+          "originItemUuid": "Item.origin",
+          "registeredItemUuid": "Item.registered",
+          "aliasItemUuids": [
+            "Item.alias"
+          ],
+          "tier": "common",
+          "category": "Metals",
+          "tags": [
+            "ore"
+          ],
+          "essences": {
+            "fire": 2,
+            "water": 2
+          },
+          "difficulty": 4,
+          "complications": [
+            {
+              "id": "rid-0002",
+              "name": "",
+              "description": "",
+              "severity": "minor",
+              "visibility": "gmOnly",
+              "activities": {
+                "crafting": false,
+                "salvage": false,
+                "gathering": false
+              },
+              "match": "any",
+              "when": {
+                "stageAwarded": false,
+                "stagePartial": false,
+                "stageMissed": false,
+                "checkTrigger": null
+              },
+              "rollCondition": {
+                "enabled": false,
+                "expr": "",
+                "cmp": "",
+                "value": ""
+              },
+              "effectRoll": {
+                "enabled": false,
+                "expr": "",
+                "label": ""
+              }
+            }
+          ],
+          "salvage": {
+            "enabled": true,
+            "allowPlayerResultReorder": false,
+            "ingredientQuantity": 2,
+            "dcOverride": 12,
+            "toolIds": [
+              "t1",
+              "t2"
+            ],
+            "resultGroups": [
+              {
+                "id": "g-fail",
+                "name": "Result Group",
+                "role": "failure",
+                "results": [
+                  {
+                    "id": "rid-0003",
+                    "componentId": "c-scrap",
+                    "systemItemId": "c-scrap",
+                    "quantity": 1,
+                    "propertyMacroUuid": null
+                  }
+                ]
+              },
+              {
+                "id": "rid-0004",
+                "name": "Success",
+                "results": [
+                  {
+                    "id": "res-1",
+                    "componentId": "c1",
+                    "systemItemId": "c1",
+                    "quantity": 3,
+                    "quantityFormula": "1d4",
+                    "propertyMacroUuid": null
+                  }
+                ]
+              }
+            ],
+            "checkModifierIds": [
+              "m1",
+              "m2"
+            ],
+            "outcomeRouting": {
+              "mode": "byRole"
+            },
+            "timeRequirement": {
+              "minutes": 30
+            },
+            "currencyRequirement": {
+              "unit": "gp",
+              "amount": 5
+            }
+          }
+        },
+        {
+          "id": "comp-2",
+          "name": "Unnamed Item",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "originItemUuid": null,
+          "registeredItemUuid": null,
+          "aliasItemUuids": [],
+          "tier": null,
+          "category": "general",
+          "tags": [],
+          "essences": {
+            "fire": 1
+          },
+          "difficulty": "__system-normalize-undefined__",
+          "salvage": {
+            "enabled": false,
+            "allowPlayerResultReorder": true,
+            "ingredientQuantity": 1,
+            "dcOverride": null,
+            "toolIds": [],
+            "resultGroups": []
+          }
+        }
+      ],
+      "tools": [
+        {
+          "id": "tool-full",
+          "enabled": false,
+          "componentId": "comp-hammer",
+          "label": "Master Hammer",
+          "name": "Hammer",
+          "img": "icons/svg/hammer.svg",
+          "description": "A well-worn hammer",
+          "registeredItemUuid": "Item.registered",
+          "originItemUuid": "Item.origin",
+          "aliasItemUuids": [
+            "Item.alias"
+          ],
+          "requirement": {
+            "formula": "1d4"
+          },
+          "prerequisites": {
+            "enabled": true,
+            "ids": [
+              "p1",
+              "p2"
+            ],
+            "gateMode": "bonus"
+          },
+          "bonus": {
+            "enabled": false,
+            "expression": ""
+          },
+          "breakage": {
+            "mode": "limitedUses",
+            "maxUses": 5
+          },
+          "checkBreakable": true,
+          "onBreak": {
+            "mode": "replaceWith",
+            "replacementTarget": {
+              "type": "component",
+              "componentId": "comp-replacement"
+            }
+          },
+          "repairRequirements": [
+            {
+              "id": "group-authored",
+              "name": "Authored",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "comp-nail"
+                  },
+                  "componentId": "comp-nail",
+                  "quantity": 1
+                }
+              ]
+            },
+            {
+              "id": "rid-0005",
+              "name": "Minted",
+              "options": [
+                {
+                  "match": {
+                    "type": "component",
+                    "componentId": "comp-plank"
+                  },
+                  "componentId": "comp-plank",
+                  "quantity": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rid-0006",
+          "enabled": true,
+          "componentId": null,
+          "label": "",
+          "name": null,
+          "img": null,
+          "description": "",
+          "registeredItemUuid": null,
+          "originItemUuid": null,
+          "aliasItemUuids": [],
+          "requirement": null,
+          "prerequisites": {
+            "enabled": false,
+            "ids": [],
+            "gateMode": "usability"
+          },
+          "bonus": {
+            "enabled": false,
+            "expression": ""
+          },
+          "breakage": {
+            "mode": "limitedUses",
+            "maxUses": null
+          },
+          "checkBreakable": true,
+          "onBreak": {
+            "mode": "destroy"
+          },
+          "repairRequirements": []
+        }
+      ],
+      "gatheringRealmSettings": {
+        "enabled": false
+      }
+    },
+    "systemLegacySpellings": {
+      "id": "sys-legacy",
+      "name": "New Crafting System",
+      "description": "",
+      "enabled": true,
+      "resolutionMode": "alchemy",
+      "features": {
+        "recipeCategories": true,
+        "categories": true,
+        "itemTags": true,
+        "essences": true,
+        "multiStepRecipes": true,
+        "propertyMacros": false,
+        "craftingChecks": false,
+        "outcomeRouting": false,
+        "effectTransfer": false,
+        "gathering": false,
+        "salvage": true,
+        "chatOutput": true,
+        "itemPiles": false,
+        "refundOnPlayerCancel": true
+      },
+      "itemTags": [
+        "alchemical"
+      ],
+      "visibilityMode": "knowledge",
+      "recipeVisibility": {
+        "listMode": "global",
+        "knowledge": {
+          "mode": "itemOrLearned",
+          "learn": {
+            "dragDropEnabled": true
+          }
+        }
+      },
+      "requirements": {
+        "time": {
+          "enabled": true
+        },
+        "currency": {
+          "enabled": false
+        }
+      },
+      "essenceDefinitions": [
+        {
+          "id": "fire",
+          "name": "Fire",
+          "description": "",
+          "icon": "fas fa-mortar-pestle",
+          "colorToken": null,
+          "enabled": true,
+          "propertyMacroUuid": null,
+          "sourceComponentId": null,
+          "sourceItemUuid": null,
+          "associatedSystemItemId": null
+        },
+        {
+          "id": "water",
+          "name": "Water",
+          "description": "",
+          "icon": "fas fa-mortar-pestle",
+          "colorToken": null,
+          "enabled": true,
+          "propertyMacroUuid": null,
+          "sourceComponentId": null,
+          "sourceItemUuid": null,
+          "associatedSystemItemId": null
+        }
+      ],
+      "recipeItemDefinitions": [
+        {
+          "id": "book-legacy",
+          "name": "legacy",
+          "description": "",
+          "img": "icons/svg/item-bag.svg",
+          "originItemUuid": "Item.legacy",
+          "registeredItemUuid": "Item.legacy",
+          "aliasItemUuids": [],
+          "enabled": true,
+          "recipeIds": [],
+          "caps": {
+            "item": {
+              "limitUses": false,
+              "maxUses": "__system-normalize-undefined__",
+              "destroyWhenExhausted": true,
+              "whenSpent": "destroyed"
+            },
+            "learn": {
+              "consumeOnLearn": true,
+              "limitRecipes": false,
+              "limitLearning": false,
+              "maxRecipes": "__system-normalize-undefined__",
+              "learnsAllowed": "__system-normalize-undefined__",
+              "learnScope": "perInstance",
+              "learningMode": "once",
+              "prerequisiteIds": [],
+              "characterPrerequisiteIds": [],
+              "destroyWhenSpent": false
+            }
+          }
+        }
+      ],
+      "membershipResolvesByRecipeIds": false,
+      "craftingCheck": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvageResolutionMode": "simple",
+      "salvageCraftingCheck": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gatheringCraftingCheck": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "alchemy": {
+        "checkMode": "tiered",
+        "learnOnCraft": false,
+        "consumeOnFail": true,
+        "showAttemptHistoryToPlayers": true
+      },
+      "teaserConfig": {
+        "enabled": false,
+        "discoveryMode": "threshold",
+        "fragments": []
+      },
+      "componentCategories": [],
+      "categoryIcons": {},
+      "componentCategoryIcons": {},
+      "categories": [],
+      "tags": [
+        "alchemical"
+      ],
+      "essences": [
+        "fire",
+        "water"
+      ],
+      "enableTags": true,
+      "enableEssences": true,
+      "enableCategories": true,
+      "enableMultiStepRecipes": true,
+      "components": [
+        {
+          "id": "comp-legacy",
+          "name": "Unnamed Item",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "originItemUuid": "Item.legacy",
+          "registeredItemUuid": "Item.legacy",
+          "aliasItemUuids": [],
+          "tier": null,
+          "category": "general",
+          "tags": [],
+          "essences": {},
+          "difficulty": "__system-normalize-undefined__",
+          "salvage": {
+            "enabled": false,
+            "allowPlayerResultReorder": true,
+            "ingredientQuantity": 1,
+            "dcOverride": null,
+            "toolIds": [],
+            "resultGroups": []
+          }
+        }
+      ],
+      "tools": [],
+      "gatheringRealmSettings": {
+        "enabled": false
+      }
+    },
+    "systemSimpleSalvageClamp": {
+      "id": "sys-simple",
+      "name": "New Crafting System",
+      "description": "",
+      "enabled": true,
+      "resolutionMode": "simple",
+      "features": {
+        "recipeCategories": true,
+        "categories": true,
+        "itemTags": true,
+        "essences": false,
+        "multiStepRecipes": false,
+        "propertyMacros": false,
+        "craftingChecks": false,
+        "outcomeRouting": false,
+        "effectTransfer": false,
+        "gathering": false,
+        "salvage": true,
+        "chatOutput": true,
+        "itemPiles": false,
+        "refundOnPlayerCancel": true
+      },
+      "itemTags": [],
+      "visibilityMode": "knowledge",
+      "recipeVisibility": {
+        "listMode": "global",
+        "knowledge": {
+          "mode": "itemOrLearned",
+          "learn": {
+            "dragDropEnabled": true
+          }
+        }
+      },
+      "requirements": {
+        "time": {
+          "enabled": true
+        },
+        "currency": {
+          "enabled": false
+        }
+      },
+      "essenceDefinitions": [],
+      "recipeItemDefinitions": [],
+      "membershipResolvesByRecipeIds": false,
+      "craftingCheck": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvageResolutionMode": "simple",
+      "salvageCraftingCheck": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "1d20",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gatheringCraftingCheck": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "alchemy": null,
+      "teaserConfig": {
+        "enabled": false,
+        "discoveryMode": "threshold",
+        "fragments": []
+      },
+      "componentCategories": [],
+      "categoryIcons": {},
+      "componentCategoryIcons": {},
+      "categories": [],
+      "tags": [],
+      "essences": [],
+      "enableTags": true,
+      "enableEssences": false,
+      "enableCategories": true,
+      "enableMultiStepRecipes": false,
+      "components": [
+        {
+          "id": "comp-salvage",
+          "name": "Unnamed Item",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "originItemUuid": null,
+          "registeredItemUuid": null,
+          "aliasItemUuids": [],
+          "tier": null,
+          "category": "general",
+          "tags": [],
+          "essences": {},
+          "difficulty": "__system-normalize-undefined__",
+          "salvage": {
+            "enabled": true,
+            "allowPlayerResultReorder": false,
+            "ingredientQuantity": 2,
+            "dcOverride": 12,
+            "toolIds": [
+              "t1",
+              "t2"
+            ],
+            "resultGroups": [
+              {
+                "id": "rid-0002",
+                "name": "Success",
+                "results": [
+                  {
+                    "id": "res-1",
+                    "componentId": "c1",
+                    "systemItemId": "c1",
+                    "quantity": 3,
+                    "quantityFormula": "1d4",
+                    "propertyMacroUuid": null
+                  }
+                ]
+              },
+              {
+                "id": "g-fail",
+                "name": "Result Group",
+                "role": "failure",
+                "results": [
+                  {
+                    "id": "rid-0001",
+                    "componentId": "c-scrap",
+                    "systemItemId": "c-scrap",
+                    "quantity": 1,
+                    "propertyMacroUuid": null
+                  }
+                ]
+              }
+            ],
+            "checkModifierIds": [
+              "m1",
+              "m2"
+            ],
+            "outcomeRouting": {
+              "mode": "byRole"
+            },
+            "timeRequirement": {
+              "minutes": 30
+            },
+            "currencyRequirement": {
+              "unit": "gp",
+              "amount": 5
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "gatheringRealmSettings": {
+        "enabled": false
+      }
+    },
+    "systemSimpleSalvageNoFormula": {
+      "id": "sys-simple-bare",
+      "name": "New Crafting System",
+      "description": "",
+      "enabled": true,
+      "resolutionMode": "simple",
+      "features": {
+        "recipeCategories": true,
+        "categories": true,
+        "itemTags": true,
+        "essences": false,
+        "multiStepRecipes": false,
+        "propertyMacros": false,
+        "craftingChecks": false,
+        "outcomeRouting": false,
+        "effectTransfer": false,
+        "gathering": false,
+        "salvage": true,
+        "chatOutput": true,
+        "itemPiles": false,
+        "refundOnPlayerCancel": true
+      },
+      "itemTags": [],
+      "visibilityMode": "knowledge",
+      "recipeVisibility": {
+        "listMode": "global",
+        "knowledge": {
+          "mode": "itemOrLearned",
+          "learn": {
+            "dragDropEnabled": true
+          }
+        }
+      },
+      "requirements": {
+        "time": {
+          "enabled": true
+        },
+        "currency": {
+          "enabled": false
+        }
+      },
+      "essenceDefinitions": [],
+      "recipeItemDefinitions": [],
+      "membershipResolvesByRecipeIds": false,
+      "craftingCheck": {
+        "enabled": false,
+        "mode": "passFail",
+        "consumption": {
+          "consumeIngredientsOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "salvageResolutionMode": "simple",
+      "salvageCraftingCheck": {
+        "enabled": false,
+        "consumption": {
+          "consumeComponentOnFail": true,
+          "breakToolsOnFail": false
+        },
+        "failureResultPolicy": "perRecord",
+        "simple": {
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "tiers": [],
+          "macroUuid": null,
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "outcomes": [
+          "fail",
+          "pass"
+        ],
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "gatheringCraftingCheck": {
+        "enabled": false,
+        "failureResultPolicy": "perRecord",
+        "progressive": {
+          "awardMode": "equal",
+          "rollFormula": "",
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "routed": {
+          "type": "relative",
+          "rollFormula": "",
+          "dc": 15,
+          "thresholdMode": "meet",
+          "dcMode": "static",
+          "macroUuid": null,
+          "tiers": [],
+          "relativeOutcomes": [],
+          "fixedOutcomes": [],
+          "checkBreakage": {
+            "triggers": []
+          }
+        },
+        "defaultModifierPolicy": "addAll",
+        "defaultModifierIds": []
+      },
+      "alchemy": null,
+      "teaserConfig": {
+        "enabled": false,
+        "discoveryMode": "threshold",
+        "fragments": []
+      },
+      "componentCategories": [],
+      "categoryIcons": {},
+      "componentCategoryIcons": {},
+      "categories": [],
+      "tags": [],
+      "essences": [],
+      "enableTags": true,
+      "enableEssences": false,
+      "enableCategories": true,
+      "enableMultiStepRecipes": false,
+      "components": [
+        {
+          "id": "comp-salvage",
+          "name": "Unnamed Item",
+          "img": "icons/svg/item-bag.svg",
+          "description": "",
+          "originItemUuid": null,
+          "registeredItemUuid": null,
+          "aliasItemUuids": [],
+          "tier": null,
+          "category": "general",
+          "tags": [],
+          "essences": {},
+          "difficulty": "__system-normalize-undefined__",
+          "salvage": {
+            "enabled": true,
+            "allowPlayerResultReorder": false,
+            "ingredientQuantity": 2,
+            "dcOverride": 12,
+            "toolIds": [
+              "t1",
+              "t2"
+            ],
+            "resultGroups": [
+              {
+                "id": "rid-0002",
+                "name": "Success",
+                "results": [
+                  {
+                    "id": "res-1",
+                    "componentId": "c1",
+                    "systemItemId": "c1",
+                    "quantity": 3,
+                    "quantityFormula": "1d4",
+                    "propertyMacroUuid": null
+                  }
+                ]
+              }
+            ],
+            "checkModifierIds": [
+              "m1",
+              "m2"
+            ],
+            "outcomeRouting": {
+              "mode": "byRole"
+            },
+            "timeRequirement": {
+              "minutes": 30
+            },
+            "currencyRequirement": {
+              "unit": "gp",
+              "amount": 5
+            }
+          }
+        }
+      ],
+      "tools": [],
+      "gatheringRealmSettings": {
+        "enabled": false
+      }
+    }
+  }
+}

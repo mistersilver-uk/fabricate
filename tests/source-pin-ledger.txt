@@ -129,7 +129,7 @@ tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
 tests/foundry-perf-profile.test.js	1
 tests/gathering-bootstrap-api.test.js	36
-tests/gathering-harvesting-boundary.test.js	4
+tests/gathering-harvesting-boundary.test.js	3
 tests/gathering-image-defaults.test.js	8
 tests/helpers/chipTone.js	1
 tests/helpers/essenceFixtures.js	1

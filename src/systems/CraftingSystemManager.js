@@ -11,16 +11,10 @@ import {
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
-import { normalizeQuantityFormula } from '../models/Result.js';
-import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
+import { Tool } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
-import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
-import {
-  normalizeComponentCategory,
-  normalizeCustomComponentCategories,
-} from '../utils/componentCategories.js';
-import { authoredComplications } from '../utils/componentComplications.js';
+import { normalizeCustomComponentCategories } from '../utils/componentCategories.js';
 import {
   advanceDefinitionRevision,
   findById,
@@ -73,6 +67,7 @@ import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidation
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
+import { normalizeComponent } from './normalize/components.js';
 import {
   convertDiceCritsToTriggers,
   convertNatSteppingToTriggers,
@@ -90,6 +85,45 @@ import {
   normalizeUnifiedTrigger,
   normalizeUnifiedTriggers,
 } from './normalize/craftingCheck.js';
+import {
+  looksLikeDocumentUuid,
+  normalizeEssenceDefinition,
+  normalizeEssenceDefinitions,
+  normalizeEssenceQuantities,
+  toKey,
+} from './normalize/essences.js';
+import {
+  labelFromUuid,
+  normalizeRecipeItemCaps,
+  normalizeRecipeItemDefinition,
+  normalizeRecipeItemDefinitions,
+} from './normalize/recipeItems.js';
+import {
+  normalizeCurrencyRequirement,
+  normalizeSalvage,
+  normalizeSalvageResult,
+  normalizeSalvageResultGroup,
+  normalizeTimeRequirement,
+  normalizeToolIds,
+  salvageNormalizationContext,
+} from './normalize/salvage.js';
+import {
+  normalizeAlchemyConfig,
+  normalizeCurrencyConfig,
+  normalizeFeatures,
+  normalizeRecipeVisibility,
+  normalizeRequirements,
+  normalizeStringList,
+  normalizeTeaserConfig,
+  normalizeVisibilityMode,
+} from './normalize/systemFields.js';
+import {
+  normalizeTool,
+  normalizeToolBreakage,
+  normalizeToolOnBreak,
+  normalizeToolPrerequisites,
+  normalizeToolRequirement,
+} from './normalize/tools.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { resolvedComponentEssencesById } from './resolvedComponentEssences.js';
@@ -101,10 +135,6 @@ import { SignatureValidator } from './SignatureValidator.js';
 import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
-// Membership sets derived from the canonical Tool model vocabularies, so the
-// system-owned tool normalizer enforces the exact same enumerations as the Tool
-// model and the adminStore editor without duplicating the literal lists.
-const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
 const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
 
 // The invalidation-domain attributions every `save()` site names (issue 1078 part B1). Derived
@@ -604,160 +634,56 @@ export class CraftingSystemManager {
     };
   }
 
-  /** Normalize one system-owned library Tool to its canonical persisted shape — the single
-   * coercion point, so a Tool from any origin loads the same. A missing `id` gets a fresh
-   * `randomID()` and `enabled` defaults to `true`. */
-  _normalizeTool(tool = {}, { validPrerequisiteIds = null } = {}) {
-    const normalizedTool = !tool || typeof tool !== 'object' ? {} : tool;
-    const id = String(normalizedTool.id || foundry.utils.randomID());
-    // `label` is the PRE-EXISTING, user-authored display override — distinct from the
-    // `name`/`img` display snapshot below and NEVER written by snapshot capture,
-    // migration, or refresh (issue 561, R2-2). Preserved untouched here.
-    const label = typeof normalizedTool.label === 'string' ? normalizedTool.label.trim() : '';
-    const componentId =
-      typeof normalizedTool.componentId === 'string' && normalizedTool.componentId.trim()
-        ? normalizedTool.componentId.trim()
-        : null;
-    // First-class tool source refs plus the `name`/`img` display snapshot (issue 561). Unknown-
-    // field stripping means these MUST be retained here and in the draft-path twin, or they are
-    // silently dropped. New-name-first, legacy-name-tolerant (issue 560).
-    const originItemUuid =
-      normalizedTool.originItemUuid ||
-      normalizedTool.registeredItemUuid ||
-      normalizedTool.sourceItemUuid ||
-      normalizedTool.sourceUuid ||
-      null;
-    const registeredItemUuid =
-      normalizedTool.registeredItemUuid ||
-      normalizedTool.originItemUuid ||
-      normalizedTool.sourceUuid ||
-      normalizedTool.sourceItemUuid ||
-      null;
-    const primaryRefs = new Set(
-      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
-    );
-    const rawAliasItemUuids = Array.isArray(normalizedTool.aliasItemUuids)
-      ? normalizedTool.aliasItemUuids
-      : Array.isArray(normalizedTool.fallbackItemIds)
-        ? normalizedTool.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((ref) => typeof ref === 'string')
-              .map((ref) => ref.trim())
-              .filter((ref) => ref && !primaryRefs.has(ref))
-          ),
-        ]
-      : [];
-    const model = new Tool({
-      ...normalizedTool,
-      id,
-      label,
-      componentId,
-      registeredItemUuid,
-      originItemUuid,
-      aliasItemUuids,
-      prerequisites: this._normalizeToolPrerequisites(
-        normalizedTool.prerequisites,
-        validPrerequisiteIds
-      ),
-    });
-    return model.toJSON();
+  _normalizeTool(tool, options) {
+    return normalizeTool(tool, options);
   }
 
-  _normalizeToolPrerequisites(input, validIds = null) {
-    const source = input && typeof input === 'object' ? input : {};
-    const ids = [
-      ...new Set(
-        (Array.isArray(source.ids) ? source.ids : [])
-          .filter((id) => typeof id === 'string')
-          .map((id) => id.trim())
-          .filter((id) => id && (!(validIds instanceof Set) || validIds.has(id)))
-      ),
-    ];
-    return {
-      enabled: source.enabled === true && ids.length > 0,
-      ids,
-      gateMode: source.gateMode === 'bonus' ? 'bonus' : 'usability',
-    };
+  _normalizeToolPrerequisites(input, validIds) {
+    return normalizeToolPrerequisites(input, validIds);
   }
 
   _normalizeToolRequirement(input) {
-    if (input === null || input === undefined) return null;
-    if (typeof input !== 'object') return null;
-    return {
-      formula: typeof input.formula === 'string' ? input.formula : '',
-    };
+    return normalizeToolRequirement(input);
   }
 
   _normalizeToolBreakage(input) {
-    if (input?.mode === 'immune') return { mode: 'limitedUses', maxUses: null };
-    const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
-    if (mode === 'limitedUses') {
-      const raw = input?.maxUses;
-      let maxUses = null;
-      if (raw !== null && raw !== undefined && raw !== '') {
-        const numeric = Number(raw);
-        maxUses = Number.isFinite(numeric) ? numeric : null;
-      }
-      return { mode, maxUses };
-    }
-    if (mode === 'breakageChance') {
-      const raw = Number(input?.breakageChance);
-      return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
-    }
-    const threshold = Number(input?.threshold);
-    return {
-      mode,
-      formula: typeof input?.formula === 'string' ? input.formula : '',
-      threshold: Number.isFinite(threshold) ? threshold : 0,
-    };
+    return normalizeToolBreakage(input);
   }
 
   _normalizeToolOnBreak(input) {
-    return new Tool({ componentId: '_normalizer_', onBreak: input }).onBreak;
+    return normalizeToolOnBreak(input);
   }
 
-  _normalizeFeatures(system = {}) {
-    const features = system.features || {};
-    const has = (k) => Object.prototype.hasOwnProperty.call(features, k);
-    // `complexRecipes` was removed as a feature (#102): recipe-control visibility
-    // derives from resolution mode, not a persistent flag. It survives ONLY as a
-    // legacy compatibility INPUT that seeds `multiStepRecipes` for old systems
-    // saved before the rename; it is no longer emitted as a normalized feature.
-    const multiStepEnabled = has('multiStepRecipes')
-      ? features.multiStepRecipes === true
-      : has('complexRecipes')
-        ? features.complexRecipes === true
-        : false;
-    return {
-      recipeCategories: true,
-      // Transitional alias
-      categories: true,
-      itemTags: true,
-      essences: has('essences') ? features.essences === true : system.enableEssences === true,
-      multiStepRecipes: multiStepEnabled,
-      propertyMacros: has('propertyMacros') ? features.propertyMacros === true : false,
-      craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,
-      outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
-      effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
-      gathering: has('gathering') ? features.gathering === true : false,
-      // Salvage is optional, defaulting ON for backward compatibility. When off the subsystem is
-      // hidden and skipped, but authored component salvage config is preserved so the toggle is
-      // reversible.
-      salvage: has('salvage') ? features.salvage === true : true,
-      chatOutput: has('chatOutput') ? features.chatOutput === true : true,
-      itemPiles: has('itemPiles') ? features.itemPiles === true : false,
-      // Whether a player self-cancelling an in-progress craft gets their consumed
-      // ingredients + spent currency back (issue 848). Default ON for a forgiving
-      // experience, but a GM may forfeit inputs on cancel by setting it false — an
-      // explicit false is honoured, mirroring the `features.salvage` default-on toggle.
-      refundOnPlayerCancel: has('refundOnPlayerCancel')
-        ? features.refundOnPlayerCancel === true
-        : true,
-    };
+  _normalizeFeatures(system) {
+    return normalizeFeatures(system);
+  }
+
+  _normalizeVisibilityMode(value) {
+    return normalizeVisibilityMode(value);
+  }
+
+  _normalizeRecipeVisibility(recipeVisibility) {
+    return normalizeRecipeVisibility(recipeVisibility);
+  }
+
+  _normalizeTeaserConfig(config) {
+    return normalizeTeaserConfig(config);
+  }
+
+  _normalizeRequirements(requirements) {
+    return normalizeRequirements(requirements);
+  }
+
+  _normalizeCurrencyConfig(currency) {
+    return normalizeCurrencyConfig(currency);
+  }
+
+  _normalizeStringList(value) {
+    return normalizeStringList(value);
+  }
+
+  _normalizeAlchemyConfig(config, resolutionMode) {
+    return normalizeAlchemyConfig(config, resolutionMode);
   }
 
   /** The FAILURE-RESULT POLICY (issue 1098) — may a failed check produce a result at all. ONE
@@ -828,389 +754,40 @@ export class CraftingSystemManager {
     return normalizeGatheringCraftingCheck(check, validCatalogueIds);
   }
 
-  // Flat system-level visibility STRATEGY enum (issue 511): `visibilityMode` ∈ {global,
-  // restricted, item, knowledge} gates the whole Crafting authoring surface, with unknown or
-  // missing reading as `knowledge`.
-  _normalizeVisibilityMode(value) {
-    return ['global', 'restricted', 'item', 'knowledge'].includes(value) ? value : 'knowledge';
-  }
-
-  _normalizeRecipeVisibility(recipeVisibility = {}) {
-    const listMode = ['global', 'player', 'knowledge', 'teaser'].includes(
-      recipeVisibility?.listMode
-    )
-      ? recipeVisibility.listMode
-      : 'global';
-    const knowledge = recipeVisibility?.knowledge || {};
-    return {
-      listMode,
-      knowledge: {
-        mode: ['item', 'learned', 'itemOrLearned'].includes(knowledge?.mode)
-          ? knowledge.mode
-          : 'itemOrLearned',
-        learn: {
-          dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false,
-        },
-      },
-    };
-  }
-
-  _normalizeTeaserConfig(config = {}) {
-    if (!config || typeof config !== 'object') {
-      return { enabled: false, discoveryMode: 'threshold', fragments: [] };
-    }
-    return {
-      enabled: config.enabled === true,
-      discoveryMode: ['threshold', 'fragments', 'both'].includes(config.discoveryMode)
-        ? config.discoveryMode
-        : 'threshold',
-      fragments: Array.isArray(config.fragments)
-        ? config.fragments.map((f) => this._normalizeTeaserFragment(f)).filter(Boolean)
-        : [],
-    };
-  }
-
-  _normalizeTeaserFragment(fragment = {}) {
-    if (!fragment || typeof fragment !== 'object') return null;
-    const id = String(fragment.id || '').trim();
-    if (!id) return null;
-    return {
-      id,
-      name: String(fragment.name || '').trim() || 'Fragment',
-      linkedItemUuid: fragment.linkedItemUuid || null,
-      recipeIds: Array.isArray(fragment.recipeIds)
-        ? fragment.recipeIds.filter((id) => typeof id === 'string')
-        : [],
-      progressValue: Math.min(100, Math.max(0, Number(fragment.progressValue) || 0)),
-    };
-  }
-
-  _normalizeRequirements(requirements = {}) {
-    const time = requirements?.time || {};
-    const currency = requirements?.currency || {};
-    return {
-      time: {
-        // Default ON for backward compatibility, mirroring the `features.salvage` convention:
-        // recipes authored before this toggle carry configs that already run, so only an explicit
-        // `false` disables them. Upgraded worlds are re-defaulted on once by the 1.19.0
-        // `migrateDefaultOnTimeRequirements` migration, not here on read.
-        enabled: time.enabled !== false,
-      },
-      currency: this._normalizeCurrencyConfig(currency),
-    };
-  }
-
-  /** Normalize the per-system currency block, which since issue 1278 is ONLY the participation
-   * flag, because a world runs one Foundry game system and so has one way actors store coins.
-   * This whitelist rebuild sheds the pre-1278 sibling keys, which the 1.26.0 migration lifts into
-   * the world config before any system write. */
-  _normalizeCurrencyConfig(currency = {}) {
-    return { enabled: currency?.enabled === true };
-  }
-
-  _normalizeStringList(value) {
-    if (!Array.isArray(value)) return [];
-    return [...new Set(value.map((v) => String(v || '').trim()).filter(Boolean))];
-  }
-
   _normalizeEssenceDefinitions(value) {
-    if (!Array.isArray(value)) return [];
-
-    const used = new Set();
-    const normalized = [];
-    for (const entry of value) {
-      const def = this._normalizeEssenceDefinition(entry, used);
-      if (!def) continue;
-      used.add(def.id);
-      normalized.push(def);
-    }
-    return normalized;
+    return normalizeEssenceDefinitions(value);
   }
 
-  /** The GM-authored per-essence colour (issue 917): a bare `--fab-tag-*` palette key, or null.
-   * There is deliberately NO `customColor` sibling, because a free hex cannot be guaranteed
-   * legible against all seven themes. An unrecognized token renders as the theme accent. */
-  _normalizeEssenceColorToken(value) {
-    const token = String(value ?? '')
-      .trim()
-      .replace(/^--fab-tag-/, '');
-    return token || null;
-  }
-
-  /** The GM-authored per-essence property macro (issue 1036). A SHAPE check, not a macro check:
-   * `_looksLikeDocumentUuid` must stay permissive because `parseUuid` still re-interprets legacy
-   * four-segment compendium uuids, so a `/^Macro\./` tightening would reject a resolvable macro. */
-  _normalizeEssencePropertyMacroUuid(value) {
-    return this._looksLikeDocumentUuid(value) ? value : null;
-  }
-
-  _normalizeEssenceDefinition(entry, usedIds = new Set()) {
-    // BOTH branches below are whitelist REBUILDS that drop any key they do not name, so every
-    // persisted field must appear in both or it is silently lost on the next save. `enabled` needs
-    // NO migration, and adding one would be wrong: this whitelist has never emitted the key, so no
-    // stored definition carries one and `entry.enabled !== false` reads absent as `true`.
-    if (typeof entry === 'string') {
-      const base = entry.trim();
-      if (!base) return null;
-      return {
-        id: this._uniqueKey(base, usedIds),
-        name: base,
-        description: '',
-        icon: 'fas fa-mortar-pestle',
-        colorToken: null,
-        enabled: true,
-        propertyMacroUuid: null,
-        sourceComponentId: null,
-        sourceItemUuid: null,
-        associatedSystemItemId: null, // transitional alias
-      };
-    }
-
-    if (!entry || typeof entry !== 'object') return null;
-
-    const rawName = String(entry.name || '').trim();
-    const rawId = String(entry.id || '')
-      .trim()
-      .toLowerCase();
-    const seed = rawId || rawName;
-    if (!seed) return null;
-
-    const id = this._uniqueKey(seed, usedIds);
-    const sourceComponentId = entry.sourceComponentId || entry.associatedSystemItemId || null;
-    const sourceItemUuid = entry.sourceItemUuid || null;
-    return {
-      id,
-      name: rawName || id,
-      description: String(entry.description || '').trim(),
-      icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
-      colorToken: this._normalizeEssenceColorToken(entry.colorToken),
-      enabled: entry.enabled !== false,
-      propertyMacroUuid: this._normalizeEssencePropertyMacroUuid(entry.propertyMacroUuid),
-      sourceComponentId,
-      sourceItemUuid,
-      associatedSystemItemId: sourceComponentId, // transitional alias
-    };
+  _normalizeEssenceDefinition(entry, usedIds) {
+    return normalizeEssenceDefinition(entry, usedIds);
   }
 
   _looksLikeDocumentUuid(value) {
-    if (!value || typeof value !== 'string') return false;
-    return /^(Actor|Item|Scene|JournalEntry|Macro|RollTable|Compendium)\./.test(value);
-  }
-
-  _normalizeRecipeItemDefinitions(value) {
-    if (!Array.isArray(value)) return [];
-
-    const usedIds = new Set();
-    const normalized = [];
-    for (const entry of value) {
-      const def = this._normalizeRecipeItemDefinition(entry, usedIds);
-      if (!def) continue;
-      usedIds.add(def.id);
-      normalized.push(def);
-    }
-    return normalized;
-  }
-
-  // Per-recipe-item use/learn caps (issue 511): each definition owns its own caps rather than
-  // sharing one system-wide config. The legacy boolean `destroyWhenExhausted` is reconciled with
-  // the enum `whenSpent`, keeping BOTH persisted — the enum wins when authored.
-  _reconcileWhenSpent(item = {}) {
-    const authored = item.whenSpent === 'destroyed' || item.whenSpent === 'inert';
-    if (authored) {
-      return { whenSpent: item.whenSpent, destroyWhenExhausted: item.whenSpent === 'destroyed' };
-    }
-    if (Object.prototype.hasOwnProperty.call(item, 'destroyWhenExhausted')) {
-      const destroyWhenExhausted = item.destroyWhenExhausted === true;
-      return { whenSpent: destroyWhenExhausted ? 'destroyed' : 'inert', destroyWhenExhausted };
-    }
-    return { whenSpent: 'destroyed', destroyWhenExhausted: true };
-  }
-
-  _normalizeRecipeItemCaps(caps = {}) {
-    const item = caps?.item || {};
-    const learn = caps?.learn || {};
-
-    const { whenSpent, destroyWhenExhausted } = this._reconcileWhenSpent(item);
-
-    // `limitLearning` (new) mirrors legacy `limitRecipes`; the new field wins when
-    // authored, otherwise the legacy boolean seeds it. Both are always persisted.
-    const limitLearning = Object.prototype.hasOwnProperty.call(learn, 'limitLearning')
-      ? learn.limitLearning === true
-      : learn.limitRecipes === true;
-
-    // `learnsAllowed` mirrors legacy `maxRecipes` and wins when authored. With the limit ON but no
-    // positive count, it defaults to 1: a limit of "0/undefined" would wrongly read as uncapped
-    // downstream and hide the learn-all CTA (issue 544).
-    const rawLearns = Object.prototype.hasOwnProperty.call(learn, 'learnsAllowed')
-      ? learn.learnsAllowed
-      : learn.maxRecipes;
-    const learnsAllowed = limitLearning
-      ? Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
-        ? Number(rawLearns)
-        : 1
-      : undefined;
-
-    // `learnScope` ('perInstance' | 'total') is the canonical cap scope: `perInstance` limits
-    // learning from a SINGLE copy, `total` across EVERY copy of the source recipe item. An
-    // authored value wins, else it derives from the legacy `learningMode`, which is kept as a
-    // synced legacy mirror.
-    const learnScope = ['perInstance', 'total'].includes(learn.learnScope)
-      ? learn.learnScope
-      : learn.learningMode === 'party'
-        ? 'total'
-        : 'perInstance';
-    const learningMode =
-      learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
-
-    // `prerequisiteIds` (issue 544) — the recipe ids a reader must ALREADY have learned (AND
-    // semantics) before learning from this book. Replaces the legacy single `prerequisite`
-    // string, which is folded in here so an un-migrated draft still reads correctly.
-    const rawPrerequisiteIds = Array.isArray(learn.prerequisiteIds)
-      ? learn.prerequisiteIds
-      : typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
-        ? [learn.prerequisite]
-        : [];
-    const prerequisiteIds = [
-      ...new Set(rawPrerequisiteIds.map((value) => String(value ?? '').trim()).filter(Boolean)),
-    ];
-
-    // `characterPrerequisiteIds` (issue 544) — the system-owned character prerequisites a reader
-    // must ALL pass to learn from this book. Distinct from `prerequisite`: this gates on the
-    // actor's roll data, that on prior knowledge.
-    const characterPrerequisiteIds = Array.isArray(learn.characterPrerequisiteIds)
-      ? [
-          ...new Set(
-            learn.characterPrerequisiteIds
-              .map((value) => String(value ?? '').trim())
-              .filter(Boolean)
-          ),
-        ]
-      : [];
-
-    return {
-      item: {
-        limitUses: item.limitUses === true,
-        maxUses: Number.isFinite(Number(item.maxUses)) ? Number(item.maxUses) : undefined,
-        destroyWhenExhausted,
-        whenSpent,
-      },
-      learn: {
-        consumeOnLearn: learn.consumeOnLearn !== false,
-        // `destroyWhenSpent` (learn) is deliberately named distinctly from
-        // `destroyWhenExhausted` (item/craft-charges) — do not normalize to one name.
-        limitRecipes: limitLearning,
-        limitLearning,
-        maxRecipes: learnsAllowed,
-        learnsAllowed,
-        learnScope,
-        learningMode,
-        prerequisiteIds,
-        characterPrerequisiteIds,
-        destroyWhenSpent: learn.destroyWhenSpent === true,
-      },
-    };
-  }
-
-  _normalizeRecipeItemDefinition(entry, usedIds = new Set()) {
-    if (!entry || typeof entry !== 'object') return null;
-
-    let id = String(entry.id || '').trim();
-    if (!id) id = foundry.utils.randomID();
-    while (usedIds.has(id)) {
-      id = foundry.utils.randomID();
-    }
-
-    // New-name-first, legacy-name-tolerant (issue 560): accept the renamed
-    // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-#560
-    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names, so a
-    // not-yet-1.16.0-migrated entry is never stripped on save.
-    const originItemUuid =
-      String(
-        entry.originItemUuid ||
-          entry.registeredItemUuid ||
-          entry.sourceItemUuid ||
-          entry.sourceUuid ||
-          ''
-      ).trim() || null;
-    // Union source refs, mirroring `_normalizeComponent`, so a compendium-imported book resolves
-    // for owned copies dragged from EITHER the compendium item or the imported world item (issue
-    // 555). `originItemUuid` is never recomputed and `registeredItemUuid` defaults to it, so
-    // existing definitions match unchanged.
-    const registeredItemUuid =
-      String(
-        entry.registeredItemUuid ||
-          entry.originItemUuid ||
-          entry.sourceUuid ||
-          entry.sourceItemUuid ||
-          ''
-      ).trim() || null;
-    const primaryRefs = new Set([registeredItemUuid, originItemUuid].filter(Boolean));
-    const rawAliasItemUuids = Array.isArray(entry.aliasItemUuids)
-      ? entry.aliasItemUuids
-      : Array.isArray(entry.fallbackItemIds)
-        ? entry.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((id) => typeof id === 'string')
-              .map((id) => id.trim())
-              .filter((id) => id && !primaryRefs.has(id))
-          ),
-        ]
-      : [];
-    return {
-      id,
-      name: String(entry.name || '').trim() || this._labelFromUuid(originItemUuid) || 'Recipe Item',
-      description: this._normalizeComponentDescription(entry.description),
-      img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
-      originItemUuid,
-      registeredItemUuid,
-      aliasItemUuids,
-      // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
-      // definition still round-trips but the library UI can hide/skip it.
-      enabled: entry.enabled !== false,
-      // Book membership (issue 511): the recipe ids this book/scroll contains — the
-      // canonical, many-to-many link (a recipe may belong to several books). Distinct
-      // from the visibility-teaser `recipeIds` fragment elsewhere. Deduped id list.
-      recipeIds: [
-        ...new Set(
-          (Array.isArray(entry.recipeIds) ? entry.recipeIds : [])
-            .map((rid) => String(rid || '').trim())
-            .filter(Boolean)
-        ),
-      ],
-      caps: this._normalizeRecipeItemCaps(entry.caps),
-    };
-  }
-
-  _uniqueKey(seed, usedIds) {
-    const cleaned = this._toKey(seed);
-    let key = cleaned || 'essence';
-    let i = 2;
-    while (usedIds.has(key)) {
-      key = `${cleaned || 'essence'}-${i++}`;
-    }
-    return key;
+    return looksLikeDocumentUuid(value);
   }
 
   _toKey(value) {
-    // Split/filter/join trims leading & trailing separators without the
-    // backtracking-prone `/^-+|-+$/` anchored regex (already-collapsed single
-    // dashes mean this yields the same slug).
-    return String(value || '')
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, '-')
-      .split('-')
-      .filter(Boolean)
-      .join('-');
+    return toKey(value);
+  }
+
+  _normalizeEssenceQuantities(essences, validEssenceIds) {
+    return normalizeEssenceQuantities(essences, validEssenceIds);
+  }
+
+  _normalizeRecipeItemDefinitions(value) {
+    return normalizeRecipeItemDefinitions(value);
+  }
+
+  _normalizeRecipeItemCaps(caps) {
+    return normalizeRecipeItemCaps(caps);
+  }
+
+  _normalizeRecipeItemDefinition(entry, usedIds) {
+    return normalizeRecipeItemDefinition(entry, usedIds);
   }
 
   _labelFromUuid(uuid) {
-    if (!uuid) return '';
-    const parts = String(uuid).split('.');
-    return parts.at(-1) || '';
+    return labelFromUuid(uuid);
   }
 
   _normalizeComponentDescription(description) {
@@ -1352,306 +929,36 @@ export class CraftingSystemManager {
     return [...fallbackSet];
   }
 
-  /** Normalize a managed component. The salvage context (issue 764) is threaded through an options
-   * bag so `_normalizeSalvage` can apply the Simple-mode group-count clamp; a bare call leaves
-   * salvage groups untouched. A legacy positional `validEssenceIds` Set is still accepted. */
-  _normalizeComponent(item = {}, options = {}) {
-    // Back-compat: a few call paths and tests still pass a bare `validEssenceIds` Set as
-    // the second positional argument. A Set is never a valid options bag, so treat it as
-    // the essence-ids and run with no salvage context (no clamp).
-    const opts = options instanceof Set ? { validEssenceIds: options } : options || {};
-    const { validEssenceIds = null, salvageResolutionMode, salvageSimpleCheckHasFormula } = opts;
-    const difficulty = Number(item.difficulty);
-    // New-name-first, legacy-name-tolerant (issue 560): the pre-#560 shape used
-    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`; accept both and emit the new names
-    // so a not-yet-1.16.0-migrated component is never stripped on save.
-    const originItemUuid =
-      item.originItemUuid ||
-      item.registeredItemUuid ||
-      item.sourceItemUuid ||
-      item.sourceUuid ||
-      null;
-    const registeredItemUuid =
-      item.registeredItemUuid ||
-      item.originItemUuid ||
-      item.sourceUuid ||
-      item.sourceItemUuid ||
-      null;
-    const primaryRefs = new Set(
-      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
-    );
-    const rawAliasItemUuids = Array.isArray(item.aliasItemUuids)
-      ? item.aliasItemUuids
-      : Array.isArray(item.fallbackItemIds)
-        ? item.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((id) => typeof id === 'string')
-              .map((id) => id.trim())
-              .filter((id) => id && !primaryRefs.has(id))
-          ),
-        ]
-      : [];
-    return {
-      id: item.id || foundry.utils.randomID(),
-      name: item.name || 'Unnamed Item',
-      img: item.img || 'icons/svg/item-bag.svg',
-      description: this._normalizeComponentDescription(item.description),
-      originItemUuid,
-      // Transitional alias for current UI/engine references.
-      registeredItemUuid,
-      aliasItemUuids,
-      tier: item.tier || null,
-      // Single-valued grouping axis (issue 676). Defaults to the reserved `general`
-      // bucket — there is no "uncategorized" state — which is how every EXISTING
-      // component acquires a category with no migration. Distinct from `tags`, which
-      // is many-valued and does a different job.
-      category: normalizeComponentCategory(item.category),
-      tags: Array.isArray(item.tags) ? item.tags : [],
-      essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
-      difficulty:
-        Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
-      // Progressive component complications (issue 1286) sit TOP-LEVEL and deliberately NOT under
-      // `salvage`: a complication fires for a component's part in progressive crafting, salvage OR
-      // gathering, while `salvage` is only valid when `features.salvage` is true. The attach is
-      // absence-preserving, so a component that authored none needs no migration.
-      ...authoredComplications(item.complications),
-      // Salvage config is always normalized and preserved on the component so the
-      // `features.salvage` toggle is non-destructive: turning salvage off hides and
-      // skips it (UI/validation/runtime gate on the flag) but never deletes authored
-      // salvage; toggling back on restores it.
-      salvage: this._normalizeSalvage(item.salvage, {
-        salvageResolutionMode,
-        salvageSimpleCheckHasFormula,
-      }),
-    };
+  _normalizeComponent(item, options) {
+    return normalizeComponent(item, options);
   }
 
-  /** Derive the salvage-normalization context (issue 764) from an owning crafting system.
-   * `salvageSimpleCheckHasFormula` reads `salvageCraftingCheck.simple.rollFormula` SPECIFICALLY —
-   * the only slot the Simple engine consults — never an OR across the three slots. Tolerant of a
-   * raw, pre-normalized system. */
-  _salvageNormalizationContext(system = {}) {
-    const raw = system?.salvageResolutionMode;
-    const token = raw === 'tiered' ? 'routed' : raw; // legacy alias
-    const salvageResolutionMode = ['simple', 'routed', 'progressive'].includes(token)
-      ? token
-      : 'simple';
-    const formula = system?.salvageCraftingCheck?.simple?.rollFormula;
-    const salvageSimpleCheckHasFormula = typeof formula === 'string' && formula.trim() !== '';
-    return { salvageResolutionMode, salvageSimpleCheckHasFormula };
+  _salvageNormalizationContext(system) {
+    return salvageNormalizationContext(system);
   }
 
-  /** Normalize a component's salvage config. In Simple salvage mode this enforces the group-count
-   * invariant (issue 764) via a SUCCESS-FIRST retain-one clamp: one success group at
-   * `resultGroups[0]`, which the engine awards ON SUCCESS via `slice(0, 1)` with no role filter,
-   * plus at most one reserved `role: 'failure'` group. The ordering is load-bearing, because the
-   * FAILURE branch must select BY ROLE or a failed check would award the success output. */
   _normalizeSalvage(salvage = {}, options = {}) {
-    if (!salvage || typeof salvage !== 'object') {
-      return {
-        enabled: false,
-        // Default TRUE (issue 651), matching the `Recipe.allowPlayerResultReorder`
-        // default. This non-object path returns its own literal, so the default has to
-        // be stated on BOTH return paths or a component with no salvage config renders
-        // the GM toggle off against a default-on spec.
-        allowPlayerResultReorder: true,
-        ingredientQuantity: 1,
-        toolIds: [],
-        resultGroups: [],
-        dcOverride: null,
-        // `checkModifierIds` is deliberately ABSENT from this literal, not `[]`: an empty
-        // array is an AUTHORED pick of zero, and a component with no salvage config at all
-        // has authored nothing. Seeding one here would silently give every such component a
-        // pick of zero modifiers under `bySubject`. See the attach in the main return.
-      };
-    }
-
-    const rawQty = Number(salvage.ingredientQuantity);
-    const ingredientQuantity = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
-
-    // A set override replaces the system-level salvage default DC; null uses it. null/''/undefined
-    // are guarded explicitly so re-normalizing a null stays null (`Number(null)` is a spurious 0).
-    const dcOverride = (() => {
-      const raw = salvage.dcOverride;
-      if ([null, undefined, ''].includes(raw)) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? Math.trunc(n) : null;
-    })();
-
-    // HOISTED DELIBERATELY (issue 676). `enabled` is the first key of the literal
-    // below and `resultGroups` used to be computed ~10 lines later, so clamping
-    // `enabled` in place against the groups would read an uninitialized local.
-    const normalizedGroups = Array.isArray(salvage.resultGroups)
-      ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
-      : [];
-
-    // Simple-mode SUCCESS-FIRST retain-one clamp (issue 764). Routed, progressive and the
-    // no-context default keep every group and the lower-bound-only `enabled` rule.
-    const { salvageResolutionMode, salvageSimpleCheckHasFormula } = options;
-    let resultGroups = normalizedGroups;
-    let enabled = salvage.enabled === true && normalizedGroups.length > 0;
-    if (salvageResolutionMode === 'simple') {
-      const successGroup = normalizedGroups.find((g) => g.role !== 'failure');
-      const failureGroup = normalizedGroups.find((g) => g.role === 'failure');
-      const clamped = [];
-      // Success group ALWAYS at index 0 — the engine's SUCCESS award is `slice(0, 1)` with no role
-      // filter, so a failure-first input is re-ordered here. Unchanged by issue 1098, whose
-      // failure award selects BY ROLE precisely so this guarantee stays the only thing relied on.
-      if (successGroup) clamped.push(successGroup);
-      // Reserved failure group tolerated ONLY with an authored Simple check formula.
-      if (failureGroup && salvageSimpleCheckHasFormula === true) clamped.push(failureGroup);
-      resultGroups = clamped;
-      // A Simple config with no success group cannot be enabled: the success branch's
-      // `slice(0, 1)` would otherwise award a lone `role: 'failure'` group on a PASSED check.
-      enabled = salvage.enabled === true && successGroup != null;
-    }
-
-    return {
-      // Requirement 5 (`data-models` → Component) is ENFORCED HERE, not by any UI control (issue
-      // 676): the normalizer is the single chokepoint EVERY writer passes, and a control that
-      // merely refuses to ENABLE a zero-group component cannot stop one BECOMING zero-group.
-      enabled,
-      // GM-authored policy: may a player reorder this salvage's progressive result
-      // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
-      // the 1.17.0 migration does not seed it.
-      allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
-      ingredientQuantity,
-      dcOverride,
-      // Preserve migrated salvage tool references so they are not orphaned on the
-      // next system save. Coerced to trimmed, non-empty, deduped id strings.
-      toolIds: this._normalizeToolIds(salvage.toolIds),
-      resultGroups,
-      // This component's own check-modifier pick (issue 1095), consulted only under `bySubject`.
-      // Attached ONLY when authored, keyed on `Array.isArray` AT ENTRY: an authored EMPTY array is
-      // a real pick of zero, distinct from an absent one which inherits the check default. It is
-      // deliberately NOT keyed on the post-filter length.
-      ...authoredCheckModifierIds(salvage.checkModifierIds),
-      ...(salvage.outcomeRouting &&
-        typeof salvage.outcomeRouting === 'object' && {
-          outcomeRouting: { ...salvage.outcomeRouting },
-        }),
-      ...(salvage.timeRequirement &&
-        typeof salvage.timeRequirement === 'object' && {
-          timeRequirement: this._normalizeTimeRequirement(salvage.timeRequirement),
-        }),
-      ...(salvage.currencyRequirement &&
-        typeof salvage.currencyRequirement === 'object' && {
-          currencyRequirement: this._normalizeCurrencyRequirement(salvage.currencyRequirement),
-        }),
-    };
+    return normalizeSalvage(salvage, options);
   }
 
-  /** Normalize an array of library tool id strings to trimmed, non-empty, deduped strings,
-   * tolerating non-array or nullish input. */
   _normalizeToolIds(toolIds) {
-    if (!Array.isArray(toolIds)) return [];
-    const seen = new Set();
-    const out = [];
-    for (const raw of toolIds) {
-      const id = String(raw ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      out.push(id);
-    }
-    return out;
+    return normalizeToolIds(toolIds);
   }
 
   _normalizeSalvageResult(result) {
-    if (!result || typeof result !== 'object') return null;
-    const compId = result.componentId || result.systemItemId;
-    const quantityFormula = normalizeQuantityFormula(result.quantityFormula);
-    return {
-      id: result.id || foundry.utils.randomID(),
-      componentId: compId || null,
-      systemItemId: compId || null, // transitional alias
-      quantity:
-        Number.isFinite(Number(result.quantity)) && Number(result.quantity) >= 1
-          ? Number(result.quantity)
-          : 1,
-      // Absence is the fixed-amount state, so `''` and whitespace collapse to it (issue 1645).
-      ...(quantityFormula && { quantityFormula }),
-      propertyMacroUuid: result.propertyMacroUuid || null,
-    };
+    return normalizeSalvageResult(result);
   }
 
   _normalizeSalvageResultGroup(group) {
-    if (!group || typeof group !== 'object') return null;
-    const results = Array.isArray(group.results)
-      ? group.results.map((r) => this._normalizeSalvageResult(r)).filter(Boolean)
-      : [];
-    return {
-      id: group.id || foundry.utils.randomID(),
-      name: String(group.name || '').trim() || 'Result Group',
-      // Preserve a reserved `role: 'failure'` group (issue 764). The editor never AUTHORS this
-      // role, but import, copy-mode and migration can carry one, and the Simple-mode clamp
-      // distinguishes success groups by it. Only the reserved value is emitted.
-      ...(group.role === 'failure' && { role: 'failure' }),
-      results,
-    };
+    return normalizeSalvageResultGroup(group);
   }
 
   _normalizeTimeRequirement(time) {
-    if (!time || typeof time !== 'object') return {};
-    const result = {};
-    for (const key of ['minutes', 'hours', 'days', 'months', 'years']) {
-      const val = Number(time[key]);
-      if (Number.isFinite(val) && val > 0) {
-        result[key] = val;
-      }
-    }
-    return result;
+    return normalizeTimeRequirement(time);
   }
 
   _normalizeCurrencyRequirement(currency) {
-    if (!currency || typeof currency !== 'object') return {};
-    const amount = Number(currency.amount);
-    return {
-      unit: String(currency.unit || '').trim() || 'gp',
-      amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
-    };
-  }
-
-  // Normalise the alchemy sub-config for alchemy-mode systems.
-  // Accepts both 'alchemy' (canonical) and 'cauldron' (T-189 legacy alias) so that persisted
-  // data written before the rename continues to produce a valid config object on load.
-  _normalizeAlchemyConfig(config, resolutionMode) {
-    if (resolutionMode !== 'alchemy' && resolutionMode !== 'cauldron') return null; // T-189: accept both
-    const c = config && typeof config === 'object' ? config : {};
-    // System-level alchemy check mode, replacing the retired per-recipe `resultSelection.provider`:
-    // `none` (a matched brew always succeeds), `simple` (mandatory pass/fail) or `tiered`
-    // (mandatory routed check, identical routing to `routedByCheck`). Defaults to `none`.
-    const checkMode = ['none', 'simple', 'tiered'].includes(c.checkMode) ? c.checkMode : 'none';
-    return {
-      checkMode,
-      // Defaults ON (issue 966). Alchemy's `global` visibility mode reveals a recipe ONLY from
-      // `learnedRecipes`, which only this flag ever writes, so an absent flag left the most
-      // permissive-sounding mode revealing nothing. An explicitly stored `false` is honoured.
-      learnOnCraft: c.learnOnCraft !== false,
-      consumeOnFail: c.consumeOnFail !== false,
-      showAttemptHistoryToPlayers: c.showAttemptHistoryToPlayers !== false,
-    };
-  }
-
-  _normalizeEssenceQuantities(essences = {}, validEssenceIds = null) {
-    const output = {};
-    if (!essences || typeof essences !== 'object') return output;
-    const validIds = validEssenceIds instanceof Set ? validEssenceIds : null;
-
-    for (const [rawKey, rawValue] of Object.entries(essences)) {
-      const key = String(rawKey || '').trim();
-      if (!key) continue;
-      if (validIds && !validIds.has(key)) continue;
-
-      const qty = Number(rawValue);
-      if (!Number.isFinite(qty) || qty <= 0) continue;
-
-      output[key] = qty;
-    }
-    return output;
+    return normalizeCurrencyRequirement(currency);
   }
 
   /** Persist a crafting-system mutation through the definition repository (issue 1089).
