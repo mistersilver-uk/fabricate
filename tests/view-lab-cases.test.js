@@ -2353,17 +2353,19 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty-two frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty-three frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
 // and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first and twenty-second at issue 1510, which are the recipe
-// studio's kind list and the component studio's category list — the first two converted MANAGER
-// selects whose panels have a frame at all, one ticked and one not).
+// option panels, and the twenty-first to twenty-third at issue 1510, which are the recipe studio's
+// kind list, the component studio's category list and the checks studio's trigger comparison list
+// — the first three converted MANAGER selects whose panels have a frame at all, and the third the
+// first opened from inside a card the walk has to author before it exists).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
+  'manager-checks-trigger-operator-list',
   'manager-component-edit-category-list',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
