@@ -42,10 +42,9 @@
     the trigger's root and one on the portaled panel, which escapes the first.
   - THE FOCUS MODEL, the key map, the caret-edge rules, the type-ahead and the flat-order option ids
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
-    arithmetic is `util/listboxNavigation.js`'s and `util/pickerOptionModel.js`'s, and
-    `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin
-    what each key does. The option ids carry a per-instance prefix, because two pickers on one
-    screen indexing from 0 would make `aria-activedescendant` ambiguous.
+    arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
+    this component applying the intent the latter hands back, and
+    `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin it.
   - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
     its own chrome refusing focus above all — are stated there rather than restated here.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
@@ -79,13 +78,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import {
-    activeOptionId,
-    caretOwnsKey,
-    nextActiveIndex,
-    openingKeyOwns,
-    typeAheadCursor,
-  } from '../util/listboxNavigation.js';
+  import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
   import {
     activeCursorIndex,
@@ -243,62 +236,47 @@
     active?.scrollIntoView?.({ block: 'nearest' });
   });
 
-  function typeAheadOwnsKey(event) {
-    if (showSearch) return false;
-    if (disabled || triggerAriaDisabled) return false;
-    if (event.ctrlKey || event.metaKey || event.altKey) return false;
-    const typed = typeAheadCursor(activeIndex, typeAheadLabels, event.key, {
-      buffer: typeAheadBuffer,
-      isDisabled: optionIsDisabled,
-    });
-    if (typed === null) return false;
-    event.preventDefault();
-    typeAheadBuffer = typed.buffer;
-    if (typed.index === null) return true;
-    open = true;
-    cursor = { generation: optionListGeneration, index: typed.index };
-    return true;
+  function moveCursorTo(index) {
+    cursor = { generation: optionListGeneration, index };
   }
 
-  function takeOpeningKey(event) {
-    if (showSearch) return false;
-    if (disabled || triggerAriaDisabled) return false;
-    const opening = openingKeyOwns(event);
-    if (!opening) return false;
-    event.preventDefault();
-    open = true;
-    if (opening.altOpen) return true;
-    const landing = nextActiveIndex(-1, renderedOptions.length, event.key, {
-      columns: gridColumns,
-      isDisabled: optionIsDisabled,
-    });
-    if (landing !== null) cursor = { generation: optionListGeneration, index: landing };
-    return true;
-  }
-
+  // Every side effect the key model has lives here; which one to run is `holderKeyIntent`'s answer.
   function onHolderKeydown(event) {
-    if (!open) {
-      if (takeOpeningKey(event)) return;
-      typeAheadOwnsKey(event);
-      return;
-    }
-    if (event.key === 'Enter') {
-      const active = renderedOptions[activeIndex];
-      if (!active) return;
-      event.preventDefault();
-      chooseOption(active);
-      return;
-    }
-    if (typeAheadOwnsKey(event)) return;
-    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-    if (caretOwnsKey(event)) return;
-    const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
+    const intent = holderKeyIntent(event, {
+      open,
+      showSearch,
+      holderDisabled: disabled || triggerAriaDisabled,
+      current: activeIndex,
+      count: renderedOptions.length,
       columns: gridColumns,
       isDisabled: optionIsDisabled,
+      labels: typeAheadLabels,
+      buffer: typeAheadBuffer,
     });
-    if (next === null) return;
-    event.preventDefault();
-    cursor = { generation: optionListGeneration, index: next };
+    switch (intent.kind) {
+      case 'choose':
+        event.preventDefault();
+        chooseOption(renderedOptions[intent.index]);
+        return;
+      case 'move-cursor':
+        event.preventDefault();
+        moveCursorTo(intent.index);
+        return;
+      case 'type-ahead':
+        event.preventDefault();
+        typeAheadBuffer = intent.buffer;
+        if (intent.index === null) return;
+        open = true;
+        moveCursorTo(intent.index);
+        return;
+      case 'open':
+        event.preventDefault();
+        open = true;
+        if (intent.index !== null) moveCursorTo(intent.index);
+        return;
+      default:
+        return;
+    }
   }
 
   function restoreTriggerFocus() {
