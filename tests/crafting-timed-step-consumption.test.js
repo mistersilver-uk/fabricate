@@ -948,13 +948,20 @@ test('non-timed step still consumes at finish and produces results (regression g
 // single craft() call, per-step time gates are summed into one gate, and mid-chain failure follows
 // the existing per-step failure policy.
 
+// A null `resultComponentId` gives the step a result group that EXISTS but awards nothing — the
+// shape issue 1907 legalised on a non-terminal step.
 function collapsedStep({ id, ingredientSets, resultComponentId, timeRequirement = null }) {
   return {
     id,
     name: `Step ${id}`,
     ingredientSets,
     resultGroups: [
-      { id: `rg-${id}`, results: [{ id: `r-${id}`, componentId: resultComponentId, quantity: 1 }] },
+      {
+        id: `rg-${id}`,
+        results: resultComponentId
+          ? [{ id: `r-${id}`, componentId: resultComponentId, quantity: 1 }]
+          : [],
+      },
     ],
     toolIds: [],
     outcomeRouting: null,
@@ -964,12 +971,12 @@ function collapsedStep({ id, ingredientSets, resultComponentId, timeRequirement 
 
 // A multi-step recipe (explicit `steps[]`, length > 1) whose system has the
 // multi-step feature OFF — the collapse trigger.
-function buildCollapsedRecipe({ craftingSystemId, set, stepTime = null }) {
+function buildCollapsedRecipe({ craftingSystemId, set, stepTime = null, firstStepAwards = 'intermediate' }) {
   const steps = [
     collapsedStep({
       id: 'a',
       ingredientSets: [set],
-      resultComponentId: 'intermediate',
+      resultComponentId: firstStepAwards,
       timeRequirement: stepTime,
     }),
     collapsedStep({
@@ -1159,6 +1166,44 @@ test('multi-step feature ON is NOT collapsed: one craft call resolves a single s
   const active = runManager.getActiveRuns(craftingActor);
   assert.equal(active.length, 1, 'the run stays active for the next step (normal multi-step flow)');
   assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the second step, awaiting a new trigger');
+});
+
+test('an empty non-terminal result group awards nothing and the run advances to the terminal step', async () => {
+  const system = collapsedSystem({
+    features: { multiStepRecipes: true, craftingChecks: false, essences: false, chatOutput: false },
+  });
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 10);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-shared', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildCollapsedRecipe({ craftingSystemId: system.id, set, firstStepAwards: null });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  stubCollapsedEngine(engine);
+
+  const first = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(first.success, true, 'the empty intermediate step resolves');
+  assert.equal(first.results.length, 0, 'the empty group awards nothing');
+  assert.equal(craftingActor._createdDocs.length, 0, 'no item is created on the empty step');
+  assert.equal(wood.system.quantity, 8, 'the empty step still costs its materials (10 -> 8)');
+
+  const active = runManager.getActiveRuns(craftingActor);
+  assert.equal(active.length, 1, 'the run stays active');
+  assert.equal(active[0].status, 'inProgress', 'an empty step does not end the run');
+  assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the terminal step');
+  assert.deepEqual(active[0].steps[0].createdResults, [], 'no award receipt for the empty step');
+
+  const second = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(second.success, true, 'the terminal step resolves');
+  assert.equal(second.results.length, 1, 'the terminal step awards its product');
+  assert.equal(second.results[0].name, 'Final', 'the awarded item is the terminal step result');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'the run completes');
+  assert.equal(runManager.getRunHistory(craftingActor)[0].status, 'succeeded');
 });
 
 // START-phase currency SETTLEMENT (issue 902). A timed step consumes currency at START and records
