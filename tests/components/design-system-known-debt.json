@@ -338,6 +338,7 @@
     "src/ui/svelte/apps/manager/ToolEditView.svelte | 3",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 4",
     "src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte | 1",
+    "src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte | 1",
     "src/ui/svelte/apps/manager/components/ComponentRow.svelte | 1",
     "src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte | 1",
