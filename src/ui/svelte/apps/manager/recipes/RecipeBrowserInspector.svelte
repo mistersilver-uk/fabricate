@@ -8,7 +8,9 @@
   Contents: hero (image, name, category/status chips, flavour), a 2x2 STAT grid, then a REQUIRES and
   a PRODUCES list of icon-chip + name + mono quantity rows, then the recipe actions. Produces is not
   garnish — an inspector that cannot say what a recipe makes is unfinished — so an empty list is a
-  DANGER row reading "a successful craft makes nothing" rather than a blank.
+  DANGER row reading "a successful craft makes nothing" rather than a blank, UNLESS the step paged to
+  is a non-terminal step of a multi-step recipe that was authored to award nothing there (issue 1907),
+  which instead reads a neutral note that the step only advances the craft.
 
   The walk over execution scopes → sets → groups → options lives in the pure `recipeBrowserModel.js`,
   so it is unit tested without a DOM and written once for both lists.

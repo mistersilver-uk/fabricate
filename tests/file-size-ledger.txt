@@ -171,7 +171,7 @@ src/ui/svelte/apps/manager/essences/essenceStudio.js::projectEssenceBehaviourFac
 src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte	950
 src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte	663
 src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte	847
-src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte	825
+src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte	827
 src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte	1249
 src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte	953
 src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte	1391
