@@ -503,8 +503,13 @@ export const CASES = Object.freeze([
     // rendered at all, so this selector is satisfied only by the fixed behaviour.
     expectSelector:
       '[data-recipe-mode="routedByIngredients"] [data-io-group="outputs"] .crafting-io-output-name',
+    // The PRODUCT NAME is what the frame has to make legible; `scrollIntoViewIfNeeded` leaves the
+    // group itself flush against the scroll container's edge once the multi-step hint wraps.
     expectContained: [
-      { container: '[data-crafting-detail-scroll]', target: '[data-io-group="outputs"]' },
+      {
+        container: '[data-crafting-detail-scroll]',
+        target: '[data-io-group="outputs"] .crafting-io-output-name',
+      },
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [

@@ -1206,6 +1206,34 @@ test('an empty non-terminal result group awards nothing and the run advances to 
   assert.equal(runManager.getRunHistory(craftingActor)[0].status, 'succeeded');
 });
 
+test('a collapsed chain runs an empty first step and returns only the final result', async () => {
+  // Multi-step feature OFF: both steps run back-to-back in ONE craft call. The empty first step
+  // (issue 1907) must still spend its materials and contribute nothing to the returned results.
+  const system = collapsedSystem();
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 10);
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-shared', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildCollapsedRecipe({ craftingSystemId: system.id, set, firstStepAwards: null });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  stubCollapsedEngine(engine);
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, true, 'the whole chain resolves in a single craft action');
+  assert.equal(result.results.length, 1, 'only the terminal step awarded anything');
+  assert.equal(result.results[0].name, 'Final', 'and it is the final step result');
+  assert.equal(wood.system.quantity, 6, 'both steps consumed (10 -> 6), the empty one included');
+  assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'no active run lingers');
+  const history = runManager.getRunHistory(craftingActor);
+  assert.equal(history[0].status, 'succeeded');
+  assert.deepEqual(history[0].steps[0].createdResults, [], 'the empty step files no award receipt');
+});
+
 // START-phase currency SETTLEMENT (issue 902). A timed step consumes currency at START and records
 // the consumption on the run.
 

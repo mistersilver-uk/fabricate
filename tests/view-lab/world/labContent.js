@@ -3081,7 +3081,7 @@ export function buildLabContent({ journalCaseState = null } = {}) {
     {
       id: LAB_SYSTEM_IDS.GLASSWORK,
       name: 'Emberlight Glassworks',
-      description: 'Furnace glass: the melt buys nothing but the blank the lap then reads true.',
+      description: 'Furnace glass: the melt buys nothing but a blank, and the lap makes it read true.',
       img: `${ICON_BASE}/commodities/gems/gem-faceted-radiant-blue.webp`,
       enabled: true,
       visibilityMode: 'global',

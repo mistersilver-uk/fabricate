@@ -597,6 +597,12 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-recipe-section="step-sm-step-draw-results"]' +
       ' p[data-recipe-result-empty].manager-muted',
+    expectContained: [
+      {
+        container: '.fabricate-manager',
+        target: '[data-recipe-section="step-sm-step-draw-results"] p[data-recipe-result-empty]',
+      },
+    ],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
