@@ -57,6 +57,28 @@ export const CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
+    id: 'player-gathering-drop-open',
+    label: 'Player app — Gathering drop modifiers open',
+    // The only state that draws the repaired drop disclosure (issue 1512), on the world's five-row
+    // drop table, so one open row's breakdown shows against four collapsed siblings.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { tab: 'gathering' },
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
+      { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
+      { selector: ':nth-match(.gathering-task-drop-summary, 1)', scroll: true },
+      // A scroll step short-circuits before the driver's activation branch, so opening is its own.
+      { selector: ':nth-match(.gathering-task-drop-summary, 1)', press: 'Enter' },
+    ],
+    // The open row and the region it names, so a header that only flipped its attribute fails.
+    expectSelector:
+      '.gathering-task-drop:has(.gathering-task-drop-summary[aria-expanded="true"][aria-controls])' +
+      ' [data-gathering-drop-modifiers]',
+    kinds: ['player', 'gathering'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+  }),
+  playerCase({
     id: 'player-gathering-tool-blocked',
     label: 'Player app — Gathering tool blocked',
     smokeLabels: ['player-gathering-tool-blocked'],

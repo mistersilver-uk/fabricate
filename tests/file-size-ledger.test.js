@@ -217,17 +217,15 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  // 104/113 as of issue 1704, which split `src/canvas/InteractableManager.js` into four pure
-  // modules behind a composing manager: the file fell from 901 lines to under the 800-line
-  // threshold and `_spawnInteractableRegion` fell from 107 lines to under the 100-line one, so
-  // both rows left the ledger and no successor crossed either threshold.
-  // It rose to 105 when the 1.9.7 hotfix (#1848) was forward-ported and
-  // `src/systems/GatheringEnvironmentStore.js` crossed the 800-line threshold, and returned to 104
-  // on #1858, which performed the extraction that debt named: the realm library read, the
-  // membership baseline, the prune and the unknown-realm rejection now live in
-  // `src/systems/environmentRealmMembership.js`, leaving the store under the threshold with no
-  // successor function over the 100-line one. Issue 1714 then banked the oversized `salvage`
-  // function: its named pipeline functions and `salvagePipeline.js` stay below both thresholds.
+  // 105/113 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
+  // threshold at 820, and `createFoundryJournalRunAuthority` crossed the 100-line function
+  // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
+  // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
+  // `deleteEmbeddedDocuments` throw and stranded a run. Issue 1701 banked `craft`: every pipeline
+  // function it split into is under the threshold, and `craftPipeline.js` under the file one.
+  // Issue 1699 banked `repairItemData`: the source-identity extraction split its 152 lines into
+  // `buildRepairKinds`, `emptyRepairSummary` and the three walks, all under the threshold, and
+  // neither new `src/systems/` module reaches the file one.
   assert.equal(files, 104, 'oversized files');
-  assert.equal(keys.length - files, 112, 'oversized functions');
+  assert.equal(keys.length - files, 111, 'oversized functions');
 });

@@ -15,6 +15,9 @@ import {
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+// The condition-type control is the shared `<Select>` since issue 1510, so its options exist only
+// while the panel is open. Manifest and reader only: the claim below did not move.
+import { selectOptionValues } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -324,9 +327,10 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       },
       'triggers'
     );
-    const select = openTrigger(target, 'trg-1').querySelector('[data-trigger-condition-type]');
-    assert.ok(select, 'the condition-type control renders');
-    const values = [...select.querySelectorAll('option')].map((option) => option.value);
+    openTrigger(target, 'trg-1');
+    const control = '[data-trigger="trg-1"] [data-trigger-condition-type]';
+    assert.ok(target.querySelector(control), 'the condition-type control renders');
+    const values = selectOptionValues(target, control);
     assert.ok(
       values.includes('outcomeTier'),
       `outcomeTier is offered as a condition type (got ${values.join(', ')})`

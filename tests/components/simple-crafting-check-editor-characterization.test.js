@@ -7,8 +7,11 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -16,7 +19,10 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-simple-check-characterization-',
   rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    // The popover closure the shared picker composes (issue 1510), which spreads the Foundry
+    // bridge. Manifest only: no assertion below moved.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
@@ -67,11 +73,19 @@ const harness = createMountedComponentHarness({
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+    // The tier card renders the product's ONE ordered list (issue 1512), which draws its controls
+    // through the icon button and its opener through the row disclosure.
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.
     'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+    // THE SHARED ONE-OF-N PICKER and its compiled graph (issue 1510), rendered by this editor's
+    // Preview-against control and by the trigger editor's five. Manifest only.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',

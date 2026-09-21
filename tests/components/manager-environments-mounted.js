@@ -13,7 +13,11 @@ import {
   createManagerQueries,
   waitForQueuedAnnouncement,
 } from '../helpers/manager/managerQueries.js';
-import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import {
+  assertDropComponentCellKeyboardPath,
+  managerComponents,
+  settleBetweenTests,
+} from './manager-mounted-shared.js';
 
 let Component;
 let EnvironmentEditViewComponent;
@@ -36,7 +40,7 @@ const {
 
 /**
  * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
- * PERSISTS a picked character modifier before the panel is rendered again (issue 1707).
+ * persists a picked character modifier before the panel is rendered again (issue 1707).
  */
 function modifierEditorShell(subject, attached = []) {
   const picked = [];
@@ -519,6 +523,12 @@ export function registerEnvironmentsCases() {
       '.manager-drop-component-button'
     );
     assert.ok(populatedComponentButton);
+    // The FILLED branch of the row's keyboard path (issue 1512); the empty branch is asserted in
+    // `manager-gathering-mounted.js`, where a freshly added row renders it.
+    assertDropComponentCellKeyboardPath(populatedDropRow, {
+      empty: false,
+      label: 'Nightshade With An Exceptionally Long Localized Component Name',
+    });
     const populatedComponentThumb = populatedComponentCell.querySelector(
       '.manager-gathering-task-thumb'
     );
@@ -2953,7 +2963,7 @@ export function registerEnvironmentsCases() {
     );
   });
 
-  // The DOM half of what `gathering-event-editor.test.js` pinned as root TEXT: the panel is one
+  // The DOM half of what `gathering-event-editor.test.js` pinned as root text: the panel is one
   // component now, so only rendering both subjects can prove their hooks stayed distinct.
   for (const subject of ['drop', 'event']) {
     it(`renders the shared modifier panel under its own ${subject} hook prefix`, async () => {
@@ -3159,4 +3169,376 @@ export function registerEnvironmentsCases() {
       'the event has never drawn one, and gains none from sharing the panel'
     );
   });
+  /** One editor draft, varied per case: the fixture differences are what each case is about. */
+  function editorDraft(overrides = {}) {
+    return {
+      id: 'env-forest',
+      craftingSystemId: 'alchemy',
+      name: 'Moonlit Forest',
+      description: 'Old trees and moonlit herbs.',
+      enabled: true,
+      selectionMode: 'targeted',
+      compositionMode: 'automatic',
+      biomes: ['forest'],
+      dangerLevel: 'dangerous',
+      sceneUuid: 'Scene.moonlit',
+      ...overrides,
+    };
+  }
+
+  function compositionRecord(id, name, compositionState, overrides = {}) {
+    return {
+      id,
+      kind: overrides.kind ?? 'task',
+      record: { name, description: `${name} description`, img: 'icons/svg/item-bag.svg' },
+      compositionState,
+      runtimeState: overrides.runtimeState ?? 'unavailable',
+      matches: overrides.matches ?? true,
+      libraryEnabled: overrides.libraryEnabled ?? true,
+      evidence: {},
+    };
+  }
+
+  function mountEditor(props) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, { target, props });
+    flushSync();
+  }
+
+  async function openEditorTab(id) {
+    target.querySelector(`[data-environment-tab-button="${id}"]`).click();
+    await tick();
+    flushSync();
+  }
+
+  it('hides the right inspector on the validation tab and collapses the workspace to one column', async () => {
+    mountEditor({
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-a', 'Forage Herbs', 'includedByMatch')],
+        events: [],
+      },
+    });
+
+    const workspace = () => target.querySelector('.manager-environment-workspace');
+    assert.ok(
+      Boolean(target.querySelector('.manager-environment-inspector')),
+      'the overview tab renders the editor-owned right inspector'
+    );
+    assert.equal(workspace().classList.contains('is-inspector-hidden'), false);
+
+    await openEditorTab('validation');
+    assert.ok(
+      !target.querySelector('.manager-environment-inspector'),
+      'the validation tab renders no right inspector'
+    );
+    assert.equal(
+      workspace().classList.contains('is-inspector-hidden'),
+      true,
+      'and the workspace collapses to one column'
+    );
+
+    await openEditorTab('overview');
+    assert.ok(
+      Boolean(target.querySelector('.manager-environment-inspector')),
+      'and it comes back on every other tab'
+    );
+  });
+
+  it('draws no tab badge at the cohort zero point, where a wrong count and a right one agree', async () => {
+    mountEditor({
+      // Every readiness check satisfied and no issue raised, so both validation counts are zero;
+      // the one composition row is excluded, so both membership counts are zero too.
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-out', 'Excluded Task', 'excluded')],
+        events: [],
+      },
+    });
+
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('.manager-environment-tab-badge')).map((node) =>
+        node.textContent.trim()
+      ),
+      [],
+      'no tab draws a badge when its count is zero'
+    );
+
+    await openEditorTab('tasks');
+    assert.ok(
+      Boolean(target.querySelector('[data-record-id="task-out"]')),
+      'though the row the count excluded is on screen, so the zero is a reading and not an empty fixture'
+    );
+  });
+
+  it('routes a manual task row quick action through the editor own compose callbacks', async () => {
+    const excluded = [];
+    const included = [];
+    mountEditor({
+      environmentDraft: editorDraft({ compositionMode: 'manual' }),
+      composition: {
+        compositionMode: 'manual',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [
+          compositionRecord('task-in', 'Forage Herbs', 'explicitlyIncluded', {
+            runtimeState: 'available',
+          }),
+          compositionRecord('task-add', 'Gather Roots', 'candidate'),
+        ],
+        events: [],
+      },
+      onExcludeRecord: (kind, id) => excluded.push([kind, id]),
+      onIncludeRecord: (kind, id) => included.push([kind, id]),
+    });
+
+    await openEditorTab('tasks');
+    target
+      .querySelector('[data-record-id="task-in"] [data-quick-action="exclude"]')
+      .click();
+    await tick();
+    target
+      .querySelector('[data-record-id="task-add"] [data-quick-action="include"]')
+      .click();
+    await tick();
+
+    assert.deepEqual(excluded, [['task', 'task-in']]);
+    assert.deepEqual(included, [['task', 'task-add']]);
+  });
+
+  it('gates the realm field on the toggle, not on the field simply existing', async () => {
+    mountEditor({
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-in', 'Forage Herbs', 'includedByMatch')],
+        events: [],
+      },
+      realmsEnabled: false,
+    });
+
+    assert.ok(
+      !target.querySelector('[data-environment-field="includedRealmIds"]'),
+      'the realm field stays gone while the world toggle is off'
+    );
+  });
+
+  it('draws the empty-state hint exactly when no realm exists yet, not once one does', async () => {
+    mountEditor({
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-in', 'Forage Herbs', 'includedByMatch')],
+        events: [],
+      },
+      realmsEnabled: true,
+      realmRecords: [],
+    });
+
+    assert.ok(
+      Boolean(target.querySelector('[data-environment-realm-empty]')),
+      'no realm exists yet, so the empty-state hint draws'
+    );
+    assert.ok(
+      !target.querySelector('.manager-environment-membership-add'),
+      'and the add-realm select stays gone until a realm exists'
+    );
+  });
+
+  it('offers the force add in automatic mode only, and emits the mode the switch was clicked for', async () => {
+    const modes = [];
+    const forced = [];
+    const included = [];
+    const events = [
+      compositionRecord('event-in', 'Thorn Snare', 'includedByMatch', {
+        kind: 'event',
+        runtimeState: 'available',
+      }),
+      compositionRecord('event-off', 'Rock Fall', 'notMatching', {
+        kind: 'event',
+        matches: false,
+      }),
+    ];
+    mountEditor({
+      environmentDraft: editorDraft(),
+      composition: {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-in', 'Forage Herbs', 'includedByMatch')],
+        events,
+      },
+      onSetCompositionMode: (mode) => modes.push(mode),
+      onForceIncludeRecord: (kind, id) => forced.push([kind, id]),
+      onIncludeRecord: (kind, id) => included.push([kind, id]),
+    });
+
+    await openEditorTab('events');
+    const forceAdd = target.querySelector(
+      '[data-section="non-matching"] [data-record-id="event-off"] .manager-environment-force-include'
+    );
+    assert.ok(Boolean(forceAdd), 'automatic mode offers the force add on a non-matching row');
+    forceAdd.click();
+    await tick();
+    assert.deepEqual(forced, [['event', 'event-off']]);
+
+    await openEditorTab('overview');
+    target.querySelector('[data-composition-mode-option="manual"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(modes, ['manual'], 'clicking the switch asks the host for manual mode');
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountEditor({
+      environmentDraft: editorDraft({ compositionMode: 'manual' }),
+      composition: {
+        compositionMode: 'manual',
+        counts: { availableTasks: 1, availableEvents: 1 },
+        tasks: [compositionRecord('task-in', 'Forage Herbs', 'includedByMatch')],
+        events,
+      },
+      onIncludeRecord: (kind, id) => included.push([kind, id]),
+    });
+
+    await openEditorTab('events');
+    assert.ok(
+      Boolean(target.querySelector('[data-section="available-to-add"]')),
+      'manual mode offers the Available to add list instead'
+    );
+    assert.ok(
+      !target.querySelector('[data-action="force-include"]'),
+      'and no force add anywhere: manual mode has no filter for one to override'
+    );
+    assert.ok(
+      !target.querySelector('.manager-environment-force-include'),
+      'nor the labelled one'
+    );
+    target
+      .querySelector('[data-record-id="event-off"] [data-quick-action="include"]')
+      .click();
+    await tick();
+    assert.deepEqual(included, [['event', 'event-off']], 'the same row is plainly added instead');
+  });
+
+  // The two states the rail draws itself (issue 1707 phase 3): the selected environment's
+  // summary card and the empty-library setup card, neither of which had a DOM assertion.
+  it('draws the selected environment summary in the rail, and follows the row that is picked', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const rail = () => target.querySelector('.manager-inspector');
+    const facts = () =>
+      Array.from(rail().querySelectorAll('[data-environment-fact]')).map((fact) => [
+        fact.dataset.environmentFact,
+        fact.querySelector('strong').textContent.trim(),
+      ]);
+    const chips = () =>
+      Array.from(rail().querySelectorAll('.manager-chip-row .manager-chip')).map((chip) =>
+        chip.textContent.trim()
+      );
+
+    assert.equal(rail().querySelector('.manager-kicker').textContent.trim(), 'Selected environment');
+    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Moonlit Forest');
+    assert.deepEqual(chips(), ['Active', 'Targeted', 'Linked scene']);
+    assert.deepEqual(facts(), [
+      ['tasks', '1'],
+      ['events', '0'],
+      ['required-tools', '0'],
+      ['mode', 'Targeted'],
+      // The hook the smoke harness reads as `.manager-inspector [data-environment-fact="scene"]`.
+      ['scene', 'Moonlit Forest'],
+    ]);
+    assert.equal(
+      rail().querySelector('.manager-environment-preview').classList.contains('is-fallback'),
+      false,
+      'the linked scene supplies the preview, so the fallback modifier stays off'
+    );
+
+    target
+      .querySelector('[data-environment-id="env-cavern"] .manager-environment-identity')
+      .click();
+    await tick();
+    flushSync();
+
+    assert.equal(rail().querySelector('.manager-inspector-name').textContent.trim(), 'Quiet Cavern');
+    assert.deepEqual(chips(), ['Disabled', 'Blind', 'Scene unresolved']);
+    assert.deepEqual(facts(), [
+      ['tasks', '1'],
+      ['events', '0'],
+      ['required-tools', '0'],
+      ['mode', 'Blind'],
+      ['scene', 'Scene.missing'],
+    ]);
+    assert.ok(
+      rail().querySelector('.manager-environment-preview').classList.contains('is-fallback'),
+      'and an unresolved scene with no image of its own falls back'
+    );
+  });
+
+  it('draws the empty-library setup card in the rail, with its published gathering-docs link', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { emptyEnvironments: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+
+    const card = target.querySelector('.manager-inspector .manager-setup-card');
+    assert.ok(Boolean(card), 'an empty library draws the setup card rather than a row summary');
+    assert.equal(card.getAttribute('aria-label'), 'Plan gathering content');
+    assert.equal(card.querySelector('.manager-kicker').textContent.trim(), 'Gathering setup');
+    assert.equal(card.querySelector('h3').textContent.trim(), 'Plan gathering content');
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('.manager-setup-list li')).map((step) =>
+        step.textContent.trim()
+      ),
+      [
+        'Define gathering tasks with their checks, timing, result groups, and failure outcomes.',
+        'Prepare event options that can be reused across your locations.',
+        'Create environments after the gathering task and event libraries are ready to attach.',
+      ]
+    );
+    assert.deepEqual(
+      Array.from(card.querySelectorAll('.manager-setup-links a')).map((link) => [
+        link.getAttribute('href'),
+        link.textContent.trim(),
+      ]),
+      [
+        ['https://mistersilver-uk.github.io/fabricate/gathering/environments', 'Gathering docs'],
+        ['https://mistersilver-uk.github.io/fabricate/help/quickstart', 'Quickstart'],
+      ]
+    );
+    assert.equal(
+      Boolean(target.querySelector('.manager-inspector [data-environment-fact]')),
+      false,
+      'and no summary fact, since there is no row to summarise'
+    );
+  });
+
 }

@@ -78,11 +78,11 @@ async function prepareManagerSuite() {
     EnvironmentEditViewComponent: await load(
       'src/ui/svelte/apps/manager/EnvironmentEditView.svelte'
     ),
-    // Mounted DIRECTLY at both subjects: the prefix is the whole discriminator (issue 1707).
+    // Mounted directly at both subjects: the prefix is the whole discriminator (issue 1707).
     GatheringModifierEditorComponent: await load(
       'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte'
     ),
-    // Mounted DIRECTLY to pin `characterModifierSearchOpenUp`'s forward across this boundary too.
+    // Mounted directly to pin `characterModifierSearchOpenUp`'s forward across this boundary too.
     GatheringTaskInspectorComponent: await load(
       'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte'
     ),
@@ -156,6 +156,41 @@ export function assertHook(container, hook, message) {
 
 export function assertNoHook(container, hook, message) {
   assert.ok(!container.querySelector(hook), message ?? `the route must not render ${hook}`);
+}
+
+/**
+ * The gathering drop row's component cell is the row's keyboard path (issue 1512), and BOTH of its
+ * branches must carry it: a new drop row is born empty, so an `is-empty` branch left a `<div>` makes
+ * every new row keyboard-unselectable. `aria-selected` stays on the `role="row"` above, and the
+ * button carries no `aria-pressed` — one selection state, one carrier.
+ *
+ * @param {Element} row The `[data-gathering-task-drop-id]` element.
+ * @param {{empty: boolean, label: string}} expected The branch and the button's accessible name.
+ */
+export function assertDropComponentCellKeyboardPath(row, expected) {
+  const cell = row.querySelector('[data-gathering-task-drop-component-cell]');
+  assert.ok(Boolean(cell), 'the drop row renders a component cell');
+  assert.equal(cell.getAttribute('role'), 'cell', 'which is a cell of the drop table');
+  const button = cell.querySelector('button');
+  assert.ok(Boolean(button), 'and the cell`s control is a real <button>, not a focusable <div>');
+  assert.equal(
+    button.getAttribute('data-keyboard-focus'),
+    'true',
+    'which declares itself focused to Foundry, or the arrow keys also pan the canvas'
+  );
+  assert.equal(button.getAttribute('aria-label'), expected.label, 'named for its own branch');
+  assert.ok(
+    !button.hasAttribute('aria-pressed'),
+    'and states no pressed state: the row above carries `aria-selected`, which is the one carrier'
+  );
+  assert.ok(
+    button.classList.contains(
+      expected.empty ? 'manager-drop-empty-component' : 'manager-drop-component-button'
+    ),
+    `the ${expected.empty ? 'empty' : 'filled'} branch renders its own variant class`
+  );
+  assert.equal(button.classList.contains('is-empty'), expected.empty, 'and marks the empty branch');
+  assert.ok(row.hasAttribute('aria-selected'), 'the ROW is where selection state lives');
 }
 
 /**

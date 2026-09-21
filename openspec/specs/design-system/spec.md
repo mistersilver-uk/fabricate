@@ -78,6 +78,7 @@ An independent caller is any other file under `src/` that imports the component 
 A candidate with fewer is recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision rather than an oversight, and so a later reader can re-test the count rather than re-derive it.
 That bar is measured over EVERY `.svelte` under `src/ui/svelte/` and not only over `src/ui/svelte/components/`, because nothing in this requirement turns on which directory a candidate sits in and a component under `apps/` can acquire twenty callers without anyone asking whether it belongs in the vocabulary — one has.
 `tests/design-system-primitives.test.js` holds a register of every path outside `components/` that clears the bar and carries no manifest row, and a path leaves that register only by GAINING a row in one of the two manifest tables, so a component crossing the bar is a decision somebody has to record rather than a threshold nothing watches.
+`environment/GatheringModifierEditor.svelte` is the worked example of that register doing its job: a composition reaching two independent callers is owed a manifest row and cannot be recorded as a non-member instead, so when issue 1707 wrote the twice-authored gathering modifier panel once and the gathering task and gathering event inspector leaves became its two callers, it left the register by entering the member table as a manager-only row naming no library entry, because no specimen specifies a condition-and-character modifier editor.
 
 Those recorded callers MUST be a structured field on the row rather than a sentence, and `tests/design-system-primitives.test.js` MUST assert the field EQUALS what the import graph measures.
 "Re-test the count" is what the clause above asks for and what nothing did: the register's caller claims were prose for as long as it existed, and prose is not resolved by anything.
@@ -365,6 +366,8 @@ The gate that PROVES a family is not application-rooted keeps its own hand-autho
 The register records the DECISION; the gate proves the ROOTING.
 Conflating the two would make an unmeasured row look like a passing proof, which is worse than either artefact alone.
 The two do meet at one place, and that place is asserted: a row whose family THIS PROGRAMME re-rooted carries `shared` and has an entry in that gate, so neither half can land without the other.
+
+One measured instance was declined rather than shipped: relocating `Chip`'s `list` and `inspector` densities to caller context, because it would size a shared primitive's own geometry from an area scope; the densities stay in the primitive's own scoped block.
 
 #### Scenario: A primitive is adopted by a second application
 
@@ -1481,7 +1484,7 @@ A select there stays native, and the surrounding stylesheet gives the control a 
 There is no second exception by prose.
 A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
 An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
-The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 69 elements across 26 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus four written into JavaScript dialog bodies.
+The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 51 elements across 18 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus four written into JavaScript dialog bodies.
 Both numerals are asserted against those constants by `tests/components/design-system-debt-ratchets.test.js`, because this sentence has rotted once already.
 It was 100 across 39 before those three shared controls converted, 84 across 33 before the player app's six, and 78 across 28 before the manager's settings and tabs, and no file carries the marker.
 The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was baselined with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
@@ -1666,6 +1669,9 @@ An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
 `openspec/specs/ui-integration/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
 The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
+The environments screen's inspector rail is a declared repurposing of that third track: its gathering task, gathering event and gathering rules leaves all edit in place, and issue 1707 gave that departure file names in `environment/GatheringTaskInspector.svelte`, `environment/GatheringEventInspector.svelte`, `environment/GatheringRulesInspector.svelte` and the `environment/GatheringModifierEditor.svelte` the first two share.
+The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
+The departure predates the extraction and is neither widened nor narrowed by it, and the read-only convention stands as the default for every other rail.
 
 A PLAYER screen orders the app rail, a browse column carrying search and filters, and a detail pane that leads with identity and a single primary action, then progress, then requirements.
 The player window carries NO premium signal in any state, and a player-side chooser is a read-only mirror of the GM's authored group.
@@ -1763,6 +1769,12 @@ A change that adds a component under `src/ui/svelte/components/` without a speci
 The row is what the gate compels, so a component that ships with no specimen clears it only by carrying `library: null` and a matching line in the pinned undocumented register — which states the debt on the record rather than failing the change, and is the same treatment the carried-forward entries above receive.
 Where a proposal conflicts with a shipped component, the change MUST either adopt the shipped behaviour or state why it is being replaced.
 
+A component extracted as an internal part of an existing primitive, whose only caller is that primitive, does not enter the set and does not add a vocabulary name.
+It carries a `NOT_A_PRIMITIVE` row naming its parent's library entry and its one caller.
+This is an exception to the `library: null` clause above, stated as one: on a part's row, `library` names the specimen that specifies its parent rather than one that specifies the part itself, and it is the only row shape in either table where that reading holds — so the undocumented register, whose only sanctioned direction is shorter, is not grown to record a part the library already specifies under its parent.
+`SlotTile` and `ChoiceOptionList` are not disturbed by this: each was adjudicated as owed a specimen of its own, which is the other branch of this rule.
+A part that would need a specimen of its own is not a part; it is a candidate, and the caller bar decides it.
+
 #### Scenario: An implementer needs a primitive the set does not contain
 
 - **WHEN** planned work needs a shared component the set does not contain
@@ -1786,6 +1798,9 @@ It stays a bare line until a second independent caller justifies naming the shap
 A converted select's KICKER-SHAPED caption is recorded as a caption the `Kicker` primitive does not serve, and is not to be re-proposed as one.
 The deciding difference is TYPE: `Kicker` draws an 8.5px eyebrow at `0.11em` tracking and these captions are 10px at `0.08em`, a different ramp step at a different tracking, so adoption would be a visible change to a caption the conversion is not otherwise touching.
 The second difference is structural and smaller — `Kicker` forwards no `id` and takes no rest spread, so it cannot be the `aria-labelledby` target the trigger's accessible name now comes from — and it is second because it is a one-prop fix where the type is a design decision.
+
+A chip remove-control wrapper is recorded as declined with its measurement: `Chip` imports nothing today, so extracting its remove control into a child component or helper puts a new node in the graph of the tree's most-imported primitive and obliges a roster edit in every mounted suite whose tree contains it, against a 15-line file-size overage on a 500-line threshold.
+The chip keeps drawing its own remove control.
 
 #### Scenario: A ruled-out candidate is re-proposed
 

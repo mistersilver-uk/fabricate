@@ -1,7 +1,11 @@
 /** The Tool Studio pointer hit-test and layout sweep, with the breakage-authority, persisted-state, clipboard and pagination helpers it drives. */
 
 import { railSelector } from '../../lib/managerRailEntries.js';
-import { openChecksActivity, openManagerRecipeEditor } from '../pageOps/managerViews.mjs';
+import {
+  chooseSelectOption,
+  openChecksActivity,
+  openManagerRecipeEditor,
+} from '../pageOps/managerViews.mjs';
 import {
   assertNoScreenshotOverlays,
   assertPointerTarget,
@@ -1306,7 +1310,20 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
     throw new Error('Recipe Tools policy-removal check unexpectedly dirtied the Recipe draft');
   }
 
-  // The trigger editor is the crafting route's triggers section (issue 1096).
+  // The trigger editor is the crafting route's triggers section (issue 1096). The tier-step target
+  // is addressed by the OUTCOME ID the Outcomes section renders, so that id is read first: the
+  // control is the shared `<Select>` since issue 1510 and its rows exist only while it is open.
+  await openChecksActivity(page, 'crafting', 'outcomes');
+  const firstOutcomeRow = page.locator('.fabricate-manager [data-outcome-row]').first();
+  try {
+    // Playwright's own timeout names a selector, not the domain fact, and it fires FIRST, so the
+    // id guard below would never be the failure a reader sees.
+    await firstOutcomeRow.waitFor({ state: 'visible', timeout: 5000 });
+  } catch {
+    throw new Error('Crafting check rendered no outcome tier to step to');
+  }
+  const targetTierId = await firstOutcomeRow.getAttribute('data-outcome-row');
+  if (!targetTierId) throw new Error('Crafting check rendered no named outcome tier to step to');
   await openChecksActivity(page, 'crafting', 'triggers');
   // Tier stepping is a per-trigger effect (issue 975), not the check-wide natural-stepping toggle
   // this walk used to round-trip, so exercising it means authoring a trigger.
@@ -1344,11 +1361,29 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
   if ((await tierStepRow.locator('[data-trigger-tier-step-steps]').count()) !== 0) {
     throw new Error('Tier-step operand slot kept the step count after switching to target');
   }
-  // Index 1 is the first real tier: index 0 is the disabled "Choose a tier…" placeholder
-  // that keeps a null tierId from rendering as a tier the check never persisted.
-  await stepTarget.selectOption({ index: 1 });
-  if (!(await stepTarget.inputValue()))
-    throw new Error('Tier-step target select persisted no tier');
+  // Addressed BY VALUE rather than positionally: `placeholder=` is the trigger's own text now
+  // rather than a leading row, so no index counts from it and the outcome id is what identifies
+  // the row a GM would click.
+  await chooseSelectOption(page, stepTarget, { value: targetTierId });
+  if ((await stepTarget.getAttribute('aria-expanded')) !== 'false') {
+    throw new Error('Tier-step target list stayed open after a row was chosen');
+  }
+  // The read-back is non-empty WHILE THE PLACEHOLDER IS SHOWING, so the placeholder class is what
+  // proves the clicked row matched a value and wrote it: without this a click that matched nothing,
+  // and therefore fired no `onChange`, read back as a pass.
+  const chosenTierValue = stepTarget.locator('.fabricate-select-value');
+  // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- a Playwright Locator: innerText() is rendered text, which textContent() does not preserve.
+  const chosenTierLabel = (await chosenTierValue.innerText()).trim();
+  if (!chosenTierLabel) throw new Error('Tier-step target control persisted no tier');
+  if (
+    ((await chosenTierValue.getAttribute('class')) ?? '').includes(
+      'fabricate-select-value-placeholder'
+    )
+  ) {
+    throw new Error(
+      `Tier-step target still shows its placeholder ("${chosenTierLabel}") after a tier was chosen`
+    );
+  }
   if (!(await checksSave.isEnabled())) {
     throw new Error('Authoring a tier-step trigger left the Checks draft undirtied');
   }

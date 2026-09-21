@@ -506,6 +506,12 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
       `the dashed Add control's right (${edges.addTierRight}) must equal the radio-card right (${edges.radioRight})`
     );
 
+    // The rows are the shared ordered list's now (issue 1512), and that list is a `<ul>`: the two
+    // edges above are measured against the card's content box, so a UA list inset would move them
+    // without any rule in the sheet changing.
+    assert.equal(edges.listPaddingLeft, '0px', 'the list contributes no inline padding of its own');
+    assert.equal(edges.listPaddingRight, '0px');
+
     // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await checksRollEdges(page, 'fabricate-card manager-inspector-card');
     assert.notEqual(
@@ -1392,6 +1398,46 @@ test('a Modifiers card button renders exactly like the tool studio button of the
   }
 });
 
+/**
+ * The rail's previewed-record control as the shared `<Select>` renders it (issue 1510): the picker
+ * root under `rootClass`, the `toolbar` trigger carrying the call site's hook and `probe`, and the
+ * value span.
+ */
+function previewRecordControl(probe, rootClass, rung = 'toolbar', hook = 'data-checks-preview-record') {
+  return (
+    `<div class="fabricate-picker manager-travel-picker fabricate-select ${rootClass}">` +
+    `<button type="button" class="fabricate-select-trigger fabricate-select-trigger-${rung}"` +
+    ` data-probe="${probe}" ${hook} data-select-size="${rung}">` +
+    '<span class="fabricate-select-value">Uncommon Craft</span>' +
+    '<i class="fas fa-chevron-down"></i></button></div>'
+  );
+}
+
+test('previewRecordControl spells classes the primitives still emit, not dead markup', () => {
+  // BOTH sources, because the fixture's ROOT is `SearchablePopover`'s namespace pair — `Select`
+  // hands its own class through `pickerClass` and never spells those two — so renaming one there
+  // rotted the fixture while a guard reading `Select.svelte` alone stayed green (issue 1510, r1).
+  const source = ['Select.svelte', 'SearchablePopover.svelte']
+    .map((file) =>
+      readFileSync(resolve(__dirname, `../../src/ui/svelte/components/${file}`), 'utf8')
+    )
+    .join('\n');
+  // Each is spelled as the literal the component assembles the class FROM, so a renamed rung or
+  // root reds here rather than passing on the family prefix alone.
+  for (const spelled of [
+    'fabricate-select-value',
+    "'data-select-size': rung",
+    '`fabricate-select-trigger fabricate-select-trigger-${rung}`',
+    'toolbar: Object.freeze(',
+    '`fabricate-picker manager-travel-picker ${pickerClass}`',
+  ]) {
+    assert.ok(
+      source.includes(spelled),
+      `${spelled} (from the rail's record-control fixture) is no longer in the primitives' source`
+    );
+  }
+});
+
 test('the Checks rail states its own control type scale instead of inheriting one', async () => {
   const context = await openLayoutContext({
     viewport: { width: 1280, height: 900 },
@@ -1425,10 +1471,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
                             <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
                           </button>
                         </div>
-                        <label class="fabricate-field manager-field">
-                          <span class="visually-hidden">Preview against record</span>
-                          <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
-                        </label>
+                        ${previewRecordControl('preview-record', 'manager-checks-preview-record-select')}
                         <label class="fabricate-field manager-field">
                           <span>Result difficulties</span>
                           <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
@@ -1450,12 +1493,23 @@ test('the Checks rail states its own control type scale instead of inheriting on
                   </div>
                 </div>
               </div>
-              <!-- OUTSIDE the rail, on purpose: the same field markup, unreached by the rail
-                   rule, is what the two pickers measured before it existed. -->
+              <!-- OUTSIDE the rail, on purpose: the INPUT is the rail rule's negative control on the
+                   leg it kept, and the second picker is the converted control's own. -->
               <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
                 <label class="fabricate-field manager-field">
-                  <select data-probe="field-select-elsewhere"><option>Uncommon Craft</option></select>
+                  <input type="text" data-probe="field-input-elsewhere" value="6, 9, 14">
                 </label>
+                ${previewRecordControl('record-trigger-elsewhere', '')}
+                <!-- The two card-body counterparts, in a full-width host because neither rule is
+                     rail-scoped: one caps a growing row, the other fills a stacked column. -->
+                <div class="manager-checks-preview-against" data-preview-against>
+                  <span class="manager-checks-preview-against-label">Preview against</span>
+                  ${previewRecordControl('preview-against', '', 'inline', 'data-preview-against-select')}
+                </div>
+                <div class="fabricate-field manager-field manager-checks-band-record">
+                  <span>Preview against</span>
+                  ${previewRecordControl('band-record', '', 'toolbar', 'data-simple-band-record')}
+                </div>
               </div>
             </section>
           </div>
@@ -1467,6 +1521,7 @@ test('the Checks rail states its own control type scale instead of inheriting on
       Object.fromEntries(
         [...document.querySelectorAll('[data-probe]')].map((element) => {
           const style = getComputedStyle(element);
+          const picker = element.closest('.fabricate-select');
           return [
             element.dataset.probe,
             {
@@ -1474,6 +1529,10 @@ test('the Checks rail states its own control type scale instead of inheriting on
               fontWeight: style.fontWeight,
               width: Math.round(element.getBoundingClientRect().width),
               height: Math.round(element.getBoundingClientRect().height),
+              root: Math.round(picker?.getBoundingClientRect().width ?? 0),
+              field: Math.round(
+                element.closest('.manager-field')?.getBoundingClientRect().width ?? 0
+              ),
             },
           ];
         })
@@ -1483,23 +1542,49 @@ test('the Checks rail states its own control type scale instead of inheriting on
     // 11.5px/500 is the prototype's own declaration on both of its rail pickers
     // (`font: 500 11.5px var(--sans)`), read off the artefact rather than chosen. The
     // sandbox input is joined to them because it stands in the same card, in the same slot.
-    for (const probe of ['preview-actor', 'preview-record', 'preview-difficulties']) {
+    // The record control left this loop when it converted: the `toolbar` rung's own `0.72rem`
+    // computes 11.52px, which is the same reading at the ladder's own numeral.
+    for (const probe of ['preview-actor', 'preview-difficulties']) {
       assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the prototype's size`);
       assert.equal(measured[probe].fontWeight, '500', `${probe} reads at the prototype's weight`);
     }
 
-    // The NEGATIVE CONTROL for the pickers.
+    // The NEGATIVE CONTROL for the rail rule, on the leg it still has.
     assert.equal(
-      measured['field-select-elsewhere'].fontSize,
+      measured['field-input-elsewhere'].fontSize,
       '13.12px',
       'a field control outside the rail is unchanged — this gate must not be measuring a ' +
-        'global re-type of every select in the manager'
+        'global re-type of every control in the manager'
     );
     assert.notEqual(
-      measured['preview-record'].fontSize,
-      measured['field-select-elsewhere'].fontSize,
+      measured['preview-difficulties'].fontSize,
+      measured['field-input-elsewhere'].fontSize,
       'and the rail rule is therefore doing work'
     );
+    // And the CONVERTED control reads at the RUNG, not at the rail: a host-dependent reading here
+    // would mean the family had been re-rooted at one screen.
+    assert.equal(
+      measured['record-trigger-elsewhere'].fontSize,
+      measured['preview-record'].fontSize,
+      'the `toolbar` rung reads the same outside the rail as inside it'
+    );
+    assert.equal(measured['preview-record'].fontSize, '11.52px', 'at the rung’s own literal');
+
+    // THE TWO WIDTH COUNTERPARTS the conversion owes the card bodies, measured rather than read off
+    // the sheet: `.fabricate-field.manager-field select` is element-typed and reaches no `<button>`,
+    // so without them a full-width editor field is a hug-content button that resizes per value.
+    assert.equal(measured['preview-against'].root, 260, 'the Outcomes row grows to its 260px cap');
+    assert.equal(
+      measured['preview-against'].width,
+      measured['preview-against'].root,
+      'and the trigger fills the slot the picker root states'
+    );
+    assert.equal(
+      measured['band-record'].width,
+      measured['band-record'].field,
+      'the simple editor’s stacked column is filled by its trigger'
+    );
+    assert.ok(measured['band-record'].field > 300, 'measured in a column wide enough to hug in');
 
     // The roll action takes the PRIMITIVE's scale, not a value chosen here.
     assert.equal(measured.roll.fontSize, '11.52px', 'the roll button reads at the primitive');

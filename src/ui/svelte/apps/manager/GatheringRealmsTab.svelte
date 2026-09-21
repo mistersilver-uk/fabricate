@@ -11,6 +11,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import { disclosurePhraseKey } from '../../util/disclosurePhrase.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
@@ -89,12 +90,6 @@
     onSelectRealm(realmId === selectedRealmId ? '' : realmId);
   }
 
-  function onRowKeydown(event, realmId) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    selectRow(realmId);
-  }
-
   function countLabel(count, oneKey, oneFallback, manyKey, manyFallback) {
     if (count === 1) return text(oneKey, oneFallback);
     return text(manyKey, manyFallback).replace('{count}', String(count));
@@ -156,18 +151,23 @@
     <div class="manager-travel-realms-list" role="list">
       {#each pagedRealms as realm (realm.id)}
         {@const isExpanded = realm.id === selectedRealmId}
+        {@const bodyId = `fab-realm-editor-${realm.id}`}
         <div
           class={`manager-travel-realms-row ${isExpanded ? 'is-expanded is-selected' : ''}`}
           role="listitem"
           data-manager-travel-realm-id={realm.id}
         >
-          <div
+          <!-- The whole header is the disclosure and therefore the button, not a focusable
+               `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
+               The name is the row's own copy — its name and its state chip — plus the hidden
+               phrase; `aria-controls` is emitted only while the editor it names is mounted. -->
+          <button
+            type="button"
+            data-keyboard-focus="true"
             class="manager-travel-realms-header"
-            role="button"
-            tabindex="0"
             aria-expanded={isExpanded}
+            aria-controls={isExpanded ? bodyId : undefined}
             onclick={() => selectRow(realm.id)}
-            onkeydown={(event) => onRowKeydown(event, realm.id)}
           >
             <div class="manager-travel-realms-left">
               <span class="manager-travel-realms-icon" aria-hidden="true"
@@ -193,10 +193,13 @@
             <span class="manager-travel-realms-chevron" aria-hidden="true">
               <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
             </span>
-          </div>
+            <span class="visually-hidden"
+              >{localize(disclosurePhraseKey(isExpanded), { name: realm.name })}</span
+            >
+          </button>
 
           {#if isExpanded}
-            <div class="manager-travel-realms-editor" data-manager-realm-editor>
+            <div class="manager-travel-realms-editor" id={bodyId} data-manager-realm-editor>
               <RealmEnvironmentsEditor
                 {realm}
                 {environments}

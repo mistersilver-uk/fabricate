@@ -11,6 +11,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconCatalogue.json',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
   'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/essenceIcons.js',
   'src/ui/svelte/components/stepperLabels.js',
@@ -21,6 +22,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The studio's eight converted option vocabularies (issue 1510).
+  'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
   // The Validation route's focus half (issue 1517).
   'src/ui/svelte/apps/manager/validationFocus.js',
   // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
@@ -116,6 +119,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
+  // The product's ONE ordered list (issue 1512), which the difficulty-tier card renders, and the
+  // icon button it draws every one of its controls through.
+  'src/ui/svelte/components/SortableList.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   // The shared labelled-field primitive (issue 1428).
@@ -141,6 +148,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker.
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // The shared one-of-n picker (issue 1510). The checks studio renders it at each converted select
+  // site; omitting a rendered .svelte module makes the mounted harness hang rather than fail.
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
   // three activity routes and by the alchemy branch through one snippet in `ChecksView`.

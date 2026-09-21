@@ -1010,6 +1010,7 @@
         <div class="manager-task-media-column">
           <button
             type="button"
+            data-keyboard-focus="true"
             class="manager-task-image-picker"
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.Tasks.ChooseImage',
@@ -1605,6 +1606,7 @@
             >
               <button
                 type="button"
+                data-keyboard-focus="true"
                 class="manager-task-image-picker manager-task-depleted-image-picker"
                 aria-label={text(
                   'FABRICATE.Admin.Manager.Economy.DepletedSwapImagePick',
@@ -1625,6 +1627,7 @@
               {#if depletedSwapImage}
                 <button
                   type="button"
+                  data-keyboard-focus="true"
                   class="manager-link-button manager-task-depleted-image-clear"
                   aria-label={text(
                     'FABRICATE.Admin.Manager.Economy.DepletedSwapImageClear',
@@ -1809,6 +1812,7 @@
             {#each paginatedLibraryTools as tool (tool.id)}
               <button
                 type="button"
+                data-keyboard-focus="true"
                 class="manager-task-component-card manager-task-required-tools-card-item"
                 data-gathering-task-required-tools-card={tool.id}
                 aria-label={text(
@@ -2058,6 +2062,7 @@
                   {#each componentTagSuggestions as tag (tag)}
                     <button
                       type="button"
+                      data-keyboard-focus="true"
                       class="manager-tag-suggestion"
                       data-gathering-component-tag-suggestion={tag}
                       onclick={() => addComponentTag(tag)}
@@ -2090,6 +2095,7 @@
                 {tag}
                 <button
                   type="button"
+                  data-keyboard-focus="true"
                   aria-label={text(
                     'FABRICATE.Admin.Manager.Environment.Tasks.RemoveComponentTagFilter',
                     'Remove {tag}'
@@ -2308,24 +2314,23 @@
               </div>
               {#each paginatedRows as row (row.id)}
                 {@const rankIndex = dropRows.indexOf(row)}
+                <!-- The row's `onclick` is a pointer convenience (issue 1512): the keyboard path is
+                     the component cell's real `<button>`, in both branches, and `aria-selected` here
+                     is the single carrier. A focusable `role="row"` is a non-form element Foundry's
+                     `KeyboardManager#hasFocus` cannot see, so the arrows panned the canvas. -->
+                <!-- svelte-ignore a11y_interactive_supports_focus -->
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div
                   class={`manager-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
                   role="row"
                   data-gathering-task-drop-id={row.id}
                   data-gathering-task-drop-zone={row.id}
                   aria-selected={selectedDrop?.id === row.id}
-                  tabindex="0"
                   use:dragDrop={{
                     onDrop: (data) => handleDropZoneDrop(row.id, data),
                     activeClass: 'is-drop-active',
                   }}
                   onclick={() => onSelectDrop(row.id)}
-                  onkeydown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      onSelectDrop(row.id);
-                    }
-                  }}
                 >
                   {#if rankedMode}
                     <span
@@ -2383,22 +2388,43 @@
                     class="manager-drop-cell manager-drop-component-cell"
                     data-gathering-task-drop-component-cell
                   >
-                    {#if row.componentId || row.itemUuid}
-                      <button
-                        type="button"
-                        class="manager-gathering-task-identity manager-drop-component-button"
-                        title={text(
-                          'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
-                          'Right-click to clear component'
-                        )}
-                        onclick={(event) => {
-                          event.stopPropagation();
-                          onSelectDrop(row.id);
-                        }}
-                        onkeydown={(event) => event.stopPropagation()}
-                        onmousedown={(event) => onDropComponentMouseDown(row.id, event)}
-                        oncontextmenu={(event) => onClearDropComponent(row.id, event)}
-                      >
+                    <!-- The row's keyboard path, in both branches (issue 1512): a new drop row is
+                         born empty, so leaving that branch a `<div>` would have made every new row
+                         keyboard-unselectable. The empty branch names itself from the drop-zone
+                         prompt and clears nothing, there being nothing to clear. -->
+                    <button
+                      type="button"
+                      class={`manager-gathering-task-identity ${
+                        row.componentId || row.itemUuid
+                          ? 'manager-drop-component-button'
+                          : 'manager-drop-empty-component is-empty'
+                      }`}
+                      data-keyboard-focus="true"
+                      aria-label={row.componentId || row.itemUuid
+                        ? componentLabel(row)
+                        : text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign',
+                            'Create or assign'
+                          )}
+                      title={row.componentId || row.itemUuid
+                        ? text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
+                            'Right-click to clear component'
+                          )
+                        : undefined}
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        onSelectDrop(row.id);
+                      }}
+                      onkeydown={(event) => event.stopPropagation()}
+                      onmousedown={row.componentId || row.itemUuid
+                        ? (event) => onDropComponentMouseDown(row.id, event)
+                        : undefined}
+                      oncontextmenu={row.componentId || row.itemUuid
+                        ? (event) => onClearDropComponent(row.id, event)
+                        : undefined}
+                    >
+                      {#if row.componentId || row.itemUuid}
                         <img
                           class="manager-gathering-task-thumb"
                           src={componentImage(row)}
@@ -2407,11 +2433,7 @@
                         <span class="manager-system-copy">
                           <span class="manager-system-name">{componentLabel(row)}</span>
                         </span>
-                      </button>
-                    {:else}
-                      <div
-                        class="manager-gathering-task-identity manager-drop-empty-component is-empty"
-                      >
+                      {:else}
                         <span
                           class="manager-inline-drop-zone"
                           data-gathering-task-drop-zone={row.id}
@@ -2433,8 +2455,8 @@
                             )}</span
                           >
                         </span>
-                      </div>
-                    {/if}
+                      {/if}
+                    </button>
                   </span>
                   <span
                     role="cell"

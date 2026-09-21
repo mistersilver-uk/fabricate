@@ -340,10 +340,65 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
 
   // ── D3's condition: ordinals + read-only difficulty badge ────────────────
 
+  // The adder is the list's own footer, and reachable at zero (issue 1512). Both halves are
+  // asserted, because a change satisfying only the first ships an empty state that says "add one"
+  // with nothing to press — so the empty branch's control is CLICKED and its effect read.
+  it('renders the stage adder as the list footer, and after the empty message at zero', async () => {
+    const populated = await harness.mount(props());
+    assert.equal(
+      populated.querySelectorAll('[data-add-salvage-result]').length,
+      1,
+      'the adder is defined ONCE: two definitions render two controls in the populated state'
+    );
+    const footerAdd = populated.querySelector('[data-add-salvage-result]');
+    assert.ok(
+      Boolean(footerAdd.closest('.fabricate-sortable-list')),
+      'with stages, the adder is the list`s last child rather than a sibling of the list'
+    );
+    harness.remount();
+
+    const empty = await harness.mount(
+      props({ component: { salvage: { enabled: true, resultGroups: [] } } })
+    );
+    const emptyAdd = empty.querySelector('[data-add-salvage-result]');
+    assert.ok(Boolean(emptyAdd), 'and the adder is still reachable with no stages at all');
+    assert.ok(
+      !emptyAdd.closest('.fabricate-sortable-list'),
+      'following the message it now sits under, because there is no list to be a footer of'
+    );
+    emptyAdd.click();
+    await flushRender();
+    assert.ok(
+      Boolean(empty.querySelector('[data-salvage-result]')),
+      'and pressing it adds the first stage, which is what presence alone would not prove'
+    );
+    harness.remount();
+  });
+
+  // The one converted list inside a `<form>`: a control without `type="button"` submits the draft
+  // on a keyboard move, so every control the list draws declares it.
+  it('gives the list`s grip, rocker and remove an explicit button type', async () => {
+    const target = await harness.mount(props());
+    const row = target.querySelector('[data-salvage-result="res-1"]');
+    const controls = [
+      row.querySelector('[data-sortable-grip]'),
+      row.querySelector('[data-sortable-move="up"]'),
+      row.querySelector('[data-sortable-move="down"]'),
+      row.querySelector('[data-remove-salvage-result]'),
+    ];
+    assert.ok(controls.every(Boolean), 'the row draws all four controls');
+    for (const control of controls) {
+      assert.equal(control.getAttribute('type'), 'button', control.getAttribute('aria-label'));
+      assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
+    }
+    harness.remount();
+  });
+
   it('D3: progressive salvage result rows render ordinals', async () => {
     // Without these the card governs a list whose order the GM cannot see.
     const target = await harness.mount(props());
-    const ordinals = [...target.querySelectorAll('[data-salvage-result-ordinal]')];
+    // The badge is the shared ordered list's as of issue 1512, so it carries the list's hook.
+    const ordinals = [...target.querySelectorAll('[data-sortable-ordinal]')];
     assert.deepEqual(
       ordinals.map((node) => node.textContent.trim()),
       ['1', '2'],
@@ -457,7 +512,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
 
   it('1286: a stage whose yield authors salvage complications grows a strip; one that does not, does not', async () => {
     const target = await harness.mount(complicatedProps());
-    const list = target.querySelector('.manager-salvage-stage-list');
+    const list = target.querySelector('.fabricate-sortable-list');
     const found = strips(target);
     assert.equal(found.length, 1, 'only the yield that authors one gets a strip');
     assert.equal(
@@ -466,25 +521,27 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       'and it is bound to the component that owns the complications'
     );
 
-    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row.
+    // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, and the shared list is
+    // what draws that shape as of issue 1512 — the band is the row's BODY, the line's own sibling.
     const row = target.querySelector('[data-salvage-result="res-1"]');
     // `assert.ok` on the identity, never `assert.equal(node, node)`.
     assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the band is in the row');
     assert.ok(
-      [...list.children].every((child) => child.matches('.manager-salvage-stage-row')),
-      'and the list itself holds nothing but stage rows, so no band is a stage of its own'
+      [...list.children].every(
+        (child) => child.matches('.manager-salvage-stage-row') || child.matches('.manager-salvage-stage-add')
+      ),
+      'and the list holds nothing but stage rows and its own footer, so no band is a stage itself'
     );
-    // The row's own controls moved into `.manager-salvage-stage-line`.
-    const line = row.querySelector('.manager-salvage-stage-line');
-    assert.ok(line, 'the row wraps its own controls in a line');
+    const line = row.querySelector('.fabricate-sortable-list-line');
+    assert.ok(Boolean(line), 'the row wraps its own controls in the list`s line');
     assert.ok(
       line.querySelector('[data-salvage-result-edit]') &&
         line.querySelector('[data-salvage-result-difficulty]'),
       "the row's picker cluster and its trailing controls are the LINE's children"
     );
     assert.ok(
-      found[0].parentElement === row,
-      "and the band is the row's own child, beside that line rather than inside it"
+      found[0].closest('.fabricate-sortable-list-body').parentElement === row,
+      "and the band sits in the row's own BODY, beside that line rather than inside it"
     );
     // Not a stage: it annotates the one above it.
     assert.equal(found[0].getAttribute('role'), 'presentation');
@@ -499,14 +556,17 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     assert.equal(
       plain.querySelectorAll('[data-salvage-stage-complications]').length,
       0,
-      'and draws no band, so the `:has()` that re-shapes the row cannot match it'
+      'and draws no band at all'
     );
-    // `display: contents` on the line is what keeps this row's flex items the ROW's own. The
-    // markup is identical for both rows; only the band's presence differs.
+    // ONE row anatomy for every row (issue 1512): the list's line and body are always present, and
+    // the `:has()` rules and the `display: contents` wrapper that bought that by hand are retired.
     assert.ok(
-      plain.querySelector('.manager-salvage-stage-line'),
+      plain.querySelector('.fabricate-sortable-list-line'),
       'the line wraps its controls exactly as the banded row does'
     );
+    const emptyBody = plain.querySelector('.fabricate-sortable-list-body');
+    assert.ok(Boolean(emptyBody), 'and the body is present too');
+    assert.equal(emptyBody.textContent.trim(), '', 'drawing nothing until there is a band');
     harness.remount();
   });
 
@@ -640,7 +700,15 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     const target = await harness.mount(props());
     const field = target.querySelector('[data-salvage-result-component]');
     assert.ok(field, 'the row still exposes its component field');
-    assert.equal(field.querySelector('select'), null, 'the native select is gone');
+    // WHICH APP-DRAWN PICKER, rather than "not a native select" (issue 1510). This editor renders
+    // no native select at all now, so the old `!querySelector('select')` was satisfied by any tree
+    // at all. The two pickers are told apart by what their trigger announces — the searchable
+    // popover a `dialog`, the shared one-of-N `Select` a `listbox` — and only the first can draw a
+    // component's art, which is the whole reason this field is the one it is.
+    assert.ok(
+      !field.querySelector('.fabricate-select-trigger'),
+      'the field is not the shared one-of-N picker, which shows a label and no image'
+    );
     const trigger = field.querySelector('button.manager-salvage-component-trigger');
     assert.ok(trigger, 'the field is a popover trigger');
     assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');

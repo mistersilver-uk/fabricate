@@ -11,16 +11,10 @@ import {
 } from '../config/preferencesCleanup.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
-import { normalizeQuantityFormula } from '../models/Result.js';
-import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
+import { Tool } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
-import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
-import {
-  normalizeComponentCategory,
-  normalizeCustomComponentCategories,
-} from '../utils/componentCategories.js';
-import { authoredComplications } from '../utils/componentComplications.js';
+import { normalizeCustomComponentCategories } from '../utils/componentCategories.js';
 import {
   advanceDefinitionRevision,
   findById,
@@ -55,9 +49,6 @@ import {
   getDuplicateSourceUuid,
   getItemMatchUuids,
   getItemIdentityReferences,
-  resolveComponentForItem,
-  resolveToolForItem,
-  matchRecipeItemDefinition,
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
@@ -73,6 +64,7 @@ import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidation
 import { migrateRecipeForModeChange } from './migrateRecipeForModeChange.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
+import { normalizeComponent } from './normalize/components.js';
 import {
   convertDiceCritsToTriggers,
   convertNatSteppingToTriggers,
@@ -90,6 +82,45 @@ import {
   normalizeUnifiedTrigger,
   normalizeUnifiedTriggers,
 } from './normalize/craftingCheck.js';
+import {
+  looksLikeDocumentUuid,
+  normalizeEssenceDefinition,
+  normalizeEssenceDefinitions,
+  normalizeEssenceQuantities,
+  toKey,
+} from './normalize/essences.js';
+import {
+  labelFromUuid,
+  normalizeRecipeItemCaps,
+  normalizeRecipeItemDefinition,
+  normalizeRecipeItemDefinitions,
+} from './normalize/recipeItems.js';
+import {
+  normalizeCurrencyRequirement,
+  normalizeSalvage,
+  normalizeSalvageResult,
+  normalizeSalvageResultGroup,
+  normalizeTimeRequirement,
+  normalizeToolIds,
+  salvageNormalizationContext,
+} from './normalize/salvage.js';
+import {
+  normalizeAlchemyConfig,
+  normalizeCurrencyConfig,
+  normalizeFeatures,
+  normalizeRecipeVisibility,
+  normalizeRequirements,
+  normalizeStringList,
+  normalizeTeaserConfig,
+  normalizeVisibilityMode,
+} from './normalize/systemFields.js';
+import {
+  normalizeTool,
+  normalizeToolBreakage,
+  normalizeToolOnBreak,
+  normalizeToolPrerequisites,
+  normalizeToolRequirement,
+} from './normalize/tools.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { resolvedComponentEssencesById } from './resolvedComponentEssences.js';
@@ -98,13 +129,26 @@ import { corpusDelta, patchCorpusInPlace, REVISION_SCOPES } from './revisionToke
 import { resolveScopedEntityRead } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import {
+  autoStampComponentSources,
+  autoStampRecipeItemSources,
+  autoStampToolSources,
+  clearSourceFlag,
+  findRecipeItemDefinitionForSource,
+  repairItemData,
+  stampSourceIdentity,
+} from './SourceIdentityService.js';
+import {
+  buildComponentSourceSnapshot,
+  buildFallbackSourceReferences,
+  buildRecipeItemSourceSnapshot,
+  buildToolSourceSnapshot,
+  extractSourceDescription,
+  rawSourceDescription,
+} from './sourceIdentitySnapshots.js';
 import { WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 import { hasPendingWorldScopeRekey } from './worldScopeRekeyPending.js';
 
-// Membership sets derived from the canonical Tool model vocabularies, so the
-// system-owned tool normalizer enforces the exact same enumerations as the Tool
-// model and the adminStore editor without duplicating the literal lists.
-const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
 const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
 
 // The invalidation-domain attributions every `save()` site names (issue 1078 part B1). Derived
@@ -604,160 +648,56 @@ export class CraftingSystemManager {
     };
   }
 
-  /** Normalize one system-owned library Tool to its canonical persisted shape — the single
-   * coercion point, so a Tool from any origin loads the same. A missing `id` gets a fresh
-   * `randomID()` and `enabled` defaults to `true`. */
-  _normalizeTool(tool = {}, { validPrerequisiteIds = null } = {}) {
-    const normalizedTool = !tool || typeof tool !== 'object' ? {} : tool;
-    const id = String(normalizedTool.id || foundry.utils.randomID());
-    // `label` is the PRE-EXISTING, user-authored display override — distinct from the
-    // `name`/`img` display snapshot below and NEVER written by snapshot capture,
-    // migration, or refresh (issue 561, R2-2). Preserved untouched here.
-    const label = typeof normalizedTool.label === 'string' ? normalizedTool.label.trim() : '';
-    const componentId =
-      typeof normalizedTool.componentId === 'string' && normalizedTool.componentId.trim()
-        ? normalizedTool.componentId.trim()
-        : null;
-    // First-class tool source refs plus the `name`/`img` display snapshot (issue 561). Unknown-
-    // field stripping means these MUST be retained here and in the draft-path twin, or they are
-    // silently dropped. New-name-first, legacy-name-tolerant (issue 560).
-    const originItemUuid =
-      normalizedTool.originItemUuid ||
-      normalizedTool.registeredItemUuid ||
-      normalizedTool.sourceItemUuid ||
-      normalizedTool.sourceUuid ||
-      null;
-    const registeredItemUuid =
-      normalizedTool.registeredItemUuid ||
-      normalizedTool.originItemUuid ||
-      normalizedTool.sourceUuid ||
-      normalizedTool.sourceItemUuid ||
-      null;
-    const primaryRefs = new Set(
-      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
-    );
-    const rawAliasItemUuids = Array.isArray(normalizedTool.aliasItemUuids)
-      ? normalizedTool.aliasItemUuids
-      : Array.isArray(normalizedTool.fallbackItemIds)
-        ? normalizedTool.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((ref) => typeof ref === 'string')
-              .map((ref) => ref.trim())
-              .filter((ref) => ref && !primaryRefs.has(ref))
-          ),
-        ]
-      : [];
-    const model = new Tool({
-      ...normalizedTool,
-      id,
-      label,
-      componentId,
-      registeredItemUuid,
-      originItemUuid,
-      aliasItemUuids,
-      prerequisites: this._normalizeToolPrerequisites(
-        normalizedTool.prerequisites,
-        validPrerequisiteIds
-      ),
-    });
-    return model.toJSON();
+  _normalizeTool(tool, options) {
+    return normalizeTool(tool, options);
   }
 
-  _normalizeToolPrerequisites(input, validIds = null) {
-    const source = input && typeof input === 'object' ? input : {};
-    const ids = [
-      ...new Set(
-        (Array.isArray(source.ids) ? source.ids : [])
-          .filter((id) => typeof id === 'string')
-          .map((id) => id.trim())
-          .filter((id) => id && (!(validIds instanceof Set) || validIds.has(id)))
-      ),
-    ];
-    return {
-      enabled: source.enabled === true && ids.length > 0,
-      ids,
-      gateMode: source.gateMode === 'bonus' ? 'bonus' : 'usability',
-    };
+  _normalizeToolPrerequisites(input, validIds) {
+    return normalizeToolPrerequisites(input, validIds);
   }
 
   _normalizeToolRequirement(input) {
-    if (input === null || input === undefined) return null;
-    if (typeof input !== 'object') return null;
-    return {
-      formula: typeof input.formula === 'string' ? input.formula : '',
-    };
+    return normalizeToolRequirement(input);
   }
 
   _normalizeToolBreakage(input) {
-    if (input?.mode === 'immune') return { mode: 'limitedUses', maxUses: null };
-    const mode = TOOL_BREAKAGE_MODES.has(input?.mode) ? input.mode : 'limitedUses';
-    if (mode === 'limitedUses') {
-      const raw = input?.maxUses;
-      let maxUses = null;
-      if (raw !== null && raw !== undefined && raw !== '') {
-        const numeric = Number(raw);
-        maxUses = Number.isFinite(numeric) ? numeric : null;
-      }
-      return { mode, maxUses };
-    }
-    if (mode === 'breakageChance') {
-      const raw = Number(input?.breakageChance);
-      return { mode, breakageChance: Number.isFinite(raw) ? raw : 0 };
-    }
-    const threshold = Number(input?.threshold);
-    return {
-      mode,
-      formula: typeof input?.formula === 'string' ? input.formula : '',
-      threshold: Number.isFinite(threshold) ? threshold : 0,
-    };
+    return normalizeToolBreakage(input);
   }
 
   _normalizeToolOnBreak(input) {
-    return new Tool({ componentId: '_normalizer_', onBreak: input }).onBreak;
+    return normalizeToolOnBreak(input);
   }
 
-  _normalizeFeatures(system = {}) {
-    const features = system.features || {};
-    const has = (k) => Object.prototype.hasOwnProperty.call(features, k);
-    // `complexRecipes` was removed as a feature (#102): recipe-control visibility
-    // derives from resolution mode, not a persistent flag. It survives ONLY as a
-    // legacy compatibility INPUT that seeds `multiStepRecipes` for old systems
-    // saved before the rename; it is no longer emitted as a normalized feature.
-    const multiStepEnabled = has('multiStepRecipes')
-      ? features.multiStepRecipes === true
-      : has('complexRecipes')
-        ? features.complexRecipes === true
-        : false;
-    return {
-      recipeCategories: true,
-      // Transitional alias
-      categories: true,
-      itemTags: true,
-      essences: has('essences') ? features.essences === true : system.enableEssences === true,
-      multiStepRecipes: multiStepEnabled,
-      propertyMacros: has('propertyMacros') ? features.propertyMacros === true : false,
-      craftingChecks: has('craftingChecks') ? features.craftingChecks === true : false,
-      outcomeRouting: has('outcomeRouting') ? features.outcomeRouting === true : false,
-      effectTransfer: has('effectTransfer') ? features.effectTransfer === true : false,
-      gathering: has('gathering') ? features.gathering === true : false,
-      // Salvage is optional, defaulting ON for backward compatibility. When off the subsystem is
-      // hidden and skipped, but authored component salvage config is preserved so the toggle is
-      // reversible.
-      salvage: has('salvage') ? features.salvage === true : true,
-      chatOutput: has('chatOutput') ? features.chatOutput === true : true,
-      itemPiles: has('itemPiles') ? features.itemPiles === true : false,
-      // Whether a player self-cancelling an in-progress craft gets their consumed
-      // ingredients + spent currency back (issue 848). Default ON for a forgiving
-      // experience, but a GM may forfeit inputs on cancel by setting it false — an
-      // explicit false is honoured, mirroring the `features.salvage` default-on toggle.
-      refundOnPlayerCancel: has('refundOnPlayerCancel')
-        ? features.refundOnPlayerCancel === true
-        : true,
-    };
+  _normalizeFeatures(system) {
+    return normalizeFeatures(system);
+  }
+
+  _normalizeVisibilityMode(value) {
+    return normalizeVisibilityMode(value);
+  }
+
+  _normalizeRecipeVisibility(recipeVisibility) {
+    return normalizeRecipeVisibility(recipeVisibility);
+  }
+
+  _normalizeTeaserConfig(config) {
+    return normalizeTeaserConfig(config);
+  }
+
+  _normalizeRequirements(requirements) {
+    return normalizeRequirements(requirements);
+  }
+
+  _normalizeCurrencyConfig(currency) {
+    return normalizeCurrencyConfig(currency);
+  }
+
+  _normalizeStringList(value) {
+    return normalizeStringList(value);
+  }
+
+  _normalizeAlchemyConfig(config, resolutionMode) {
+    return normalizeAlchemyConfig(config, resolutionMode);
   }
 
   /** The FAILURE-RESULT POLICY (issue 1098) — may a failed check produce a result at all. ONE
@@ -828,389 +768,40 @@ export class CraftingSystemManager {
     return normalizeGatheringCraftingCheck(check, validCatalogueIds);
   }
 
-  // Flat system-level visibility STRATEGY enum (issue 511): `visibilityMode` ∈ {global,
-  // restricted, item, knowledge} gates the whole Crafting authoring surface, with unknown or
-  // missing reading as `knowledge`.
-  _normalizeVisibilityMode(value) {
-    return ['global', 'restricted', 'item', 'knowledge'].includes(value) ? value : 'knowledge';
-  }
-
-  _normalizeRecipeVisibility(recipeVisibility = {}) {
-    const listMode = ['global', 'player', 'knowledge', 'teaser'].includes(
-      recipeVisibility?.listMode
-    )
-      ? recipeVisibility.listMode
-      : 'global';
-    const knowledge = recipeVisibility?.knowledge || {};
-    return {
-      listMode,
-      knowledge: {
-        mode: ['item', 'learned', 'itemOrLearned'].includes(knowledge?.mode)
-          ? knowledge.mode
-          : 'itemOrLearned',
-        learn: {
-          dragDropEnabled: knowledge?.learn?.dragDropEnabled !== false,
-        },
-      },
-    };
-  }
-
-  _normalizeTeaserConfig(config = {}) {
-    if (!config || typeof config !== 'object') {
-      return { enabled: false, discoveryMode: 'threshold', fragments: [] };
-    }
-    return {
-      enabled: config.enabled === true,
-      discoveryMode: ['threshold', 'fragments', 'both'].includes(config.discoveryMode)
-        ? config.discoveryMode
-        : 'threshold',
-      fragments: Array.isArray(config.fragments)
-        ? config.fragments.map((f) => this._normalizeTeaserFragment(f)).filter(Boolean)
-        : [],
-    };
-  }
-
-  _normalizeTeaserFragment(fragment = {}) {
-    if (!fragment || typeof fragment !== 'object') return null;
-    const id = String(fragment.id || '').trim();
-    if (!id) return null;
-    return {
-      id,
-      name: String(fragment.name || '').trim() || 'Fragment',
-      linkedItemUuid: fragment.linkedItemUuid || null,
-      recipeIds: Array.isArray(fragment.recipeIds)
-        ? fragment.recipeIds.filter((id) => typeof id === 'string')
-        : [],
-      progressValue: Math.min(100, Math.max(0, Number(fragment.progressValue) || 0)),
-    };
-  }
-
-  _normalizeRequirements(requirements = {}) {
-    const time = requirements?.time || {};
-    const currency = requirements?.currency || {};
-    return {
-      time: {
-        // Default ON for backward compatibility, mirroring the `features.salvage` convention:
-        // recipes authored before this toggle carry configs that already run, so only an explicit
-        // `false` disables them. Upgraded worlds are re-defaulted on once by the 1.19.0
-        // `migrateDefaultOnTimeRequirements` migration, not here on read.
-        enabled: time.enabled !== false,
-      },
-      currency: this._normalizeCurrencyConfig(currency),
-    };
-  }
-
-  /** Normalize the per-system currency block, which since issue 1278 is ONLY the participation
-   * flag, because a world runs one Foundry game system and so has one way actors store coins.
-   * This whitelist rebuild sheds the pre-1278 sibling keys, which the 1.26.0 migration lifts into
-   * the world config before any system write. */
-  _normalizeCurrencyConfig(currency = {}) {
-    return { enabled: currency?.enabled === true };
-  }
-
-  _normalizeStringList(value) {
-    if (!Array.isArray(value)) return [];
-    return [...new Set(value.map((v) => String(v || '').trim()).filter(Boolean))];
-  }
-
   _normalizeEssenceDefinitions(value) {
-    if (!Array.isArray(value)) return [];
-
-    const used = new Set();
-    const normalized = [];
-    for (const entry of value) {
-      const def = this._normalizeEssenceDefinition(entry, used);
-      if (!def) continue;
-      used.add(def.id);
-      normalized.push(def);
-    }
-    return normalized;
+    return normalizeEssenceDefinitions(value);
   }
 
-  /** The GM-authored per-essence colour (issue 917): a bare `--fab-tag-*` palette key, or null.
-   * There is deliberately NO `customColor` sibling, because a free hex cannot be guaranteed
-   * legible against all seven themes. An unrecognized token renders as the theme accent. */
-  _normalizeEssenceColorToken(value) {
-    const token = String(value ?? '')
-      .trim()
-      .replace(/^--fab-tag-/, '');
-    return token || null;
-  }
-
-  /** The GM-authored per-essence property macro (issue 1036). A SHAPE check, not a macro check:
-   * `_looksLikeDocumentUuid` must stay permissive because `parseUuid` still re-interprets legacy
-   * four-segment compendium uuids, so a `/^Macro\./` tightening would reject a resolvable macro. */
-  _normalizeEssencePropertyMacroUuid(value) {
-    return this._looksLikeDocumentUuid(value) ? value : null;
-  }
-
-  _normalizeEssenceDefinition(entry, usedIds = new Set()) {
-    // BOTH branches below are whitelist REBUILDS that drop any key they do not name, so every
-    // persisted field must appear in both or it is silently lost on the next save. `enabled` needs
-    // NO migration, and adding one would be wrong: this whitelist has never emitted the key, so no
-    // stored definition carries one and `entry.enabled !== false` reads absent as `true`.
-    if (typeof entry === 'string') {
-      const base = entry.trim();
-      if (!base) return null;
-      return {
-        id: this._uniqueKey(base, usedIds),
-        name: base,
-        description: '',
-        icon: 'fas fa-mortar-pestle',
-        colorToken: null,
-        enabled: true,
-        propertyMacroUuid: null,
-        sourceComponentId: null,
-        sourceItemUuid: null,
-        associatedSystemItemId: null, // transitional alias
-      };
-    }
-
-    if (!entry || typeof entry !== 'object') return null;
-
-    const rawName = String(entry.name || '').trim();
-    const rawId = String(entry.id || '')
-      .trim()
-      .toLowerCase();
-    const seed = rawId || rawName;
-    if (!seed) return null;
-
-    const id = this._uniqueKey(seed, usedIds);
-    const sourceComponentId = entry.sourceComponentId || entry.associatedSystemItemId || null;
-    const sourceItemUuid = entry.sourceItemUuid || null;
-    return {
-      id,
-      name: rawName || id,
-      description: String(entry.description || '').trim(),
-      icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
-      colorToken: this._normalizeEssenceColorToken(entry.colorToken),
-      enabled: entry.enabled !== false,
-      propertyMacroUuid: this._normalizeEssencePropertyMacroUuid(entry.propertyMacroUuid),
-      sourceComponentId,
-      sourceItemUuid,
-      associatedSystemItemId: sourceComponentId, // transitional alias
-    };
+  _normalizeEssenceDefinition(entry, usedIds) {
+    return normalizeEssenceDefinition(entry, usedIds);
   }
 
   _looksLikeDocumentUuid(value) {
-    if (!value || typeof value !== 'string') return false;
-    return /^(Actor|Item|Scene|JournalEntry|Macro|RollTable|Compendium)\./.test(value);
-  }
-
-  _normalizeRecipeItemDefinitions(value) {
-    if (!Array.isArray(value)) return [];
-
-    const usedIds = new Set();
-    const normalized = [];
-    for (const entry of value) {
-      const def = this._normalizeRecipeItemDefinition(entry, usedIds);
-      if (!def) continue;
-      usedIds.add(def.id);
-      normalized.push(def);
-    }
-    return normalized;
-  }
-
-  // Per-recipe-item use/learn caps (issue 511): each definition owns its own caps rather than
-  // sharing one system-wide config. The legacy boolean `destroyWhenExhausted` is reconciled with
-  // the enum `whenSpent`, keeping BOTH persisted — the enum wins when authored.
-  _reconcileWhenSpent(item = {}) {
-    const authored = item.whenSpent === 'destroyed' || item.whenSpent === 'inert';
-    if (authored) {
-      return { whenSpent: item.whenSpent, destroyWhenExhausted: item.whenSpent === 'destroyed' };
-    }
-    if (Object.prototype.hasOwnProperty.call(item, 'destroyWhenExhausted')) {
-      const destroyWhenExhausted = item.destroyWhenExhausted === true;
-      return { whenSpent: destroyWhenExhausted ? 'destroyed' : 'inert', destroyWhenExhausted };
-    }
-    return { whenSpent: 'destroyed', destroyWhenExhausted: true };
-  }
-
-  _normalizeRecipeItemCaps(caps = {}) {
-    const item = caps?.item || {};
-    const learn = caps?.learn || {};
-
-    const { whenSpent, destroyWhenExhausted } = this._reconcileWhenSpent(item);
-
-    // `limitLearning` (new) mirrors legacy `limitRecipes`; the new field wins when
-    // authored, otherwise the legacy boolean seeds it. Both are always persisted.
-    const limitLearning = Object.prototype.hasOwnProperty.call(learn, 'limitLearning')
-      ? learn.limitLearning === true
-      : learn.limitRecipes === true;
-
-    // `learnsAllowed` mirrors legacy `maxRecipes` and wins when authored. With the limit ON but no
-    // positive count, it defaults to 1: a limit of "0/undefined" would wrongly read as uncapped
-    // downstream and hide the learn-all CTA (issue 544).
-    const rawLearns = Object.prototype.hasOwnProperty.call(learn, 'learnsAllowed')
-      ? learn.learnsAllowed
-      : learn.maxRecipes;
-    const learnsAllowed = limitLearning
-      ? Number.isFinite(Number(rawLearns)) && Number(rawLearns) > 0
-        ? Number(rawLearns)
-        : 1
-      : undefined;
-
-    // `learnScope` ('perInstance' | 'total') is the canonical cap scope: `perInstance` limits
-    // learning from a SINGLE copy, `total` across EVERY copy of the source recipe item. An
-    // authored value wins, else it derives from the legacy `learningMode`, which is kept as a
-    // synced legacy mirror.
-    const learnScope = ['perInstance', 'total'].includes(learn.learnScope)
-      ? learn.learnScope
-      : learn.learningMode === 'party'
-        ? 'total'
-        : 'perInstance';
-    const learningMode =
-      learnScope === 'total' ? 'party' : Number(learnsAllowed) > 1 ? 'ntimes' : 'once';
-
-    // `prerequisiteIds` (issue 544) — the recipe ids a reader must ALREADY have learned (AND
-    // semantics) before learning from this book. Replaces the legacy single `prerequisite`
-    // string, which is folded in here so an un-migrated draft still reads correctly.
-    const rawPrerequisiteIds = Array.isArray(learn.prerequisiteIds)
-      ? learn.prerequisiteIds
-      : typeof learn.prerequisite === 'string' && learn.prerequisite.trim()
-        ? [learn.prerequisite]
-        : [];
-    const prerequisiteIds = [
-      ...new Set(rawPrerequisiteIds.map((value) => String(value ?? '').trim()).filter(Boolean)),
-    ];
-
-    // `characterPrerequisiteIds` (issue 544) — the system-owned character prerequisites a reader
-    // must ALL pass to learn from this book. Distinct from `prerequisite`: this gates on the
-    // actor's roll data, that on prior knowledge.
-    const characterPrerequisiteIds = Array.isArray(learn.characterPrerequisiteIds)
-      ? [
-          ...new Set(
-            learn.characterPrerequisiteIds
-              .map((value) => String(value ?? '').trim())
-              .filter(Boolean)
-          ),
-        ]
-      : [];
-
-    return {
-      item: {
-        limitUses: item.limitUses === true,
-        maxUses: Number.isFinite(Number(item.maxUses)) ? Number(item.maxUses) : undefined,
-        destroyWhenExhausted,
-        whenSpent,
-      },
-      learn: {
-        consumeOnLearn: learn.consumeOnLearn !== false,
-        // `destroyWhenSpent` (learn) is deliberately named distinctly from
-        // `destroyWhenExhausted` (item/craft-charges) — do not normalize to one name.
-        limitRecipes: limitLearning,
-        limitLearning,
-        maxRecipes: learnsAllowed,
-        learnsAllowed,
-        learnScope,
-        learningMode,
-        prerequisiteIds,
-        characterPrerequisiteIds,
-        destroyWhenSpent: learn.destroyWhenSpent === true,
-      },
-    };
-  }
-
-  _normalizeRecipeItemDefinition(entry, usedIds = new Set()) {
-    if (!entry || typeof entry !== 'object') return null;
-
-    let id = String(entry.id || '').trim();
-    if (!id) id = foundry.utils.randomID();
-    while (usedIds.has(id)) {
-      id = foundry.utils.randomID();
-    }
-
-    // New-name-first, legacy-name-tolerant (issue 560): accept the renamed
-    // `registeredItemUuid`/`originItemUuid`/`aliasItemUuids` and the pre-#560
-    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`, emitting the new names, so a
-    // not-yet-1.16.0-migrated entry is never stripped on save.
-    const originItemUuid =
-      String(
-        entry.originItemUuid ||
-          entry.registeredItemUuid ||
-          entry.sourceItemUuid ||
-          entry.sourceUuid ||
-          ''
-      ).trim() || null;
-    // Union source refs, mirroring `_normalizeComponent`, so a compendium-imported book resolves
-    // for owned copies dragged from EITHER the compendium item or the imported world item (issue
-    // 555). `originItemUuid` is never recomputed and `registeredItemUuid` defaults to it, so
-    // existing definitions match unchanged.
-    const registeredItemUuid =
-      String(
-        entry.registeredItemUuid ||
-          entry.originItemUuid ||
-          entry.sourceUuid ||
-          entry.sourceItemUuid ||
-          ''
-      ).trim() || null;
-    const primaryRefs = new Set([registeredItemUuid, originItemUuid].filter(Boolean));
-    const rawAliasItemUuids = Array.isArray(entry.aliasItemUuids)
-      ? entry.aliasItemUuids
-      : Array.isArray(entry.fallbackItemIds)
-        ? entry.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((id) => typeof id === 'string')
-              .map((id) => id.trim())
-              .filter((id) => id && !primaryRefs.has(id))
-          ),
-        ]
-      : [];
-    return {
-      id,
-      name: String(entry.name || '').trim() || this._labelFromUuid(originItemUuid) || 'Recipe Item',
-      description: this._normalizeComponentDescription(entry.description),
-      img: String(entry.img || '').trim() || 'icons/svg/item-bag.svg',
-      originItemUuid,
-      registeredItemUuid,
-      aliasItemUuids,
-      // Per-recipe-item enable toggle (issue 511, PR-B). Defaults on; a disabled
-      // definition still round-trips but the library UI can hide/skip it.
-      enabled: entry.enabled !== false,
-      // Book membership (issue 511): the recipe ids this book/scroll contains — the
-      // canonical, many-to-many link (a recipe may belong to several books). Distinct
-      // from the visibility-teaser `recipeIds` fragment elsewhere. Deduped id list.
-      recipeIds: [
-        ...new Set(
-          (Array.isArray(entry.recipeIds) ? entry.recipeIds : [])
-            .map((rid) => String(rid || '').trim())
-            .filter(Boolean)
-        ),
-      ],
-      caps: this._normalizeRecipeItemCaps(entry.caps),
-    };
-  }
-
-  _uniqueKey(seed, usedIds) {
-    const cleaned = this._toKey(seed);
-    let key = cleaned || 'essence';
-    let i = 2;
-    while (usedIds.has(key)) {
-      key = `${cleaned || 'essence'}-${i++}`;
-    }
-    return key;
+    return looksLikeDocumentUuid(value);
   }
 
   _toKey(value) {
-    // Split/filter/join trims leading & trailing separators without the
-    // backtracking-prone `/^-+|-+$/` anchored regex (already-collapsed single
-    // dashes mean this yields the same slug).
-    return String(value || '')
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, '-')
-      .split('-')
-      .filter(Boolean)
-      .join('-');
+    return toKey(value);
+  }
+
+  _normalizeEssenceQuantities(essences, validEssenceIds) {
+    return normalizeEssenceQuantities(essences, validEssenceIds);
+  }
+
+  _normalizeRecipeItemDefinitions(value) {
+    return normalizeRecipeItemDefinitions(value);
+  }
+
+  _normalizeRecipeItemCaps(caps) {
+    return normalizeRecipeItemCaps(caps);
+  }
+
+  _normalizeRecipeItemDefinition(entry, usedIds) {
+    return normalizeRecipeItemDefinition(entry, usedIds);
   }
 
   _labelFromUuid(uuid) {
-    if (!uuid) return '';
-    const parts = String(uuid).split('.');
-    return parts.at(-1) || '';
+    return labelFromUuid(uuid);
   }
 
   _normalizeComponentDescription(description) {
@@ -1229,46 +820,24 @@ export class CraftingSystemManager {
     return descriptionTextCandidate(value, seen);
   }
 
-  /** The ordered description fields a Foundry Item may carry, most specific first. Shared by
-   * {@link _extractSourceDescription} and the repair pass's priming sweep, which needs the RAW
-   * text only. */
-  _sourceDescriptionCandidates(source = null) {
-    if (!source || typeof source !== 'object') return [];
-    return [
-      source?.system?.description?.value,
-      source?.system?.description,
-      source?.description?.value,
-      source?.description,
-    ];
+  /** The snapshot cluster's collaborators (issue 1699), rebuilt on every call: several suites
+   * patch `_enrichToHtml`, `_buildComponentSourceSnapshot` or `_resolveImportedComponentSourceData`
+   * on an already-constructed instance, and a bag captured once would never see them. */
+  _sourceSnapshotCollaborators() {
+    return {
+      enrichToHtml: (raw, options) => this._enrichToHtml(raw, options),
+      resolveImportedComponentSourceData: (itemUuid, source) =>
+        this._resolveImportedComponentSourceData(itemUuid, source),
+      plainTextDescription: (value) => this._plainTextDescription(value),
+      descriptionTextCandidate: (value, seen) => this._descriptionTextCandidate(value, seen),
+      normalizeComponentDescription: (description) =>
+        this._normalizeComponentDescription(description),
+      extractSourceDescription: (source) => this._extractSourceDescription(source),
+    };
   }
 
-  /** The first non-empty RAW description text on a source document, without resolving anything;
-   * feeds the repair pass's single priming sweep. */
-  _rawSourceDescription(source = null) {
-    for (const candidate of this._sourceDescriptionCandidates(source)) {
-      const raw = this._descriptionTextCandidate(candidate);
-      if (raw) return raw;
-    }
-    return '';
-  }
-
-  /** RESOLVE a source document's description through Foundry's enricher, then normalize the
-   * enriched HTML to display-safe plain text — the whole point of issue 800, so a label-less
-   * `@UUID[…]` becomes the referenced document's real NAME. Async because `enrichHTML` is. */
   async _extractSourceDescription(source = null) {
-    if (!source || typeof source !== 'object') return '';
-
-    const candidates = this._sourceDescriptionCandidates(source);
-
-    for (const candidate of candidates) {
-      const raw = this._descriptionTextCandidate(candidate);
-      if (!raw) continue;
-      const enriched = await this._enrichToHtml(raw, { relativeTo: source });
-      const plainText = this._plainTextDescription(enriched);
-      if (plainText) return plainText;
-    }
-
-    return '';
+    return extractSourceDescription(this._sourceSnapshotCollaborators(), source);
   }
 
   async _buildComponentSourceSnapshot(
@@ -1277,61 +846,26 @@ export class CraftingSystemManager {
     fallbackItem = null,
     sourceData = null
   ) {
-    const resolvedSourceData =
-      sourceData ?? (await this._resolveImportedComponentSourceData(itemUuid, source));
-    const sourceResolved = !!source;
-    const fallbackName = fallbackItem?.name || itemUuid?.split('.')?.pop() || 'Imported Item';
-    const fallbackImg = fallbackItem?.img || 'icons/svg/item-bag.svg';
-
-    return {
-      name: sourceResolved ? source?.name || fallbackName : fallbackName,
-      img: sourceResolved ? source?.img || fallbackImg : fallbackImg,
-      description: sourceResolved
-        ? await this._extractSourceDescription(source)
-        : this._normalizeComponentDescription(fallbackItem?.description),
-      registeredItemUuid: resolvedSourceData.currentUuid,
-      originItemUuid: resolvedSourceData.canonicalUuid,
-      aliasItemUuids: resolvedSourceData.aliasItemUuids,
-      sourceFallbacks: resolvedSourceData.sourceFallbacks,
-      references: resolvedSourceData.references,
-    };
+    return buildComponentSourceSnapshot(
+      this._sourceSnapshotCollaborators(),
+      itemUuid,
+      source,
+      fallbackItem,
+      sourceData
+    );
   }
 
   async _buildRecipeItemSourceSnapshot(itemUuid, source = null, fallbackDefinition = null) {
-    // Resolve the same union of source refs a component records (live document uuid +
-    // canonical compendium uuid + broken-source fallbacks), so a recipe item claims the
-    // full breadth for matching (issue 555). Clone-gated identity is applied inside
-    // `_resolveImportedSourceData`, so a duplicated source keys on its own uuid.
-    const sourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
-    const fallbackName = fallbackDefinition?.name || itemUuid?.split('.')?.pop() || 'Recipe Item';
-    const fallbackImg = fallbackDefinition?.img || 'icons/svg/item-bag.svg';
-
-    return {
-      name: source?.name || fallbackName,
-      img: source?.img || fallbackImg,
-      description: source
-        ? await this._extractSourceDescription(source)
-        : this._normalizeComponentDescription(fallbackDefinition?.description),
-      registeredItemUuid: sourceData.currentUuid,
-      originItemUuid: sourceData.canonicalUuid,
-      aliasItemUuids: sourceData.aliasItemUuids,
-    };
+    return buildRecipeItemSourceSnapshot(
+      this._sourceSnapshotCollaborators(),
+      itemUuid,
+      source,
+      fallbackDefinition
+    );
   }
 
-  /** Build a first-class Tool's source snapshot from an Item uuid (issue 561): the same union of
-   * source refs a component records, plus the `name` and `img` display snapshot — but NEVER
-   * `label`, which is a distinct user-authored override. */
   async _buildToolSourceSnapshot(itemUuid, source = null) {
-    const sourceData = await this._resolveImportedComponentSourceData(itemUuid, source);
-    const fallbackName = itemUuid?.split('.')?.pop() || 'Imported Tool';
-    return {
-      name: source?.name || fallbackName,
-      img: source?.img || 'icons/svg/item-bag.svg',
-      description: source ? await this._extractSourceDescription(source) : '',
-      registeredItemUuid: sourceData.currentUuid,
-      originItemUuid: sourceData.canonicalUuid,
-      aliasItemUuids: sourceData.aliasItemUuids,
-    };
+    return buildToolSourceSnapshot(this._sourceSnapshotCollaborators(), itemUuid, source);
   }
 
   _buildFallbackSourceReferences(
@@ -1340,318 +874,44 @@ export class CraftingSystemManager {
     nextSourceItemUuid,
     additionalFallbacks = []
   ) {
-    const fallbackSet = new Set(Array.isArray(item?.aliasItemUuids) ? item.aliasItemUuids : []);
-    for (const ref of [item?.registeredItemUuid, item?.originItemUuid]) {
-      if (ref) fallbackSet.add(ref);
-    }
-    for (const ref of Array.isArray(additionalFallbacks) ? additionalFallbacks : []) {
-      if (ref) fallbackSet.add(ref);
-    }
-    fallbackSet.delete(nextSourceUuid);
-    fallbackSet.delete(nextSourceItemUuid);
-    return [...fallbackSet];
-  }
-
-  /** Normalize a managed component. The salvage context (issue 764) is threaded through an options
-   * bag so `_normalizeSalvage` can apply the Simple-mode group-count clamp; a bare call leaves
-   * salvage groups untouched. A legacy positional `validEssenceIds` Set is still accepted. */
-  _normalizeComponent(item = {}, options = {}) {
-    // Back-compat: a few call paths and tests still pass a bare `validEssenceIds` Set as
-    // the second positional argument. A Set is never a valid options bag, so treat it as
-    // the essence-ids and run with no salvage context (no clamp).
-    const opts = options instanceof Set ? { validEssenceIds: options } : options || {};
-    const { validEssenceIds = null, salvageResolutionMode, salvageSimpleCheckHasFormula } = opts;
-    const difficulty = Number(item.difficulty);
-    // New-name-first, legacy-name-tolerant (issue 560): the pre-#560 shape used
-    // `sourceUuid`/`sourceItemUuid`/`fallbackItemIds`; accept both and emit the new names
-    // so a not-yet-1.16.0-migrated component is never stripped on save.
-    const originItemUuid =
-      item.originItemUuid ||
-      item.registeredItemUuid ||
-      item.sourceItemUuid ||
-      item.sourceUuid ||
-      null;
-    const registeredItemUuid =
-      item.registeredItemUuid ||
-      item.originItemUuid ||
-      item.sourceUuid ||
-      item.sourceItemUuid ||
-      null;
-    const primaryRefs = new Set(
-      [registeredItemUuid, originItemUuid].filter((ref) => typeof ref === 'string' && ref.trim())
+    return buildFallbackSourceReferences(
+      item,
+      nextSourceUuid,
+      nextSourceItemUuid,
+      additionalFallbacks
     );
-    const rawAliasItemUuids = Array.isArray(item.aliasItemUuids)
-      ? item.aliasItemUuids
-      : Array.isArray(item.fallbackItemIds)
-        ? item.fallbackItemIds
-        : null;
-    const aliasItemUuids = Array.isArray(rawAliasItemUuids)
-      ? [
-          ...new Set(
-            rawAliasItemUuids
-              .filter((id) => typeof id === 'string')
-              .map((id) => id.trim())
-              .filter((id) => id && !primaryRefs.has(id))
-          ),
-        ]
-      : [];
-    return {
-      id: item.id || foundry.utils.randomID(),
-      name: item.name || 'Unnamed Item',
-      img: item.img || 'icons/svg/item-bag.svg',
-      description: this._normalizeComponentDescription(item.description),
-      originItemUuid,
-      // Transitional alias for current UI/engine references.
-      registeredItemUuid,
-      aliasItemUuids,
-      tier: item.tier || null,
-      // Single-valued grouping axis (issue 676). Defaults to the reserved `general`
-      // bucket — there is no "uncategorized" state — which is how every EXISTING
-      // component acquires a category with no migration. Distinct from `tags`, which
-      // is many-valued and does a different job.
-      category: normalizeComponentCategory(item.category),
-      tags: Array.isArray(item.tags) ? item.tags : [],
-      essences: this._normalizeEssenceQuantities(item.essences, validEssenceIds),
-      difficulty:
-        Number.isFinite(difficulty) && difficulty >= 1 ? Math.floor(difficulty) : undefined,
-      // Progressive component complications (issue 1286) sit TOP-LEVEL and deliberately NOT under
-      // `salvage`: a complication fires for a component's part in progressive crafting, salvage OR
-      // gathering, while `salvage` is only valid when `features.salvage` is true. The attach is
-      // absence-preserving, so a component that authored none needs no migration.
-      ...authoredComplications(item.complications),
-      // Salvage config is always normalized and preserved on the component so the
-      // `features.salvage` toggle is non-destructive: turning salvage off hides and
-      // skips it (UI/validation/runtime gate on the flag) but never deletes authored
-      // salvage; toggling back on restores it.
-      salvage: this._normalizeSalvage(item.salvage, {
-        salvageResolutionMode,
-        salvageSimpleCheckHasFormula,
-      }),
-    };
   }
 
-  /** Derive the salvage-normalization context (issue 764) from an owning crafting system.
-   * `salvageSimpleCheckHasFormula` reads `salvageCraftingCheck.simple.rollFormula` SPECIFICALLY —
-   * the only slot the Simple engine consults — never an OR across the three slots. Tolerant of a
-   * raw, pre-normalized system. */
-  _salvageNormalizationContext(system = {}) {
-    const raw = system?.salvageResolutionMode;
-    const token = raw === 'tiered' ? 'routed' : raw; // legacy alias
-    const salvageResolutionMode = ['simple', 'routed', 'progressive'].includes(token)
-      ? token
-      : 'simple';
-    const formula = system?.salvageCraftingCheck?.simple?.rollFormula;
-    const salvageSimpleCheckHasFormula = typeof formula === 'string' && formula.trim() !== '';
-    return { salvageResolutionMode, salvageSimpleCheckHasFormula };
+  _normalizeComponent(item, options) {
+    return normalizeComponent(item, options);
   }
 
-  /** Normalize a component's salvage config. In Simple salvage mode this enforces the group-count
-   * invariant (issue 764) via a SUCCESS-FIRST retain-one clamp: one success group at
-   * `resultGroups[0]`, which the engine awards ON SUCCESS via `slice(0, 1)` with no role filter,
-   * plus at most one reserved `role: 'failure'` group. The ordering is load-bearing, because the
-   * FAILURE branch must select BY ROLE or a failed check would award the success output. */
+  _salvageNormalizationContext(system) {
+    return salvageNormalizationContext(system);
+  }
+
   _normalizeSalvage(salvage = {}, options = {}) {
-    if (!salvage || typeof salvage !== 'object') {
-      return {
-        enabled: false,
-        // Default TRUE (issue 651), matching the `Recipe.allowPlayerResultReorder`
-        // default. This non-object path returns its own literal, so the default has to
-        // be stated on BOTH return paths or a component with no salvage config renders
-        // the GM toggle off against a default-on spec.
-        allowPlayerResultReorder: true,
-        ingredientQuantity: 1,
-        toolIds: [],
-        resultGroups: [],
-        dcOverride: null,
-        // `checkModifierIds` is deliberately ABSENT from this literal, not `[]`: an empty
-        // array is an AUTHORED pick of zero, and a component with no salvage config at all
-        // has authored nothing. Seeding one here would silently give every such component a
-        // pick of zero modifiers under `bySubject`. See the attach in the main return.
-      };
-    }
-
-    const rawQty = Number(salvage.ingredientQuantity);
-    const ingredientQuantity = Number.isFinite(rawQty) && rawQty >= 1 ? Math.floor(rawQty) : 1;
-
-    // A set override replaces the system-level salvage default DC; null uses it. null/''/undefined
-    // are guarded explicitly so re-normalizing a null stays null (`Number(null)` is a spurious 0).
-    const dcOverride = (() => {
-      const raw = salvage.dcOverride;
-      if ([null, undefined, ''].includes(raw)) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? Math.trunc(n) : null;
-    })();
-
-    // HOISTED DELIBERATELY (issue 676). `enabled` is the first key of the literal
-    // below and `resultGroups` used to be computed ~10 lines later, so clamping
-    // `enabled` in place against the groups would read an uninitialized local.
-    const normalizedGroups = Array.isArray(salvage.resultGroups)
-      ? salvage.resultGroups.map((g) => this._normalizeSalvageResultGroup(g)).filter(Boolean)
-      : [];
-
-    // Simple-mode SUCCESS-FIRST retain-one clamp (issue 764). Routed, progressive and the
-    // no-context default keep every group and the lower-bound-only `enabled` rule.
-    const { salvageResolutionMode, salvageSimpleCheckHasFormula } = options;
-    let resultGroups = normalizedGroups;
-    let enabled = salvage.enabled === true && normalizedGroups.length > 0;
-    if (salvageResolutionMode === 'simple') {
-      const successGroup = normalizedGroups.find((g) => g.role !== 'failure');
-      const failureGroup = normalizedGroups.find((g) => g.role === 'failure');
-      const clamped = [];
-      // Success group ALWAYS at index 0 — the engine's SUCCESS award is `slice(0, 1)` with no role
-      // filter, so a failure-first input is re-ordered here. Unchanged by issue 1098, whose
-      // failure award selects BY ROLE precisely so this guarantee stays the only thing relied on.
-      if (successGroup) clamped.push(successGroup);
-      // Reserved failure group tolerated ONLY with an authored Simple check formula.
-      if (failureGroup && salvageSimpleCheckHasFormula === true) clamped.push(failureGroup);
-      resultGroups = clamped;
-      // A Simple config with no success group cannot be enabled: the success branch's
-      // `slice(0, 1)` would otherwise award a lone `role: 'failure'` group on a PASSED check.
-      enabled = salvage.enabled === true && successGroup != null;
-    }
-
-    return {
-      // Requirement 5 (`data-models` → Component) is ENFORCED HERE, not by any UI control (issue
-      // 676): the normalizer is the single chokepoint EVERY writer passes, and a control that
-      // merely refuses to ENABLE a zero-group component cannot stop one BECOMING zero-group.
-      enabled,
-      // GM-authored policy: may a player reorder this salvage's progressive result
-      // stages? Default TRUE (issue 651) — an absent key reads as `true`, which is why
-      // the 1.17.0 migration does not seed it.
-      allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
-      ingredientQuantity,
-      dcOverride,
-      // Preserve migrated salvage tool references so they are not orphaned on the
-      // next system save. Coerced to trimmed, non-empty, deduped id strings.
-      toolIds: this._normalizeToolIds(salvage.toolIds),
-      resultGroups,
-      // This component's own check-modifier pick (issue 1095), consulted only under `bySubject`.
-      // Attached ONLY when authored, keyed on `Array.isArray` AT ENTRY: an authored EMPTY array is
-      // a real pick of zero, distinct from an absent one which inherits the check default. It is
-      // deliberately NOT keyed on the post-filter length.
-      ...authoredCheckModifierIds(salvage.checkModifierIds),
-      ...(salvage.outcomeRouting &&
-        typeof salvage.outcomeRouting === 'object' && {
-          outcomeRouting: { ...salvage.outcomeRouting },
-        }),
-      ...(salvage.timeRequirement &&
-        typeof salvage.timeRequirement === 'object' && {
-          timeRequirement: this._normalizeTimeRequirement(salvage.timeRequirement),
-        }),
-      ...(salvage.currencyRequirement &&
-        typeof salvage.currencyRequirement === 'object' && {
-          currencyRequirement: this._normalizeCurrencyRequirement(salvage.currencyRequirement),
-        }),
-    };
+    return normalizeSalvage(salvage, options);
   }
 
-  /** Normalize an array of library tool id strings to trimmed, non-empty, deduped strings,
-   * tolerating non-array or nullish input. */
   _normalizeToolIds(toolIds) {
-    if (!Array.isArray(toolIds)) return [];
-    const seen = new Set();
-    const out = [];
-    for (const raw of toolIds) {
-      const id = String(raw ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      out.push(id);
-    }
-    return out;
+    return normalizeToolIds(toolIds);
   }
 
   _normalizeSalvageResult(result) {
-    if (!result || typeof result !== 'object') return null;
-    const compId = result.componentId || result.systemItemId;
-    const quantityFormula = normalizeQuantityFormula(result.quantityFormula);
-    return {
-      id: result.id || foundry.utils.randomID(),
-      componentId: compId || null,
-      systemItemId: compId || null, // transitional alias
-      quantity:
-        Number.isFinite(Number(result.quantity)) && Number(result.quantity) >= 1
-          ? Number(result.quantity)
-          : 1,
-      // Absence is the fixed-amount state, so `''` and whitespace collapse to it (issue 1645).
-      ...(quantityFormula && { quantityFormula }),
-      propertyMacroUuid: result.propertyMacroUuid || null,
-    };
+    return normalizeSalvageResult(result);
   }
 
   _normalizeSalvageResultGroup(group) {
-    if (!group || typeof group !== 'object') return null;
-    const results = Array.isArray(group.results)
-      ? group.results.map((r) => this._normalizeSalvageResult(r)).filter(Boolean)
-      : [];
-    return {
-      id: group.id || foundry.utils.randomID(),
-      name: String(group.name || '').trim() || 'Result Group',
-      // Preserve a reserved `role: 'failure'` group (issue 764). The editor never AUTHORS this
-      // role, but import, copy-mode and migration can carry one, and the Simple-mode clamp
-      // distinguishes success groups by it. Only the reserved value is emitted.
-      ...(group.role === 'failure' && { role: 'failure' }),
-      results,
-    };
+    return normalizeSalvageResultGroup(group);
   }
 
   _normalizeTimeRequirement(time) {
-    if (!time || typeof time !== 'object') return {};
-    const result = {};
-    for (const key of ['minutes', 'hours', 'days', 'months', 'years']) {
-      const val = Number(time[key]);
-      if (Number.isFinite(val) && val > 0) {
-        result[key] = val;
-      }
-    }
-    return result;
+    return normalizeTimeRequirement(time);
   }
 
   _normalizeCurrencyRequirement(currency) {
-    if (!currency || typeof currency !== 'object') return {};
-    const amount = Number(currency.amount);
-    return {
-      unit: String(currency.unit || '').trim() || 'gp',
-      amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
-    };
-  }
-
-  // Normalise the alchemy sub-config for alchemy-mode systems.
-  // Accepts both 'alchemy' (canonical) and 'cauldron' (T-189 legacy alias) so that persisted
-  // data written before the rename continues to produce a valid config object on load.
-  _normalizeAlchemyConfig(config, resolutionMode) {
-    if (resolutionMode !== 'alchemy' && resolutionMode !== 'cauldron') return null; // T-189: accept both
-    const c = config && typeof config === 'object' ? config : {};
-    // System-level alchemy check mode, replacing the retired per-recipe `resultSelection.provider`:
-    // `none` (a matched brew always succeeds), `simple` (mandatory pass/fail) or `tiered`
-    // (mandatory routed check, identical routing to `routedByCheck`). Defaults to `none`.
-    const checkMode = ['none', 'simple', 'tiered'].includes(c.checkMode) ? c.checkMode : 'none';
-    return {
-      checkMode,
-      // Defaults ON (issue 966). Alchemy's `global` visibility mode reveals a recipe ONLY from
-      // `learnedRecipes`, which only this flag ever writes, so an absent flag left the most
-      // permissive-sounding mode revealing nothing. An explicitly stored `false` is honoured.
-      learnOnCraft: c.learnOnCraft !== false,
-      consumeOnFail: c.consumeOnFail !== false,
-      showAttemptHistoryToPlayers: c.showAttemptHistoryToPlayers !== false,
-    };
-  }
-
-  _normalizeEssenceQuantities(essences = {}, validEssenceIds = null) {
-    const output = {};
-    if (!essences || typeof essences !== 'object') return output;
-    const validIds = validEssenceIds instanceof Set ? validEssenceIds : null;
-
-    for (const [rawKey, rawValue] of Object.entries(essences)) {
-      const key = String(rawKey || '').trim();
-      if (!key) continue;
-      if (validIds && !validIds.has(key)) continue;
-
-      const qty = Number(rawValue);
-      if (!Number.isFinite(qty) || qty <= 0) continue;
-
-      output[key] = qty;
-    }
-    return output;
+    return normalizeCurrencyRequirement(currency);
   }
 
   /** Persist a crafting-system mutation through the definition repository (issue 1089).
@@ -3161,662 +2421,67 @@ export class CraftingSystemManager {
     return leftRefs.length === rightRefs.length && leftRefs.every((ref) => rightRefs.includes(ref));
   }
 
-  /** Strip a clone's stale `_stats` provenance (`duplicateSource` plus the inherited
-   * `compendiumSource`) from a registered source Item. Kind-agnostic, and only touches a source
-   * that is itself a clone; a non-clone's `compendiumSource` is legitimate provenance. */
-  async _stripCloneSourceProvenance(source) {
-    if (!getDuplicateSourceUuid(source) || typeof source.update !== 'function') return false;
-    const patch = {};
-    if (source._stats?.duplicateSource || source.system?._stats?.duplicateSource) {
-      patch['_stats.duplicateSource'] = null;
-    }
-    if (source._stats?.compendiumSource || source.system?._stats?.compendiumSource) {
-      patch['_stats.compendiumSource'] = null;
-    }
-    if (Object.keys(patch).length === 0) return false;
-    await source.update(patch);
-    return true;
+  /** The stamping and repair cluster's collaborators (issue 1699), rebuilt on every call: the
+   * suites assign `save`, `_notifySystemsChanged`, `globalThis.game` and `globalThis.fromUuid`
+   * after construction and patch the flag-key derivations on the instance, so a bag captured once
+   * would never see them. The world collections arrive as thunks, which is what keeps the service
+   * free of Foundry globals. */
+  _sourceIdentityCollaborators() {
+    return {
+      getSystems: () => this.getSystems(),
+      componentRoleFlagKey: (systemId) => this._componentRoleFlagKey(systemId),
+      toolRoleFlagKey: (systemId) => this._toolRoleFlagKey(systemId),
+      recipeItemRoleFlagKey: (systemId) => this._recipeItemRoleFlagKey(systemId),
+      resolveUuid: (uuid) => (typeof fromUuid === 'function' ? fromUuid(uuid) : null),
+      getPack: (packId) => globalThis.game?.packs?.get?.(packId),
+      worldItems: () => (globalThis.game?.items ? [...globalThis.game.items] : []),
+      itemPacks: () => (globalThis.game?.packs ? [...globalThis.game.packs] : []),
+      actors: () => (globalThis.game?.actors ? [...globalThis.game.actors] : []),
+      rawSourceDescription: (source) =>
+        rawSourceDescription(this._sourceSnapshotCollaborators(), source),
+      extractSourceDescription: (source) => this._extractSourceDescription(source),
+      primeEnricherCache: (rawTexts) => this._primeEnricherCache(rawTexts),
+      persistItemMetadata: async () => {
+        await this.save({ domains: ITEM_METADATA_FACTS });
+        this._notifySystemsChanged();
+      },
+    };
   }
 
-  /** Core identity write, KIND-GENERIC over the durable flag key: strip a clone's stale `_stats`
-   * provenance and stamp `flags.fabricate.<flagKey>`, overwriting an inherited marker. Writes
-   * stay conditional, and the caller is assumed to have checked writability. Shared by every
-   * registered kind (issue 561) and by the one-shot auto-stamp. */
-  async _writeSourceIdentity(source, flagKey, id) {
-    const stripped = await this._stripCloneSourceProvenance(source);
-    let stamped = false;
-    if (getFabricateFlag(source, flagKey, null) !== id) {
-      await setFabricateFlag(source, flagKey, id);
-      stamped = true;
-    }
-    return { stripped, stamped };
-  }
-
-  /**
-   * Persist a transferable durable identity (`flags.fabricate.<flagKey>`) on a registered source
-   * WORLD item, so any future inventory copy inherits it and resolves to this registration even
-   * when Foundry's transitive `_stats.duplicateSource` points at a template. KIND-GENERIC, and a
-   * no-op for compendium, locked or non-Item sources, whose copies still resolve via source UUIDs.
-   *
-   * The clone-gate is safe HERE, and only here and in world/pack source repair, because a
-   * registered SOURCE carrying `duplicateSource` is a genuine sidebar-Duplicate. It must NEVER
-   * be applied to actor-owned copies, which carry it legitimately from every non-compendium
-   * drag-drop; {@link matchRecipeItemDefinition} is the runtime matcher that deliberately has no
-   * gate.
-   */
   async _stampSourceIdentity(source, flagKey, id) {
-    if (!id) return;
-    if (!source || source.pack || (source.documentName && source.documentName !== 'Item')) return;
-    if (typeof source.setFlag !== 'function') return;
-    const { stripped } = await this._writeSourceIdentity(source, flagKey, id);
-    if (stripped) {
-      console.debug?.(
-        'Fabricate | stripped clone provenance from a registered source',
-        source.uuid
-      );
-    }
+    return stampSourceIdentity(source, flagKey, id);
   }
 
-  /**
-   * Clear a stale `flags.fabricate.<flagKey>` from a world item that no longer sources
-   * the given registration (used when a definition/component is re-pointed to a new
-   * source). KIND-GENERIC.
-   * @private
-   */
   async _clearSourceFlag(registeredItemUuid, flagKey, id) {
-    if (!registeredItemUuid || !id) return;
-    let doc;
-    try {
-      doc = await fromUuid(registeredItemUuid);
-    } catch {
-      doc = null;
-    }
-    if (!doc || doc.pack || typeof doc.unsetFlag !== 'function') return;
-    if (getFabricateFlag(doc, flagKey, null) !== id) return;
-    try {
-      await doc.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${flagKey}`);
-    } catch {
-      // Non-fatal.
-    }
+    return clearSourceFlag(this._sourceIdentityCollaborators(), registeredItemUuid, flagKey, id);
   }
 
-  /**
-   * One-shot auto-stamp (issues 555, 567): backfill the durable per-system
-   * `roles[system.id].recipeItemDefinitionId` on every registered recipe-item definition's
-   * writable source Item. A shared source registered in BOTH system A and system B is stamped
-   * once per owning system, so it carries both leaves. Dotted system ids, locked packs and
-   * unresolvable sources are counted and skipped, and a second run performs zero writes. Sources
-   * only: owned copies are covered by future drags and by the manual repair, and the legacy
-   * scalar is NOT stripped, remaining the transitional fallback for pre-upgrade owned copies.
-   * Callers gate this on primary-GM plus the one-shot setting version.
-   */
   async autoStampRecipeItemSources() {
-    const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
-    for (const system of this.getSystems()) {
-      // A dotted (unsafe) system id cannot serve as a `roles` map key; skip it rather than
-      // nesting garbage. Its recipe items still resolve via the legacy-scalar + raw-ref path.
-      const flagKey = this._recipeItemRoleFlagKey(system.id);
-      if (!flagKey) continue;
-      for (const def of system.recipeItemDefinitions || []) {
-        const uuid = def?.originItemUuid;
-        if (!uuid || !def?.id) continue;
-        summary.scanned += 1;
-        let source;
-        try {
-          source = typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
-        } catch {
-          source = null;
-        }
-        if (!source || typeof source.setFlag !== 'function') {
-          summary.skippedMissing += 1;
-          continue;
-        }
-        if (source.pack) {
-          const pack = globalThis.game?.packs?.get?.(source.pack);
-          if (!pack || pack.locked) {
-            summary.skippedLocked += 1;
-            continue;
-          }
-        }
-        const { stamped, stripped } = await this._writeSourceIdentity(source, flagKey, def.id);
-        if (stamped) summary.stamped += 1;
-        if (stripped) summary.stripped += 1;
-      }
-    }
-    return summary;
+    return autoStampRecipeItemSources(this._sourceIdentityCollaborators());
   }
 
-  /** Issue 556 one-shot auto-stamp: backfill the durable per-system
-   * `roles[system.id].componentId` on every registered component's writable source Item. Locked
-   * packs and unresolvable sources are counted and skipped, and a second run performs zero
-   * writes. Sources only — owned copies are covered by future drags and by the manual repair.
-   * Callers gate this on primary-GM plus the one-shot setting version, so it does no gating of
-   * its own beyond writability. */
   async autoStampComponentSources() {
-    const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
-    for (const system of this.getSystems()) {
-      // A dotted (unsafe) system id cannot serve as a `roles` map key; skip it rather
-      // than nesting garbage. Its components still resolve via the raw-ref fall-through.
-      const flagKey = this._componentRoleFlagKey(system.id);
-      if (!flagKey) continue;
-      for (const component of system.components || []) {
-        const uuid = component?.originItemUuid || component?.registeredItemUuid;
-        if (!uuid || !component?.id) continue;
-        summary.scanned += 1;
-        let source;
-        try {
-          source = typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
-        } catch {
-          source = null;
-        }
-        if (!source || typeof source.setFlag !== 'function') {
-          summary.skippedMissing += 1;
-          continue;
-        }
-        if (source.pack) {
-          const pack = globalThis.game?.packs?.get?.(source.pack);
-          if (!pack || pack.locked) {
-            summary.skippedLocked += 1;
-            continue;
-          }
-        }
-        const { stamped, stripped } = await this._writeSourceIdentity(
-          source,
-          flagKey,
-          component.id
-        );
-        if (stamped) summary.stamped += 1;
-        if (stripped) summary.stripped += 1;
-      }
-    }
-    return summary;
+    return autoStampComponentSources(this._sourceIdentityCollaborators());
   }
 
-  /** Issue 561 one-shot auto-stamp: backfill the durable per-system `roles[system.id].toolId` on
-   * every registered tool's writable source Item — a clone of {@link autoStampComponentSources}.
-   * A tool with no source refs is skipped, as are dotted system ids and locked or unresolvable
-   * sources. ORDERING: it reads the tool source refs that the `1.15.0` `migrateToolsToFirstClass`
-   * migration populates, so it MUST run after that migration persists. */
   async autoStampToolSources() {
-    const summary = { scanned: 0, stamped: 0, stripped: 0, skippedLocked: 0, skippedMissing: 0 };
-    for (const system of this.getSystems()) {
-      const flagKey = this._toolRoleFlagKey(system.id);
-      if (!flagKey) continue;
-      for (const tool of system.tools || []) {
-        const uuid = tool?.originItemUuid || tool?.registeredItemUuid;
-        if (!uuid || !tool?.id) continue;
-        summary.scanned += 1;
-        let source;
-        try {
-          source = typeof fromUuid === 'function' ? await fromUuid(uuid) : null;
-        } catch {
-          source = null;
-        }
-        if (!source || typeof source.setFlag !== 'function') {
-          summary.skippedMissing += 1;
-          continue;
-        }
-        if (source.pack) {
-          const pack = globalThis.game?.packs?.get?.(source.pack);
-          if (!pack || pack.locked) {
-            summary.skippedLocked += 1;
-            continue;
-          }
-        }
-        const { stamped, stripped } = await this._writeSourceIdentity(source, flagKey, tool.id);
-        if (stamped) summary.stamped += 1;
-        if (stripped) summary.stripped += 1;
-      }
-    }
-    return summary;
+    return autoStampToolSources(this._sourceIdentityCollaborators());
   }
 
-  /** Resolve the existing definition a registered source maps to. A NON-clone source's durable
-   * identity flag is authoritative even if the recorded `originItemUuid` drifted: the per-system
-   * `roles[system.id].recipeItemDefinitionId` leaf (issue 567) is read FIRST, then the legacy
-   * scalar as a transitional fallback. A CLONE's inherited flag belongs to the ORIGINAL and is
-   * ignored, so a duplicated source becomes its own definition (issue 555, flow 4b). */
   _findRecipeItemDefinitionForSource(system, snapshot, source) {
-    const definitions = Array.isArray(system.recipeItemDefinitions)
-      ? system.recipeItemDefinitions
-      : [];
-    if (!getDuplicateSourceUuid(source)) {
-      const roleFlagKey = this._recipeItemRoleFlagKey(system.id);
-      const roleId = roleFlagKey ? getFabricateFlag(source, roleFlagKey, null) : null;
-      if (roleId) {
-        const byRole = definitions.find((def) => def.id === roleId);
-        if (byRole) return byRole;
-      }
-      const flagId = getFabricateFlag(source, 'recipeItemDefinitionId', null);
-      if (flagId) {
-        const byFlag = definitions.find((def) => def.id === flagId);
-        if (byFlag) return byFlag;
-      }
-    }
-    // Union find-existing over the snapshot's full ref set. The snapshot's refs are
-    // already clone-gated by `_resolveImportedSourceData` (a clone contributes only its
-    // own uuid), so a duplicated source can never collide with the original here — the
-    // 4b overwrite stays fixed even with union matching.
-    const claimed = new Set(getItemMatchUuids(snapshot));
-    if (claimed.size === 0) return null;
-    return (
-      definitions.find((def) => getItemMatchUuids(def).some((ref) => claimed.has(ref))) || null
+    return findRecipeItemDefinitionForSource(
+      this._sourceIdentityCollaborators(),
+      system,
+      snapshot,
+      source
     );
   }
 
-  // Normalize a name for the name-assisted re-point: trim, collapse internal
-  // whitespace, and lowercase. Exact (post-normalization) equality only — no fuzzy or
-  // substring matching. Names are literal snapshot strings captured at registration,
-  // not localized keys, so a client-language change cannot move the match.
-  _normalizeMatchName(name) {
-    return String(name ?? '')
-      .trim()
-      .replaceAll(/\s+/g, ' ')
-      .toLowerCase();
-  }
-
-  // Resolve a definition by exact name, unique WITHIN the per-system definition set passed
-  // in (recipe-item repair is per-system since issue 567, so the caller only ever hands
-  // this ONE system's `kind.definitions`). Returns the single match, `'ambiguous'` when two
-  // or more of that system's definitions share the name, or `null` when none match. A source
-  // registered in two systems is reconciled independently in each, so name uniqueness is
-  // scoped to the system being reconciled, never global.
-  _uniqueDefinitionByName(name, definitions) {
-    const normalized = this._normalizeMatchName(name);
-    if (!normalized) return null;
-    const matches = definitions.filter((def) => this._normalizeMatchName(def?.name) === normalized);
-    if (matches.length === 0) return null;
-    if (matches.length >= 2) return 'ambiguous';
-    return matches[0];
-  }
-
-  // Owner resolution for a WORLD / WRITABLE-PACK SOURCE item. Clone-gated: a source
-  // carrying `_stats.duplicateSource` is a sidebar-Duplicate, so it must NOT be
-  // identity-matched onto the ORIGINAL through its inherited `compendiumSource` (the
-  // self-corruption hazard — it would be stamped with the original's id). A clone
-  // keys on its own uuid only; a non-clone keys on uuid + compendium source.
-  _resolveSourceRepairOwner(item, kind) {
-    const isClone = !!getDuplicateSourceUuid(item);
-    const refs = new Set(
-      isClone
-        ? [item?.uuid].filter((ref) => typeof ref === 'string' && ref.trim())
-        : getItemIdentityReferences(item)
-    );
-    if (refs.size === 0) return null;
-    return (
-      kind.definitions.find((def) => kind.refExtractor(def).some((ref) => refs.has(ref))) || null
-    );
-  }
-
-  // Owner resolution for an ACTOR-OWNED item, returning `{definition, tier}`. NO
-  // clone-gate: an owned copy legitimately carries `duplicateSource` (Foundry stamps it
-  // on drag-drop) and its `compendiumSource` is real provenance, so it resolves through
-  // the ordinary runtime matchers — the four-tier recipe-item matcher (which surfaces the
-  // tier), or the component source matcher (`tier: null`).
-  _resolveOwnedRepairOwner(item, kind) {
-    if (kind.bucket === 'recipeItems') {
-      return matchRecipeItemDefinition(item, kind.definitions, kind.systemId);
-    }
-    // A first-class Tool carries its OWN identity, so it MUST resolve through the Tool
-    // resolver — routing the tools bucket through the component resolver would mis-resolve
-    // it via component legacy-scalar logic (issue 561, D-F(repair) / A9).
-    if (kind.bucket === 'tools') {
-      const definition = resolveToolForItem(item, kind.definitions, kind.systemId);
-      return { definition, tier: null };
-    }
-    const definition = resolveComponentForItem(item, kind.definitions, kind.systemId);
-    return { definition, tier: null };
-  }
-
-  /** Write the durable identity onto ONE item given its already-resolved owner definition, shared
-   * by the world/pack-source and actor-owned passes for both kinds. Strips a lingering
-   * `_stats.duplicateSource` when an owner is found, stamps the kind's durable flag, and clears a
-   * stale flag when the item sources nothing; writes stay conditional. */
-  async _repairSourceItem(item, owner, kind, summary) {
-    if (!item || typeof item.update !== 'function') return;
-    const currentFlag = getFabricateFlag(item, kind.flagKey, null);
-    const bucket = summary[kind.bucket];
-
-    if (owner) {
-      if (item._stats?.duplicateSource) {
-        await item.update({ '_stats.duplicateSource': null });
-        summary.stripped += 1;
-        bucket.stripped += 1;
-      }
-      if (currentFlag !== owner.id) {
-        await setFabricateFlag(item, kind.flagKey, owner.id);
-        summary.stamped += 1;
-        bucket.stamped += 1;
-      }
-    } else if (currentFlag && typeof item.unsetFlag === 'function') {
-      await item.unsetFlag(FABRICATE_FLAG_NAMESPACE, `fabricate.${kind.flagKey}`);
-      summary.cleared += 1;
-      bucket.cleared += 1;
-    }
-  }
-
-  /** Reconcile ONE actor-owned item for one kind. A flagged owned copy is authoritative and left
-   * untouched; otherwise it resolves through the ordinary runtime matcher and, for recipe items
-   * only, may be re-pointed by name when an unflagged copy's name uniquely matches a DIFFERENT
-   * definition than its `duplicateSource` names. This never triggers a learn. */
-  async _repairOwnedItem(item, kind, summary, auditLog) {
-    if (!item || typeof item.update !== 'function') return;
-    // A flagged owned copy already carries its identity-of-record — authoritative,
-    // left exactly as-is (no re-point, no strip, no learn).
-    if (getFabricateFlag(item, kind.flagKey, null)) return;
-
-    const { definition, tier } = this._resolveOwnedRepairOwner(item, kind);
-
-    // Components, and recipe items matched by a RELIABLE tier (durable flag / own uuid /
-    // compendium source), are stamped directly to the resolved owner.
-    if (kind.bucket !== 'recipeItems' || (definition && tier !== 'duplicate')) {
-      await this._repairSourceItem(item, definition, kind, summary);
-      return;
-    }
-
-    // Recipe item matched ONLY via tier 4 (duplicateSource), or unmatched. Tier 4 is the
-    // unreliable signal at the heart of issue 555, so an owned copy here is only stamped
-    // when its NAME confirms an identity. Without a duplicateSource there is nothing to
-    // re-point against, so stamp whatever (if anything) matched.
-    if (!getDuplicateSourceUuid(item)) {
-      await this._repairSourceItem(item, definition, kind, summary);
-      return;
-    }
-
-    const byName = this._uniqueDefinitionByName(item?.name, kind.definitions);
-    if (byName === 'ambiguous') {
-      // A name matching two or more definitions cannot be safely resolved — leave the
-      // copy untouched (it stays a tier-4 fallback, which R5 refuses for bulk auto-learn).
-      summary.skippedAmbiguous += 1;
-      return;
-    }
-    if (!byName) {
-      // No name confirmation for a tier-4-only copy — leave it as-is.
-      return;
-    }
-    // The copy's name uniquely names a definition. When that differs from the one its
-    // duplicateSource resolves to, it is a re-point (the duplicated-scroll-mislabelled
-    // case); log an auditable, reversible record. When it confirms the same definition,
-    // stamp it without counting a re-point.
-    if (!definition || byName.id !== definition.id) {
-      auditLog.push({
-        itemUuid: item.uuid || null,
-        oldDuplicateSourceTarget: getDuplicateSourceUuid(item),
-        newlyStampedDefinitionId: byName.id,
-      });
-      summary.repointed += 1;
-    }
-    await this._repairSourceItem(item, byName, kind, summary);
-  }
-
-  /**
-   * The source reference a DEFINITION owns, for resolving its own authoritative
-   * document. Prefers the live registered uuid, then the canonical origin uuid, then
-   * any recorded alias. Distinct from the item-driven repair walk, which starts from
-   * an ITEM and asks which definition claims it.
-   * @private
-   */
-  _definitionSourceUuid(definition = null) {
-    const refs = [
-      definition?.registeredItemUuid,
-      definition?.originItemUuid,
-      ...(Array.isArray(definition?.aliasItemUuids) ? definition.aliasItemUuids : []),
-    ];
-    for (const ref of refs) {
-      const uuid = typeof ref === 'string' ? ref.trim() : '';
-      if (uuid) return uuid;
-    }
-    return '';
-  }
-
-  /** Record one skipped description against BOTH the split reason counter and the flat `skipped`
-   * total. The split exists so a GM can tell a broken source link, their problem to fix, from a
-   * source that simply has no description. */
-  _countSkippedDescription(summary, reason) {
-    summary.descriptions[reason] += 1;
-    summary.descriptions.skipped += 1;
-  }
-
-  /**
-   * DEFINITION-DRIVEN description refresh, run as part of {@link repairItemData}. It shares the
-   * button, the `_assertGM` gate and the summary object with the identity repair, but deliberately
-   * NOT its traversal: the item-driven walk SKIPS LOCKED PACKS, because identity repair writes
-   * flags into pack items, whereas descriptions only READ through `fromUuid` — and a locked system
-   * pack is exactly where the reported raw `@UUID[Compendium.…]` lives. Riding the item walk would
-   * also invert authority, making an actor-owned COPY a candidate writer of the DEFINITION's
-   * description. Tools are excluded by design, because a tool snapshot carries no description.
-   */
-  async _refreshDefinitionDescriptions(summary) {
-    const targets = [];
-    for (const system of this.getSystems()) {
-      for (const bucket of ['components', 'recipeItemDefinitions']) {
-        for (const definition of system?.[bucket] || []) {
-          if (definition) targets.push(definition);
-        }
-      }
-    }
-
-    // Sweep 1 — resolve each definition's OWN source document and collect its raw
-    // description. Doing this up front is what makes priming correct: the enricher
-    // cache is warmed ONCE from every reference in the world, instead of core's
-    // per-`enrichHTML` priming costing one round-trip per description.
-    const resolved = [];
-    const rawTexts = [];
-    for (const definition of targets) {
-      const uuid = this._definitionSourceUuid(definition);
-      if (!uuid) {
-        this._countSkippedDescription(summary, 'skippedUnresolved');
-        continue;
-      }
-      let source;
-      try {
-        source = await fromUuid(uuid);
-      } catch {
-        source = null;
-      }
-      if (!source) {
-        // The item, its pack, or the module that provided it is gone. Distinct from a
-        // blank source below, because THIS one is actionable by the GM.
-        this._countSkippedDescription(summary, 'skippedUnresolved');
-        continue;
-      }
-      resolved.push({ definition, source });
-      const raw = this._rawSourceDescription(source);
-      if (raw) rawTexts.push(raw);
-    }
-
-    await this._primeEnricherCache(rawTexts);
-
-    // Sweep 2 — resolve, normalize, store.
-    let changed = false;
-    for (const { definition, source } of resolved) {
-      const next = await this._extractSourceDescription(source);
-      const current = typeof definition.description === 'string' ? definition.description : '';
-      if (next === current) {
-        summary.descriptions.unchanged += 1;
-        continue;
-      }
-      // Never let a source with no description at all WIPE text a definition already
-      // carries — that would be data loss dressed up as a repair. Pinned by
-      // `tests/repair-item-data.test.js`; deleting this guard must fail that test.
-      if (!next) {
-        this._countSkippedDescription(summary, 'skippedEmpty');
-        continue;
-      }
-      definition.description = next;
-      summary.descriptions.refreshed += 1;
-      changed = true;
-    }
-
-    return changed;
-  }
-
-  /**
-   * GM maintenance ("Repair Item Data"): reconcile EVERY PROJECTION of a definition's resolved
-   * source document — durable identity and derived display snapshots alike.
-   *
-   * The identity leg is item-driven: every component, tool and recipe-item definition's identity
-   * is reconciled across world items, writable packs and actor-owned items. World/pack SOURCE
-   * items are strip-and-stamped with a clone-gated identity, so a duplicated source becomes its
-   * own definition; actor-owned copies resolve through the ordinary runtime matchers and, for
-   * recipe items, a guardrailed name-assisted re-point. Locked packs are skipped, synthetic and
-   * compendium-resident actors are never scanned, and nothing triggers a learn.
-   *
-   * The description leg is definition-driven (issue 800): each definition resolves its OWN source
-   * reference, including sources in LOCKED packs, and its stored description is refreshed to the
-   * enricher-resolved plain text. See {@link _refreshDefinitionDescriptions}.
-   */
+  /** GM maintenance ("Repair Item Data"): the GM gate stays here, ahead of the bag, so the
+   * permission failure is still the manager's. */
   async repairItemData({ includeCompendiums = true } = {}) {
     this._assertGM('repair item data');
-
-    // Components, tools, AND recipe items all resolve PER SYSTEM. Their definition ids are
-    // not globally unique (copy-import preserves component ids; recipe-item ids are generated
-    // against a per-system uniqueness set), and each durable identity is a per-system map key
-    // `roles.<systemId>.<role>`. A per-system kind means each system's pass reads and writes
-    // ONLY its own leaf, so a non-owning system's null-owner pass finds its leaf unset and
-    // no-ops — it can never clear another system's identity, regardless of getSystems() order
-    // (issue 556 Fix 2, extended to recipe items by issue 567).
-    const kinds = [];
-    for (const system of this.getSystems()) {
-      // A dotted (unsafe) system id cannot serve as a `roles` map key; skip its
-      // component repair so nothing is nested under a broken key (the components still
-      // resolve via raw refs). Fresh ids are validated at creation/import.
-      const flagKey = this._componentRoleFlagKey(system.id);
-      if (!flagKey) continue;
-      // DELIBERATELY NOT REPOINTED at issue 1370: the subject of the restamp is the PERSISTED
-      // record whose durable identity is being repaired, not a merged read row.
-      kinds.push({
-        bucket: 'components',
-        flagKey,
-        systemId: system.id,
-        definitions: system.components || [],
-        refExtractor: (def) => getItemMatchUuids(def),
-      });
-      // First-class Tools are ALSO a per-system kind (issue 561): each system's pass reads
-      // and writes ONLY its own `roles.<systemId>.toolId` leaf. Item-sourced tools reconcile
-      // via their own source references (owned copies through `resolveToolForItem`).
-      const toolFlagKey = this._toolRoleFlagKey(system.id);
-      if (toolFlagKey) {
-        // DELIBERATELY NOT REPOINTED at issue 1370, for the same reason as the component kind
-        // above.
-        kinds.push({
-          bucket: 'tools',
-          flagKey: toolFlagKey,
-          systemId: system.id,
-          definitions: (system.tools || []).filter(
-            (tool) => tool && (tool.originItemUuid || tool.registeredItemUuid)
-          ),
-          refExtractor: (def) => getItemMatchUuids(def),
-        });
-      }
-      // Recipe items are ALSO a per-system kind (issue 567): each system's pass reads and
-      // writes ONLY its own `roles.<systemId>.recipeItemDefinitionId` leaf, so a shared
-      // source registered in two systems keeps a durable claim in each and neither clobbers
-      // the other. A dotted/unsafe system id is skipped (its recipe items resolve via the
-      // legacy-scalar + raw-reference fall-through).
-      const recipeFlagKey = this._recipeItemRoleFlagKey(system.id);
-      if (recipeFlagKey) {
-        kinds.push({
-          bucket: 'recipeItems',
-          flagKey: recipeFlagKey,
-          systemId: system.id,
-          definitions: system.recipeItemDefinitions || [],
-          refExtractor: (def) => getItemMatchUuids(def),
-        });
-      }
-    }
-
-    const summary = {
-      scanned: 0,
-      skippedLocked: 0,
-      // Flat totals (kept for back-compat with the component-source repair contract).
-      stamped: 0,
-      stripped: 0,
-      cleared: 0,
-      // Name-assisted re-point outcomes.
-      repointed: 0,
-      skippedAmbiguous: 0,
-      components: { stamped: 0, stripped: 0, cleared: 0 },
-      tools: { stamped: 0, stripped: 0, cleared: 0 },
-      recipeItems: { stamped: 0, stripped: 0, cleared: 0 },
-      // Description refresh outcomes (issue 800), deliberately a bucket of its own so
-      // the identity counts above keep their existing meaning. Repair-time component
-      // description refresh excludes Tools because first-class Tool source snapshots
-      // (name, image, and description) are captured at registration/relink and
-      // deliberately do not auto-refresh.
-      // `skipped` is the flat total; `skippedUnresolved` (source item/pack/module gone
-      // — actionable) and `skippedEmpty` (source resolved but carries no description —
-      // nothing to do) split it by cause so the GM notice can name one.
-      descriptions: {
-        refreshed: 0,
-        unchanged: 0,
-        skipped: 0,
-        skippedUnresolved: 0,
-        skippedEmpty: 0,
-      },
-      repointLog: [],
-    };
-
-    const repairSource = async (item) => {
-      for (const kind of kinds) {
-        await this._repairSourceItem(
-          item,
-          this._resolveSourceRepairOwner(item, kind),
-          kind,
-          summary
-        );
-      }
-    };
-
-    const worldItems = globalThis.game?.items ? [...globalThis.game.items] : [];
-    for (const item of worldItems) {
-      summary.scanned += 1;
-      await repairSource(item);
-    }
-
-    if (includeCompendiums) {
-      const packs = globalThis.game?.packs ? [...globalThis.game.packs] : [];
-      for (const pack of packs) {
-        if (pack?.documentName !== 'Item') continue;
-        if (pack.locked) {
-          summary.skippedLocked += 1;
-          continue;
-        }
-        let docs;
-        try {
-          docs = await pack.getDocuments();
-        } catch {
-          docs = [];
-        }
-        for (const item of docs) {
-          summary.scanned += 1;
-          await repairSource(item);
-        }
-      }
-    }
-
-    // Actor-owned copies. Guarded exactly like `game?.items` / `game?.packs` above so a
-    // world with no `game.actors` (e.g. the pure-logic test harness) is a clean no-op.
-    const actors = globalThis.game?.actors ? [...globalThis.game.actors] : [];
-    for (const actor of actors) {
-      const items = actor?.items ? [...actor.items] : [];
-      for (const item of items) {
-        summary.scanned += 1;
-        for (const kind of kinds) {
-          await this._repairOwnedItem(item, kind, summary, summary.repointLog);
-        }
-      }
-    }
-
-    // Description leg — definition-driven, unaffected by `includeCompendiums` and by
-    // `pack.locked` (it reads through `fromUuid` rather than writing into packs).
-    const descriptionsChanged = await this._refreshDefinitionDescriptions(summary);
-    if (descriptionsChanged) {
-      await this.save({ domains: ITEM_METADATA_FACTS });
-      this._notifySystemsChanged();
-    }
-
-    return summary;
+    return repairItemData(this._sourceIdentityCollaborators(), { includeCompendiums });
   }
 
   /**

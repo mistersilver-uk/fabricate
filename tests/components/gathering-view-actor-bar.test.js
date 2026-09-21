@@ -126,6 +126,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
     for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) copyModule(modulePath);
     copyModule('src/gatheringImageDefaults.js');
+    copyModule('src/ui/svelte/util/disclosurePhrase.js');
     copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');

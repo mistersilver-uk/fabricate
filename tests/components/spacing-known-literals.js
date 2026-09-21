@@ -116,7 +116,11 @@ export function isExemptSpacingPixels(pixels) {
 // `.actor-bar-stamina-track` and `.essence-pool-bar` keep a width and a display and no spacing at
 // all. What the primitives absorb is `var(--fab-space-*)` throughout, so the nine occupancies are
 // paid rather than relocated. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 811;
+// 811 -> 807 (issue 1512): the ordered row's own sheet block is tokenised, so `styles/fabricate.css`
+// loses one occupancy each of `gap 10`, `gap 2`, `padding 11` and `padding 8`. The band's three
+// literals are a pure move from `RecipeResultItemRow` to `RecipeStageComplicationBand`, net zero.
+// Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 806;
 
 /** The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST. */
 export const FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS = 1445;

@@ -99,11 +99,15 @@ manager-recipe-edit-crafting-modifier-inert
 manager-recipe-edit-books-scrolls
 manager-recipe-edit-tools
 manager-recipe-edit-ingredients
+manager-recipe-edit-ingredients-kind-list
 manager-recipe-edit-ingredients-cost
 manager-recipe-edit-tag-picker
 manager-recipe-edit-ingredients-or-menu
 manager-recipe-edit-validation
 manager-recipe-edit-multistep
+manager-recipe-edit-step-open
+manager-recipe-edit-step-narrow
+manager-recipe-edit-results-narrow
 manager-recipe-edit-results
 manager-recipe-edit-results-multistep
 manager-multistep-disable-confirm
@@ -118,6 +122,7 @@ manager-access-recipe-roster-no-match
 manager-components-normal
 manager-components-essence-chips
 manager-component-edit-inheriting
+manager-component-edit-category-list
 manager-component-edit-world-tags
 manager-components-world-cohort
 manager-components-add-from-catalogue
@@ -131,6 +136,7 @@ manager-components-description-ingested
 manager-component-edit-normal
 manager-component-edit-stacked
 manager-component-edit-salvage
+manager-component-edit-salvage-narrow
 manager-component-edit-salvage-off
 manager-component-edit-salvage-simple
 manager-component-complications-empty
@@ -146,6 +152,7 @@ manager-checks-rail-dirty
 manager-checks-section-badged-and-dotted
 manager-checks-off
 manager-checks-stacked-floor
+manager-checks-trigger-operator-list
 manager-checks-crafting-consumption
 manager-checks-salvage-on-failure
 manager-checks-gathering-on-failure
@@ -226,6 +233,7 @@ manager-world-downtime-test-companion-tab-navigation
 manager-world-travel-ungated
 manager-world-travel-with-gathering-expanded
 manager-world-travel-realms-normal
+manager-world-travel-realm-open
 manager-world-travel-realms-stacked
 manager-world-travel-map-normal
 manager-world-travel-map-stacked
@@ -235,6 +243,7 @@ manager-gathering-settings-normal
 manager-gathering-economy-actors
 manager-gathering-economy-regen-unit-list
 manager-environment-edit-blind-weights
+manager-environment-edit-blind-weights-narrow
 manager-environment-edit-automatic-force-add
 manager-environment-validation
 manager-tool-parity-01-library-1280x720
@@ -305,6 +314,7 @@ player-inventory-bulk-report
 player-gathering-events
 player-gathering-task-ready
 player-gathering-after-success
+player-gathering-drop-open
 player-gathering-tool-blocked
 player-gathering-timed-ready
 player-gathering-timed-active
@@ -451,6 +461,7 @@ coverage-mode-routed-check-checks
 coverage-mode-routed-check-five-bands
 manager-checks-crafting-dynamic-dc
 manager-checks-crafting-recipe-tiers
+manager-checks-crafting-recipe-tiers-narrow
 manager-checks-crafting-tier-step
 manager-checks-crafting-trigger-break-tools
 manager-checks-crafting-simulator-rolled

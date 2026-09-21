@@ -38,6 +38,10 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
+      // This case stacks the browse column above the rail, so it is the frame that proves the
+      // list geometry survives a change to the rail even though the rail itself clips below the
+      // 700px fold here; the default-width browse case is the one that photographs the column.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -58,6 +62,8 @@ export const CASES = Object.freeze([
       // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
       // moved out of the root: without this the leaf publishes environment-editor frames instead.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -436,7 +442,7 @@ export const CASES = Object.freeze([
     expectView: 'environment-edit',
     // The route survives a tab click that did nothing, so the assertion names the tab panel and the inspector.
     expectSelector:
-      '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-row.is-selected)' +
+      '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-entry.is-selected)' +
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
@@ -464,6 +470,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       // And drawn by the leaf they moved into (issue 1707 phase 2).
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -491,6 +499,8 @@ export const CASES = Object.freeze([
       // pattern above reaches `environment/` (issue 1707).
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringEventInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
   managerCase({
@@ -521,6 +531,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
+      // And the rail that renders that leaf, since phase 3 moved it out of the root too.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
 ]);

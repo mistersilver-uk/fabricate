@@ -26,10 +26,16 @@ const CONVERTED_BATCHES = Object.freeze([
     task: 5,
     files: Object.freeze([
       // 39 sites — 30 `<button>` and 9 `<a href>` — less 2 that issue 1707 phase 2 moved into
-      // `environment/GatheringTaskInspector.svelte` (the drop Duplicate/Delete pair) below.
+      // `environment/GatheringTaskInspector.svelte` (the drop Duplicate/Delete pair) and 2 its
+      // phase 3 moved into `environment/GatheringInspectorRail.svelte` (the empty-library setup
+      // card's docs links), both below. The sum over the three rows is still 39.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-        sites: 37,
+        sites: 35,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte',
+        sites: 2,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte',
@@ -723,7 +729,14 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-setup-links',
-        buttons: 8,
+        buttons: 6,
+      },
+      // Two of the root's eight left with the empty-library setup card issue 1707 phase 3 moved
+      // into the inspector rail; the sum over the two rows is unchanged.
+      {
+        file: 'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte',
+        container: 'manager-setup-links',
+        buttons: 2,
       },
       {
         file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
@@ -1048,9 +1061,10 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    42,
-    // 41 -> 42 (issue 1707 phase 2): the root's task-5 pair split across the file it moved into.
-    'across 42 components'
+    43,
+    // 41 -> 42 (issue 1707 phase 2), -> 43 (phase 3): the root's task-5 sites split across the two
+    // files they moved into. The 123-site total above is unchanged, because nothing converted.
+    'across 43 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the

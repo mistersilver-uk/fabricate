@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 231,
+  "pinnedTotal": 225,
   "rows": [
     {
       "key": "(top level) | .fabricate-list-row.is-truncated .fabricate-list-row-detail",
@@ -67,10 +67,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-checks-formula-sep",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-checks-trigger-body .manager-field select",
       "count": 2
     },
     {
@@ -219,14 +215,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-recipe-preview",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-controls",
       "count": 2
     },
     {

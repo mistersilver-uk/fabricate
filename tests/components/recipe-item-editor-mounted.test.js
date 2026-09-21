@@ -29,6 +29,8 @@ const harness = createMountedComponentHarness({
     // …and the announcement half beside it (issue 1517, review r1).
     'src/ui/svelte/apps/manager/validationAnnouncement.js',
     'src/ui/svelte/util/announceAfterFocus.js',
+    'src/ui/svelte/util/bookRecipeBrowse.js',
+    'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',
@@ -47,6 +49,7 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',

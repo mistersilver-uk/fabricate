@@ -9,6 +9,14 @@
       "Stepper": {
         "Decrease": "Decrease {label}",
         "Increase": "Increase {label}"
+      },
+      "SortableList": {
+        "Reorder": "Reorder {name} — use the up and down arrow keys",
+        "Remove": "Remove {name}"
+      },
+      "Disclosure": {
+        "Expand": "Show details for {name}",
+        "Collapse": "Hide details for {name}"
       }
     },
     "Migration": {
@@ -2568,11 +2576,6 @@
           "DeleteStepAlsoTools": "its ingredients and results are deleted too",
           "DeleteStepAlsoAll": "its ingredients, results, and tools are deleted too",
           "UnnamedStep": "this step",
-          "DragStep": "Drag to reorder",
-          "DragResult": "Drag to reorder",
-          "MoveResultUp": "Move up",
-          "MoveResultDown": "Move down",
-          "ResultMoveAnnouncement": "{name} moved to position {position} of {total}",
           "UnnamedResult": "this result",
           "Difficulty": "Difficulty",
           "DifficultyUnset": "No difficulty",
@@ -3292,8 +3295,6 @@
             "DifficultyShort": "DC",
             "Edit": "Edit",
             "EditDcHint": "Set on this component in its editor",
-            "MoveUp": "Move up",
-            "MoveDown": "Move down",
             "DecrementResult": "Decrease quantity",
             "IncrementResult": "Increase quantity"
           },
@@ -4619,12 +4620,9 @@
             "ColRuntime": "Runtime state",
             "NoIncludedTasks": "No tasks are available in this environment yet.",
             "NoIncludedEvents": "No events are available in this environment yet.",
-            "DragReorder": "Drag to reorder",
             "OpenSourceTask": "Open source task",
             "OpenSourceEvent": "Open source event",
             "MoreActions": "More actions",
-            "MoveUp": "Move up",
-            "MoveDown": "Move down",
             "QuickExclude": "Exclude",
             "QuickRemove": "Remove",
             "Exclude": "Exclude from environment",
@@ -6147,7 +6145,6 @@
             "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
             "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed.",
             "TiersLeadBands": "A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.",
-            "ReorderTier": "Reorder {name} — use the up and down arrow keys",
             "ModifierNamedHeading": "Named modifiers",
             "SimpleBoundary": "Difficulty class",
             "SimpleBandsFallback": "This check has no reachable range to draw against yet. Set a roll formula and a DC.",

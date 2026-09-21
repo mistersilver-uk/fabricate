@@ -23,6 +23,7 @@
   import Kicker from '../../components/Kicker.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import Notice from '../../components/Notice.svelte';
+  import { disclosurePhraseKey } from '../../util/disclosurePhrase.js';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
   import GatheringDropModifiers from './GatheringDropModifiers.svelte';
@@ -67,12 +68,9 @@
     else next.add(id);
     expandedIds = next;
   }
-  function onRowKey(event, id) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      toggle(id);
-    }
-  }
+
+  /** A drop the world left nameless still has to be announced, so the phrase names the kind. */
+  const NAMELESS_DROP = 'FABRICATE.Labels.UnknownComponent';
 </script>
 
 {#if loading}
@@ -117,15 +115,22 @@
 
     <ul class="gathering-task-drops-list">
       {#each drops as drop, index (drop.id ?? index)}
-        {@const isOpen = expandedIds.has(drop.id ?? index)}
+        {@const key = drop.id ?? index}
+        {@const isOpen = expandedIds.has(key)}
+        {@const bodyId = `fab-drop-modifiers-${key}`}
+        {@const phraseName = drop.name || localize(NAMELESS_DROP)}
         <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
-          <div
+          <!-- The whole summary is the disclosure and therefore the button, not a focusable
+               `div role="button"` Foundry's `KeyboardManager#hasFocus` cannot see (issue 1512).
+               The name is this header's own copy plus the hidden phrase; `aria-controls` is emitted
+               only while the body it names is mounted. -->
+          <button
+            type="button"
+            data-keyboard-focus="true"
             class="gathering-task-drop-summary"
-            role="button"
-            tabindex="0"
             aria-expanded={isOpen}
-            onclick={() => toggle(drop.id ?? index)}
-            onkeydown={(event) => onRowKey(event, drop.id ?? index)}
+            aria-controls={isOpen ? bodyId : undefined}
+            onclick={() => toggle(key)}
           >
             <Medallion art={drop.img || DEFAULT_DROP_IMG} alt="" size={36} />
             <span class="gathering-task-drop-copy">
@@ -139,15 +144,10 @@
                   >
                 {/if}
               </span>
+              <!-- No `role="meter"` in here: ARIA makes a button's children presentational, so the
+                   role is stripped and the figure and the phrase carry the chance (issue 1512). -->
               <span
                 class="gathering-task-drop-chance"
-                role="meter"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow={pct(drop.finalChance)}
-                aria-label={localize('FABRICATE.App.Gathering.Detail.FindChance', {
-                  x: pct(drop.finalChance),
-                })}
                 data-gathering-drop-value={pct(drop.finalChance)}
               >
                 <FillBar value={pct(drop.finalChance)} size="sm" />
@@ -157,10 +157,16 @@
             <span class="gathering-task-drop-chevron" aria-hidden="true">
               <i class={`fas ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
             </span>
-          </div>
+            <span class="visually-hidden"
+              >{localize(disclosurePhraseKey(isOpen), { name: phraseName })}
+              {localize('FABRICATE.App.Gathering.Detail.FindChance', {
+                x: pct(drop.finalChance),
+              })}</span
+            >
+          </button>
 
           {#if isOpen}
-            <GatheringDropModifiers {drop} />
+            <GatheringDropModifiers {drop} {bodyId} />
           {/if}
         </li>
       {/each}
@@ -225,12 +231,26 @@
     overflow: hidden;
   }
 
+  /* A `<button>` since issue 1512, so core's `button` reset is neutralised: it pins a height, a
+     border, a fill and a centred content box. `height: auto` keeps the medallion's own box. */
   .gathering-task-drop-summary {
+    appearance: none;
+    -webkit-appearance: none;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: var(--fab-space-2);
+    width: 100%;
+    min-width: 0;
+    height: auto;
     padding: var(--fab-space-2);
+    border: 0;
+    text-align: left;
     cursor: pointer;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-rendering: inherit;
   }
 
   .gathering-task-drop-summary:focus-visible {

@@ -167,7 +167,8 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
     assert.ok(rootSource.includes('function onGatheringEventModifierKeydown'), 'root should expose an event modifier keydown stepper');
     // The `onkeydown` attribute is the shared panel's now, and since issue 1707 phase 2 the drop's
-    // arity normalisation is the task leaf's; what the root still owns is handing each scope's
+    // arity normalisation is the task leaf's; since phase 3 the root hands both steppers to the
+    // rail under scope-distinguished names. What the root still owns is handing each scope's
     // stepper down, and the normalised call reaching the real row is asserted by the mounted
     // Arrow-step case in `manager-gathering-mounted.js`.
     assert.ok(
@@ -175,7 +176,7 @@ describe('GatheringEventEditView source contract', () => {
       'the drop panel call site should wire the drop keydown stepper'
     );
     assert.ok(
-      /onConditionModifierKeydown=\{onGatheringEventModifierKeydown\}/.test(rootSource),
+      /onEventConditionModifierKeydown=\{onGatheringEventModifierKeydown\}/.test(rootSource),
       'the event panel call site should wire the event keydown stepper'
     );
     assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');

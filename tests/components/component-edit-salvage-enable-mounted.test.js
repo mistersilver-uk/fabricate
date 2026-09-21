@@ -8,9 +8,39 @@ import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
 } from '../helpers/componentEditViewModules.js';
+// The DC preset control is the shared `<Select>` since issue 1510: choosing a value is an
+// open-then-click on a panel portaled onto the mount target, and the chosen value is read back off
+// its own option list rather than off a `value` property a button does not have.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+const PRESET_TRIGGER = '[data-salvage-dc-preset]';
 
 function flushRender() {
   return new Promise((done) => setTimeout(done, 0));
+}
+
+/** The preset the control currently shows, as its own option value. */
+function chosenPreset(target) {
+  const shown = selectTriggerText(target, PRESET_TRIGGER);
+  const labels = selectOptionLabels(target, PRESET_TRIGGER);
+  const values = selectOptionValues(target, PRESET_TRIGGER);
+  closeSelectPanel(target, PRESET_TRIGGER);
+  const index = labels.indexOf(shown);
+  assert.ok(index >= 0, `the trigger shows "${shown}", which is no preset this control offers`);
+  return values[index];
+}
+
+/** Pick a preset the way a GM does, then let the reveal below it settle. */
+async function choosePreset(target, value) {
+  chooseSelectOption(target, PRESET_TRIGGER, value);
+  await flushRender();
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -307,8 +337,12 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     });
     const target = await harness.mount(mountProps);
 
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    assert.equal(preset.value, 'custom', 'an override matching no tier selects Custom…');
+    assert.equal(chosenPreset(target), 'custom', 'an override matching no tier selects Custom…');
+    assert.equal(
+      assertSelectHasResolvedName(target, PRESET_TRIGGER),
+      'Salvage check DC',
+      'and it still announces the name the native control did'
+    );
     assert.equal(
       target.querySelector('[data-salvage-dc-custom]').value,
       '14',
@@ -357,14 +391,17 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(
       props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 17 } } })
     );
-    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'dc:17');
-    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'no custom input for a tier match');
+    assert.equal(chosenPreset(target), 'dc:17');
+    assert.ok(
+      !target.querySelector('[data-salvage-dc-custom]'),
+      'no custom input for a tier match'
+    );
     harness.remount();
   });
 
   it('a null dcOverride selects the system default', async () => {
     const target = await harness.mount(props());
-    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'system');
+    assert.equal(chosenPreset(target), 'system');
     harness.remount();
   });
 
@@ -377,13 +414,10 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const { dirtyEvents, props: mountProps } = track();
     const target = await harness.mount(mountProps);
 
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    assert.equal(preset.value, 'system', 'every component starts at the system default');
-    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'no custom input yet');
+    assert.equal(chosenPreset(target), 'system', 'every component starts at the system default');
+    assert.ok(!target.querySelector('[data-salvage-dc-custom]'), 'no custom input yet');
 
-    preset.value = 'custom';
-    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-    await flushRender();
+    await choosePreset(target, 'custom');
 
     const custom = target.querySelector('[data-salvage-dc-custom]');
     assert.ok(custom, 'Custom… reveals its input');
@@ -397,10 +431,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const { drafts, props: mountProps } = track();
     const target = await harness.mount(mountProps);
 
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    preset.value = 'custom';
-    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-    await flushRender();
+    await choosePreset(target, 'custom');
 
     // 14 is deliberately OFF-tier (the tiers are 12 and 17) — an arbitrary integer.
     const custom = target.querySelector('[data-salvage-dc-custom]');
@@ -409,23 +440,13 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     await flushRender();
 
     assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the arbitrary DC reaches the payload');
-    assert.equal(
-      target.querySelector('[data-salvage-dc-preset]').value,
-      'custom',
-      'and the control stays on Custom…'
-    );
+    assert.equal(chosenPreset(target), 'custom', 'and the control stays on Custom…');
     harness.remount();
   });
 
   it('Custom… stays open while its input is cleared, and hands back on picking a tier', async () => {
     const target = await harness.mount(props());
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    const change = () =>
-      preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-
-    preset.value = 'custom';
-    change();
-    await flushRender();
+    await choosePreset(target, 'custom');
     const custom = target.querySelector('[data-salvage-dc-custom]');
     custom.value = '';
     custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
@@ -436,27 +457,22 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     );
 
     // Picking a real option hands control back to the persisted value.
-    preset.value = 'dc:12';
-    change();
-    await flushRender();
-    assert.equal(target.querySelector('[data-salvage-dc-custom]'), null, 'the custom input closes');
-    assert.equal(target.querySelector('[data-salvage-dc-preset]').value, 'dc:12');
+    await choosePreset(target, 'dc:12');
+    assert.ok(!target.querySelector('[data-salvage-dc-custom]'), 'the custom input closes');
+    assert.equal(chosenPreset(target), 'dc:12');
     harness.remount();
   });
 
   it('the Custom… choice does not leak across components', async () => {
     // It is transient UI state, not draft data.
     const target = await harness.mount(props());
-    const preset = target.querySelector('[data-salvage-dc-preset]');
-    preset.value = 'custom';
-    preset.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-    await flushRender();
+    await choosePreset(target, 'custom');
     assert.ok(target.querySelector('[data-salvage-dc-custom]'));
     harness.remount();
 
     const next = await harness.mount(props({ component: { id: 'comp-2', name: 'Other' } }));
-    assert.equal(next.querySelector('[data-salvage-dc-preset]').value, 'system');
-    assert.equal(next.querySelector('[data-salvage-dc-custom]'), null);
+    assert.equal(chosenPreset(next), 'system');
+    assert.ok(!next.querySelector('[data-salvage-dc-custom]'));
     harness.remount();
   });
 
@@ -465,8 +481,12 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     const target = await harness.mount(
       props({ salvageCheckTiers: [], onManageCheckPresets: () => calls.push(true) })
     );
-    const options = [...target.querySelectorAll('[data-salvage-dc-preset] option')].map((o) => o.value);
-    assert.deepEqual(options, ['system', 'custom'], 'no presets to offer');
+    assert.deepEqual(
+      selectOptionValues(target, PRESET_TRIGGER),
+      ['system', 'custom'],
+      'no presets to offer'
+    );
+    closeSelectPanel(target, PRESET_TRIGGER);
 
     target.querySelector('[data-salvage-manage-presets]').click();
     assert.deepEqual(calls, [true], 'the deep link fires');

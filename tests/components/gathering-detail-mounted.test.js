@@ -15,6 +15,7 @@ import {
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -69,6 +70,30 @@ function environment(overrides = {}) {
     tasks: [taskModel()],
     discoveredTasks: [],
     ...overrides
+  };
+}
+
+function dropBreakdown() {
+  return {
+    successChance: 1,
+    awardMode: 'allDrops',
+    awardLimit: 1,
+    eventPolicy: 'successWithEvent',
+    drops: [{
+      id: 'd-ore',
+      name: 'Raw Ore',
+      img: 'icons/ore.webp',
+      componentId: 'ore',
+      quantity: 2,
+      baseChance: 0.4,
+      finalChance: 0.53,
+      modifiers: {
+        weather: { conditionId: 'rain', value: 10 },
+        timeOfDay: { conditionId: 'night', value: -5 },
+        biome: { value: 0 },
+        character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }]
+      }
+    }]
   };
 }
 
@@ -220,6 +245,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const gatheringFormatDestination = join(tempRoot, 'src/ui/svelte/util/gatheringFormat.js');
     writeFileSync(gatheringFormatDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/gatheringFormat.js'), 'utf8'));
 
+    const disclosurePhraseDestination = join(tempRoot, 'src/ui/svelte/util/disclosurePhrase.js');
+    writeFileSync(disclosurePhraseDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/disclosurePhrase.js'), 'utf8'));
+
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
@@ -353,28 +381,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   });
 
   it('renders "What you might find" with per-drop mini bars, award/event hints, and expandable modifiers', async () => {
-    const dropBreakdown = {
-      successChance: 1,
-      awardMode: 'allDrops',
-      awardLimit: 1,
-      eventPolicy: 'successWithEvent',
-      drops: [{
-        id: 'd-ore',
-        name: 'Raw Ore',
-        img: 'icons/ore.webp',
-        componentId: 'ore',
-        quantity: 2,
-        baseChance: 0.4,
-        finalChance: 0.53,
-        modifiers: {
-          weather: { conditionId: 'rain', value: 10 },
-          timeOfDay: { conditionId: 'night', value: -5 },
-          biome: { value: 0 },
-          character: [{ label: 'Dexterity', icon: 'fas fa-user', contribution: 8 }]
-        }
-      }]
-    };
-    const { services, calls } = makeServices(listing([environment()]), dropBreakdown);
+    const { services, calls } = makeServices(listing([environment()]), dropBreakdown());
     await mountView(services);
     await settle();
 
@@ -404,6 +411,78 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(modifiers.textContent.includes('Dexterity'), 'character ability contribution listed');
     assert.ok(modifiers.textContent.includes('ModifierWeather'), 'weather contribution listed');
     assert.ok(modifiers.textContent.includes('+10%'), 'weather delta shown signed');
+  });
+
+  it('opens the drop row from its own header button, which names itself and resolves its region', async () => {
+    const { services } = makeServices(listing([environment()]), dropBreakdown());
+    await mountView(services);
+    await settle();
+
+    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
+    const header = row.querySelector('.gathering-task-drop-summary');
+    assertWholeHeaderDisclosure({
+      root: target,
+      header,
+      recordName: 'Raw Ore',
+      expanded: false,
+      chevronSelector: '.gathering-task-drop-chevron i',
+      site: 'the gathering drop row, collapsed',
+    });
+    // ARIA makes a button's children presentational, so the chance cannot be a meter in here: the
+    // figure is the header's own content and the phrase states what the figure is.
+    assert.ok(!header.querySelector('[role="meter"]'), 'no meter role survives inside the header');
+    assert.equal(
+      header.querySelector('[data-gathering-drop-value]').getAttribute('data-gathering-drop-value'),
+      '53',
+      'the chance value hook stays on the bar'
+    );
+    const dropPhrase = header.querySelector('.visually-hidden').textContent;
+    assert.ok(
+      dropPhrase.includes('FABRICATE.App.Gathering.Detail.FindChance') && dropPhrase.includes('53'),
+      'and the phrase carries the chance the stripped meter used to announce'
+    );
+
+    header.click();
+    flushSync();
+
+    const body = assertWholeHeaderDisclosure({
+      root: target,
+      header: row.querySelector('.gathering-task-drop-summary'),
+      recordName: 'Raw Ore',
+      expanded: true,
+      chevronSelector: '.gathering-task-drop-chevron i',
+      site: 'the gathering drop row, open',
+    });
+    assert.ok(
+      body.matches('[data-gathering-drop-modifiers]'),
+      'the region the header controls IS the modifiers body, not a wrapper around it'
+    );
+
+    row.querySelector('.gathering-task-drop-summary').click();
+    flushSync();
+    assertWholeHeaderDisclosure({
+      root: target,
+      header: row.querySelector('.gathering-task-drop-summary'),
+      recordName: 'Raw Ore',
+      expanded: false,
+      chevronSelector: '.gathering-task-drop-chevron i',
+      site: 'the gathering drop row, collapsed again',
+    });
+  });
+
+  it('names a nameless drop from the shared component fallback', async () => {
+    // The lab world holds drops with no name, and "Show details for " names nothing at all.
+    const breakdown = dropBreakdown();
+    breakdown.drops[0].name = '';
+    const { services } = makeServices(listing([environment()]), breakdown);
+    await mountView(services);
+    await settle();
+
+    const header = target.querySelector('[data-gathering-drop] .gathering-task-drop-summary');
+    assert.ok(
+      header.querySelector('.visually-hidden').textContent.includes('FABRICATE.Labels.UnknownComponent'),
+      'the phrase falls back to the shared unknown-component name'
+    );
   });
 
   it('shows the event-chance bar (with tier) atop the Events tab when event chance > 0', async () => {

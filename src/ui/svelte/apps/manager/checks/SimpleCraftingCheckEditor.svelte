@@ -21,6 +21,8 @@
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
+  import Select from '../../../components/Select.svelte';
+  import { previewRecordSelectOptions } from './checksSelectOptions.js';
 
   // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, and
   // `section` selects which cards render, so one editor serves the five-section strip.
@@ -47,6 +49,12 @@
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
+
+  // Minted per instance (issue 1510): the Preview-against caption names its own trigger by id, and
+  // salvage and gathering mount this editor beside the crafting one.
+  const instanceId = $props.id();
+
+  const previewRecordOptions = $derived(previewRecordSelectOptions(previewRecords));
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
   const shows = (id) => !section || section === id;
@@ -177,22 +185,21 @@
         <!-- PREVIEW AGAINST: the SAME selection the rail's card offers, reported upward, so the
                      simulator and the strip cannot read different records. -->
         {#if previewRecords.length > 1}
-          <Field as="label" class="manager-checks-band-record">
-            <span
+          <Field as="div" class="manager-checks-band-record">
+            <span id={`${instanceId}-band-record`}
               >{text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainst',
                 'Preview against'
               )}</span
             >
-            <select
-              data-simple-band-record
+            <Select
+              size="toolbar"
               value={previewRecordId}
-              onchange={(event) => onSelectPreviewRecord(event.currentTarget.value)}
-            >
-              {#each previewRecords as record (record.id)}
-                <option value={record.id}>{record.label}</option>
-              {/each}
-            </select>
+              options={previewRecordOptions}
+              ariaLabelledBy={`${instanceId}-band-record`}
+              triggerData={{ 'data-simple-band-record': '' }}
+              onChange={onSelectPreviewRecord}
+            />
           </Field>
         {/if}
 

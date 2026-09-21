@@ -42,15 +42,11 @@
     the trigger's root and one on the portaled panel, which escapes the first.
   - THE FOCUS MODEL, the key map, the caret-edge rules, the type-ahead and the flat-order option ids
     are the shipped instance of the listbox contract in `openspec/specs/design-system/spec.md`; the
-    arithmetic is `util/listboxNavigation.js`'s, and `searchable-popover-keyboard-mounted.test.js`
-    (40 cases) and `-capabilities-mounted` (27) pin what each key does. The option ids carry a
-    PER-INSTANCE prefix, because two pickers on one screen indexing from 0 would make
-    `aria-activedescendant` ambiguous.
-  - THE PANEL'S OWN CHROME MUST NOT TAKE FOCUS EITHER: it is `role="dialog" tabindex="-1"`, so a
-    click on its inset, header or empty note would move focus off the holder and take the key map
-    with it, invisibly. The `mousedown` guard excepts every element with its OWN reason to take
-    focus — the query field, and the LIST, because a scrollbar drag reaches the handler with the
-    scrolling element as its target.
+    arithmetic is `util/pickerOptionModel.js`'s and the key decision is `util/listboxNavigation.js`'s,
+    this component applying the intent the latter hands back, and
+    `searchable-popover-keyboard-mounted.test.js` (43 cases) and `-capabilities-mounted` (33) pin it.
+  - THE PANEL IS A PART, `SearchablePopoverPanel.svelte`, and the invariants that live inside it —
+    its own chrome refusing focus above all — are stated there rather than restated here.
   - THE CURSOR CANNOT OUTLIVE THE LIST IT INDEXES, and the expiry is a READ rather than a write: the
     position is STAMPED with a generation derived from the list, where an `$effect` reset would land
     one flush late. A range clamp sits beside the stamp for a `filterOptions` seam that narrows the
@@ -76,29 +72,30 @@
   import { tick } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
-  import EmptyState from './EmptyState.svelte';
   import ManagerButton from './ManagerButton.svelte';
-  import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
+  import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
+  import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { localize } from '../util/foundryBridge.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
-  import { activeOptionId, nextActiveIndex, typeAheadCursor } from '../util/listboxNavigation.js';
+  import { activeOptionId, holderKeyIntent } from '../util/listboxNavigation.js';
   import { pickerScrollerBounds } from '../util/overlayBounds.js';
+  import {
+    activeCursorIndex,
+    filteredCountLabel,
+    groupedOptionBuckets,
+    labelSubstringFilter,
+    optionListGeneration as listGenerationOf,
+    pickerEmptiness,
+    renderedOptionOrder,
+    selectedOptionIds,
+  } from '../util/pickerOptionModel.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   function localizedText(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function labelSubstringFilter(list, query) {
-    if (!query) return list;
-    return list.filter((option) =>
-      String(option.label || '')
-        .toLowerCase()
-        .includes(query)
-    );
   }
 
   let {
@@ -171,7 +168,6 @@
   let typeAheadBuffer = $state(null);
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
-  let optionsList = $state(null);
   let triggerElement = $state(null);
   let searchInput = $state(null);
 
@@ -184,39 +180,16 @@
   const isGrid = $derived(as === 'grid');
   const gridColumns = $derived(isGrid && Number.isInteger(columns) && columns > 1 ? columns : 1);
 
-  const groupedOptions = $derived.by(() => {
-    const groups = Array.isArray(optionGroups) ? optionGroups.filter((group) => group?.id) : [];
-    if (groups.length === 0) return [];
-    const known = new Set(groups.map((group) => group.id));
-    const buckets = groups.map((group) => ({
-      id: group.id,
-      label: group.label || '',
-      options: filteredOptions.filter((option) => option.group === group.id),
-    }));
-    const ungrouped = filteredOptions.filter((option) => !known.has(option.group));
-    if (ungrouped.length > 0) buckets.push({ id: '__ungrouped', label: '', options: ungrouped });
-    let offset = 0;
-    return buckets
-      .filter((bucket) => bucket.options.length > 0)
-      .map((bucket) => {
-        const positioned = { ...bucket, offset };
-        offset += bucket.options.length;
-        return positioned;
-      });
-  });
+  const groupedOptions = $derived(groupedOptionBuckets(filteredOptions, optionGroups));
   const isGrouped = $derived(groupedOptions.length > 0);
-  const renderedOptions = $derived(
-    isGrouped ? groupedOptions.flatMap((bucket) => bucket.options) : filteredOptions
-  );
+  const renderedOptions = $derived(renderedOptionOrder(groupedOptions, filteredOptions));
   const typeAheadLabels = $derived(renderedOptions.map((option) => String(option.label ?? '')));
 
   function optionIsDisabled(index) {
     return Boolean(renderedOptions[index]?.disabled);
   }
 
-  const selectedIdSet = $derived(
-    multiple ? new Set(Array.isArray(value) ? value : [value]) : new Set()
-  );
+  const selectedIdSet = $derived(selectedOptionIds(value, multiple));
 
   function optionIsSelected(option) {
     return multiple ? selectedIdSet.has(option.id) : option.id === value;
@@ -225,32 +198,30 @@
   const staysOpenOnChoose = $derived(multiple || stayOpen);
 
   const filteredCount = $derived(
-    String(filteredCountTemplate)
-      .replace('{matched}', String(filteredOptions.length))
-      .replace('{total}', String(options.length))
+    filteredCountLabel(filteredCountTemplate, filteredOptions.length, options.length)
   );
 
-  const filteredToNothing = $derived(options.length > 0 && filteredOptions.length === 0);
   const noMatchesText = $derived(
     noMatchesHint || localizedText('FABRICATE.Common.Picker.NoMatches', 'No matches')
   );
-  const emptyMessage = $derived(filteredToNothing ? noMatchesText : emptyHint);
-  const emptyBody = $derived(filteredToNothing ? '' : emptyDetail);
+  const emptiness = $derived(
+    pickerEmptiness({
+      total: options.length,
+      matched: filteredOptions.length,
+      noMatchesText,
+      emptyHint,
+      emptyDetail,
+    })
+  );
+  const emptyMessage = $derived(emptiness.message);
+  const emptyBody = $derived(emptiness.body);
 
   const optionListGeneration = $derived(
-    [
-      open ? 'open' : 'closed',
-      normalizedSearch,
-      options.length,
-      options[0]?.id ?? '',
-      options[options.length - 1]?.id ?? '',
-    ].join('/')
+    listGenerationOf({ open, query: normalizedSearch, options })
   );
 
   const activeIndex = $derived(
-    cursor.generation === optionListGeneration && cursor.index < renderedOptions.length
-      ? cursor.index
-      : -1
+    activeCursorIndex(cursor, optionListGeneration, renderedOptions.length)
   );
 
   const listRendered = $derived(open && filteredOptions.length > 0);
@@ -265,81 +236,47 @@
     active?.scrollIntoView?.({ block: 'nearest' });
   });
 
-  const CARET_EDGE = new Map([
-    ['ArrowLeft', 'start'],
-    ['Home', 'start'],
-    ['ArrowRight', 'end'],
-    ['End', 'end'],
-  ]);
-
-  function caretOwnsKey(event) {
-    const field = event.target;
-    if (typeof field?.selectionStart !== 'number') return false;
-    const edge = CARET_EDGE.get(event.key);
-    if (!edge) return false;
-    if (field.selectionStart !== field.selectionEnd) return true;
-    return edge === 'start' ? field.selectionStart > 0 : field.selectionEnd < field.value.length;
+  function moveCursorTo(index) {
+    cursor = { generation: optionListGeneration, index };
   }
 
-  function typeAheadOwnsKey(event) {
-    if (showSearch) return false;
-    if (disabled || triggerAriaDisabled) return false;
-    if (event.ctrlKey || event.metaKey || event.altKey) return false;
-    const typed = typeAheadCursor(activeIndex, typeAheadLabels, event.key, {
-      buffer: typeAheadBuffer,
-      isDisabled: optionIsDisabled,
-    });
-    if (typed === null) return false;
-    event.preventDefault();
-    typeAheadBuffer = typed.buffer;
-    if (typed.index === null) return true;
-    open = true;
-    cursor = { generation: optionListGeneration, index: typed.index };
-    return true;
-  }
-
-  const OPENING_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Home', 'End']);
-
-  function openingKeyOwns(event) {
-    if (showSearch) return false;
-    if (disabled || triggerAriaDisabled) return false;
-    if (event.ctrlKey || event.metaKey || event.shiftKey) return false;
-    const altOpen = event.altKey && event.key === 'ArrowDown';
-    if (!altOpen && (event.altKey || !OPENING_KEYS.has(event.key))) return false;
-    event.preventDefault();
-    open = true;
-    if (altOpen) return true;
-    const landing = nextActiveIndex(-1, renderedOptions.length, event.key, {
-      columns: gridColumns,
-      isDisabled: optionIsDisabled,
-    });
-    if (landing !== null) cursor = { generation: optionListGeneration, index: landing };
-    return true;
-  }
-
+  // Every side effect the key model has lives here; which one to run is `holderKeyIntent`'s answer.
   function onHolderKeydown(event) {
-    if (!open) {
-      if (openingKeyOwns(event)) return;
-      typeAheadOwnsKey(event);
-      return;
-    }
-    if (event.key === 'Enter') {
-      const active = renderedOptions[activeIndex];
-      if (!active) return;
-      event.preventDefault();
-      chooseOption(active);
-      return;
-    }
-    if (typeAheadOwnsKey(event)) return;
-    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
-    if (caretOwnsKey(event)) return;
-    const next = nextActiveIndex(activeIndex, renderedOptions.length, event.key, {
+    const intent = holderKeyIntent(event, {
+      open,
+      showSearch,
+      holderDisabled: disabled || triggerAriaDisabled,
+      current: activeIndex,
+      count: renderedOptions.length,
       columns: gridColumns,
       isDisabled: optionIsDisabled,
+      labels: typeAheadLabels,
+      buffer: typeAheadBuffer,
     });
-    if (next === null) return;
-    event.preventDefault();
-    cursor = { generation: optionListGeneration, index: next };
+    switch (intent.kind) {
+      case 'choose':
+        event.preventDefault();
+        chooseOption(renderedOptions[intent.index]);
+        return;
+      case 'move-cursor':
+        event.preventDefault();
+        moveCursorTo(intent.index);
+        return;
+      case 'type-ahead':
+        event.preventDefault();
+        typeAheadBuffer = intent.buffer;
+        if (intent.index === null) return;
+        open = true;
+        moveCursorTo(intent.index);
+        return;
+      case 'open':
+        event.preventDefault();
+        open = true;
+        if (intent.index !== null) moveCursorTo(intent.index);
+        return;
+      default:
+        return;
+    }
   }
 
   function restoreTriggerFocus() {
@@ -533,332 +470,59 @@
   {/if}
 
   {#if open}
-    <div
-      bind:this={popoverRoot}
-      class={`fabricate-picker-popover manager-travel-popover ${popoverClass} ${compactOptionRows ? 'is-compact-option-rows' : ''}`}
-      role="dialog"
-      tabindex="-1"
-      data-keyboard-focus="true"
-      aria-label={dialogNameAttribute}
-      aria-labelledby={dialogNamedBy}
-      use:anchoredPopover={{
-        component: 'SearchablePopover',
-        trigger: triggerElement ?? pickerRoot,
-        layout: popoverLayout,
-        layoutOptions: () => ({
-          horizontalAlign,
-          minWidth,
-          maxWidth,
-          ...(measureListMetrics?.({
-            popover: popoverRoot,
-            list: optionsList,
-            search: searchInput,
-          }) ?? {}),
-        }),
-        maxHeightCap: maxHeight,
-        bounds,
-        targets: measureListMetrics ? { list: optionsList } : undefined,
-        ignoreScrollWithin,
-      }}
-      onclick={stop}
-      onmousedown={keepFocusOnHolder}
-      onkeydown={(event) => {
-        if (event.key === 'Escape') {
-          stop(event);
-          close();
-        }
-      }}
-    >
-      {#snippet optionRow(option, index)}
-        <button
-          {...option.data}
-          type="button"
-          class={`manager-travel-option ${optionClass} ${option.class || ''}`}
-          role="option"
-          id={activeOptionId(instanceId, index)}
-          tabindex="-1"
-          data-keyboard-focus="true"
-          aria-selected={optionIsSelected(option)}
-          aria-disabled={option.disabled ? 'true' : undefined}
-          data-active-option={index === activeIndex ? 'true' : undefined}
-          data-recipe-add={option.addMarker || undefined}
-          data-popover-option={option.dataId || undefined}
-          title={option.label}
-          onclick={() => chooseOption(option)}
-          onmousedown={(event) => event.preventDefault()}
-        >
-          {#if optionContent}
-            {@render optionContent(option)}
-          {:else}
-            {#if option.img}
-              <span class="manager-travel-portrait" aria-hidden="true"
-                ><img src={option.img} alt="" /></span
-              >
-            {:else if option.icon}
-              <i class={option.icon} aria-hidden="true"></i>
-            {/if}
-            {#if option.meta}
-              <span class="manager-travel-option-lines">
-                <span class="manager-travel-option-name">{option.label}</span>
-                <span class="manager-travel-option-meta">{option.meta}</span>
-              </span>
-            {:else}
-              <span class="manager-travel-option-name">{option.label}</span>
-            {/if}
-            {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
-            {#if option.trailingIcon}<i
-                class={`manager-travel-option-marker ${option.trailingIcon}`}
-                aria-hidden="true"
-              ></i>{/if}
-            {#if option.disabled && option.disabledReason}<Chip
-                tone="disabled"
-                data-popover-option-reason="">{option.disabledReason}</Chip
-              >{/if}
-          {/if}
-        </button>
-      {/snippet}
-
-      {#if popoverTitle || showFilteredCount}
-        <div class="manager-travel-popover-header" data-popover-header>
-          {#if popoverTitle}
-            <span class="manager-travel-popover-title">{popoverTitle}</span>
-          {/if}
-          {#if showFilteredCount}
-            <span
-              class="manager-travel-popover-count"
-              data-popover-filtered-count
-              role="status"
-              aria-live="polite">{filteredCount}</span
-            >
-          {/if}
-        </div>
-      {/if}
-
-      {#if showSearch && !inlineSearchTrigger}
-        <div
-          class={`manager-travel-popover-search ${searchClass}`}
-          class:is-compact={compactOptionRows}
-        >
-          {#if compactOptionRows}<i class="fas fa-magnifying-glass" aria-hidden="true"></i>{/if}
-          <input bind:this={searchInput} bind:value={search} {...searchFieldAttributes} />
-        </div>
-      {/if}
-
-      {#if header}{@render header(filteredOptions.length, options.length)}{/if}
-
-      {#if filteredOptions.length > 0}
-        <div
-          bind:this={optionsList}
-          class={`manager-travel-popover-options ${listClass}`}
-          role="listbox"
-          id={listId}
-          aria-label={dialogNameAttribute}
-          aria-labelledby={dialogNamedBy}
-          aria-multiselectable={multiple ? 'true' : undefined}
-          data-picker-as={as}
-          data-picker-columns={isGrid ? String(gridColumns) : undefined}
-        >
-          {#if isGrouped}
-            {#each groupedOptions as bucket (bucket.id)}
-              <div
-                class="manager-travel-popover-group"
-                role="group"
-                aria-label={bucket.label || undefined}
-                data-popover-group={bucket.id}
-              >
-                {#if bucket.label}
-                  <p class="manager-travel-popover-group-label" aria-hidden="true">
-                    {bucket.label}
-                  </p>
-                {/if}
-                {#each bucket.options as option, index (option.id)}
-                  {@render optionRow(option, bucket.offset + index)}
-                {/each}
-              </div>
-            {/each}
-          {:else}
-            {#each renderedOptions as option, index (option.id)}
-              {@render optionRow(option, index)}
-            {/each}
-          {/if}
-        </div>
-      {:else}
-        <div class="manager-travel-popover-empty" role="status" aria-live="polite">
-          <EmptyState note title={emptyMessage} hint={emptyBody || undefined} />
-        </div>
-      {/if}
-
-      {#if footer}{@render footer()}{/if}
-    </div>
+    <SearchablePopoverPanel
+      bind:popover={popoverRoot}
+      bind:search={searchInput}
+      bind:query={search}
+      anchor={triggerElement ?? pickerRoot}
+      {popoverLayout}
+      {popoverClass}
+      {compactOptionRows}
+      {dialogNameAttribute}
+      {dialogNamedBy}
+      {horizontalAlign}
+      {minWidth}
+      {maxWidth}
+      {maxHeight}
+      {bounds}
+      {ignoreScrollWithin}
+      {measureListMetrics}
+      {popoverTitle}
+      {showFilteredCount}
+      {filteredCount}
+      {showSearch}
+      {inlineSearchTrigger}
+      {searchClass}
+      {searchFieldAttributes}
+      {filteredOptions}
+      totalCount={options.length}
+      {groupedOptions}
+      {isGrouped}
+      {renderedOptions}
+      {listId}
+      {listClass}
+      {multiple}
+      {as}
+      {isGrid}
+      {gridColumns}
+      {optionClass}
+      option={optionContent}
+      {instanceId}
+      {activeIndex}
+      {emptyMessage}
+      {emptyBody}
+      {header}
+      {footer}
+      {chooseOption}
+      {optionIsSelected}
+      {close}
+      {stop}
+      {keepFocusOnHolder}
+    />
   {/if}
 </div>
 
 <style>
-  .manager-travel-popover-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-2);
-    padding: 4px 7px 6px;
-  }
-
-  .manager-travel-popover-title {
-    min-width: 0;
-    color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .manager-travel-popover-count {
-    flex: 0 0 auto;
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 9px;
-    font-weight: 500;
-  }
-
-  .manager-travel-popover.is-compact-option-rows {
-    padding: 5px;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-popover-header {
-    flex: 0 0 auto;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-option[aria-selected='true'] {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-option:hover {
-    border-color: var(--fab-border-strong);
-    background: var(--fab-surface-raised);
-  }
-
-  .manager-travel-popover.is-compact-option-rows
-    .manager-travel-option[aria-selected='true']:hover {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-  }
-
-  .manager-travel-popover
-    [aria-multiselectable='true']
-    .manager-travel-option[aria-selected='true'],
-  .manager-travel-popover
-    [aria-multiselectable='true']
-    .manager-travel-option[aria-selected='true']:hover {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-surface-active);
-  }
-
-  .manager-travel-popover-search.is-compact {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 7px;
-    min-width: 0;
-    box-sizing: border-box;
-    height: 30px;
-    margin: 2px 7px 6px;
-    padding: 0 8px;
-    border: 1px solid var(--fab-accent-border);
-    border-bottom: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
-    background: var(--fab-bg-0);
-  }
-
-  .manager-travel-popover-search.is-compact > i {
-    flex: 0 0 auto;
-    color: var(--fab-text-subtle);
-    font-size: 9px;
-  }
-
-  .manager-travel-popover-search.is-compact input {
-    flex: 1;
-    align-self: stretch;
-    min-width: 0;
-    min-height: 0;
-    height: auto;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    color: var(--fab-text);
-    background: transparent;
-    font-size: 11.5px;
-    font-weight: 500;
-  }
-
-  .manager-travel-popover-search.is-compact:focus-within {
-    border-color: var(--fab-accent);
-    box-shadow: inset 0 0 0 1px var(--fab-accent);
-  }
-
-  .manager-travel-popover-search.is-compact input:focus-visible {
-    outline: none;
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-popover-options {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 7px 0 7px 7px;
-    scrollbar-gutter: stable;
-    scrollbar-width: thin;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-option {
-    min-height: 40px;
-    padding: 7px;
-    gap: 7px;
-    border: 1px solid var(--fab-border);
-    border-radius: 7px;
-    background: var(--fab-bg-3);
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-portrait {
-    width: 24px;
-    height: 24px;
-  }
-
-  .manager-travel-popover.is-compact-option-rows
-    .manager-travel-option
-    > i:not(.manager-travel-option-marker) {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    color: var(--fab-text-muted);
-    background: var(--fab-surface-raised);
-    font-size: 11px;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-option {
-    font-family: var(--font-primary);
-    font-size: 11.5px;
-    font-weight: 500;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-option-name {
-    font-size: 11.5px;
-    font-weight: 500;
-  }
-
-  .manager-travel-popover.is-compact-option-rows .manager-travel-option-meta {
-    font-size: 9.5px;
-    font-weight: 400;
-  }
-
   .manager-travel-picker-copy {
     display: flex;
     flex: 1 1 auto;

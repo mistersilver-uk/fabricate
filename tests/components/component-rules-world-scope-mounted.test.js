@@ -15,6 +15,18 @@ import {
   recordingComponentActions,
 } from '../helpers/componentScopeMountModules.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+// The category card's one control is the shared `<Select>` since issue 1510, so choosing a value is
+// an open-then-click on a panel portaled onto the mount target rather than a `change` event.
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+const CATEGORY_TRIGGER = '[data-component-edit-category]';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -85,12 +97,29 @@ async function openEditor(
   return { target, calls, opened, dirty };
 }
 
-/** Choose one option on the category control, exactly as a GM does. */
+/** Choose one option on the category control, exactly as a GM does: open, then click the row. */
 function chooseCategory(target, value) {
-  const select = target.querySelector('[data-component-edit-category]');
-  select.value = value;
-  select.dispatchEvent(new target.ownerDocument.defaultView.Event('change', { bubbles: true }));
-  return select;
+  chooseSelectOption(target, CATEGORY_TRIGGER, value);
+  return target.querySelector(CATEGORY_TRIGGER);
+}
+
+/** The value the control currently shows, read back through its own option list. */
+function chosenCategory(target) {
+  const shown = selectTriggerText(target, CATEGORY_TRIGGER);
+  const labels = selectOptionLabels(target, CATEGORY_TRIGGER);
+  const values = selectOptionValues(target, CATEGORY_TRIGGER);
+  closeSelectPanel(target, CATEGORY_TRIGGER);
+  const index = labels.indexOf(shown);
+  assert.ok(index >= 0, `the trigger shows "${shown}", which is no option this control offers`);
+  return values[index];
+}
+
+/** A concrete category, which is any option but the inherit sentinel. */
+function concreteCategory(target) {
+  const value = selectOptionValues(target, CATEGORY_TRIGGER).find((each) => each !== '__inherit');
+  closeSelectPanel(target, CATEGORY_TRIGGER);
+  assert.ok(Boolean(value), 'the control offers a concrete category to choose');
+  return value;
 }
 
 /** Submit the editor's form, which is what the shell's header Save does by `form` id. */
@@ -389,9 +418,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
 
     it('a category choice and an essence choice in ONE save write both flags, then the value', async () => {
       const { target, calls } = await openEssences('ingot', 'sys-forge', options(2));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      chooseCategory(target, concreteCategory(target));
       await drain();
       await flip(target);
       save(target);
@@ -430,22 +457,29 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     // AC-14, rebuilt to the reference for issue 1371's parity round 4 (gap-list rows 133, 143).
     it('offers the inherit option FIRST and selects it while the section inherits', async () => {
       const { target } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      assert.ok(Boolean(select), 'the editor renders its category control');
+      const trigger = target.querySelector(CATEGORY_TRIGGER);
+      assert.ok(Boolean(trigger), 'the editor renders its category control');
       assert.equal(
-        select.options[0].value,
+        assertSelectHasResolvedName(target, CATEGORY_TRIGGER),
+        'Component category',
+        'and it still announces the name the native control did'
+      );
+      assert.equal(
+        selectOptionValues(target, CATEGORY_TRIGGER)[0],
         '__inherit',
         'the inherit option is folded into the control rather than living beside it'
       );
-      assert.match(select.options[0].textContent, /Inherit from world/);
+      const [inheritLabel] = selectOptionLabels(target, CATEGORY_TRIGGER);
+      closeSelectPanel(target, CATEGORY_TRIGGER);
+      assert.match(inheritLabel, /Inherit from world/);
       assert.match(
-        select.options[0].textContent,
+        inheritLabel,
         /Refined/,
         'and it NAMES the world value, which is the whole reason it is an option and not a switch'
       );
-      assert.equal(select.value, '__inherit', 'an inheriting section selects it');
+      assert.equal(chosenCategory(target), '__inherit', 'an inheriting section selects it');
       assert.equal(
-        select.disabled,
+        trigger.disabled,
         false,
         'the control is no longer disabled: choosing a concrete category IS how you override'
       );
@@ -458,14 +492,13 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     it('choosing a concrete category WRITES NOTHING until Save', async () => {
       // Reviewer 9.2. The choice is TWO facts in two world settings keys.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      const concrete = concreteCategory(target);
+      chooseCategory(target, concrete);
       await drain();
 
       assert.deepEqual(calls, [], 'a draft edit persists nothing, in EITHER key');
       // …and it is a real edit rather than a choice that did not take.
-      assert.equal(select.value, concrete.value);
+      assert.equal(chosenCategory(target), concrete);
       assert.ok(
         target
           .querySelector('[data-component-edit-category-note]')
@@ -477,9 +510,8 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     it('and Save lands BOTH halves, flag first, so a half-failed save cannot hide a value', async () => {
       // THE ORDER IS THE ASSERTION. There is no transaction across the two settings keys.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      const concrete = concreteCategory(target);
+      chooseCategory(target, concrete);
       await drain();
       save(target);
       await drain();
@@ -490,7 +522,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
         'the membership flag is cleared BEFORE the value is written'
       );
       assert.deepEqual(calls[0].args, ['ingot', 'sys-forge', 'category', false]);
-      assert.equal(calls[1].args[1].category, concrete.value, 'and the value is the chosen one');
+      assert.equal(calls[1].args[1].category, concrete, 'and the value is the chosen one');
     });
 
     it('and choosing the inherit option defers setSectionInherited(…, true) to Save too', async () => {
@@ -499,8 +531,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'), {
         systemId: 'sys-alchemy',
       });
-      const select = target.querySelector('[data-component-edit-category]');
-      assert.notEqual(select.value, '__inherit', 'the overriding system does not start there');
+      assert.notEqual(chosenCategory(target), '__inherit', 'the overriding system does not start there');
       chooseCategory(target, '__inherit');
       await drain();
       assert.deepEqual(calls, [], 'still a draft');
@@ -516,12 +547,10 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     it('a REFUSED flag write stops the save rather than writing the value alone', async () => {
       // The failure branch of the ordering above. If the first half refuses.
       const { target, calls } = await openEditor(componentRecord('ingot', 'Iron Ingot', 'Refined'));
-      const select = target.querySelector('[data-component-edit-category]');
-      const concrete = [...select.options].find((option) => option.value !== '__inherit');
-      chooseCategory(target, concrete.value);
+      chooseCategory(target, concreteCategory(target));
       await drain();
       // The recording bag answers `true` for every verb.
-      const editorTarget = target.querySelector('[data-component-edit-category]');
+      const editorTarget = target.querySelector(CATEGORY_TRIGGER);
       assert.ok(Boolean(editorTarget), 'the control is still there, so the setup below is real');
       calls.length = 0;
       await editor.setProps({
@@ -556,12 +585,16 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     it('and WITHHOLDS the inherit option when no world category is authored', async () => {
       // THE FIXTURE IS A MEMBER WITH NO WORLD DEFAULT, and that is the whole point of it.
       const { target } = await openEditor(componentRecord('orphan', 'Unbound Salt', 'general'));
-      const select = target.querySelector('[data-component-edit-category]');
       assert.ok(
-        ![...select.options].some((option) => option.value === '__inherit'),
+        !selectOptionValues(target, CATEGORY_TRIGGER).includes('__inherit'),
         'the option is ABSENT rather than offered against an unauthored world value'
       );
-      assert.equal(select.disabled, false, 'and this system supplies its own value');
+      closeSelectPanel(target, CATEGORY_TRIGGER);
+      assert.equal(
+        target.querySelector(CATEGORY_TRIGGER).disabled,
+        false,
+        'and this system supplies its own value'
+      );
       const note = target.querySelector('[data-component-edit-category-note]');
       assert.ok(Boolean(note), 'the third branch of the note renders in its place');
       assert.match(note.textContent, /No world category is set/);

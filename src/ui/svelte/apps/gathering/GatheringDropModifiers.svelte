@@ -12,7 +12,9 @@
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
 
-  let { drop = null } = $props();
+  // `bodyId` lands on this root rather than a wrapper, so the region the row's disclosure names
+  // with `aria-controls` is the body (issue 1512).
+  let { drop = null, bodyId = '' } = $props();
 
   function signedPercent(value) {
     const magnitude = Math.abs(Math.trunc(Number(value) || 0));
@@ -72,7 +74,7 @@
   const lines = $derived(modifierLines(drop));
 </script>
 
-<div class="gathering-task-drop-modifiers" data-gathering-drop-modifiers>
+<div class="gathering-task-drop-modifiers" id={bodyId || undefined} data-gathering-drop-modifiers>
   <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.Modifiers')}</Kicker>
   <ul class="gathering-task-drop-modifier-list">
     <li class="gathering-task-drop-modifier is-base">

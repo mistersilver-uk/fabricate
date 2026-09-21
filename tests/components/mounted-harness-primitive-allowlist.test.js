@@ -41,8 +41,11 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/Select.svelte',
   // THE right-inspector action button (issue 1036, maintainer round 2).
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-  // The product's ONE horizontal fill bar.
+  // The product's ONE horizontal fill bar, ONE row disclosure and ONE ordered list (issue 1512).
+  // The list reaches five manager surfaces at once, and it renders the disclosure and the icon
+  // button behind it, so a tree holding any converted list pulls three primitives in.
   'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
@@ -82,6 +85,11 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   // THE manager's searchable picker (issue 1458), and the entry with the LONGEST tail.
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // Its portaled panel (issue 1719), which inherits that tail whole: the picker renders it in
+  // every open state, so it is in the static closure of every suite the entry above reaches. It
+  // is the sharpest silent-failure case on this list, because a panel missing from a roster
+  // cancels the suite at the click that opens it rather than failing an assertion.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   // THE shared overflow action menu (issue 1477). It is a LEAF TWO RUNGS DOWN.
   'src/ui/svelte/components/ActionMenu.svelte',
   // THE THREE THAT SHIPPED TOGETHER (issue 1505).
@@ -410,5 +418,43 @@ test('every exported roster in the shared harness resolves whole through the gua
     [],
     'a closing bracket inside a roster comment silently narrows the naming guard above:\n- ' +
       truncated.join('\n- ')
+  );
+});
+
+// The picker's two pure leaves, which every harness that mounts a picker names together. The
+// closure walk above quantifies over `.svelte` shared primitives, so it cannot see a roster that
+// names one `.js` module and not the other, and that omission cancels the suite silently. Each is
+// imported by `components/SearchablePopover.svelte` alone, which is what makes the two rosters'
+// requirement sets identical rather than merely similar.
+const CO_LOCATED_PICKER_MODULES = Object.freeze([
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/pickerOptionModel.js',
+]);
+
+test('a roster naming one of the picker’s two leaf modules names the other', () => {
+  // Anchored on the opening quote, so a relative import specifier — the unit tests' own
+  // `'../../src/ui/svelte/util/listboxNavigation.js'` — is not read as a roster entry. Symmetric by
+  // construction: either leaf named alone counts the roster and is checked against the full set.
+  const quoted = CO_LOCATED_PICKER_MODULES.map((path) => `'${path}'`);
+  const gaps = [];
+  let rosters = 0;
+  for (const file of repoPathsUnder('tests', '.js')) {
+    const source = readRepoFile(file);
+    const named = quoted.filter((entry) => source.includes(entry));
+    if (named.length === 0) continue;
+    rosters += 1;
+    if (named.length !== quoted.length) gaps.push(file);
+  }
+
+  assert.ok(
+    rosters >= 30,
+    `only ${rosters} files name a picker leaf module as a roster entry, so this clause has ` +
+      'lost most of its domain and would pass over an almost empty set'
+  );
+  assert.deepEqual(
+    gaps,
+    [],
+    'these rosters name one of the picker’s two leaf modules and not the other, so a suite that ' +
+      `opens a picker hangs (# cancelled) instead of failing:\n- ${gaps.join('\n- ')}`
   );
 });

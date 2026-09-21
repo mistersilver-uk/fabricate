@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte'
   ],

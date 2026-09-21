@@ -41,7 +41,11 @@ import {
   readsGlobal,
   referencesIdentifier,
   requiresProp,
+  rendersBefore,
   spellsLiteral,
+  styleDeclares,
+  styleRule,
+  styleRules,
   renderedComponents,
   renderedElements,
   rendersComponent,
@@ -390,4 +394,84 @@ test('the module predicates answer for a constant and a named reference', () => 
   assert.equal(declaredConstantOf(moduleFixture, 'counter'), false, 'a let is not a const');
   assert.equal(referencesIdentifierOf(moduleFixture, 'registerApp'), true);
   assert.equal(referencesIdentifierOf(moduleFixture, 'SvelteRecipeManagerApp'), false);
+});
+
+const STYLED = [
+  '<div class="books-tab"><span class="item-links"></span></div>',
+  '<style>',
+  '  .books-tab .item-links {',
+  '    display: grid;',
+  '    grid-template-columns: repeat(3, minmax(0, 1fr));',
+  '  }',
+  '  .item-links { margin: 0; }',
+  '  @media (max-width: 40rem) {',
+  '    .books-tab .item-links { gap: 0.25rem; }',
+  '  }',
+  '  :global(.fabricate-manager) .tab-empty { width: 100%; }',
+  '  [data-state="on"].pill { color: red; }',
+  '</style>',
+].join('\n');
+
+const styled = parseComponent(STYLED);
+
+test('styleRules reaches the rules an at-rule block nests as well as the top-level ones', () => {
+  assert.equal(styleRules(styled).length, 5);
+  assert.equal(styleRules(parseComponent('<div></div>')).length, 0);
+});
+
+test('styleRule pins the compound chain a bare-class rule beside it cannot satisfy', () => {
+  const rule = styleRule(styled, ['books-tab', 'item-links']);
+  const properties = rule.block.children.map((node) => node.property);
+  assert.deepStrictEqual(properties, ['display', 'grid-template-columns']);
+});
+
+test('styleRule throws on an absent selector, so a CSS claim cannot pass vacuously', () => {
+  assert.throws(() => styleRule(styled, ['books-tab', 'missing']), /no scoped rule/);
+  assert.throws(() => styleRule(parseComponent('<div></div>'), ['any']), /no scoped rule/);
+});
+
+test('styleRule addresses a :global() leg and an attribute selector structurally', () => {
+  assert.ok(styleRule(styled, [{ global: 'fabricate-manager' }, 'tab-empty']));
+  assert.ok(styleRule(styled, [[{ attribute: ['data-state', 'on'] }, 'pill']]));
+  assert.throws(() => styleRule(styled, [{ global: 'fabricate-manager' }]), /no scoped rule/);
+});
+
+test('styleDeclares compares the whole value, not a fragment of it', () => {
+  const grid = ['books-tab', 'item-links'];
+  assert.equal(styleDeclares(styled, [grid, 'grid-template-columns']), true);
+  assert.equal(
+    styleDeclares(styled, [grid, 'grid-template-columns', 'repeat(3, minmax(0, 1fr))']),
+    true
+  );
+  assert.equal(styleDeclares(styled, [grid, 'grid-template-columns', 'repeat(3, minmax(0']), false);
+  assert.equal(styleDeclares(styled, [grid, 'max-width']), false);
+});
+
+const ORDERED = [
+  '<section>',
+  '  <Tabs />',
+  '  <div class="chips">',
+  '    {#each chips as chip}<Chip />{/each}',
+  '    <Popover />',
+  '  </div>',
+  '  <button data-remove="result-set"></button>',
+  '</section>',
+].join('\n');
+
+const ordered = parseComponent(ORDERED);
+
+test('rendersBefore orders components, blocks, classes and attributes in one list', () => {
+  assert.equal(rendersBefore(ordered, ['Tabs', 'Popover']), true);
+  assert.equal(rendersBefore(ordered, ['Popover', 'Tabs']), false);
+  assert.equal(rendersBefore(ordered, ['EachBlock', 'Popover']), true);
+  assert.equal(rendersBefore(ordered, [{ class: 'chips' }, 'EachBlock']), true);
+  assert.equal(
+    rendersBefore(ordered, ['Popover', { attribute: ['data-remove', 'result-set'] }]),
+    true
+  );
+});
+
+test('rendersBefore is false when either end is absent, rather than vacuously true', () => {
+  assert.equal(rendersBefore(ordered, ['Tabs', 'Missing']), false);
+  assert.equal(rendersBefore(ordered, ['Missing', 'Tabs']), false);
 });

@@ -1037,19 +1037,86 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-prerequisite-operator',
   'data-economy-regen-policy',
   'data-economy-regen-unit',
+  // ISSUE 1510 PHASE 2, COMMIT 2a — the recipe studio. `data-recipe-field` is spelled WITH its
+  // value at the three cells that carry it, because the bare attribute is shared with the tab's
+  // inputs and textareas and a bare entry would ban driving those natively too.
+  'data-recipe-category-select',
+  'data-recipe-field="checkTierId"',
+  'data-recipe-field="minSuccessOutcomeId"',
+  'data-recipe-field="craftingModifierSet"',
+  'data-recipe-option-kind',
+  // Issue 1510 phase 2, commit 2b — the component studio. Each is spelled bare, checked rather than
+  // assumed: `data-component-edit-category` and `data-complication-trigger` are each a prefix of
+  // two further hooks, but both of those name a state paragraph and a clause wrapper rather than a
+  // control, so no bare entry here bans driving a native control that survives. `data-salvage-route`
+  // carries the outcome name as its value, so it has no fixed value to spell; and of the container
+  // hook `data-salvage-routing`, which wraps no native control.
+  'data-component-edit-category',
+  'data-salvage-route',
+  'data-salvage-dc-preset',
+  'data-complication-trigger',
+  'data-complication-roll-condition-cmp',
+  // Issue 1510 phase 2, commit 2c — the checks studio. Each is spelled bare, checked rather than
+  // assumed: no entry here is a prefix of a further hook on a native control that survives, and
+  // `data-trigger-tier-step`, `data-preview-against` and `data-checks-preview-as` are shorter
+  // container hooks wrapping none.
+  'data-checks-preview-record',
+  'data-trigger-condition-type',
+  'data-trigger-group',
+  'data-trigger-aggregate',
+  'data-trigger-operator',
+  'data-trigger-tier-step-target',
+  'data-preview-against-select',
+  'data-simple-band-record',
 ]);
+
+/**
+ * Every `const <name> = …locator('<selector>')` binding in a producer, so a drive written against a
+ * binding is judged by the hook the binding carries. The clauses below read a 400-character
+ * look-back and this harness binds outside it: the tier-step target's hook is declared roughly 700
+ * characters above the drive that uses it (issue 1510). A name keeps EVERY selector bound to it,
+ * because a second walk re-declaring the name would otherwise hide the first drive behind it, and
+ * each binding resolves to its initializer's LAST `.locator()` hop — `page.locator('.card')
+ * .locator('select#y')` names the select, not the card, and a lazy read of the first hop let that
+ * shape escape the element-typed ban.
+ */
+function locatorBindings(source) {
+  const bindings = new Map();
+  const pattern = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*[^;]*\.locator\((['"`])((?:(?!\2).)*)\2\)/gu;
+  for (const match of source.matchAll(pattern)) {
+    bindings.set(match[1], [...(bindings.get(match[1]) ?? []), match[3]]);
+  }
+  return bindings;
+}
+
+/**
+ * Every selector a drive at `index` could be against: the chain's last `.locator(...)` hop, plus
+ * each selector bound to its RECEIVER where the call is written `<name>.selectOption(`. Both,
+ * never one — a binding resolves what the window cannot see, and the window resolves the hop a
+ * shadowed or unparsed binding would miss.
+ */
+function drivenLocators(source, index, bindings) {
+  const receiver = /([A-Za-z_$][\w$]*)\s*$/u.exec(source.slice(Math.max(0, index - 80), index));
+  const chain = source.slice(Math.max(0, index - 400), index);
+  const hops = [...chain.matchAll(/\.locator\((['"`])((?:(?!\1).)*)\1\)/gu)];
+  const bound = receiver ? (bindings.get(receiver[1]) ?? []) : [];
+  return [...new Set([...bound, hops.at(-1)?.[2] ?? ''])].filter(Boolean);
+}
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
   const offenders = [];
   let calls = 0;
   for (const producer of CAPTURE_PRODUCERS) {
+    const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.selectOption\(/g)) {
       calls += 1;
       // The locator chain that reaches the call, which may be spread over several lines. A
-      // window rather than a line, because the harness's own idiom wraps a long chain.
+      // window rather than a line, because the harness's own idiom wraps a long chain — and the
+      // RESOLVED locator beside it, for the drive written against a binding declared above it.
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      const resolved = drivenLocators(producer.source, match.index, bindings);
       for (const hook of CONVERTED_SELECT_HOOKS) {
-        if (!chain.includes(hook)) continue;
+        if (!chain.includes(hook) && !resolved.some((selector) => selector.includes(hook))) continue;
         offenders.push(`${producer.path}: \`${hook}\` is driven by .selectOption()`);
       }
     }
@@ -1115,9 +1182,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 14,
+    replacements.length >= 17,
     `only ${replacements.length} \`chooseSelectOption(\` call sites remain in the registry, ` +
-      'against a floor of 14. Converted steps were reverted to the native `select:` verb, or the ' +
+      'against a floor of 17. Converted steps were reverted to the native `select:` verb, or the ' +
       'helper was renamed and this clause is now judging an empty set.'
   );
   assert.deepEqual(
@@ -1150,17 +1217,19 @@ test('no capture producer drives a converted select by an element-typed locator'
   const seen = new Set();
   let elementTyped = 0;
   for (const producer of CAPTURE_PRODUCERS) {
+    const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.selectOption\(/gu)) {
-      // The LOCATOR is the argument of the LAST `.locator(...)` before the call: a chain built from
-      // several hops still ends on the one that names the element being driven.
-      const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
-      const hops = [...chain.matchAll(/\.locator\((['"`])((?:(?!\1).)*)\1\)/gu)];
-      const locator = hops.at(-1)?.[2] ?? '';
-      if (!NATIVE_SELECT_ELEMENT_TOKEN.test(locator)) continue;
-      elementTyped += 1;
-      seen.add(locator);
-      if (NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.includes(locator)) continue;
-      offenders.push(`${producer.path}: \`${locator}\``);
+      // BOTH candidates are judged: the LAST `.locator(...)` hop before the call — a chain built
+      // from several hops still ends on the one that names the element being driven — and, where
+      // the call is written against a BINDING, that binding's own selector wherever it was
+      // declared. Judging only one of them let a drive escape through the other.
+      for (const locator of drivenLocators(producer.source, match.index, bindings)) {
+        if (!NATIVE_SELECT_ELEMENT_TOKEN.test(locator)) continue;
+        elementTyped += 1;
+        seen.add(locator);
+        if (NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.includes(locator)) continue;
+        offenders.push(`${producer.path}: \`${locator}\``);
+      }
     }
   }
   assert.ok(
@@ -1196,11 +1265,13 @@ test('no capture producer reads a converted select back with an <input>-only API
   const offenders = [];
   let readBacks = 0;
   for (const producer of CAPTURE_PRODUCERS) {
+    const bindings = locatorBindings(producer.source);
     for (const match of producer.source.matchAll(/\.inputValue\(/gu)) {
       readBacks += 1;
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      const resolved = drivenLocators(producer.source, match.index, bindings);
       for (const hook of CONVERTED_SELECT_HOOKS) {
-        if (!chain.includes(hook)) continue;
+        if (!chain.includes(hook) && !resolved.some((selector) => selector.includes(hook))) continue;
         offenders.push(`${producer.path}: \`${hook}\` is read back with .inputValue()`);
       }
     }
@@ -1266,7 +1337,7 @@ test('no suite drives a converted select by an inline open-then-click of its own
 
 test('the option list a capture producer clicks is rooted where the portal puts it', () => {
   const primitive = readFileSync('src/ui/svelte/components/Select.svelte', 'utf8');
-  const popover = readFileSync('src/ui/svelte/components/SearchablePopover.svelte', 'utf8');
+  const popover = readFileSync('src/ui/svelte/components/SearchablePopoverPanel.svelte', 'utf8');
   // Name-level, like the Checks guard below: the VALUES are option identities that vary per
   // world, and the names are what a rename would take away.
   assert.ok(
@@ -1276,8 +1347,8 @@ test('the option list a capture producer clicks is rooted where the portal puts 
   );
   assert.ok(
     popover.includes('data-popover-option'),
-    '`SearchablePopover.svelte` no longer writes `data-popover-option`, so the identity handle ' +
-      'every converted driver clicks by is on no row at all'
+    '`SearchablePopoverPanel.svelte` no longer writes `data-popover-option`, so the identity ' +
+      'handle every converted driver clicks by is on no row at all'
   );
 
   // HARNESS-ONLY, on the `interpolationSafeTrap` precedent above.

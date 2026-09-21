@@ -23,9 +23,11 @@
   import CheckOddsPanel from './CheckOddsPanel.svelte';
   import CheckOutcomePreview from './CheckOutcomePreview.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import Select from '../../../components/Select.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
+  import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import {
     formatPreviewDifficulties,
     parsePreviewDifficulties,
@@ -131,6 +133,7 @@
       dataId: actor.id,
     })),
   ]);
+  const previewRecordOptions = $derived(previewRecordSelectOptions(previewRecords));
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
@@ -509,23 +512,19 @@
             )}
           </p>
         {:else}
-          <Field as="label">
-            <span class="visually-hidden"
-              >{text(
-                'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
-                'Preview against record'
-              )}</span
-            >
-            <select
-              data-checks-preview-record
-              value={previewRecordId}
-              onchange={(event) => onSelectPreviewRecord(event.currentTarget.value)}
-            >
-              {#each previewRecords as record (record.id)}
-                <option value={record.id}>{record.label}</option>
-              {/each}
-            </select>
-          </Field>
+          <!-- The shared picker since issue 1510. Its screen-reader-only caption is the trigger's own `ariaLabel` now, one naming route rather than a hidden element inside a `<label>`; `class` rides the picker root, where the sheet hangs the rail column's width. -->
+          <Select
+            size="toolbar"
+            class="manager-checks-preview-record-select"
+            value={previewRecordId}
+            options={previewRecordOptions}
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
+              'Preview against record'
+            )}
+            triggerData={{ 'data-checks-preview-record': '' }}
+            onChange={onSelectPreviewRecord}
+          />
         {/if}
       </InspectorCard>
 
