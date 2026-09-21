@@ -25,13 +25,13 @@ const DEFAULT_EXEMPT_LABEL = 'screenshots-exempt';
 const SCREENSHOTS_BLOCK_START = '<!-- fabricate:screenshots:start -->';
 const SCREENSHOTS_BLOCK_END = '<!-- fabricate:screenshots:end -->';
 
-// The recipe editor's frames (overview/ingredients/validation/multi-step/tools/access/ results)
-// share the same trigger files, so any recipe editor / tab / sub-component change republishes all
-// of them.
 // The read-side builder behind every player crafting frame: it resolves the Produces row, the
 // per-set products and the per-step projection the detail bodies render.
 const CRAFTING_LISTING_BUILDER_PATTERN = /^src\/ui\/presenters\/CraftingListingBuilder\.js$/;
 
+// The recipe editor's frames (overview/ingredients/validation/multi-step/tools/access/ results)
+// share the same trigger files, so any recipe editor / tab / sub-component change republishes all
+// of them.
 const RECIPE_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipe\/(?!RecipeTools(?:Tab|Section)\.svelte$).*\.svelte$/,
