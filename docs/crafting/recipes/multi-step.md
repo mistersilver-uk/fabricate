@@ -20,7 +20,8 @@ Leave its result group empty and the step still costs its materials, its tools, 
 The run simply advances to the next step with nothing awarded.
 This is how you author preparation work that has no item to show for it.
 The last step is different.
-It must produce something, because that is what the recipe makes.
+Each of its result groups must produce something, because that is what the recipe makes.
+An on-failure result group is the exception, as always, and is allowed to award nothing.
 Progressive mode is the exception, and every one of its steps must still award results, because a progressive stage is defined by what it awards.
 
 ---
@@ -107,6 +108,8 @@ You author each step on the Ingredients and Results tabs of the recipe editor in
 A step you have deliberately left without results is not treated as unfinished work.
 Its result set on the Results tab, and the matching step in the recipe browser's inspector, show a plain note that the step only advances the craft.
 This replaces the red warning an empty last step still gets.
+A step with no result group at all is a different thing.
+That is unfinished authoring, so it keeps the red warning wherever it sits.
 
 {% include screenshot.html case="manager-recipe-edit-multistep" caption="The steps of a multi-step recipe on the Overview tab." %}
 

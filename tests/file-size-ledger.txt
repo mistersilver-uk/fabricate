@@ -93,9 +93,9 @@ src/ui/extensionRegistry.js::createExtensionRegistry	142
 src/ui/model/scopedEntityListModel.js::createScopedEntityListModel	118
 src/ui/navTabBadgeStore.js::createNavTabBadgeStore	114
 src/ui/presenters/AlchemyListingBuilder.js::buildListing	120
-src/ui/presenters/CraftingListingBuilder.js	1282
+src/ui/presenters/CraftingListingBuilder.js	1285
 src/ui/presenters/CraftingListingBuilder.js::_buildCheck	111
-src/ui/presenters/CraftingListingBuilder.js::_buildRecipeModel	154
+src/ui/presenters/CraftingListingBuilder.js::_buildRecipeModel	156
 src/ui/presenters/GatheringListingBuilder.js	1074
 src/ui/presenters/GatheringListingBuilder.js::_buildEnvironmentListing	225
 src/ui/presenters/GatheringListingBuilder.js::listForActor	108

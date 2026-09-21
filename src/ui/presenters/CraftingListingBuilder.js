@@ -577,7 +577,9 @@ export class CraftingListingBuilder {
       displayedStepId: stringOrNull(firstStep?.id),
       activeStepTimeGateArmed: activeStep.timeGateArmed,
       // How many execution steps this recipe runs; `steps[]` above is `simple`-only and cannot
-      // answer it. A body branches on `> 1` to follow {@link _productStep} (issue 1907).
+      // answer it. A body branches on `> 1` to follow {@link _productStep} (issue 1907). It
+      // counts AUTHORED steps and ignores `features.multiStepRecipes`, so a collapsed chain
+      // still headlines its terminal product, unlike the Journal run model's `multiStep`.
       stepCount: this._executionSteps(recipe).length,
       check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
@@ -1144,8 +1146,9 @@ export class CraftingListingBuilder {
 
   /**
    * The step a PRODUCT read resolves against: the terminal step once a recipe runs more than one,
-   * which is the step the collapse path and the Journal already treat as product-bearing, so a
-   * legal empty non-terminal step (issue 1907) never drives a product surface. One rule, shared by
+   * which is the step the collapse path already treats as product-bearing (its editor write-through
+   * and its atomic chain), so a legal empty non-terminal step (issue 1907) never drives a product
+   * surface. One rule, shared by
    * the headline row and the `routedByCheck` tier table, because they must not disagree.
    * @private
    */
