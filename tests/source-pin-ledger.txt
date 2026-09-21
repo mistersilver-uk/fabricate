@@ -76,7 +76,7 @@ tests/components/manager-layout-recipes.js	5
 tests/components/manager-layout-select.js	6
 tests/components/manager-layout-shared.js	5
 tests/components/manager-layout-tools-fixtures.js	1
-tests/components/manager-layout-tools.js	16
+tests/components/manager-layout-tools.js	18
 tests/components/manager-row-menu-routing.test.js	3
 tests/components/manager-single-page-header.test.js	5
 tests/components/notice-mounted.test.js	1
