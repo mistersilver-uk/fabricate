@@ -67,12 +67,23 @@ export const CASES = Object.freeze([
     query: { system: 'lab-smithing' },
     steps: [
       'Crafting',
-      { selector: '.manager-recipe-row[data-recipe-id="sm-r-pattern-blade"]' },
+      // The row `<li>` is a container: `onSelectRecipe` is bound to the nested identity BUTTON, so
+      // clicking the wrapper leaves the inspector on its fallback recipe and renders no pager.
+      {
+        selector:
+          '.manager-recipe-row[data-recipe-id="sm-r-pattern-blade"] .manager-recipe-identity',
+      },
       { selector: '[data-recipe-step-pager]', scroll: true },
     ],
     expectView: 'recipes',
     expectSelector:
       '.fabricate-manager [data-recipe-produces-empty].manager-muted:not(.manager-recipe-flow-empty)',
+    // The note has to be IN the picture, not merely in the DOM. The inspector is a scrolling rail
+    // BESIDE `.manager-main`, not inside it, so it is the container both pins are taken against.
+    expectContained: [
+      { container: '[data-recipe-inspector]', target: '[data-recipe-step-pager]' },
+      { container: '[data-recipe-inspector]', target: '[data-recipe-produces-empty]' },
+    ],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,

@@ -495,11 +495,17 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Reading Lens' },
       { selector: '.crafting-recipe-row[data-recipe-id="gl-r-lens"]' },
+      // The Produces row sits below the requirements and the alternatives, so the frame has to be
+      // scrolled to it or it photographs everything except the thing it exists to show.
+      { selector: '[data-io-group="outputs"]', scroll: true },
     ],
     // The routed body over a product row: without the terminal-step read the Output section is not
     // rendered at all, so this selector is satisfied only by the fixed behaviour.
     expectSelector:
       '[data-recipe-mode="routedByIngredients"] [data-io-group="outputs"] .crafting-io-output-name',
+    expectContained: [
+      { container: '[data-crafting-detail-scroll]', target: '[data-io-group="outputs"]' },
+    ],
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SHARED,
