@@ -51,9 +51,9 @@ src/ui/svelte/apps/manager/world	336
 src/ui/svelte/components	1488
 src/ui/svelte/stores	4536
 src/ui/svelte/util	1258
-src/utils	944
+src/utils	947
 styles	1058
-tests	19987
+tests	19989
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210

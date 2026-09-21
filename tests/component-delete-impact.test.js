@@ -108,6 +108,48 @@ test('stripComponentsFromRecipeJson reports changed:false for an untouched recip
   assert.equal(changed, false, 'an unreferenced recipe must not be re-saved');
 });
 
+test('the cascade keeps a result group that ARRIVED empty and drops only one it emptied', () => {
+  // Issue 1907: an empty non-terminal group is authored data, so pruning it would leave the step
+  // with no result group at all — a shape `Recipe.validate` rejects, on a recipe left enabled.
+  const twoStep = {
+    id: 'r-layered',
+    craftingSystemId: 'sys',
+    enabled: true,
+    ingredientSets: [],
+    resultGroups: [],
+    steps: [
+      {
+        id: 'step-1',
+        ingredientSets: [{ id: 's1', ingredientGroups: [{ options: [{ componentId: 'tin' }] }] }],
+        resultGroups: [{ id: 'rg-1', results: [] }],
+      },
+      {
+        id: 'step-2',
+        ingredientSets: [{ id: 's2', ingredientGroups: [{ options: [{ componentId: 'tin' }] }] }],
+        resultGroups: [
+          { id: 'rg-2a', results: [{ componentId: 'doomed' }] },
+          { id: 'rg-2b', results: [{ componentId: 'bar' }] },
+        ],
+      },
+    ],
+  };
+
+  const { json, changed } = stripComponentsFromRecipeJson(twoStep, new Set(['doomed']));
+
+  assert.equal(changed, true, 'the recipe names the deleted component');
+  assert.deepEqual(
+    json.steps[0].resultGroups.map((group) => group.id),
+    ['rg-1'],
+    'the authored empty group on step 1 survives'
+  );
+  assert.deepEqual(
+    json.steps[1].resultGroups.map((group) => group.id),
+    ['rg-2b'],
+    'only the group the strip itself emptied is pruned'
+  );
+  assert.equal(recipeLostItsShape(json), false, 'the recipe is not clamped to disabled');
+});
+
 test('recipeLostItsShape reads STEP sets and results, not only the recipe-level ones', () => {
   // The behaviour fix at the heart of the shared decision: a multi-step recipe whose
   // recipe-level sets were emptied is still craftable through its steps, and the component
