@@ -22,6 +22,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The studio's eight converted option vocabularies (issue 1510).
+  'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
   // The Validation route's focus half (issue 1517).
   'src/ui/svelte/apps/manager/validationFocus.js',
   // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
@@ -146,6 +148,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker.
   'src/ui/svelte/components/SearchablePopover.svelte',
+  // The shared one-of-n picker (issue 1510). The checks studio renders it at each converted select
+  // site; omitting a rendered .svelte module makes the mounted harness hang rather than fail.
+  'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
