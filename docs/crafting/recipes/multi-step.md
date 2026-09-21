@@ -15,13 +15,18 @@ Multi-step recipes chain several steps that must be completed in sequence.
 Each step can have its own ingredients, required tools, results, and time requirements.
 An ingredient inside a step can still offer a currency cost as an alternative to its items, the same as in a single-step recipe.
 
+A step that comes before the last one does not have to produce anything.
+Leave its result group empty and the step still costs its materials, its tools, its time and its crafting check, and the run simply advances to the next step with nothing awarded — which is how you author preparation work that has no item to show for it.
+The last step is different: it must produce something, because that is what the recipe makes.
+Progressive mode is the exception, and every one of its steps must still award results, because a progressive stage is defined by what it awards.
+
 ---
 
 ## How It Works
 
 1. Player starts the recipe and a **crafting run** is created
 2. The first step's ingredients are validated
-3. On success, the step's results are created and the run advances
+3. On success, the step's results, if any, are created and the run advances
 4. Repeat for each step
 5. When the last step succeeds, the run completes
 
@@ -53,6 +58,7 @@ Instant steps do not show a duration.
 The intermediate items a step produces along the way are not listed as separate results.
 Only the recipe's final product is shown, as a single **Produces** row beneath the steps.
 This keeps the focus on what the whole recipe makes rather than on the parts made on the way there.
+That **Produces** row always reads the recipe's last step, so a recipe whose early steps award nothing still shows the player what it makes.
 
 The **Craft** button reflects the first step.
 A later step showing missing materials never stops a player from starting the recipe, so players can gather what a later step needs before it comes up in the run.
@@ -91,6 +97,9 @@ A multi-step recipe is made up of an ordered list of steps.
 Each step has its own ingredient sets, result groups, optional required tools, and an optional time requirement.
 For the example above, the Forge step requires the Forge tool and a 4-hour time gate, the Assemble step consumes the unfinished plates plus leather straps, and the Enchant step combines the plate armour with an enchanting gem.
 You author each step on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
+
+A step you have deliberately left without results is not treated as unfinished work.
+On the Results tab its result set reads "Nothing produced on this step — it only advances the craft", and the recipe browser's inspector says the same as you page through to that step — plain notes, not the red warning an empty last step still gets.
 
 {% include screenshot.html case="manager-recipe-edit-multistep" caption="The steps of a multi-step recipe on the Overview tab." %}
 

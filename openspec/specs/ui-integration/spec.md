@@ -1608,6 +1608,7 @@ The reserved `role: 'failure'` group — the failure output for plain `simple` r
 **The routed clause is CONDITIONAL, not absolute (issue 1098).**
 In a routed mode the list renders a failure-toned row for a result group assigned to a failure-marked outcome tier **when the system's `craftingCheck.failureResultPolicy` permits results on failure**, and renders none when it does not — matching what the engine will actually do.
 The successful-craft-makes-nothing warning still keys on the SUCCESS rows only: a recipe whose only group is a failure output still makes nothing when the craft succeeds, and says so.
+When the empty group belongs to a non-terminal step of a multi-step recipe, both this inspector pager and the recipe editor's result-group card render a neutral note that the step only advances the craft, without danger styling; the terminal-step and single-step cases keep the danger panel (issue 1907).
 
 ### The On-failure section
 
@@ -3970,6 +3971,7 @@ The player app is a single shared window with a full-height left navigation rail
   Each entry also carries its effective authored `duration` when the step is timed.
   The `simple`-mode detail body renders these as an ordered list of per-step requirement blocks — a static preview of the whole recipe, not a live run-progress tracker.
   Each block renders inputs only; intermediate step yields are not shown.
+  For a recipe with more than one execution step, the headline Produces row resolves against the terminal execution step in every mode except `routedByCheck`, and the `routedByIngredients` body reads that terminal-step product rather than the selected first-step set's products (issue 1907).
   A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
   A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
 - Only the **active** execution step's requirement block is interactive; every other step stays a read-only preview, consistent with the static-preview contract above.
