@@ -11,7 +11,7 @@ src/canvas/regions	331
 src/config	435
 src/integrations	20
 src/migration	1353
-src/models	460
+src/models	468
 src/models/match	66
 src/systems	25529
 src/systems/normalize	308
@@ -53,7 +53,7 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1258
 src/utils	944
 styles	1058
-tests	19976
+tests	19982
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
