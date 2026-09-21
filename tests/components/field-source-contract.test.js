@@ -131,8 +131,11 @@ test('the host set is the closed three, and all three still have real users', ()
   // Floors, not exact counts — a new field is an ordinary edit. What is NOT ordinary is the
   // SPLIT collapsing: flattening the 31 `<div>` fields into `<label>`s renders identically and
   // changes what a screen reader announces on 31 screens.
+  // The `label` floor dropped 45 → 40 when the checks studio's selects moved onto the `Select`
+  // primitive: each wrapper existed to name a native `<select>`, and the primitive now carries
+  // that name itself (`ariaLabelledBy`/`ariaLabel`), so no site changed which host announces it.
   for (const [host, floor] of [
-    ['label', 45],
+    ['label', 40],
     ['div', 28],
     ['fieldset', 1],
   ]) {
