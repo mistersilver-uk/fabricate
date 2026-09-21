@@ -7,13 +7,13 @@
   the SAME `.manager-checks-tier-*` contract as `CraftingCheckEditor`; the column-header row goes
   with the table, one text field and one number needing none once labelled.
 
-  THE HANDLE DRAGS, a handle that does not reorder being a promise the surface does not keep. The
-  grip is ALSO a real BUTTON that moves its row with the arrow keys, HTML5 drag-and-drop having
-  no keyboard path: one affordance answers both inputs.
+  The row renders through `SortableList` (issue 1512), which draws the numbered badge, the rocker,
+  the delete and the polite announcement; the library's section 16 carries the ruling.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import SortableList from '../../../components/SortableList.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
 
@@ -42,6 +42,11 @@
   // strings' `{label}` slot all read it.
   const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC'));
 
+  // Named once: the card's heading and the list's own `aria-label` are the same sentence.
+  const tiersTitle = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe difficulty tiers')
+  );
+
   function addTier() {
     onChange([...list, { id: newId(), name: '', dc: Number(defaultDc) || 0 }]);
   }
@@ -54,9 +59,8 @@
     onChange(list.filter((tier) => tier.id !== id));
   }
 
-  // `dragIndex` is the row under the pointer, `$state` because the row it names paints itself
-  // as travelling.
-  let dragIndex = $state(-1);
+  // Both inputs are the shared list's (issue 1512) — the drag source, the grip, the arrow keys,
+  // the rocker and the announcement. This surface keeps only the array move.
 
   /** Move one row, clamped. A move to where it already is emits nothing. */
   function moveTier(from, to) {
@@ -69,13 +73,6 @@
     onChange(next);
   }
 
-  function onGripKeydown(event, index) {
-    const delta = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-    if (delta === 0) return;
-    event.preventDefault();
-    moveTier(index, index + delta);
-  }
-
   function tierName(tier) {
     return tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier');
   }
@@ -86,7 +83,7 @@
 <div class="manager-checks-card-head">
   <div>
     <h3 class="manager-checks-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe difficulty tiers')}
+      {tiersTitle}
     </h3>
     <p class="manager-checks-card-description">
       {anchorsBands
@@ -110,89 +107,62 @@
         'No tiers yet. Add named tiers a recipe can select to override the DC.'
       )}
     </p>
+    <!-- The adder follows the empty message (issue 1512): with no tiers there is no list for it to
+         be a footer of, and an empty state that says "add one" with nothing to press is a dead end. -->
+    {@render addTierButton()}
   {:else}
-    <div
-      class="manager-checks-tier-list"
-      role="list"
-      aria-label={text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle',
-        'Recipe difficulty tiers'
-      )}
+    <SortableList
+      items={list}
+      itemLabel={tierName}
+      ariaLabel={tiersTitle}
+      numbered
+      removable
+      onReorder={(from, to) => moveTier(from, to)}
+      onRemove={(tier) => removeTier(tier.id)}
+      rowClass={() => 'manager-checks-tier-row'}
+      rowData={(tier) => ({ 'data-tier-row': tier.id })}
+      removeData={() => ({
+        'data-remove-tier': '',
+        title: text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveTier', 'Remove tier'),
+      })}
     >
-      {#each list as tier, index (tier.id)}
-        <!-- The ROW is the drag source and the drop target; the grip is the handle a pointer grabs
-             it by. `ondragover` must preventDefault or the drop never fires — the HTML5 contract,
-             not a workaround. -->
-        <div
-          class={`manager-checks-tier-row ${dragIndex === index ? 'is-dragging' : ''}`}
-          role="listitem"
-          data-tier-row={tier.id}
-          draggable="true"
-          ondragstart={() => {
-            dragIndex = index;
-          }}
-          ondragend={() => {
-            dragIndex = -1;
-          }}
-          ondragover={(event) => event.preventDefault()}
-          ondrop={(event) => {
-            event.preventDefault();
-            moveTier(dragIndex, index);
-            dragIndex = -1;
-          }}
-        >
-          <ManagerButton
-            class="manager-checks-tier-grip"
-            data-tier-grip={tier.id}
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.ReorderTier',
-              'Reorder {name} — use the up and down arrow keys'
-            ).replace('{name}', tierName(tier))}
-            onkeydown={(event) => onGripKeydown(event, index)}
-          >
-            <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          </ManagerButton>
-          <input
-            class="manager-checks-tier-name"
-            data-tier-name
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}
-            value={tier.name || ''}
-            oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
+      {#snippet row(tier)}
+        <input
+          class="manager-checks-tier-name"
+          data-tier-name
+          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}
+          value={tier.name || ''}
+          oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
+        />
+        <!-- The number is labelled in the row rather than in a column header, so the row stays
+             self-describing with no header row above it. `aria-hidden`, because the stepper already
+             carries the same word as its own accessible name. -->
+        <span class="manager-checks-tier-unit" aria-hidden="true">{dcLabel}</span>
+        <!-- `fill`, so the stepper takes the row's pinned track and height rather than sitting in it
+             as a narrower inline island. No `allowUnset`: a tier's DC has no absent state, 0 being a
+             real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
+             because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
+        <div class="manager-checks-tier-stepper is-narrow">
+          <Stepper
+            fill
+            min={0}
+            value={tier.dc ?? 0}
+            {...stepperLabels(dcLabel)}
+            inputProps={{ 'data-tier-dc': '' }}
+            onChange={(dc) => updateTier(tier.id, { dc })}
           />
-          <!-- The number is labelled in the ROW rather than in a column header, so the row stays
-               self-describing with no header row above it. `aria-hidden`, because the stepper already
-               carries the same word as its own accessible name. -->
-          <span class="manager-checks-tier-unit" aria-hidden="true">{dcLabel}</span>
-          <!-- `fill`, so the stepper takes the row's pinned track and height rather than sitting in it
-               as a narrower inline island. No `allowUnset`: a tier's DC has no absent state, 0 being a
-               real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
-               because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
-          <div class="manager-checks-tier-stepper is-narrow">
-            <Stepper
-              fill
-              min={0}
-              value={tier.dc ?? 0}
-              {...stepperLabels(dcLabel)}
-              inputProps={{ 'data-tier-dc': '' }}
-              onChange={(dc) => updateTier(tier.id, { dc })}
-            />
-          </div>
-          <ManagerButton
-            role="danger"
-            class="manager-checks-tier-remove"
-            data-remove-tier
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveTier', 'Remove tier')}
-            onclick={() => removeTier(tier.id)}
-          >
-            <i class="fas fa-trash" aria-hidden="true"></i>
-          </ManagerButton>
         </div>
-      {/each}
-    </div>
+      {/snippet}
+      {#snippet footer()}
+        <li class="manager-checks-tier-add">{@render addTierButton()}</li>
+      {/snippet}
+    </SortableList>
   {/if}
+</div>
 
+{#snippet addTierButton()}
   <ManagerButton role="dashed" data-add-tier onclick={addTier}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddTier', 'Add difficulty tier')}</span>
   </ManagerButton>
-</div>
+{/snippet}

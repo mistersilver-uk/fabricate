@@ -23,6 +23,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
@@ -36,6 +37,7 @@ const harness = createMountedComponentHarness({
     // suite, it cancels every test in it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
   ],

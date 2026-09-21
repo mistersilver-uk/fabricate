@@ -19,6 +19,7 @@ import {
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import {
   booksScrollsFixtures,
+  assertDropComponentCellKeyboardPath,
   managerComponents,
   settleBetweenTests,
   settleRouteExit,
@@ -468,6 +469,9 @@ export function registerGatheringCases() {
     assert.ok(addedDropRow.querySelector('[data-gathering-task-drop-zone]'));
     assert.ok(addedDropRow.textContent.includes('No Component'));
     assert.ok(addedDropRow.textContent.includes('Create or assign'));
+    // The EMPTY branch of the row's keyboard path (issue 1512): the zero-point case, and the only
+    // place the shared-wrapper claim can fail, because a new row is always born in it.
+    assertDropComponentCellKeyboardPath(addedDropRow, { empty: true, label: 'Create or assign' });
     assert.equal(addedDropRow.textContent.includes('Drop component'), false);
     assert.equal(addedDropRow.textContent.includes('Drop chance'), false);
     assert.equal(addedDropRow.textContent.includes('Quantity'), false);

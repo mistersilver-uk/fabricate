@@ -180,6 +180,40 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
+  // The primitive's portaled panel (issue 1719), which draws the whole of what a picker presents.
+  // Fifteen frames rather than the parent's ten, because the panel is also what `Select`,
+  // `ModifierPillSelect` and `IconPicker` open, and the three `Select` frames are the
+  // only ones that draw it with no header and no search row — the shape most importers get.
+  'src/ui/svelte/components/SearchablePopoverPanel.svelte': Object.freeze([
+    'manager-world-parties-actor-picker',
+    'manager-world-parties-realm-override-picker',
+    'manager-gathering-task-availability-menu',
+    'player-actor-picker',
+    'manager-recipe-edit-tag-picker',
+    'world-tool-entry-on-break-repair-tag-picker-empty',
+    'manager-recipe-edit-ingredients-or-menu',
+    'manager-essences-source-picker',
+    'player-crafting-sources-picker',
+    'manager-recipe-item-contents-picker',
+    'manager-recipes-bulk-edit-check-tier',
+    'player-inventory-page-size',
+    'interactables-manager-region-open',
+    'manager-recipe-edit-crafting-modifier-cap-reached',
+    'manager-system-edit-lists',
+  ]),
+  // The product's ONE ordered list (issue 1512). It draws nothing of its own on a browse screen, so
+  // the representative pair would publish two frames that do not contain it; these three are the
+  // AFTER frames for the surfaces whose row geometry moved, and each draws the full row set — grip,
+  // badge, rocker — that the primitive is judged on.
+  'src/ui/svelte/components/SortableList.svelte': Object.freeze([
+    'manager-recipe-edit-step-open',
+    'manager-checks-crafting-recipe-tiers-narrow',
+    'manager-environment-edit-blind-weights-narrow',
+  ]),
+  // The product's ONE row disclosure (issue 1512), promoted on its second importer. Its own frame is
+  // the open step row: the disclosure is the sole opener there, and `aria-expanded="true"` with the
+  // body visible is the only state in which the control is more than a chevron.
+  'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze(['manager-recipe-edit-step-open']),
   // The app's own select (issue 1504); its whole subject — the option list — exists only while
   // open. The recipe studio's kind list adds the `inline` rung (issue 1510).
   'src/ui/svelte/components/Select.svelte': Object.freeze([

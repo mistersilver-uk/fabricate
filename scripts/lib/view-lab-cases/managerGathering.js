@@ -442,7 +442,7 @@ export const CASES = Object.freeze([
     expectView: 'environment-edit',
     // The route survives a tab click that did nothing, so the assertion names the tab panel and the inspector.
     expectSelector:
-      '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-row.is-selected)' +
+      '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-entry.is-selected)' +
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
