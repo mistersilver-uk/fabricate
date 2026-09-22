@@ -1,21 +1,22 @@
 /**
- * Ratchets the source-text pin sites per test file (issue 1658), so the conversions in #1691 and
- * #1697 each lower `tests/source-pin-ledger.txt` and nothing silently re-grows it.
+ * Bounds the source-text pin sites per test file (issue 1658) as a ceiling with no headroom, so a
+ * new pin needs a reason and a conversion that removes one is banked by deleting its row.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 import { literalStrings, parseModule, walkNodes } from './helpers/moduleAst.js';
-import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
 import { countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'source-pin-ledger.txt');
 
-const REGENERATE =
-  'UPDATE_SOURCE_PIN_LEDGER=1 node --conditions=browser --test ' +
-  'tests/source-pin-ratchet.test.js, then review the JSON diff';
+const RUN = 'node --conditions=browser --test tests/source-pin-ratchet.test.js';
+
+/** Below this the scan is truncated rather than clean; `tests/` holds ~1,160 modules. */
+const SCAN_FLOOR = 901;
 
 /**
  * The whole `tests/**` tree, not the `npm test` glob's directories: a pin in a directory the glob
@@ -85,26 +86,35 @@ function buildLedger() {
     });
     if (sites > 0) counted.push([file, sites]);
   }
-  return Object.fromEntries(counted.sort(([left], [right]) => byCodePoint(left, right)));
+  return {
+    observed: Object.fromEntries(counted.sort(([left], [right]) => byCodePoint(left, right))),
+    scanned: Object.keys(corpus).length,
+  };
 }
 
-const gate = ledgerGate({
+const gate = ceilingLedgerGate({
+  test,
+  assert,
+  title: 'no test file pins more source text than its ledger ceiling',
   ledgerPath: LEDGER_PATH,
-  regenerateEnv: 'UPDATE_SOURCE_PIN_LEDGER',
+  updateEnv: 'UPDATE_SOURCE_PIN_LEDGER',
+  tightenEnv: 'TIGHTEN_SOURCE_PIN_LEDGER',
   build: buildLedger,
+  // No headroom: a pin is discrete, so there is no size at which one more is the same debt.
+  ceiling: (_key, sites) => sites,
+  shrink: 'fail',
+  floor: SCAN_FLOOR,
   wording: {
     subject: 'source-pin counts',
-    regenerate: REGENERATE,
-    structuralHint:
-      'A file that newly pins source text needs a reason; one that stopped has paid the debt ' +
-      'down and should bank it.',
-    roseHint: 'means a new pin on how the code is written rather than what it does',
-    fellHint: 'needs the ledger lowered to bank the conversion',
+    update: `UPDATE_SOURCE_PIN_LEDGER=1 ${RUN}`,
+    tighten: `TIGHTEN_SOURCE_PIN_LEDGER=1 ${RUN}`,
+    addedHint:
+      'A new pin asserts how the code is written rather than what it does; assert the behaviour ' +
+      'instead, or say in the PR why the text is the contract.',
+    staleHint:
+      'A file that stopped pinning source text has paid the debt down, and a row nobody is using ' +
+      'is a standing permission for whoever finds it next.',
   },
-});
-
-test('the source-pin ledger matches the pinned baseline exactly, per test file', () => {
-  gate.check(assert);
 });
 
 /** The counter's behaviour, as a table. */
