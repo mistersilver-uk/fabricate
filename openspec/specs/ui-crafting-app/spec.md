@@ -347,7 +347,7 @@ macro that was skipped or threw — none of which may ever reach a player surfac
 
 ### Deferred (this iteration)
 
-- No learn affordance renders on the Crafting tab; recipe learning is wired only through the Inventory surface (see §Books & Scrolls learning and the Inventory learn path, `game.fabricate.learnRecipeFromInventory`).
+- No learn affordance renders on the Crafting tab; recipe learning is wired only through the Inventory surface (see `ui-system-studio/spec.md` §Books & Scrolls learning and the Inventory learn path, `game.fabricate.learnRecipeFromInventory`).
 - The Alchemy tab and the Journal cross-link remain out of scope for the player
   Crafting tab.
 
@@ -357,7 +357,7 @@ The player app is a single shared window with a full-height left navigation rail
 
 - The player app carries five **Core** tabs, in this order: Crafting (always present), Alchemy (conditional — shown when at least one crafting system uses the alchemy resolution mode, `resolutionMode === "alchemy"`), Gathering, Journal, Inventory.
 - Alchemy is the only conditional Core entry.
-- Any tabs contributed by registered **player navigation providers** are appended after the Core tabs, grouped by surface in registration order and within a surface in the provider's own array order (see §Player Navigation Extension).
+- Any tabs contributed by registered **player navigation providers** are appended after the Core tabs, grouped by surface in registration order and within a surface in the provider's own array order (see `ui-extension-points/spec.md` §Player Navigation Extension).
 - A provider tab is rendered through the same rail control as a Core tab and is addressed by a namespaced route key, so a provider tab id can never collide with a Core tab id and Core never enumerates the ids it accepts.
 
 - The one-tab rule governs the **Crafting / Alchemy pair only**, not the rail as a whole: if only one of those two tab types exists, show that one without a tab bar for the pair.
@@ -555,7 +555,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   Both bodies pass it, so a presence gate would re-skin every progressive stage row in every world — including the overwhelming majority that author no complications at all — which is precisely the failure this section's opt-in rule exists to prevent.
 - The band is explicitly NOT draggable.
   Pre-roll, which is the forecast state the strip exists for, the salvage list is reorderable and the row is a drag source, so a mousedown-drag inside the prose would start a drag rather than a text selection.
-- The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (§Component Studio requirement 16).
+- The strip's placement is deliberately ASYMMETRIC between the player and GM surfaces and MUST NOT be "unified": it is a band inside the row on the player side, while on the GM side the Component Studio's salvage strip is a tucked sibling OUTSIDE the row and the Recipe Studio's sits inside the stage card (`ui-entity-editors/spec.md` §Component Studio requirement 16).
 - **The tense is carried by the row's BADGE and the band's TONE, and never by the severity tile.**
   Severity is one vocabulary across all six complication call sites, and a tile recoloured by tense would make one control say two things — a `severe` complication that has not fired and a `minor` one that has would be indistinguishable at a glance, which is the opposite of what a severity ramp is for.
   The band's own fill and top rule change with the tense; the tile does not.
@@ -738,7 +738,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   The sentinel reaches a tile two ways — a tag requirement with nothing matching in inventory has no item to read an image from, and a matched item may carry the bag literal as its own `img` — and both resolve to the glyph.
   It never falls back to `DEFAULT_RECIPE_IMAGE`: the blueprint is the _recipe's_ fallback (see `data-models` §Recipe requirement 16) and is not a material's fallback.
   The recipe-image chokepoints and the tool-state image path keep their existing fallbacks unchanged.
-- (No learn action on the Crafting tab: recipe learning is wired through the Inventory surface only — see §Books & Scrolls learning.)
+- (No learn action on the Crafting tab: recipe learning is wired through the Inventory surface only — see `ui-system-studio/spec.md` §Books & Scrolls Surface.)
 
 ##### Requirement Rail
 

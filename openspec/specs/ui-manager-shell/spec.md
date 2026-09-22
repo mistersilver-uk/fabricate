@@ -51,7 +51,7 @@ Selected-system navigation:
   The only experimental-gated selected-system rail item is `Graph`: it renders as a disabled planned rail item with the `Soon` treatment **only** while `fabricate.experimentalFeatures` is enabled, and cannot become the active route until its v2 route content is implemented (#442).
   There is no `Recipes` placeholder rail item and no `Rules` rail item; the deferred-placeholder set is `graph` alone, shown only under the experimental toggle.
   The top-level `Checks` rail item — an expandable nav GROUP whose Crafting / Salvage / Gathering / Validation entries are rail CHILDREN owning the routes `CHECKS_VIEWS` declares, not tabs inside one view — and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
-  The one other experimental-gated rail entry is the world `Downtime` group, which is not a selected-system entry at all; see §Downtime Preview and Premium Extension, Experimental gate.
+  The one other experimental-gated rail entry is the world `Downtime` group, which is not a selected-system entry at all; see `ui-extension-points/spec.md` §Downtime Preview and Premium Extension, Experimental gate.
   "Sub-tab" names the five SECTIONS inside an activity route and must not be reused for these children.
   When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
 - Every collapsible rail group — `Crafting`, `Checks`, `Gathering`, world `Travel`, and world `Downtime` — obeys ONE disclosure rule, and no group's disclosure depends on any other group's state.

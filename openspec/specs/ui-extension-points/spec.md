@@ -293,7 +293,7 @@ Bringing an already-open window to the front is not a reopen — the shell and i
 Its accessible name is its visible label; a supplied `accessibleName` replaces that name and must therefore contain the visible label text, and a supplied `tooltip` is exposed through `aria-describedby`.
 Rail buttons carry stable per-tab identity, `aria-controls` referencing the content panel, roving `tabindex`, and Up/Down/Home/End focus-and-activation; the content panel is labelled by the active rail button.
 The visible rail label truncates with an ellipsis rather than overflowing its button, and the untruncated text is what `accessibleName` and `tooltip` are for.
-- **Core guarantees the rail and the extension panel's geometry, and that neither the rail nor the panel overflows horizontally at the player window's enforced 1024x640 minimum size** (§Responsive Product UI).
+- **Core guarantees the rail and the extension panel's geometry, and that neither the rail nor the panel overflows horizontally at the player window's enforced 1024x640 minimum size** (`ui-visual-style/spec.md` §Responsive Product UI).
 The rail-label truncation above is what makes that hold for a provider label of any length.
 The extension panel is full-height with no padding, background, scroller or containment of its own: `.fabricate-app-content` owns the scroll, and Core establishes no CSS container so a companion's fixed-position content positions against the viewport.
 Responsive behaviour of content _inside_ the target is the companion's, and a companion that wants container queries declares its own container on its own root, whose inline size is the panel's.

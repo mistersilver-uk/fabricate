@@ -3,7 +3,7 @@
 ## Purpose
 
 Define recipe visibility, knowledge gating, recipe-item matching, and learning behaviour.
-UI rendering requirements live in `ui-integration/spec.md`.
+UI rendering requirements live in the UI surface specs indexed by `ui-integration/spec.md`.
 
 ## Scope
 

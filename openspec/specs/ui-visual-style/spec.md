@@ -527,7 +527,7 @@ Responsive layout rules for application bodies must therefore be keyed to the ap
   Below the combined three-column minimum the columns reflow into a single vertical stack so the view stays usable instead of clipping or overflowing.
 - The player `Crafting` view's requirement rail responds to its own app container width: slot tiles wrap onto further rows rather than shrinking below their minimum tile size, and the essence pool's carrier and requirement bars reflow rather than crushing when a set carries three or more essence requirements.
 - The unified Fabricate window enforces a 1024x640 minimum window size, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
-  §Player Navigation Extension states its no-horizontal-overflow guarantee at that floor.
+  `ui-extension-points/spec.md` §Player Navigation Extension states its no-horizontal-overflow guarantee at that floor.
 - These responsive rules are presentation-only.
   They must not change crafting, gathering, inventory, alchemy, journal, validation, task visibility, attemptability, or persistence behaviour.
 
