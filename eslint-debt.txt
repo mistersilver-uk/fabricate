@@ -198,7 +198,6 @@ src/ui/svelte/stores/adminStore.js	unicorn/no-negated-array-predicate
 src/ui/svelte/stores/adminStore.js	unicorn/no-useless-fallback-in-spread
 src/ui/svelte/stores/adminStore.js	unicorn/no-useless-undefined
 src/ui/svelte/stores/adminStore.js	unicorn/prefer-array-some
-src/ui/svelte/stores/adminStore.js	unicorn/prefer-default-parameters
 src/ui/svelte/stores/adminStore.js	unicorn/prefer-includes-over-repeated-comparisons
 src/ui/svelte/stores/adminStoreInternals.js	unicorn/prefer-string-replace-all
 src/ui/svelte/stores/adminSystemInspectorProjection.js	import-x/order

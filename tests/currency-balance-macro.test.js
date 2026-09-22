@@ -194,7 +194,7 @@ describe('the balance key needs no migration', () => {
 
 describe('the surfaces that do not follow the vocabulary automatically', () => {
   const PROJECTIONS = [
-    '../src/ui/svelte/stores/adminStore.js',
+    '../src/ui/svelte/stores/adminCurrencySection.js',
     '../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     '../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
   ];

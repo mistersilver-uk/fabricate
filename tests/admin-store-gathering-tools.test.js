@@ -1317,7 +1317,7 @@ describe('adminStore library tools (system-owned)', () => {
 
     it('an in-system Tool with no world half saves its own sections verbatim', async () => {
       // The compatibility case. A pre-migration Tool has no membership record, so there is no
-      // switch to read and `_toolRecordForSave` must write the draft whole — otherwise the
+      // switch to read and `toolRecordForSave` must write the draft whole — otherwise the
       // section-aware save would silently refuse every edit on an unmigrated world.
       const services = createMockServices({
         systemTools: [{ id: 't1', label: 'Axe', componentId: 'comp-axe' }],

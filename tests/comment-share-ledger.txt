@@ -20,7 +20,7 @@ src/models/match	24
 src/systems	35
 src/systems/normalize	25
 src/ui	20
-src/ui/model	16
+src/ui/model	14
 src/ui/presenters	34
 src/ui/svelte	41
 src/ui/svelte/actions	19
@@ -53,7 +53,7 @@ src/ui/svelte/apps/manager/system	23
 src/ui/svelte/apps/manager/tools	19
 src/ui/svelte/apps/manager/world	18
 src/ui/svelte/components	16
-src/ui/svelte/stores	25
+src/ui/svelte/stores	26
 src/ui/svelte/util	23
 src/utils	24
 styles	6
