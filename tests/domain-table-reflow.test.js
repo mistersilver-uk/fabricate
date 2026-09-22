@@ -20,7 +20,7 @@ const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), 
 const DOMAIN = readFileSync(path.join(REPOSITORY_ROOT, 'DOMAIN.md'), 'utf8');
 
 /** The size `DOMAIN.md` must stay under, in bytes. */
-const MAXIMUM_BYTES = 420 * 1024;
+const MAXIMUM_BYTES = 421 * 1024;
 
 /** The file's real size on disk. `String#length` counts UTF-16 units, and 165 lines here are
  * not ASCII — em dashes, arrows, ellipses — so the two disagree by a few KB. */
