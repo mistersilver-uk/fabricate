@@ -729,7 +729,7 @@ describe('the system Component Rules editor over the world layer (issue 1371)', 
     });
 
     it('and NO string on this card claims the tag merge the runtime discards', async () => {
-      // `### GM World Component Screens` requirement 1.
+      // `## GM World Component Screens` requirement 1.
       const { target } = await openEditor(componentRecord('coal', 'Coal', 'Raw'), {
         showTags: true,
       });

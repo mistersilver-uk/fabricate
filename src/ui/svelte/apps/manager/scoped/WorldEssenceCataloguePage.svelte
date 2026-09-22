@@ -321,7 +321,7 @@
 
 <style>
   /* STATIC class names, so `lint:svelte:warnings` stays at zero. `styles/fabricate.css` is closed
-     to this lane by `### GM World Scoped Entity Routes` requirement 7. */
+     to this lane by `## GM World Scoped Entity Routes` requirement 7. */
   .manager-scoped-essence-page {
     display: grid;
     grid-template-rows: minmax(0, 1fr);

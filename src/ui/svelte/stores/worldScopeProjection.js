@@ -853,7 +853,7 @@ function retiredEssenceIds(mergeMap) {
  * reads it through the same `services.getVocabularyScopeStore?.() ?? null` idiom as the other
  * three, so it degrades to `null` - and to a `total: 0` projection - until PR 7 registers the
  * store. That leg exists NOW because `adminStore.js` is a gateway file requirement 7 of
- * `### GM World Scoped Entity Routes` closes to PR 7: a producer wired later could only be
+ * `## GM World Scoped Entity Routes` closes to PR 7: a producer wired later could only be
  * wired by reopening a file that lane may not open. Its WRITE-path sibling was added by issue
  * 1374 for the same reason, so the vocabulary lane declares its action family in
  * `worldScopeActions.js` — a file it owns — and finds the store leg already there.

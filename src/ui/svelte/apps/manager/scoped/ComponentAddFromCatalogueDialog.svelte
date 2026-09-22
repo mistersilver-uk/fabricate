@@ -8,7 +8,7 @@
   each assigned by the brief: a SEARCH FIELD, an APPLY LABEL naming the act, and a scrolling body.
 
   THE WRITE IS SEQUENTIAL behind one in-flight flag, because every world-scope action reads, edits
-  and writes back one setting. A REFUSAL IS REPORTED AND THE RUN CONTINUES (`### GM World
+  and writes back one setting. A REFUSAL IS REPORTED AND THE RUN CONTINUES (`## GM World
   Component Screens` requirement 6): refused records stay TICKED with their count stated, and the
   dialog closes only when every target landed. ITS PER-OPEN STATE IS RE-SEEDED ON THE OPEN
   TRANSITION, keyed on `systemId` as well as `open`, because the instance outlives every open; a

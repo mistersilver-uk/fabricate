@@ -382,8 +382,8 @@ export function createToolDraftSection({
   /**
    * Move one world-default section between following the world Tool and this system's own. Turning
    * inheritance on writes the switch alone; turning it off seeds the override from the value that
-   * was on screen. `ui-system-studio` `## Tools Tab`, on data-models requirement 15 clause 1a
-   * (issue 1373).
+   * was on screen. `ui-system-studio` `## Tools Tab`, on `data-models`
+   * `## Scoped Entity Definitions` requirement 15 clause 1a (issue 1373).
    */
   async function setToolSectionInherited(
     toolId,

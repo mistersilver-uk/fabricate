@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the GM Manager's system-scope studio screens, where a GM authors a crafting system's items, essences, tools, recipes, books, access, knowledge, environments and gathering events.
+Define the GM Manager's system-scope studio screens, where a GM authors a crafting system's settings, checks, items, essences, tools, recipes, books, access, knowledge, environments and gathering events, and reviews its overview and validation.
 Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
 
 ## Systems Tab

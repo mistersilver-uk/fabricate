@@ -160,7 +160,7 @@
 
   /**
    * Run ONE write of a bulk run, and treat a throw exactly as the store's own refusal is treated.
-   * `### GM World Component Screens` requirement 6 makes a refusal REPORTED rather than thrown;
+   * `## GM World Component Screens` requirement 6 makes a refusal REPORTED rather than thrown;
    * an uncaught throw broke that promise from the other side, stopping the loop with a page of
    * rows ticked and no statement of which were written. `updateWorldDefaultSection` and
    * `setWorldTags` are RAW verbs with no wrapper. THE UNIT IS THE COMPONENT, not the write.

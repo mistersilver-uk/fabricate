@@ -1366,7 +1366,7 @@ export function registerWorldScopeCases() {
 
     it('reads the WORLD VOCABULARY badge through the optional fourth store leg', async () => {
       // THE FIELD NAME IS THE POINT. The shell reads `worldScope.vocabulary.total` and
-      // `### GM World Scoped Entity Routes` requirement 7 bars PR 7 from the shell, so a
+      // `## GM World Scoped Entity Routes` requirement 7 bars PR 7 from the shell, so a
       // producer publishing `count`, or leaving the caller to read `entries.length`, would
       // leave this badge on 0 for good with every other assertion in this repository still
       // green. Driving the REAL store from a registered vocabulary store is what makes the

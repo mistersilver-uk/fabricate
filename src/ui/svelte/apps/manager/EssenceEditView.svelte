@@ -17,7 +17,7 @@
   - `id="manager-essence-edit-form"` is a contract: the manager root's header Save submits through
     `form="manager-essence-edit-form"`, and dropping either half stops Save working silently.
   - The in-system record's fields, `enabled` included, accumulate in this draft and land on Save;
-    the MEMBERSHIP writes do not, as `### Scoped entity editor patterns` requirement 14 states.
+    the MEMBERSHIP writes do not, as `## Scoped entity editor patterns` requirement 14 states.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';

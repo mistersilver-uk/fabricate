@@ -3312,7 +3312,7 @@ export function createAdminStore(services) {
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
-      // Issue 1392: `### GM World Scoped Entity Routes` requirement 7 enumerates a projection's
+      // Issue 1392: `## GM World Scoped Entity Routes` requirement 7 enumerates a projection's
       // registration but not its inputs, and nothing in `{stores, systems, usage}` answers a world-wide
       // recipe question. `_allRecipes()` is already invoked every publish, so this adds no corpus read.
       recipes: worldRecipes,

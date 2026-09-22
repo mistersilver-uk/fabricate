@@ -16,7 +16,7 @@
  * THE UI SITES ARE ROUTED TOO, AT ONE POINT, AND NOT THROUGH THIS SEAM (issue 1374). They were
  * deferred here to the world tool-breakage editor, and that editor cannot discharge the
  * obligation: four of the five sit in `CraftingSystemManagerRoot.svelte`, which
- * `### GM World Scoped Entity Routes` requirement 7 closes to the lane that builds it. The fifth
+ * `## GM World Scoped Entity Routes` requirement 7 closes to the lane that builds it. The fifth
  * IS the projection the other four read, so the manager's selected-system projection
  * (`adminSystemInspectorProjection.js`) calls the pure resolver directly, with the world block
  * passed to it EXPLICITLY by `adminStore` rather than probed. That is `adminStore`'s constraint
