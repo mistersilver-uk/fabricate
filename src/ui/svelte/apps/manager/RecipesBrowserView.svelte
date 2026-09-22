@@ -29,6 +29,7 @@
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import { createBulkSelection } from './bulkSelection.svelte.js';
+  import { createBrowserListState } from './browserListState.svelte.js';
   import {
     RECIPE_SORT_KEYS,
     buildRecipeBrowserModel,
@@ -69,22 +70,20 @@
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the CATEGORY filter and the group/page position, because a category
-  // names a vocabulary the new system does not share; status and lock are preferences and are not
-  // reset. The search term is the STORE's to clear, on a system switch and on leaving this route
-  // alike (issue 1462), because an active term also changes counts on screens with no search box.
-  // The sentinel is `ui.systemId`, PERSISTED on the lifted state rather than a component-local
-  // `$state`, which re-initialises to '' on every mount and made returning from an editor read as
-  // a system switch (issue 806); the equality early-return keeps the write from looping.
+  // A category names a vocabulary the new system does not share; status and lock are preferences
+  // and are not reset. The search term is the store's to clear, on a switch and on leaving this
+  // route alike (issue 1462), because an active term changes counts on screens with no search box.
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: { categoryFilter: 'all', pageIndex: 0 },
+    onSystemSwitch: () => {
+      ui.collapsedCategories = new Set();
+      // The selection is scoped to this system; the root drops the staged draft at zero (issue 1010).
+      selection.reset();
+    },
+  });
   $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.categoryFilter = 'all';
-    ui.pageIndex = 0;
-    ui.collapsedCategories = new Set();
-    // The bulk selection is scoped to the selected system, so a switch resets it SILENTLY and
-    // the root discards the staged draft when the count reaches zero (issue 1010).
-    selection.reset();
-    ui.systemId = selectedSystemId;
+    list.syncSystem(selectedSystemId);
   });
 
   // The blocked-enable flash. This view CLAIMS the refusal message through the store's `onBlocked`

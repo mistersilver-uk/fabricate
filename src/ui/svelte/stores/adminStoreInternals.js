@@ -90,3 +90,21 @@ export function normalizeGatheringLibraryTool(tool = {}, randomID = fallbackRand
     aliasItemUuids: rawAliasItemUuids,
   }).toJSON();
 }
+
+/**
+ * Reorder a list, returning a new array, or `null` for an invalid or no-op move. Shared by the
+ * store's character-prerequisite and modifier lists and by the currency section's unit ladder.
+ */
+export function reorderListByIndex(list, fromIndex, toIndex) {
+  const source = Array.isArray(list) ? list : [];
+  const from = Number(fromIndex);
+  const to = Number(toIndex);
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+  if (from < 0 || from >= source.length) return null;
+  if (to < 0 || to >= source.length) return null;
+  if (from === to) return null;
+  const next = [...source];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}

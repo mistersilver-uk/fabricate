@@ -1127,6 +1127,8 @@ describe('UI PR screenshot evidence', () => {
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+      // Issue 1674 moved the two import dialogs and the report assembly out of the shell.
+      'src/ui/managerServices.js',
       'src/ui/presenters/importReportContent.js',
       // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
       'src/ui/svelte/apps/manager/ImportReportModal.svelte',

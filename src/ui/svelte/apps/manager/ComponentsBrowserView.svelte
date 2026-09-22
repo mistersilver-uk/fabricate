@@ -12,6 +12,7 @@
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import { createBulkSelection } from './bulkSelection.svelte.js';
+  import { createBrowserListState } from './browserListState.svelte.js';
   import {
     COMPONENT_DEFAULT_PAGE_SIZE,
     COMPONENT_ESSENCE_FILTER_ANY,
@@ -72,17 +73,16 @@
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the filters — they name a vocabulary the new system does not share.
-  // The page, sort and group PREFERENCES are deliberately kept.
+  // The filters name a vocabulary the new system does not share; sort and grouping are kept.
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: { categoryFilter: 'all', essenceFilter: 'all', pageIndex: 0 },
+    // The selection is scoped to this system; the root drops the staged draft at zero (issue 772).
+    onSystemSwitch: () => selection.reset(),
+  });
+
   $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.categoryFilter = 'all';
-    ui.essenceFilter = 'all';
-    ui.pageIndex = 0;
-    // The bulk selection is scoped to the selected system, so a switch resets it SILENTLY and
-    // the root discards the staged draft when the count reaches zero (issue 772).
-    selection.reset();
-    ui.systemId = selectedSystemId;
+    list.syncSystem(selectedSystemId);
   });
 
   // The filter reads the run the ROWS draw (`essenceChips`), not the resolved map the editor is

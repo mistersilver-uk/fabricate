@@ -27,7 +27,7 @@ import { SettingsBackedStore } from './SettingsBackedStore.js';
  * It is a persistence shell and nothing more: read, normalize, write. The ladder EDITS — adding a
  * unit, refusing a cyclic sub-unit, reordering, seeding presets, adopting a provider's canonical
  * denominations — live in `adminStore`, composed from the same shared helpers
- * (`canAddCurrencySubUnit`, `_reorderListByIndex`) that the modifier and prerequisite lists use.
+ * (`canAddCurrencySubUnit`, `reorderListByIndex`) that the modifier and prerequisite lists use.
  * Mirroring them here as store methods would be a second implementation of one set of rules.
  */
 export class CurrencyConfigStore extends SettingsBackedStore {

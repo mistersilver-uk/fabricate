@@ -133,13 +133,9 @@ src/ui/InteractionPromptApp.svelte.js	unicorn/prefer-export-from
 src/ui/InteractionPromptApp.svelte.js	unicorn/prefer-optional-catch-binding
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	import-x/order
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	no-unused-vars
-src/ui/SvelteCraftingSystemManagerApp.svelte.js	no-useless-assignment
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/catch-error-name
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/consistent-optional-chaining
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/no-top-level-side-effects
-src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/prefer-array-from-map
-src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/prefer-dom-node-append
-src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/prefer-dom-node-remove
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/prefer-optional-catch-binding
 src/ui/SvelteCraftingSystemManagerApp.svelte.js	unicorn/prefer-spread
 src/ui/SvelteFabricateApp.svelte.js	import-x/order
@@ -202,7 +198,6 @@ src/ui/svelte/stores/adminStore.js	unicorn/no-negated-array-predicate
 src/ui/svelte/stores/adminStore.js	unicorn/no-useless-fallback-in-spread
 src/ui/svelte/stores/adminStore.js	unicorn/no-useless-undefined
 src/ui/svelte/stores/adminStore.js	unicorn/prefer-array-some
-src/ui/svelte/stores/adminStore.js	unicorn/prefer-default-parameters
 src/ui/svelte/stores/adminStore.js	unicorn/prefer-includes-over-repeated-comparisons
 src/ui/svelte/stores/adminStoreInternals.js	unicorn/prefer-string-replace-all
 src/ui/svelte/stores/adminSystemInspectorProjection.js	import-x/order

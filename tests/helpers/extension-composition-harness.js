@@ -68,7 +68,10 @@ export async function withFabricateLifecycleReplay(run) {
  * globals it reads, then run the scenario against that instance. `modulePath` is Vite-root-relative
  * and `hooks` is the `globalThis.Hooks` the class registers against.
  */
-async function withProductionApplication({ modulePath, exportName, ApplicationV2, hooks }, run) {
+export async function withProductionApplication(
+  { modulePath, exportName, ApplicationV2, hooks },
+  run
+) {
   const originalFoundry = globalThis.foundry;
   const originalHooks = globalThis.Hooks;
   const originalGame = globalThis.game;

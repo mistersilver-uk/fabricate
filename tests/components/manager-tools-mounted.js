@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
+import { createToolsBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
 import {
   labCaseSelector,
   managerComponents,
@@ -216,6 +217,38 @@ export function registerToolsCases() {
         /Destroys|Marks broken|Replaces/.test(chip.textContent)
       ).length,
       0
+    );
+  });
+
+  it('clamps a lifted page the library can no longer reach, and leaves a reachable one', () => {
+    // Every control in this toolbar resets the page itself, so an out-of-range lifted page is the
+    // only way into the clamp from here (issue 1716). The lifted object a test passes is a plain
+    // one, which the view reads at first render rather than tracking, so the observation is the
+    // write the clamp makes rather than a re-render.
+    const twelveTools = Array.from({ length: 12 }, (unused, index) => ({
+      ...toolRouteFixture,
+      id: `tool-${String(index + 1).padStart(2, '0')}`,
+      label: `Tool ${String(index + 1).padStart(2, '0')}`,
+    }));
+
+    const unreachable = { ...createToolsBrowserState(), pageIndex: 2 };
+    mountToolsBrowser({ tools: twelveTools, browserState: unreachable });
+    assert.equal(
+      unreachable.pageIndex,
+      0,
+      'twelve tools over a page of eight is two pages, so page three holds nothing'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    const reachable = { ...createToolsBrowserState(), pageIndex: 1 };
+    mountToolsBrowser({ tools: twelveTools, browserState: reachable });
+    assert.equal(
+      reachable.pageIndex,
+      1,
+      'while the last page that still holds rows is left where the GM put it'
     );
   });
 

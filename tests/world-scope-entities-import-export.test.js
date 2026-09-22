@@ -1258,10 +1258,7 @@ test('11: both prepareForImport call sites pass every parameter the exporter dec
   );
   assert.match(publicApi, /buildWorldEntityIndex\(fabricate\)/, 'and build it from the stores');
 
-  const managerSource = readFileSync(
-    resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
-    'utf8'
-  );
+  const managerSource = readFileSync(resolve(ROOT, 'src/ui/managerServices.js'), 'utf8');
   assert.match(
     managerSource,
     /prepareForImport\(data, mode, \{ worldEntityIndex \}\)/,
@@ -1333,10 +1330,7 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
 
   const sites = {
     'src/bootstrap/composeServices.js': entrySources['src/bootstrap/composeServices.js'],
-    'src/ui/SvelteCraftingSystemManagerApp.svelte.js': readFileSync(
-      resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
-      'utf8'
-    ),
+    'src/ui/managerServices.js': readFileSync(resolve(ROOT, 'src/ui/managerServices.js'), 'utf8'),
   };
   for (const [path, source] of Object.entries(sites)) {
     const site = importerConstructionSite(source);

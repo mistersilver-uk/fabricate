@@ -593,6 +593,8 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-report'],
     matches: [
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      // The two import dialogs and the report assembly moved here (issue 1674).
+      /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
@@ -609,6 +611,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      /^src\/ui\/managerServices\.js$/,
     ],
   },
   // The gated Crafting nav group (issue 511) publishes three distinct frames — the expanded group

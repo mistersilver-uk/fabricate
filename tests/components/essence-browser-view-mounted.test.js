@@ -18,6 +18,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -29,13 +30,19 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-browser-',
   // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than copied;
   // copied verbatim it throws `ReferenceError: $state is not defined`.
-  runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
+  // ... and the browse-list wiring is a second one (issue 1716), reached through the view.
+  runeModules: [
+    'src/ui/svelte/apps/manager/bulkSelection.svelte.js',
+    'src/ui/svelte/apps/manager/browserListState.svelte.js',
+  ],
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
+    // The lifted browse state's default page size, which the browse-list composable reads.
+    'src/ui/model/managerBrowserViewState.js',
     'src/ui/model/essenceBrowserModel.js',
     // ... which since issue 1688 runs on the shared adapter-driven pipeline.
     'src/ui/model/entityBrowserModel.js',
@@ -109,6 +116,18 @@ const CONFIGURED_DISABLED = makeEssenceRow({
   deleteRewritesRecipes: true,
 });
 const PLAIN_ENABLED = makeEssenceRow({ id: 'water', name: 'Water' });
+
+// A world catalogue this system has adopted none of, which is what renders the membership segment.
+const WORLD_ONLY_SCOPE = {
+  available: true,
+  entityType: 'essence',
+  enableable: true,
+  entries: [
+    { id: 'aether', entity: { name: 'Aether' }, systems: [] },
+    { id: 'water', entity: { name: 'Water' }, systems: [] },
+  ],
+};
+
 
 function props(essences, extra = {}) {
   return {
@@ -284,19 +303,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     // the membership segment OR by the zero state's own button — the one route in the product to
     // adopting one. This studio is already correct, because `isEmpty` is fed `listCards`, which
     // is `essenceCards` PLUS `absentCards`.
-    const root = await harness.mount(
-      props([], {
-        scope: {
-          available: true,
-          entityType: 'essence',
-          enableable: true,
-          entries: [
-            { id: 'aether', entity: { name: 'Aether' }, systems: [] },
-            { id: 'water', entity: { name: 'Water' }, systems: [] },
-          ],
-        },
-      })
-    );
+    const root = await harness.mount(props([], { scope: WORLD_ONLY_SCOPE }));
 
     assert.equal(
       root.querySelectorAll('.manager-essence-row').length,
@@ -485,4 +492,45 @@ describeBrowserBulkSelection({
     count: 2,
     why: 'the cluster holds the enable toggle and the Edit rules button — and the selection control must NOT join them, because the Foundry smoke walk reaches the row actions through button selectors',
   },
+});
+
+describeBrowserListState({
+  label: 'EssenceBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) =>
+    props(
+      Array.from({ length: rowCount }, (_, index) =>
+        makeEssenceRow({ id: `f${index + 1}`, name: `Flux ${index + 1}` })
+      ),
+      { selectedSystemId, browserState }
+    ),
+  // The search term and the source cohort both name this system's records.
+  resetAxes: { searchTerm: ['flux', ''], sourceFilter: ['world', 'all'], pageIndex: [1, 0] },
+  // Status, sort, view mode and page size are preferences the switch leaves alone.
+  preservedAxes: { statusFilter: 'disabled', sortKey: 'source', viewMode: 'grid', pageSize: 5 },
+});
+
+describe('EssenceBrowserView membership axis (issue 1716)', () => {
+  it('returns the membership axis to this system on a genuine switch', async () => {
+    // The axis is component-local, so no lifted state carries it and only the callback can
+    // return it; it names this system's records, for the source filter's own reason.
+    const root = await harness.mount(
+      props([], { scope: WORLD_ONLY_SCOPE, selectedSystemId: 'sys-first' })
+    );
+
+    root.querySelector('[data-essence-membership-option="all"] input').click();
+    flushSync();
+    assert.ok(
+      root.querySelector('[data-essence-membership-option="all"] input').checked,
+      'the control: the GM widened the axis past this system'
+    );
+
+    await harness.setProps({ selectedSystemId: 'sys-switched' });
+
+    assert.ok(
+      root.querySelector('[data-essence-membership-option="in"] input').checked,
+      'a switch narrows the axis back, or it keeps naming a system the rows no longer come from'
+    );
+    harness.remount();
+  });
 });

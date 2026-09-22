@@ -19,6 +19,7 @@
     DEFAULT_BROWSER_PAGE_SIZE,
     createToolsBrowserState,
   } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserPageWindow } from './browserListState.svelte.js';
 
   let {
     tools = [],
@@ -230,9 +231,8 @@
   // Kept under its shipped name: the Foundry smoke's `assertToolLibraryPagination` phase pins this
   // list's footer geometry and, since the pager became `multiPageOnly`, its PRESENCE.
   const filteredTools = $derived(filteredRows);
-  const pagedTools = $derived(
-    filteredTools.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredTools });
+  const pagedTools = $derived(page.pageRows);
 
   // `{shown}` is the PAGE, not the filter: fed the filter total, a two-page result read `11 shown`
   // over eight rows. `{world}` and the membership filter still state the filter total.
@@ -247,7 +247,7 @@
   );
 
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredTools.length) ui.pageIndex = 0;
+    page.clampPage();
   });
 
   /** Whether one row is the inspected one, across BOTH selection kinds. */

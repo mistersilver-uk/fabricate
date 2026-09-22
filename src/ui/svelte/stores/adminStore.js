@@ -5,14 +5,6 @@ import {
   getCharacterPrerequisitePresetsForFoundrySystem,
   seedCharacterPrerequisitePresets,
 } from '../../../config/characterPrerequisitePresets.js';
-import {
-  getCurrencyPresetsForFoundrySystem,
-  seedCurrencyPresets,
-} from '../../../config/currencyPresets.js';
-import {
-  getDefaultProviderId,
-  getProviderCanonicalUnits,
-} from '../../../config/currencyProviders.js';
 import { getFabricateFlag } from '../../../config/flags.js';
 import {
   getCharacterModifierPresetsForFoundrySystem,
@@ -58,27 +50,21 @@ import {
 } from '../../model/vocabularyCascade.js';
 import { normalizeVocabularyKey } from '../../model/vocabularyUsage.js';
 import {
-  canAddCurrencySubUnit,
-  CURRENCY_MACRO_KEYS,
-  normalizeCurrencyUnit,
-  normalizeWorldCurrencyConfig,
-  validateCurrencyProfile,
-} from '../../../systems/currencyProfile.js';
-import {
   authoredCheckModifierIds,
   isRollExpression,
   resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import {
-  ENVIRONMENT_COMPOSED_COMPOSITION_STATES,
-  ENVIRONMENT_INCLUDED_COMPOSITION_STATES,
   conditionSettingsToCurrent,
-  environmentComposesRecord,
-  resolveGatheringCompositionMode,
+  DEFAULT_GATHERING_CONDITIONS,
 } from '../../../systems/gatheringComposition.js';
-import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
-import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+import {
+  buildEnvironmentCompositionViewModel,
+  environmentComposesGatheringRecord as _environmentComposesGatheringRecord,
+} from '../../model/environmentComposition.js';
+import { emptyEnvironmentState as _emptyEnvironmentState } from '../../model/environmentValidation.js';
+import { normalizeNodeConfig } from '../../../systems/gatheringNodeConfig.js';
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
@@ -106,18 +92,9 @@ import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,
   TOOL_BREAKAGE_AUTHORITIES,
-  TOOL_SECTIONS,
 } from '../../../systems/toolScope.js';
-// The read union and the switch deciding what it answers (issue 1373): the Tool Rules editor
-// DISPLAYS from `resolvedToolsFor` and SAVES only the sections the membership record marks
-// overriding, so a display read cannot convert an inheriting section into an override.
 import { componentsWithResolvedEssences } from '../../../systems/resolvedComponentEssences.js';
-import { resolvedToolsFor } from '../../../systems/scopedEntityReads.js';
-import { findMembership, isSectionInherited } from '../../../systems/scopedDefinitions.js';
-import {
-  defaultKnowledgeTab,
-  projectKnowledgeSnapshot,
-} from '../apps/manager/knowledge/knowledgeStudio.js';
+import { projectKnowledgeSnapshot } from '../apps/manager/knowledge/knowledgeStudio.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   TIME_OF_DAY_ICONS,
@@ -145,7 +122,15 @@ import {
   clonePlain as _clonePlain,
   fallbackRandomID as _fallbackRandomID,
   normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
+  reorderListByIndex as _reorderListByIndex,
 } from './adminStoreInternals.js';
+import { createEnvironmentDraftSection } from './adminEnvironmentDraftSection.js';
+import { createToolDraftSection } from './adminToolDraftSection.js';
+import {
+  createCurrencySection,
+  emptyWorldCurrencyState,
+} from './adminCurrencySection.js';
+import { createKnowledgeSection } from './adminKnowledgeSection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
@@ -195,7 +180,6 @@ const GATHERING_CONFIG_SETTING = 'gatheringConfig';
 // out because this file does not import `src/config/settings.js`. Guarded by
 // `tests/essence-world-scope-screens.test.js`, which drives the store with a double keyed on it.
 const WORLD_ESSENCE_MERGE_MAP_SETTING = 'worldEssenceMergeMap';
-const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   biomes: [
     'forest',
@@ -258,8 +242,6 @@ const GATHERING_BLIND_CANDIDATE_GATES = new Set(['attemptableOnly', 'allMatching
 const GATHERING_REVEAL_POLICIES = new Set(['never', 'onSuccess', 'onAttempt']);
 const GATHERING_REVEAL_SCOPES = new Set(['actor', 'user', 'party', 'global']);
 const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChance', 'full']);
-// ENVIRONMENT_INCLUDED_COMPOSITION_STATES is imported from gatheringComposition.js — the
-// module that now owns the full composition-state vocabulary — rather than defined here.
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -276,68 +258,6 @@ const DEFAULT_GATHERING_RULES = Object.freeze({
 });
 
 // --- Module-private helper functions ---
-
-// --- Currency unit mutation helpers, module-level and shallow so the mutate callbacks stay flat ---
-
-function _stripSubUnit(unit, subUnitId) {
-  return {
-    ...unit,
-    contains: (unit.contains || []).filter((entry) => entry.unitId !== subUnitId),
-  };
-}
-
-function _deleteCurrencyUnitFromList(units, unitId) {
-  if (!unitId) return null;
-  const nextUnits = units
-    .filter((unit) => unit.id !== unitId)
-    .map((unit) => _stripSubUnit(unit, unitId));
-  return nextUnits.length === units.length ? null : nextUnits;
-}
-
-/** Reorder a list, returning a new array, or `null` for an invalid or no-op move. */
-function _reorderListByIndex(list, fromIndex, toIndex) {
-  const source = Array.isArray(list) ? list : [];
-  const from = Number(fromIndex);
-  const to = Number(toIndex);
-  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
-  if (from < 0 || from >= source.length) return null;
-  if (to < 0 || to >= source.length) return null;
-  if (from === to) return null;
-  const next = [...source];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
-}
-
-function _setSubUnitAmount(entry, subUnitId, numericAmount) {
-  if (entry.unitId !== subUnitId) return entry;
-  return { ...entry, amount: numericAmount };
-}
-
-function _updateSubUnitAmountInList(units, parentUnitId, subUnitId, numericAmount) {
-  let changed = false;
-  const nextUnits = units.map((unit) => {
-    if (unit.id !== parentUnitId) return unit;
-    const contains = (unit.contains || []).map((entry) => {
-      const updated = _setSubUnitAmount(entry, subUnitId, numericAmount);
-      if (updated !== entry) changed = true;
-      return updated;
-    });
-    return { ...unit, contains };
-  });
-  return { nextUnits, changed };
-}
-
-function _deleteSubUnitFromList(units, parentUnitId, subUnitId) {
-  let changed = false;
-  const nextUnits = units.map((unit) => {
-    if (unit.id !== parentUnitId) return unit;
-    const contains = (unit.contains || []).filter((entry) => entry.unitId !== subUnitId);
-    if (contains.length !== (unit.contains || []).length) changed = true;
-    return { ...unit, contains };
-  });
-  return { nextUnits, changed };
-}
 
 function _nextSystemName(systemManager) {
   const base = 'New Crafting System';
@@ -1064,55 +984,6 @@ function _graphSearchMatches(index, lowerSearchTerm) {
   return matches;
 }
 
-function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
-  return {
-    canShowEnvironmentsTab,
-    environmentsLoading: false,
-    environmentsError: error,
-    environments: [],
-    selectedEnvironmentId: '',
-    environmentDraft: null,
-    environmentDraftDirty: false,
-    environmentDraftIsNew: false,
-    environmentSaving: false,
-    environmentSaveError: null,
-    environmentValidationState: null,
-  };
-}
-
-// The WORLD currency projection (issue 1278). A top-level sibling, never hung off
-// `selectedSystem`: the config is world scope, and hanging it there would make the same ladder
-// appear to change when the GM merely clicks a different crafting system.
-function _emptyWorldCurrencyState() {
-  return {
-    worldCurrency: {
-      spendStrategy: 'actorProperty',
-      providerId: '',
-      macros: { canAfford: '', increment: '', decrement: '', balance: '' },
-      units: [],
-    },
-    worldCurrencyValidation: _emptyWorldCurrencyValidation(),
-  };
-}
-
-// The derived `validateCurrencyProfile` report for the world ladder (issue 1493), a top-level
-// sibling of `worldCurrency` rather than a fifth key inside it, since `CurrencyConfig` is exactly
-// those four keys. Only `valid` and `errors` are published; no surface reads the rest.
-function _emptyWorldCurrencyValidation() {
-  return { valid: true, errors: [] };
-}
-
-function _buildWorldCurrencyValidation(config) {
-  const report = validateCurrencyProfile(config?.units, {
-    spendStrategy: config?.spendStrategy,
-    macros: config?.macros,
-  });
-  return {
-    valid: report?.valid === true,
-    errors: Array.isArray(report?.errors) ? [...report.errors] : [],
-  };
-}
-
 // The WORLD character libraries projection (issue 1308), a top-level sibling for the reason the
 // currency projection is one.
 function _emptyCharacterLibrariesState() {
@@ -1162,213 +1033,6 @@ function _travelErrorState(err, localizeFn = null, fieldContext = null) {
         localizeFn?.('FABRICATE.Admin.Manager.Travel.Error') ||
         'Travel update failed.';
   return { travelError: summary, travelFieldErrors: fieldErrors };
-}
-
-function _environmentErrorMessage(err) {
-  if (!err) return null;
-  if (Array.isArray(err.errors) && err.errors.length > 0) {
-    return err.errors.join('\n');
-  }
-  return err.message || String(err);
-}
-
-function _environmentValidationMessages(err) {
-  if (!err) return [];
-  if (Array.isArray(err.errors)) {
-    return err.errors
-      .map((error) => (typeof error === 'string' ? error : error?.message))
-      .filter(Boolean);
-  }
-  const message = _environmentErrorMessage(err);
-  return message ? [message] : [];
-}
-
-function _fieldSelectorForPath(path) {
-  if (!path) return null;
-  const escaped = String(path)
-    .replaceAll('\\', '\\\\')
-    .replaceAll('"', String.raw`\"`);
-  return `[data-environment-field="${escaped}"]`;
-}
-
-function _validationSummary(count, localizeFn) {
-  const key =
-    count === 1
-      ? 'FABRICATE.Admin.Environments.ValidationSummaryOne'
-      : 'FABRICATE.Admin.Environments.ValidationSummary';
-  return (
-    localizeFn?.(key, { count }) ||
-    (count === 1
-      ? 'Resolve 1 validation issue before saving.'
-      : `Resolve ${count} validation issues before saving.`)
-  );
-}
-
-function _buildEnvironmentValidationState(err, draft, localizeFn, attempt) {
-  const messages = _environmentValidationMessages(err);
-  if (messages.length === 0) return null;
-
-  const structuredErrors = Array.isArray(err?.fieldErrors) ? err.fieldErrors : [];
-  const inferenceContext = _createEnvironmentValidationInferenceContext();
-  const errors = messages.map((message, index) => {
-    const structured = structuredErrors[index] || {};
-    const inferred = _inferEnvironmentValidationTarget(message, draft, inferenceContext);
-    const path =
-      structured.path || structured.fieldPath || structured.field || inferred?.path || null;
-    const taskId = structured.taskId || inferred?.taskId || null;
-    const fieldSelector = structured.fieldSelector || _fieldSelectorForPath(path);
-    return {
-      message,
-      path,
-      taskId,
-      fieldSelector,
-      id: path
-        ? `environment-validation-${_domIdFromPath(path)}-${index}`
-        : `environment-validation-${index}`,
-    };
-  });
-
-  return {
-    summary: _validationSummary(errors.length, localizeFn),
-    errors,
-    firstInvalidField: errors.find((error) => error.fieldSelector) || errors[0] || null,
-    attempt,
-  };
-}
-
-function _createEnvironmentValidationInferenceContext() {
-  return {
-    groupNameOccurrences: new Map(),
-  };
-}
-
-function _inferEnvironmentValidationTarget(
-  message,
-  draft,
-  context = _createEnvironmentValidationInferenceContext()
-) {
-  const task = _findTaskForValidationMessage(message, draft);
-  const lower = String(message || '').toLowerCase();
-
-  if (/at least one task before it can be enabled/.test(lower)) return { path: 'enabled' };
-  if (/selection requires|selectionmode/.test(lower)) return { path: 'environment.selectionMode' };
-  if (/craftingsystemid/.test(lower)) return { path: 'environment.craftingSystemId' };
-
-  if (!task) return null;
-  const prefix = `task.${task.id}`;
-
-  if (/routed resolution requires resultselection|resultselection\.provider/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.resultSelection.provider` };
-  }
-
-  if (/visibility gate requires formula and threshold/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.visibility.formula` };
-  }
-
-  const timeUnit = lower.match(/timerequirement\.(minutes|hours|days|months|years)/)?.[1];
-  if (timeUnit) return { taskId: task.id, path: `${prefix}.timeRequirement.${timeUnit}` };
-  if (/timerequirement must include a positive duration/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.timeRequirement.minutes` };
-  }
-
-  if (/failureoutcome\.mode/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.failureOutcome.mode` };
-  }
-  if (/failureoutcome text mode requires text/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.failureOutcome.text` };
-  }
-  if (/failureoutcome macro mode requires macrouuid/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.failureOutcome.macroUuid` };
-  }
-
-  const resultGroupName = message.match(/result group "([^"]+)"/)?.[1];
-  if (resultGroupName) {
-    const group = _resolveResultGroupValidationTarget({
-      task,
-      groupName: resultGroupName,
-      duplicate: / duplicates "/i.test(message),
-      context,
-    });
-    return {
-      taskId: task.id,
-      path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups`,
-    };
-  }
-  if (/result groups require names/.test(lower)) {
-    const group = _resolveResultGroupValidationTarget({
-      task,
-      groupName: '',
-      context,
-    });
-    return {
-      taskId: task.id,
-      path: group ? `${prefix}.resultGroups.${group.id}.name` : `${prefix}.resultGroups`,
-    };
-  }
-  if (/requires at least one result group|exactly one result group/.test(lower)) {
-    return { taskId: task.id, path: `${prefix}.resultGroups` };
-  }
-  if (/progressive result group requires at least one result/.test(lower)) {
-    const group = Array.isArray(task.resultGroups) ? task.resultGroups[0] : null;
-    return {
-      taskId: task.id,
-      path: group ? `${prefix}.resultGroups.${group.id}.results` : `${prefix}.resultGroups`,
-    };
-  }
-
-  const resultId = message.match(/progressive result "([^"]+)"/)?.[1];
-  if (resultId) return { taskId: task.id, path: `${prefix}.result.${resultId}.componentId` };
-
-  return { taskId: task.id, path: `${prefix}.name` };
-}
-
-function _resolveResultGroupValidationTarget({ task, groupName, duplicate = false, context }) {
-  const groups = Array.isArray(task?.resultGroups) ? task.resultGroups : [];
-  const normalizedName = _normalizeValidationGroupName(groupName);
-  const matches = groups.filter(
-    (group) => _normalizeValidationGroupName(group?.name) === normalizedName
-  );
-  if (matches.length === 0) return null;
-
-  const occurrenceKey = `${task?.id || 'task'}:${duplicate ? 'duplicate' : 'named'}:${normalizedName}`;
-  const previous = context.groupNameOccurrences.get(occurrenceKey);
-  const defaultIndex = duplicate && matches.length > 1 ? 1 : 0;
-  const index = previous === undefined ? defaultIndex : previous + 1;
-  context.groupNameOccurrences.set(occurrenceKey, index);
-  return matches[Math.min(index, matches.length - 1)] || matches[0];
-}
-
-function _normalizeValidationGroupName(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase();
-}
-
-function _findTaskForValidationMessage(message, draft) {
-  const tasks = Array.isArray(draft?.tasks) ? draft.tasks : [];
-  const taskName = String(message || '').match(/Task "([^"]+)"/)?.[1];
-  if (taskName) {
-    return tasks.find((task) => task?.name === taskName) || tasks[0] || null;
-  }
-  return tasks[0] || null;
-}
-
-function _domIdFromPath(path) {
-  return String(path || 'field').replaceAll(/[^a-zA-Z0-9_-]+/g, '-');
-}
-
-function _taskCopyName(name, localizeFn) {
-  const sourceName = String(name || '').trim() || 'Gather';
-  return (
-    localizeFn?.('FABRICATE.Admin.Environments.TaskCopySuffix', { name: sourceName }) ||
-    `${sourceName} Copy`
-  );
-}
-
-function _normalizePositiveQuantity(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return 1;
-  return Math.max(1, Math.floor(numeric));
 }
 
 function _normalizeNullablePositiveInteger(value) {
@@ -1581,26 +1245,6 @@ export function createAdminStore(services) {
   const recipeSearch = writable('');
   const itemSearch = writable('');
   const graphSearch = writable('');
-  const selectedEnvironmentId = writable('');
-  const selectedEnvironmentSystemId = writable('');
-  const environmentDraft = writable(null);
-  const persistedEnvironmentDraft = writable(null);
-  const environmentDraftDirty = writable(false);
-  const environmentDraftIsNew = writable(false);
-  const environmentSaving = writable(false);
-  const environmentSaveError = writable(null);
-  const environmentValidationState = writable(null);
-  let environmentValidationAttempt = 0;
-  let dirtyEnvironmentDiscardConfirmation = null;
-  const toolDraft = writable(null);
-  const toolDraftBaseline = writable(null);
-  const toolDraftSystemId = writable('');
-  const toolDraftSourceItemUuid = writable('');
-  const toolDraftDirty = writable(false);
-  const toolDraftSaving = writable(false);
-  const toolDraftSaveError = writable(null);
-  const toolDraftValidation = writable({ valid: false, errors: ['missing'] });
-  let dirtyToolsDraftDiscardConfirmation = null;
   const travelSelectedPartyId = writable('');
   const travelSaving = writable(false);
   const travelError = writable(null);
@@ -1646,18 +1290,6 @@ export function createAdminStore(services) {
       : { type: 'all' };
     return layoutGraph(buildBoundedRecipeGraph(index, { scope }));
   }
-
-  // `refresh()` is invoked by ~40 mutation paths and a whole-world `actors x items` scan has no cheap
-  // invalidation signature, so the knowledge projection must not join it (issue 785).
-  // `knowledgeActive` makes `refreshKnowledge()` a total no-op while the surface is closed.
-  let knowledgeActive = false;
-  let knowledgeSnapshot = null;
-  let knowledgeSelectedActorId = '';
-  let knowledgeRefreshScheduled = false;
-  // Resolved ONCE per surface entry from the DEFINITION count, never as a live derivation: a GM
-  // authoring the first recipe item elsewhere would flip 0 -> 1 and yank the open tab mid-task.
-  let knowledgeDefaultTab = defaultKnowledgeTab(0);
-  let knowledgeDefaultTabResolved = false;
 
   // Per-store item-card memo (store-instance scope, NEVER module-global — avoids cross-app/test
   // bleed). OWNED here and INJECTED into the projection for that reason; see
@@ -1719,59 +1351,13 @@ export function createAdminStore(services) {
     knowledge: projectKnowledgeSnapshot(null, { active: false }),
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
-    ..._emptyWorldCurrencyState(),
+    ...emptyWorldCurrencyState(),
     ..._emptyCharacterLibrariesState(),
     // The three world-scope entity corpora (issue 1362). Seeded EMPTY rather than absent so a world
     // screen mounted before the first publish reads a shape, and `seeded` reads all-false — an
     // UNKNOWN corpus, never an empty one.
     ..._emptyWorldScopeState(),
   });
-
-  function _setEnvironmentDraftState(
-    draft,
-    { persistedDraft = draft, dirty = false, isNew = false, saveError = null } = {}
-  ) {
-    const draftClone = _clonePlain(draft);
-    environmentDraft.set(draftClone);
-    persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
-    environmentDraftDirty.set(dirty);
-    environmentDraftIsNew.set(isNew);
-    environmentSaveError.set(saveError);
-    environmentValidationState.set(null);
-  }
-
-  function _clearEnvironmentDraftState({ canShowEnvironmentsTab = false, error = null } = {}) {
-    selectedEnvironmentId.set('');
-    _setEnvironmentDraftState(null, {
-      persistedDraft: null,
-      dirty: false,
-      isNew: false,
-      saveError: null,
-    });
-    return _emptyEnvironmentState(canShowEnvironmentsTab, error);
-  }
-
-  function _currentEnvironmentViewPatch() {
-    return {
-      selectedEnvironmentId: get(selectedEnvironmentId),
-      environmentDraft: _clonePlain(get(environmentDraft)),
-      environmentDraftDirty: get(environmentDraftDirty),
-      environmentDraftIsNew: get(environmentDraftIsNew),
-      environmentSaving: get(environmentSaving),
-      environmentSaveError: get(environmentSaveError),
-      environmentValidationState: _clonePlain(get(environmentValidationState)),
-      environmentComposition: _clonePlain(
-        _buildEnvironmentCompositionViewModel(get(environmentDraft))
-      ),
-    };
-  }
-
-  function _patchEnvironmentViewState() {
-    viewState.update((state) => ({
-      ...state,
-      ..._currentEnvironmentViewPatch(),
-    }));
-  }
 
   /**
    * Republish `itemCards` after cards filled themselves in place (issue 1081), each swapped for a
@@ -1793,441 +1379,6 @@ export function createAdminStore(services) {
     });
   }
 
-  function _currentToolsDraftViewPatch() {
-    const draft = get(toolDraft);
-    const baseline = get(toolDraftBaseline);
-    const systemId = get(toolDraftSystemId);
-      // THE UNION, because this is a display projection and the draft it overlays is one too (issue
-      // 1373). A raw-array library beneath a union-seeded draft would be two answers to one question.
-    const library = systemId ? _resolvedSystemTools(systemId) : [];
-    const overlay = (entries, entry) => {
-      if (!entry) return entries.map(_clonePlain);
-      const index = entries.findIndex((tool) => String(tool.id) === String(entry.id));
-      if (index === -1) return [...entries.map(_clonePlain), _clonePlain(entry)];
-      return entries.map((tool, toolIndex) =>
-        toolIndex === index ? _clonePlain(entry) : _clonePlain(tool)
-      );
-    };
-    return {
-      toolDraft: _clonePlain(draft),
-      toolDraftBaseline: _clonePlain(baseline),
-      toolDraftSystemId: systemId,
-      toolDraftSourceItemUuid: get(toolDraftSourceItemUuid),
-      toolDraftDirty: get(toolDraftDirty),
-      toolDraftSaving: get(toolDraftSaving),
-      toolDraftSaveError: get(toolDraftSaveError),
-      toolDraftValidation: _clonePlain(get(toolDraftValidation)),
-      // Temporary shell aliases: these are projections, never mutable editor state.
-      toolsDraft: systemId ? overlay(library, draft) : null,
-      toolsDraftBaseline: systemId ? overlay(library, baseline) : null,
-      toolsDraftSystemId: systemId,
-      toolsDraftDirty: get(toolDraftDirty),
-      toolsDraftDirtyToolIds: get(toolDraftDirty) && draft?.id ? [draft.id] : [],
-      toolsDraftSaving: get(toolDraftSaving),
-      toolsDraftSaveError: get(toolDraftSaveError),
-      toolsDraftSelectedToolId: draft?.id || '',
-      toolsDraftExpandedToolId: draft?.id || '',
-    };
-  }
-
-  function _patchToolsDraftViewState() {
-    viewState.update((state) => ({
-      ...state,
-      ..._currentToolsDraftViewPatch(),
-    }));
-  }
-
-  function _recomputeToolsDraftDirty() {
-    const current = get(toolDraft);
-    const baseline = get(toolDraftBaseline);
-    toolDraftDirty.set(current !== null && JSON.stringify(current) !== JSON.stringify(baseline));
-  }
-
-  function enterToolsDraft(systemId = get(selectedSystemId)) {
-    if (!systemId) return false;
-    toolDraft.set(null);
-    toolDraftBaseline.set(null);
-    toolDraftSystemId.set(String(systemId));
-    toolDraftSourceItemUuid.set('');
-    toolDraftDirty.set(false);
-    toolDraftSaveError.set(null);
-    toolDraftValidation.set({ valid: false, errors: ['missing'] });
-    _patchToolsDraftViewState();
-    return true;
-  }
-
-  function _setFocusedToolDraft(draft, baseline, systemId) {
-    toolDraft.set(_clonePlain(draft));
-    toolDraftBaseline.set(_clonePlain(baseline));
-    toolDraftSystemId.set(String(systemId || ''));
-    toolDraftSourceItemUuid.set('');
-    toolDraftSaveError.set(null);
-    _recomputeToolsDraftDirty();
-    toolDraftValidation.set(validateToolDraft());
-    _patchToolsDraftViewState();
-    return true;
-  }
-
-  /** Open an unpersisted draft for a brand-new system Tool. */
-  function createToolDraft(initialPatch = {}, systemId = get(selectedSystemId)) {
-    if (!systemId) return null;
-    const patch = initialPatch && typeof initialPatch === 'object' ? initialPatch : {};
-    const created = _normalizeGatheringLibraryTool({ ...patch, id: _randomID() }, _randomID);
-    _setFocusedToolDraft(created, null, systemId);
-    return _clonePlain(created);
-  }
-
-  /**
-   * Open the rules editor on one Tool, seeded from the read union (issue 1373): for an inheriting
-   * section the draft must state the value a craft will take.
-   */
-  function openToolDraft(toolId, systemId = get(selectedSystemId)) {
-    const id = String(toolId || '');
-    if (!id || !systemId) return false;
-    const existing = _resolvedSystemTools(systemId).find((tool) => String(tool.id) === id);
-    if (!existing) return false;
-    return _setFocusedToolDraft(existing, existing, systemId);
-  }
-
-  function patchToolDraft(patch = {}) {
-    const current = get(toolDraft);
-    if (!current || !patch || typeof patch !== 'object') return false;
-    const nested = ['requirement', 'prerequisites', 'bonus', 'breakage', 'onBreak'];
-    const merged = { ...current, ...patch };
-    for (const key of nested) {
-      if (patch[key] && typeof patch[key] === 'object') {
-        merged[key] = { ...current[key], ...patch[key] };
-      }
-    }
-    toolDraft.set(_normalizeGatheringLibraryTool(merged, _randomID));
-    toolDraftSaveError.set(null);
-    _recomputeToolsDraftDirty();
-    toolDraftValidation.set(validateToolDraft());
-    _patchToolsDraftViewState();
-    return true;
-  }
-
-  function updateToolsDraft(mutator) {
-    if (typeof mutator !== 'function') return false;
-    const current = get(toolDraft);
-    if (!current) return false;
-    const next = mutator([_clonePlain(current)]);
-    return Array.isArray(next) && next[0] ? patchToolDraft(next[0]) : false;
-  }
-
-  /**
-   * Register a first-class item-sourced Tool from a dropped Item uuid (issue 561): `componentId:
-   * null`, its own source refs, and the durable `roles[systemId].toolId` stamped on the Item.
-   */
-  async function addToolFromUuidToDraft(itemUuid) {
-    if (!get(toolDraft) && !createToolDraft()) return false;
-    return stageToolDraftSource(itemUuid);
-  }
-
-  function stageToolDraftSource(itemUuid, snapshot = {}) {
-    const uuid = String(itemUuid || '').trim();
-    if (!uuid || !get(toolDraft)) return false;
-    toolDraftSourceItemUuid.set(uuid);
-    return patchToolDraft({
-      ...snapshot,
-      componentId: null,
-      registeredItemUuid: uuid,
-      originItemUuid: uuid,
-      aliasItemUuids: [],
-    });
-  }
-
-  function unlinkToolDraftSource() {
-    if (!get(toolDraft)) return false;
-    toolDraftSourceItemUuid.set('');
-    return patchToolDraft({
-      componentId: null,
-      registeredItemUuid: null,
-      originItemUuid: null,
-      aliasItemUuids: [],
-      name: null,
-      img: null,
-      description: '',
-    });
-  }
-
-  function updateToolInDraft(toolId, patch = {}) {
-    if (!toolId || typeof patch !== 'object' || patch === null) return false;
-    if (String(get(toolDraft)?.id || '') !== String(toolId) && !openToolDraft(toolId)) return false;
-    return patchToolDraft(patch);
-  }
-
-  async function deleteToolFromDraft(toolId) {
-    const id = String(toolId || get(toolDraft)?.id || '');
-    if (!id) return false;
-    if (String(get(toolDraft)?.id || '') !== id && !openToolDraft(id)) return false;
-    return deleteToolDraft();
-  }
-
-  function selectDraftTool(toolId) {
-    return toolId ? openToolDraft(toolId) : false;
-  }
-
-  function setExpandedDraftTool(toolId) {
-    return toolId ? openToolDraft(toolId) : false;
-  }
-
-  function validateToolsDraft() {
-    const result = validateToolDraft();
-    return result.valid
-      ? { valid: true, errors: [] }
-      : { valid: false, errors: [{ id: get(toolDraft)?.id || '', errors: result.errors }] };
-  }
-
-  function validateToolDraft(toolId = get(toolDraft)?.id) {
-    const id = String(toolId || '');
-    const tool = get(toolDraft);
-    if (String(tool?.id || '') !== id) return { valid: false, errors: ['missing'] };
-    if (!tool) return { valid: false, errors: ['missing'] };
-    const result = Tool.fromJSON(tool).validate();
-    return { valid: result.valid, errors: result.errors };
-  }
-
-  function isToolDraftDirty(toolId = get(toolDraft)?.id) {
-    return String(toolId || '') === String(get(toolDraft)?.id || '') && get(toolDraftDirty);
-  }
-
-  async function saveToolDraft() {
-    const systemId = get(toolDraftSystemId);
-    const draft = get(toolDraft);
-    if (!systemId || !draft) return false;
-    if (!get(toolDraftDirty)) return true;
-    const validation = validateToolDraft();
-    toolDraftValidation.set(validation);
-    if (!validation.valid) {
-      toolDraftSaveError.set('invalid');
-      _patchToolsDraftViewState();
-      return false;
-    }
-    const systemManager = services.getCraftingSystemManager?.();
-    if (typeof systemManager?.upsertTool !== 'function') return false;
-    toolDraftSaving.set(true);
-    toolDraftSaveError.set(null);
-    _patchToolsDraftViewState();
-    try {
-      const itemUuid = get(toolDraftSourceItemUuid);
-      // SECTION-AWARE: `_toolRecordForSave` restores every INHERITING section from the live in-system
-      // record, so a draft seeded from the read union cannot write the world's answer as an override.
-      const result = await systemManager.upsertTool(
-        systemId,
-        _toolRecordForSave(systemId, draft),
-        itemUuid ? { itemUuid } : {}
-      );
-      if (!result?.item) throw new Error('Tool save returned no item');
-      const persisted = _normalizeGatheringLibraryTool(result.item, _randomID);
-      // AND THE EDITOR GOES BACK TO THE UNION, not to the record the manager just wrote: an
-      // inheriting section's persisted value is deliberately NOT what this screen shows.
-      const saved =
-        _resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(persisted.id)) ||
-        persisted;
-      toolDraft.set(_clonePlain(saved));
-      toolDraftBaseline.set(_clonePlain(saved));
-      toolDraftSourceItemUuid.set('');
-      toolDraftDirty.set(false);
-      toolDraftValidation.set(validateToolDraft(saved.id));
-      await refresh();
-      return true;
-    } catch (error) {
-      toolDraftSaveError.set(error?.message || 'save');
-      services.notify?.error?.(
-        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.SaveFailed') ||
-          'The Tool could not be saved. Try again.'
-      );
-      return false;
-    } finally {
-      toolDraftSaving.set(false);
-      _patchToolsDraftViewState();
-    }
-  }
-
-  function discardToolDraft() {
-    const baseline = get(toolDraftBaseline);
-    if (baseline) {
-      toolDraft.set(_clonePlain(baseline));
-      toolDraftDirty.set(false);
-      toolDraftSaveError.set(null);
-      toolDraftSourceItemUuid.set('');
-      toolDraftValidation.set(validateToolDraft(baseline.id));
-      _patchToolsDraftViewState();
-      return true;
-    }
-    return cancelToolsDraft();
-  }
-
-  async function deleteToolDraft() {
-    const draft = get(toolDraft);
-    const systemId = get(toolDraftSystemId);
-    if (!draft || !systemId) return false;
-    const persisted = get(toolDraftBaseline) !== null;
-    toolDraftSaving.set(true);
-    _patchToolsDraftViewState();
-    try {
-      if (persisted) {
-        const systemManager = services.getCraftingSystemManager?.();
-        if (typeof systemManager?.deleteTool !== 'function') return false;
-        const result = await systemManager.deleteTool(systemId, draft.id);
-        if (result?.deleted !== true) return false;
-      }
-      toolDraft.set(null);
-      toolDraftBaseline.set(null);
-      toolDraftSourceItemUuid.set('');
-      toolDraftDirty.set(false);
-      toolDraftSaveError.set(null);
-      toolDraftValidation.set({ valid: false, errors: ['missing'] });
-      await refresh();
-      _patchToolsDraftViewState();
-      return true;
-    } catch (error) {
-      toolDraftSaveError.set(error?.message || 'delete');
-      services.notify?.error?.(
-        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.DeleteFailed') ||
-          'The Tool could not be deleted. Try again.'
-      );
-      return false;
-    } finally {
-      toolDraftSaving.set(false);
-      _patchToolsDraftViewState();
-    }
-  }
-
-  /** Write a few fields onto one system's live Tool record without committing the open draft. */
-  async function _writeLiveTool(toolId, systemId, patch, failureKey, failureFallback) {
-    const systemManager = services.getCraftingSystemManager?.();
-    const live = _systemTools(systemId).find((tool) => String(tool.id) === String(toolId));
-    if (!live || typeof systemManager?.upsertTool !== 'function') return false;
-    try {
-      const result = await systemManager.upsertTool(systemId, { ...live, ...patch });
-      if (!result?.item) return false;
-      const saved = _normalizeGatheringLibraryTool(result.item, _randomID);
-      if (String(get(toolDraft)?.id || '') === String(saved.id)) {
-        const written = Object.fromEntries(Object.keys(patch).map((key) => [key, saved[key]]));
-        if (get(toolDraftDirty)) {
-          toolDraft.update((draft) => ({ ...draft, ...written }));
-          toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
-        } else {
-          // THE UNION, NOT THE RECORD THE MANAGER HANDED BACK (issue 1373). `saved` is the raw in-system
-          // record, so re-seeding a clean draft from it would put every inheriting section back onto the
-          // value this screen exists not to show.
-          const resolved =
-            _resolvedSystemTools(systemId).find((tool) => String(tool.id) === String(saved.id)) ||
-            saved;
-          toolDraft.set(_clonePlain(resolved));
-          toolDraftBaseline.set(_clonePlain(resolved));
-        }
-        _recomputeToolsDraftDirty();
-      }
-      await refresh();
-      _patchToolsDraftViewState();
-      return true;
-    } catch {
-      services.notify?.error?.(services.localize?.(failureKey) || failureFallback);
-      return false;
-    }
-  }
-
-  async function toggleToolEnabled(toolId, enabled, systemId = get(selectedSystemId)) {
-    return _writeLiveTool(
-      toolId,
-      systemId,
-      { enabled: enabled === true },
-      'FABRICATE.Admin.Manager.Tools.Editor.ToggleFailed',
-      'The Tool status could not be changed. Try again.'
-    );
-  }
-
-  /**
-   * Move one world-default section between following the world Tool and this system's own. Turning
-   * inheritance on writes the switch alone; turning it off seeds the override from the value that
-   * was on screen. `ui-integration` `### Tools Tab`, requirement 15 clause 1a (issue 1373).
-   */
-  async function setToolSectionInherited(toolId, section, inherit, systemId = get(selectedSystemId)) {
-    const target = String(toolId || '').trim();
-    const system = String(systemId || '').trim();
-    if (!target || !system || typeof inherit !== 'boolean') return false;
-    // READ BEFORE THE WRITE. Once the switch says overriding, the union answers this section from
-    // the in-system record, so the world value the GM was looking at is no longer reachable here.
-    const shown = inherit
-      ? undefined
-      : _resolvedSystemTools(system).find((tool) => String(tool.id) === target)?.[section];
-    const written = await worldScope.tool.setSectionInherited(target, system, section, inherit);
-    if (written !== true) return false;
-    if (inherit || shown === undefined) {
-      await refresh();
-      _syncToolDraftSection(target, system, section);
-      return true;
-    }
-    return _writeLiveTool(
-      target,
-      system,
-      { [section]: _clonePlain(shown) },
-      'FABRICATE.Admin.Manager.Tools.Editor.InheritFailed',
-      'This section could not be set for this system. Try again.'
-    );
-  }
-
-  /**
-   * Stop using one world Tool in one crafting system (issue 1373), the inverse of {@link
-   * adoptWorldTool}.
-   */
-  async function removeToolFromSystem(toolId, systemId = get(selectedSystemId)) {
-    const target = String(toolId || '').trim();
-    const system = String(systemId || '').trim();
-    if (!target || !system) return false;
-    const systemManager = services.getCraftingSystemManager?.();
-    if (typeof systemManager?.deleteTool !== 'function') return false;
-    try {
-      const deleted = await systemManager.deleteTool(system, target);
-      if (deleted?.deleted !== true) return false;
-    } catch (error) {
-      services.notify?.error?.(
-        services.localize?.('FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystemFailed') ||
-          `The Tool could not be removed from this system. ${error?.message || ''}`.trim()
-      );
-      return false;
-    }
-    await worldScope.tool.removeFromSystem(target, system);
-    if (String(get(toolDraft)?.id || '') === target) {
-      toolDraft.set(null);
-      toolDraftBaseline.set(null);
-      toolDraftSourceItemUuid.set('');
-      toolDraftDirty.set(false);
-      toolDraftSaveError.set(null);
-      toolDraftValidation.set({ valid: false, errors: ['missing'] });
-    }
-    await refresh();
-    _patchToolsDraftViewState();
-    return true;
-  }
-
-  async function saveAllDirtyToolDrafts() {
-    return saveToolDraft();
-  }
-
-  async function saveToolsDraft() {
-    return saveAllDirtyToolDrafts();
-  }
-
-  function cancelToolsDraft() {
-    toolDraft.set(null);
-    toolDraftBaseline.set(null);
-    toolDraftSystemId.set('');
-    toolDraftSourceItemUuid.set('');
-    toolDraftDirty.set(false);
-    toolDraftSaveError.set(null);
-    toolDraftValidation.set({ valid: false, errors: ['missing'] });
-    _patchToolsDraftViewState();
-    return true;
-  }
-
-  function isToolsDraftDirty() {
-    return get(toolDraftDirty) && get(toolDraft) !== null;
-  }
-
   /**
    * The `yes`/`no` pair of a delete confirm, in the shape `DialogV2.confirm` merges (issue 1154):
    * it merges each over a default with `mergeObject`, which iterates `Object.keys(other)` — `[]` for
@@ -2241,39 +1392,6 @@ export function createAdminStore(services) {
       },
       no: { callback: () => false },
     };
-  }
-
-  async function confirmDiscardDirtyToolsDraft() {
-    if (!isToolsDraftDirty()) return true;
-    if (dirtyToolsDraftDiscardConfirmation) return dirtyToolsDraftDiscardConfirmation;
-    dirtyToolsDraftDiscardConfirmation = (async () => {
-      const result = await services.confirmDialog?.({
-        title:
-          services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Title') ||
-          'Discard unsaved tool changes?',
-        content:
-          services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Content') ||
-          'The tools library has unsaved changes. Discard them and continue?',
-        yes: {
-          label:
-            services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Confirm') ||
-            'Discard changes',
-          callback: () => true,
-        },
-        no: {
-          label:
-            services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Cancel') ||
-            'Keep editing',
-          callback: () => false,
-        },
-      });
-      return result === true;
-    })();
-    try {
-      return await dirtyToolsDraftDiscardConfirmation;
-    } finally {
-      dirtyToolsDraftDiscardConfirmation = null;
-    }
   }
 
   /**
@@ -2438,6 +1556,41 @@ export function createAdminStore(services) {
   // Kept thin: uniqueness/invariant validation lives in GatheringPartyStore and GatheringRealmStore;
   // this section surfaces their errors inline and refreshes derived view state.
   const travel = _createTravelSection();
+
+  // --- Currency and Knowledge sections (issue 1708) ---
+  // Each owns its own state and returns the subset of the store API it implements; the store holds
+  // only the returned object and wires the few call-ins the rest of it makes.
+  const currency = createCurrencySection({ services, randomID: _randomID, refresh });
+  const knowledge = createKnowledgeSection({
+    services,
+    viewState,
+    selectedSystemId,
+    deleteConfirmButtons: _deleteConfirmButtons,
+    onMicrotask: _onMicrotask,
+    isDestroyed: () => destroyed,
+  });
+  const tools = createToolDraftSection({
+    services,
+    viewState,
+    selectedSystemId,
+    refresh,
+    randomID: _randomID,
+    systemTools: _systemTools,
+    worldToolCorpus: _worldToolCorpus,
+    getWorldScopeTool: () => worldScope.tool,
+  });
+  const environment = createEnvironmentDraftSection({
+    services,
+    viewState,
+    selectedSystemId,
+    refresh,
+    escapeHtml: _escapeHtml,
+    deleteConfirmButtons: _deleteConfirmButtons,
+    getEnvironmentStore: _getEnvironmentStore,
+    canShowEnvironmentsTab: _canShowEnvironmentsTab,
+    buildCompositionViewModel: _buildEnvironmentCompositionViewModel,
+    normalizeGatheringTagList: _normalizeGatheringTagList,
+  });
 
   function _createTravelSection() {
     function getPartyStore() {
@@ -2950,7 +2103,7 @@ export function createAdminStore(services) {
         } catch (error) {
           console.warn('Fabricate | Failed to refresh after deleting a realm', error);
         }
-        _stripRealmFromEnvironmentDraft(realmId);
+        environment.stripRealmFromDraft(realmId);
         return true;
       },
     };
@@ -3088,67 +2241,6 @@ export function createAdminStore(services) {
   }
 
   /**
-   * The same library through the read union — what a craft will actually do. A display read and
-   * never a write source; {@link _toolRecordForSave} keeps the two apart. `ui-integration`
-   * `### Tools Tab` states the rule, on requirement 15 clause 1a (issue 1373).
-   */
-  function _resolvedSystemTools(systemId) {
-    const id = String(systemId || get(selectedSystemId) || '');
-    if (!id) return [];
-    const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
-    if (!system) return [];
-    return resolvedToolsFor(system, _worldToolCorpus()).map((tool) =>
-      _normalizeGatheringLibraryTool(tool, _randomID)
-    );
-  }
-
-  /**
-   * One `(tool, system)` pair's world membership record, the only carrier of the per-section
-   * inherit switch.
-   */
-  function _toolMembership(toolId, systemId) {
-    return findMembership(_worldToolCorpus()?.membership, toolId, systemId);
-  }
-
-  /**
-   * The record a save actually persists: the draft, with every inheriting section restored from the
-   * live in-system record. The save reads the SWITCH, not the draft, because persisting the draft
-   * whole would freeze one moment's world default onto this system with nothing going red.
-   * `ui-integration` `### Tools Tab` states it (issue 1373).
-   */
-  function _toolRecordForSave(systemId, draft) {
-    const record = _clonePlain(draft);
-    const id = String(record?.id ?? '');
-    const membership = _toolMembership(id, systemId);
-    if (!membership) return record;
-    const live = _systemTools(systemId).find((tool) => String(tool.id) === id) || null;
-    if (!live) return record;
-    for (const section of TOOL_SECTIONS) {
-      if (!isSectionInherited(membership, section)) continue;
-      if (section in live) record[section] = _clonePlain(live[section]);
-      else delete record[section];
-    }
-    return record;
-  }
-
-  /**
-   * Re-read one section of the open draft from the read union, after a membership write moved it.
-   */
-  function _syncToolDraftSection(toolId, systemId, section) {
-    if (String(get(toolDraft)?.id || '') !== String(toolId)) return;
-    const resolved = _resolvedSystemTools(systemId).find(
-      (tool) => String(tool.id) === String(toolId)
-    );
-    if (!resolved) return;
-    const written = { [section]: _clonePlain(resolved[section]) };
-    toolDraft.update((draft) => (draft ? { ...draft, ...written } : draft));
-    toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
-    _recomputeToolsDraftDirty();
-    toolDraftValidation.set(validateToolDraft());
-    _patchToolsDraftViewState();
-  }
-
-  /**
    * Persist the given library Tools onto the crafting system via the system manager (the
    * `craftingSystems` setting).
    */
@@ -3281,79 +2373,21 @@ export function createAdminStore(services) {
     return Array.isArray(values) ? values.filter(Boolean) : [];
   }
 
-  function _gatheringLibraryRecordMatchesEnvironment(
-    record,
-    environment,
-    conditions,
-    includeDanger = false,
-    conditionSettings = null
-  ) {
-    return evaluateEnvironmentMatch(record, environment, conditions, {
-      includeDanger,
-      conditionSettings,
-    }).matches;
-  }
-
   /**
-   * Classify every library task/event for the environment into a `CompositionState` +
-   * `RuntimeState` plus match evidence, honoring `compositionMode`.
+   * The composition projection for one environment, over this store's collaborators; the
+   * derivation itself lives in `src/ui/model/environmentComposition.js`.
    */
   function _buildEnvironmentCompositionViewModel(environment) {
-    const empty = {
-      compositionMode: 'automatic',
-      conditions: { ...DEFAULT_GATHERING_CONDITIONS },
-      tasks: [],
-      events: [],
-      counts: _emptyCompositionCounts(),
-    };
-    if (!environment || typeof environment !== 'object') return empty;
-    const systemId = String(environment.craftingSystemId || get(selectedSystemId) || '');
-    if (!systemId) return empty;
-
-    const config = _currentGatheringConfig();
-    const system = config.systems?.[systemId] || {};
-    const craftingSystem = services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
-    const managedItemById = new Map(
-      _buildManagedItemOptions(_getManagedItems(craftingSystem)).map((item) => [
-        String(item.id || ''),
-        item,
-      ])
-    );
-    const conditionSettings = system.conditions || null;
-    const conditions = conditionSettingsToCurrent(conditionSettings);
-    const compositionMode = environment.compositionMode === 'manual' ? 'manual' : 'automatic';
-
-    const tasks = _classifyCompositionRecords({
-      records: Array.isArray(system.tasks) ? system.tasks : [],
-      environment,
-      conditions,
-      conditionSettings,
-      compositionMode,
-      kind: 'task',
-      includeDanger: false,
-      order: environment.taskOrder,
-      managedItemById,
+    return buildEnvironmentCompositionViewModel(environment, {
+      defaultSystemId: get(selectedSystemId),
+      gatheringConfig: _currentGatheringConfig,
+      managedItemOptionsFor: (systemId) =>
+        _buildManagedItemOptions(
+          _getManagedItems(services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null)
+        ),
+      localize: services.localize,
     });
-    const events = _classifyCompositionRecords({
-      records: Array.isArray(system.events) ? system.events : [],
-      environment,
-      conditions,
-      conditionSettings,
-      compositionMode,
-      kind: 'event',
-      includeDanger: true,
-      order: environment.eventOrder,
-    });
-
-    return {
-      compositionMode,
-      conditions,
-      tasks,
-      events,
-      counts: _compositionCounts(tasks, events),
-    };
   }
-
   /**
    * Build the derived `evaluateSystemValidation` report for the selected system, assembling the
    * collaborators the pure aggregator needs. Pure and synchronous.
@@ -3407,294 +2441,6 @@ export function createAdminStore(services) {
     if (!candidate) return [];
 
     return recipeManager.getSignatureConflicts?.(candidate, { systemId: sysId }) || [];
-  }
-
-  function _classifyCompositionRecords({
-    records,
-    environment,
-    conditions,
-    conditionSettings,
-    compositionMode,
-    kind,
-    includeDanger,
-    order,
-    managedItemById = new Map(),
-  }) {
-    const enabledKey = kind === 'event' ? 'enabledEventIds' : 'enabledTaskIds';
-    const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
-    const forcedKey = kind === 'event' ? 'forcedEventIds' : 'forcedTaskIds';
-    const enabled = Array.isArray(environment?.[enabledKey])
-      ? environment[enabledKey].map(String)
-      : [];
-    const disabled = Array.isArray(environment?.[disabledKey])
-      ? environment[disabledKey].map(String)
-      : [];
-    const forced = Array.isArray(environment?.[forcedKey])
-      ? environment[forcedKey].map(String)
-      : [];
-    const orderIndex = new Map(
-      (Array.isArray(order) ? order : []).map((id, index) => [String(id), index])
-    );
-
-    const classified = (Array.isArray(records) ? records : []).map((record, index) => {
-      const id = String(record?.id || '');
-      const libraryEnabled = record?.enabled !== false;
-      const { matches, conditionsMet, evidence } = evaluateEnvironmentMatch(
-        record,
-        environment,
-        conditions,
-        { includeDanger, conditionSettings }
-      );
-      // Exclude and force are automatic-mode overrides of the match filter (maintainer ruling,
-      // issue 1315); manual mode has no filter to override, so it has neither.
-      const excluded = compositionMode !== 'manual' && disabled.includes(id);
-      const explicitlyIncluded = enabled.includes(id);
-      const forceIncluded = compositionMode !== 'manual' && forced.includes(id);
-
-      let compositionState;
-      if (!libraryEnabled) compositionState = 'libraryDisabled';
-      // Exclude is checked before force so the two can collide on the same record without a
-      // branch order bug deciding it silently: exclude wins.
-      else if (excluded) compositionState = 'excluded';
-      else if (forceIncluded) compositionState = 'forceIncluded';
-      // Manual mode composes exactly `enabled*Ids` with no match filter (maintainer ruling), so a
-      // picked non-matching record still composes as `includedNotMatching` — distinct from
-      // `notMatching` so the Included list can flag it.
-      else if (!matches)
-        compositionState =
-          compositionMode === 'manual' && explicitlyIncluded
-            ? 'includedNotMatching'
-            : 'notMatching';
-      else if (compositionMode === 'manual')
-        compositionState = explicitlyIncluded ? 'explicitlyIncluded' : 'candidate';
-      else compositionState = 'includedByMatch';
-
-      // A record is runtime-available only when its composition state would compose it AND current
-      // weather/time satisfy its required conditions. `composed` projects `environmentComposesRecord`
-      // onto the shared four-state vocabulary in `gatheringComposition.js`.
-      const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);
-      const runtimeState = composed && conditionsMet ? 'available' : 'unavailable';
-      const orderRank = orderIndex.has(id) ? orderIndex.get(id) : Number.MAX_SAFE_INTEGER;
-      const dropRateAdjustment = _dropRateAdjustmentSummary({
-        kind,
-        record,
-        environment,
-        managedItemById,
-      });
-      return {
-        id,
-        record,
-        kind,
-        libraryEnabled,
-        matches,
-        conditionsMet,
-        evidence,
-        excluded,
-        explicitlyIncluded,
-        compositionState,
-        runtimeState,
-        orderRank,
-        _index: index,
-        ...dropRateAdjustment,
-      };
-    });
-
-    return classified.sort((a, b) =>
-      a.orderRank === b.orderRank ? a._index - b._index : a.orderRank - b.orderRank
-    );
-  }
-
-  function _effectiveDropRate(baseDropRate, adjustment) {
-    const base = Number.isFinite(Number(baseDropRate)) ? Math.floor(Number(baseDropRate)) : 0;
-    const delta = Number.isFinite(Number(adjustment)) ? Math.floor(Number(adjustment)) : 0;
-    return Math.min(100, Math.max(0, base + delta));
-  }
-
-  function _dropRowDisplay(row, managedItemById = new Map()) {
-    const componentId = String(row?.componentId || row?.systemItemId || '');
-    const item = componentId ? managedItemById.get(componentId) : null;
-    const itemUuid = String(row?.itemUuid || '');
-    const unresolvedKey = 'FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop';
-    const unresolved = services.localize?.(unresolvedKey);
-    const fallbackName =
-      unresolved && unresolved !== unresolvedKey ? unresolved : 'Unresolved drop';
-    return {
-      name: String(row?.name || item?.name || itemUuid || fallbackName),
-      img: String(row?.img || item?.img || 'icons/svg/item-bag.svg'),
-    };
-  }
-
-  function _dropRateAdjustmentSummary({ kind, record, environment, managedItemById = new Map() }) {
-    const id = String(record?.id || '');
-    if (!id)
-      return {
-        hasDropRateAdjustment: false,
-        dropRateAdjustment: 0,
-        dropRateAdjustmentsEnabled: true,
-        dropRateAdjustmentRows: [],
-      };
-    if (kind === 'event') {
-      const adjustments = _normalizeDraftDropRateAdjustmentMap(
-        environment?.eventDropRateAdjustments
-      );
-      const adjustment = adjustments[id] || 0;
-      const eventEnabledMap = _normalizeDraftEventDropRateAdjustmentsEnabled(
-        environment?.eventDropRateAdjustmentsEnabled
-      );
-      const dropRateAdjustmentsEnabled = eventEnabledMap[id] !== false;
-      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
-      const baseDropRate = Number.isFinite(Number(record?.dropRate))
-        ? Math.floor(Number(record.dropRate))
-        : 1;
-      return {
-        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
-        hasStoredDropRateAdjustment: adjustment !== 0,
-        dropRateAdjustment: adjustment,
-        dropRateAdjustmentsEnabled,
-        baseDropRate,
-        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
-        dropRateAdjustmentRows: [],
-      };
-    }
-
-    const taskAdjustments = _normalizeDraftTaskDropRateAdjustments(
-      environment?.taskDropRateAdjustments
-    );
-    const taskAdjustmentEnabledMap = _normalizeDraftTaskDropRateAdjustmentsEnabled(
-      environment?.taskDropRateAdjustmentsEnabled
-    );
-    const dropRateAdjustmentsEnabled = taskAdjustmentEnabledMap[id] !== false;
-    const rowAdjustments = taskAdjustments[id] || {};
-    const rows = (
-      Array.isArray(record?.dropRows ?? record?.itemDrops)
-        ? (record.dropRows ?? record.itemDrops)
-        : []
-    ).map((row) => {
-      const rowId = String(row?.id || '');
-      const adjustment = rowAdjustments[rowId] || 0;
-      const appliedAdjustment = dropRateAdjustmentsEnabled ? adjustment : 0;
-      const baseDropRate = Number.isFinite(Number(row?.dropRate))
-        ? Math.floor(Number(row.dropRate))
-        : 1;
-      const display = _dropRowDisplay(row, managedItemById);
-      return {
-        id: rowId,
-        name: display.name,
-        img: display.img,
-        componentId: String(row?.componentId || row?.systemItemId || ''),
-        itemUuid: String(row?.itemUuid || ''),
-        quantity:
-          Number.isFinite(Number(row?.quantity)) && Number(row.quantity) > 0
-            ? Number(row.quantity)
-            : 1,
-        baseDropRate,
-        adjustment,
-        effectiveDropRate: _effectiveDropRate(baseDropRate, appliedAdjustment),
-        hasDropRateAdjustment: dropRateAdjustmentsEnabled && adjustment !== 0,
-        hasStoredDropRateAdjustment: adjustment !== 0,
-      };
-    });
-    const hasStoredDropRateAdjustment = rows.some((row) => row.hasStoredDropRateAdjustment);
-    return {
-      hasDropRateAdjustment: dropRateAdjustmentsEnabled && hasStoredDropRateAdjustment,
-      hasStoredDropRateAdjustment,
-      dropRateAdjustmentsEnabled,
-      dropRateAdjustment: dropRateAdjustmentsEnabled
-        ? rows.reduce((sum, row) => sum + row.adjustment, 0)
-        : 0,
-      dropRateAdjustmentRows: rows,
-    };
-  }
-
-  function _emptyCompositionCounts() {
-    return {
-      availableTasks: 0,
-      excludedTasks: 0,
-      candidateTasks: 0,
-      includedNotMatchingTasks: 0,
-      availableEvents: 0,
-      excludedEvents: 0,
-      candidateEvents: 0,
-      includedNotMatchingEvents: 0,
-      diagnosticTasks: 0,
-      diagnosticEvents: 0,
-      requiredTools: 0,
-    };
-  }
-
-  /**
-   * Distinct tool ids required by the tasks available right now — the same
-   * `runtimeState === 'available'` population `availableTasks` counts, so the fact is weather- and
-   * time-dependent exactly like its neighbours (issue 1321, a deliberate trade).
-   */
-  function _requiredToolCount(tasks) {
-    const toolIds = new Set();
-    for (const row of tasks) {
-      if (row.runtimeState !== 'available') continue;
-      for (const toolId of Array.isArray(row.record?.toolIds) ? row.record.toolIds : []) {
-        // Trim before counting, matching the helper this replaced: an untrimmed pair would count
-        // ' pick ' and 'pick' as two distinct required tools.
-        const trimmed = String(toolId ?? '').trim();
-        if (trimmed) toolIds.add(trimmed);
-      }
-    }
-    return toolIds.size;
-  }
-
-  function _compositionCounts(tasks, events) {
-    const tally = (records) => {
-      const available = records.filter((r) => r.runtimeState === 'available').length;
-      const excluded = records.filter((r) => r.compositionState === 'excluded').length;
-      const candidate = records.filter((r) => r.compositionState === 'candidate').length;
-      // `includedNotMatching` composes (ruling 2), so this counts records that ARE runtime available
-      // whenever conditions are met. The field was `unavailable*` behind a fact labelled "Included but
-      // unavailable" — inverted against its own label — so producer, consumers and label were renamed.
-      const includedNotMatching = records.filter(
-        (r) => r.compositionState === 'includedNotMatching'
-      ).length;
-      const diagnostic = records.filter(
-        (r) => r.compositionState === 'notMatching' || r.compositionState === 'libraryDisabled'
-      ).length;
-      return { available, excluded, candidate, includedNotMatching, diagnostic };
-    };
-    const t = tally(tasks);
-    const h = tally(events);
-    return {
-      availableTasks: t.available,
-      excludedTasks: t.excluded,
-      candidateTasks: t.candidate,
-      includedNotMatchingTasks: t.includedNotMatching,
-      diagnosticTasks: t.diagnostic,
-      availableEvents: h.available,
-      excludedEvents: h.excluded,
-      candidateEvents: h.candidate,
-      includedNotMatchingEvents: h.includedNotMatching,
-      diagnosticEvents: h.diagnostic,
-      requiredTools: _requiredToolCount(tasks),
-    };
-  }
-
-  /**
-   * Whether `environment` currently composes the library task/event `record`, through the shared
-   * `environmentComposesRecord` predicate, so it mirrors the runtime chain by construction.
-   */
-  function _environmentComposesGatheringRecord(environment, record, kind, conditionSettings) {
-    if (!record?.id) return false;
-    const includeDanger = kind === 'event';
-    const matches = _gatheringLibraryRecordMatchesEnvironment(
-      record,
-      environment,
-      {},
-      includeDanger,
-      conditionSettings
-    );
-    return environmentComposesRecord(
-      environment,
-      record,
-      kind,
-      resolveGatheringCompositionMode(environment),
-      matches
-    );
   }
 
   /**
@@ -3888,12 +2634,6 @@ export function createAdminStore(services) {
     });
   }
 
-  function _selectedManagedItemOptions() {
-    const systemManager = services.getCraftingSystemManager();
-    const selectedSystem = systemManager?.getSystem?.(get(selectedSystemId)) || null;
-    return _buildManagedItemOptions(_getManagedItems(selectedSystem));
-  }
-
   function _managerReady(manager) {
     return !!manager && (manager.initialized === true || manager.initialized === undefined);
   }
@@ -3959,238 +2699,6 @@ export function createAdminStore(services) {
     return services.onFabricateDataChanged(() => {
       _scheduleExternalRefresh();
     });
-  }
-
-  function _newEnvironmentResultGroup(existingGroups = []) {
-    const baseName =
-      services.localize?.('FABRICATE.Admin.Environments.NewResultGroupName') || 'Results';
-    const existingNames = new Set(
-      (Array.isArray(existingGroups) ? existingGroups : [])
-        .map((group) =>
-          String(group?.name || '')
-            .trim()
-            .toLowerCase()
-        )
-        .filter(Boolean)
-    );
-    let name = baseName;
-    let suffix = 2;
-    while (existingNames.has(name.trim().toLowerCase())) {
-      name = `${baseName} ${suffix}`;
-      suffix += 1;
-    }
-    return {
-      id: _randomID(),
-      name,
-      results: [],
-    };
-  }
-
-  function _newEnvironmentResult() {
-    const firstComponent = _selectedManagedItemOptions()[0];
-    return {
-      id: _randomID(),
-      componentId: firstComponent?.id || null,
-      quantity: 1,
-      propertyMacroUuid: null,
-    };
-  }
-
-  function _newEnvironmentDraft(systemId) {
-    return {
-      craftingSystemId: systemId,
-      name:
-        services.localize?.('FABRICATE.Admin.Environments.NewEnvironmentName') ||
-        'New Gathering Environment',
-      description: '',
-      enabled: false,
-      selectionMode: 'targeted',
-      dangerLevel: 'safe',
-      sceneUuid: null,
-    };
-  }
-
-  function _hasDirtyEnvironmentDraft() {
-    return get(environmentDraftDirty) === true && !!get(environmentDraft);
-  }
-
-  async function confirmDiscardDirtyEnvironmentDraft() {
-    if (!_hasDirtyEnvironmentDraft()) return 'discard';
-    if (dirtyEnvironmentDiscardConfirmation) return dirtyEnvironmentDiscardConfirmation;
-
-    const localizeFn = services.localize;
-    dirtyEnvironmentDiscardConfirmation = (async () => {
-      try {
-        const content = `<p>${
-          localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyContent') ||
-          'The current gathering environment has unsaved changes. Save them and continue?'
-        }</p>`;
-        if (typeof services.choiceDialog !== 'function') {
-          // Fall back to the two-way confirm when no three-way dialog is available.
-          const confirmed = await services.confirmDialog?.({
-            title:
-              localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyTitle') ||
-              'Discard unsaved environment changes?',
-            content,
-            yes: {
-              label:
-                localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyConfirm') ||
-                'Discard Changes',
-              callback: () => true,
-            },
-            no: {
-              label:
-                localizeFn?.('FABRICATE.Admin.Environments.DiscardDirtyCancel') || 'Keep Editing',
-              callback: () => false,
-            },
-          });
-          return confirmed === true ? 'discard' : 'cancel';
-        }
-        const action = await services.choiceDialog({
-          title:
-            localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') ||
-            'Save unsaved changes?',
-          content,
-          choices: [
-            {
-              action: 'save',
-              label: localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Save') || 'Save',
-              icon: 'fas fa-save',
-            },
-            {
-              action: 'discard',
-              label:
-                localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Discard') ||
-                'Discard Changes',
-              icon: 'fas fa-trash',
-            },
-            {
-              action: 'cancel',
-              label:
-                localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Cancel') || 'Keep Editing',
-              icon: 'fas fa-times',
-            },
-          ],
-          defaultAction: 'save',
-        });
-        return action === 'save' || action === 'discard' ? action : 'cancel';
-      } finally {
-        dirtyEnvironmentDiscardConfirmation = null;
-      }
-    })();
-
-    return dirtyEnvironmentDiscardConfirmation;
-  }
-
-  // Resolve a dirty environment draft for an action that would leave it: true to proceed, false to
-  // abort. On 'save' the draft is persisted (abort if it fails validation); 'discard' proceeds.
-  async function _proceedAfterDirtyEnvironmentConfirm() {
-    const action = await confirmDiscardDirtyEnvironmentDraft();
-    if (action === 'cancel') return false;
-    if (action === 'save') {
-      const result = await saveEnvironmentDraft();
-      return result?.ok !== false;
-    }
-    return true;
-  }
-
-  async function _discardDirtyEnvironmentDraftForNavigation() {
-    if (!_hasDirtyEnvironmentDraft()) return true;
-    const action = await confirmDiscardDirtyEnvironmentDraft();
-    if (action === 'cancel') return false;
-    if (action === 'save') {
-      const result = await saveEnvironmentDraft();
-      return result?.ok !== false;
-    }
-    await cancelEnvironmentDraft();
-    return true;
-  }
-
-  async function _buildEnvironmentState(selectedSystem) {
-    if (!_canShowEnvironmentsTab(selectedSystem)) {
-      selectedEnvironmentId.set('');
-      selectedEnvironmentSystemId.set(selectedSystem?.id || '');
-      return _clearEnvironmentDraftState();
-    }
-
-    if (get(selectedEnvironmentSystemId) !== selectedSystem.id) {
-      selectedEnvironmentId.set('');
-      selectedEnvironmentSystemId.set(selectedSystem.id);
-      _setEnvironmentDraftState(null, { persistedDraft: null });
-    }
-
-    const environmentStore = _getEnvironmentStore();
-    if (!environmentStore?.listBySystem) {
-      return _clearEnvironmentDraftState({
-        canShowEnvironmentsTab: true,
-        error:
-          services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable') ||
-          'Gathering environment store is not available.',
-      });
-    }
-
-    try {
-      const rawEnvironments = await environmentStore.listBySystem(selectedSystem.id);
-      const environments = _clonePlain(Array.isArray(rawEnvironments) ? rawEnvironments : []);
-      const environmentTaskCounts = {};
-      for (const environment of environments) {
-        const counts = _buildEnvironmentCompositionViewModel(environment)?.counts || {};
-        environmentTaskCounts[String(environment.id)] = {
-          availableTaskCount: counts.availableTasks || 0,
-          availableEventCount: counts.availableEvents || 0,
-          requiredToolCount: counts.requiredTools || 0,
-        };
-      }
-      let environmentId = get(selectedEnvironmentId);
-      const canKeepNewDraft =
-        get(environmentDraftIsNew) &&
-        get(environmentDraftDirty) &&
-        get(environmentDraft)?.craftingSystemId === selectedSystem.id;
-
-      if (canKeepNewDraft) {
-        environmentId = '';
-      } else if (environments.every((environment) => !(environment.id === environmentId))) {
-        environmentId = environments[0]?.id || '';
-        selectedEnvironmentId.set(environmentId);
-      }
-
-      if (!canKeepNewDraft) {
-        const persistedDraft = environmentId
-          ? _clonePlain(
-              environments.find((environment) => environment.id === environmentId) || null
-            )
-          : null;
-        const canPreserveDirtyDraft =
-          get(environmentDraftDirty) &&
-          get(environmentDraft)?.id === environmentId &&
-          get(environmentDraft)?.craftingSystemId === selectedSystem.id;
-
-        if (canPreserveDirtyDraft) {
-          persistedEnvironmentDraft.set(_clonePlain(persistedDraft));
-        } else {
-          _setEnvironmentDraftState(persistedDraft, {
-            persistedDraft,
-            dirty: false,
-            isNew: false,
-            saveError: null,
-          });
-        }
-      }
-
-      return {
-        canShowEnvironmentsTab: true,
-        environmentsLoading: false,
-        environmentsError: null,
-        environments,
-        environmentTaskCounts,
-        ..._currentEnvironmentViewPatch(),
-      };
-    } catch (error) {
-      return _clearEnvironmentDraftState({
-        canShowEnvironmentsTab: true,
-        error: _environmentErrorMessage(error),
-      });
-    }
   }
 
   // --- refresh --- /** * Refreshes overlap, and the later one is not necessarily the one that
@@ -4430,7 +2938,7 @@ export function createAdminStore(services) {
       });
     }
 
-    const environmentState = await _buildEnvironmentState(selectedSystem);
+    const environmentState = await environment.buildState(selectedSystem);
 
     // Books & Scrolls library (issue 511): batch-resolve each recipe item's linked world item and
     // derive its `recipes[]`/`learnedByCount` now the recipe list is built. Overwrites the phase-1
@@ -4494,22 +3002,10 @@ export function createAdminStore(services) {
       graphSearchTerm: get(graphSearch),
       ...environmentState,
       ...travel.buildState(),
-      ...buildWorldCurrencyState(),
+      ...currency.buildState(),
       ...buildCharacterLibrariesState(),
       ...worldScopeState,
     }));
-  }
-
-  // Read the world currency config straight from its store on every publish: cheap (one setting
-  // read plus a normalize), and honest when another client's GM edits the ladder — there is no
-  // per-system cache to invalidate because there is no per-system copy any more.
-  function buildWorldCurrencyState() {
-    const store = services.getCurrencyConfigStore?.();
-    if (!store) return _emptyWorldCurrencyState();
-    const worldCurrency = normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID });
-    // Validated on every publish, off the SAME normalized config the editor renders, so the
-    // report can never describe a ladder the GM is not looking at. Pure in-memory work.
-    return { worldCurrency, worldCurrencyValidation: _buildWorldCurrencyValidation(worldCurrency) };
   }
 
   // The three world-scope entity corpora (issue 1362), read straight from their stores on every
@@ -5396,206 +3892,6 @@ export function createAdminStore(services) {
     };
   }
 
-  // GM Knowledge surface (issue 785).
-
-  function _knowledgeRawCharacter(actorId) {
-    const characters = Array.isArray(knowledgeSnapshot?.characters)
-      ? knowledgeSnapshot.characters
-      : [];
-    return characters.find((character) => String(character?.id) === String(actorId)) || null;
-  }
-
-  function _knowledgeRawOwnedCopy(actorId, itemId) {
-    const copies = _knowledgeRawCharacter(actorId)?.ownedCopies || [];
-    return copies.find((copy) => String(copy?.itemId) === String(itemId)) || null;
-  }
-
-  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key is a STATIC
-  // literal at its call site, because an interpolated key is invisible to both
-  // `ui-lang-keys-resolve` and `lang-keys-no-orphans` and a missing message would ship silently.
-  function _knowledgeText(key, fallback, data = null) {
-    const localized = data ? services.localize?.(key, data) : services.localize?.(key);
-    if (localized) return localized;
-    if (!data) return fallback;
-    return Object.entries(data).reduce(
-      (text, [name, value]) => text.replace(`{${name}}`, String(value)),
-      fallback
-    );
-  }
-
-  function _notifyKnowledgeResult(result) {
-    const message = result?.message;
-    if (!message) return;
-    const text = services.localize?.(message, result?.messageData) || message;
-    if (result?.success === true) services.notify?.info?.(text);
-    else services.notify?.error?.(text);
-  }
-
-  function _publishKnowledge() {
-    viewState.update((prev) => ({
-      ...prev,
-      knowledge: projectKnowledgeSnapshot(knowledgeSnapshot, {
-        active: knowledgeActive,
-        selectedActorId: knowledgeSelectedActorId,
-        defaultTab: knowledgeDefaultTab,
-      }),
-    }));
-  }
-
-  function _clearKnowledgeCache() {
-    knowledgeSnapshot = null;
-    knowledgeDefaultTabResolved = false;
-    knowledgeSelectedActorId = '';
-  }
-
-  /**
-   * Re-read the Knowledge snapshot.
-   *
-   * @param {{force?: boolean}} [options] `force` re-reads the seam; otherwise a cached snapshot is
-   * simply re-published.
-   */
-  async function refreshKnowledge({ force = false } = {}) {
-    if (!knowledgeActive) return false;
-    if (force || !knowledgeSnapshot) {
-      const systemId = get(selectedSystemId);
-      knowledgeSnapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
-      if (!knowledgeDefaultTabResolved) {
-        knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
-        knowledgeDefaultTabResolved = true;
-      }
-    }
-    _publishKnowledge();
-    return true;
-  }
-
-  /** Hook entry point. */
-  function scheduleKnowledgeRefresh() {
-    if (destroyed || !knowledgeActive || knowledgeRefreshScheduled) return;
-    knowledgeRefreshScheduled = true;
-    _onMicrotask(async () => {
-      knowledgeRefreshScheduled = false;
-      if (destroyed) return;
-      await refreshKnowledge({ force: true });
-    });
-  }
-
-  /** Enter or leave the Knowledge surface. */
-  async function setKnowledgeActive(active) {
-    const next = active === true;
-    knowledgeActive = next;
-    if (!next) {
-      _clearKnowledgeCache();
-      _publishKnowledge();
-      return false;
-    }
-    await refreshKnowledge({ force: true });
-    return true;
-  }
-
-  /** Select a roster character. Pure re-publication — no seam read. */
-  function selectKnowledgeActor(actorId) {
-    knowledgeSelectedActorId = String(actorId || '');
-    if (!knowledgeActive) return false;
-    _publishKnowledge();
-    return true;
-  }
-
-  async function _runKnowledgeMutation(call) {
-    const result = (await call()) || {
-      success: false,
-      message: 'FABRICATE.Knowledge.Manage.Failed',
-    };
-    _notifyKnowledgeResult(result);
-    await refreshKnowledge({ force: true });
-    return result;
-  }
-
-  /** Spend one charge of an owned recipe-item copy. */
-  async function expendRecipeItemUse(actorId, itemId) {
-    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
-    return _runKnowledgeMutation(() =>
-      services.expendRecipeItemUse?.({
-        actorId,
-        itemId,
-        definitionId: copy?.definitionId || '',
-        systemId: get(selectedSystemId),
-      })
-    );
-  }
-
-  /** Delete one owned copy. */
-  async function deleteOwnedRecipeItem(actorId, itemId) {
-    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
-    const quantity = Number(copy?.quantity) || 1;
-    if (quantity > 1) {
-      const confirmed = await services.confirmDialog?.({
-        title: _knowledgeText(
-          'FABRICATE.Admin.Manager.Knowledge.DeleteStackTitle',
-          'Delete the whole stack?'
-        ),
-        content: `<p>${_knowledgeText(
-          'FABRICATE.Admin.Manager.Knowledge.DeleteStackContent',
-          'This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.',
-          { quantity }
-        )}</p>`,
-        ..._deleteConfirmButtons(),
-      });
-      if (!confirmed) return { success: false, cancelled: true };
-    }
-    return _runKnowledgeMutation(() => services.deleteOwnedRecipeItem?.({ actorId, itemId }));
-  }
-
-  /**
-   * Erase one learned recipe. Frees the learn budget but deliberately leaves discovery progress
-   * intact — an erase is an un-learn, a reset is an amnesia.
-   */
-  async function eraseLearnedRecipe(actorId, recipeId) {
-    return _runKnowledgeMutation(() => services.eraseLearnedRecipe?.({ actorId, recipeId }));
-  }
-
-  async function _confirmKnowledgeReset(titleKey, titleFallback, contentKey, contentFallback) {
-    const note = _knowledgeText(
-      'FABRICATE.Admin.Manager.Knowledge.ResetDiscoveryNote',
-      'Erasing a single memory leaves discovery progress intact; a reset also clears it.'
-    );
-    return services.confirmDialog?.({
-      title: _knowledgeText(titleKey, titleFallback),
-      content: `<p>${_knowledgeText(contentKey, contentFallback)}</p><p>${note}</p>`,
-      // A reset erases learned knowledge but deletes no definition, so it names its own
-      // verb rather than reusing the delete pair.
-      yes: {
-        label: _knowledgeText('FABRICATE.Admin.Manager.Knowledge.ResetConfirm', 'Reset'),
-        callback: () => true,
-      },
-      no: { callback: () => false },
-    });
-  }
-
-  /** Reset this character's learned knowledge for the SELECTED system. */
-  async function resetActorSystemKnowledge(actorId) {
-    const confirmed = await _confirmKnowledgeReset(
-      'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',
-      'Reset this system?',
-      'FABRICATE.Admin.Manager.Knowledge.ResetSystemContent',
-      'Clear every recipe this character has learned in the selected crafting system.'
-    );
-    if (!confirmed) return { success: false, cancelled: true };
-    const systemId = get(selectedSystemId);
-    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId }));
-  }
-
-  /** Reset this character's learned knowledge across every system. */
-  async function resetActorAllKnowledge(actorId) {
-    const confirmed = await _confirmKnowledgeReset(
-      'FABRICATE.Admin.Manager.Knowledge.ResetAllTitle',
-      'Reset every system?',
-      'FABRICATE.Admin.Manager.Knowledge.ResetAllContent',
-      'Clear every recipe this character has learned across all crafting systems, including entries whose recipe no longer exists.'
-    );
-    if (!confirmed) return { success: false, cancelled: true };
-    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId: null }));
-  }
-
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
@@ -5627,16 +3923,14 @@ export function createAdminStore(services) {
       await refresh();
       return true;
     }
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
+    if (!(await environment.proceedAfterDirtyConfirm())) return false;
 
     selectedSystemId.set(systemId);
     _clearSystemScopedSearches();
     // The Knowledge snapshot is scoped to ONE system's recipe-item definitions
     // (identity is system-scoped), so it can never survive a system change.
-    _clearKnowledgeCache();
-    selectedEnvironmentId.set('');
-    selectedEnvironmentSystemId.set(systemId || '');
-    _setEnvironmentDraftState(null, { persistedDraft: null });
+    knowledge.clearCache();
+    environment.resetForSystem(systemId);
     await services.setSetting('lastManagedCraftingSystem', systemId);
     await refresh();
     return true;
@@ -5644,7 +3938,7 @@ export function createAdminStore(services) {
 
   /** Create a crafting system, select it, and report it back so the caller can navigate. */
   async function createSystem() {
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
+    if (!(await environment.proceedAfterDirtyConfirm())) return false;
 
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
@@ -5691,9 +3985,7 @@ export function createAdminStore(services) {
     const remaining = systemManager.getSystems();
     const nextId = remaining[0]?.id || '';
     selectedSystemId.set(nextId);
-    selectedEnvironmentId.set('');
-    selectedEnvironmentSystemId.set(nextId);
-    _setEnvironmentDraftState(null, { persistedDraft: null });
+    environment.resetForSystem(nextId);
     await services.setSetting('lastManagedCraftingSystem', nextId);
     await refresh();
   }
@@ -5842,712 +4134,12 @@ export function createAdminStore(services) {
     if (
       get(activeTab) === ENVIRONMENTS_TAB &&
       nextTab !== ENVIRONMENTS_TAB &&
-      !(await _discardDirtyEnvironmentDraftForNavigation())
+      !(await environment.discardDirtyForNavigation())
     )
       return false;
     activeTab.set(nextTab);
     await refresh();
     return true;
-  }
-
-  async function selectEnvironment(environmentId) {
-    const nextEnvironmentId = environmentId || '';
-    if (nextEnvironmentId === get(selectedEnvironmentId)) return true;
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
-
-    selectedEnvironmentId.set(nextEnvironmentId);
-    environmentDraftDirty.set(false);
-    environmentDraftIsNew.set(false);
-    environmentSaveError.set(null);
-    environmentValidationState.set(null);
-    await refresh();
-    return true;
-  }
-
-  async function createEnvironmentDraft() {
-    const systemManager = services.getCraftingSystemManager();
-    const system = systemManager?.getSystem?.(get(selectedSystemId)) || null;
-    if (!_canShowEnvironmentsTab(system)) return null;
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
-
-    selectedEnvironmentId.set('');
-    _setEnvironmentDraftState(_newEnvironmentDraft(system.id), {
-      persistedDraft: null,
-      dirty: true,
-      isNew: true,
-      saveError: null,
-    });
-    _patchEnvironmentViewState();
-    return _clonePlain(get(environmentDraft));
-  }
-
-  function _normalizeDraftBlindSelection(value) {
-    if (!value || typeof value !== 'object') return null;
-    const weights =
-      value.weights && typeof value.weights === 'object'
-        ? Object.fromEntries(
-            Object.entries(value.weights)
-              .map(([key, weight]) => [String(key), Number(weight)])
-              .filter(([, weight]) => Number.isFinite(weight))
-          )
-        : {};
-    if (Object.keys(weights).length === 0) return null;
-    return { weights };
-  }
-
-  function _normalizeDraftDropRateAdjustmentValue(value) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < -100 || number > 100 || number === 0) return null;
-    return number;
-  }
-
-  function _normalizeDraftDropRateAdjustmentMap(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([id, adjustment]) => [
-          String(id || '').trim(),
-          _normalizeDraftDropRateAdjustmentValue(adjustment),
-        ])
-        .filter(([id, adjustment]) => id && adjustment !== null)
-    );
-  }
-
-  function _normalizeDraftTaskDropRateAdjustments(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([taskId, rowAdjustments]) => [
-          String(taskId || '').trim(),
-          _normalizeDraftDropRateAdjustmentMap(rowAdjustments),
-        ])
-        .filter(([taskId, rowAdjustments]) => taskId && Object.keys(rowAdjustments).length > 0)
-    );
-  }
-
-  function _normalizeDraftTaskDropRateAdjustmentsEnabled(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([taskId, enabled]) => [String(taskId || '').trim(), enabled])
-        .filter(([taskId, enabled]) => taskId && enabled === false)
-    );
-  }
-
-  function _normalizeDraftEventDropRateAdjustmentsEnabled(value) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([eventId, enabled]) => [String(eventId || '').trim(), enabled])
-        .filter(([eventId, enabled]) => eventId && enabled === false)
-    );
-  }
-
-  function updateEnvironmentDraft(updates = {}) {
-    const current = get(environmentDraft);
-    if (!current || typeof updates !== 'object' || updates === null) return false;
-
-    const allowed = new Set([
-      'name',
-      'description',
-      'img',
-      'enabled',
-      'selectionMode',
-      'compositionMode',
-      'sceneUuid',
-      'includedRealmIds',
-      'biomes',
-      'dangerTags',
-      'dangerLevel',
-      'eventSelectionMode',
-      'eventPolicy',
-      'enabledTaskIds',
-      'disabledTaskIds',
-      'enabledEventIds',
-      'disabledEventIds',
-      'forcedTaskIds',
-      'forcedEventIds',
-      'taskOrder',
-      'eventOrder',
-      'taskDropRateAdjustments',
-      'taskDropRateAdjustmentsEnabled',
-      'eventDropRateAdjustments',
-      'eventDropRateAdjustmentsEnabled',
-      'blindSelection',
-      'nodeRuntime',
-    ]);
-    const next = _clonePlain(current);
-    for (const [field, value] of Object.entries(updates)) {
-      if (!allowed.has(field)) continue;
-      switch (field) {
-        case 'enabled': {
-          next.enabled = value === true;
-
-          break;
-        }
-        case 'compositionMode': {
-          next.compositionMode = value === 'manual' ? 'manual' : 'automatic';
-
-          break;
-        }
-        case 'sceneUuid': {
-          const normalized = String(value ?? '').trim();
-          next.sceneUuid = normalized || null;
-
-          break;
-        }
-        case 'img': {
-          const normalized = String(value ?? '').trim();
-          next.img = normalized || null;
-
-          break;
-        }
-        default: {
-          if (['biomes', 'dangerTags'].includes(field)) {
-            next[field] = _normalizeGatheringTagList(value);
-          } else if (
-            [
-              'includedRealmIds',
-              'enabledTaskIds',
-              'disabledTaskIds',
-              'enabledEventIds',
-              'disabledEventIds',
-              'forcedTaskIds',
-              'forcedEventIds',
-              'taskOrder',
-              'eventOrder',
-            ].includes(field)
-          ) {
-            next[field] = [
-              ...new Set(
-                (Array.isArray(value) ? value : [])
-                  .map((entry) => String(entry || '').trim())
-                  .filter(Boolean)
-              ),
-            ];
-          } else
-            switch (field) {
-              case 'eventDropRateAdjustments': {
-                next.eventDropRateAdjustments = _normalizeDraftDropRateAdjustmentMap(value);
-
-                break;
-              }
-              case 'eventDropRateAdjustmentsEnabled': {
-                next.eventDropRateAdjustmentsEnabled =
-                  _normalizeDraftEventDropRateAdjustmentsEnabled(value);
-
-                break;
-              }
-              case 'taskDropRateAdjustments': {
-                next.taskDropRateAdjustments = _normalizeDraftTaskDropRateAdjustments(value);
-
-                break;
-              }
-              case 'taskDropRateAdjustmentsEnabled': {
-                next.taskDropRateAdjustmentsEnabled =
-                  _normalizeDraftTaskDropRateAdjustmentsEnabled(value);
-
-                break;
-              }
-              case 'blindSelection': {
-                next.blindSelection = _normalizeDraftBlindSelection(value);
-
-                break;
-              }
-              case 'nodeRuntime': {
-                next.nodeRuntime = normalizeNodeRuntime(value);
-
-                break;
-              }
-              default: {
-                next[field] = String(value ?? '');
-              }
-            }
-        }
-      }
-    }
-
-    environmentDraft.set(next);
-    environmentDraftDirty.set(true);
-    environmentSaveError.set(null);
-    environmentValidationState.set(null);
-    _patchEnvironmentViewState();
-    return true;
-  }
-
-  function _compositionFieldKeys(kind) {
-    return kind === 'event'
-      ? {
-          enabledKey: 'enabledEventIds',
-          disabledKey: 'disabledEventIds',
-          orderKey: 'eventOrder',
-          forcedKey: 'forcedEventIds',
-        }
-      : {
-          enabledKey: 'enabledTaskIds',
-          disabledKey: 'disabledTaskIds',
-          orderKey: 'taskOrder',
-          forcedKey: 'forcedTaskIds',
-        };
-  }
-
-  function _compositionIdArray(value) {
-    return Array.isArray(value)
-      ? value.map((entry) => String(entry || '').trim()).filter(Boolean)
-      : [];
-  }
-
-  function setEnvironmentCompositionMode(mode) {
-    return updateEnvironmentDraft({ compositionMode: mode === 'manual' ? 'manual' : 'automatic' });
-  }
-
-  function includeEnvironmentRecord(kind, recordId) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-    const id = String(recordId || '').trim();
-    if (!id) return false;
-    const { enabledKey, disabledKey, orderKey } = _compositionFieldKeys(kind);
-    const enabled = _compositionIdArray(current[enabledKey]);
-    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
-    const order = _compositionIdArray(current[orderKey]);
-    if (!enabled.includes(id)) enabled.push(id);
-    if (!order.includes(id)) order.push(id);
-    return updateEnvironmentDraft({
-      [enabledKey]: enabled,
-      [disabledKey]: disabled,
-      [orderKey]: order,
-    });
-  }
-
-  function forceIncludeEnvironmentRecord(kind, recordId) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-    const id = String(recordId || '').trim();
-    if (!id) return false;
-    const { disabledKey, orderKey, forcedKey } = _compositionFieldKeys(kind);
-    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
-    const order = _compositionIdArray(current[orderKey]);
-    const forced = _compositionIdArray(current[forcedKey]);
-    if (!forced.includes(id)) forced.push(id);
-    if (!order.includes(id)) order.push(id);
-    return updateEnvironmentDraft({
-      [forcedKey]: forced,
-      [disabledKey]: disabled,
-      [orderKey]: order,
-    });
-  }
-
-  function excludeEnvironmentRecord(kind, recordId) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-    const id = String(recordId || '').trim();
-    if (!id) return false;
-    const { enabledKey, disabledKey, forcedKey } = _compositionFieldKeys(kind);
-    const enabled = _compositionIdArray(current[enabledKey]).filter((entry) => entry !== id);
-    const forced = _compositionIdArray(current[forcedKey]).filter((entry) => entry !== id);
-    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
-    if (current.compositionMode !== 'manual') disabled.push(id);
-    return updateEnvironmentDraft({
-      [enabledKey]: enabled,
-      [disabledKey]: disabled,
-      [forcedKey]: forced,
-    });
-  }
-
-  function restoreEnvironmentRecord(kind, recordId) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-    const id = String(recordId || '').trim();
-    if (!id) return false;
-    const { disabledKey } = _compositionFieldKeys(kind);
-    const disabled = _compositionIdArray(current[disabledKey]).filter((entry) => entry !== id);
-    return updateEnvironmentDraft({ [disabledKey]: disabled });
-  }
-
-  function reorderEnvironmentRecord(kind, fromIndex, toIndex) {
-    const current = get(environmentDraft);
-    if (!current) return false;
-    const viewModel = _buildEnvironmentCompositionViewModel(current);
-    const records = kind === 'event' ? viewModel.events : viewModel.tasks;
-    // Both kinds filter on the shared four-state included set, not `runtimeState`, which requires
-    // `conditionsMet`: an included record whose current weather/time did not match would drop out
-    // of `ids`, and this function writes `ids` as the entire new order array, so an ambient runtime
-    // condition would silently discard that record's saved rank.
-    const ids = records
-      .filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
-      .map((entry) => entry.id);
-    const from = Number(fromIndex);
-    const to = Number(toIndex);
-    if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
-    if (from < 0 || from >= ids.length || to < 0 || to >= ids.length || from === to) return false;
-    const [moved] = ids.splice(from, 1);
-    ids.splice(to, 0, moved);
-    const { orderKey } = _compositionFieldKeys(kind);
-    return updateEnvironmentDraft({ [orderKey]: ids });
-  }
-
-  async function cancelEnvironmentDraft() {
-    const persistedDraft = get(persistedEnvironmentDraft);
-    if (persistedDraft) {
-      selectedEnvironmentId.set(persistedDraft.id || '');
-      _setEnvironmentDraftState(persistedDraft, {
-        persistedDraft,
-        dirty: false,
-        isNew: false,
-        saveError: null,
-      });
-    } else {
-      const environments = get(viewState).environments || [];
-      const fallback = environments[0] || null;
-      selectedEnvironmentId.set(fallback?.id || '');
-      _setEnvironmentDraftState(fallback, {
-        persistedDraft: fallback,
-        dirty: false,
-        isNew: false,
-        saveError: null,
-      });
-    }
-    _patchEnvironmentViewState();
-    return _clonePlain(get(environmentDraft));
-  }
-
-  async function saveEnvironmentDraft() {
-    const current = get(environmentDraft);
-    if (!current) return { ok: false, error: 'No environment draft is selected.' };
-
-    const environmentStore = _getEnvironmentStore();
-    if (!environmentStore) {
-      const message =
-        services.localize?.('FABRICATE.Admin.Environments.StoreUnavailable') ||
-        'Gathering environment data is not available.';
-      environmentSaveError.set(message);
-      environmentValidationState.set(null);
-      _patchEnvironmentViewState();
-      return { ok: false, error: message };
-    }
-
-    environmentSaving.set(true);
-    environmentSaveError.set(null);
-    environmentValidationState.set(null);
-    _patchEnvironmentViewState();
-
-    try {
-      const payload = _clonePlain(current);
-      let saved;
-      if (get(environmentDraftIsNew) || !payload.id) {
-        if (!environmentStore.create) {
-          throw new Error('Gathering environment store cannot create environments.');
-        }
-        if (!payload.id) delete payload.id;
-        saved = await environmentStore.create(payload);
-      } else {
-        if (!environmentStore.update) {
-          throw new Error('Gathering environment store cannot update environments.');
-        }
-        saved = await environmentStore.update(payload.id, payload);
-      }
-
-      const savedDraft = _clonePlain(saved || payload);
-      selectedEnvironmentId.set(savedDraft?.id || payload.id || '');
-      _setEnvironmentDraftState(savedDraft, {
-        persistedDraft: savedDraft,
-        dirty: false,
-        isNew: false,
-        saveError: null,
-      });
-      environmentSaving.set(false);
-      await refresh();
-      return { ok: true, environment: _clonePlain(get(environmentDraft)) };
-    } catch (error) {
-      const message = _environmentErrorMessage(error);
-      const validationState = _buildEnvironmentValidationState(
-        error,
-        get(environmentDraft),
-        services.localize,
-        ++environmentValidationAttempt
-      );
-      environmentSaving.set(false);
-      environmentSaveError.set(message);
-      environmentValidationState.set(validationState);
-      _patchEnvironmentViewState();
-      return { ok: false, error: message, validation: _clonePlain(validationState) };
-    }
-  }
-
-  async function duplicateEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
-    const sourceId = environmentId || get(environmentDraft)?.id || '';
-    if (!sourceId) return null;
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
-
-    const environmentStore = _getEnvironmentStore();
-    if (!environmentStore?.duplicate) return null;
-
-    try {
-      const duplicate = await environmentStore.duplicate(sourceId);
-      if (!duplicate) return null;
-      selectedEnvironmentId.set(duplicate.id || '');
-      _setEnvironmentDraftState(duplicate, {
-        persistedDraft: duplicate,
-        dirty: false,
-        isNew: false,
-        saveError: null,
-      });
-      await refresh();
-      return _clonePlain(get(environmentDraft));
-    } catch (error) {
-      environmentSaveError.set(_environmentErrorMessage(error));
-      environmentValidationState.set(null);
-      _patchEnvironmentViewState();
-      return null;
-    }
-  }
-
-  async function deleteEnvironmentDraft(environmentId = get(selectedEnvironmentId)) {
-    const targetId = environmentId || get(environmentDraft)?.id || '';
-    if (!targetId) {
-      if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
-      await cancelEnvironmentDraft();
-      return false;
-    }
-
-    const environmentStore = _getEnvironmentStore();
-    if (!environmentStore?.delete) return false;
-
-    const currentEnvironments = get(viewState).environments || [];
-    const selectedIdBeforeDelete = get(selectedEnvironmentId);
-    const deletingSelectedDraft =
-      targetId === selectedIdBeforeDelete || targetId === get(environmentDraft)?.id;
-    const targetIndex = currentEnvironments.findIndex((environment) => environment.id === targetId);
-    const targetEnvironment =
-      currentEnvironments.find((environment) => environment.id === targetId) ||
-      get(environmentDraft);
-    // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
-    // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which is
-    // HTML.
-    const environmentName = String(targetEnvironment?.name || targetId);
-    const escapedEnvironmentName = _escapeHtml(environmentName);
-    const confirmed = await services.confirmDialog?.({
-      title:
-        services.localize?.('FABRICATE.Admin.Environments.DeleteTitle', {
-          name: environmentName,
-        }) || `Delete ${environmentName}?`,
-      content: `<p>${
-        services.localize?.('FABRICATE.Admin.Environments.DeleteContent', {
-          name: escapedEnvironmentName,
-        }) ||
-        `Delete gathering environment <strong>${escapedEnvironmentName}</strong>? This also cleans active and historical gathering runs that reference it.`
-      }</p>`,
-      ..._deleteConfirmButtons(),
-    });
-    if (!confirmed) return false;
-
-    try {
-      const deleted = await environmentStore.delete(targetId);
-      if (!deleted) return false;
-      const remaining = currentEnvironments.filter((environment) => environment.id !== targetId);
-      if (deletingSelectedDraft) {
-        const next =
-          remaining[Math.min(Math.max(targetIndex, 0), Math.max(remaining.length - 1, 0))] || null;
-        selectedEnvironmentId.set(next?.id || '');
-        _setEnvironmentDraftState(next, {
-          persistedDraft: next,
-          dirty: false,
-          isNew: false,
-          saveError: null,
-        });
-      } else {
-        selectedEnvironmentId.set(selectedIdBeforeDelete);
-        environmentSaveError.set(null);
-        environmentValidationState.set(null);
-      }
-      await refresh();
-      return true;
-    } catch (error) {
-      environmentSaveError.set(_environmentErrorMessage(error));
-      environmentValidationState.set(null);
-      _patchEnvironmentViewState();
-      return false;
-    }
-  }
-
-  async function reorderEnvironments(orderedEnvironmentIds = []) {
-    const systemId = get(selectedSystemId);
-    const environmentStore = _getEnvironmentStore();
-    if (!systemId || !environmentStore?.reorder) return [];
-
-    try {
-      const reordered = await environmentStore.reorder(systemId, orderedEnvironmentIds);
-      const environments = Array.isArray(reordered) ? reordered : [];
-      const selectedId = get(selectedEnvironmentId);
-      if (selectedId && environments.every((environment) => !(environment.id === selectedId))) {
-        selectedEnvironmentId.set(environments[0]?.id || '');
-        environmentDraftDirty.set(false);
-        environmentDraftIsNew.set(false);
-      }
-      environmentSaveError.set(null);
-      environmentValidationState.set(null);
-      await refresh();
-      return _clonePlain(get(viewState).environments || []);
-    } catch (error) {
-      environmentSaveError.set(_environmentErrorMessage(error));
-      environmentValidationState.set(null);
-      _patchEnvironmentViewState();
-      return [];
-    }
-  }
-
-  async function moveEnvironmentDraft(environmentId, direction) {
-    const environments = get(viewState).environments || [];
-    const index = environments.findIndex((environment) => environment.id === environmentId);
-    if (index === -1) return [];
-
-    const nextIndex = direction === 'up' ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= environments.length) return environments;
-
-    const ordered = environments.map((environment) => environment.id);
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(nextIndex, 0, moved);
-    return reorderEnvironments(ordered);
-  }
-
-  async function toggleEnvironmentEnabled(environmentId, enabled) {
-    const targetId = environmentId || '';
-    if (!targetId) return false;
-
-    const environmentStore = _getEnvironmentStore();
-    if (!environmentStore?.update) return false;
-
-    const environments = get(viewState).environments || [];
-    const target = environments.find((environment) => environment.id === targetId);
-    if (!target) return false;
-
-    const nextEnabled = typeof enabled === 'boolean' ? enabled : target.enabled !== true;
-    const payload = {
-      ..._clonePlain(target),
-      enabled: nextEnabled,
-    };
-
-    try {
-      const saved = _clonePlain((await environmentStore.update(targetId, payload)) || payload);
-      if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
-        if (get(environmentDraftDirty)) {
-          const currentDraft = _clonePlain(get(environmentDraft));
-          if (currentDraft?.id === targetId) {
-            environmentDraft.set({
-              ...currentDraft,
-              enabled: saved.enabled === true,
-            });
-            persistedEnvironmentDraft.set(saved);
-          }
-        } else {
-          _setEnvironmentDraftState(saved, {
-            persistedDraft: saved,
-            dirty: false,
-            isNew: false,
-            saveError: null,
-          });
-        }
-      }
-      environmentSaveError.set(null);
-      environmentValidationState.set(null);
-      await refresh();
-      return true;
-    } catch (error) {
-      environmentSaveError.set(_environmentErrorMessage(error));
-      environmentValidationState.set(null);
-      _patchEnvironmentViewState();
-      return false;
-    }
-  }
-
-  // Add or remove a realm "tag" on a specific environment's includedRealmIds,
-  // persisting immediately. Driven from the Realms tab membership editor; the
-  // inverse of the environment editor's own realm selector.
-  async function setEnvironmentRealmMembership(environmentId, realmId, included) {
-    const targetId = environmentId || '';
-    const realm = String(realmId ?? '');
-    if (!targetId || !realm) return false;
-
-    const environmentStore = _getEnvironmentStore();
-    if (!environmentStore?.update) return false;
-
-    const environments = get(viewState).environments || [];
-    const target = environments.find((environment) => environment.id === targetId);
-    if (!target) return false;
-
-    const current = Array.isArray(target.includedRealmIds) ? target.includedRealmIds : [];
-    const has = current.includes(realm);
-    if (included === has) return true; // already in the desired state
-    const nextIds = included ? [...current, realm] : current.filter((id) => id !== realm);
-    const payload = {
-      ..._clonePlain(target),
-      includedRealmIds: nextIds,
-    };
-
-    try {
-      const saved = _clonePlain((await environmentStore.update(targetId, payload)) || payload);
-      if (get(selectedEnvironmentId) === targetId || get(environmentDraft)?.id === targetId) {
-        if (get(environmentDraftDirty)) {
-          const currentDraft = _clonePlain(get(environmentDraft));
-          if (currentDraft?.id === targetId) {
-            environmentDraft.set({
-              ...currentDraft,
-              includedRealmIds: Array.isArray(saved.includedRealmIds)
-                ? saved.includedRealmIds
-                : nextIds,
-            });
-            persistedEnvironmentDraft.set(saved);
-          }
-        } else {
-          _setEnvironmentDraftState(saved, {
-            persistedDraft: saved,
-            dirty: false,
-            isNew: false,
-            saveError: null,
-          });
-        }
-      }
-      environmentSaveError.set(null);
-      environmentValidationState.set(null);
-      await refresh();
-      return true;
-    } catch (error) {
-      environmentSaveError.set(_environmentErrorMessage(error));
-      environmentValidationState.set(null);
-      _patchEnvironmentViewState();
-      return false;
-    }
-  }
-
-  // A deleted realm id is definitionally invalid rather than a GM edit, so it leaves an open
-  // draft too — dirty drafts survive the post-delete re-read, and a clean one is re-seeded from
-  // a record the cascade may have failed to rewrite. Stripping both the draft and its persisted
-  // baseline is what stops a later save re-introducing the id (issue 1848).
-  function _stripRealmFromEnvironmentDraft(realmId) {
-    const realm = String(realmId ?? '');
-    if (!realm) return;
-    const draft = _withoutRealmMembership(get(environmentDraft), realm);
-    const persisted = _withoutRealmMembership(get(persistedEnvironmentDraft), realm);
-    if (!draft && !persisted) return;
-    if (draft) environmentDraft.set(draft);
-    if (persisted) persistedEnvironmentDraft.set(persisted);
-    _patchEnvironmentViewState();
-  }
-
-  // The record with `realmId` gone from both membership lists, or null when it cites neither.
-  function _withoutRealmMembership(record, realmId) {
-    if (!record || typeof record !== 'object') return null;
-    const included = Array.isArray(record.includedRealmIds) ? record.includedRealmIds : [];
-    const excluded = Array.isArray(record.excludedRealmIds) ? record.excludedRealmIds : [];
-    if (!included.includes(realmId) && !excluded.includes(realmId)) return null;
-    const next = _clonePlain(record);
-    if (Array.isArray(record.includedRealmIds)) {
-      next.includedRealmIds = included.filter((id) => id !== realmId);
-    }
-    if (Array.isArray(record.excludedRealmIds)) {
-      next.excludedRealmIds = excluded.filter((id) => id !== realmId);
-    }
-    return next;
   }
 
   // --- Feature toggles ---
@@ -6591,7 +4183,7 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const key = FEATURE_MAP[feature];
     if (!key) return;
-    if (key === 'gathering' && enabled !== true && !(await _proceedAfterDirtyEnvironmentConfirm()))
+    if (key === 'gathering' && enabled !== true && !(await environment.proceedAfterDirtyConfirm()))
       return false;
     if (key === 'multiStepRecipes' && enabled !== true && !(await _confirmDisableMultiStep(sysId)))
       return false;
@@ -8454,217 +6046,6 @@ export function createAdminStore(services) {
   const saveGatheringCheckProgressive = (progressive) => _saveGatheringCheckPatch({ progressive });
   const saveGatheringCheckRouted = (routed) => _saveGatheringCheckPatch({ routed });
 
-  // Currency is WORLD scope (issue 1278): a world runs exactly one Foundry game system and so has
-  // exactly one way actors store coins.
-
-  async function _updateCurrencyConfig(mutate) {
-    const store = services.getCurrencyConfigStore?.();
-    if (!store) return false;
-
-    const currency = normalizeWorldCurrencyConfig(store.get(), { randomID: _randomID });
-    const result = await mutate(currency);
-    if (result === false) return false;
-
-    await store.save(currency);
-    await refresh();
-    return result ?? true;
-  }
-
-  async function addCurrencyUnit(partial = {}) {
-    return await _updateCurrencyConfig((currency) => {
-      const id = String(partial?.id || _randomID()).trim();
-      if (!id || currency.units.some((unit) => unit.id === id)) return null;
-      const unit = normalizeCurrencyUnit(
-        {
-          id,
-          label:
-            partial?.label ||
-            services.localize?.('FABRICATE.Admin.Manager.CurrencyUnits.NewLabel') ||
-            'Currency unit',
-          abbreviation: partial?.abbreviation || '',
-          icon: partial?.icon || 'fa-solid fa-coins',
-          actorPath: partial?.actorPath || '',
-          contains: partial?.contains || [],
-        },
-        _randomID
-      );
-      if (!unit) return null;
-      currency.units = [...currency.units, unit];
-      return unit;
-    });
-  }
-
-  async function updateCurrencyUnit(unitId, updates = {}) {
-    return await _updateCurrencyConfig((currency) => {
-      if (!unitId) return false;
-      let changed = false;
-      currency.units = currency.units.map((unit) => {
-        if (unit.id !== unitId) return unit;
-        changed = true;
-        return normalizeCurrencyUnit({ ...unit, ...updates, id: unit.id }, _randomID) || unit;
-      });
-      return changed;
-    });
-  }
-
-  async function deleteCurrencyUnit(unitId) {
-    return await _updateCurrencyConfig((currency) => {
-      const nextUnits = _deleteCurrencyUnitFromList(currency.units, unitId);
-      if (!nextUnits) return false;
-      currency.units = nextUnits;
-      return true;
-    });
-  }
-
-  /**
-   * Move one currency unit from `fromIndex` to `toIndex` (issue 768); array order is the persisted
-   * order. Takes no system id, because the ladder is world scope.
-   */
-  async function reorderCurrencyUnit(fromIndex, toIndex) {
-    return await _updateCurrencyConfig((currency) => {
-      const next = _reorderListByIndex(currency.units, fromIndex, toIndex);
-      if (!next) return false;
-      currency.units = next;
-      return true;
-    });
-  }
-
-  async function addCurrencySubUnit(parentUnitId, subUnitId, amount = 1) {
-    return await _updateCurrencyConfig((currency) => {
-      if (!canAddCurrencySubUnit(currency.units, parentUnitId, subUnitId)) return false;
-      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
-      currency.units = currency.units.map((unit) =>
-        unit.id === parentUnitId
-          ? {
-              ...unit,
-              contains: [...(unit.contains || []), { unitId: subUnitId, amount: numericAmount }],
-            }
-          : unit
-      );
-      return true;
-    });
-  }
-
-  async function updateCurrencySubUnit(parentUnitId, subUnitId, amount) {
-    return await _updateCurrencyConfig((currency) => {
-      const numericAmount = Math.max(1, Math.trunc(Number(amount) || 1));
-      const { nextUnits, changed } = _updateSubUnitAmountInList(
-        currency.units,
-        parentUnitId,
-        subUnitId,
-        numericAmount
-      );
-      currency.units = nextUnits;
-      return changed;
-    });
-  }
-
-  async function deleteCurrencySubUnit(parentUnitId, subUnitId) {
-    return await _updateCurrencyConfig((currency) => {
-      const { nextUnits, changed } = _deleteSubUnitFromList(
-        currency.units,
-        parentUnitId,
-        subUnitId
-      );
-      currency.units = nextUnits;
-      return changed;
-    });
-  }
-
-  function _foundrySystemId() {
-    return typeof services.getFoundrySystemId === 'function'
-      ? String(services.getFoundrySystemId() || '')
-      : '';
-  }
-
-  // Provider inventory mode means "use the system's coins": the provider owns the denomination
-  // ladder, so `config.units` is overwritten with its canonical units and re-normalized, keeping
-  // the engine's affordability math aligned.
-  function _applyProviderCanonicalUnits(currency) {
-    const normalizedCanonical = getProviderCanonicalUnits(currency.providerId)
-      .map((unit) => normalizeCurrencyUnit(unit, _randomID))
-      .filter(Boolean);
-    if (normalizedCanonical.length === 0) return;
-    currency.units = normalizedCanonical;
-  }
-
-  async function setCurrencySpendStrategy(spendStrategy) {
-    const nextStrategy = ['actorInventory', 'macro'].includes(spendStrategy)
-      ? spendStrategy
-      : 'actorProperty';
-    return await _updateCurrencyConfig((currency) => {
-      currency.spendStrategy = nextStrategy;
-      // Switching to actorInventory seeds a default providerId and syncs the provider's canonical units,
-      // guarded so a no-provider system never wipes the GM's. Switching to macro leaves them in place,
-      // because macros own conversion by abbreviation.
-      if (nextStrategy === 'actorInventory') {
-        if (!currency.providerId) {
-          currency.providerId = getDefaultProviderId(_foundrySystemId());
-        }
-        _applyProviderCanonicalUnits(currency);
-      }
-      return true;
-    });
-  }
-
-  async function setCurrencyProvider(providerId) {
-    return await _updateCurrencyConfig((currency) => {
-      currency.providerId = String(providerId || '').trim();
-      // Selecting a provider adopts its canonical units under the actorInventory strategy; under
-      // other strategies the providerId is inert and user-managed units stay untouched.
-      if (currency.spendStrategy === 'actorInventory') {
-        _applyProviderCanonicalUnits(currency);
-      }
-      return true;
-    });
-  }
-
-  async function setCurrencyMacro(key, uuid) {
-    if (!CURRENCY_MACRO_KEYS.includes(key)) return false;
-    return await _updateCurrencyConfig((currency) => {
-      currency.macros = { ...currency.macros, [key]: String(uuid || '').trim() };
-      return true;
-    });
-  }
-
-  async function clearCurrencyMacro(key) {
-    return await setCurrencyMacro(key, '');
-  }
-
-  async function seedCurrencyUnitPresets() {
-    const foundrySystemId =
-      typeof services.getFoundrySystemId === 'function'
-        ? String(services.getFoundrySystemId() || '')
-        : '';
-    const presets = getCurrencyPresetsForFoundrySystem(foundrySystemId);
-    if (!presets || presets.length === 0) {
-      return { added: [], skipped: [], unsupported: true, foundrySystemId };
-    }
-    return await _updateCurrencyConfig((currency) => {
-      const result = seedCurrencyPresets({
-        presets,
-        currentUnits: currency.units || [],
-      });
-      currency.units = result.next
-        .map((unit) => normalizeCurrencyUnit(unit, _randomID))
-        .filter(Boolean);
-      // pf2e coins live in the actor inventory (read/spent via actor.inventory.removeCoins),
-      // not at a flat actor property, so the pf2e preset selects the actorInventory spend
-      // strategy. dnd5e (and every other system) stays on the default actorProperty strategy.
-      currency.spendStrategy = foundrySystemId === 'pf2e' ? 'actorInventory' : 'actorProperty';
-      // pf2e seeds the system's default provider; dnd5e stays on actorProperty where providerId is
-      // inert (but still normalized/persisted).
-      if (foundrySystemId === 'pf2e') {
-        currency.providerId = getDefaultProviderId(foundrySystemId);
-        // The actorInventory strategy is provider-owned, so overwrite the seeded units with the
-        // provider's canonical ladder (a clean overwrite of the same pf2e preset list) rather than
-        // the merge above, keeping the engine on canonical denominations.
-        _applyProviderCanonicalUnits(currency);
-      }
-      return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
-    });
-  }
-
   async function saveAlchemyConfig(config = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -9537,9 +6918,7 @@ export function createAdminStore(services) {
     unsubscribeTravelMarkerMove = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
-    knowledgeRefreshScheduled = false;
-    knowledgeActive = false;
-    _clearKnowledgeCache();
+    knowledge.deactivate();
     // The graph index retains the whole recipe corpus's component sets (issue 1082); a closed
     // manager must not keep them alive alongside the knowledge snapshot.
     graphIndexCache = null;
@@ -9580,7 +6959,7 @@ export function createAdminStore(services) {
     activeTab,
     recipeSearch,
     itemSearch,
-    selectedEnvironmentId,
+    selectedEnvironmentId: environment.selectedEnvironmentId,
     // Computed state
     viewState,
     // Actions
@@ -9592,16 +6971,16 @@ export function createAdminStore(services) {
     setVisibilityMode,
     setSalvageResolutionMode,
     setTab,
-    selectEnvironment,
-    createEnvironmentDraft,
-    updateEnvironmentDraft,
-    setEnvironmentCompositionMode,
-    includeEnvironmentRecord,
-    forceIncludeEnvironmentRecord,
-    excludeEnvironmentRecord,
-    restoreEnvironmentRecord,
-    reorderEnvironmentRecord,
-    confirmDiscardDirtyEnvironmentDraft,
+    selectEnvironment: environment.selectEnvironment,
+    createEnvironmentDraft: environment.createEnvironmentDraft,
+    updateEnvironmentDraft: environment.updateEnvironmentDraft,
+    setEnvironmentCompositionMode: environment.setEnvironmentCompositionMode,
+    includeEnvironmentRecord: environment.includeEnvironmentRecord,
+    forceIncludeEnvironmentRecord: environment.forceIncludeEnvironmentRecord,
+    excludeEnvironmentRecord: environment.excludeEnvironmentRecord,
+    restoreEnvironmentRecord: environment.restoreEnvironmentRecord,
+    reorderEnvironmentRecord: environment.reorderEnvironmentRecord,
+    confirmDiscardDirtyEnvironmentDraft: environment.confirmDiscardDirtyEnvironmentDraft,
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtyToolEntryDraft,
@@ -9613,14 +6992,14 @@ export function createAdminStore(services) {
     confirmDiscardDirtyGatheringEventDraft,
     confirmGatheringLibraryTaskCompositionLoss,
     confirmGatheringLibraryEventCompositionLoss,
-    cancelEnvironmentDraft,
-    saveEnvironmentDraft,
-    duplicateEnvironmentDraft,
-    deleteEnvironmentDraft,
-    reorderEnvironments,
-    moveEnvironmentDraft,
-    toggleEnvironmentEnabled,
-    setEnvironmentRealmMembership,
+    cancelEnvironmentDraft: environment.cancelEnvironmentDraft,
+    saveEnvironmentDraft: environment.saveEnvironmentDraft,
+    duplicateEnvironmentDraft: environment.duplicateEnvironmentDraft,
+    deleteEnvironmentDraft: environment.deleteEnvironmentDraft,
+    reorderEnvironments: environment.reorderEnvironments,
+    moveEnvironmentDraft: environment.moveEnvironmentDraft,
+    toggleEnvironmentEnabled: environment.toggleEnvironmentEnabled,
+    setEnvironmentRealmMembership: environment.setEnvironmentRealmMembership,
     toggleSystemEnabled,
     setToolBreakageAuthority,
     toggleFeature,
@@ -9662,37 +7041,37 @@ export function createAdminStore(services) {
     updateGatheringLibraryTool,
     deleteGatheringLibraryTool,
     validateGatheringLibraryTool,
-    createToolDraft,
+    createToolDraft: tools.createToolDraft,
     // The id minter, exposed (issue 1373): a world-scope create needs an id and `worldScopeActions`
     // refuses to mint one, reading no Foundry global by design. A fourth hand-rolled copy of this
     // ladder in the root would reach the `Math.random()` rung SonarCloud fails as S2245.
     randomID: _randomID,
-    openToolDraft,
+    openToolDraft: tools.openToolDraft,
     getActorRollData,
-    setToolSectionInherited,
-    removeToolFromSystem,
-    patchToolDraft,
-    stageToolDraftSource,
-    unlinkToolDraftSource,
-    discardToolDraft,
-    deleteToolDraft,
-    toggleToolEnabled,
-    enterToolsDraft,
-    updateToolsDraft,
-    addToolFromUuidToDraft,
-    updateToolInDraft,
-    deleteToolFromDraft,
-    selectDraftTool,
-    setExpandedDraftTool,
-    validateToolsDraft,
-    validateToolDraft,
-    isToolDraftDirty,
-    saveToolDraft,
-    saveAllDirtyToolDrafts,
-    saveToolsDraft,
-    cancelToolsDraft,
-    isToolsDraftDirty,
-    confirmDiscardDirtyToolsDraft,
+    setToolSectionInherited: tools.setToolSectionInherited,
+    removeToolFromSystem: tools.removeToolFromSystem,
+    patchToolDraft: tools.patchToolDraft,
+    stageToolDraftSource: tools.stageToolDraftSource,
+    unlinkToolDraftSource: tools.unlinkToolDraftSource,
+    discardToolDraft: tools.discardToolDraft,
+    deleteToolDraft: tools.deleteToolDraft,
+    toggleToolEnabled: tools.toggleToolEnabled,
+    enterToolsDraft: tools.enterToolsDraft,
+    updateToolsDraft: tools.updateToolsDraft,
+    addToolFromUuidToDraft: tools.addToolFromUuidToDraft,
+    updateToolInDraft: tools.updateToolInDraft,
+    deleteToolFromDraft: tools.deleteToolFromDraft,
+    selectDraftTool: tools.selectDraftTool,
+    setExpandedDraftTool: tools.setExpandedDraftTool,
+    validateToolsDraft: tools.validateToolsDraft,
+    validateToolDraft: tools.validateToolDraft,
+    isToolDraftDirty: tools.isToolDraftDirty,
+    saveToolDraft: tools.saveToolDraft,
+    saveAllDirtyToolDrafts: tools.saveAllDirtyToolDrafts,
+    saveToolsDraft: tools.saveToolsDraft,
+    cancelToolsDraft: tools.cancelToolsDraft,
+    isToolsDraftDirty: tools.isToolsDraftDirty,
+    confirmDiscardDirtyToolsDraft: tools.confirmDiscardDirtyToolsDraft,
     gatheringTaskAutopopulateFromComponent,
     addGatheringLibraryEvent,
     updateGatheringLibraryEvent,
@@ -9733,18 +7112,18 @@ export function createAdminStore(services) {
     saveGatheringCheckActive,
     saveGatheringCheckProgressive,
     saveGatheringCheckRouted,
-    addCurrencyUnit,
-    updateCurrencyUnit,
-    deleteCurrencyUnit,
-    reorderCurrencyUnit,
-    addCurrencySubUnit,
-    updateCurrencySubUnit,
-    deleteCurrencySubUnit,
-    setCurrencySpendStrategy,
-    setCurrencyProvider,
-    setCurrencyMacro,
-    clearCurrencyMacro,
-    seedCurrencyUnitPresets,
+    addCurrencyUnit: currency.addCurrencyUnit,
+    updateCurrencyUnit: currency.updateCurrencyUnit,
+    deleteCurrencyUnit: currency.deleteCurrencyUnit,
+    reorderCurrencyUnit: currency.reorderCurrencyUnit,
+    addCurrencySubUnit: currency.addCurrencySubUnit,
+    updateCurrencySubUnit: currency.updateCurrencySubUnit,
+    deleteCurrencySubUnit: currency.deleteCurrencySubUnit,
+    setCurrencySpendStrategy: currency.setCurrencySpendStrategy,
+    setCurrencyProvider: currency.setCurrencyProvider,
+    setCurrencyMacro: currency.setCurrencyMacro,
+    clearCurrencyMacro: currency.clearCurrencyMacro,
+    seedCurrencyUnitPresets: currency.seedCurrencyUnitPresets,
     saveAlchemyConfig,
     setAlchemyCheckMode,
     saveTeaserConfig,
@@ -9806,16 +7185,16 @@ export function createAdminStore(services) {
     deleteRealm: travel.deleteRealm,
     setGatheringRealmsEnabled,
     // --- GM Knowledge surface (issue 785) ---
-    setKnowledgeActive,
-    refreshKnowledge,
-    scheduleKnowledgeRefresh,
+    setKnowledgeActive: knowledge.setKnowledgeActive,
+    refreshKnowledge: knowledge.refreshKnowledge,
+    scheduleKnowledgeRefresh: knowledge.scheduleKnowledgeRefresh,
     markLearnedRecipeIndexStale,
-    selectKnowledgeActor,
-    expendRecipeItemUse,
-    deleteOwnedRecipeItem,
-    eraseLearnedRecipe,
-    resetActorSystemKnowledge,
-    resetActorAllKnowledge,
+    selectKnowledgeActor: knowledge.selectKnowledgeActor,
+    expendRecipeItemUse: knowledge.expendRecipeItemUse,
+    deleteOwnedRecipeItem: knowledge.deleteOwnedRecipeItem,
+    eraseLearnedRecipe: knowledge.eraseLearnedRecipe,
+    resetActorSystemKnowledge: knowledge.resetActorSystemKnowledge,
+    resetActorAllKnowledge: knowledge.resetActorAllKnowledge,
     // World scope: components, essences and tools (issue 1362). The key set is part of the contract —
     // `setEnabled` is absent on `worldScope.component`, and `setWorldTags` / `setMutedTags` exist only
     // there. `tool.addToSystem` is `adoptWorldTool` rather than the raw world-scope write; see there.

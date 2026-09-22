@@ -48,6 +48,13 @@ test('a reached .svelte.js lands in the compiled runes bucket rather than the co
     closure.runeModules.includes('src/ui/svelte/apps/manager/bulkSelection.svelte.js'),
     'the root imports the bulk-selection composable, so the walk must reach it'
   );
+  // The transitive half, and the reason the bucket is not singleton-shaped: nothing the root
+  // imports directly names this one, so a walk that stopped at the root's own specifiers would
+  // miss it and cancel every root-mounted suite.
+  assert.ok(
+    closure.runeModules.includes('src/ui/svelte/apps/manager/browserListState.svelte.js'),
+    'a view the root graph reaches imports the browse-list composable'
+  );
   assert.ok(
     closure.runeModules.every((path) => path.endsWith('.svelte.js')),
     'nothing but a runes module belongs in a bucket the tree compiles as one'

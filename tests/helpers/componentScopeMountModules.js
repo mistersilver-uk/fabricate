@@ -307,6 +307,8 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         'src/ui/svelte/util/listReorderAnnouncement.js',
         'src/ui/svelte/actions/dragDrop.js',
         'src/utils/componentCategories.js',
+        // The lifted browse state's default page size, read by the browse-list composable.
+        'src/ui/model/managerBrowserViewState.js',
         'src/ui/model/componentBrowserModel.js',
         // ... which since issue 1688 runs on the shared adapter-driven pipeline.
         'src/ui/model/entityBrowserModel.js',
@@ -323,8 +325,12 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         'src/utils/bulkSelectionModel.js',
       ],
       // The selection wiring is a runes composable (issue 1706), so it is COMPILED rather than
-      // copied; copied verbatim it throws `ReferenceError: $state is not defined`.
-      runeModules: ['src/ui/svelte/apps/manager/bulkSelection.svelte.js'],
+      // copied; copied verbatim it throws `ReferenceError: $state is not defined`. The browse-list
+      // wiring (issue 1716) is the second one the view reaches.
+      runeModules: [
+        'src/ui/svelte/apps/manager/bulkSelection.svelte.js',
+        'src/ui/svelte/apps/manager/browserListState.svelte.js',
+      ],
       compiledModules,
       componentPath,
     }),

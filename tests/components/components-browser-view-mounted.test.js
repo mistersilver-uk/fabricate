@@ -13,6 +13,7 @@ import {
 import { createComponentBrowserState } from '../../src/ui/model/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 // Issue 1504: the page-size control is a shared `<Select>`.
 import { chooseSelectOption } from '../helpers/select-control.js';
@@ -297,6 +298,25 @@ describeBrowserBulkSelection({
     count: 1,
     why: 'the row still carries exactly ONE action — a labelled `Edit rules ↗` since parity round 4'
   }
+});
+
+describeBrowserListState({
+  label: 'ComponentsBrowserView',
+  harness: browser,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    itemCards: manyGeneral(rowCount),
+    categoryVocabulary: ['general'],
+    selectedSystemId,
+    browserState
+  }),
+  // Both filters name a vocabulary the new system does not share, and the page goes with them.
+  resetAxes: {
+    categoryFilter: ['alchemy', 'all'],
+    essenceFilter: ['e1', 'all'],
+    pageIndex: [1, 0]
+  },
+  // Sort and grouping are preferences, and the page size with them.
+  preservedAxes: { sortKey: 'difficulty', groupByCategory: false, pageSize: 5 }
 });
 
 // The grouped `pageIds` branch, which the shared cases stopped reaching when this screen's group

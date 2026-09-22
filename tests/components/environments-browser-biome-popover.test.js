@@ -9,6 +9,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -53,6 +54,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/actionMenuLayout.js',
   ],
+  // The browse-list wiring is a runes composable (issue 1716), reached by this view and by the
+  // two gathering browsers it compiles below, so it is compiled rather than copied. An omission
+  // cancels this suite rather than failing it.
+  runeModules: ['src/ui/svelte/apps/manager/browserListState.svelte.js'],
   compiledModules: [
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
@@ -174,24 +179,26 @@ async function openBiomePopover(trigger) {
   flushSync();
 }
 
-describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', () => {
-  before(async () => {
-    await harness.setup();
-    // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
-    // tests/helpers/svelte-dom.js), and `globalThis` itself has no
-    // `addEventListener`. The popover-positioning effect (unrelated to the
-    // dismissal mechanism under test here) registers `window` resize/scroll
-    // listeners whenever the popover opens; stub them so that pre-existing,
-    // out-of-scope effect does not crash this suite.
-    window.addEventListener ??= () => {};
-    window.removeEventListener ??= () => {};
-    // `defineProperty` and not `window.innerWidth = 1280`.
-    Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
-    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
-  });
-  after(harness.teardown);
-  afterEach(harness.remount);
+// File-level, because this harness now serves the shared crafting-system switch run below as
+// well as the popover describe (issue 1716); a `before` inside one describe never reaches another.
+before(async () => {
+  await harness.setup();
+  // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
+  // tests/helpers/svelte-dom.js), and `globalThis` itself has no
+  // `addEventListener`. The popover-positioning effect (unrelated to the
+  // dismissal mechanism under test here) registers `window` resize/scroll
+  // listeners whenever the popover opens; stub them so that pre-existing,
+  // out-of-scope effect does not crash this suite.
+  window.addEventListener ??= () => {};
+  window.removeEventListener ??= () => {};
+  // `defineProperty` and not `window.innerWidth = 1280`.
+  Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+});
+after(harness.teardown);
+afterEach(harness.remount);
 
+describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', () => {
   it("right-clicking the open popover's own trigger closes it instead of reopening it", async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target);
@@ -301,4 +308,115 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
 
     assert.ok(colorPopover(target), 'a mousedown inside the popover leaves it open');
   });
+});
+
+// `EnvironmentsBrowserView` renders the two gathering browsers itself and threads their lifted
+// state through, so all three instantiations below mount the same component.
+const SWITCH_SYSTEM = 'sys-first';
+
+/** One gathering vocabulary the biome add-form can render against. */
+const biomeVocabulary = {
+  values: [
+    { id: 'forest', label: 'Moon Forest', icon: 'fas fa-tree', colorToken: 'sage', customColor: '' },
+  ],
+};
+
+const gatheringRows = (key, rowCount, namePrefix) => ({
+  systems: {
+    [SWITCH_SYSTEM]: {
+      vocabularies: { biomes: biomeVocabulary },
+      [key]: Array.from({ length: rowCount }, (_, index) => ({
+        id: `${key}-${index + 1}`,
+        name: `${namePrefix} ${index + 1}`,
+        enabled: true,
+        biomes: ['forest'],
+      })),
+    },
+  },
+});
+
+describeBrowserListState({
+  label: 'EnvironmentsBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    activeGatheringTab: 'environments',
+    selectedSystemId,
+    selectedSystemName: 'Alchemy',
+    gatheringConfig: gatheringRows('environments', 0, 'Glade'),
+    environments: Array.from({ length: rowCount }, (_, index) => ({
+      id: `env-${index + 1}`,
+      name: `Glade ${index + 1}`,
+      enabled: true,
+      selectionMode: 'weighted',
+      risk: 'safe',
+      biomes: ['forest'],
+    })),
+    browserState,
+  }),
+  // Every filter axis names a vocabulary the new system does not share.
+  resetAxes: {
+    searchTerm: ['moon', ''],
+    statusFilter: ['active', 'all'],
+    selectionFilter: ['weighted', 'all'],
+    riskFilter: ['deadly', 'all'],
+    biomeFilter: ['forest', 'all'],
+  },
+  // The page is the one this view deliberately keeps: its resets only ever widen the corpus, so
+  // the clamp never fires and a GM reading page two stays on page two.
+  preservedAxes: { pageIndex: 1, pageSize: 1 },
+  clampsPage: true,
+  localDraft: {
+    props: ({ selectedSystemId, browserState }) => ({
+      activeGatheringTab: 'settings',
+      selectedSystemId,
+      selectedSystemName: 'Alchemy',
+      gatheringConfig: gatheringRows('environments', 0, 'Glade'),
+      browserState,
+    }),
+    selector: '[data-gathering-vocabulary-panel="biomes"] form input[aria-label="Add biome"]',
+    typed: 'Mushroom forest',
+    why: 'a half-typed biome name belongs to the system it was being added to, so the switch clears it',
+  },
+});
+
+describeBrowserListState({
+  label: 'GatheringTasksBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    activeGatheringTab: 'tasks',
+    selectedSystemId,
+    selectedSystemName: 'Alchemy',
+    gatheringConfig: gatheringRows('tasks', rowCount, 'Forage'),
+    gatheringTasksBrowserState: browserState,
+  }),
+  resetAxes: {
+    searchTerm: ['forage', ''],
+    statusFilter: ['active', 'all'],
+    biomeFilter: ['forest', 'all'],
+    availabilityFilter: ['limited', 'all'],
+    pageIndex: [1, 0],
+  },
+  preservedAxes: { pageSize: 1 },
+  clampsPage: true,
+});
+
+describeBrowserListState({
+  label: 'GatheringEventsBrowserView',
+  harness,
+  props: ({ rowCount, selectedSystemId, browserState }) => ({
+    activeGatheringTab: 'encounters',
+    selectedSystemId,
+    selectedSystemName: 'Alchemy',
+    gatheringConfig: gatheringRows('events', rowCount, 'Ambush'),
+    gatheringEventsBrowserState: browserState,
+  }),
+  resetAxes: {
+    searchTerm: ['ambush', ''],
+    statusFilter: ['active', 'all'],
+    biomeFilter: ['forest', 'all'],
+    dangerFilter: ['deadly', 'all'],
+    pageIndex: [1, 0],
+  },
+  preservedAxes: { pageSize: 1 },
+  clampsPage: true,
 });
