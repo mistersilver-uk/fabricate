@@ -19,7 +19,7 @@ A SKILL.md is loaded whole into a subagent's context, so its token cost is paid 
 - No generic language-teaching or imported boilerplate content; every section must be specific to this repository's stack and workflow.
 - Every backtick-quoted repository path must exist — `npm run validate:agents` fails CI on a missing path (an intentionally absent path needs an entry in the validator's allow-missing set with a reason).
 - Cite code by symbol name and file path, never by line number; the same validator rejects `file.js:NNN`-style citations.
-- A PR description template must include the `Closes #<issue>` closing-keyword line inside its `Description` section.
+- The PR description template lives in `.github/pull_request_template.md`; a skill that opens or updates a PR references that file rather than carrying a copy.
 - Write one sentence per line (`npm run lint:md` enforces it).
 - Instructions must be mechanical: state the trigger condition and the default instead of "when feasible" or "where practical".
 

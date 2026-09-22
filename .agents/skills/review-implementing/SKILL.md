@@ -23,21 +23,7 @@ Commit fixes to that same branch, push it, and update the existing PR unless the
 Ensure the PR title complies with Conventional Commits.
 For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
 
-When updating the PR description, preserve or add these H2 sections in order, keeping the closing keyword (`Closes #<issue>`) on its own line in `Description`:
-
-```md
-## Description
-
-Closes #<issue>
-
-## Benefit(s)
-
-## Changes in this PR
-
-## Testing
-
-## Screenshots (if applicable)
-```
+When updating the PR description, preserve or add the H2 sections of `.github/pull_request_template.md` in its order, keeping the closing keyword (`Closes #<issue>`) on its own line in `Description`.
 
 ### 1. Parse Reviewer Notes
 
