@@ -10,14 +10,41 @@ import {
   toggledDirection,
   VOCABULARY_SORT_KEYS,
 } from '../src/ui/svelte/apps/manager/vocabularyShell.js';
+import { SYSTEM_VOCABULARY_PANELS } from '../src/ui/svelte/apps/manager/systemVocabularyStudio.js';
 import { WORLD_VOCABULARY_PANELS } from '../src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js';
 
 const row = (id, name, totalUsage = 0) => ({ id, name, totalUsage });
 
 test('defineVocabularyPanel answers the kind facts neither scope gets to choose', () => {
-  // THE WHOLE POINT OF THE FACTORY. A scope states its own hooks and lang wiring; where the panel
-  // sits and which glyph heads it belong to the VOCABULARY, so a scope cannot drift into drawing
-  // the recipe categories somewhere else.
+  // THE WHOLE POINT OF THE FACTORY. Two scopes state their own hooks and lang wiring; where the
+  // panel sits and which glyph heads it belong to the VOCABULARY, so the two screens cannot drift
+  // into drawing the recipe categories in different places.
+  for (const kind of ['recipeCategories', 'componentCategories', 'componentTags']) {
+    const world = WORLD_VOCABULARY_PANELS.find((panel) => panel.kind === kind);
+    const system = SYSTEM_VOCABULARY_PANELS.find((panel) => panel.kind === kind);
+    assert.ok(world && system, `${kind} is a panel at BOTH scopes`);
+    assert.equal(world.column, system.column, `${kind} sits in the same band on both screens`);
+    assert.equal(world.icon, system.icon, `${kind} is headed by the same glyph on both screens`);
+  }
+  // AND THE HOOKS DIVERGE, which is what makes the clause above a claim rather than a tautology.
+  // WITHIN a scope, because three panels mount at once and a shared hook makes every row selector
+  // ambiguous; ACROSS the two scopes `rowAttr` is deliberately the same vocabulary of hooks, since
+  // the two screens are different routes and are never mounted together.
+  for (const table of [WORLD_VOCABULARY_PANELS, SYSTEM_VOCABULARY_PANELS]) {
+    for (const field of ['kind', 'rowAttr', 'inputId', 'sortLabelId']) {
+      const values = table.map((panel) => panel[field]);
+      assert.equal(new Set(values).size, 3, `two panels share a ${field}: ${values.join(', ')}`);
+    }
+  }
+  // The two DOCUMENT-scoped ids must not collide across scopes either: an id is unique per
+  // document, and the two screens share a stylesheet and a component.
+  for (const field of ['inputId', 'sortLabelId']) {
+    const values = [...WORLD_VOCABULARY_PANELS, ...SYSTEM_VOCABULARY_PANELS].map(
+      (panel) => panel[field]
+    );
+    assert.equal(new Set(values).size, 6, `a ${field} is reused across scopes: ${values.join(', ')}`);
+  }
+
   const divergent = defineVocabularyPanel({
     kind: 'componentTags',
     rowAttr: 'data-tag-id',

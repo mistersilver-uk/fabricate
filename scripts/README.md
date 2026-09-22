@@ -718,7 +718,8 @@ Each is full-profile only, leaves the world as it found it, and rides an existin
 - `fabricate-journal-craft-detail` — the Journal with a crafting history run selected so the run-detail requirements card is visible.
 - `player-crafting-roll-result` — the crafting run summary's roll-result box (awarded pills and outcome) after a UI craft.
 - `chat-craft-card` — the chat sidebar clipped to the crafting result card posted by the Phase E craft.
-- `manager-tags-categories-tags-tab` — the Tags & Categories screen's Item tags rows (the three seeded tags).
+- `manager-tags-categories-tags-tab` — the Tags & Categories screen's component-tag band (the three seeded tags), scrolled into view.
+  The id predates issue 1915's retirement of the tabs and is kept for golden and evidence-map stability; there is no tab to open, and the band is addressed by `[data-vocabulary-panel="componentTags"]`.
 
 ### Test artifacts
 

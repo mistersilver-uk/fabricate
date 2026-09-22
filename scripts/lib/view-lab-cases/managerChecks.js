@@ -536,19 +536,39 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
     ],
   }),
+  // THE THREE VOCABULARY FRAMES, all three kept through issue 1915's convergence. `-tags-tab` is
+  // retained under its old id for golden and evidence-map stability; there is no tab to open any
+  // more, so it now selects the TAG panel's sort control instead.
   managerCase({
     id: 'manager-tags-categories-normal',
     label: 'Manager — Tags categories normal',
     smokeLabels: ['manager-tags-categories-normal'],
     reaches: 'exact',
     query: {},
-    steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-recipe' }],
+    steps: [{ selector: '#manager-nav-tags' }],
     expectView: 'tags',
+    // Like-for-like with `world-vocabulary`: one shell, two frames, the same frame.
+    position: { width: 1280, height: 1000 },
+    // Each panel's trailing delete control, measured inside ITS OWN panel (issue 1915).
+    expectContained: [
+      {
+        container: '[data-vocabulary-panel="recipeCategories"]',
+        target: '[data-category-id] .manager-icon-button',
+      },
+      {
+        container: '[data-vocabulary-panel="componentCategories"]',
+        target: '[data-component-category-id] .manager-icon-button',
+      },
+      {
+        container: '[data-vocabulary-panel="componentTags"]',
+        target: '[data-tag-id] .manager-icon-button',
+      },
+    ],
     kinds: ['manager', 'tags'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
-      // `VocabularyTabs` is the strip issue 1429 extracted from `TagsCategoriesView`, so the prefix above misses it.
-      /^src\/ui\/svelte\/apps\/manager\/(VocabularyTabs|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
     ],
   }),
   managerCase({
@@ -557,12 +577,19 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-tags-categories-tags-tab'],
     reaches: 'exact',
     query: {},
-    steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-tag' }],
+    steps: [
+      { selector: '#manager-nav-tags' },
+      // The tag band's own direction toggle, which leaves it sorted DESCENDING in the frame.
+      { selector: '[data-vocabulary-panel="componentTags"] [data-vocabulary-direction]' },
+    ],
     expectView: 'tags',
+    expectSelector: '[data-vocabulary-panel="componentTags"] [data-vocabulary-direction="desc"]',
+    position: { width: 1280, height: 1000 },
     kinds: ['manager', 'tags'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
-      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
     ],
   }),
   managerCase({
@@ -571,13 +598,37 @@ export const CASES = Object.freeze([
     smokeLabels: ['manager-tags-categories-stacked'],
     reaches: 'exact',
     query: {},
-    steps: [{ selector: '#manager-nav-tags' }, { selector: '#vocabulary-tab-recipe' }],
+    // ONE COLUMN, with a confirm strip ARMED on a referenced row: the state where a 354px card
+    // has to hold the two confirm buttons without wrapping them out of it.
+    steps: [
+      { selector: '#manager-nav-tags' },
+      {
+        selector:
+          '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .manager-icon-button:not(.is-danger)',
+      },
+    ],
     expectView: 'tags',
+    expectSelector: '[data-vocabulary-confirm]',
     position: { width: 1000, height: 700 },
+    expectContained: [
+      {
+        container: '[data-vocabulary-panel="recipeCategories"]',
+        target: '[data-category-id] .manager-icon-button',
+      },
+      {
+        container: '[data-vocabulary-panel="componentCategories"]',
+        target: '[data-component-category-id] .manager-icon-button',
+      },
+      {
+        container: '[data-vocabulary-panel="componentTags"]',
+        target: '[data-tag-id] .manager-icon-button',
+      },
+    ],
     kinds: ['manager', 'tags', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
-      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
     ],
   }),
 ]);

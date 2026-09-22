@@ -12,7 +12,11 @@ import {
 } from '../../../../../systems/worldVocabulary.js';
 import { isGeneralComponentCategory } from '../../../../../utils/componentCategories.js';
 import { isGeneralRecipeCategory } from '../../../../../utils/recipeCategories.js';
-import { decorateTagRows, defineVocabularyPanel } from '../vocabularyShell.js';
+import {
+  decorateTagRows,
+  defineVocabularyPanel,
+  vocabularyPanelProps,
+} from '../vocabularyShell.js';
 
 /** The lang-key root every world vocabulary string hangs off. */
 const LANG_ROOT = 'FABRICATE.Admin.Manager.Scoped.WorldVocabulary';
@@ -156,54 +160,50 @@ function panelText(panel, field, text, fallback = '') {
 }
 
 /**
- * The whole prop bag for one world panel, so every per-kind copy spelling lives in this module and
- * the page states none of its own.
+ * The whole prop bag for one world panel. Every per-kind copy spelling lives here rather than on
+ * the page, and the shared assembler carries the structural half both scopes agree on.
  *
  * @param {object} panel one {@link WORLD_VOCABULARY_PANELS} descriptor
  * @param {{rows: object[], text: Function, routeIcon: string, onAdd: Function, onRemove: Function}} wiring
  * @returns {object} the props `VocabularyShellPanel` takes and spreads over `VocabularyPanel`
  */
 export function worldPanelProps(panel, { rows, text, routeIcon = '', onAdd, onRemove }) {
-  const title = panelText(panel, 'Title', text);
-  return {
-    kind: panel.kind,
-    icon: panel.icon || routeIcon,
-    title,
-    subline: panelText(panel, 'Subline', text),
-    sortToolbarLabel: text(`${LANG_ROOT}.SortToolbar`, 'Sort {vocabulary}').replace(
-      '{vocabulary}',
-      title
-    ),
-    sortLabelId: panel.sortLabelId,
-    rows,
-    label: title,
-    inputId: panel.inputId,
-    inputLabel: panelText(panel, 'InputLabel', text),
-    inputPlaceholder: panelText(panel, 'Placeholder', text),
-    addLabel: panelText(panel, 'AddLabel', text),
-    rowAttr: panel.rowAttr,
-    lockedRow: null,
-    emptyTitle: panelText(panel, 'EmptyTitle', text),
-    emptyHint: panelText(panel, 'EmptyHint', text),
-    emptyIcon: panel.emptyIcon,
-    searchPlaceholder: panelText(panel, 'SearchPlaceholder', text),
-    searchLabel: panelText(panel, 'SearchLabel', text),
-    searchMissTitle: panelText(panel, 'SearchMiss', text, 'No matches for "{query}".'),
-    removeLabel: panelText(panel, 'RemoveLabel', text),
-    removeNamedLabel: panelText(panel, 'RemoveNamedLabel', text, '{name}'),
-    removeConfirmHint: panelText(panel, 'RemoveConfirm', text),
-    confirmRemoveLabel: text(
-      'FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove',
-      'Delete anyway'
-    ),
-    cancelRemoveLabel: text('FABRICATE.Admin.Manager.Cancel', 'Cancel'),
-    describeInput: describeVocabularyInput(panel, rows, text),
-    normalize: inputNormalizer(panel.kind),
-    successFeedback: () => panelText(panel, 'AddedFeedback', text),
-    addFailedFeedback: panelText(panel, 'AddFailedFeedback', text),
-    showIcon: panel.showIcon,
-    decorativeIcon: panel.decorativeIcon,
-    onAdd: (value) => onAdd(panel, value),
-    onRemove: (row) => onRemove(panel, row),
-  };
+  const label = panelText(panel, 'Title', text);
+  return vocabularyPanelProps(
+    panel,
+    {
+      label,
+      subline: panelText(panel, 'Subline', text),
+      sortToolbarLabel: text(`${LANG_ROOT}.SortToolbar`, 'Sort {vocabulary}').replace(
+        '{vocabulary}',
+        label
+      ),
+      inputLabel: panelText(panel, 'InputLabel', text),
+      inputPlaceholder: panelText(panel, 'Placeholder', text),
+      addLabel: panelText(panel, 'AddLabel', text),
+      emptyTitle: panelText(panel, 'EmptyTitle', text),
+      emptyHint: panelText(panel, 'EmptyHint', text),
+      searchPlaceholder: panelText(panel, 'SearchPlaceholder', text),
+      searchLabel: panelText(panel, 'SearchLabel', text),
+      searchMissTitle: panelText(panel, 'SearchMiss', text, 'No matches for "{query}".'),
+      removeLabel: panelText(panel, 'RemoveLabel', text),
+      removeNamedLabel: panelText(panel, 'RemoveNamedLabel', text, '{name}'),
+      removeConfirmHint: panelText(panel, 'RemoveConfirm', text),
+      confirmRemoveLabel: text(
+        'FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove',
+        'Delete anyway'
+      ),
+      cancelRemoveLabel: text('FABRICATE.Admin.Manager.Cancel', 'Cancel'),
+      addFailedFeedback: panelText(panel, 'AddFailedFeedback', text),
+    },
+    {
+      icon: panel.icon || routeIcon,
+      rows,
+      describeInput: describeVocabularyInput(panel, rows, text),
+      normalize: inputNormalizer(panel.kind),
+      successFeedback: () => panelText(panel, 'AddedFeedback', text),
+      onAdd: (value) => onAdd(panel, value),
+      onRemove: (row) => onRemove(panel, row),
+    }
+  );
 }

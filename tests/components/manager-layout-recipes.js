@@ -1025,17 +1025,16 @@ test('the Books & Scrolls route names one grid track per section and grows the t
 
 // The same defect family on the Tags & Categories route (issue 878). It carried its own duplicate
 // page header until then, which happened to give it exactly three children for the shared
-// three-track `auto auto 1fr`. Deleting the header took it to TWO, and the shared template's `1fr`
-// would have landed on an EMPTY third row — the vocabulary workspace sizing to its content with
-// the panel's remaining height sitting dead below it, the mirror image of the books-scrolls
-// toolbar float.
-test('the Tags & Categories route names one grid track per section and grows the workspace', () => {
+// three-track `auto auto 1fr`. Deleting the header took it to two, and issue 1915 to ONE: the tab
+// strip is retired and the shared vocabulary shell is `<main>`'s only child, so a leading `auto`
+// track would size the shell's status line and leave the growing track to the panels below it.
+test('the Tags & Categories route names one grid track for the shell it now renders', () => {
   assertOneTrackPerGridChild({
     viewFile: 'TagsCategoriesView.svelte',
     route: 'tags',
-    expectedChildren: 2,
-    growingLabel: 'the scrolling vocabulary workspace',
-    autoLabel: 'the tab strip',
+    expectedChildren: 1,
+    growingLabel: 'the scrolling vocabulary shell',
+    autoLabel: 'nothing else',
   });
 });
 
@@ -1085,7 +1084,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
     </div>`;
     await page.setContent(
       withChipHash(
-        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="fabricate-tabs manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-editor-tab-count">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section><span class="manager-chip" data-default-chip-reference>Default</span></div></main></div></div>`
+        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-vocabulary-shell"><div class="manager-vocabulary-shell-grid"><section class="manager-vocabulary-shell-panel" data-vocabulary-panel="recipeCategories"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></section></div><span class="manager-chip" data-default-chip-reference>Default</span></div></main></div></div>`
       )
     );
     const geometry = await page.evaluate(() => {

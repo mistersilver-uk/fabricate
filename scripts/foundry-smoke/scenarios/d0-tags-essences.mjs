@@ -12,17 +12,23 @@ export default {
   consumes: [],
   async run(ctx) {
     const { page, results, screenshot } = ctx;
-    await setManagerWindowSize(page, { width: 1280, height: 820 });
+    // 1280x1000 since issue 1915: the screen draws all three vocabularies at once, at the same
+    // frame the world screen it now shares a shell with is captured at.
+    await setManagerWindowSize(page, { width: 1280, height: 1000 });
     await page.locator(railSelector('manager-nav-tags')).click();
     await page
       .locator('.fabricate-manager[data-manager-view="tags"]')
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
     await page.waitForTimeout(500);
+    // A PRESENCE GUARD ON THE FIRST PANEL rather than on the retired inspector card: the route
+    // can render its shell with no panels in it, and that is the failure worth naming here.
     if (
-      (await page.locator('.fabricate-manager [data-tags-evidence="how-it-works"]').count()) === 0
+      (await page
+        .locator('.fabricate-manager [data-vocabulary-panel="recipeCategories"]')
+        .count()) === 0
     ) {
-      throw new Error('Manager tags inspector did not render the How-it-works evidence card.');
+      throw new Error('Manager tags screen did not render the recipe-category vocabulary panel.');
     }
     await captureStableManagerView(ctx, {
       layout: 'tags-categories normal',
@@ -32,16 +38,10 @@ export default {
     // Tags & Categories → Item tags panel, scrolled to its seeded rows (issue #752 — evidence
     // for #735's row rendering).
     try {
-      // The issue-689 redesign is tabbed (one vocabulary at a time) and renames the tab "Component
-      // tags"; the pre-redesign screen stacks all three panels with the old "Item tags" label.
-      const tagsTabButton = page.locator('.fabricate-manager [data-vocabulary-tab="tag"]').first();
-      if ((await tagsTabButton.count()) > 0) {
-        await tagsTabButton.click();
-      }
+      // No tab to open since issue 1915: the tag vocabulary is the full-width band beneath the
+      // 2-up category grid, and it is addressed by its own panel hook.
       const itemTagsPanel = page
-        .locator(
-          '.fabricate-manager .manager-vocabulary-panel[aria-label="Component tags"], .fabricate-manager .manager-vocabulary-panel[aria-label="Item tags"]'
-        )
+        .locator('.fabricate-manager [data-vocabulary-panel="componentTags"]')
         .first();
       await itemTagsPanel.waitFor({ state: 'visible', timeout: 5000 });
       const tagRowCount = await itemTagsPanel.locator('[data-tag-id]').count();

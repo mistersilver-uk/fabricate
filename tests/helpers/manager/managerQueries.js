@@ -313,17 +313,22 @@ export function createManagerQueries(getTarget) {
     return getTarget().querySelector('.fabricate-manager').dataset.managerView;
   }
 
-  // The three numbers that disagreed on one screen before issue 878: the tab mark, the inspector's
-  // at-a-glance tile, and the active panel's own entry chip.
-  function vocabularyCounters(tab, fact) {
+  /**
+   * The three numbers one vocabulary is counted by since issue 1915 retired the tabs: the nav
+   * rail's badge, which is the WHOLE screen's vocabulary; the panel's own entry chip; and the rows
+   * it actually renders, reserved row included. The rail badge is deliberately not per-kind - it
+   * is the sum, and a per-panel assertion that quoted it would be asserting a different number.
+   *
+   * @param {string} kind `recipeCategories` | `componentCategories` | `componentTags`
+   * @param {string} rowAttr that panel's own row hook
+   */
+  function vocabularyCounters(kind, rowAttr) {
+    const panel = getTarget().querySelector(`[data-vocabulary-panel="${kind}"]`);
+    assert.ok(Boolean(panel), `the ${kind} panel is not mounted, so its counters read nothing`);
     return {
-      tabBadge: getTarget()
-        .querySelector(`[data-vocabulary-tab="${tab}"] .manager-editor-tab-count`)
-        .textContent.trim(),
-      glanceTile: getTarget()
-        .querySelector(`[data-tags-category-fact="${fact}"] strong`)
-        .textContent.trim(),
-      entryChip: getTarget().querySelector('[data-vocabulary-shown-count] span').textContent.trim(),
+      railBadge: getTarget().querySelector('#manager-nav-tags .manager-nav-count').textContent.trim(),
+      entryChip: panel.querySelector('[data-vocabulary-shown-count] span').textContent.trim(),
+      rowCount: panel.querySelectorAll(`[${rowAttr}]`).length,
     };
   }
 

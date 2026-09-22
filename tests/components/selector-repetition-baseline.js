@@ -5,10 +5,10 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 204 repeated selectors
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 203 repeated selectors
  * rather than these 110, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,042 `(at-context, selector)` keys, of which 2,932 appear exactly
+ * Unfiltered, the sheet holds 3,038 `(at-context, selector)` keys, of which 2,928 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,565 rules at that head, 110 repeated keys and 225 appearances
+ * printed from. The sheet holds 2,562 rules at that head, 110 repeated keys and 225 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -101,6 +101,23 @@
  * earlier reading of this table is the base's: issue 1371's catalogue, entry and system-rules
  * screens added seven repeated keys and rebuilt two rules out of existence, all of it beneath
  * both branches and neither one's conversion.
+ * ISSUE 1915 MOVED THE THREE CONTEXTUAL FIGURES AND ONE OF THE KEYED-ALONE ONES, and it is the
+ * first change here to move the keyed-alone figure without touching the keyed table. Converging
+ * both Tags & Categories screens on one shell deletes three rule blocks:
+ * `.manager-tags-categories-workspace` at the top level AND its member of the 1120px
+ * `@container` collapse list, and `.manager-vocabulary-tabs`, whose tab strip is retired. The
+ * workspace class is the reason the keyed-alone figure moves: its two rules sit in two DIFFERENT
+ * at-contexts, so it is two singletons under this file's keying and one repeated selector under
+ * the other, and deleting both takes 204 -> 203 there while the keyed table is untouched.
+ * `.manager-environment-details-grid` leaves with it, a fourth singleton key: it was the
+ * workspace's only companion in that `@container` list and `styles-dead-classes` reports the
+ * block as matching nothing the moment the workspace selector goes, which is that gate finding a
+ * dead selector that had been hiding inside a live rule. The `tags` `.manager-main` rule is
+ * REWRITTEN rather than added, and the narrowed toolbar-select skin is RE-KEYED onto
+ * `.manager-vocabulary-shell-panel` — a singleton before and after in both keyings — so neither
+ * moves a figure. 2,565 -> 2,562 rules, 3,042 -> 3,038 keys, 2,932 -> 2,928 singletons, 204 ->
+ * 203 keyed alone; 110 repeated keys and 225 appearances are unmoved. Re-derived by running
+ * `node scripts/stylesheet-selector-census.mjs`, not subtracted.
  */
 import { readFileSync } from 'node:fs';
 

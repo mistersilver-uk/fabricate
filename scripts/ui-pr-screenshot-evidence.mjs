@@ -428,12 +428,10 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
-      // The vocabulary tab strip, extracted out of the view in issue 1429.
-      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
-      // The inspector rail's contextual help and reference-safety card render through the
-      // shared explainer primitive (issue 881), whose CSS is co-located in its own scoped
-      // block; these frames are the ones that show it on this screen.
-      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
+      // The shared vocabulary shell and its per-panel card (issue 1915), which replaced both the
+      // retired tab strip and the inspector rail's explainer cards on this screen.
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
     ],
   },
   // Issue 752: the Item tags vocabulary rows (evidence for #735's row rendering).
@@ -443,8 +441,8 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-tags-categories-tags-tab'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
     ],
   },
   {

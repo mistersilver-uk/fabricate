@@ -85,3 +85,31 @@ export function partitionVocabularyPanels(panels) {
 export function toggledDirection(direction) {
   return direction === 'asc' ? 'desc' : 'asc';
 }
+
+/**
+ * One panel's whole prop bag, assembled once for both scopes. The descriptor supplies the
+ * structural half (hooks, ids, glyphs), `copy` the already-localized strings under the scope's own
+ * lang root, and `wiring` the rows and callbacks. Each scope therefore states only what diverges.
+ *
+ * @param {object} panel a {@link defineVocabularyPanel} descriptor
+ * @param {object} copy already-localized strings, keyed by the prop they land on
+ * @param {object} wiring rows, row predicates and callbacks
+ * @returns {object} the props `VocabularyShellPanel` takes and spreads over `VocabularyPanel`
+ */
+export function vocabularyPanelProps(panel, copy, wiring) {
+  return {
+    kind: panel.kind,
+    icon: panel.icon,
+    title: copy.label,
+    sortLabelId: panel.sortLabelId,
+    inputId: panel.inputId,
+    rowAttr: panel.rowAttr,
+    emptyIcon: panel.emptyIcon,
+    showIcon: panel.showIcon,
+    decorativeIcon: panel.decorativeIcon,
+    // The world scope has no reserved entry; the system scope overrides this through `wiring`.
+    lockedRow: null,
+    ...copy,
+    ...wiring,
+  };
+}

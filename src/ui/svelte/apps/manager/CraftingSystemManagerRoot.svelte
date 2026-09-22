@@ -9396,9 +9396,6 @@
         {categoryRows}
         {componentCategoryRows}
         {tagRows}
-        counts={tagCategoryCounts}
-        activeTab={tagsActiveTab}
-        onTabChange={(id) => (tagsActiveTab = id)}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
         onAddComponentCategory={addComponentCategory}

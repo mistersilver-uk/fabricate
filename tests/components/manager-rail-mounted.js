@@ -718,16 +718,20 @@ export function registerRailCases() {
     },
     {
       name: 'the recipe-category vocabulary panel',
-      trip: 'switching vocabulary tab and back',
+      trip: 'leaving the route and coming back',
       open: async () => {
         navButton('Tags & Categories').click();
       },
       searchLabel: 'Search recipe categories',
       term: 'Poti',
-      // A tab switch UNMOUNTS this panel and mounts the component one.
-      leave: () => target.querySelector('[data-vocabulary-tab="component"]').click(),
-      leftPanel: 'Search component categories',
-      back: () => target.querySelector('[data-vocabulary-tab="recipe"]').click(),
+      // A ROUTE trip since issue 1915: the three vocabularies mount together, so there is no tab
+      // to switch to and the whole screen is what unmounts. The sibling panel is still checked,
+      // because three panels on one screen share a slot registry and only ONE of them may hold
+      // this term.
+      leave: () => navButton('Essence Rules').click(),
+      leftView: 'essences',
+      siblingSearch: 'Search component categories',
+      back: () => navButton('Tags & Categories').click(),
       view: 'tags',
     },
     {
@@ -841,6 +845,15 @@ export function registerRailCases() {
         surface.term,
         `${surface.name} kept the search term across ${surface.trip}`
       );
+      // A SIBLING ON THE SAME SCREEN, where one exists. Three vocabulary panels mount at once and
+      // each binds its own slot; a shared one would restore the term into all three.
+      if (surface.siblingSearch) {
+        assert.equal(
+          searchValue(surface.siblingSearch),
+          '',
+          `${surface.siblingSearch} has its OWN slot — the term did not leak across the panels`
+        );
+      }
     });
   }
 
