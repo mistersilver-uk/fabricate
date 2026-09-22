@@ -52,6 +52,7 @@ import {
   planTagRemovals,
   planRecipeTagRemovals,
 } from '../../model/vocabularyCascade.js';
+import { normalizeVocabularyKey } from '../../model/vocabularyUsage.js';
 import {
   canAddCurrencySubUnit,
   CURRENCY_MACRO_KEYS,
