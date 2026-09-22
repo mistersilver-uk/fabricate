@@ -29,9 +29,13 @@
  * `normalizeCustomComponentCategories` de-duplicates on the case-PRESERVING value, so `Reagent`
  * and `reagent` remain two distinct system categories while `## CraftingSystem` requirement 6c
  * already keys their shared icon map by the lowercased name. Issue 1397 is the symptom of that
- * inconsistency. This module takes the rule the icon maps and the reference counter already
- * assume; reconciling the system half, and deciding how a world `reagent` and a system `Reagent`
- * resolve in a merged list, is issue 1411's (`## World Vocabulary` requirement 3).
+ * inconsistency, and its crash is fixed at the DISPLAY layer: the three system row builders
+ * de-duplicate on this same normalized key, first spelling wins in stored order, while
+ * `normalizeCustomCategoryNames` keeps de-duplicating storage on the case-preserving value.
+ * Component tags diverge from nothing, because `normalizeTag` already lower-cases. This module
+ * takes the rule the icon maps and the reference counter already assume; reconciling the storage
+ * half, and deciding how a world `reagent` and a system `Reagent` resolve in a merged list, is
+ * issue 1411's (`## World Vocabulary` requirement 3).
  *
  * ## The reserved general bucket is not a world entry
  *

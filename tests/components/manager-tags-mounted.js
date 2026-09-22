@@ -603,6 +603,98 @@ export function registerTagsCases() {
     assert.ok(target.textContent.includes('Tag could not be added.'));
   });
 
+  // ── Case-only duplicates collapse to one row rather than crashing the list (issue 1397) ──
+  describe('two entries differing only in case (issue 1397)', () => {
+    /** Every row id one panel renders, in document order. */
+    const rowIds = (kind, rowAttr) =>
+      [...panelFor(kind).querySelectorAll(`[${rowAttr}]`)].map((row) =>
+        row.getAttribute(rowAttr)
+      );
+
+    /** One row's visible name. */
+    const rowName = (kind, rowAttr, id) =>
+      panelFor(kind)
+        .querySelector(`[${rowAttr}="${id}"] .manager-vocabulary-main strong`)
+        .textContent.trim();
+
+    it('renders one row per normalized key across all three vocabularies', async () => {
+      // Before issue 1397 each pair minted two rows under one `id`, and Svelte's keyed `{#each}`
+      // threw `each_key_duplicate` while the screen was rendering - so the whole route died.
+      await openTagsScreen([], {
+        selectedSystemOverrides: {
+          categories: ['Potions', 'potions'],
+          componentCategories: ['Reagent', 'reagent'],
+          itemTags: ['herb', 'HERB'],
+        },
+      });
+
+      assert.deepEqual(rowIds('recipeCategories', 'data-category-id'), ['general', 'potions']);
+      assert.deepEqual(rowIds('componentCategories', 'data-component-category-id'), [
+        'general',
+        'reagent',
+      ]);
+      assert.deepEqual(rowIds('componentTags', 'data-tag-id'), ['herb']);
+      // The FIRST spelling in stored order is the one that survives.
+      assert.equal(rowName('recipeCategories', 'data-category-id', 'potions'), 'Potions');
+      assert.equal(rowName('componentCategories', 'data-component-category-id', 'reagent'), 'Reagent');
+      // Tag rows render their name `#`-prefixed, which is the row anatomy rather than the entry.
+      assert.equal(rowName('componentTags', 'data-tag-id', 'herb'), '#herb');
+    });
+
+    it('counts a custom General as the locked row it collides with, not as a second entry', async () => {
+      // The other half of the defect: the two category builders PREPEND the locked General row,
+      // so a GM-authored `General` produced a second row under an id the list already held.
+      // The COUNTERS are what see this one. `splitGeneralRow` lifts every `general`-id row out of
+      // the custom list before it is rendered, so the duplicate never reaches the keyed `{#each}`
+      // and the row list alone cannot tell a collapsed pair from a correct build.
+      await openTagsScreen([], {
+        selectedSystemOverrides: { categories: ['General', 'Potions'], componentCategories: [] },
+      });
+
+      assert.deepEqual(
+        vocabularyCounters('recipeCategories', 'data-category-id'),
+        { railBadge: '6', entryChip: '2 entries', rowCount: 2 },
+        'General plus one custom category is two entries in the panel and two of the six the ' +
+          'rail badge sums, not three'
+      );
+      assert.deepEqual(rowIds('recipeCategories', 'data-category-id'), ['general', 'potions']);
+      assert.ok(
+        panelFor('recipeCategories')
+          .querySelector('[data-category-id="general"]')
+          .textContent.includes('Locked'),
+        'the surviving General row is the locked reserved one, not the GM-authored duplicate'
+      );
+    });
+
+    it('leaves the other spelling rendered once the shown one is deleted (known successor state)', async () => {
+      // Storage stays case-preserving (issue 1411 owns reconciling it), so deleting the visible
+      // `Potions` removes only that spelling and `potions` takes its place on the next publish.
+      const calls = [];
+      await openTagsScreen(calls, {
+        selectedSystemOverrides: { categories: ['Potions', 'potions'] },
+      });
+
+      target.querySelector('[aria-label="Remove category Potions"]').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger').click();
+      await tick();
+      flushSync();
+      assert.ok(
+        calls.some((call) => call[0] === 'removeCategory' && call[1] === 'Potions'),
+        'the delete reaches the store with the AUTHORED label of the spelling on screen'
+      );
+
+      // What storage then holds, mounted as the GM would next see it.
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      await openTagsScreen([], { selectedSystemOverrides: { categories: ['potions'] } });
+      assert.deepEqual(rowIds('recipeCategories', 'data-category-id'), ['general', 'potions']);
+      assert.equal(rowName('recipeCategories', 'data-category-id', 'potions'), 'potions');
+    });
+  });
+
   // ── The nav badge reads the pre-counted tag placeholders (issue 1081) ────────────────
   describe('the Tags & Categories badge reads pre-counted placeholders (issue 1081)', () => {
     /** A projected recipe row whose detail-tier fields are COUNTING getters. */

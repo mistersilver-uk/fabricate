@@ -1,9 +1,40 @@
 /** Reference counting for the Tags & Categories screen (issue 689). */
 
+/** The COUNTING key: a record's stored value trimmed and lower-cased, a blank keying as `''`. */
 function vocabularyKey(value) {
   return String(value || '')
     .trim()
     .toLowerCase();
+}
+
+/**
+ * The ROW ID key: the same trim and lower-case, with a blank falling into the reserved `general`
+ * bucket because a vocabulary row always names a bucket a record can belong to.
+ *
+ * It is deliberately not {@link vocabularyKey}: folding a blank into `general` there would count an
+ * uncategorised record as a reference to the reserved bucket.
+ */
+export function normalizeVocabularyKey(value) {
+  return vocabularyKey(value) || 'general';
+}
+
+/**
+ * The custom entries of one system vocabulary, one spelling per {@link normalizeVocabularyKey}.
+ *
+ * The first spelling in STORED order wins, so the visible name is the one the GM authored first;
+ * blanks and the reserved bucket are dropped, the latter because the category row builders prepend
+ * the locked General row outside this set and a second row under its id crashes the list.
+ */
+export function dedupeVocabularyEntries(entries) {
+  const firstSpellingByKey = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const spelling = String(entry ?? '').trim();
+    if (!spelling) continue;
+    const key = normalizeVocabularyKey(spelling);
+    if (key === 'general' || firstSpellingByKey.has(key)) continue;
+    firstSpellingByKey.set(key, spelling);
+  }
+  return [...firstSpellingByKey.values()].sort((left, right) => left.localeCompare(right));
 }
 
 function increment(map, key) {

@@ -2701,11 +2701,17 @@ vocabulary is a set of VALUES those records take.
    Nothing renames an entry, which is why the id is derived rather than minted.
    De-duplication is on `id`, FIRST-WINS.
    **This DIVERGES from the system-scope rule and the divergence is temporary and owned**:
-   `normalizeComponentCategory` preserves authored casing so `Reagent` and `reagent` remain
+   `normalizeCustomComponentCategories` preserves authored casing so `Reagent` and `reagent` remain
    distinct system categories, while `## CraftingSystem` requirement 6c already keys their shared
    icon map by the lowercased name — the inconsistency issue 1397 is the symptom of.
+   Issue 1397's crash is fixed at the DISPLAY layer — all three system row builders de-duplicate on
+   the normalized (trimmed, lower-cased) key, first spelling wins in stored order, matching this
+   rule — and the STORAGE rule is unchanged: `normalizeCustomCategoryNames`, shared by both category
+   vocabularies, still de-duplicates on the case-preserving value, so `Reagent` and `reagent` remain
+   two distinct system categories.
+   Component tags have no such divergence; `normalizeTag` already lower-cases.
    The world rule is the one the icon maps and the reference counter already assume; reconciling
-   the system half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged
+   the storage half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged
    per-kind list `## Scoped Entity Definitions` requirement 12 mandates, is issue 1411's.
 4. **Each vocabulary's reserved general bucket is not a world entry.**
    It is implicit per system, never persisted, and refused on add at both scopes

@@ -41,7 +41,11 @@
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
-  import { buildVocabularyUsage } from '../../../model/vocabularyUsage.js';
+  import {
+    buildVocabularyUsage,
+    dedupeVocabularyEntries,
+    normalizeVocabularyKey,
+  } from '../../../model/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
@@ -3517,12 +3521,6 @@
     return featureMap
       .filter(([key]) => system.features[key] === true)
       .map(([, key, fallback]) => text(key, fallback));
-  }
-
-  function uniqueSorted(values) {
-    return Array.from(
-      new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b));
   }
 
   function buildSelectedCountFacts(counts) {
@@ -7418,16 +7416,9 @@
     return parts.join(', ');
   }
 
-  function normalizeVocabularyKey(value) {
-    const normalized = String(value || '')
-      .trim()
-      .toLowerCase();
-    return normalized || 'general';
-  }
-
   function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
-    const customRows = uniqueSorted(categories || []).map((category) => {
+    const customRows = dedupeVocabularyEntries(categories).map((category) => {
       const key = normalizeVocabularyKey(category);
       const recipeUsageCount = usage.get(key) || 0;
       return {
@@ -7457,7 +7448,7 @@
   // Component-category rows (issue 676).
   function buildComponentCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Common.General', 'General');
-    const customRows = uniqueSorted(categories || []).map((category) => {
+    const customRows = dedupeVocabularyEntries(categories).map((category) => {
       const key = normalizeVocabularyKey(category);
       const componentUsageCount = usage.get(key) || 0;
       return {
@@ -7485,7 +7476,7 @@
   }
 
   function buildTagRows(tags, usage) {
-    return uniqueSorted(tags || []).map((tag) => {
+    return dedupeVocabularyEntries(tags).map((tag) => {
       const key = normalizeVocabularyKey(tag);
       const componentUsageCount = usage.get(key) || 0;
       return {

@@ -14,7 +14,12 @@ import {
   planTagRemovals,
   planRecipeTagRemovals,
 } from '../src/ui/model/vocabularyCascade.js';
-import { buildVocabularyUsage, countRecipeTagPlaceholders } from '../src/ui/model/vocabularyUsage.js';
+import {
+  buildVocabularyUsage,
+  countRecipeTagPlaceholders,
+  dedupeVocabularyEntries,
+  normalizeVocabularyKey,
+} from '../src/ui/model/vocabularyUsage.js';
 
 describe('categoryIcons (issue 689)', () => {
   it('normalizes a Font Awesome class string and rejects markup', () => {
@@ -198,5 +203,44 @@ describe('vocabularyUsage (issue 689)', () => {
     assert.equal(usage.categoryReferenceCount, 2);
     assert.equal(usage.componentCategoryReferenceCount, 2);
     assert.equal(usage.tagReferenceCount, 4);
+  });
+});
+
+describe('the system vocabulary row key and its de-duplication (issue 1397)', () => {
+  it('keys a row on its trimmed lower-cased name and a blank on the reserved bucket', () => {
+    assert.equal(normalizeVocabularyKey('  Potions '), 'potions');
+    assert.equal(normalizeVocabularyKey('HERB'), 'herb');
+    assert.equal(normalizeVocabularyKey(''), 'general');
+    assert.equal(normalizeVocabularyKey('   '), 'general');
+    assert.equal(normalizeVocabularyKey(null), 'general');
+  });
+
+  it('is deliberately NOT the counting key, which leaves a blank uncounted', () => {
+    // The counting key reads a record's stored value; an uncategorised recipe belongs to no
+    // vocabulary entry, so folding it into `general` here would invent references.
+    const usage = buildVocabularyUsage([{ category: '', ingredientSets: [] }], []);
+    assert.equal(usage.categoryUsage.get('general'), undefined);
+    assert.equal(usage.categoryUsage.get(''), 1);
+  });
+
+  it('keeps the FIRST spelling of a collapsed key, in stored order', () => {
+    assert.deepEqual(dedupeVocabularyEntries(['Potions', 'potions']), ['Potions']);
+    assert.deepEqual(dedupeVocabularyEntries(['potions', 'Potions']), ['potions']);
+    assert.deepEqual(dedupeVocabularyEntries(['herb', 'HERB', ' Herb ']), ['herb']);
+  });
+
+  it('drops the reserved bucket at any spelling, because the builders prepend it', () => {
+    assert.deepEqual(dedupeVocabularyEntries(['General', 'Potions']), ['Potions']);
+    assert.deepEqual(dedupeVocabularyEntries([' general ', 'GENERAL']), []);
+  });
+
+  it('drops blanks and non-strings, and never returns an entry that renders as nothing', () => {
+    assert.deepEqual(dedupeVocabularyEntries(['  ', '', null, undefined, 'Ore']), ['Ore']);
+    assert.deepEqual(dedupeVocabularyEntries(null), []);
+    assert.deepEqual(dedupeVocabularyEntries(undefined), []);
+  });
+
+  it('orders the survivors by localeCompare rather than by storage order', () => {
+    assert.deepEqual(dedupeVocabularyEntries(['ore', 'Ale', 'herb']), ['Ale', 'herb', 'ore']);
   });
 });
