@@ -44,7 +44,7 @@ tests/components/gathering-chance-bar-mounted.test.js	2
 tests/components/gathering-detail-mounted.test.js	31
 tests/components/gathering-environments-mounted.test.js	34
 tests/components/gathering-environments-source.test.js	133
-tests/components/gathering-event-editor.test.js	79
+tests/components/gathering-event-editor.test.js	80
 tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
 tests/components/gathering-realm-toggle.test.js	32
@@ -81,7 +81,7 @@ tests/components/pill-family-routing.test.js	1
 tests/components/portal-host-app-root.test.js	3
 tests/components/re-rooted-controls-host-independence.test.js	19
 tests/components/recipe-browser-mounted.test.js	5
-tests/components/recipe-edit-placeholder.test.js	36
+tests/components/recipe-edit-placeholder.test.js	38
 tests/components/recipe-studio-primitives.test.js	5
 tests/components/recipes-browser-view-mounted.test.js	3
 tests/components/record-inspector-nodes-mounted.test.js	2
