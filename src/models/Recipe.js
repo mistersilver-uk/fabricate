@@ -317,23 +317,10 @@ export class Recipe {
       plain('Recipe must have at least one result group');
     }
 
-    const resultContainers = hasSteps
-      ? this.steps.map((step, stepIndex) => ({
-          location: `Step "${this._entityLabel(step, stepIndex)}"`,
-          resultGroups: Array.isArray(step.resultGroups) ? step.resultGroups : [],
-          resultSelection: step.resultSelection || this.resultSelection,
-        }))
-      : [
-          {
-            location: 'Recipe',
-            resultGroups: this.resultGroups,
-            resultSelection: this.resultSelection,
-          },
-        ];
-
-    for (const container of resultContainers) {
+    for (const container of this._resultContainers()) {
       this._validateResultGroups(container.resultGroups, container.location, issues, {
         requireComplete,
+        requireResults: container.requireResults,
         Roll,
       });
       this._validateRoutedResultSelection(
@@ -394,7 +381,33 @@ export class Recipe {
     return name || String(index + 1);
   }
 
-  _validateResultGroups(resultGroups, location, issues, { requireComplete = true, Roll } = {}) {
+  /**
+   * One result-validation scope per step, or a single `Recipe` scope when there are none.
+   * `requireResults` marks the terminal scope, the only one that must award something (issue 1907).
+   */
+  _resultContainers() {
+    const { resultGroups, resultSelection } = this;
+    if (this.steps.length === 0) {
+      return [{ location: 'Recipe', resultGroups, resultSelection, requireResults: true }];
+    }
+    return this.steps.map((step, stepIndex) => ({
+      location: `Step "${this._entityLabel(step, stepIndex)}"`,
+      resultGroups: Array.isArray(step.resultGroups) ? step.resultGroups : [],
+      resultSelection: step.resultSelection || this.resultSelection,
+      requireResults: stepIndex === this.steps.length - 1,
+    }));
+  }
+
+  /**
+   * Validate one scope's result groups: unique ids, non-empty contents, each result valid.
+   * `requireResults` is false for a non-terminal step, whose groups may award nothing (issue 1907).
+   */
+  _validateResultGroups(
+    resultGroups,
+    location,
+    issues,
+    { requireComplete = true, requireResults = true, Roll } = {}
+  ) {
     const resultGroupIds = new Set();
     const resultIds = new Set();
     for (const [groupIndex, group] of resultGroups.entries()) {
@@ -406,10 +419,10 @@ export class Recipe {
       }
       resultGroupIds.add(group.id);
       if (!Array.isArray(group.results) || group.results.length === 0) {
-        // The reserved alchemy Simple failure group (`role: 'failure'`) is empty-by-default and
-        // legitimately produces nothing on a failed check, so an empty one is NOT a completeness
-        // error (issue 554).
-        if (requireComplete && group.role !== 'failure') {
+        // Two exemptions from the contents rule: the reserved alchemy Simple failure group
+        // (`role: 'failure'`), empty-by-default on a failed check (issue 554), and any group on a
+        // non-terminal step, which may award nothing while the run advances (issue 1907).
+        if (requireComplete && requireResults && group.role !== 'failure') {
           issues.push(
             buildRecipeActivationIssue('resultGroupEmpty', { location, group: groupLabel })
           );

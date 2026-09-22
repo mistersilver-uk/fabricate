@@ -33,6 +33,10 @@
     failureResultsAllowed = false,
     // Progressive systems award this group's results in order; forwarded to the group card.
     progressive = false,
+    // Whether this scope is the recipe, or the TERMINAL step of a multi-step recipe. Only a
+    // terminal scope must produce, so an empty group elsewhere is legal (issue 1907). Defaults
+    // true so a caller with no step concept keeps today's danger-toned empty panel.
+    isTerminalStep = true,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     // Deep link from a progressive row's difficulty badge to the component editor.
@@ -187,6 +191,7 @@
         chromeless={true}
         {componentOptions}
         {progressive}
+        {isTerminalStep}
         {onOpenComponent}
         onChange={(nextGroup) => updateSimpleGroup(nextGroup)}
       />
@@ -223,6 +228,7 @@
             {componentOptions}
             {routingProvider}
             {progressive}
+            {isTerminalStep}
             {onOpenComponent}
             ingredientSetOptions={ingredientOptionsFor(group)}
             assignedIngredientSetIds={assignedSetIdsFor(group)}

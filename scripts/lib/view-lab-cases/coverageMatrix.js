@@ -418,7 +418,12 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' }],
+    // The crafting list pages at twelve rows, and the lab world now holds more recipes than
+    // that ahead of the Runeblade alphabetically (issue 1907), so narrow the list first.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+    ],
     kinds: ['player', 'crafting', 'resolution-mode'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_CHECK],
   }),

@@ -9,6 +9,8 @@ Define destructive operations, required confirmations, clean-up behaviour, and m
 - Destructive actions must be explicit and confirmed.
 - Clean-up must be deterministic and idempotent.
 - Invalid references should be removed or marked stale immediately.
+- An empty result group is AUTHORED DATA, not residue, so a cascade may prune only a group it emptied ITSELF (issue 1907).
+  A group that arrived empty — the reserved `role: 'failure'` group, or a non-terminal step's deliberately empty group — is retained by every cascade, the component-reference strip (`stripComponentsFromRecipeJson`) included, because pruning it would turn a valid recipe into one missing a step's result group.
 
 ## Destructive Operations
 
@@ -95,6 +97,7 @@ It has both a single-essence and a SET form, and the two perform the same cascad
 4. Every recipe referencing the essence — through either the legacy per-set essences map or a first-class essence ingredient option, at recipe level or step level — is rewritten to drop it.
    A group left with no options is dropped, and a set left with no ingredient groups, ingredients or essences is dropped.
 5. A recipe left with no ingredient sets, or with no results, is clamped to disabled.
+   A result group that was ALREADY empty when the cascade ran is retained rather than pruned — the reserved `role: 'failure'` group and a non-terminal step's deliberately empty group are authored data, not residue (issue 1907) — so the cascade never prunes an authored empty group.
 6. Each rewritten recipe is re-saved as an INCOMPLETE authoring shell (`allowIncomplete`), because a recipe stripped of its only requirement is deliberately persisted rather than deleted.
 7. The rewrites run BEFORE the crafting-system write.
    That ordering is only safe because the disabled-essence blocker is an ACTIVATION-only validation and never a persistence one: a persistence-level blocker would abort the cascade partway through, with the essence definitions and component essence maps already mutated in memory and nothing persisted.
@@ -123,6 +126,7 @@ When `features.multiStepRecipes` is disabled for a system that has multi-step re
 1. Existing multi-step recipes are **retained verbatim** in persisted data.
    No recipe is deleted, migrated, reverted, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
 2. Each such recipe stays **listed and craftable** for every viewer — it is never hidden from the player listing and the crafting guard never rejects it on multi-step grounds.
+   Its player-listing PRODUCES row still resolves the recipe's product step (`ui-integration`, Multi-Step Recipe Presentation), because the projected step count reads AUTHORED structure rather than the feature flag, and the collapsed chain does award that step's results (issue 1907).
 3. A collapsed recipe executes as an **atomic chain**: one craft action runs the authored steps sequentially, back-to-back, in a single call, with no step-triggering UX and no between-step waiting.
    Each step keeps its own consumption, crafting check, tool, and result-creation behaviour, so the chain reuses the existing per-step machinery.
 4. **Time requirements sum into one gate.** When time requirements are enabled, the single atomic action waits behind one gate whose duration is the **sum** of every step's duration; the chain then executes all steps at maturity.

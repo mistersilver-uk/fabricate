@@ -58,6 +58,39 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipes-inspector-empty-step',
+    label: 'Manager — Recipes inspector on an empty intermediate step',
+    // Issue 1907: the pager opens on `sm-r-pattern-blade` step 1, whose result group is authored
+    // empty. The note is the neutral muted one, not the danger panel the terminal step keeps.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      // The row `<li>` is a container: `onSelectRecipe` is bound to the nested identity BUTTON, so
+      // clicking the wrapper leaves the inspector on its fallback recipe and renders no pager.
+      {
+        selector:
+          '.manager-recipe-row[data-recipe-id="sm-r-pattern-blade"] .manager-recipe-identity',
+      },
+      { selector: '[data-recipe-step-pager]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager [data-recipe-produces-empty].manager-muted:not(.manager-recipe-flow-empty)',
+    // The note has to be IN the picture, not merely in the DOM. The inspector is a scrolling rail
+    // BESIDE `.manager-main`, not inside it, so it is the container both pins are taken against.
+    expectContained: [
+      { container: '[data-recipe-inspector]', target: '[data-recipe-step-pager]' },
+      { container: '[data-recipe-inspector]', target: '[data-recipe-produces-empty]' },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Recipe/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipes-narrow',
     label: 'Manager — Recipes narrow',
     smokeLabels: ['manager-recipes-narrow'],

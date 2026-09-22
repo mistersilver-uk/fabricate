@@ -107,13 +107,16 @@ export function stripComponentsFromRecipeJson(recipe, componentIds) {
           Object.keys(set.essences || {}).length > 0
       );
 
+  // Only a group THIS strip emptied is residue. A group that ARRIVED empty is authored data —
+  // the reserved `role: 'failure'` group, and a non-terminal step's deliberately empty group
+  // (issue 1907) — so pruning it would turn a valid recipe into one missing a step's result group.
   const stripResultGroups = (groups) =>
-    (groups || [])
-      .map((group) => ({
-        ...group,
-        results: (group?.results || []).filter((res) => !isDeletedLegacy(res)),
-      }))
-      .filter((group) => (group.results || []).length > 0);
+    (groups || []).flatMap((group) => {
+      const authored = (group?.results || []).length;
+      const results = (group?.results || []).filter((res) => !isDeletedLegacy(res));
+      if (authored > 0 && results.length === 0) return [];
+      return [{ ...group, results }];
+    });
 
   json.ingredientSets = stripSets(source?.ingredientSets);
   json.resultGroups = stripResultGroups(source?.resultGroups);

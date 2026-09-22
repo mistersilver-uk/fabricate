@@ -1529,6 +1529,90 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.match(produces[0].textContent, /×3/);
   });
 
+  it('multi-step: an empty INTERMEDIATE step reads as neutral progress, the terminal one as a gap', async () => {
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-empty-intermediate',
+        steps: [
+          {
+            id: 's1',
+            name: 'Fold',
+            ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g1', name: 'Nothing yet', results: [] }]
+          },
+          {
+            id: 's2',
+            name: 'Finish',
+            ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g2', name: 'Final', results: [] }]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const intermediate = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(intermediate, 'the GM is told what the step is for');
+    assert.match(intermediate.textContent, /only advances the craft/);
+    assert.ok(
+      intermediate.classList.contains('manager-muted'),
+      'the neutral note reuses the muted copy class'
+    );
+    assert.ok(
+      !intermediate.classList.contains('manager-recipe-flow-empty'),
+      'an intermediate step is not a gap, so it carries no danger panel'
+    );
+    assert.ok(!intermediate.querySelector('i'), 'and no alarm icon');
+
+    root.querySelector('[data-recipe-step-next]').click();
+    flushSync();
+
+    const terminal = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(terminal, 'the terminal step still warns');
+    assert.match(terminal.textContent, /a successful craft makes nothing/);
+    assert.ok(
+      terminal.classList.contains('manager-recipe-flow-empty'),
+      'the terminal-step panel keeps its danger tone'
+    );
+    assert.ok(Boolean(terminal.querySelector('i')), 'and its alarm icon');
+  });
+
+  it('multi-step: a step with NO result group at all keeps the danger note, not the neutral one', async () => {
+    // `stepMissingResultGroup` is unchanged by issue 1907: only a step that DECLARES a group may
+    // award nothing. A shell step reading "it only advances the craft" would hide a real gap.
+    const root = await inspector.mount({
+      selectedRecipe: makeRecipe({
+        id: 'r-shell-step',
+        steps: [
+          {
+            id: 's1',
+            name: 'Fold',
+            ingredientSets: [{ id: 'set1', ingredientGroups: [{ id: 'ig1', options: [{ id: 'o1', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: []
+          },
+          {
+            id: 's2',
+            name: 'Finish',
+            ingredientSets: [{ id: 'set2', ingredientGroups: [{ id: 'ig2', options: [{ id: 'o2', quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }] }] }],
+            resultGroups: [{ id: 'g2', name: 'Final', results: [{ id: 'r2', componentId: 'cmp-potion', quantity: 1 }] }]
+          }
+        ]
+      }),
+      recipeCount: 1,
+      componentOptions: INSPECTOR_COMPONENTS
+    });
+
+    const empty = root.querySelector('[data-recipe-produces-empty]');
+    assert.ok(empty, 'the missing group is still reported');
+    assert.ok(
+      empty.classList.contains('manager-recipe-flow-empty'),
+      'a step with no result group is a gap, so it keeps the danger panel'
+    );
+    assert.ok(Boolean(empty.querySelector('i')), 'and its alarm icon');
+    assert.match(empty.textContent, /a successful craft makes nothing/);
+  });
+
   it('alchemy: two outcome sections — Success and Failure — never "Result Group N"', async () => {
     const root = await inspector.mount({
       selectedRecipe: makeRecipe({

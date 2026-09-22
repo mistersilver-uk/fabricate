@@ -524,6 +524,169 @@ test('routedByCheck multi-step: first step evaluated, empty top-level result, st
   assert.deepEqual(recipe.steps, [], 'step-list body is simple-only');
 });
 
+// routedByIngredients PRODUCES = terminal step (issue 1907)
+
+function routedSystem() {
+  const system = simpleSystem({ features: { multiStepRecipes: true } });
+  system.resolutionMode = 'routedByIngredients';
+  system.resultSelection = { provider: 'ingredientSet' };
+  return system;
+}
+
+// A routed recipe whose FIRST step awards nothing: its one set routes to a result group that
+// exists but is empty, which issue 1907 made legal on a non-terminal step.
+function routedEmptyFirstStepRecipe() {
+  return new Recipe({
+    id: 'recipe-routed-multistep',
+    name: 'Folded Blade',
+    craftingSystemId: 'sys-survival',
+    ingredientSets: [],
+    resultGroups: [],
+    resultSelection: { provider: 'ingredientSet' },
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Fold',
+        ingredientSets: [
+          { ...ingredientSet('set-1', [{ componentId: 'c-leather', quantity: 5 }]), resultGroupId: 'rg-1' },
+        ],
+        resultGroups: [{ id: 'rg-1', name: 'Nothing yet', results: [] }],
+      },
+      {
+        id: 'step-2',
+        name: 'Finish',
+        ingredientSets: [
+          { ...ingredientSet('set-2', [{ componentId: 'c-lumber', quantity: 1 }]), resultGroupId: 'rg-2' },
+        ],
+        resultGroups: [
+          { id: 'rg-2', name: 'Tent', results: [{ componentId: 'c-tent', quantity: 1 }] },
+        ],
+      },
+    ],
+  });
+}
+
+test('routedByIngredients multi-step PRODUCES the terminal step product, not the empty first step', () => {
+  const model = buildOne({
+    system: routedSystem(),
+    recipe: routedEmptyFirstStepRecipe(),
+    items: stockedActor(),
+  });
+
+  assert.equal(model.stepCount, 2, 'the projection reports both execution steps');
+  assert.deepEqual(model.ingredientSets[0].products, [], 'the first step set still routes to nothing');
+  assert.deepEqual(
+    model.result.items.map((item) => item.name),
+    ['Tent'],
+    'the headline row is the terminal step product'
+  );
+});
+
+test('a single-step routedByIngredients recipe still resolves its default set', () => {
+  const single = new Recipe({
+    id: 'recipe-routed-single',
+    name: 'Rope',
+    craftingSystemId: 'sys-survival',
+    resultSelection: { provider: 'ingredientSet' },
+    ingredientSets: [
+      { ...ingredientSet('set-rope', [{ componentId: 'c-cloth', quantity: 3 }]), resultGroupId: 'rg' },
+    ],
+    resultGroups: [{ id: 'rg', name: 'Rope', results: [{ componentId: 'c-tent', quantity: 1 }] }],
+  });
+  const model = buildOne({
+    system: routedSystem(),
+    recipe: single,
+    items: [new FakeItem('Cloth Scrap', 3)],
+  });
+
+  assert.equal(model.stepCount, 1, 'one implicit execution step');
+  assert.deepEqual(
+    model.result.items.map((item) => item.name),
+    ['Tent'],
+    'the default set still drives the headline row'
+  );
+});
+
+// routedByCheck multi-step: the tier table is that mode's ONLY Produces surface (issue 1907)
+
+test('routedByCheck multi-step resolves each success tier against the TERMINAL step', () => {
+  const system = simpleSystem({
+    features: { multiStepRecipes: true },
+    craftingCheck: {
+      enabled: true,
+      simple: {},
+      routed: {
+        rollFormula: '1d20',
+        dc: 15,
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 'tier-fine', name: 'Fine', success: true, dc: 5 },
+          { id: 'tier-ruined', name: 'Ruined', success: false, dc: -5 },
+        ],
+      },
+      progressive: {},
+    },
+  });
+  system.resolutionMode = 'routedByCheck';
+
+  // Step 1 awards nothing; the single group on step 2 is what every success tier must resolve to.
+  const recipe = new Recipe({
+    id: 'recipe-routed-check-multistep',
+    name: 'Inscribe',
+    craftingSystemId: 'sys-survival',
+    ingredientSets: [],
+    resultGroups: [],
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Prepare',
+        ingredientSets: [ingredientSet('set-1', [{ componentId: 'c-leather', quantity: 5 }])],
+        resultGroups: [{ id: 'rg-1', name: 'Nothing yet', results: [] }],
+      },
+      {
+        id: 'step-2',
+        name: 'Inscribe',
+        ingredientSets: [ingredientSet('set-2', [{ componentId: 'c-lumber', quantity: 1 }])],
+        resultGroups: [
+          { id: 'rg-2', name: 'Tent', results: [{ componentId: 'c-tent', quantity: 1 }] },
+        ],
+      },
+    ],
+  });
+
+  const model = buildOne({ system, recipe, items: stockedActor() });
+
+  assert.deepEqual(model.result.items, [], 'routedByCheck keeps an empty top-level list by design');
+  const success = model.outcomeTiers.filter((tier) => tier.success);
+  assert.ok(success.length > 0, 'the fixture actually produces a success tier to assert on');
+  assert.deepEqual(
+    success.flatMap((tier) => tier.awardedResults.map((item) => item.name)),
+    ['Tent'],
+    'the tier table names the terminal product, not the empty first step'
+  );
+});
+
+// Collapsed chain (multi-step feature OFF). `getExecutionSteps` is feature-flag independent, so a
+// collapsed recipe still reports both steps and headlines the terminal product — which is right:
+// the whole chain runs atomically and the final step is what the crafter leaves with.
+
+test('a COLLAPSED routed chain still headlines the terminal product', () => {
+  const system = routedSystem();
+  system.features.multiStepRecipes = false;
+  const model = buildOne({
+    system,
+    recipe: routedEmptyFirstStepRecipe(),
+    items: stockedActor(),
+  });
+
+  assert.equal(model.stepCount, 2, 'the execution-step read is feature-flag independent');
+  assert.deepEqual(
+    model.result.items.map((item) => item.name),
+    ['Tent'],
+    'the atomic chain advertises what it actually leaves the crafter with'
+  );
+});
+
 test('progressive multi-step hides stale recipe duration and carries no simple step-list', () => {
   const system = simpleSystem({
     features: { multiStepRecipes: true },

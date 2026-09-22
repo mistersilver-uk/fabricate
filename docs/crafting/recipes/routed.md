@@ -26,6 +26,9 @@ Every recipe in the system follows the system's mode.
 
 The player's choice of ingredients decides the result.
 Each ingredient set is tied to a result group, so changing the materials changes what is produced.
+In a multi-step recipe, this applies to the step the player is on.
+The choice decides what that step's own result group produces, but the recipe's headline **Produces** row still shows the final product made on its last step.
+See [Multi-Step Recipes]({% link crafting/recipes/multi-step.md %}) for how the Produces row and its routing hint work across steps.
 
 Use this when different materials should make different things.
 For example, the same gold band could become a Ring of Fire Resistance with a ruby, or a Ring of Frost Resistance with a sapphire.
