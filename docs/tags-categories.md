@@ -15,11 +15,12 @@ Two entries of one vocabulary that differ only in upper and lower case show as a
 Hover it to see every spelling it stands for, and deleting it removes all of them and reassigns their recipes or components in one step.
 
 Sorting a panel by name or by reference count, and reversing the direction, affects that panel alone.
-The left rail's **Tags & Categories** count is the size of all three vocabularies added together.
+The left rail's **Tags & Categories** count adds up what the three panels show, so it includes the reserved **General** row each category panel carries.
 
 ## Recipe categories
 
 Custom recipe categories organize recipe browsing and authoring.
+Categories are flat: there are no parent or child categories, and each recipe picks exactly one.
 The reserved **General** recipe category is always present and is not stored in the custom category list.
 Each recipe category can carry an icon.
 Set it from the **Icon** field when you add the category, or change it later from the icon button on the category's row.
@@ -30,6 +31,7 @@ A **Category** filter, placed above the crafting-system filter, lets players nar
 The filter offers only the categories that appear in the player's visible recipes, sorted alphabetically with **General** pinned last, and its default **All categories** option shows the full list.
 
 Removing a custom recipe category is reference-safe, as removing an entry from any of the three vocabularies is: the records that use it are reassigned or stripped rather than left pointing at something that no longer exists.
+A category with no recipes deletes in one click, and a category still used by recipes opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many recipes will be reassigned to **General**.
 Confirming reassigns those recipes to **General** so none is left pointing at a category that no longer exists.
 
@@ -48,6 +50,7 @@ Every component belongs to exactly one category, and a component you have never 
 There is no uncategorised state.
 
 Removing a custom component category is reference-safe.
+A category with no components deletes in one click, and a category still used by components opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many components will be reassigned to **General**.
 Confirming moves those components to **General** rather than leaving them pointing at a category that no longer exists.
 
@@ -62,6 +65,7 @@ They are not shown on component browser rows and they do not filter the browser,
 
 A tag's reference count on this screen includes both the components that carry it and the recipe ingredients that filter on it.
 Removing a tag is reference-safe.
+A tag with no references deletes in one click, and a referenced tag opens the inline confirm strip on that row instead.
 Fabricate asks you to confirm on the row and tells you how many references will lose the tag.
 Confirming strips the tag from every component that carries it and from every recipe ingredient that filters on it, so nothing is left pointing at a tag that no longer exists.
 
@@ -78,7 +82,8 @@ An entry with no references anywhere in the world, and whose removal changes not
 Every other entry asks you to confirm, even one whose reference count reads as zero, because deleting it would still change a category or a tag recorded on the world's shared component defaults.
 The confirmation tells you exactly what changes: how many crafting systems inherit the category from the shared default it clears, how many world-level components lose the tag, or, for a recipe category, that no recipe anywhere is rewritten.
 
-The per-panel sort control is the same one the system screen carries, so ordering a vocabulary by name or by reference count and reversing the direction works identically at both scopes.
+The per-panel sort control is the same one the system screen carries, so ordering a vocabulary by name or by reference count and reversing the direction works the same way here.
+The system screen remembers each panel's search and sort when you leave it and come back; this screen starts fresh each time you open it.
 
 Each panel's add field refuses a name you have already added to that vocabulary, ignoring case and leading or trailing spaces.
 The two category panels also refuse the reserved **General** category, which is always available without being added or removed as an entry.
