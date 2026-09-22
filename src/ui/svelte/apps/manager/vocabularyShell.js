@@ -74,7 +74,7 @@ export function decorateTagRows(rows) {
   return (Array.isArray(rows) ? rows : []).map((row) => ({ ...row, displayName: `#${row.name}` }));
 }
 
-/** The shell's two bands: the 2-up grid, then the full-width panels beneath it. */
+/** The shell's two placements: the 2-up grid, then the full-width panels beneath it. */
 export function partitionVocabularyPanels(panels) {
   const list = Array.isArray(panels) ? panels : [];
   return {

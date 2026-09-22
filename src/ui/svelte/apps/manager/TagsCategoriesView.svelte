@@ -44,11 +44,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // WHICH BAND EACH VOCABULARY SITS IN IS THE DESCRIPTOR'S ANSWER, not this file's, so the two
-  // screens cannot drift into drawing the same vocabulary in two different places.
-  const bands = partitionVocabularyPanels(SYSTEM_VOCABULARY_PANELS);
-  const [recipeCategories, componentCategories] = bands.grid;
-  const [componentTags] = bands.full;
+  // Each vocabulary's placement is the descriptor's answer, not this file's, so the two screens
+  // cannot drift into drawing the same vocabulary in two different places.
+  const placements = partitionVocabularyPanels(SYSTEM_VOCABULARY_PANELS);
+  const [recipeCategories, componentCategories] = placements.grid;
+  const [componentTags] = placements.full;
 
   /** The row set, add, remove and icon writer for one vocabulary, by panel kind. */
   const WIRING = {

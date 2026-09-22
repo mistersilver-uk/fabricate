@@ -8,8 +8,8 @@
   | --- | --- | --- | --- |
   | `kind` | `recipeCategories` \| `componentCategories` \| `componentTags` | `''` | the SCREEN's vocabulary id, unique among the three mounted panels |
   | `icon` | Font Awesome class | `''` | the head tile's glyph |
-  | `title` | string | `''` | already localized by the caller's presentation model |
-  | `subline` | string | `''` | says what the retired panel hint used to say |
+  | `title` | string | `''` | already localized by the caller's presentation model; a different sense from `row.title`, the row-level tooltip naming the spellings a collapsed row stands for (issue 1397) |
+  | `subline` | string | `''` | one short line under the title; NOT the retired panel hint, which said more and was deleted with the tabs |
   | `sortToolbarLabel` | string | `''` | the toolbar's accessible name, already substituted |
   | `sortLabelId` | string | `''` | unique per panel; three copies of one id collapse every reference |
   | `rows` | array | `[]` | UNSORTED; this component sorts by the lifted sort state |
@@ -23,7 +23,7 @@
   Invariants:
   - No `aria-label` on the section: the inner `VocabularyPanel` section is the landmark, and a
     second one would name the same region twice.
-  - `hint` is always empty, because the head carries a SUBLINE saying what the hint would say.
+  - `hint` is always empty: the head's SUBLINE is the line under the title, and a hint as well would draw two.
   - The five `:global` repairs stay chained onto `.manager-toolbar`: the class sits on a COMPONENT
     tag, and a bare (0,1,0) would win ties it has no business in.
   - Pinned by `tests/components/world-vocabulary-control-row-cascade.test.js` and

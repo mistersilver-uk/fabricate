@@ -31,7 +31,7 @@ test('the three panels carry distinct row hooks, input ids and sort-label ids', 
   assert.deepEqual(
     WORLD_VOCABULARY_PANELS.filter((panel) => panel.column === 'full').map((panel) => panel.kind),
     ['componentTags'],
-    'and the tag vocabulary is the full-width band beneath it'
+    'and the tag vocabulary is the full-width panel beneath it'
   );
 });
 

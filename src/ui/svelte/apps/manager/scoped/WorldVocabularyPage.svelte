@@ -41,7 +41,7 @@
   }
 
   const title = $derived(text(TITLE_KEY, TITLE_FALLBACK));
-  const bands = partitionVocabularyPanels(WORLD_VOCABULARY_PANELS);
+  const placements = partitionVocabularyPanels(WORLD_VOCABULARY_PANELS);
 
   // PANEL-OWNED, and a STATED EXCEPTION to the lifted browse state: this route has no library
   // search to collide with and its panels die with the route, so search and sort live here.
@@ -97,12 +97,12 @@
 <main class="manager-main" data-scoped-page="world-vocabulary" aria-label={title}>
   <VocabularyShell {statusMessage}>
     {#snippet grid()}
-      {#each bands.grid as panel (panel.kind)}
+      {#each placements.grid as panel (panel.kind)}
         <VocabularyShellPanel {...propsFor(panel)} bind:browserState={panelStates[panel.kind]} />
       {/each}
     {/snippet}
     {#snippet full()}
-      {#each bands.full as panel (panel.kind)}
+      {#each placements.full as panel (panel.kind)}
         <VocabularyShellPanel {...propsFor(panel)} bind:browserState={panelStates[panel.kind]} />
       {/each}
     {/snippet}

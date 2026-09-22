@@ -23,7 +23,7 @@ test('defineVocabularyPanel answers the kind facts neither scope gets to choose'
     const world = WORLD_VOCABULARY_PANELS.find((panel) => panel.kind === kind);
     const system = SYSTEM_VOCABULARY_PANELS.find((panel) => panel.kind === kind);
     assert.ok(world && system, `${kind} is a panel at BOTH scopes`);
-    assert.equal(world.column, system.column, `${kind} sits in the same band on both screens`);
+    assert.equal(world.column, system.column, `${kind} sits in the same placement on both screens`);
     assert.equal(world.icon, system.icon, `${kind} is headed by the same glyph on both screens`);
   }
   // AND THE HOOKS DIVERGE, which is what makes the clause above a claim rather than a tautology.
@@ -51,7 +51,7 @@ test('defineVocabularyPanel answers the kind facts neither scope gets to choose'
     decorativeIcon: 'fas fa-tag',
     showIcon: true,
   });
-  assert.equal(divergent.column, 'full', 'the tag vocabulary is always the full-width band');
+  assert.equal(divergent.column, 'full', 'the tag vocabulary is always the full-width panel');
   assert.equal(divergent.icon, 'fas fa-hashtag');
   assert.equal(divergent.emptyIcon, 'fas fa-hashtag', 'the empty state falls to the head glyph');
   assert.equal(divergent.decorativeIcon, 'fas fa-tag', 'and a stated field WINS over the default');
@@ -70,17 +70,17 @@ test('defineVocabularyPanel answers the kind facts neither scope gets to choose'
   assert.equal(unknown.icon, '');
 });
 
-test('partitionVocabularyPanels splits the 2-up grid from the band beneath it', () => {
-  const bands = partitionVocabularyPanels(WORLD_VOCABULARY_PANELS);
+test('partitionVocabularyPanels splits the 2-up grid from the panel beneath it', () => {
+  const placements = partitionVocabularyPanels(WORLD_VOCABULARY_PANELS);
   assert.deepEqual(
-    bands.grid.map((panel) => panel.kind),
+    placements.grid.map((panel) => panel.kind),
     ['recipeCategories', 'componentCategories'],
     'the two CATEGORY vocabularies, in the reference’s order'
   );
   assert.deepEqual(
-    bands.full.map((panel) => panel.kind),
+    placements.full.map((panel) => panel.kind),
     ['componentTags'],
-    'and the tag vocabulary is the full-width band'
+    'and the tag vocabulary is the full-width panel'
   );
   assert.deepEqual(partitionVocabularyPanels(null), { grid: [], full: [] }, 'and it is total');
 });

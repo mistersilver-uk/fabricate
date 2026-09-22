@@ -38,7 +38,7 @@ export default {
     // Tags & Categories → Item tags panel, scrolled to its seeded rows (issue #752 — evidence
     // for #735's row rendering).
     try {
-      // No tab to open since issue 1915: the tag vocabulary is the full-width band beneath the
+      // No tab to open since issue 1915: the tag vocabulary is the full-width panel beneath the
       // 2-up category grid, and it is addressed by its own panel hook.
       const itemTagsPanel = page
         .locator('.fabricate-manager [data-vocabulary-panel="componentTags"]')
@@ -50,7 +50,7 @@ export default {
           `Item tags panel rendered ${tagRowCount} tag rows, expected the three seeded tags.`
         );
       }
-      // The band's own direction toggle, so this producer and the View Lab case of the same id
+      // The tag panel's own direction toggle, so this producer and the View Lab case of the same id
       // depict one state: the tag vocabulary sorted descending.
       await itemTagsPanel.locator('[data-vocabulary-direction]').first().click();
       await itemTagsPanel

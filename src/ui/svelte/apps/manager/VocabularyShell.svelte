@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The shared vocabulary shell both Tags & Categories screens render (issue 1915): the failure
-  status line, the 2-up category grid and the full-width band beneath it.
+  status line, the 2-up category grid and the full-width placement beneath it.
 
   Props:
   | prop | values | default | contract |
@@ -9,8 +9,8 @@
   | `statusMessage` | string | `''` | empty until the screen has a failure to announce |
 
   Snippets:
-  - `grid` — the 2-up band; the caller renders one `VocabularyShellPanel` per grid panel.
-  - `full` — the full-width band beneath it, same per-panel component.
+  - `grid` — the 2-up category row; the caller renders one `VocabularyShellPanel` per grid panel.
+  - `full` — the full-width panels beneath it, same per-panel component.
 
   Rest spread:
   - `{...rest}` lands on the shell root, written after `class`, so a caller may hook the root
