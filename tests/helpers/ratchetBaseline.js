@@ -247,3 +247,209 @@ export function ledgerGate({ ledgerPath, regenerateEnv, build, wording }) {
     },
   };
 }
+
+/** A ledger row as a `key -> ceiling` map, rejecting a row that bounds nothing (issue 1914). */
+function indexCeilings(ledger, title) {
+  const rows = new Map();
+  for (const [key, value] of Object.entries(ledger)) {
+    if (!Number.isInteger(value) || value < 1) {
+      throw new Error(
+        `${title}: row "${key}" holds ${String(value)}, and a ceiling is a positive ` +
+          'integer. A zero or malformed row bounds nothing while still reading as a satisfied ' +
+          'gate, which is the one failure a ceiling cannot afford.'
+      );
+    }
+    rows.set(key, value);
+  }
+  return rows;
+}
+
+/** An observation as text: a share is fractional, a count is not. */
+function showObserved(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+/**
+ * Sort an observation against its ceilings into the four things a reader can act on.
+ *
+ * @returns {{added: object[], exceeded: object[], stale: object[], slack: object[]}} `slack` is a
+ * row a tighten run would lower, which is the win the epic's sweeps are looking for.
+ */
+function ceilingFindings(rows, observed, ceilingOf) {
+  const added = [];
+  const exceeded = [];
+  const stale = [];
+  const slack = [];
+  for (const [key, value] of Object.entries(observed)) {
+    const row = rows.get(key);
+    const tight = ceilingOf(key, value);
+    if (row === undefined) added.push({ key, value, tight });
+    else if (value > row) exceeded.push({ key, value, row, tight });
+    else if (tight < row) slack.push({ key, value, row, tight });
+  }
+  for (const [key, row] of rows) {
+    if (!Object.hasOwn(observed, key)) stale.push({ key, row });
+  }
+  const byKey = (left, right) => byCodePoint(left.key, right.key);
+  return {
+    added: added.sort(byKey),
+    exceeded: exceeded.sort(byKey),
+    stale: stale.sort(byKey),
+    slack: slack.sort(byKey),
+  };
+}
+
+/** The ledger a run in either regenerate mode writes. */
+function regeneratedLedger({ mode, rows, observed, ceilingOf }) {
+  if (mode === 'tighten') {
+    return Object.fromEntries(
+      Object.entries(observed).map(([key, value]) => [key, ceilingOf(key, value)])
+    );
+  }
+  const next = Object.fromEntries(rows);
+  const { added, exceeded } = ceilingFindings(rows, observed, ceilingOf);
+  for (const { key, tight } of [...added, ...exceeded]) next[key] = tight;
+  return next;
+}
+
+/** The mode a run asked for, rejecting the pair that would leave the file's contents undefined. */
+function regenerateMode({ title, updateEnv, tightenEnv }) {
+  const update = Boolean(process.env[updateEnv]);
+  const tighten = Boolean(process.env[tightenEnv]);
+  if (update && tighten) {
+    throw new Error(
+      `${title}: ${updateEnv} and ${tightenEnv} are both set, and they write different files — ` +
+        'one raises only the failing rows, the other rewrites every row and drops stale ones. ' +
+        'Run the one you meant.'
+    );
+  }
+  if (update) return 'update';
+  return tighten ? 'tighten' : 'assert';
+}
+
+/** The failure a ceiling gate raises, or the empty string when nothing crossed. */
+function describeCeilingBreaches({ title, wording, added, exceeded, stale, staleRows }) {
+  const blocking = staleRows === 'fail' ? stale : [];
+  if (added.length + exceeded.length + blocking.length === 0) return '';
+  const takeOn =
+    added.length + exceeded.length === 0
+      ? ''
+      : `\n\nTake the debt on deliberately with \`${wording.update}\`, which rewrites only the ` +
+        `rows above and leaves every other row byte-identical, and state the reason in the PR. ` +
+        wording.addedHint;
+  const bank =
+    blocking.length === 0
+      ? ''
+      : `\n\nBank the win with \`${wording.tighten}\`. ${wording.staleHint}`;
+  return (
+    `${title}: ${wording.subject} crossed the ledger.` +
+    section(
+      'NO ROW — new debt, which is what a ceiling gate exists to make visible:',
+      added.map(({ key, value, tight }) => `${key} (${showObserved(value)}, would be pinned ${tight})`)
+    ) +
+    section(
+      'OVER CEILING — a listed unit grew past the ceiling it was given:',
+      exceeded.map(
+        ({ key, value, row, tight }) =>
+          `${key} (ceiling ${row}, found ${showObserved(value)}, would be pinned ${tight})`
+      )
+    ) +
+    section(
+      'STALE — the row bounds nothing, so it stands as a permission for whoever finds it next:',
+      blocking.map(({ key, row }) => `${key} (ceiling ${row}, nothing found)`)
+    ) +
+    takeOn +
+    bank
+  );
+}
+
+/**
+ * A ledger whose rows are ceilings rather than exact counts (issue 1914): a unit that stays under
+ * its row passes without touching the file, so only new or grown debt reaches the diff.
+ *
+ * @param {() => {observed: object, scanned: number, detail?: object}} options.build The scan.
+ * @param {(key: string, observed: number, detail?: object) => number} options.ceiling The row to
+ * write for an observation, which is where each gate states its own headroom rule.
+ * @param {'fail'|'allow'} options.staleRows What a row with no observation means for this gate.
+ * @returns {{current: Function, pinned: Function, regenerated: Function}} `current()` is the
+ * memoised `build()` result; `regenerated()` is true under either mode.
+ */
+export function ceilingLedgerGate({
+  test,
+  assert,
+  title,
+  ledgerPath,
+  updateEnv,
+  tightenEnv,
+  build,
+  ceiling,
+  staleRows,
+  floor,
+  wording,
+}) {
+  let cached;
+  const current = () => {
+    cached ??= build();
+    return cached;
+  };
+  const gate = {
+    current,
+    /** The pinned ceilings as committed. */
+    pinned: () => parseLedger(readFileSync(ledgerPath, 'utf8')),
+    /** True when this run rewrote the ledger instead of asserting against it. */
+    regenerated: () => Boolean(process.env[updateEnv] || process.env[tightenEnv]),
+    check(t) {
+      const mode = regenerateMode({ title, updateEnv, tightenEnv });
+      const { observed, scanned, detail } = current();
+      if (scanned < floor) {
+        assert.fail(
+          `${title}: the scan looked at only ${scanned} candidates, below the floor of ${floor}. ` +
+            'An empty or truncated corpus observes nothing, and a gate that only bounds what it ' +
+            'observes would read that as every row stale and every ceiling met.'
+        );
+      }
+      const rows = indexCeilings(gate.pinned(), title);
+      const ceilingOf = (key, value) => {
+        const bound = ceiling(key, value, detail);
+        if (!Number.isInteger(bound) || bound < 1) {
+          throw new Error(`${title}: the ceiling rule returned ${bound} for "${key}"`);
+        }
+        return bound;
+      };
+      if (mode !== 'assert') {
+        writeFileSync(ledgerPath, formatLedger(regeneratedLedger({ mode, rows, observed, ceilingOf })));
+        return;
+      }
+      const { added, exceeded, stale, slack } = ceilingFindings(rows, observed, ceilingOf);
+      const failure = describeCeilingBreaches({
+        title,
+        wording,
+        added,
+        exceeded,
+        stale,
+        staleRows,
+      });
+      if (failure !== '') assert.fail(failure);
+      reportHeadroom(t, { wording, stale: staleRows === 'allow' ? stale : [], slack });
+    },
+  };
+  test(title, (t) => gate.check(t));
+  return gate;
+}
+
+/** What a tighten run would reclaim, printed so the epic's sweeps can see it without a scan. */
+function reportHeadroom(t, { wording, stale, slack }) {
+  if (typeof t?.diagnostic !== 'function') return;
+  if (stale.length > 0) {
+    t.diagnostic(
+      `${stale.length} stale row(s) a \`${wording.tighten}\` run would drop: ` +
+        stale.map(({ key, row }) => `${key} (${row})`).join(', ')
+    );
+  }
+  if (slack.length > 0) {
+    t.diagnostic(
+      `${slack.length} row(s) a \`${wording.tighten}\` run would lower: ` +
+        slack.map(({ key, row, tight }) => `${key} (${row} -> ${tight})`).join(', ')
+    );
+  }
+}
