@@ -98,6 +98,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     // Spelled out, not spread: `mounted-harness-primitive-allowlist.test.js` reads the literals.
     writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
     writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchablePopoverPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
