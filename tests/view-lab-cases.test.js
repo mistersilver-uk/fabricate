@@ -5012,12 +5012,17 @@ test('the capture workflow renders and publishes the one id list it computed', (
 // `tests/view-lab-cases.test.js` asserted only that a case DECLARING `expectView` is a manager
 // case; the VALUE was never matched against any route id.
 function buildExpectViewPredicate() {
-  // The rail's entries are their own units since issue 1717 and the page header's model since
-  // issue 1720, and a route literal is asserted wherever it is compared — so the scan reads the
-  // shell, the three entry units and the header model as one.
+  // The rail's entries are their own units since issue 1717 and the page header's model and five
+  // components since issue 1720, and a route literal is asserted wherever it is compared — so the
+  // scan reads the shell, the three entry units and the whole page header as one.
   const rootSource = [
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'src/ui/svelte/apps/manager/headerModel.svelte.js',
+    'src/ui/svelte/apps/manager/ManagerPageHeader.svelte',
+    'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte',
+    'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
+    'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
+    'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
     'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte',

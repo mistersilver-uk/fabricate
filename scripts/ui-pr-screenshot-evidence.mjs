@@ -145,8 +145,20 @@ const requirementRailFrame = (id, label) => ({
   matches: REQUIREMENT_RAIL_MATCHES,
 });
 
+// The page header and the model behind it (issue 1720): the trail, the eyebrow, the title and the
+// header actions of every manager frame the shell appears in are drawn by these six.
+const PAGE_HEADER_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ManagerPageHeader\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderBreadcrumbs\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderActions\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderCraftingActions\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/ManagerHeaderGatheringActions\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/headerModel\.svelte\.js$/,
+];
+
 const WORLD_NAVIGATION_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+  ...PAGE_HEADER_MATCHES,
   /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/Gathering(Parties|Realms|MapLinks)Tab\.svelte$/,
 ];
@@ -165,7 +177,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-systems',
     label: 'Manager systems browser',
     smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-selected-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
   {
     id: 'manager-rail-expanded',
@@ -173,6 +185,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-rail-expanded'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      ...PAGE_HEADER_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
@@ -187,6 +200,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-rail-collapsed'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      ...PAGE_HEADER_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/ManagerNavRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerSystemNav\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerWorldNav\.svelte$/,
@@ -215,6 +229,7 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      ...PAGE_HEADER_MATCHES,
     ],
   },
   {
@@ -620,7 +635,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-crafting-group',
     label: 'Manager Crafting nav group (expanded: Settings + Recipes + Books & Scrolls)',
     smokeLabels: ['manager-crafting-group-expanded'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
   {
     id: 'manager-books-scrolls',
@@ -671,7 +686,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-crafting-settings',
     label: 'Manager Crafting → Settings placeholder',
     smokeLabels: ['manager-crafting-settings'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
   // Issue 752: the Crafting → Settings surface of an ALCHEMY-mode system (evidence for #736's #713
   // half).
@@ -687,7 +702,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-experimental-off',
     label: 'Manager rail — experimental features disabled',
     smokeLabels: ['manager-experimental-off'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
   },
   // The recipe editor publishes twelve distinct frames (overview/identity, ingredients, validation
   // tab, multi-step durations, the four Results-tab modes — routed-by-check, multi-step,
@@ -1058,6 +1073,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^styles\//,
       /\.css$/,
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      ...PAGE_HEADER_MATCHES,
     ],
   },
 ]);

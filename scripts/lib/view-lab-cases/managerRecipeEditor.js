@@ -628,7 +628,7 @@ export const CASES = Object.freeze([
     // Matches the screen it renders.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
     ],
   }),
   managerCase({
@@ -702,7 +702,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
       // The manager router and the Crafting entry model (issue 1151), as `manager-books-scrolls-normal` records.
-      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
