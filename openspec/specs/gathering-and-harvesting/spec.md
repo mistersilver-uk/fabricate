@@ -1508,7 +1508,7 @@ This presence gate is additive with the realm/travel and stamina/node gates (whi
 The local user, and a remote viewer that has broadcast no scene, fall back to the evaluating client's current scene.
 2. For a non-GM user the selected actor must be player-owned by the acting user.
 3. The selected actor must have at least one token present on the associated scene.
-Presence is read from that scene's token documents (`Actor#getDependentTokens`), so it holds whichever scene the evaluating client views.
+Presence is read from that scene's token documents (`Actor#getDependentTokens`), so it is judged on that same scene regardless of which scene the evaluating client's own canvas currently views.
 4. If any of the above checks fail, the environment is not attemptable by that user.
 
 If `environment.sceneUuid` is absent, the environment is not scene-gated by this specification.

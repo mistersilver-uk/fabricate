@@ -253,6 +253,10 @@ test('bootstrap constructs gathering collaborators after systems load with expli
     'getSelectableActors: getGatheringSelectableActors',
     'isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer)',
     'sceneAccess: createGatheringSceneAccess({',
+    // Issue 1912: both gates key off the requesting viewer / every scene, never this client's canvas.
+    'getCurrentScene: (viewer) => resolveViewerScene({',
+    'currentUser: game.user,',
+    'return senseTravelMarkerRegions({ actor });',
     'resultCreator: createGatheringResultCreator(this.craftingSystemManager)',
     'failureFeedback: createGatheringFailureFeedback()',
     'getRunViewer: getGatheringRunViewer',

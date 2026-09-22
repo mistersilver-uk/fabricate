@@ -73,7 +73,8 @@ export function resolveViewerScene({ viewer, currentUser, scenes, currentScene }
  * An actor's concrete token documents on `scenes`, or on EVERY scene when none are named, whatever
  * scene this client views (issue 1912). `Actor#getActiveTokens` is scoped to `canvas.scene`, so it
  * is only the fallback for adapters that lack `getDependentTokens`; production prefers the latter,
- * unlinked tokens included and synthetic ones excluded, exactly as `getActiveTokens(false, true)` does.
+ * unlinked tokens included. `concreteOnly` (14.365+, ignored on V13) drops synthetic tokens as
+ * `getActiveTokens(false, true)` does.
  */
 export function getActorTokensOnScenes(actor, scenes = null) {
   const wanted = scenes ? normalizeList(scenes).filter(Boolean) : null;

@@ -1346,8 +1346,7 @@ class Fabricate {
     this.gatheringLocationService = new GatheringLocationService({
       partyStore: this.gatheringPartyStore,
       travelStore: this.gatheringRealmStore,
-      // Which Scene Region UUIDs the party's travel marker sits inside, on ANY scene: the active GM
-      // evaluates a player's start while viewing whatever scene it likes (issue 1912).
+      // The marker's Scene Regions on ANY scene, not this client's canvas (issue 1912).
       senseSceneRegions: (travelActorUuid) => {
         const resolve = globalThis.fromUuidSync;
         if (typeof resolve !== 'function' || !travelActorUuid) return [];
@@ -1402,8 +1401,7 @@ class Fabricate {
       isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer),
       isGamePaused: isCurrentWorldPaused,
       sceneAccess: createGatheringSceneAccess({
-        // The REQUESTING viewer's scene, not this client's: a player's start runs on the active GM's
-        // client (issue 1912).
+        // The REQUESTING viewer's scene, not this client's (issue 1912).
         getCurrentScene: (viewer) => resolveViewerScene({
           viewer,
           currentUser: game.user,

@@ -1,10 +1,10 @@
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	109
-src/main.js	4684
+src/main.js	4682
 src/main.js::Hooks.once#2	208
 src/main.js::_runMigrations	145
 src/main.js::bindFabricateGlobal	136
 src/main.js::createCraftingJournalOperations	269
-src/main.js::initialize	392
+src/main.js::initialize	390
 src/migration/MigrationRunner.js::run	227
 src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	123
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	117
