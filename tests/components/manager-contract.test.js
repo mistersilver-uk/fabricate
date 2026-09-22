@@ -132,6 +132,7 @@ const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelt
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
+const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
 const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
@@ -584,13 +585,17 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['class', 'manager-rail']],
   });
 
+  // `manager-breadcrumbs` is the trail's own identity since issue 1720.
+  defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
+    attributes: [['class', 'manager-breadcrumbs']],
+  });
+
   // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
   // `data-manager-view` are not here: every route module reads them off the mounted shell
   // (`target.querySelector('.fabricate-manager').dataset.managerView`).
   defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
     attributes: [
       ['class', 'manager-header'],
-      ['class', 'manager-breadcrumbs'],
       ['class', 'manager-inspector'],
     ],
     spells: ['is-rail-collapsed', 'manager-environment-edit-main'],
@@ -966,18 +971,22 @@ describe('CraftingSystemManager source contract', () => {
 
   // The heading is the selected system's name, falling back to the route name only when nothing
   // is selected, rather than rendering an empty heading (#429).
-  defineStructureContract('titles the page after the record it edits', [MANAGER_ROOT, MANAGER_SYSTEM_NAV], {
-    reads: ['selectedSystem.name'],
-    spellsExactly: [
-      'FABRICATE.Admin.Manager.SystemEdit.Nav',
-      'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
-    ],
-    spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
-    writes: ['data-nav-system-edit'],
-    writesNo: ['data-nav-system-overview'],
-    names: ['systemOverviewCount'],
-    assignsNo: [['activeView', 'system-overview']],
-  });
+  defineStructureContract(
+    'titles the page after the record it edits',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, MANAGER_HEADER_BREADCRUMBS],
+    {
+      reads: ['selectedSystem.name'],
+      spellsExactly: [
+        'FABRICATE.Admin.Manager.SystemEdit.Nav',
+        'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
+      ],
+      spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
+      writes: ['data-nav-system-edit'],
+      writesNo: ['data-nav-system-overview'],
+      names: ['systemOverviewCount'],
+      assignsNo: [['activeView', 'system-overview']],
+    }
+  );
 
   defineStructureContract(
     'folds a stale overview token into the system-edit page',
@@ -2841,7 +2850,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
     const root = componentAstOf(MANAGER_ROOT);
-    const crumbs = templateNodes(root).filter((node) =>
+    const crumbs = templateNodes(componentAstOf(MANAGER_HEADER_BREADCRUMBS)).filter((node) =>
       declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
     );
     assert.equal(crumbs.length, 1, 'the entry trail draws one intermediate catalogue crumb');

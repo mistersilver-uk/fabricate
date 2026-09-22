@@ -109,6 +109,8 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './ImportReportModal.svelte',
   './ItemPageInspector.svelte',
   './KnowledgeView.svelte',
+  // Added by issue 1720: the page header's breadcrumb trail is its own unit.
+  './ManagerHeaderBreadcrumbs.svelte',
   // Added by issue 1717: the rail is its own unit, which renders the two entry units and took the
   // nav-tab badge helpers with it, so `../../../navTabBadgeStore.js` left this list.
   './ManagerNavRail.svelte',

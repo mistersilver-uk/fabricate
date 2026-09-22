@@ -111,6 +111,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
+  import ManagerHeaderBreadcrumbs from './ManagerHeaderBreadcrumbs.svelte';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import {
     buildCraftingNavItems,
@@ -7204,297 +7205,50 @@
     -->
     <header class="manager-header">
       <div class="manager-heading">
-        <nav
-          class="manager-breadcrumbs"
-          aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-        >
-          <!--
-            TWO ROOTS, NOT ONE (issue 1322).
-          -->
-          {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute || isWorldScopedRoute}
-            <!--
-              `World.Heading` is the RAIL's micro-label and is authored in caps for the
-               letter-spaced treatment there.
-            -->
-            {#if isWorldRoute}
-              <span data-breadcrumb-world
-                >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
-              >
-            {:else}
-              <button type="button" data-breadcrumb-world onclick={() => openWorldParties()}
-                >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</button
-              >
-            {/if}
-            {#if isWorldScopedRoute}
-              <!--
-                A CATALOGUE IS TWO CRUMBS AND AN ENTRY IS THREE.
-              -->
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              {#if worldScopedEntryRoute}
-                <button
-                  type="button"
-                  data-breadcrumb-world-scoped-catalogue={worldScopedEntryRoute.catalogueView}
-                  onclick={() => setView(worldScopedEntryRoute.catalogueView)}
-                  >{text(
-                    worldScopedEntryRoute.catalogueTitleKey,
-                    worldScopedEntryRoute.catalogueTitleFallback
-                  )}</button
-                >
-                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                <!-- The entity's OWN name when the corpus can supply one, falling back to the
-                     screen's title: an entry route with no subject chosen yet, or a subject the
-                     corpus no longer holds, has nothing to name and must not print an empty
-                     crumb. -->
-                <span data-breadcrumb-world-scoped={currentView} title={worldScopedEntryCrumb}
-                  >{worldScopedEntryCrumb || header.title}</span
-                >
-              {:else}
-                <span data-breadcrumb-world-scoped={currentView}>{header.title}</span>
-              {/if}
-            {/if}
-            {#if isWorldRulesRoute}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}</span>
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-world-rules-tab={worldRulesTab}>{worldRulesPageTitle}</span>
-            {/if}
-            {#if isWorldTravelRoute}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}</span>
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-world-travel-tab={worldTravelTab}
-                >{worldTravelTab === 'map'
-                  ? text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')
-                  : text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}</span
-              >
-            {/if}
-            {#if isWorldDowntimeRoute}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <!--
-                THE TAB CRUMB NAMES THE TAB, so it belongs to whoever owns the tab.
-              -->
-              {#if downtimeTabCrumbNavigable}
-                <button
-                  type="button"
-                  data-breadcrumb-downtime-tab={worldDowntimeTabId}
-                  onclick={() => downtimeChromeChannel.reselect()}>{downtimeTabCrumb}</button
-                >
-              {:else}
-                <span data-breadcrumb-downtime-tab={worldDowntimeTabId}>{downtimeTabCrumb}</span>
-              {/if}
-              <!--
-                AND THE COMPANION'S OWN LEAF UNDER IT, when there is one and it says something the
-                 tab crumb does not.
-              -->
-              {#if downtimeLeafCrumb}
-                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                <span data-breadcrumb-downtime-leaf>{downtimeLeafCrumb}</span>
-              {/if}
-            {/if}
-          {:else}
-            <button type="button" onclick={() => selectSystemAndShowBrowser()}
-              >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-            >
-            {#if selectedSystem && currentView !== 'systems'}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <button type="button" onclick={() => editSystem(selectedSystem.id)}
-                >{selectedSystem.name}</button
-              >
-            {/if}
-          {/if}
-          {#if currentView === 'recipes'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
-          {/if}
-          {#if currentView === 'crafting-settings'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Settings', 'Settings')}</span
-            >
-          {/if}
-          {#if currentView === 'access'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Access', 'Access')}</span>
-          {/if}
-          {#if currentView === 'books-scrolls'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
-          {/if}
-          {#if currentView === 'knowledge'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Knowledge', 'Knowledge')}</span>
-          {/if}
-          {#if currentView === 'recipe-item-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToBooksScrolls}
-              >{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the item, not the generic "Edit recipe item" — the same rule the recipe
-               and component breadcrumbs already follow. -->
-            <span title={recipeItemCrumb}>{recipeItemCrumb}</span>
-          {/if}
-          {#if currentView === 'components'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</span>
-          {/if}
-          {#if currentView === 'tags'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-          {/if}
-          {#if currentView === 'essences'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</span>
-          {/if}
-          {#if currentView === 'essence-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEssencesBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the essence, not the generic "Edit essence" — the same rule the recipe and
-               component breadcrumbs already follow, and the reference's own trail
-               (`Crafting systems > <system> > Essence Rules > <essence>`). The generic word
-               survives as the fallback for a subject with no name yet. -->
-            <span title={essenceEditName}
-              >{essenceEditName ||
-                text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
-            >
-          {/if}
-          {#if currentView === 'recipe-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToRecipesBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the recipe (§F5), not the generic "Edit recipe". -->
-            <span
-              >{recipeDraft?.name ||
-                text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span
-            >
-          {/if}
-          {#if currentView === 'component-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToComponentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the component, not the generic "Edit component" — the same rule the
-               recipe breadcrumb follows. -->
-            <span
-              >{componentForEdit?.name ||
-                text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span
-            >
-          {/if}
-          {#if currentView === 'environments'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- THE GROUP, THEN THE SCREEN. Gathering is four screens under one name, so a trail
-               that stopped at the group read identically on all four. Checks already names its
-               own sub-tab; this is that rule applied to the other group that has one.
-
-               A SPAN HERE AND A BUTTON IN THE EDITORS BELOW, which is one rule rather than two:
-               a crumb is a control when pressing it goes somewhere the GM is not. From the
-               library, `Gathering` names the screen already on the screen — `backToEnvironmentsBrowse`
-               returns to this route and leaves the active tab where it is, so a button would sit
-               there doing nothing. From an editor it really does leave, so there it is a control.
-               Same rule the Downtime tab crumb follows. -->
-            <span>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
-            {#if gatheringTabLabel}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-gathering-tab={activeGatheringTab}>{gatheringTabLabel}</span>
-            {/if}
-          {/if}
-          {#if currentView === 'environment-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments',
-                'Environments'
-              )}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span title={environmentCrumb}>{environmentCrumb}</span>
-          {/if}
-          {#if currentView === 'gathering-task-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- THE GROUP IS NOT SKIPPED. `Tasks` is a screen INSIDE Gathering, so a trail that
-               jumped from the system straight to it described a path that does not exist. -->
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToGatheringTaskLibrary}
-              >{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks', 'Tasks')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span title={gatheringTaskCrumb}>{gatheringTaskCrumb}</span>
-          {/if}
-          {#if currentView === 'gathering-event-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToGatheringEventLibrary}
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
-                'Events'
-              )}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span title={gatheringEventCrumb}>{gatheringEventCrumb}</span>
-          {/if}
-          {#if isChecksRoute}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text(
-                `FABRICATE.Admin.Manager.Checks.Tabs.${checksActiveTab[0].toUpperCase()}${checksActiveTab.slice(1)}`,
-                checksActiveTab
-              )}</span
-            >
-          {/if}
-          {#if currentView === 'system-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span
-            >
-          {/if}
-        </nav>
+        <ManagerHeaderBreadcrumbs
+          {header}
+          {text}
+          {currentView}
+          {selectedSystem}
+          {isWorldRoute}
+          {isWorldDowntimeRoute}
+          {isWorldRulesRoute}
+          {isWorldTravelRoute}
+          {isWorldScopedRoute}
+          {isChecksRoute}
+          {checksActiveTab}
+          {worldScopedEntryRoute}
+          {worldScopedEntryCrumb}
+          {worldRulesTab}
+          {worldRulesPageTitle}
+          {worldTravelTab}
+          {worldDowntimeTabId}
+          {downtimeTabCrumb}
+          {downtimeTabCrumbNavigable}
+          {downtimeLeafCrumb}
+          {downtimeChromeChannel}
+          {activeGatheringTab}
+          {gatheringTabLabel}
+          {recipeDraft}
+          {recipeItemCrumb}
+          {componentForEdit}
+          {essenceEditName}
+          {environmentCrumb}
+          {gatheringTaskCrumb}
+          {gatheringEventCrumb}
+          {openWorldParties}
+          {setView}
+          {selectSystemAndShowBrowser}
+          {editSystem}
+          {openCraftingSection}
+          {backToBooksScrolls}
+          {backToEssencesBrowse}
+          {backToRecipesBrowse}
+          {backToComponentsBrowse}
+          {backToEnvironmentsBrowse}
+          {backToGatheringTaskLibrary}
+          {backToGatheringEventLibrary}
+        />
         <!--
           The eyebrow sits between the trail and the title.
         -->
