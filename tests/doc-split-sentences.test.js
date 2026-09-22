@@ -16,6 +16,7 @@ import {
   withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
+import { TOTALS_DOCUMENT, totalsRegion } from '../scripts/view-lab-registry-totals.mjs';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = 'tests/fixtures/doc-split';
@@ -71,9 +72,9 @@ const RENUMBERED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
 const RENUMBERED_COUNT = 1;
 
-/** The document the retired View Lab counts are generated into, and the region that holds them. */
-const TOTALS_DOCUMENT = 'scripts/README.md';
-const TOTALS_DELIMITERS = ['<!-- viewlab-totals:start -->', '<!-- viewlab-totals:end -->'];
+/** The region the retired View Lab counts are generated into, read from the writer that owns it. */
+const TOTALS_REGION_LINES = totalsRegion().split('\n');
+const TOTALS_DELIMITERS = [TOTALS_REGION_LINES[0], TOTALS_REGION_LINES.at(-1)];
 
 /**
  * Sentences a count LEFT rather than changed (issue #1937). A RENUMBERED entry keeps its number and

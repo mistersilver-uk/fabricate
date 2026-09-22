@@ -41,13 +41,18 @@ export function totalsRegion(totals = registryTotals()) {
   ].join('\n');
 }
 
-/** The document with its region replaced. */
-function withTotalsRegion(markdown, region = totalsRegion()) {
+/** The document with its one region replaced; a missing, inverted or duplicated region throws. */
+// eslint-disable-next-line unicorn/no-exports-in-scripts -- dual-mode CLI, imported by tests.
+export function withTotalsRegion(markdown, region = totalsRegion()) {
   const start = markdown.indexOf(REGION_START);
   const end = markdown.indexOf(REGION_END);
   // Splicing on a missing or inverted delimiter would drop the surrounding prose silently.
   if (start === -1 || end < start) {
     throw new Error(`${TOTALS_DOCUMENT} has no ${REGION_START} … ${REGION_END} region`);
+  }
+  // A second region would keep stale counts behind a fresh first one.
+  if (markdown.includes(REGION_START, start + 1) || markdown.includes(REGION_END, end + 1)) {
+    throw new Error(`${TOTALS_DOCUMENT} has more than one ${REGION_START} … ${REGION_END} region`);
   }
   return markdown.slice(0, start) + region + markdown.slice(end + REGION_END.length);
 }

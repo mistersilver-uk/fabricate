@@ -51,7 +51,11 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
-import { TOTALS_DOCUMENT, totalsRegion } from '../scripts/view-lab-registry-totals.mjs';
+import {
+  TOTALS_DOCUMENT,
+  totalsRegion,
+  withTotalsRegion,
+} from '../scripts/view-lab-registry-totals.mjs';
 
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
@@ -3326,17 +3330,30 @@ function outsideGeneratedRegion(markdown) {
   const end = lines.at(-1);
   const from = markdown.indexOf(start);
   if (from === -1) return markdown;
-  return markdown.slice(0, from) + markdown.slice(markdown.indexOf(end, from) + end.length);
+  const to = markdown.indexOf(end, from);
+  assert.ok(to !== -1, `a totals region opened by ${start} has no ${end}`);
+  return markdown.slice(0, from) + markdown.slice(to + end.length);
 }
 
-test('the generated totals region says what the registry says', () => {
+test('the generated totals region says what the registry says, exactly once', () => {
   const carrier = readFileSync(resolve(ROOT, TOTALS_DOCUMENT), 'utf8');
   const expected = totalsRegion();
-  assert.ok(
-    carrier.includes(expected),
-    `${TOTALS_DOCUMENT}'s totals region is stale — run \`npm run viewlab:totals\`. It should read:` +
-      `\n${expected}`
+  assert.equal(
+    carrier.split(expected).length,
+    2,
+    `${TOTALS_DOCUMENT}'s totals region is stale or duplicated — run \`npm run viewlab:totals\`. ` +
+      `It should read once:\n${expected}`
   );
+});
+
+test('the totals writer replaces one region and refuses a missing or duplicated one', () => {
+  const region = totalsRegion();
+  const document = `intro\n\n${region}\n\nouter\n`;
+  assert.equal(withTotalsRegion(document, region), document, 'a current region is a no-op');
+  const stale = document.replace(region, `${region.split('\n')[0]}\nstale\n${region.split('\n').at(-1)}`);
+  assert.equal(withTotalsRegion(stale, region), document, 'a stale region is replaced in place');
+  assert.throws(() => withTotalsRegion('no region here\n', region), /has no/u);
+  assert.throws(() => withTotalsRegion(`${document}${region}\n`, region), /more than one/u);
 });
 
 test('no carrier quotes a registry count outside the generated region', () => {
@@ -3552,12 +3569,19 @@ test('each case file holds its own case ids in its own order', () => {
     assert.deepEqual(
       cases.map((viewCase) => viewCase.id),
       goldenLines(caseIdGolden(path)),
-      `${path} changed which cases it declares, or the order it declares them in`
+      `${path} changed which cases it declares, or the order it declares them in; if that is ` +
+        `intended, rewrite ${caseIdGolden(path)} with the ids in declaration order`
     );
   }
 });
 
 test('no case-id golden is orphaned by a renamed case file', () => {
+  const names = VIEW_LAB_CASE_FILES.map(({ path }) => basename(path, '.js'));
+  assert.equal(
+    new Set(names).size,
+    names.length,
+    'two case files share a basename, so they would share one golden; rename one of them'
+  );
   assert.deepEqual(
     readdirSync(resolve(ROOT, CASE_ID_GOLDENS)).sort(),
     VIEW_LAB_CASE_FILES.map(({ path }) => basename(caseIdGolden(path))).sort(),

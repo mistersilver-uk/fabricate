@@ -588,6 +588,7 @@ It exists because PR screenshot evidence should not cost a container boot and a 
 npm run viewlab:chrome:harvest              # one-off; see below
 node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
 npm run viewlab:index                       # regenerate the evidence index on its own
+npm run viewlab:totals                      # regenerate the registry totals in scripts/README.md
 ```
 
 The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches under `.foundry-e2e/cache/`.

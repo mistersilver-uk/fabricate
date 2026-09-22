@@ -488,6 +488,7 @@ node scripts/view-lab-screenshots.mjs apps            # every case
 node scripts/view-lab-screenshots.mjs apps <id,id>    # a subset
 node scripts/view-lab-screenshots.mjs apps --clean    # wipe ui-screenshot-artifact/apps/ first
 npm run viewlab:index              # regenerate the index without a capture
+npm run viewlab:totals             # regenerate the registry totals region in this file
 ```
 
 ### Where the chrome comes from, and which source may attest
