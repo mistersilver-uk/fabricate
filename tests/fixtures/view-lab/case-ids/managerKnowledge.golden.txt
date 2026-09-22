@@ -1,0 +1,13 @@
+manager-knowledge-owned-copies
+manager-knowledge-empty-tab
+manager-knowledge-learned-lost-copy
+manager-knowledge-party-pool-warning
+manager-knowledge-delete-armed
+manager-knowledge-narrow
+manager-components-progressive
+manager-components-bulk-edit-progressive
+manager-component-edit-difficulty
+manager-import-report
+manager-import-folder-mapping
+manager-alchemy-settings
+manager-experimental-off

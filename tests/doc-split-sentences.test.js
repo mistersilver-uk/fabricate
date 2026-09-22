@@ -16,6 +16,7 @@ import {
   withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
+import { TOTALS_DOCUMENT, totalsRegion } from '../scripts/view-lab-registry-totals.mjs';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = 'tests/fixtures/doc-split';
@@ -64,21 +65,60 @@ const RETARGETED_COUNT = 1;
 
 /** Sentences that state a View Lab registry case count, where the only change is that NUMBER. */
 const RENUMBERED = [
-  'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
-  'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other ' +
-    'file the lab depends on selects **surface coverage**: one frame of every route and tab the ' +
-    'lab renders — every manager route, every player tab, one per single-screen canvas window, ' +
-    'plus the light-theme pair — which is 48 of the 379 publishable cases.',
-  'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the ' +
-    'normal case, at 379 cases across five windows — the **View Lab** is the producer, and it is ' +
-    'what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every ' +
-    'case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
   // Issue #1692 moved the walk into scripts/foundry-smoke/, leaving the runner at ~230 lines.
   'The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).',
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
-const RENUMBERED_COUNT = 4;
+const RENUMBERED_COUNT = 1;
+
+/** The region the retired View Lab counts are generated into, read from the writer that owns it. */
+const TOTALS_REGION_LINES = totalsRegion().split('\n');
+const TOTALS_DELIMITERS = [TOTALS_REGION_LINES[0], TOTALS_REGION_LINES.at(-1)];
+
+/**
+ * Sentences a count LEFT rather than changed (issue #1937). A RENUMBERED entry keeps its number and
+ * must be re-edited whenever the registry grows; these stopped quoting one, so `removed` names the
+ * clause deleted from `before`, and `after` is `null` when the whole sentence was retired into the
+ * generated region `derivedIn` carries.
+ */
+const DECOUNTED = [
+  {
+    before:
+      'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case, at 379 cases across five windows — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+    after:
+      'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+    removed: ', at 379 cases across five windows',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+  {
+    before:
+      "Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders, 48 cases — rather than every state of every screen.",
+    after:
+      "Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.",
+    removed: ', 48 cases',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+  {
+    before:
+      'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
+    after: null,
+    removed:
+      'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+  {
+    before:
+      'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair — which is 48 of the 379 publishable cases.',
+    after:
+      'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.',
+    removed: ' — which is 48 of the 379 publishable cases',
+    derivedIn: TOTALS_DOCUMENT,
+  },
+];
+
+/** Pinned for the same reason as DEDUPLICATED_COUNT. */
+const DECOUNTED_COUNT = 4;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -319,6 +359,7 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
     ...RETARGETED.map(({ before }) => before),
     ...RENAMED.map(({ before }) => before),
     ...RENUMBERED,
+    ...DECOUNTED.map(({ before }) => before),
   ]);
   const lost = missingSentences(before, after).filter(({ sentence }) => !allowed.has(sentence));
 
@@ -329,8 +370,9 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
       'DESTINATIONS names. Move them, or — if one is a genuine duplicate that now lives in one ' +
       'place — add it to DEDUPLICATED with the file that still carries it, and raise ' +
       'DEDUPLICATED_COUNT in the same commit. If only a registry case count changed, add it to ' +
-      'RENUMBERED and raise RENUMBERED_COUNT instead; if only a renamed identifier changed, ' +
-      'RENAMED and RENAMED_COUNT.'
+      'RENUMBERED and raise RENUMBERED_COUNT instead; if a count clause LEFT the sentence because ' +
+      'the number is generated now, DECOUNTED and DECOUNTED_COUNT; if only a renamed identifier ' +
+      'changed, RENAMED and RENAMED_COUNT.'
   );
 });
 
@@ -410,6 +452,50 @@ test('every renumbering claim really is a renumbering and nothing more', () => {
       1,
       `RENUMBERED entry does not match exactly one surviving sentence once digits are ignored ` +
         `(found ${matches.length}):\n  ${sentence}`
+    );
+  }
+});
+
+test('every decount claim really is a decount and nothing more', () => {
+  assert.equal(
+    DECOUNTED.length,
+    DECOUNTED_COUNT,
+    'the decount allowlist changed size. Each entry excuses one sentence from the subset ' +
+      'assertion, so growing it needs its own justification in review.'
+  );
+
+  const surviving = survivingSentences();
+  for (const { before, after, removed, derivedIn } of DECOUNTED) {
+    // 1. A clause with no number in it is an ordinary deletion wearing a decount's name.
+    assert.ok(/\d/u.test(removed), `DECOUNTED names a clause that states no count:\n  ${removed}`);
+    // 2. It must not be stale: an entry whose `before` still exists excuses nothing.
+    assert.equal(
+      surviving.get(before) ?? 0,
+      0,
+      `DECOUNTED still lists this sentence, which is present after all — remove the entry:\n  ${before}`
+    );
+    // 3. The count must still be somewhere, which is the region that generates it.
+    assert.ok(
+      DESTINATIONS.includes(derivedIn),
+      `${derivedIn} is not in DESTINATIONS, so nothing checks it`
+    );
+    const derived = readFileSync(path.join(REPOSITORY_ROOT, derivedIn), 'utf8');
+    for (const delimiter of TOTALS_DELIMITERS) {
+      assert.ok(
+        derived.includes(delimiter),
+        `DECOUNTED derives this count in ${derivedIn}, which has no ${delimiter}`
+      );
+    }
+    // 4. A retired sentence is done here; otherwise ONLY the named clause may have gone.
+    if (after === null) continue;
+    assert.equal(
+      before.replace(removed, '').replaceAll(/\s+/gu, ' ').trim(),
+      after,
+      'a DECOUNTED entry changed more than the clause it names, so it is a rewrite'
+    );
+    assert.ok(
+      (surviving.get(after) ?? 0) > 0,
+      `DECOUNTED claims this replaced a sentence and it is in no destination:\n  ${after}`
     );
   }
 });

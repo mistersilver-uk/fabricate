@@ -1,7 +1,7 @@
 /** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'svelte/compiler';
@@ -50,6 +50,12 @@ import {
   buildChecksNavItems,
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
+
+import {
+  TOTALS_DOCUMENT,
+  totalsRegion,
+  withTotalsRegion,
+} from '../scripts/view-lab-registry-totals.mjs';
 
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
@@ -3293,43 +3299,73 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
   assert.equal(noMatch.steps.at(-1).selector, '[data-access-roster-search="players"]');
 });
 
-test('the registry counts quoted in prose match the registry', () => {
-  // These four numbers are hand-copied registry facts, and they have drifted three separate times:
-  // this change found `AGENTS.md` claiming 155 cases, `CONTRIBUTING.md` claiming 181, and
-  // `scripts/README.md` claiming 219 with a `reaches` split to match — three different wrong
-  // answers, none of which anything failed on.
-  const reaches = (value) =>
-    publishableCases().filter((viewCase) => viewCase.reaches === value).length;
-  const total = publishableCases().length;
-  const coverage = LAB_SURFACE_CASE_IDS.length;
+// The registry totals used to be hand-copied into four documents, and they drifted three separate
+// times: `AGENTS.md` once claimed 155 cases, `CONTRIBUTING.md` 181 and `scripts/README.md` 219 —
+// three different wrong answers, none of which anything failed on. They are generated now, and
+// these two tests are the gate: the region must say what the registry says, and no carrier may
+// quote a count again.
 
-  for (const [file, pattern, expected] of [
-    [
-      'CONTRIBUTING.md',
-      /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
-      [total, reaches('exact'), reaches('window'), reaches('beyond')],
-    ],
-    ['CONTRIBUTING.md', /which is (\d+) of the (\d+) publishable cases/, [coverage, total]],
-    [
-      'scripts/README.md',
-      /There are (\d+) `exact` cases, (\d+) `window`, and (\d+) `beyond`, out of (\d+) total/,
-      [reaches('exact'), reaches('window'), reaches('beyond'), total],
-    ],
-    ['AGENTS.md', /the normal case, at (\d+) cases across five windows/, [total]],
-    ['AGENTS.md', /one frame of every route and tab the lab renders, (\d+) cases/, [coverage]],
-    [
-      '.agents/skills/fabricate-orchestrator/SKILL.md',
-      /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
-      [coverage, total],
-    ],
-  ]) {
-    const found = readFileSync(resolve(ROOT, file), 'utf8').match(pattern);
-    assert.ok(found, `${file} no longer contains the sentence this guards: ${pattern}`);
-    assert.deepEqual(
-      found.slice(1).map(Number),
-      expected,
-      `${file} quotes stale registry counts in "${found[0]}"`
-    );
+/** The documents that carried a hand-copied count, plus the one that carries the generated region. */
+const TOTALS_CARRIERS = Object.freeze([
+  'AGENTS.md',
+  'CONTRIBUTING.md',
+  TOTALS_DOCUMENT,
+  '.agents/skills/fabricate-orchestrator/SKILL.md',
+]);
+
+/** The six sentence shapes the generated region retired, as each document used to state it. */
+const RETIRED_COUNT_PATTERNS = Object.freeze([
+  /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
+  /which is (\d+) of the (\d+) publishable cases/,
+  /There are (\d+) `exact` cases, (\d+) `window`, and (\d+) `beyond`, out of (\d+) total/,
+  /the normal case, at (\d+) cases across five windows/,
+  /one frame of every route and tab the lab renders, (\d+) cases/,
+  /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
+]);
+
+/** A carrier with the generated region cut out, so the guard cannot read the writer's own output. */
+function outsideGeneratedRegion(markdown) {
+  const lines = totalsRegion().split('\n');
+  const [start] = lines;
+  const end = lines.at(-1);
+  const from = markdown.indexOf(start);
+  if (from === -1) return markdown;
+  const to = markdown.indexOf(end, from);
+  assert.ok(to !== -1, `a totals region opened by ${start} has no ${end}`);
+  return markdown.slice(0, from) + markdown.slice(to + end.length);
+}
+
+test('the generated totals region says what the registry says, exactly once', () => {
+  const carrier = readFileSync(resolve(ROOT, TOTALS_DOCUMENT), 'utf8');
+  const expected = totalsRegion();
+  assert.equal(
+    carrier.split(expected).length,
+    2,
+    `${TOTALS_DOCUMENT}'s totals region is stale or duplicated — run \`npm run viewlab:totals\`. ` +
+      `It should read once:\n${expected}`
+  );
+});
+
+test('the totals writer replaces one region and refuses a missing or duplicated one', () => {
+  const region = totalsRegion();
+  const document = `intro\n\n${region}\n\nouter\n`;
+  assert.equal(withTotalsRegion(document, region), document, 'a current region is a no-op');
+  const stale = document.replace(region, `${region.split('\n')[0]}\nstale\n${region.split('\n').at(-1)}`);
+  assert.equal(withTotalsRegion(stale, region), document, 'a stale region is replaced in place');
+  assert.throws(() => withTotalsRegion('no region here\n', region), /has no/u);
+  assert.throws(() => withTotalsRegion(`${document}${region}\n`, region), /more than one/u);
+});
+
+test('no carrier quotes a registry count outside the generated region', () => {
+  for (const carrier of TOTALS_CARRIERS) {
+    const prose = outsideGeneratedRegion(readFileSync(resolve(ROOT, carrier), 'utf8'));
+    for (const pattern of RETIRED_COUNT_PATTERNS) {
+      assert.ok(
+        !pattern.test(prose),
+        `${carrier} states a registry count in prose again (${pattern}). The numbers are ` +
+          `generated into ${TOTALS_DOCUMENT}; point at that region instead of copying it.`
+      );
+    }
   }
 });
 
@@ -3502,22 +3538,73 @@ test('every case literal parses as its own attributable region', () => {
   }
 });
 
-test('the registry order and its surface coverage match the committed golden files', () => {
-  // Generated on the base commit: nothing else here would notice a run landing out of order.
-  const golden = (name) =>
-    readFileSync(resolve(ROOT, `tests/fixtures/view-lab/${name}.golden.txt`), 'utf8')
-      .split('\n')
-      .filter((line) => line !== '');
+// Registry order is guarded by one golden per case file rather than one for the whole registry, so
+// a PR adding a case to one surface changes one small file. Three assertions carry what the single
+// 505-line golden used to: cross-file order, within-file order, and no golden left behind.
 
+const CASE_ID_GOLDENS = 'tests/fixtures/view-lab/case-ids';
+const CASE_FILE_ORDER_GOLDEN = 'tests/fixtures/view-lab/caseFileOrder.golden.txt';
+
+/** A golden's lines, blank lines dropped so the trailing newline is not read as an entry. */
+const goldenLines = (relativePath) =>
+  readFileSync(resolve(ROOT, relativePath), 'utf8')
+    .split('\n')
+    .filter((line) => line !== '');
+
+/** The golden that holds one case file's ids. The frozen entry carries `path` and `cases` only. */
+const caseIdGolden = (casePath) => `${CASE_ID_GOLDENS}/${basename(casePath, '.js')}.golden.txt`;
+
+test('the case files stay in their committed order', () => {
   assert.deepEqual(
-    [...caseIds],
-    golden('caseIds'),
-    'the registry order changed. `chooseSurfaceRepresentatives` breaks ties first-in-order, so ' +
-      'a reordered run silently changes which frame represents a surface'
+    VIEW_LAB_CASE_FILES.map(({ path }) => path),
+    goldenLines(CASE_FILE_ORDER_GOLDEN),
+    'the case-file order changed. `VIEW_LAB_CASES` is this list flat-mapped and ' +
+      '`chooseSurfaceRepresentatives` breaks ties first-in-order, so a reordered manifest ' +
+      'silently changes which frame represents a surface'
+  );
+});
+
+test('each case file holds its own case ids in its own order', () => {
+  for (const { path, cases } of VIEW_LAB_CASE_FILES) {
+    assert.deepEqual(
+      cases.map((viewCase) => viewCase.id),
+      goldenLines(caseIdGolden(path)),
+      `${path} changed which cases it declares, or the order it declares them in; if that is ` +
+        `intended, rewrite ${caseIdGolden(path)} with the ids in declaration order`
+    );
+  }
+});
+
+test('no case-id golden is orphaned by a renamed case file', () => {
+  const names = VIEW_LAB_CASE_FILES.map(({ path }) => basename(path, '.js'));
+  assert.equal(
+    new Set(names).size,
+    names.length,
+    'two case files share a basename, so they would share one golden; rename one of them'
   );
   assert.deepEqual(
+    readdirSync(resolve(ROOT, CASE_ID_GOLDENS)).sort(),
+    VIEW_LAB_CASE_FILES.map(({ path }) => basename(caseIdGolden(path))).sort(),
+    `a golden under ${CASE_ID_GOLDENS} names no case file, or a case file has no golden — a ` +
+      'rename that leaves the old golden behind guards a file that no longer exists'
+  );
+});
+
+test('the sharded goldens compose into the whole registry order', () => {
+  // The migration proof (issue #1937): concatenated in case-file order these reproduce the
+  // 505-line golden they replaced, so nothing outside the case files reaches the flat registry.
+  assert.deepEqual(
+    [...caseIds],
+    goldenLines(CASE_FILE_ORDER_GOLDEN).flatMap((path) => goldenLines(caseIdGolden(path))),
+    'the flat registry is no longer the case files concatenated in manifest order, so the ' +
+      'per-file goldens no longer guard what one whole-registry golden used to'
+  );
+});
+
+test('surface coverage matches its committed golden file', () => {
+  assert.deepEqual(
     [...LAB_SURFACE_CASE_IDS],
-    golden('labSurfaceCaseIds'),
+    goldenLines('tests/fixtures/view-lab/labSurfaceCaseIds.golden.txt'),
     'surface coverage changed — the frame set every unattributable change publishes'
   );
 });

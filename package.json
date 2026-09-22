@@ -57,6 +57,7 @@
     "docs:screenshots": "node scripts/docs-screenshots.mjs generate",
     "docs:screenshots:check": "node scripts/docs-screenshots.mjs check",
     "viewlab:index": "node scripts/view-lab-index.mjs",
+    "viewlab:totals": "node scripts/view-lab-registry-totals.mjs",
     "benchmark:performance": "node scripts/benchmark-performance.mjs",
     "benchmark:compare": "node scripts/benchmark-compare.mjs"
   },
