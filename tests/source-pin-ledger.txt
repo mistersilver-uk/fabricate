@@ -90,7 +90,7 @@ tests/components/row-disclosure-mounted.test.js	3
 tests/components/run-primitives-mounted.test.js	1
 tests/components/scoped-entity-preview-fact-groups-mounted.test.js	2
 tests/components/scoped-list-inspector-geometry.test.js	2
-tests/components/scoped-shell-prop-contract.test.js	20
+tests/components/scoped-shell-prop-contract.test.js	21
 tests/components/searchable-popover-trigger-form-mounted.test.js	6
 tests/components/segmented-control-mounted.test.js	12
 tests/components/select-mounted.test.js	1

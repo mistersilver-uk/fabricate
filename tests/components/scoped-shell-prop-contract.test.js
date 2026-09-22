@@ -1351,6 +1351,45 @@ describe('the world Component entry header wires the borderless medallion', () =
 });
 
 /**
+ * The `saving` leg only disables Save, so a world entry editor reading a sibling entity's flag
+ * renders identically in every state a mounted census can reach (issue 1720).
+ */
+describe('each world entry header action pair binds its own entity’s save legs', () => {
+  const LADDER = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+  const ENTITIES = Object.freeze([
+    ['essence', 'Essence'],
+    ['tool', 'Tool'],
+    ['component', 'Component'],
+  ]);
+
+  /**
+   * The one `<ScopedEntryHeaderActions …/>` the named entry route's branch renders. The anchor is
+   * the branch tag rather than the route token, which the visibility gate above also spells.
+   */
+  function actionPairFor(ladder, route) {
+    const branch = ladder.indexOf(`if currentView === '${route}'}`);
+    assert.ok(branch !== -1, `NON-VACUITY: the ladder still branches on \`${route}\``);
+    const open = ladder.indexOf('<ScopedEntryHeaderActions', branch);
+    assert.ok(open !== -1, `and \`${route}\` still renders the shared action pair`);
+    return ladder.slice(open, ladder.indexOf('/>', open));
+  }
+
+  it('gives each route its own dirty and saving flags, never a sibling entity’s', () => {
+    const ladder = sourceOf(LADDER);
+    const wrong = [];
+    for (const [entity, Entity] of ENTITIES) {
+      const pair = actionPairFor(ladder, `world-${entity}-entry`);
+      const dirty = /saveDisabled=\{!(\w+)\}/.exec(pair);
+      const saving = /saving=\{(\w+)\}/.exec(pair);
+      assert.ok(dirty && saving, `the ${entity} pair still binds both save legs`);
+      if (dirty[1] !== `world${Entity}EntryDirty`) wrong.push(`${entity} gates Save on ${dirty[1]}`);
+      if (saving[1] !== `world${Entity}EntrySaving`) wrong.push(`${entity} spins on ${saving[1]}`);
+    }
+    assert.deepEqual(wrong, [], 'a world entry editor reads another entity’s save state');
+  });
+});
+
+/**
  * `{ selector, body }` for every rule in a stylesheet text.
  *
  * @param {string} css
