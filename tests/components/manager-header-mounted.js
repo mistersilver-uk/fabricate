@@ -92,6 +92,45 @@ const WORLD_COMPONENTS = Object.freeze([Object.freeze({ id: 'vial', name: 'Glass
 const GATHERING_EVENTS = Object.freeze([
   Object.freeze({ id: 'event-thorns', name: 'Thorn Snare', enabled: true, dropRate: 10 }),
 ]);
+// The two world rules libraries, non-empty and of DIFFERENT sizes, because each page's lede is a
+// count of its own library and an equal pair would agree with the other's derivation.
+const WORLD_PREREQUISITES = Object.freeze([
+  Object.freeze({ id: 'pre-trained', name: 'Trained', path: 'skills.cra.rank', op: 'gte', value: 2 }),
+  Object.freeze({ id: 'pre-expert', name: 'Expert', path: 'skills.cra.rank', op: 'gte', value: 4 }),
+]);
+const WORLD_MODIFIERS = Object.freeze([
+  Object.freeze({ id: 'mod-herbalism', label: 'Herbalism', expression: '@skills.nature.value' }),
+  Object.freeze({ id: 'mod-forge', label: 'Forge', expression: '@skills.smithing.value' }),
+  Object.freeze({ id: 'mod-lore', label: 'Lore', expression: '@skills.arcana.value' }),
+]);
+// FOUR counts, all different: the hub's lede reads party total, enabled, assigned and the world's
+// player characters in one sentence, so equal readings let a swapped thunk pass.
+const WORLD_HUB_PARTIES = Object.freeze([
+  Object.freeze({
+    id: 'party-one',
+    name: 'Wayfarers',
+    enabled: true,
+    memberCount: 1,
+    memberActorUuids: Object.freeze(['Actor.member']),
+    memberCards: Object.freeze([{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }]),
+    travelActorUuid: 'Actor.marker',
+    travelActor: Object.freeze({ uuid: 'Actor.marker', name: 'Mira', img: '' }),
+  }),
+  ...['party-two', 'party-three', 'party-four'].map((id, index) =>
+    Object.freeze({
+      id,
+      name: `Watch ${index + 1}`,
+      // Three more parties, two of them enabled: four parties, three enabled, one character
+      // assigned, two player characters in the world.
+      enabled: index < 2,
+      memberCount: 0,
+      memberActorUuids: Object.freeze([]),
+      memberCards: Object.freeze([]),
+      travelActorUuid: null,
+      travelActor: null,
+    })
+  ),
+]);
 
 /**
  * A world-scope leg, in the shape `adminStore` publishes and the root reads: the corpus under
@@ -130,6 +169,22 @@ async function openScopedEntry(leaf, rowId) {
   );
   assert.ok(Boolean(open), `the ${leaf} catalogue rendered no open-entry action for \`${rowId}\``);
   open.click();
+  await settleHeader();
+}
+
+/** Open the fixture component's editor from the Component Rules catalogue. */
+async function openComponentEditor() {
+  navButton('Component Rules').click();
+  await settleHeader();
+  target.querySelector('[data-component-edit="c1"]').click();
+  await settleHeader();
+}
+
+/** Open one of World > Rules & Resources' three pages: the rail parent, then its leaf. */
+async function openWorldRulesPage(destination) {
+  worldNavItem('rules').click();
+  await settleHeader();
+  target.querySelector(`[data-world-rules-item="${destination}"]`).click();
   await settleHeader();
 }
 
@@ -214,6 +269,13 @@ const TASK_INVALID = () => ({
 
 const hook = (selector, why) => assert.ok(Boolean(target.querySelector(selector)), why);
 
+/** The heading is what distinguishes the states one route reaches through its own tab strip. */
+const titled = (expected, why) =>
+  assert.equal(target.querySelector('.manager-title').textContent.trim(), expected, why);
+
+/** And the Save tooltip is what distinguishes a valid draft from a refused one. */
+const saveTitled = (expected, why) => assert.equal(headerSaveButton(target).title, expected, why);
+
 /**
  * Every state the header draws, as `{ view, open, prove }`. `view` is asserted against the
  * rendered route token and `prove` against the hook that distinguishes this state from its
@@ -295,12 +357,22 @@ const CENSUS_STATES = {
     view: 'component-edit',
     open: async () => {
       mountManager();
-      navButton('Component Rules').click();
-      await settleHeader();
-      target.querySelector('[data-component-edit="c1"]').click();
-      await settleHeader();
+      await openComponentEditor();
     },
     prove: () => hook('[data-component-edit-heading]', 'the identity heading did not render'),
+  },
+  'the component editor with a dirty draft, which adds the unsaved chip and enables Save': {
+    view: 'component-edit',
+    open: async () => {
+      mountManager();
+      await openComponentEditor();
+      // The component editor has no name field: its identity is the linked item's. Its draft is
+      // the tag, category, essence, salvage and complication set, so a tag the fixture does not
+      // carry is the shortest edit that dirties it.
+      target.querySelector('[data-component-edit-tag-toggle="herb"]').click();
+      await settleHeader();
+    },
+    prove: () => hook('.manager-header-actions .manager-chip', 'the draft never went dirty'),
   },
   'Knowledge, the first of the routes whose action group renders empty': {
     view: 'knowledge',
@@ -334,6 +406,16 @@ const CENSUS_STATES = {
       mountManager();
       await openSystemEssenceEditor();
     },
+  },
+  'the essence editor with a dirty draft, which adds the unsaved chip and enables Save': {
+    view: 'essence-edit',
+    open: async () => {
+      mountManager();
+      await openSystemEssenceEditor();
+      setInputValue(target.querySelector('#manager-essence-edit-name'), 'Rain');
+      await settleHeader();
+    },
+    prove: () => hook('[data-essence-edit-dirty]', 'the draft never went dirty'),
   },
   'the essence editor in world rules mode, which heads the screen with the world record': {
     view: 'essence-edit',
@@ -370,6 +452,7 @@ const CENSUS_STATES = {
       navButton('Gathering').click();
       await settleHeader();
     },
+    prove: () => titled('Gathering environments', 'the Environments tab never came up'),
   },
   'Gathering > Tasks, the same route under the tab with its own create action': {
     view: 'environments',
@@ -377,6 +460,7 @@ const CENSUS_STATES = {
       mountManager();
       await openGatheringTab('Tasks');
     },
+    prove: () => titled('Gathering Tasks', 'the Tasks tab never came up'),
   },
   'Gathering > Events, the encounters tab, whose create action is a different one': {
     view: 'environments',
@@ -384,6 +468,7 @@ const CENSUS_STATES = {
       mountManager([], { gatheringLibraryEvents: [...GATHERING_EVENTS] });
       await openGatheringTab('Events');
     },
+    prove: () => titled('Gathering events', 'the Events tab never came up'),
   },
   'the environment editor with a dirty draft, which is where the status pills render': {
     view: 'environment-edit',
@@ -402,6 +487,7 @@ const CENSUS_STATES = {
       mountManager();
       await openGatheringTaskEditor();
     },
+    prove: () => saveTitled('', 'the draft never validated, so Save carries its error join'),
   },
   'the gathering task editor whose Save titles itself with the joined validation errors': {
     view: 'gathering-task-edit',
@@ -409,6 +495,11 @@ const CENSUS_STATES = {
       mountManager([], { gatheringTaskValidation: TASK_INVALID });
       await openGatheringTaskEditor();
     },
+    prove: () =>
+      saveTitled(
+        TASK_INVALID().errors.join('\n'),
+        'the refused draft left Save untitled'
+      ),
   },
   'the gathering event editor, dirty': {
     view: 'gathering-event-edit',
@@ -447,10 +538,12 @@ const CENSUS_STATES = {
   'the World hub, whose trail is the bare world crumb': {
     view: 'world',
     open: async () => {
-      mountManager();
+      mountManager([], { travelParties: WORLD_HUB_PARTIES });
       worldNavItem('parties').click();
       await settleHeader();
     },
+    prove: () =>
+      titled('World Parties', 'the rail did not land on the hub the subtitle counts for'),
   },
   'World > Travel on its realms tab': {
     view: 'world-travel',
@@ -459,6 +552,7 @@ const CENSUS_STATES = {
       worldTravelItem('travel').click();
       await settleHeader();
     },
+    prove: () => titled('Realms', 'the realms tab never came up'),
   },
   'World > Travel on its map tab, whose action group renders empty': {
     view: 'world-travel',
@@ -469,6 +563,7 @@ const CENSUS_STATES = {
       worldTravelItem('map').click();
       await settleHeader();
     },
+    prove: () => titled('Map Region Links', 'the map tab never came up'),
   },
   'World > Rules & Resources on its currency page, which is outside the actions gate': {
     view: 'world-currency',
@@ -477,6 +572,22 @@ const CENSUS_STATES = {
       worldNavItem('rules').click();
       await settleHeader();
     },
+  },
+  'World > Rules & Resources on its character prerequisites page': {
+    view: 'world-prerequisites',
+    open: async () => {
+      mountManager([], { characterPrerequisites: WORLD_PREREQUISITES });
+      await openWorldRulesPage('prerequisites');
+    },
+    prove: () => titled('Character prerequisites', 'the rules rail never reached prerequisites'),
+  },
+  'World > Rules & Resources on its modifiers page': {
+    view: 'world-modifiers',
+    open: async () => {
+      mountManager([], { modifiers: WORLD_MODIFIERS });
+      await openWorldRulesPage('modifiers');
+    },
+    prove: () => titled('Modifiers', 'the rules rail never reached modifiers'),
   },
   'the world essence catalogue, the one world scoped route back inside the actions gate': {
     view: 'world-essences',
@@ -792,6 +903,42 @@ const HEADER_CENSUS = Object.freeze({
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
       "+ 3 span | Save rules",
     ],
+    "the component editor with a dirty draft, which adds the unsaved chip and enables Save": [
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 button type=\"button\" | Alchemy",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 button type=\"button\" | Component Rules",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span | Iron Ore",
+      "+ 2 div class=\"manager-recipe-edit-heading\" data-component-edit-heading=\"\"",
+      "+ 3 span class=\"fab-medallion svelte-1jh7cl8\" data-medallion=\"image\" style=\"width: 44px; height: 44px;\"",
+      "+ 4 img alt=\"\" class=\"fab-medallion-img svelte-1jh7cl8\" src=\"icons/commodities/metal/ore-chunk-grey.webp\"",
+      "+ 3 div class=\"manager-recipe-edit-heading-copy\"",
+      "+ 4 h1 class=\"manager-title\" title=\"Iron Ore\" | Iron Ore",
+      "+ 4 p class=\"manager-subtitle\" data-component-edit-subline=\"\" | Alchemy rules · Reagent · Simple",
+      "+ 1 div aria-label=\"Component actions\" class=\"manager-header-actions\"",
+      "+ 2 span class=\"manager-chip is-warning svelte-1vupdsz\" data-component-edit-dirty=\"\" | Unsaved",
+      "+ 2 button class=\"fabricate-button manager-button fab-manager-button is-ghost\" data-component-edit-back=\"\" data-keyboard-focus=\"true\" type=\"button\"",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-arrow-left\"",
+      "+ 3 span | Back",
+      "+ 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-component-edit-save=\"\" data-keyboard-focus=\"true\" form=\"manager-component-edit-form\" type=\"submit\"",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
+      "+ 3 span | Save rules",
+    ],
     "Knowledge, the first of the routes whose action group renders empty": [
       "- 2 div class=\"manager-page-kicker\"",
       "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
@@ -891,6 +1038,38 @@ const HEADER_CENSUS = Object.freeze({
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-arrow-left\"",
       "+ 3 span | Back",
       "+ 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-essence-edit-save=\"\" data-keyboard-focus=\"true\" disabled=\"\" form=\"manager-essence-edit-form\" type=\"submit\"",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
+      "+ 3 span | Save essence",
+    ],
+    "the essence editor with a dirty draft, which adds the unsaved chip and enables Save": [
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 button type=\"button\" | Alchemy",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 button type=\"button\" | Essence Rules",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span title=\"Rain\" | Rain",
+      "+ 2 h1 class=\"manager-title\" | Edit essence",
+      "+ 2 p class=\"manager-subtitle\" | Update identity, icon, and source linkage for this essence.",
+      "+ 1 div aria-label=\"Essence actions\" class=\"manager-header-actions\"",
+      "+ 2 span class=\"manager-chip is-warning svelte-1vupdsz\" data-essence-edit-dirty=\"\" | Unsaved",
+      "+ 2 button class=\"fabricate-button manager-button fab-manager-button is-ghost\" data-essence-edit-back=\"\" data-keyboard-focus=\"true\" type=\"button\"",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-arrow-left\"",
+      "+ 3 span | Back",
+      "+ 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-essence-edit-save=\"\" data-keyboard-focus=\"true\" form=\"manager-essence-edit-form\" type=\"submit\"",
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
       "+ 3 span | Save essence",
     ],
@@ -1274,7 +1453,7 @@ const HEADER_CENSUS = Object.freeze({
       "- 3 span | Export",
       "+ 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | WORLD / every system",
       "+ 2 h1 class=\"manager-title\" | World Parties",
-      "+ 2 p class=\"manager-subtitle\" | 2 parties · 1 enabled · 1 of 2 characters assigned",
+      "+ 2 p class=\"manager-subtitle\" | 4 parties · 3 enabled · 1 of 2 characters assigned",
       "+ 1 div aria-label=\"World party actions\" class=\"manager-header-actions\"",
       "- 3 span | Create",
       "+ 3 span | New party",
@@ -1351,6 +1530,54 @@ const HEADER_CENSUS = Object.freeze({
       "+ 3 span data-breadcrumb-world-rules-tab=\"currency\" | World Currency",
       "+ 2 h1 class=\"manager-title\" | World Currency",
       "+ 2 p class=\"manager-subtitle\" | No coins yet · world-level, shared by every crafting system that enables currency",
+    ],
+    "World > Rules & Resources on its character prerequisites page": [
+      "- 3 button type=\"button\" | Crafting Systems",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 3 button data-breadcrumb-world=\"\" type=\"button\" | World",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span | Rules & Resources",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span data-breadcrumb-world-rules-tab=\"prerequisites\" | Character prerequisites",
+      "+ 2 h1 class=\"manager-title\" | Character prerequisites",
+      "+ 2 p class=\"manager-subtitle\" | 2 prerequisites · shared by every crafting system",
+    ],
+    "World > Rules & Resources on its modifiers page": [
+      "- 3 button type=\"button\" | Crafting Systems",
+      "- 2 div class=\"manager-page-kicker\"",
+      "- 3 p class=\"fab-kicker svelte-q4je4u\" data-page-kicker=\"\" | Browse",
+      "- 2 h1 class=\"manager-title\" | Crafting systems",
+      "- 2 p class=\"manager-subtitle\" | Select a row to view counts and enabled features.",
+      "- 1 div aria-label=\"System actions\" class=\"manager-header-actions\"",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" data-manager-import-system=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-import\"",
+      "- 3 span | Import",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-file-export\"",
+      "- 3 span | Export",
+      "- 2 button class=\"fabricate-button manager-button fab-manager-button is-primary\" data-keyboard-focus=\"true\" type=\"button\"",
+      "- 3 i aria-hidden=\"true\" class=\"fas fa-plus\"",
+      "- 3 span | Create",
+      "+ 3 button data-breadcrumb-world=\"\" type=\"button\" | World",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span | Rules & Resources",
+      "+ 3 i aria-hidden=\"true\" class=\"fas fa-chevron-right\"",
+      "+ 3 span data-breadcrumb-world-rules-tab=\"modifiers\" | Modifiers",
+      "+ 2 h1 class=\"manager-title\" | Modifiers",
+      "+ 2 p class=\"manager-subtitle\" | 3 modifiers · shared by every crafting system",
     ],
     "the world essence catalogue, the one world scoped route back inside the actions gate": [
       "- 3 button type=\"button\" | Crafting Systems",
