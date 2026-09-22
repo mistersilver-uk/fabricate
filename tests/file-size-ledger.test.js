@@ -1,12 +1,12 @@
 /**
- * Ratchets the oversized files and functions under `src/` (issue 1659), so every Phase 4 and 5
- * extraction lowers a number rather than reporting a win nothing checked.
+ * Bounds the oversized files and functions under `src/` (issue 1659), so a unit this epic exists
+ * to shrink cannot grow materially, and a unit that shrinks costs no ledger edit (issue 1914).
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, pinnedLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   FILE_THRESHOLDS,
@@ -18,11 +18,21 @@ import {
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'file-size-ledger.txt');
 
-const REGENERATE =
-  'UPDATE_FILE_SIZE_LEDGER=1 node --conditions=browser --test ' +
-  'tests/file-size-ledger.test.js, then review the diff';
+const RUN = 'node --conditions=browser --test tests/file-size-ledger.test.js';
 
 const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte']);
+
+/** Below this the scan is truncated rather than clean; `src/` holds ~840 scanned files. */
+const SCAN_FLOOR = 501;
+
+/** Enough rows that a truncated scan cannot regenerate the ledger down to a handful. */
+const ROW_FLOOR = 150;
+
+/** A file row rounds to fifty lines, a function row to ten; both after five percent of headroom. */
+function ceilingFor(key, lines) {
+  const step = key.includes('::') ? 10 : 50;
+  return Math.ceil((lines * 1.05) / step) * step;
+}
 
 const extensionOf = (file) => file.slice(file.lastIndexOf('.'));
 
@@ -55,25 +65,34 @@ function buildLedger() {
       if (unit.lines > FUNCTION_THRESHOLD) entries.push([`${file}::${unit.symbol}`, unit.lines]);
     }
   }
-  return Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right)));
+  return {
+    observed: Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right))),
+    scanned: Object.keys(corpus).length,
+  };
 }
 
-const gate = pinnedLedgerGate({
+const gate = ceilingLedgerGate({
   test,
   assert,
-  title: 'the file-size ledger matches the pinned baseline exactly',
+  title: 'no oversized file or function under `src/` is past its ledger ceiling',
   ledgerPath: LEDGER_PATH,
-  regenerateEnv: 'UPDATE_FILE_SIZE_LEDGER',
+  updateEnv: 'UPDATE_FILE_SIZE_LEDGER',
+  tightenEnv: 'TIGHTEN_FILE_SIZE_LEDGER',
   build: buildLedger,
-  subject: 'oversized files and functions',
-  regenerate: REGENERATE,
-  structuralHint:
-    'A unit appears when it crosses its threshold and vanishes when it falls below; an ' +
-    'extraction is expected to remove entries, and adding one needs a reason. A `#N` suffix ' +
-    'is positional among same-named functions, so an added or removed sibling renumbers those ' +
-    'after it: a matched added/removed pair at the same line count is that renumber, not debt.',
-  roseHint: 'means a unit this epic exists to shrink has grown instead',
-  fellHint: 'needs the ledger lowered to bank the extraction',
+  ceiling: ceilingFor,
+  staleRows: 'allow',
+  floor: SCAN_FLOOR,
+  wording: {
+    subject: 'oversized files and functions',
+    update: `UPDATE_FILE_SIZE_LEDGER=1 ${RUN}`,
+    tighten: `TIGHTEN_FILE_SIZE_LEDGER=1 ${RUN}`,
+    addedHint:
+      'A unit with no row has just crossed its threshold, and adding to the nearest large file ' +
+      'instead of extracting one is the shape this gate exists to catch. A `#N` suffix is ' +
+      'positional among same-named functions, so an added or removed sibling renumbers those ' +
+      'after it: a new row matching a dropped one at the same size is that renumber, not debt.',
+    staleHint: 'A row vanishes when its unit falls below the threshold, which is a win.',
+  },
 });
 
 test('the thresholds are the two the issue states, and exclusive', () => {
@@ -212,20 +231,26 @@ test('an inline handler in the markup is measured, not only the script blocks', 
   assert.equal(measured[0].lines, 3);
 });
 
+test('the headroom is proportional, so it is five percent of the unit at any size', () => {
+  // A fixed grid would hand a just-crossed file most of a step for free and the largest file
+  // almost nothing; these four are the sizes the ledger actually holds.
+  assert.equal(ceilingFor('a.svelte', 502), 550);
+  assert.equal(ceilingFor('a.js', 819), 900);
+  assert.equal(ceilingFor('src/main.js', 16609), 17450);
+  assert.equal(ceilingFor('a.js::fn', 101), 110);
+  assert.ok(ceilingFor('a.js', 800) > 800, 'a ceiling is never below the unit it bounds');
+});
+
 test('the ledger reports the two figures epic 1656 tracks', (t) => {
-  // The one pair a reviewer can check against the issue without reading 229 rows.
+  // The pair a reviewer checks against the issue without reading the rows. Floored rather than
+  // pinned: the exact targets live on #1656, and pinning them here is a second conflict site.
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  // 105/113 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
-  // threshold at 820, and `createFoundryJournalRunAuthority` crossed the 100-line function
-  // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
-  // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
-  // `deleteEmbeddedDocuments` throw and stranded a run. Issue 1701 banked `craft`: every pipeline
-  // function it split into is under the threshold, and `craftPipeline.js` under the file one.
-  // Issue 1699 banked `repairItemData`: the source-identity extraction split its 152 lines into
-  // `buildRepairKinds`, `emptyRepairSummary` and the three walks, all under the threshold, and
-  // neither new `src/systems/` module reaches the file one.
-  assert.equal(files, 104, 'oversized files');
-  assert.equal(keys.length - files, 111, 'oversized functions');
+  t.diagnostic(`${files} oversized files and ${keys.length - files} oversized functions`);
+  assert.ok(
+    keys.length > ROW_FLOOR,
+    `only ${keys.length} rows, below the floor of ${ROW_FLOOR}; a ledger regenerated from a ` +
+      'truncated scan would look exactly like this'
+  );
 });

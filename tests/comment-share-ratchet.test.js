@@ -1,21 +1,24 @@
 /**
- * Ratchets the comment-line share per directory (issue 1657), so Phase 1 sweeps of this epic can
- * each lower `tests/comment-share-ledger.txt` without a later sweep silently re-growing it.
+ * Bounds the comment-line share per directory (issue 1657) as a ceiling, so a sweep that trims
+ * comments costs no ledger edit and only a directory that grows materially does (issue 1914).
  */
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.txt');
 
-/** The command that re-derives the ledger, named in every drift message so it is actionable. */
-const REGENERATE =
-  'UPDATE_COMMENT_SHARE_LEDGER=1 node --conditions=browser --test ' +
-  'tests/comment-share-ratchet.test.js, then review the JSON diff';
+const RUN = 'node --conditions=browser --test tests/comment-share-ratchet.test.js';
+
+/** Below this the scan is truncated rather than clean; the four roots hold ~2,100 files. */
+const SCAN_FLOOR = 451;
+
+/** The headroom every row carries, in comment lines a directory may add before it crosses. */
+const HEADROOM_LINES = 25;
 
 /** The corpus this gate polices. `.json` is excluded on purpose — see the ledger note below. */
 const SCAN_ROOTS = Object.freeze(['src', 'tests', 'scripts', 'styles']);
@@ -192,6 +195,21 @@ function extensionOf(file) {
   return file.slice(file.lastIndexOf('.'));
 }
 
+/** Physical lines, discounting the empty element a trailing newline leaves behind. */
+function totalLines(text) {
+  const lines = text.split('\n');
+  return lines.length - (lines.at(-1) === '' ? 1 : 0);
+}
+
+/** A whole-percent share, so `100 * commentLines / totalLines` is what each row bounds. */
+const shareOf = ({ commentLines, totalLines: total }) => (100 * commentLines) / total;
+
+/** The share the directory would hold after `HEADROOM_LINES` more comment lines. */
+function ceilingFor(key, _share, detail) {
+  const { commentLines, totalLines: total } = detail[key];
+  return Math.ceil((100 * (commentLines + HEADROOM_LINES)) / (total + HEADROOM_LINES));
+}
+
 /**
  * Keyed by every directory directly holding a scanned file, counting only files directly in it —
  * not the coarser one-child-per-root key a redistribution inside a subtree could hide behind.
@@ -200,19 +218,29 @@ function buildLedger(corpus) {
   const buckets = new Map();
   for (const [file, text] of Object.entries(corpus)) {
     const dir = directoryOf(file);
-    const count = countCommentLines(text, extensionOf(file));
-    buckets.set(dir, (buckets.get(dir) ?? 0) + count);
+    const bucket = buckets.get(dir) ?? { commentLines: 0, totalLines: 0 };
+    bucket.commentLines += countCommentLines(text, extensionOf(file));
+    bucket.totalLines += totalLines(text);
+    buckets.set(dir, bucket);
   }
-  return Object.fromEntries([...buckets].sort(([a], [b]) => byCodePoint(a, b)));
+  const sorted = [...buckets]
+    .filter(([, bucket]) => bucket.totalLines > 0)
+    .sort(([a], [b]) => byCodePoint(a, b));
+  return {
+    observed: Object.fromEntries(sorted.map(([dir, bucket]) => [dir, shareOf(bucket)])),
+    detail: Object.fromEntries(sorted),
+    scanned: Object.keys(corpus).length,
+  };
 }
 
-/** One corpus walk per run: three assertions read it, and the tree is ~550 files. */
-
-function rollUpByRoot(ledger) {
+/** Comment and total lines per top-level root, which is the figure epic 1656's roll-up reads. */
+function rollUpByRoot(detail) {
   const rollup = {};
-  for (const [dir, count] of Object.entries(ledger)) {
+  for (const [dir, bucket] of Object.entries(detail)) {
     const [root] = dir.split('/', 1);
-    rollup[root] = (rollup[root] ?? 0) + count;
+    const into = (rollup[root] ??= { commentLines: 0, totalLines: 0 });
+    into.commentLines += bucket.commentLines;
+    into.totalLines += bucket.totalLines;
   }
   return rollup;
 }
@@ -242,31 +270,50 @@ function findSymlinkedDirectories(root) {
   return found;
 }
 
-const gate = ledgerGate({
+const gate = ceilingLedgerGate({
+  test,
+  assert,
+  title: 'no directory is past its comment-share ceiling',
   ledgerPath: LEDGER_PATH,
-  regenerateEnv: 'UPDATE_COMMENT_SHARE_LEDGER',
+  updateEnv: 'UPDATE_COMMENT_SHARE_LEDGER',
+  tightenEnv: 'TIGHTEN_COMMENT_SHARE_LEDGER',
   build: () => buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS)),
+  ceiling: ceilingFor,
+  staleRows: 'allow',
+  floor: SCAN_FLOOR,
   wording: {
-    subject: 'comment-line counts per directory',
-    regenerate: REGENERATE,
-    structuralHint: 'A directory appears or vanishes as its files are created, renamed or emptied.',
-    roseHint: 'needs justification or a revert',
-    fellHint:
-      'needs the ledger lowered to bank the win; one key down and another up by the same amount ' +
-      'is a file moved between directories, not a regression',
+    subject: 'comment-line share per directory',
+    update: `UPDATE_COMMENT_SHARE_LEDGER=1 ${RUN}`,
+    tighten: `TIGHTEN_COMMENT_SHARE_LEDGER=1 ${RUN}`,
+    addedHint:
+      'A directory appears as its first scanned file is created. One key rising while another ' +
+      'falls by a comparable share is a file moved between directories, not new prose.',
+    staleHint: 'A directory vanishes when its files are moved, renamed or emptied.',
   },
 });
 
-test('the comment-line ledger matches the pinned baseline exactly, per directory', () => {
-  gate.check(assert);
+/** Prints the roll-up epic 1656's definition of done reads; percentages are not summable, so it
+ * is derived from the scan's own line counts and never pinned. */
+test('the scan reports the root-level roll-up epic 1656 tracks', (t) => {
+  const rollup = rollUpByRoot(gate.current().detail);
+  for (const [root, bucket] of Object.entries(rollup).sort(([a], [b]) => byCodePoint(a, b))) {
+    const share = ((100 * bucket.commentLines) / bucket.totalLines).toFixed(2);
+    t.diagnostic(`${root}: ${bucket.commentLines}/${bucket.totalLines} lines comment (${share}%)`);
+  }
+  assert.deepStrictEqual(
+    Object.keys(rollup).sort(byCodePoint),
+    [...SCAN_ROOTS].sort(byCodePoint),
+    'every scanned root still contributes a directory'
+  );
 });
 
-/** Prints the four numbers epic 1656's definition of done reads; it cannot fail alone. */
-test('the ledger reports as the root-level roll-up epic 1656 tracks', (t) => {
-  // A regeneration run has just rewritten the file, so comparing against it proves nothing until
-  // the next run.
-  if (gate.regenerated()) return t.skip('ledger regenerated this run');
-  assert.deepStrictEqual(rollUpByRoot(gate.current()), rollUpByRoot(gate.pinned()));
+test('a row absorbs at least twenty-five comment lines before it is crossed', () => {
+  // A bare `ceil(share)` leaves a row tripping on one added line, which is the churn the ceiling
+  // exists to remove; the rule is stated over the directory's own denominator instead.
+  const detail = { small: { commentLines: 20, totalLines: 100 } };
+  assert.equal(ceilingFor('small', shareOf(detail.small), detail), 36);
+  const grown = { commentLines: 45, totalLines: 125 };
+  assert.ok(shareOf(grown) <= 36, 'twenty-five more comment lines still fit under the ceiling');
 });
 
 test('none of the four scanned roots contains a symlinked directory', () => {
