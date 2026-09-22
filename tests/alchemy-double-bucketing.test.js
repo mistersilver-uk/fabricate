@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { roleItem } from './helpers/componentIdentityFixtures.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -169,7 +171,7 @@ test('the facade threads craftingSystemId into the collector so the palette and 
   // imports a .css asset), so this asserts the seam on source text — the established pattern for
   // src/main.js coverage in this repo.
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+  const mainSource = entryModuleSource('src/bootstrap/craftingFacade.js');
   assert.match(
     mainSource,
     /resolveAlchemySubmissions\(\s*sources,\s*components,\s*submittedComponentIds,\s*craftingSystemId\s*\)/,

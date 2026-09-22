@@ -31,6 +31,8 @@ import {
   POOLED_HOLDINGS_READ_MESSAGE_KEYS,
 } from '../src/systems/companionContract.js';
 import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
+
 
 import {
   assertContractResult,
@@ -1146,7 +1148,7 @@ describe('the harness copies are faithful to src/main.js', () => {
     for (const [label, body] of bothTexts(BULK)) {
       assert.ok(body.length > 100, `non-vacuity: ${label} sliced to ${body.length} characters`);
       assert.ok(
-        body.includes('user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null'),
+        body.includes('user?.isGM === true ? null : COMPANION_OUTCOMES.gmOnly'),
         `${label} lost the inline GM gate`
       );
       assert.ok(
@@ -1645,7 +1647,7 @@ describe('the harness copies are faithful to src/main.js', () => {
   });
 
   it('publishes COMPANION beside HOOKS, and publishes no grant symbol anywhere else', () => {
-    const source = readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8');
+    const source = FABRICATE_ENTRY_SOURCE;
     assert.ok(
       source.includes('HOOKS: FABRICATE_HOOKS,') &&
         source.includes('COMPANION: COMPANION_CONTRACT'),

@@ -228,7 +228,7 @@ The question worth answering instead is which subset unblocks the GM Downtime St
 `docs/api/index.md` publishes `getCraftingEngine()`, `getCraftingRunManager()`, `getRecipeVisibilityService()`, `getRecipeManager()`, `getCraftingSystemManager()`, `getGatheringRunManager()`, `getGatheringGateAndCheckEvaluator()` and `getGatheringRichStateService()` — the last of which its own documentation describes as "Gathering rich-state **internals**".
 
 Every method on those objects becomes de facto public the moment premium calls it, with no version marker, no deprecation policy and no test pinning the returned shape.
-`tests/fabricate-api-surface.test.js` pins that the *getters* exist, by matching literal strings in `src/main.js`; it pins nothing about what they return.
+`tests/fabricate-api-surface.test.js` pins that the *getters* exist, by matching literal strings in the module entry and its `src/bootstrap/` modules; it pins nothing about what they return.
 
 **This reframes D5 and D6 completely.**
 The question is not "what API should core build that premium currently lacks".
@@ -282,7 +282,7 @@ It ships today in `fabricate-mythwright` v0.11.0 — the only premium module dec
 The whole compatibility strategy is ad-hoc optional chaining, and the failure mode is a `ui.notifications.warn`.
 
 **Worse, core now has two opposite timing contracts for companions and only one is written down as an exception.**
-`src/main.js` carries a comment beside `whenReady()` naming the exact hazard — `fabricate.ready` is one-shot, and "a late manager launch can never latch on a spent event" — which is why the replay-safe `whenReady()` promise exists.
+`src/bootstrap/Fabricate.js` carries a comment beside `whenReady()` naming the exact hazard — `fabricate.ready` is one-shot, and "a late manager launch can never latch on a spent event" — which is why the replay-safe `whenReady()` promise exists.
 `docs/api/index.md` teaches the one-shot hook in **eleven** worked examples and never mentions `whenReady()` at all.
 Meanwhile `registerWorldNavProvider` is deliberately exempted from the readiness rule and documented as such, because its registry lives in a module-scope closure and survives the init-to-ready rebind.
 So the documented entry point is the unsafe one, the safe one is undocumented, and the one shipping consumer uses the documented unsafe one.

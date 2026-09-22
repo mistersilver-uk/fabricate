@@ -24,9 +24,10 @@ import {
   routeComplicationDeliveryMessage,
   validateComplicationDeliveryPayload,
 } from '../src/systems/complicationSocket.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 function entry(overrides = {}) {
   return {
@@ -51,12 +52,12 @@ function message(overrides = {}) {
 }
 
 /**
- * The body of a top-level function in `src/main.js`, from its signature to the first column-zero
+ * The body of a top-level function in the module entry, from its signature to the first column-zero
  * `}`.
  */
 function mainFunctionBody(name) {
   const start = mainSource.indexOf(`function ${name}(`);
-  assert.ok(start !== -1, `src/main.js should declare ${name}`);
+  assert.ok(start !== -1, `the module entry should declare ${name}`);
   const end = mainSource.indexOf('\n}\n', start);
   assert.ok(end > start, `${name} should be a top-level function`);
   return mainSource.slice(start, end);
@@ -552,7 +553,7 @@ test('the complication route is registered on the shared channel in its own guar
 
   const route = mainSource.indexOf('routeComplicationDeliveryMessage(payload, {');
   const guard = mainSource.lastIndexOf('try {', route);
-  const rescue = mainSource.indexOf('} catch (_error) {', route);
+  const rescue = mainSource.indexOf('} catch {', route);
   assert.ok(guard !== -1 && guard < route, 'the route should sit inside its own try block');
   assert.ok(rescue > route, 'a throw on one payload must not starve the others on this channel');
   assert.equal(
@@ -1026,7 +1027,7 @@ test('1286: a delivery dropped because the actor is not permission-testable is R
 
 test('the delivery writer is composed with the Foundry edges and a non-Math.random mint', () => {
   assert.ok(
-    mainSource.includes('this.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
+    mainSource.includes('fabricate.complicationDeliveryWriter = createComplicationDeliveryWriter({'),
     'the acting-client writer should be composed during bootstrap'
   );
   assert.ok(
@@ -1047,13 +1048,13 @@ test('1286: the delivery writer is INJECTED into both engines that fire complica
   // at the bootstrap site. Both engines are asserted, because only one of them is obvious.
   assert.ok(
     mainSource.includes(
-      'this.craftingEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter })'
+      'fabricate.craftingEngine?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
     ),
     'the crafting engine (immediate craft, timed craft FINISH and salvage) takes the writer'
   );
   assert.ok(
     mainSource.includes(
-      'gatheringEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter })'
+      'getGatheringEngine()?.installComplicationDelivery({\n    writer: fabricate.complicationDeliveryWriter,\n  })'
     ),
     'and so does the gathering engine'
   );

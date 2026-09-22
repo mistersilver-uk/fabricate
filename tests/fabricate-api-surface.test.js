@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { compileFunction } from 'node:vm';
 
 import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainPath = resolve(__dirname, '../src/main.js');
-const mainSource = readFileSync(mainPath, 'utf8');
+const mainSource = FABRICATE_ENTRY_SOURCE;
 
 /**
  * Assert one public hook namespace is on the aggregate, correctly named, and documented.
@@ -68,11 +68,11 @@ test('every public player hook is namespaced, reachable on the API, and document
 });
 
 test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
-  assertRegistryBind('managerExtensions', './ui/managerExtensions.js');
+  assertRegistryBind('managerExtensions', '../ui/managerExtensions.js');
 });
 
 test('Fabricate publishes the stable player extension API through both lifecycle binds', () => {
-  assertRegistryBind('playerExtensions', './ui/playerExtensions.js');
+  assertRegistryBind('playerExtensions', '../ui/playerExtensions.js');
 });
 
 test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
@@ -95,7 +95,7 @@ test('Fabricate bridges replicated crafting-data setting changes into local refr
   // same module cannot fail an assertion whose subject is the wiring.
   assert.match(
     mainSource,
-    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\/config\/settingChangeBridge\.js'/,
+    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\.?\/config\/settingChangeBridge\.js'/,
     'main.js should import the setting-change bridge'
   );
   assert.ok(
@@ -115,7 +115,7 @@ test('Fabricate routes gathering node depletion to the active GM', () => {
   assert.ok(
     mainSource.includes('createGatheringNodeDepletionWriter') &&
       mainSource.includes('routeGatheringNodeDepleteMessage') &&
-      mainSource.includes("from './systems/gatheringNodeSocket.js'"),
+      mainSource.includes("from '../systems/gatheringNodeSocket.js'"),
     'main.js should import the gathering node depletion writer and router'
   );
   assert.ok(
@@ -123,7 +123,9 @@ test('Fabricate routes gathering node depletion to the active GM', () => {
     'the inbound route should be rate limited per sender'
   );
   assert.ok(
-    mainSource.includes('depleteEnvironmentNode: (payload) => this.gatheringNodeDepletionWriter.deplete(payload)'),
+    /depleteEnvironmentNode: \(payload\) =>\s*fabricate\.gatheringNodeDepletionWriter\.deplete\(payload\)/.test(
+      mainSource
+    ),
     'the rich-state service should receive the GM-routed depletion seam'
   );
   assert.ok(
@@ -152,7 +154,7 @@ test('Fabricate wires RecipeManager to the live crafting-system manager', () => 
   // inline now route through — including `_validateSignatures`.
   assert.match(
     mainSource,
-    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*this\.currencyConfigStore,?\s*\}\)/s,
+    /fabricate\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*fabricate\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*fabricate\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*fabricate\.currencyConfigStore,?\s*\}\)/s,
     'RecipeManager production initialization should receive the live crafting-system resolver and manager'
   );
 });
@@ -161,12 +163,12 @@ test('Fabricate wires the world currency config into both currency readers', () 
   // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
   // per-system `enabled` flag with the world's ladder.
   assert.ok(
-    mainSource.includes('this.currencyConfigStore = new CurrencyConfigStore({'),
+    mainSource.includes('fabricate.currencyConfigStore = new CurrencyConfigStore({'),
     'main.js should construct the world currency config store'
   );
   assert.match(
     mainSource,
-    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*this\.currencyConfigStore/,
+    /new CraftingEngine\([\s\S]*?currencyConfigStore:\s*fabricate\.currencyConfigStore/,
     'CraftingEngine should receive the world currency config store'
   );
 });
@@ -210,7 +212,7 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
   // single shared predicate so the gate never drifts from the engine/resolver.
   assert.ok(
     mainSource.includes(
-      "import { getRealmRevealMode, isGatheringRealmsEnabled } from './systems/gatheringRealms.js';"
+      "import { getRealmRevealMode, isGatheringRealmsEnabled } from '../systems/gatheringRealms.js';"
     ),
     'main.js imports the shared gate predicate and the WORLD reveal-mode reader'
   );
@@ -224,7 +226,9 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
     'revealGatheringRealmForActor no-ops (false) when disabled'
   );
   assert.ok(
-    mainSource.includes('if (!isGatheringRealmsEnabled(this.craftingSystemManager?.getSystem(systemId))) return Promise.resolve(false);'),
+    /if \(!isGatheringRealmsEnabled\(this\.craftingSystemManager\?\.getSystem\(systemId\)\)\)\s*return Promise\.resolve\(false\);/.test(
+      mainSource
+    ),
     'hideGatheringRealmForActor no-ops (false) when disabled'
   );
 });
@@ -257,7 +261,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
   // that hands them a resolver is not: without this line every crafting row's owned-material tally
   // silently reads as if the player owns nothing, and no existing test goes red.
   assert.ok(
-    mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
+    /import \{ findMatchingComponent \} from '\.\.?\/utils\/essenceResolver\.js';/.test(mainSource),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
   );
   assert.ok(
@@ -328,8 +332,10 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
 
 test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {
   const start = mainSource.indexOf('function createJournalCommandsForFabricate(');
-  const end = mainSource.indexOf('\n// The GM notice', start);
-  assert.ok(start >= 0 && end > start);
+  // Bounded at its own column-zero closing brace: the factory is the last declaration in
+  // `src/bootstrap/journalOperations.js`, so a following-comment bound would run into another file.
+  const end = mainSource.indexOf('\n}\n', start) + 2;
+  assert.ok(start >= 0 && end > start + 2, 'the journal command factory must be present');
   let composed;
   const received = [];
   // Foundry V13.351/V14.365 handleCustomSocket destructures this argument: a
@@ -395,7 +401,7 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
     'the constructed gathering engine should receive the journal authority adapter'
   );
   assert.ok(
-    mainSource.includes('fabricate.craft(actor, recipe).then(result => {'),
+    /fabricate\s*\.craft\(actor, recipe\)\s*\.then\(\(result\) => \{/.test(mainSource),
     'the /craft chat command should delegate through the public craft facade'
   );
   assert.ok(

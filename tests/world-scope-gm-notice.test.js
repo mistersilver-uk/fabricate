@@ -11,6 +11,8 @@ import {
   MigrationRunner,
 } from '../src/migration/MigrationRunner.js';
 import { buildWorldEssenceMergeRemapNotice } from '../src/systems/remapWorldScopeIdentityFlags.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 import {
   buildWorldEssenceMergeNotice,
   buildWorldScopeEntityNotice,
@@ -19,7 +21,7 @@ import {
 } from '../src/systems/worldScopeEntityNotice.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+const MAIN = [entrySources['src/bootstrap/migrations.js'], entrySources['src/main.js']].join('\n');
 const LANG = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
 const EMPTY = Object.freeze({ message: '', detail: '' });
 

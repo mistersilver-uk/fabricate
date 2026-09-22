@@ -108,6 +108,23 @@ function isChangedManagerEnvironmentLocalizationKey(key) {
 
 const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const MAIN = 'src/main.js';
+
+/** Every module the entry composes; each carries the chunk-split claim in its own contract row. */
+const BOOTSTRAP_MODULES = [
+  'src/bootstrap/Fabricate.js',
+  'src/bootstrap/bulkFacade.js',
+  'src/bootstrap/companionFacade.js',
+  'src/bootstrap/composeServices.js',
+  'src/bootstrap/craftingFacade.js',
+  'src/bootstrap/gatheringFacade.js',
+  'src/bootstrap/gatheringRuntime.js',
+  'src/bootstrap/hooks.js',
+  'src/bootstrap/journalFacade.js',
+  'src/bootstrap/journalOperations.js',
+  'src/bootstrap/migrations.js',
+  'src/bootstrap/publicApi.js',
+  'src/bootstrap/socketRouter.js',
+];
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
@@ -304,6 +321,33 @@ describe('CraftingSystemManager source contract', () => {
     ],
     importsLazily: ['./ui/SvelteCraftingSystemManagerApp.svelte.js'],
     names: ['loadCraftingSystemManagerAppClass'],
+  });
+
+  // The thirteen `src/bootstrap/` modules the entry composes (issue 1715). `defineStructureContract`
+  // runs its claims against ONE target, so each is its own row rather than an extension of the
+  // entry's: a static manager import in any of them would defeat the chunk split as surely as one
+  // here. The `../ui/…` spelling is the one that can occur a directory down.
+  for (const module of BOOTSTRAP_MODULES) {
+    defineStructureContract(
+      `takes no static manager import in ${module.slice('src/bootstrap/'.length)}`,
+      module,
+      {
+        importsNo: [
+          '../ui/SvelteRecipeManagerApp.svelte.js',
+          '../ui/SvelteCraftingSystemManagerApp.svelte.js',
+        ],
+      }
+    );
+  }
+
+  it('lists every src/bootstrap module, so a new one cannot escape the chunk-split row', () => {
+    assert.deepEqual(
+      readdirSync(resolve(repoRoot, 'src/bootstrap'))
+        .filter((file) => file.endsWith('.js'))
+        .sort()
+        .map((file) => `src/bootstrap/${file}`),
+      [...BOOTSTRAP_MODULES].sort()
+    );
   });
 
   // `Document#testUserPermission` short-circuits every GM to OWNER, so GMs are filtered first. No

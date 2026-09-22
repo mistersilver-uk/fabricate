@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 import {
   applyRetireCraftingModToken,
   buildRetiredCraftingModNotice,
@@ -550,10 +552,7 @@ test('runner: a malformed transient report is coerced rather than passed to a no
 // Foundry side effects and a `.css` asset import), so this repo's established pattern for covering
 // it is a source-text guard.
 
-const MAIN_SOURCE = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../src/main.js'),
-  'utf8'
-);
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/migrations.js');
 
 test('main.js reads the counts off the runner SUMMARY, not off the data payload', () => {
   assert.ok(

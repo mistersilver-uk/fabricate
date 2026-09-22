@@ -6,6 +6,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
+import { resolve } from 'node:path';
+
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 globalThis.foundry = {
   utils: { randomID: () => `rnd-${Math.random().toString(36).slice(2)}` },
 };
@@ -28,7 +32,12 @@ const MANAGER_SOURCE = readFileSync(
   new URL('../src/systems/CraftingSystemManager.js', import.meta.url),
   'utf8'
 );
-const MAIN_SOURCE = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const MAIN_SOURCE = [
+  entrySources['src/bootstrap/composeServices.js'],
+  entrySources['src/bootstrap/migrations.js'],
+  entrySources['src/bootstrap/Fabricate.js'],
+  entrySources['src/bootstrap/hooks.js'],
+].join('\n');
 
 /** A manager with NO world stores at all — the unmigrated client every player boots as. */
 function unwiredManager() {
@@ -630,20 +639,20 @@ describe('the _scopeBasis call sites', () => {
   });
 });
 
-// Criterion 7 — construction order in src/main.js. THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO
+// Criterion 7 — construction order in the composition root. THIS DESCRIBE NOW CARRIES CRITERION 7 FOR TWO
 // PRs (issue 1363).
 
-describe('src/main.js construction order', () => {
+describe('composition-root construction order', () => {
   /**
    * Source-order assertions, the idiom `tests/migration-runner-corpus-writeback.test.js` and
-   * `tests/setting-change-bridge.test.js` already use, because `src/main.js` is not otherwise
+   * `tests/setting-change-bridge.test.js` already use, because the composition root is not otherwise
    * reachable by a unit test — and because a mis-ordering here is SILENT: reading an unregistered
    * key throws inside `ClientSettings##assertSetting`, but `load()` is guarded, so the store simply
    * stays unseeded forever with nothing in the console.
    */
   const at = (needle) => {
     const index = MAIN_SOURCE.indexOf(needle);
-    assert.notEqual(index, -1, `src/main.js no longer contains \`${needle}\``);
+    assert.notEqual(index, -1, `the module entry and src/bootstrap/ no longer contain \`${needle}\``);
     return index;
   };
 
@@ -657,14 +666,14 @@ describe('src/main.js construction order', () => {
     'worldVocabularyStore',
   ]) {
     it(`constructs and loads ${store} after settings and migrations, before both managers`, () => {
-      const construction = at(`this.${store} = create`);
-      const load = at(`this.${store}.load();`);
-      assert.ok(at('this.registerSettings();') < construction, 'settings must be registered first');
-      assert.ok(at('await this._runMigrations();') < construction, 'migrations run before stores');
+      const construction = at(`fabricate.${store} = create`);
+      const load = at(`fabricate.${store}.load();`);
+      assert.ok(at('fabricate.registerSettings();') < construction, 'settings must be registered first');
+      assert.ok(at('await fabricate._runMigrations();') < construction, 'migrations run before stores');
       assert.ok(construction < load, 'constructed, then loaded');
-      assert.ok(load < at('this.recipeManager = new RecipeManager('), 'before the recipe manager');
+      assert.ok(load < at('fabricate.recipeManager = new RecipeManager('), 'before the recipe manager');
       assert.ok(
-        load < at('this.craftingSystemManager = new CraftingSystemManager('),
+        load < at('fabricate.craftingSystemManager = new CraftingSystemManager('),
         'and before the crafting system manager, which derives its basis from these stores'
       );
     });
@@ -710,12 +719,12 @@ describe('src/main.js construction order', () => {
 
   it('runs the world identity drift audit after the three loads and before either manager', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
-    assert.ok(at('this.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
+    assert.ok(at('fabricate.toolScopeStore.load();') < audit, 'after the LAST of the three loads');
     assert.ok(
-      audit < at('this.recipeManager = new RecipeManager('),
+      audit < at('fabricate.recipeManager = new RecipeManager('),
       'and before the recipe manager, which is the first thing that can read the union'
     );
-    assert.ok(audit < at('this.craftingSystemManager = new CraftingSystemManager('));
+    assert.ok(audit < at('fabricate.craftingSystemManager = new CraftingSystemManager('));
   });
 
   it('gates the audit on the ACTIVE GM, not on isGM', () => {
@@ -743,8 +752,8 @@ describe('src/main.js construction order', () => {
   it('sites the audit OUTSIDE _runMigrations and off the migration report guard', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     assert.ok(
-      audit < at('  async _runMigrations() {'),
-      'the audit is inside initialize(), which is declared before _runMigrations()'
+      audit < at('export async function runMigrations(fabricate) {'),
+      'the audit is in the composition root, not in the migration pass'
     );
     const line = MAIN_SOURCE.slice(MAIN_SOURCE.lastIndexOf('\n', audit) + 1, audit);
     assert.equal(

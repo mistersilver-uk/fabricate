@@ -1,0 +1,1796 @@
+{
+  "hookEventsAtYield": [
+    "init",
+    "getCompendiumContextOptions",
+    "ready",
+    "updateWorldTime",
+    "updateActor",
+    "getSceneControlButtons",
+    "renderTileHUD",
+    "renderTokenHUD",
+    "preCreateRegionBehavior",
+    "chatMessage",
+    "createItem",
+    "createItem"
+  ],
+  "hookEventsAfterReady": [
+    "init",
+    "getCompendiumContextOptions",
+    "ready",
+    "updateWorldTime",
+    "updateActor",
+    "getSceneControlButtons",
+    "renderTileHUD",
+    "renderTokenHUD",
+    "preCreateRegionBehavior",
+    "chatMessage",
+    "createItem",
+    "createItem",
+    "createItem",
+    "createItem",
+    "dropCanvasData",
+    "controlToken",
+    "fabricate.craftingSystemsChanged",
+    "renderItemDirectory",
+    "updateItem",
+    "updateSetting",
+    "createSetting",
+    "createJournalEntry",
+    "updateJournalEntry",
+    "deleteJournalEntry",
+    "createJournalEntryPage",
+    "deleteJournalEntryPage",
+    "updateUser",
+    "userConnected",
+    "canvasReady"
+  ],
+  "callAllLog": [
+    {
+      "name": "fabricate.journalRunAuthorityRestored",
+      "registrationsBefore": 12
+    },
+    {
+      "name": "fabricate.ready",
+      "registrationsBefore": 29
+    }
+  ],
+  "socketListenerCount": 1,
+  "socketChannels": [
+    "module.fabricate"
+  ],
+  "instanceProperties": [
+    {
+      "name": "_bulkDestroyService",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "_bulkSalvageService",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "_craftingListingBuilder",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "_inventoryListingBuilder",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "_readyPromise",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "_resolveReady",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_runJournalBuilder",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "_startupMarks",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "actorInventoryCoinSpender",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "actorPropertyCoinSpender",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "api",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "characterLibrariesStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "cleanupInteractables",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "compendiumImporter",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "complicationDeliveryWriter",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "componentScopeStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "craftingEngine",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "craftingRunManager",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "craftingSystemManager",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "currencyConfigStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "essenceScopeStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "exportSystem",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "gathering",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringBlindRunStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringBlindStartWriter",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringEnvironmentStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringGateAndCheckEvaluator",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringLocationService",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringNodeDepletionWriter",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringPartyStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringRealmStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringRichStateService",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "gatheringRunManager",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "getCompendiumImporter",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "importFromPack",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "importSystemFromFile",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "interactableManager",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "itemPilesIntegration",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "journalRunCommands",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "ready",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "recipeManager",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "recipeVisibilityService",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "resolutionModeService",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "salvageRunManager",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "toolScopeStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    },
+    {
+      "name": "worldVocabularyStore",
+      "enumerable": true,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": null
+    }
+  ],
+  "prototypeProperties": [
+    {
+      "name": "_buildNotPermittedRow",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_companionCheckSeams",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_componentAwardSeams",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_gateBulkTargets",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "_getAlchemyListingBuilder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_getBulkDestroyService",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_getBulkSalvageService",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_getCraftingListingBuilder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_getInventoryListingBuilder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_getRunJournalBuilder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_mergeBulkRows",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 3
+    },
+    {
+      "name": "_pooledConsumptionSeams",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_pooledHoldingsSeams",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_postBulkSalvageChatMessage",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_promptMigrationRecovery",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_readPlayerResultOrder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_requireGM",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_requireGmActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "_requireGmActors",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_requireReady",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_resolveCraftingActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_resolveCraftingSources",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_resolveJournalActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_resolveJournalComponent",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "_resolveJournalGatheringTask",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "_resolveJournalResultItem",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "_resolveJournalTool",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "_runMigrations",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_withRememberedActorDefault",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "_worldCurrencySeams",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "adjustGatheringStamina",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "advanceCraftingRun",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "awardComponents",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "cancelCraftingRun",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "checkAffordability",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "clearGatheringPartyRealmOverride",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "clearGatheringPartyRegionOverride",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "clearGatheringTaskReveal",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "constructor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "consumePooledHoldings",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "craft",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "craftRecipe",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "creditCurrency",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "deleteRecipe",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "destroyComponents",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "dismissJournalRun",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "evaluateSelectedSet",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "executeJournalRunCommand",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "findCuratedIcon",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "getActorInventoryCoinSpender",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getActorPropertyCoinSpender",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCharacterLibrariesStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCompendiumImporter",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getComponentScopeStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCraftingComponentSourceIds",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCraftingEngine",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCraftingRunManager",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCraftingSourceActors",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCraftingSystemManager",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getCurrencyConfigStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getDismissedJournalRunKeys",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "getEssenceScopeStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getFavouriteRecipeIds",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringConditions",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringDropBreakdown",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringEconomy",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringEnvironmentStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringGateAndCheckEvaluator",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringLocationForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringLocationService",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringPartyStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringRealmStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringRegionStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringRichStateService",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringRunManager",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getGatheringStaminaState",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getHideUnavailableEnvironments",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getItemPilesIntegration",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getJournalRunAuthorityAvailability",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getProgressiveResultOrder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getRecipeManager",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getRecipeVisibilityService",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getResolutionModeService",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getSalvageRunManager",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getSelectedAlchemySystemId",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getSelectedCraftingActorId",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getSelectedGatheringActorId",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getToolScopeStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getVocabularyScopeStore",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getWorldTime",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "getWorldTimeComponents",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "grantRecipeKnowledge",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "hideGatheringRealmForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "hideGatheringRegionForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "hydrateCraftingRecipe",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "initialize",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "inspectGatheringEnvironmentState",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "learnRecipeFromInventory",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listAlchemyForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listCraftingForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listCraftingSourceActors",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listCuratedIcons",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listGatheringForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listInventoryForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listJournalForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "listSelectableActors",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "readPooledHoldings",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "reconcileJournalRunAuthority",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "registerSettings",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "remapWorldEssenceIdentityFlags",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "remapWorldScopeIdentityFlags",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "resetActorKnowledge",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "resolveBulkCheckDecision",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "restockGatheringNode",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "revealGatheringRealmForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "revealGatheringRegionForActor",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "revealGatheringTask",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "rollActorCheck",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "rollGatheringStamina",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "salvageComponent",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "salvageComponents",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "setCraftingComponentSourceIds",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setGatheringConditions",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "setGatheringEconomy",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "setGatheringPartyRealmOverride",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "setGatheringPartyRegionOverride",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "setGatheringStamina",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "setGatheringTimeOfDay",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setGatheringWeather",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setHideUnavailableEnvironments",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setProgressiveResultOrder",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 2
+    },
+    {
+      "name": "setSelectedAlchemySystemId",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setSelectedCraftingActorId",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setSelectedGatheringActorId",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "setupJournalRunAuthority",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "startGatheringAttempt",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "submitAlchemyAttempt",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "toggleFavouriteRecipe",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 1
+    },
+    {
+      "name": "updateGatheringConditions",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    },
+    {
+      "name": "whenReady",
+      "enumerable": false,
+      "writable": true,
+      "configurable": true,
+      "accessor": false,
+      "length": 0
+    }
+  ],
+  "gatheringKeys": [
+    "clearPartyRealmOverride",
+    "clearPartyRegionOverride",
+    "getConditions",
+    "getLocationForActor",
+    "getLocationService",
+    "getPartyStore",
+    "getRealmStore",
+    "getRegionStore",
+    "hideRealmForActor",
+    "hideRegionForActor",
+    "revealRealmForActor",
+    "revealRegionForActor",
+    "setConditions",
+    "setPartyRealmOverride",
+    "setPartyRegionOverride",
+    "setTimeOfDay",
+    "setWeather"
+  ],
+  "apiKeys": [
+    "COMPANION",
+    "CompendiumImporter",
+    "CraftingEngine",
+    "CraftingRunManager",
+    "CraftingSystemExporter",
+    "CraftingSystemManager",
+    "CurrencyConfigStore",
+    "GatheringEngine",
+    "GatheringEnvironmentStore",
+    "GatheringGateAndCheckEvaluator",
+    "GatheringLocationService",
+    "GatheringPartyStore",
+    "GatheringRealmStore",
+    "GatheringRegionStore",
+    "GatheringRunManager",
+    "HOOKS",
+    "Ingredient",
+    "IngredientGroup",
+    "ItemPilesIntegration",
+    "Recipe",
+    "RecipeManager",
+    "RecipeVisibilityService",
+    "ResolutionModeService",
+    "SalvageRunManager",
+    "SignatureValidator",
+    "getCraftingSystemManagerAppClass",
+    "getFabricateAppClass",
+    "getInteractableConfigAppClass",
+    "getInteractablesManagerAppClass",
+    "loadCraftingSystemManagerAppClass",
+    "managerExtensions",
+    "playerExtensions"
+  ],
+  "macroApiKeys": [
+    "craft",
+    "createSimpleRecipe",
+    "deleteRecipe",
+    "exportSystem",
+    "getAvailableRecipes",
+    "importSystemFromFile",
+    "listCraftingSystems",
+    "listRecipes",
+    "openRecipeManager"
+  ],
+  "references": {
+    "apiHooksIsFabricateHooks": true,
+    "apiCompanionIsCompanionContract": true,
+    "facadeIsEntrySingleton": true,
+    "recipeManagerTookCurrencyStore": true,
+    "craftingEngineTookCurrencyStore": true,
+    "craftingEngineTookRecipeManager": true,
+    "craftingEngineTookRunManager": true,
+    "craftingEngineTookSalvageRunManager": true,
+    "craftingEngineTookResolutionModeService": true,
+    "craftingEngineTookComplicationWriter": true,
+    "componentScopeStoreIsShared": true,
+    "essenceScopeStoreIsShared": true,
+    "toolScopeStoreIsShared": true,
+    "vocabularyScopeStoreIsShared": true,
+    "readyFlag": true,
+    "whenReadyResolution": "resolved"
+  },
+  "compositionLog": [
+    "bind:game.fabricate",
+    "assign:_startupMarks",
+    "call:registerSettings",
+    "settings:register",
+    "setting:theme",
+    "setting:itemStackQuantityPath",
+    "call:_runMigrations",
+    "assign:currencyConfigStore",
+    "assign:characterLibrariesStore",
+    "assign:componentScopeStore",
+    "assign:essenceScopeStore",
+    "assign:toolScopeStore",
+    "assign:worldVocabularyStore",
+    "assign:recipeManager",
+    "assign:craftingSystemManager",
+    "assign:craftingRunManager",
+    "assign:salvageRunManager",
+    "assign:gatheringRunManager",
+    "assign:gatheringGateAndCheckEvaluator",
+    "assign:recipeVisibilityService",
+    "assign:resolutionModeService",
+    "assign:itemPilesIntegration",
+    "assign:actorInventoryCoinSpender",
+    "assign:actorPropertyCoinSpender",
+    "assign:compendiumImporter",
+    "assign:craftingEngine",
+    "assign:journalRunCommands",
+    "assign:gatheringRealmStore",
+    "assign:gatheringEnvironmentStore",
+    "assign:gatheringPartyStore",
+    "assign:gatheringLocationService",
+    "assign:gatheringNodeDepletionWriter",
+    "assign:gatheringRichStateService",
+    "assign:gatheringBlindRunStore",
+    "assign:gatheringBlindStartWriter",
+    "assign:complicationDeliveryWriter",
+    "assign:ready"
+  ],
+  "deprecationWarnings": [
+    "Fabricate: getGatheringRegionStore is deprecated; use getGatheringRealmStore instead.",
+    "Fabricate: setGatheringPartyRegionOverride is deprecated; use setGatheringPartyRealmOverride instead.",
+    "Fabricate: clearGatheringPartyRegionOverride is deprecated; use clearGatheringPartyRealmOverride instead.",
+    "Fabricate: revealGatheringRegionForActor is deprecated; use revealGatheringRealmForActor instead.",
+    "Fabricate: hideGatheringRegionForActor is deprecated; use hideGatheringRealmForActor instead.",
+    "Fabricate: gathering.getRegionStore is deprecated; use gathering.getRealmStore instead.",
+    "Fabricate: gathering.setPartyRegionOverride is deprecated; use gathering.setPartyRealmOverride instead.",
+    "Fabricate: gathering.clearPartyRegionOverride is deprecated; use gathering.clearPartyRealmOverride instead.",
+    "Fabricate: gathering.revealRegionForActor is deprecated; use gathering.revealRealmForActor instead.",
+    "Fabricate: gathering.hideRegionForActor is deprecated; use gathering.hideRealmForActor instead."
+  ],
+  "binding": [
+    {
+      "name": "craftRecipe",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "salvageComponent",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "salvageComponents",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "destroyComponents",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "startGatheringAttempt",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "listGatheringForActor",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "listCraftingForActor",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "listInventoryForActor",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "listAlchemyForActor",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "listJournalForActor",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "executeJournalRunCommand",
+      "length": 2,
+      "failsAttached": true,
+      "failsDetached": true
+    },
+    {
+      "name": "rollActorCheck",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "awardComponents",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "creditCurrency",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "readPooledHoldings",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "consumePooledHoldings",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "getGatheringRegionStore",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    },
+    {
+      "name": "evaluateSelectedSet",
+      "length": 0,
+      "failsAttached": false,
+      "failsDetached": true
+    }
+  ]
+}

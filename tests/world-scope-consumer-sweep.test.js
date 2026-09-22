@@ -1,5 +1,6 @@
 /** THE CONSUMER SWEEP'S BEHAVIOURAL CONTRACT (issue 1370, epic 1357, PR 8a). */
 
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, it } from 'node:test';
@@ -10,6 +11,8 @@ import {
   describeWorldIdentityDrift,
 } from '../src/systems/worldScopeEntityNotice.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 import {
   resolvedComponentsFor,
   resolvedEssencesFor,
@@ -25,7 +28,7 @@ import {
 installFoundryStubs();
 
 /** `src/main.js` statically imports CSS and cannot load under `node --test`. */
-const MAIN_SOURCE = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const MAIN_SOURCE = entryModuleSource('src/bootstrap/composeServices.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 const SYSTEM_ID = 'sys-a';

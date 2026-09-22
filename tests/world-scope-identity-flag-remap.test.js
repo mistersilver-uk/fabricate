@@ -391,14 +391,19 @@ test('the unsafe-systemId skips reach the SUMMARY, so the GM notice can name the
 
 // (b) the COMPOSITION mutation
 
-/** The index of a live `await <name>();` statement in `src/main.js`, or `-1`. */
+/** The index of a live `await io.<name>();` statement in the ready startup sequence, or `-1`. */
 function liveCallIndex(source, name) {
-  return source.search(new RegExp(`\n +await ${name}\\(\\);`));
+  return source.search(new RegExp(`\n +await io\\.${name}\\(\\);`));
 }
 
-test('src/main.js calls the remap from its ready body, AFTER the owned-item restamp', () => {
+/** The module entry and the ready edge that runs its one-shots, in that order. */
+const ENTRY_AND_READY_EDGE = ['main.js', 'bootstrap/hooks.js'];
+
+test('the ready startup sequence calls the remap AFTER the owned-item restamp', () => {
   // DELETING THE `ready`-BODY CALL SITE MUST FLIP THIS TO FAIL.
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+  const source = ENTRY_AND_READY_EDGE.map((file) =>
+    readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
+  ).join('\n');
   const restampIndex = liveCallIndex(source, 'runOwnedItemComponentIdentityRestamp');
   const remapIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   assert.ok(restampIndex > 0, 'the premise: the shipped owned-item restamp edge is still there');
@@ -828,8 +833,10 @@ test('a world with no pending merge never walks the actor corpus', async () => {
 
 // --- the composition mutation ----------------------------------------------
 
-test('src/main.js runs the essence remap from its ready body, AFTER the 1.30.0 remap', () => {
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+test('the ready startup sequence runs the essence remap AFTER the 1.30.0 remap', () => {
+  const source = ENTRY_AND_READY_EDGE.map((file) =>
+    readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
+  ).join('\n');
   // Matched as a live statement, never as a substring — see {@link liveCallIndex}.
   const rekeyIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   const essenceIndex = liveCallIndex(source, 'runWorldEssenceMergeFlagRemap');

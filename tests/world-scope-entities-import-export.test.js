@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 import { destinationWorld, emptySeededScope } from './helpers/worldScopeImportHarness.js';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 
 installFoundryUtilsEnv();
 
@@ -1244,11 +1246,10 @@ test('11: both prepareForImport call sites pass every parameter the exporter dec
     'prepareForImport gained or lost a parameter — pin it in BOTH call-site guards below first'
   );
 
-  const mainSource = readFileSync(resolve(ROOT, 'src/main.js'), 'utf8');
-  const publicApi = mainSource.slice(
-    mainSource.indexOf('game.fabricate.importSystemFromFile ='),
-    mainSource.indexOf('game.fabricate.cleanupInteractables =')
-  );
+  const mainSource = entrySources['src/bootstrap/publicApi.js'];
+  const importStart = mainSource.indexOf('function buildImportSystem(fabricate) {');
+  assert.notEqual(importStart, -1, 'located the public-API import builder');
+  const publicApi = mainSource.slice(importStart, mainSource.indexOf('\n}\n', importStart));
   assert.ok(publicApi.length > 0, 'located the public-API import closure');
   assert.match(
     publicApi,
@@ -1331,7 +1332,7 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
   );
 
   const sites = {
-    'src/main.js': readFileSync(resolve(ROOT, 'src/main.js'), 'utf8'),
+    'src/bootstrap/composeServices.js': entrySources['src/bootstrap/composeServices.js'],
     'src/ui/SvelteCraftingSystemManagerApp.svelte.js': readFileSync(
       resolve(ROOT, 'src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
       'utf8'
@@ -1344,14 +1345,14 @@ test('11: both CompendiumImporter call sites INJECT the three world-scope store 
     }
   }
 
-  // `src/main.js` builds this importer INSIDE the same method that constructs the three stores, so
-  // it is the one site with an ordering hazard — and the hazard is silent, because the merge fails
-  // closed.
-  const mainSite = importerConstructionSite(sites['src/main.js']);
+  // The composition root builds this importer INSIDE the same phase pass that constructs the three
+  // stores, so it is the one site with an ordering hazard — and the hazard is silent, because the
+  // merge fails closed.
+  const mainSite = importerConstructionSite(sites['src/bootstrap/composeServices.js']);
   for (const seam of seamNames) {
     assert.ok(
-      mainSite.includes(`${seam}: scopeStoreDelegate(() => this.${seam})`),
-      `src/main.js must resolve ${seam} lazily, not capture the field at construction`
+      mainSite.includes(`${seam}: scopeStoreDelegate(() => fabricate.${seam})`),
+      `the composition root must resolve ${seam} lazily, not capture the field at construction`
     );
   }
 });

@@ -6,6 +6,7 @@
  * sees BARE references alone, so the `globalThis.game?.…` reads here are out of scope.
  */
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
@@ -15,7 +16,7 @@ import { DOMAIN_LAYER_ROOTS, DOMAIN_RESTRICTED_GLOBALS } from '../eslint.config.
 import { ESLINT_DEBT } from '../eslint.debt.js';
 
 import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
-import { collectWorkingTreeSources } from './helpers/sourceScan.js';
+import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 const RULE = 'no-restricted-globals';
 
@@ -173,6 +174,19 @@ test('the rule is armed on the domain layer and absent from the sanctioned edges
     'a debted file has the rule off; its count is held by the ledger instead'
   );
   assert.equal(await armed('src/main.js'), false, 'the module entry shell is an edge, not debt');
+  // The entry's Foundry edge moved to `src/bootstrap/` (issue 1715) and is an edge there too, so
+  // the directory is deliberately outside DOMAIN_LAYER_ROOTS. Paired with an existence check, so
+  // this cannot answer `false` for a file that was never created.
+  assert.equal(
+    existsSync(resolve(repoRoot, 'src/bootstrap/hooks.js')),
+    true,
+    'the hooks edge exists, so the assertion below is about a real file'
+  );
+  assert.equal(
+    await armed('src/bootstrap/hooks.js'),
+    false,
+    'the relocated module entry edge is an edge, not debt'
+  );
   assert.equal(
     await armed('src/ui/svelte/util/foundryHooks.js'),
     false,

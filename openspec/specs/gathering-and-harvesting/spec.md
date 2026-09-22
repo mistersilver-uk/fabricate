@@ -405,7 +405,7 @@ Realm ids referencing *missing* realms become `staleRealmIds` and do not resolve
 The `travelActor` source token slots between the override and unresolved branches without changing the resolver contract.
 4. Clearing an override is a stamped mutation: it sets `mode: "none"`, empties `realmIds`, and updates `updatedAt`/`updatedByUserId`.
 5. Changing current realm refreshes gathering listings but must not retroactively rewrite completed gathering history.
-6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/main.js`; the runtime implementation (`senseTravelMarkerRegions` in `src/gatheringBootstrapAdapters.js`) prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
+6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/bootstrap/composeServices.js`; the runtime implementation (`senseTravelMarkerRegions` in `src/gatheringBootstrapAdapters.js`) prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
 Sensing walks the travel actor's concrete tokens on **every** scene (`Actor#getDependentTokens`), never only the evaluating client's viewed canvas: a player's attempt is evaluated on the active GM's client, so the answer must not depend on which scene that GM happens to be viewing.
 The service itself stays Foundry-free, defaulting the collaborator to `() => []`.
 

@@ -421,16 +421,16 @@ test('an unclosed phase is reported rather than silently dropped', () => {
   assert.deepEqual(marks.opened(), [STARTUP_PHASES.STARTUP_MAINTENANCE]);
 });
 
-test('main.js opens and closes every declared startup phase', () => {
+test('the composition root opens and closes every declared startup phase', () => {
   // The mirror that rots silently: a phase declared here but never marked in `initialize()` makes
   // the profile report `missing` forever while every gate stays green.
-  const source = readFileSync(join(REPOSITORY_ROOT, 'src', 'main.js'), 'utf8');
+  const source = readFileSync(join(REPOSITORY_ROOT, 'src', 'bootstrap', 'composeServices.js'), 'utf8');
   for (const phase of STARTUP_PHASE_NAMES) {
     const constant = Object.entries(STARTUP_PHASES).find(([, value]) => value === phase)[0];
     const begins = source.split(`_startupMarks.begin(STARTUP_PHASES.${constant})`).length - 1;
     const ends = source.split(`_startupMarks.end(STARTUP_PHASES.${constant})`).length - 1;
-    assert.equal(begins, 1, `main.js must begin the ${phase} phase exactly once`);
-    assert.equal(ends, 1, `main.js must end the ${phase} phase exactly once`);
+    assert.equal(begins, 1, `the composition root must begin the ${phase} phase exactly once`);
+    assert.equal(ends, 1, `the composition root must end the ${phase} phase exactly once`);
   }
 });
 

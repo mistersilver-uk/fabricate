@@ -1,0 +1,458 @@
+/**
+ * The module entry's boot contract (issue 1715), observed from a real boot: the facade's
+ * descriptors and key sets, the ordered hook registrations, the composition phase order, the socket
+ * router and the deprecation log. It reads no `src/` text and is frozen once regenerated.
+ */
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { test } from 'node:test';
+
+import { withFabricateLifecycleReplay } from '../helpers/extension-composition-harness.js';
+
+const GOLDEN_PATH = resolve(import.meta.dirname, '../fixtures/fabricateBootContract.golden.json');
+
+const REGENERATE =
+  'UPDATE_BOOT_CONTRACT_GOLDEN=1 node --conditions=browser --test ' +
+  'tests/bootstrap/fabricate-boot-contract.test.js, then review the diff';
+
+/** Instance fields whose first assignment orders the composition root. */
+const COMPOSED_FIELDS = Object.freeze([
+  '_startupMarks',
+  'currencyConfigStore',
+  'characterLibrariesStore',
+  'componentScopeStore',
+  'essenceScopeStore',
+  'toolScopeStore',
+  'worldVocabularyStore',
+  'recipeManager',
+  'craftingSystemManager',
+  'craftingRunManager',
+  'salvageRunManager',
+  'gatheringRunManager',
+  'gatheringGateAndCheckEvaluator',
+  'recipeVisibilityService',
+  'resolutionModeService',
+  'itemPilesIntegration',
+  'actorInventoryCoinSpender',
+  'actorPropertyCoinSpender',
+  'compendiumImporter',
+  'craftingEngine',
+  'journalRunCommands',
+  'gatheringRealmStore',
+  'gatheringEnvironmentStore',
+  'gatheringPartyStore',
+  'gatheringLocationService',
+  'gatheringNodeDepletionWriter',
+  'gatheringRichStateService',
+  'gatheringBlindRunStore',
+  'gatheringBlindStartWriter',
+  'complicationDeliveryWriter',
+  'ready',
+]);
+
+/** Prototype members whose call position orders the composition root. */
+const COMPOSED_CALLS = Object.freeze(['registerSettings', '_runMigrations']);
+
+/** Setting reads whose position is load-bearing: the theme and the stack-quantity path. */
+const WATCHED_SETTING_READS = Object.freeze(['theme', 'itemStackQuantityPath']);
+
+/**
+ * The ten deprecated aliases, in the order the contract exercises them: five facade methods and
+ * five `game.fabricate.gathering` namespace members, each of which must warn exactly once.
+ */
+const DEPRECATED_ALIASES = Object.freeze([
+  ['facade', 'getGatheringRegionStore', []],
+  ['facade', 'setGatheringPartyRegionOverride', [{}]],
+  ['facade', 'clearGatheringPartyRegionOverride', [{}]],
+  ['facade', 'revealGatheringRegionForActor', [{}]],
+  ['facade', 'hideGatheringRegionForActor', [{}]],
+  ['gathering', 'getRegionStore', []],
+  ['gathering', 'setPartyRegionOverride', [{}]],
+  ['gathering', 'clearPartyRegionOverride', [{}]],
+  ['gathering', 'revealRegionForActor', [{}]],
+  ['gathering', 'hideRegionForActor', [{}]],
+]);
+
+/** Facade members probed through a detached reference, so an instance-bound copy is visible. */
+const BINDING_PROBES = Object.freeze([
+  'craftRecipe',
+  'salvageComponent',
+  'salvageComponents',
+  'destroyComponents',
+  'startGatheringAttempt',
+  'listGatheringForActor',
+  'listCraftingForActor',
+  'listInventoryForActor',
+  'listAlchemyForActor',
+  'listJournalForActor',
+  'executeJournalRunCommand',
+  'rollActorCheck',
+  'awardComponents',
+  'creditCurrency',
+  'readPooledHoldings',
+  'consumePooledHoldings',
+  'getGatheringRegionStore',
+  'evaluateSelectedSet',
+]);
+
+const byCodePoint = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+
+/** One descriptor row: the measured triple plus `Function#length` where the value is callable. */
+function describe(target, name) {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name);
+  const accessor = typeof descriptor.get === 'function' || typeof descriptor.set === 'function';
+  return {
+    name,
+    enumerable: descriptor.enumerable,
+    writable: accessor ? null : descriptor.writable,
+    configurable: descriptor.configurable,
+    accessor,
+    length: typeof descriptor.value === 'function' ? descriptor.value.length : null,
+  };
+}
+
+const describeAll = (target) =>
+  Object.getOwnPropertyNames(target).sort(byCodePoint).map((name) => describe(target, name));
+
+/** Record the composition's phase order without changing what it composes. */
+function installCompositionRecorder(instance) {
+  const log = [];
+  const prototype = Object.getPrototypeOf(instance);
+  const restore = [];
+  const seenReads = new Set();
+  let registered = false;
+
+  for (const name of COMPOSED_CALLS) {
+    const original = prototype[name];
+    Object.defineProperty(prototype, name, {
+      value(...args) {
+        log.push(`call:${name}`);
+        return original.apply(this, args);
+      },
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    restore.push(() =>
+      Object.defineProperty(prototype, name, {
+        value: original,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+      })
+    );
+  }
+
+  for (const field of COMPOSED_FIELDS) {
+    let held = instance[field];
+    const present = Object.hasOwn(instance, field);
+    Object.defineProperty(instance, field, {
+      get: () => held,
+      set(value) {
+        log.push(`assign:${field}`);
+        held = value;
+      },
+      enumerable: true,
+      configurable: true,
+    });
+    restore.push(() => {
+      if (!present && held === undefined) {
+        delete instance[field];
+        return;
+      }
+      Object.defineProperty(instance, field, {
+        value: held,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    });
+  }
+
+  const settings = globalThis.game.settings;
+  const originalRegister = settings.register;
+  const originalGet = settings.get;
+  settings.register = function register(...args) {
+    if (!registered) {
+      registered = true;
+      log.push('settings:register');
+    }
+    return originalRegister.apply(this, args);
+  };
+  settings.get = function get(namespace, key, ...rest) {
+    if (WATCHED_SETTING_READS.includes(key) && !seenReads.has(key)) {
+      seenReads.add(key);
+      log.push(`setting:${key}`);
+    }
+    return originalGet.call(this, namespace, key, ...rest);
+  };
+  restore.push(() => {
+    settings.register = originalRegister;
+    settings.get = originalGet;
+  });
+
+  return {
+    log,
+    restore: () => {
+      for (const undo of restore.reverse()) undo();
+    },
+  };
+}
+
+/** A `game.socket` that records its listeners, the lab shim leaving the field null. */
+function installSocketRecorder() {
+  const listeners = new Map();
+  globalThis.game.socket = {
+    on: (event, handler) => {
+      if (!listeners.has(event)) listeners.set(event, []);
+      listeners.get(event).push(handler);
+    },
+    off: () => {},
+    emit: () => {},
+    listeners: (event) => listeners.get(event) ?? [],
+  };
+  return listeners;
+}
+
+/** Exercise each deprecated alias once and return the warnings it produced, in order. */
+function recordDeprecationWarnings(facade) {
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => {
+    const [first] = args;
+    if (typeof first === 'string' && first.startsWith('Fabricate: ')) warnings.push(first);
+  };
+  try {
+    for (const [surface, name, args] of DEPRECATED_ALIASES) {
+      const target = surface === 'facade' ? facade : facade.gathering;
+      try {
+        target[name](...args);
+      } catch {
+        // The warning is the subject; several aliases refuse on their arguments afterwards.
+      }
+    }
+  } finally {
+    console.warn = originalWarn;
+  }
+  return warnings;
+}
+
+/** Whether a call failed, counting an async member's rejection as a failure. */
+async function failed(invoke) {
+  try {
+    await invoke();
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Each probed member called through the facade and again through a detached reference. A method
+ * written as an arrow instead of shorthand loses `this` on both, and an instance-bound copy keeps
+ * it on both; only prototype method shorthand answers `false` then `true`.
+ */
+async function probeBinding(facade) {
+  const rows = [];
+  for (const name of BINDING_PROBES) {
+    const detached = facade[name];
+    rows.push({
+      name,
+      length: detached.length,
+      failsAttached: await failed(() => facade[name]()),
+      failsDetached: await failed(() => detached()),
+    });
+  }
+  return rows;
+}
+
+/** Everything the boot contract compares, measured from one real boot. */
+async function measureBootContract({ ready, loadModule }) {
+  const hooks = globalThis.Hooks;
+  const hookEventsAtYield = [...hooks.registrations.values()].map((entry) => entry.event);
+  const instance = (await loadModule('/src/main.js')).default;
+  const composition = installCompositionRecorder(instance);
+  // The `ready` backstop re-binds `game.fabricate` BEFORE `initialize()`, so a listener of the
+  // `fabricate.journalRunAuthorityRestored` that pass fires meets a bound global. The bind
+  // registers no hook, so only this recorder can see it move.
+  const gameGlobal = globalThis.game;
+  let boundFacade = gameGlobal.fabricate;
+  Object.defineProperty(gameGlobal, 'fabricate', {
+    get: () => boundFacade,
+    set(value) {
+      composition.log.push('bind:game.fabricate');
+      boundFacade = value;
+    },
+    enumerable: true,
+    configurable: true,
+  });
+  const socketListeners = installSocketRecorder();
+
+  const callAllLog = [];
+  const originalCallAll = hooks.callAll;
+  hooks.callAll = function callAll(name, ...rest) {
+    callAllLog.push({ name, registrationsBefore: hooks.registrations.size });
+    return originalCallAll.call(this, name, ...rest);
+  };
+
+  try {
+    await ready();
+  } finally {
+    hooks.callAll = originalCallAll;
+    Object.defineProperty(gameGlobal, 'fabricate', {
+      value: boundFacade,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    composition.restore();
+  }
+
+  const facade = globalThis.game.fabricate;
+  const { FABRICATE_HOOKS } = await loadModule('/src/config/hooks.js');
+  const { COMPANION_CONTRACT } = await loadModule('/src/systems/companionContract.js');
+  const whenReady = await Promise.race([
+    facade.whenReady().then(() => 'resolved'),
+    new Promise((settle) => setTimeout(() => settle('pending'), 500)),
+  ]);
+
+  return {
+    hookEventsAtYield,
+    hookEventsAfterReady: [...hooks.registrations.values()].map((entry) => entry.event),
+    callAllLog,
+    socketListenerCount: socketListeners.get('module.fabricate')?.length ?? 0,
+    socketChannels: [...socketListeners.keys()].sort(byCodePoint),
+    instanceProperties: describeAll(facade),
+    prototypeProperties: describeAll(Object.getPrototypeOf(facade)),
+    gatheringKeys: Object.keys(facade.gathering).sort(byCodePoint),
+    apiKeys: Object.keys(facade.api).sort(byCodePoint),
+    macroApiKeys: Object.keys(globalThis.fabricate).sort(byCodePoint),
+    references: {
+      apiHooksIsFabricateHooks: facade.api.HOOKS === FABRICATE_HOOKS,
+      apiCompanionIsCompanionContract: facade.api.COMPANION === COMPANION_CONTRACT,
+      facadeIsEntrySingleton: facade === instance,
+      recipeManagerTookCurrencyStore:
+        facade.recipeManager.currencyConfigStore === facade.currencyConfigStore,
+      craftingEngineTookCurrencyStore:
+        facade.craftingEngine.currencyConfigStore === facade.currencyConfigStore,
+      craftingEngineTookRecipeManager:
+        facade.craftingEngine.recipeManager === facade.recipeManager,
+      craftingEngineTookRunManager:
+        facade.craftingEngine.craftingRunManager === facade.craftingRunManager,
+      craftingEngineTookSalvageRunManager:
+        facade.craftingEngine.salvageRunManager === facade.salvageRunManager,
+      craftingEngineTookResolutionModeService:
+        facade.craftingEngine.resolutionModeService === facade.resolutionModeService,
+      craftingEngineTookComplicationWriter:
+        facade.craftingEngine.complicationDeliveryWriter === facade.complicationDeliveryWriter,
+      componentScopeStoreIsShared:
+        facade.getComponentScopeStore() === facade.componentScopeStore,
+      essenceScopeStoreIsShared: facade.getEssenceScopeStore() === facade.essenceScopeStore,
+      toolScopeStoreIsShared: facade.getToolScopeStore() === facade.toolScopeStore,
+      vocabularyScopeStoreIsShared:
+        facade.getVocabularyScopeStore() === facade.worldVocabularyStore,
+      readyFlag: facade.ready === true,
+      whenReadyResolution: whenReady,
+    },
+    compositionLog: composition.log,
+    deprecationWarnings: recordDeprecationWarnings(facade),
+    binding: await probeBinding(facade),
+  };
+}
+
+test('the module entry boots to its pinned contract', { timeout: 300000 }, async () => {
+  let measured = null;
+  await withFabricateLifecycleReplay(async (context) => {
+    measured = await measureBootContract(context);
+  });
+
+  if (process.env.UPDATE_BOOT_CONTRACT_GOLDEN === '1') {
+    writeFileSync(GOLDEN_PATH, `${JSON.stringify(measured, null, 2)}\n`);
+  }
+  const golden = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
+
+  // Compared field by field so a failure names the contract that moved rather than printing the
+  // whole boot; the whole-object comparison below is what makes the set of fields itself exact.
+  assert.deepStrictEqual(
+    measured.hookEventsAtYield,
+    golden.hookEventsAtYield,
+    'the module-scope and initialize()-time hook registrations, unfiltered and in order'
+  );
+  assert.deepStrictEqual(
+    measured.hookEventsAfterReady,
+    golden.hookEventsAfterReady,
+    'hoisting the ready-body registrations above `await fabricate.initialize()` moves the six ' +
+      'inner registrations to the end of this array'
+  );
+  assert.deepStrictEqual(measured.callAllLog, golden.callAllLog, 'the callAll positions');
+  assert.deepStrictEqual(
+    measured.instanceProperties,
+    golden.instanceProperties,
+    'the own properties of `game.fabricate`, with their measured descriptors'
+  );
+  assert.deepStrictEqual(
+    measured.prototypeProperties,
+    golden.prototypeProperties,
+    'the prototype members, with their measured descriptors: an `Object.assign`-installed slice ' +
+      'reds on enumerability and an instance-installed one reds by leaving this set'
+  );
+  assert.deepStrictEqual(measured.gatheringKeys, golden.gatheringKeys);
+  assert.deepStrictEqual(measured.apiKeys, golden.apiKeys);
+  assert.deepStrictEqual(measured.macroApiKeys, golden.macroApiKeys);
+  assert.deepStrictEqual(measured.references, golden.references);
+  assert.deepStrictEqual(
+    measured.compositionLog,
+    golden.compositionLog,
+    'the composition phase order, including the migration pass and the stack-quantity path'
+  );
+  assert.deepStrictEqual(
+    measured.deprecationWarnings,
+    golden.deprecationWarnings,
+    'each of the ten deprecated aliases warns exactly once, through one shared warned-name set'
+  );
+  assert.deepStrictEqual(
+    measured.binding,
+    golden.binding,
+    'a facade member written as an arrow rather than method shorthand fails attached too'
+  );
+  assert.deepStrictEqual(measured, golden, REGENERATE);
+});
+
+test('the boot contract golden is not vacuous', () => {
+  const golden = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
+  assert.equal(golden.hookEventsAtYield.length, 12);
+  assert.equal(golden.hookEventsAfterReady.length, 29);
+  assert.equal(golden.socketListenerCount, 1);
+  assert.equal(golden.instanceProperties.length, 46);
+  assert.equal(golden.prototypeProperties.length, 140);
+  assert.equal(golden.gatheringKeys.length, 17);
+  assert.equal(golden.deprecationWarnings.length, 10);
+  assert.equal(new Set(golden.deprecationWarnings).size, 10);
+  assert.equal(
+    golden.instanceProperties.filter((row) => row.enumerable).length,
+    46,
+    'every own property is a plain assignment'
+  );
+  assert.equal(
+    golden.prototypeProperties.filter((row) => row.enumerable).length,
+    0,
+    'every prototype member is non-enumerable, as a class method is'
+  );
+  assert.equal(
+    golden.prototypeProperties.filter((row) => row.accessor).length,
+    0,
+    'there is no accessor among them, so no descriptor lacks `writable`'
+  );
+  assert.ok(golden.compositionLog.length >= 30);
+  assert.deepEqual(
+    Object.entries(golden.references).filter(([, value]) => value !== true && value !== 'resolved'),
+    [],
+    'every reference-identity claim is positive; a regeneration must not bank a false one'
+  );
+  assert.ok(golden.binding.every((row) => typeof row.length === 'number'));
+  assert.ok(
+    golden.binding.some((row) => row.failsDetached && !row.failsAttached),
+    'at least one probe distinguishes a prototype method from a bound or arrow copy'
+  );
+});

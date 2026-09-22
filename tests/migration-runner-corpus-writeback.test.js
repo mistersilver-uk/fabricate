@@ -4,6 +4,7 @@
  * paired each of these with an arrangement-aware arm.
  */
 
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,8 @@ import test from 'node:test';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from '../src/migration/MigrationRunner.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 
 /** A recipe the 0.6.0 catalyst-to-tool migration transforms. */
 function catalystRecipe(id, systemId = 'sys-1') {
@@ -183,7 +186,7 @@ test('only the write-failure notice instructs a reload', () => {
 test('main.js reports a deferred pass before it reports an aborted one', () => {
   // A source scan, and deliberately so: `main.js` cannot be imported under `node --test`, and
   // a unit test that hand-injects the collaborator cannot observe the wiring at all.
-  const source = readFileSync(fileURLToPath(new URL('../src/main.js', import.meta.url)), 'utf8');
+  const source = entryModuleSource('src/bootstrap/migrations.js');
 
   assert.match(
     source,

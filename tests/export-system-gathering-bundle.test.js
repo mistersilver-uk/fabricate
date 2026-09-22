@@ -17,9 +17,11 @@ import {
 } from './helpers/authoringExportHarness.js';
 import { buildExportPayload } from '../src/systems/CraftingSystemExporter.js';
 import { buildFullAuthoringFixture, FIXTURE_SYSTEM_ID } from './helpers/fullAuthoringFixture.js';
+import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
+const mainSource = entryModuleSource('src/bootstrap/publicApi.js');
 const adminStoreSource = readFileSync(
   resolve(__dirname, '../src/ui/svelte/stores/adminStore.js'),
   'utf8'
@@ -127,10 +129,10 @@ test('the dropped 3-arg call is exactly what emptied the bundle (defect reproduc
 test('source contract: game.fabricate.exportSystem passes the gathering args to buildExportPayload', () => {
   // Isolate the public-API closure so the guard cannot pass on some other caller.
   const closure = mainSource.slice(
-    mainSource.indexOf('game.fabricate.exportSystem = (systemId) =>'),
-    mainSource.indexOf('game.fabricate.importSystemFromFile =')
+    mainSource.indexOf('function buildExportSystem(fabricate) {'),
+    mainSource.indexOf('function buildImportSystem(fabricate) {')
   );
-  assert.ok(closure.length > 0, 'located the game.fabricate.exportSystem closure in src/main.js');
+  assert.ok(closure.length > 0, 'located the exportSystem builder in src/bootstrap/publicApi.js');
 
   // Resolution mirrors the admin-store path (issue #642 fix).
   assert.ok(

@@ -9,12 +9,18 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { entrySources } from '../helpers/bootstrapEntrySource.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
   resolve(__dirname, '../../src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
   'utf8'
 );
-const mainSource = readFileSync(resolve(__dirname, '../../src/main.js'), 'utf8');
+const mainSource = [
+  entrySources['src/bootstrap/publicApi.js'],
+  entrySources['src/bootstrap/Fabricate.js'],
+  entrySources['src/bootstrap/composeServices.js'],
+].join('\n');
 
 /** A faithful harness mirroring the static `show()` deferred-open decision. */
 function makeHarness({ readyAtStart = false } = {}) {
@@ -162,18 +168,15 @@ test('main.js binds game.fabricate from BOTH init and ready via an idempotent he
     mainSource.includes('function bindFabricateGlobal('),
     'the global binding is extracted into a reusable helper'
   );
-  // The ready hook must re-bind before initialize(), the backstop for a missed init.
-  assert.match(
-    mainSource,
-    /Hooks\.once\('ready', async \(\) => \{[\s\S]*?bindFabricateGlobal\(\);[\s\S]*?await fabricate\.initialize\(\);/,
-    'the ready hook re-binds the global before initialize()'
-  );
+  // The `ready`-body order — the re-bind ahead of `initialize()` — is pinned behaviourally by
+  // `tests/bootstrap/fabricate-boot-contract.test.js`'s 29-entry hook array and composition log,
+  // which a source regex over one file could not follow across `src/bootstrap/` (issue 1715).
 });
 
 test('initialize() resolves the replay-safe readiness promise (guards drift)', () => {
   assert.match(
     mainSource,
-    /this\.ready = true;\s*\n\s*this\._resolveReady\?\.\(\);/,
+    /fabricate\.ready = true;\s*\n\s*fabricate\._resolveReady\?\.\(\);/,
     'completing startup settles the whenReady() promise'
   );
   assert.ok(

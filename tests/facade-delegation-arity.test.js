@@ -3,21 +3,21 @@
  * fix is the part worth keeping, because it is the shape of the trap.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
+
+import { INSTALLED_FACADE_MEMBERS } from '../src/bootstrap/Fabricate.js';
+import { FABRICATE_ENTRY_SOURCE } from './helpers/bootstrapEntrySource.js';
 
 /** Normalise line endings before scanning. */
 function normaliseEndings(text) {
   return text.split(String.fromCharCode(13) + '\n').join('\n');
 }
 
-const mainSource = normaliseEndings(
-  readFileSync(resolve(import.meta.dirname, '../src/main.js'), 'utf8')
-);
+const mainSource = normaliseEndings(FABRICATE_ENTRY_SOURCE);
 
 /** A method declared at class-body indentation, with its parameter list and body. */
-const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\}/g;
+const METHOD = /\n {2}(?:async )?([A-Za-z_][\w$]*)\(([^)]*)\) \{\n((?: {4}[^\n]*\n|\n)*?) {2}\},?\n/g;
 
 /** `this.<service>?.<sameName>(` — the delegation shape the facade uses throughout. */
 const HANDOFF_OWNER = /this\.[A-Za-z_][\w$]*$/;
@@ -49,6 +49,20 @@ function delegations() {
   }
   return found;
 }
+
+test('every slice member really is installed on the prototype', () => {
+  // The export exists so the install is asserted rather than inferred: a slice dropped from the
+  // list, or a name declared twice across two slices, is visible here and nowhere else.
+  assert.ok(INSTALLED_FACADE_MEMBERS.length > 60, `expected the five slices, got ${INSTALLED_FACADE_MEMBERS.length}`);
+  assert.equal(
+    new Set(INSTALLED_FACADE_MEMBERS).size,
+    INSTALLED_FACADE_MEMBERS.length,
+    'two slices declare the same member name, so one silently overwrites the other'
+  );
+  for (const name of ['craftRecipe', 'startGatheringAttempt', 'awardComponents', 'salvageComponents', 'listJournalForActor']) {
+    assert.ok(INSTALLED_FACADE_MEMBERS.includes(name), `${name} is installed`);
+  }
+});
 
 test('the gate finds the facade delegations it exists to police', () => {
   // A scan that silently matches nothing is the vacuous shape this work keeps turning up, so the

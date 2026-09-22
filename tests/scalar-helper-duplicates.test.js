@@ -121,6 +121,18 @@ test('the retired helper names have no declaration left', () => {
   );
 });
 
+test('deprecate is declared in exactly one bootstrap module', () => {
+  // The ten deprecated public names latch on one module-scope `Set` (issue 1715). A second
+  // declaration partitions them across two latches, which the boot contract's shared-latch probe
+  // can only see for a name reachable through both surfaces.
+  const sites = declarationsOf(['deprecate']).get('deprecate') ?? [];
+  assert.deepEqual(
+    sites.map((site) => site.split(':')[0]),
+    ['src/bootstrap/gatheringRuntime.js'],
+    'a second `deprecate` splits the warned-name latch; import the one in gatheringRuntime.js'
+  );
+});
+
 test('no retired name is also owned by scalars.js', () => {
   // Overlapping lists would let a name be consolidated and retired at once, failing neither test.
   const overlap = Object.keys(CONSOLIDATED).filter((name) => RETIRED.includes(name));

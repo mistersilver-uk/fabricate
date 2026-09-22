@@ -28,7 +28,10 @@ const AUTHORITY_SOURCE_PATTERN = /^journalRun[A-Za-z]*\.js$/;
 
 // The EDGES that also mint a refusal a player reads. Named explicitly, because no glob over the
 // authority modules reaches them and every reason minted here was unmapped until issue 1648.
-const EDGE_SOURCES = ['src/main.js', 'src/ui/SvelteFabricateApp.svelte.js'];
+const EDGE_SOURCES = [
+  'src/bootstrap/journalOperations.js',
+  'src/ui/SvelteFabricateApp.svelte.js',
+];
 
 function authoritySources() {
   const names = readdirSync(join(ROOT, AUTHORITY_SOURCE_DIR))

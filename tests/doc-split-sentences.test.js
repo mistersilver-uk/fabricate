@@ -161,10 +161,120 @@ const RENAMED = [
       'The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-smoke/scenarios/` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.',
     identifiers: [['scripts/foundry-smoke/scenarios/', 'scripts/foundry-test-run.mjs']],
   },
+
+  // Issue 1715 moved the module entry's Foundry edge into `src/bootstrap/`; each of these eleven
+  // sentences cites one code anchor that moved with it. The migration-gate entry renames a symbol
+  // and its file together, which is one anchor rather than two.
+  {
+    before:
+      "`_resolveCraftingActor` / `_resolveCraftingSources` (`src/main.js`) are the whole gate, which is exactly why every player-facing facade (`craftRecipe`, `salvageComponent`, `listInventoryForActor`, the alchemy pair) takes an **`actorId`** and resolves it, and **never accepts an actor uuid**.",
+    after:
+      "`_resolveCraftingActor` / `_resolveCraftingSources` (`src/bootstrap/craftingFacade.js`) are the whole gate, which is exactly why every player-facing facade (`craftRecipe`, `salvageComponent`, `listInventoryForActor`, the alchemy pair) takes an **`actorId`** and resolves it, and **never accepts an actor uuid**.",
+    identifiers: [["src/bootstrap/craftingFacade.js", "src/main.js"]],
+  },
+  {
+    before:
+      "`applyComplicationDelivery` (`src/main.js`) is the correct pattern; the blind-run gather relay carried the defect and #1288 removed it — `isGatheringActorSelectableByUser` (`src/config/preferencesCleanup.js`) now reads the passed user only, and denies rather than throwing on a nullish user (`Document#testUserPermission` reads `user.isGM` as its first statement) or slipping through on a user-id STRING (`getUserLevel` reads `user.id`, so a string falls through to `ownership.default`).",
+    after:
+      "`applyComplicationDelivery` (`src/bootstrap/socketRouter.js`) is the correct pattern; the blind-run gather relay carried the defect and #1288 removed it — `isGatheringActorSelectableByUser` (`src/config/preferencesCleanup.js`) now reads the passed user only, and denies rather than throwing on a nullish user (`Document#testUserPermission` reads `user.isGM` as its first statement) or slipping through on a user-id STRING (`getUserLevel` reads `user.id`, so a string falls through to `ownership.default`).",
+    identifiers: [["src/bootstrap/socketRouter.js", "src/main.js"]],
+  },
+  {
+    before:
+      "**The player salvage order key is derived INDEPENDENTLY at two sites, and they must produce the identical string or the captured order silently reads empty.** The inventory store WRITES the order under `progressiveOrderKey({ scope: 'salvage', id })` (via `salvageOrderId` in `inventoryStore.svelte.js`), and `CraftingEngine.salvage` READS it back through the injected `getPlayerResultOrder` (wired to `_readPlayerResultOrder` in `src/main.js`) at capture time — two separate derivations of the same key.",
+    after:
+      "**The player salvage order key is derived INDEPENDENTLY at two sites, and they must produce the identical string or the captured order silently reads empty.** The inventory store WRITES the order under `progressiveOrderKey({ scope: 'salvage', id })` (via `salvageOrderId` in `inventoryStore.svelte.js`), and `CraftingEngine.salvage` READS it back through the injected `getPlayerResultOrder` (wired to `_readPlayerResultOrder` in `src/bootstrap/composeServices.js`) at capture time — two separate derivations of the same key.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "Both hooks fire synchronously, inside the still-`await`ed `game.settings.set`: `ClientSettings#set` → `#setWorld` → `Setting#update`/`create` → `ClientDatabaseBackend#_handleUpdateDocuments` (or `#_handleCreateDocuments` on the first write) calls `Hooks.callAll('updateSetting', …)` / `Hooks.callAll('createSetting', …)` before the write's promise resolves (`client/data/client-backend.mjs`, identical on 13.351 and 14.367), which is why `src/main.js` registers one handler on both hooks rather than choosing between them.",
+    after:
+      "Both hooks fire synchronously, inside the still-`await`ed `game.settings.set`: `ClientSettings#set` → `#setWorld` → `Setting#update`/`create` → `ClientDatabaseBackend#_handleUpdateDocuments` (or `#_handleCreateDocuments` on the first write) calls `Hooks.callAll('updateSetting', …)` / `Hooks.callAll('createSetting', …)` before the write's promise resolves (`client/data/client-backend.mjs`, identical on 13.351 and 14.367), which is why `src/bootstrap/hooks.js` registers one handler on both hooks rather than choosing between them.",
+    identifiers: [["src/bootstrap/hooks.js", "src/main.js"]],
+  },
+  {
+    before:
+      "`SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` were the unguarded case (#656, fixed): both now take an injected `isPrimaryGM` collaborator, defaulting fail-open to `() => true` so unit fixtures still resume, with the real `activeGM` check wired at construction in `src/main.js`.",
+    after:
+      "`SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` were the unguarded case (#656, fixed): both now take an injected `isPrimaryGM` collaborator, defaulting fail-open to `() => true` so unit fixtures still resume, with the real `activeGM` check wired at construction in `src/bootstrap/composeServices.js`.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "**Membership is an explicit allowlist, so READ it — never infer it from a module's kind or its name.** That incident does **not** generalize to \"builders are in the harness graph\": its sibling `InventoryListingBuilder` is copied by **no** harness (its only importer is `src/main.js`), so the hazard does not apply to it at all — issue 675's delta inherited the opposite belief from this note and planned around a constraint that did not bind.",
+    after:
+      "**Membership is an explicit allowlist, so READ it — never infer it from a module's kind or its name.** That incident does **not** generalize to \"builders are in the harness graph\": its sibling `InventoryListingBuilder` is copied by **no** harness (its only importer is `src/bootstrap/craftingFacade.js`), so the hazard does not apply to it at all — issue 675's delta inherited the opposite belief from this note and planned around a constraint that did not bind.",
+    identifiers: [["src/bootstrap/craftingFacade.js", "src/main.js"]],
+  },
+  {
+    before:
+      "`createJournalCommandsForFabricate` in `src/main.js` therefore emits `options ?? {}`; targeted replies supply `{ recipients: [senderId] }` rather than relying on a recipient field inside a broadcast payload.",
+    after:
+      "`createJournalCommandsForFabricate` in `src/bootstrap/journalOperations.js` therefore emits `options ?? {}`; targeted replies supply `{ recipients: [senderId] }` rather than relying on a recipient field inside a broadcast payload.",
+    identifiers: [["src/bootstrap/journalOperations.js", "src/main.js"]],
+  },
+  {
+    before:
+      "Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/main.js` before transport, independently of the post-commit roll-handoff entitlement check.",
+    after:
+      "Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/bootstrap/journalOperations.js` before transport, independently of the post-commit roll-handoff entitlement check.",
+    identifiers: [["src/bootstrap/journalOperations.js", "src/main.js"]],
+  },
+  {
+    before:
+      "The service stays Foundry-free and unit-testable: the `senseSceneRegions` collaborator (`(travelActorUuid) => Iterable<sceneRegionUuid>`) is injected (default `() => []`); the real implementation is wired in `src/main.js`.",
+    after:
+      "The service stays Foundry-free and unit-testable: the `senseSceneRegions` collaborator (`(travelActorUuid) => Iterable<sceneRegionUuid>`) is injected (default `() => []`); the real implementation is wired in `src/bootstrap/composeServices.js`.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "Key files: `GatheringLocationService.js`, `src/main.js` (`senseSceneRegions` injection), `src/canvas/regionHitTest.js`, `foundryBridge.js`, `adminStore.js`, `GatheringView.svelte` / `src/ui/SvelteFabricateApp.svelte.js`.",
+    after:
+      "Key files: `GatheringLocationService.js`, `src/bootstrap/composeServices.js` (`senseSceneRegions` injection), `src/canvas/regionHitTest.js`, `foundryBridge.js`, `adminStore.js`, `GatheringView.svelte` / `src/ui/SvelteFabricateApp.svelte.js`.",
+    identifiers: [["src/bootstrap/composeServices.js", "src/main.js"]],
+  },
+  {
+    before:
+      "The gate is `_runMigrations` in `src/main.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.",
+    after:
+      "The gate is `runMigrations` in `src/bootstrap/migrations.js`, which early-returns unless `game.users?.activeGM?.id === game.user?.id`, so exactly one client runs the pass and no player or assistant races the setting writes.",
+    identifiers: [["`runMigrations` in `src/bootstrap/migrations.js`", "`_runMigrations` in `src/main.js`"]],
+  },
+  // Four cites written as a bare `main.js` rather than `src/main.js`, repointed with the rest.
+  {
+    before:
+      "The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `main.js` (issue 656).",
+    after:
+      "The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `src/bootstrap/composeServices.js` (issue 656).",
+    identifiers: [["`src/bootstrap/composeServices.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `main.js` wiring.",
+    after:
+      "See `buildCompendiumImportContextOption` (`src/ui/compendiumDirectoryContext.js`) and its `src/bootstrap/hooks.js` wiring.",
+    identifiers: [["`src/bootstrap/hooks.js`", "`main.js`"]],
+  },
+  {
+    before:
+      "**The player-path ownership gate lives in the `main.js` FACADE, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.",
+    after:
+      "**The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.",
+    identifiers: [["`src/bootstrap/craftingFacade.js` facade", "`main.js` FACADE"]],
+  },
+  {
+    before:
+      "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
+    after:
+      "The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `src/bootstrap/socketRouter.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.",
+    identifiers: [["`src/bootstrap/socketRouter.js`", "`main.js`"]],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 10;
+const RENAMED_COUNT = 25;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {

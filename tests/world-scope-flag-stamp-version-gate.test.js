@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { entrySources } from './helpers/bootstrapEntrySource.js';
+
 
 import {
   COMPONENT_FLAG_STAMP_TARGET,
@@ -22,7 +24,7 @@ import {
 } from '../src/systems/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MAIN = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+const MAIN = [entrySources['src/main.js'], entrySources['src/bootstrap/Fabricate.js']].join('\n');
 
 /** The body of one named `async function` in `src/main.js`. */
 function bodyOf(name) {

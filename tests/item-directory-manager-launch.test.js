@@ -9,11 +9,21 @@ import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mainPath = resolve(__dirname, '../src/main.js');
+import { entrySources } from './helpers/bootstrapEntrySource.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The module entry and the `src/bootstrap/` modules it split into (issue 1715), as one text: the
+ * deferred loader and `openRecipeManager` stay in the entry, while the Items Directory button
+ * moved to `src/bootstrap/hooks.js`. Read through ONE call, so the pin count does not rise.
+ */
 function mainSource() {
-  return readFileSync(mainPath, 'utf8');
+  return [
+    entrySources['src/main.js'],
+    entrySources['src/bootstrap/hooks.js'],
+    entrySources['src/bootstrap/publicApi.js'],
+  ].join('\n');
 }
 
 test('the deferred manager is opened through the memoized loader', () => {
@@ -43,7 +53,9 @@ test('the Items Directory manager button reports a failed load and swallows it',
   // SWALLOWING, and brace-bounded to this button's own handler: nothing awaits a click handler,
   // so a rethrow would land as the unhandled rejection that made this failure invisible.
   assert.ok(
-    /^[^}]*void openDeferredApp\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/.test(buttonSource),
+    /^[^}]*void openDeferredApp\(io\.showCraftingSystemManagerApp, io\.reportManagerLoadFailure\)/.test(
+      buttonSource
+    ),
     'the header button should dispatch through the swallowing wrapper'
   );
   assert.ok(
@@ -65,7 +77,9 @@ test('openRecipeManager reports a failed load and rethrows it', () => {
   // RETHROWING: a public API member must keep returning a promise that rejects, so a macro
   // author's `await` still sees the failure after the user has been told.
   assert.ok(
-    /^[^}]*return openDeferredAppRethrowing\(showCraftingSystemManagerApp, reportManagerLoadFailure\)/.test(apiSource),
+    /^[^}]*return openDeferredAppRethrowing\(\s*io\.showCraftingSystemManagerApp,\s*io\.reportManagerLoadFailure\s*\)/.test(
+      apiSource
+    ),
     'openRecipeManager should dispatch through the rethrowing wrapper'
   );
   assert.ok(
@@ -80,19 +94,21 @@ test('openRecipeManager reports a failed load and rethrows it', () => {
 
 test('the api export stays raw and un-notified', () => {
   const source = mainSource();
-  const apiStart = source.indexOf('game.fabricate.api = {');
-  assert.notEqual(apiStart, -1, 'main.js should expose the advanced-user api object');
+  const apiStart = source.indexOf('function buildApiClasses(io) {');
+  assert.notEqual(apiStart, -1, 'the public API should expose the advanced-user api object');
   const apiSource = source.slice(apiStart, source.indexOf('\n  };', apiStart));
 
   // DELIBERATE (issue 1565): an API consumer owns its own error handling, and the Foundry smoke
   // is one of these consumers — a failure there must surface as a named failing step rather than
   // as a notification-mirrored console error.
   assert.ok(
-    /^\s*loadCraftingSystemManagerAppClass,$/m.test(apiSource),
+    /^\s*loadCraftingSystemManagerAppClass: io\.loadCraftingSystemManagerAppClass,$/m.test(
+      apiSource
+    ),
     'the api member should be the bare loader'
   );
   assert.ok(
-    !/loadCraftingSystemManagerAppClass:/.test(apiSource),
+    !/loadCraftingSystemManagerAppClass: \(\)/.test(apiSource),
     'not a wrapped or notifying variant'
   );
 });
@@ -146,12 +162,13 @@ test('both module console lines are written at a level the published build keeps
 test('the stale-entry check is dispatched from the ready body, behind a typeof guard', () => {
   const source = mainSource();
 
-  // IN `ready`, NOT `initialize()`.
-  const readyStart = source.indexOf("Hooks.once('ready', async () => {");
-  assert.notEqual(readyStart, -1, 'main.js should register a ready hook');
+  // IN the `ready` startup sequence, NOT `initialize()` (issue 1715 moved the body into
+  // `src/bootstrap/hooks.js`; the entry still owns the check itself).
+  const readyStart = source.indexOf('async function runReadyStartupSequence(io) {');
+  assert.notEqual(readyStart, -1, 'the ready startup sequence should be declared');
   assert.ok(
-    /^[^}]*\n {2}reportStaleEntryScript\(\);/.test(source.slice(readyStart)),
-    'the stale-entry check should be dispatched from the ready body'
+    /^[^}]*\n {2}io\.reportStaleEntryScript\(\);/.test(source.slice(readyStart)),
+    'the stale-entry check should be dispatched first from the ready startup sequence'
   );
 
   // EVERY READ OF THE BUILD-TIME DEFINE IS GUARDED.
