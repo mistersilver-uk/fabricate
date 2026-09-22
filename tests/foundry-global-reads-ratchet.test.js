@@ -69,7 +69,7 @@ const gate = ceilingLedgerGate({
   build: buildLedger,
   // No headroom: the disable is all-or-nothing, so one more read is one more unbounded coupling.
   ceiling: (_key, reads) => reads,
-  staleRows: 'fail',
+  shrink: 'fail',
   floor: SCAN_FLOOR,
   wording: {
     subject: 'bare Foundry-global reads in the domain layer',
@@ -89,12 +89,14 @@ test('the ledger reports the figures issue 1677 measured', (t) => {
   // Floored rather than pinned: the exact targets live on #1656, and pinning them here makes
   // every banked read a second conflict site on top of the ledger row itself.
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
-  const pinned = gate.pinned();
-  const total = Object.values(pinned).reduce((sum, count) => sum + count, 0);
-  t.diagnostic(`${Object.keys(pinned).length} debted domain files, ${total} bare reads across them`);
+  // Read off the SCAN, not the committed file: a scan that stopped matching leaves the ledger
+  // byte-identical, so a floor read off the file clears while nothing at all was measured.
+  const { observed } = gate.current();
+  const total = Object.values(observed).reduce((sum, count) => sum + count, 0);
+  t.diagnostic(`${Object.keys(observed).length} debted domain files, ${total} bare reads`);
   assert.ok(
-    Object.keys(pinned).length > ROW_FLOOR,
-    `only ${Object.keys(pinned).length} rows, below the floor of ${ROW_FLOOR}`
+    Object.keys(observed).length > ROW_FLOOR,
+    `only ${Object.keys(observed).length} debted files measured, below the floor of ${ROW_FLOOR}`
   );
 });
 

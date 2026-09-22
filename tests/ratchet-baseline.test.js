@@ -159,7 +159,7 @@ let probeSequence = 0;
  * A ceiling gate over a throwaway ledger, with its own env names so no two probes can collide.
  * The default rule gives every observation one unit of headroom.
  */
-function ceilingProbe({ rows, observed, scanned = 10, detail, ceiling, staleRows = 'fail' }) {
+function ceilingProbe({ rows, observed, scanned = 10, detail, ceiling, shrink = 'fail' }) {
   probeSequence += 1;
   const ledgerPath = join(TEMP_LEDGERS, `probe-${probeSequence}.txt`);
   writeFileSync(ledgerPath, formatLedger(rows));
@@ -177,7 +177,7 @@ function ceilingProbe({ rows, observed, scanned = 10, detail, ceiling, staleRows
     tightenEnv,
     build: () => ({ observed, scanned, detail }),
     ceiling: ceiling ?? ((key, value) => Math.ceil(value) + 1),
-    staleRows,
+    shrink,
     floor: 5,
     wording: {
       subject: 'probe counts',
@@ -195,14 +195,19 @@ function ceilingProbe({ rows, observed, scanned = 10, detail, ceiling, staleRows
       delete process.env[name];
     }
   };
+  const underUpdate = (run) => withEnv(updateEnv, run);
+  const underTighten = (run) => withEnv(tightenEnv, run);
   return {
     gate,
     run: (t) => registered(t),
-    update: (t) => withEnv(updateEnv, () => registered(t)),
-    tighten: (t) => withEnv(tightenEnv, () => registered(t)),
-    both: (t) => withEnv(updateEnv, () => withEnv(tightenEnv, () => registered(t))),
+    underUpdate,
+    underTighten,
+    update: (t) => underUpdate(() => registered(t)),
+    tighten: (t) => underTighten(() => registered(t)),
+    both: (t) => underUpdate(() => underTighten(() => registered(t))),
     text: () => readFileSync(ledgerPath, 'utf8'),
     read: () => parseLedger(readFileSync(ledgerPath, 'utf8')),
+    ledgerPath,
   };
 }
 
@@ -231,32 +236,53 @@ test('an observation at its ceiling passes, and one below it passes without a re
   atCeiling.run();
   assert.equal(atCeiling.text(), 'a\t5\n', 'a passing run never writes');
 
-  const below = ceilingProbe({ rows: { a: 50 }, observed: { a: 5 } });
+  const below = ceilingProbe({ rows: { a: 50 }, observed: { a: 5 }, shrink: 'allow' });
   const spy = diagnosticSpy();
   below.run(spy.context);
   assert.equal(below.text(), 'a\t50\n');
   assert.match(spy.lines.join('\n'), /1 row\(s\)[\s\S]*a \(50 -> 6\)/);
 });
 
+test('a row left above its unit is a diagnostic under `allow` and a failure under `fail`', () => {
+  // A ledger with no headroom rule cannot distinguish "shrank" from "about to be spent back", so
+  // there the win is banked at once rather than left standing as a row nobody is using.
+  const failed = ceilingProbe({ rows: { a: 50 }, observed: { a: 5 }, shrink: 'fail' });
+  assert.throws(() => failed.run(), {
+    message: /SLACK[\s\S]*a \(ceiling 50, found 5, would be pinned 6\)[\s\S]*TIGHTEN_PROBE/,
+  });
+  assert.equal(failed.text(), 'a\t50\n', 'a failing run never writes');
+});
+
 test('a stale row passes with a diagnostic under `allow` and fails under `fail`', () => {
-  const allowed = ceilingProbe({ rows: { a: 5, gone: 3 }, observed: { a: 5 }, staleRows: 'allow' });
+  const allowed = ceilingProbe({ rows: { a: 5, gone: 3 }, observed: { a: 5 }, shrink: 'allow' });
   const spy = diagnosticSpy();
   allowed.run(spy.context);
   assert.match(spy.lines.join('\n'), /1 stale row\(s\)[\s\S]*gone \(3\)/);
 
-  const failed = ceilingProbe({ rows: { a: 5, gone: 3 }, observed: { a: 5 }, staleRows: 'fail' });
+  const failed = ceilingProbe({ rows: { a: 5, gone: 3 }, observed: { a: 5 }, shrink: 'fail' });
   assert.throws(() => failed.run(), {
     message: /STALE[\s\S]*gone \(ceiling 3, nothing found\)[\s\S]*TIGHTEN_PROBE/,
   });
 });
 
-test('an empty observation fails on the floor rather than passing as all-stale', () => {
+test('an empty observation fails on the floor in every mode, not only when asserting', () => {
   // The failure a ceiling gate is uniquely exposed to: it bounds only what it observes, so a
-  // corpus that read nothing meets every ceiling it was given.
-  const probe = ceilingProbe({ rows: { a: 5 }, observed: {}, scanned: 0, staleRows: 'allow' });
-  assert.throws(() => probe.run(), {
-    message: /only 0 candidates, below the floor of 5[\s\S]*every ceiling met/,
-  });
+  // corpus that read nothing meets every ceiling it was given. The regenerate modes are the
+  // dangerous half — a broken scan there rewrites the ledger down to nothing on disk.
+  const probe = ceilingProbe({ rows: { a: 5 }, observed: {}, scanned: 0, shrink: 'allow' });
+  const message = /only 0 candidates, below the floor of 5[\s\S]*every ceiling met/;
+  assert.throws(() => probe.run(), { message });
+  assert.throws(() => probe.tighten(), { message });
+  assert.throws(() => probe.update(), { message });
+  assert.equal(probe.text(), 'a\t5\n', 'no mode wrote past the floor');
+});
+
+test('a gate reports whether this run rewrote the ledger, which two gates skip a figure on', () => {
+  const probe = ceilingProbe({ rows: { a: 5 }, observed: { a: 5 } });
+  assert.equal(probe.gate.regenerated(), false);
+  assert.equal(probe.underUpdate(() => probe.gate.regenerated()), true);
+  assert.equal(probe.underTighten(() => probe.gate.regenerated()), true);
+  assert.equal(probe.gate.regenerated(), false, 'it reads the env per call, not once at build');
 });
 
 test('setting both regenerate modes at once is rejected instead of picking one', () => {
@@ -268,7 +294,7 @@ test('the update mode rewrites only the failing rows', () => {
   const probe = ceilingProbe({
     rows: { grown: 5, slack: 90, gone: 4 },
     observed: { grown: 9, slack: 5, fresh: 2 },
-    staleRows: 'allow',
+    shrink: 'allow',
   });
   probe.update();
   assert.deepEqual(probe.read(), { fresh: 3, gone: 4, grown: 10, slack: 90 });
@@ -278,7 +304,7 @@ test('the tighten mode rewrites every row, drops stale rows, and is idempotent',
   const probe = ceilingProbe({
     rows: { grown: 5, slack: 90, gone: 4 },
     observed: { grown: 9, slack: 5, fresh: 2 },
-    staleRows: 'allow',
+    shrink: 'allow',
   });
   probe.tighten();
   assert.deepEqual(probe.read(), { fresh: 3, grown: 10, slack: 6 });
@@ -312,10 +338,29 @@ test('the ceiling rule reads the detail the scan carried, not only the observati
 
 test('a zero or malformed row is rejected rather than read as a satisfied ceiling', () => {
   const zeroed = ceilingProbe({ rows: { a: 5 }, observed: { a: 5 } });
-  writeFileSync(join(TEMP_LEDGERS, `probe-${probeSequence}.txt`), 'a\t0\n');
+  writeFileSync(zeroed.ledgerPath, 'a\t0\n');
   assert.throws(() => zeroed.run(), { message: /row "a" holds 0[\s\S]*positive integer/ });
 
   const malformed = ceilingProbe({ rows: { a: 5 }, observed: { a: 5 } });
-  writeFileSync(join(TEMP_LEDGERS, `probe-${probeSequence}.txt`), 'a\tmany\n');
+  writeFileSync(malformed.ledgerPath, 'a\tmany\n');
   assert.throws(() => malformed.run(), { message: /row "a" holds NaN/ });
+});
+
+test('the tighten mode repairs a malformed row instead of being blocked by it', () => {
+  // Row validation runs before the mode branch, so a gate that validated for tighten too would
+  // reject the only run that can write the row back.
+  const probe = ceilingProbe({ rows: { a: 5 }, observed: { a: 5 } });
+  writeFileSync(probe.ledgerPath, 'a\t0\n');
+  assert.throws(() => probe.run(), { message: /row "a" holds 0/ });
+  probe.tighten();
+  assert.deepEqual(probe.read(), { a: 6 });
+  probe.run();
+});
+
+test('a duplicated row is rejected rather than collapsed to whichever came last', () => {
+  // `parseLedger` keeps the last of two rows, so an unnoticed duplicate would silently pick a
+  // ceiling that is not the one either row states.
+  const probe = ceilingProbe({ rows: { a: 5 }, observed: { a: 5 } });
+  writeFileSync(probe.ledgerPath, 'a\t5\na\t900\n');
+  assert.throws(() => probe.run(), { message: /row "a" appears twice[\s\S]*merge them into one/ });
 });

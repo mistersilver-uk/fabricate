@@ -80,7 +80,7 @@ const gate = ceilingLedgerGate({
   tightenEnv: 'TIGHTEN_FILE_SIZE_LEDGER',
   build: buildLedger,
   ceiling: ceilingFor,
-  staleRows: 'allow',
+  shrink: 'allow',
   floor: SCAN_FLOOR,
   wording: {
     subject: 'oversized files and functions',
@@ -245,12 +245,14 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // The pair a reviewer checks against the issue without reading the rows. Floored rather than
   // pinned: the exact targets live on #1656, and pinning them here is a second conflict site.
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
-  const keys = Object.keys(gate.pinned());
+  // Read off the SCAN, not the committed file: a scan that stopped matching leaves the ledger
+  // byte-identical, so a floor read off the file clears while nothing at all was measured.
+  const keys = Object.keys(gate.current().observed);
   const files = keys.filter((key) => !key.includes('::')).length;
   t.diagnostic(`${files} oversized files and ${keys.length - files} oversized functions`);
   assert.ok(
     keys.length > ROW_FLOOR,
-    `only ${keys.length} rows, below the floor of ${ROW_FLOOR}; a ledger regenerated from a ` +
-      'truncated scan would look exactly like this'
+    `only ${keys.length} units measured, below the floor of ${ROW_FLOOR}; a truncated scan ` +
+      'would look exactly like this'
   );
 });

@@ -102,7 +102,7 @@ const gate = ceilingLedgerGate({
   build: buildLedger,
   // No headroom: a pin is discrete, so there is no size at which one more is the same debt.
   ceiling: (_key, sites) => sites,
-  staleRows: 'fail',
+  shrink: 'fail',
   floor: SCAN_FLOOR,
   wording: {
     subject: 'source-pin counts',

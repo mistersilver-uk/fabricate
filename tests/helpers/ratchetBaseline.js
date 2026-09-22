@@ -140,55 +140,20 @@ export function assertRatchet({
   );
 }
 
-/**
- * The spine both exact-count ledger gates share (issues 1657, 1658): read a pinned `key -> count`
- * map, compare a freshly built one against it in BOTH directions, and describe the drift so a
- * reader can act on it.
- *
- * @param {object} actual Freshly derived `key -> count`.
- * @param {object} expected The pinned ledger.
- * @param {{subject: string, regenerate: string, structuralHint: string, roseHint: string, fellHint:
- * string}} wording `structuralHint` speaks to a key appearing or vanishing, which is a different
- * event from a count moving and needs each gate's own guidance.
- * @returns {string|undefined} A message, or undefined when the two agree.
- */
-export function describeLedgerDrift(actual, expected, wording) {
-  const added = Object.keys(actual)
-    .filter((key) => !(key in expected))
-    .sort(byCodePoint);
-  const removed = Object.keys(expected)
-    .filter((key) => !(key in actual))
-    .sort(byCodePoint);
-  if (added.length > 0 || removed.length > 0) {
-    return (
-      `the set of ${wording.subject} changed — added: [${added.join(', ')}], ` +
-      `removed: [${removed.join(', ')}]. ${wording.structuralHint} These gates scan the working ` +
-      'tree, not the git index, so a stray untracked file under a scanned root is the other ' +
-      `likely cause (\`git status\` will show it). Re-derive with ${wording.regenerate}.`
-    );
-  }
-  const changed = Object.keys(expected)
-    .filter((key) => actual[key] !== expected[key])
-    .sort(byCodePoint)
-    .map((key) => `${key}: pinned ${expected[key]} -> actual ${actual[key]}`);
-  if (changed.length === 0) return undefined;
-  return (
-    `${wording.subject} drifted: ${changed.join('; ')}. This gate fails in both directions: a ` +
-    `count that ROSE ${wording.roseHint}, and a count that FELL ${wording.fellHint}. ` +
-    `Re-derive with ${wording.regenerate}.`
-  );
-}
-
-/** One exact-count ledger gate (issues 1657, 1658). */
-/** Read a tab-separated ledger back into a `key -> count` map. */
-export function parseLedger(text) {
+/** A ledger's rows in file order as `[key, count]` pairs, with duplicates still separate. */
+function ledgerEntries(text) {
   const entries = [];
   for (const line of String(text).split('\n')) {
     if (line.trim() === '') continue;
     const separator = line.lastIndexOf('\t');
     entries.push([line.slice(0, separator), Number(line.slice(separator + 1))]);
   }
-  return Object.fromEntries(entries);
+  return entries;
+}
+
+/** Read a tab-separated ledger back into a `key -> count` map. */
+export function parseLedger(text) {
+  return Object.fromEntries(ledgerEntries(text));
 }
 
 /** Write a `key -> count` map as a tab-separated ledger, ordered so a diff reads cleanly. */
@@ -199,64 +164,22 @@ export function formatLedger(ledger) {
     .join('\n')}\n`;
 }
 
-/** A `ledgerGate` plus the baseline assertion every ledger repeats, registered in one call. */
-export function pinnedLedgerGate({
-  test,
-  assert,
-  title,
-  ledgerPath,
-  regenerateEnv,
-  build,
-  subject,
-  regenerate,
-  structuralHint,
-  roseHint,
-  fellHint,
-}) {
-  const gate = ledgerGate({
-    ledgerPath,
-    regenerateEnv,
-    build,
-    wording: { subject, regenerate, structuralHint, roseHint, fellHint },
-  });
-  test(title, () => gate.check(assert));
-  return gate;
-}
-
-export function ledgerGate({ ledgerPath, regenerateEnv, build, wording }) {
-  let cached;
-  const current = () => {
-    cached ??= build();
-    return cached;
-  };
-  return {
-    current,
-    /** The pinned ledger as committed. */
-    pinned: () => parseLedger(readFileSync(ledgerPath, 'utf8')),
-    /** True when this run rewrote the ledger instead of asserting against it. */
-    regenerated: () => Boolean(process.env[regenerateEnv]),
-    /** Assert the fresh ledger against the pinned one, or rewrite it when regenerating. */
-    check(assert) {
-      const actual = current();
-      if (process.env[regenerateEnv]) {
-        writeFileSync(ledgerPath, formatLedger(actual));
-        return;
-      }
-      const expected = parseLedger(readFileSync(ledgerPath, 'utf8'));
-      assert.deepStrictEqual(actual, expected, describeLedgerDrift(actual, expected, wording));
-    },
-  };
-}
-
-/** A ledger row as a `key -> ceiling` map, rejecting a row that bounds nothing (issue 1914). */
-function indexCeilings(ledger, title) {
+/** Ledger rows as a `key -> ceiling` map, rejecting a duplicated or malformed row (issue 1914). */
+function indexCeilings(entries, title) {
   const rows = new Map();
-  for (const [key, value] of Object.entries(ledger)) {
+  for (const [key, value] of entries) {
     if (!Number.isInteger(value) || value < 1) {
       throw new Error(
         `${title}: row "${key}" holds ${String(value)}, and a ceiling is a positive ` +
           'integer. A zero or malformed row bounds nothing while still reading as a satisfied ' +
           'gate, which is the one failure a ceiling cannot afford.'
+      );
+    }
+    if (rows.has(key)) {
+      throw new Error(
+        `${title}: row "${key}" appears twice. Two rows bound one key differently depending on ` +
+          'which one a reader trusts, and a regenerate run keeps only the last — merge them into ' +
+          'one row carrying the ceiling you mean.'
       );
     }
     rows.set(key, value);
@@ -328,9 +251,10 @@ function regenerateMode({ title, updateEnv, tightenEnv }) {
 }
 
 /** The failure a ceiling gate raises, or the empty string when nothing crossed. */
-function describeCeilingBreaches({ title, wording, added, exceeded, stale, staleRows }) {
-  const blocking = staleRows === 'fail' ? stale : [];
-  if (added.length + exceeded.length + blocking.length === 0) return '';
+function describeCeilingBreaches({ title, wording, added, exceeded, stale, slack, shrink }) {
+  const vanished = shrink === 'fail' ? stale : [];
+  const loosened = shrink === 'fail' ? slack : [];
+  if (added.length + exceeded.length + vanished.length + loosened.length === 0) return '';
   const takeOn =
     added.length + exceeded.length === 0
       ? ''
@@ -338,9 +262,10 @@ function describeCeilingBreaches({ title, wording, added, exceeded, stale, stale
         `rows above and leaves every other row byte-identical, and state the reason in the PR. ` +
         wording.addedHint;
   const bank =
-    blocking.length === 0
+    vanished.length + loosened.length === 0
       ? ''
-      : `\n\nBank the win with \`${wording.tighten}\`. ${wording.staleHint}`;
+      : `\n\nBank the win with \`${wording.tighten}\`.` +
+        (vanished.length === 0 ? '' : ` ${wording.staleHint}`);
   return (
     `${title}: ${wording.subject} crossed the ledger.` +
     section(
@@ -356,7 +281,15 @@ function describeCeilingBreaches({ title, wording, added, exceeded, stale, stale
     ) +
     section(
       'STALE — the row bounds nothing, so it stands as a permission for whoever finds it next:',
-      blocking.map(({ key, row }) => `${key} (ceiling ${row}, nothing found)`)
+      vanished.map(({ key, row }) => `${key} (ceiling ${row}, nothing found)`)
+    ) +
+    section(
+      'SLACK — a listed unit shrank, and this ledger carries no headroom, so the gap between ' +
+        'the row and the unit is a standing permission to spend the win straight back:',
+      loosened.map(
+        ({ key, value, row, tight }) =>
+          `${key} (ceiling ${row}, found ${showObserved(value)}, would be pinned ${tight})`
+      )
     ) +
     takeOn +
     bank
@@ -370,7 +303,8 @@ function describeCeilingBreaches({ title, wording, added, exceeded, stale, stale
  * @param {() => {observed: object, scanned: number, detail?: object}} options.build The scan.
  * @param {(key: string, observed: number, detail?: object) => number} options.ceiling The row to
  * write for an observation, which is where each gate states its own headroom rule.
- * @param {'fail'|'allow'} options.staleRows What a row with no observation means for this gate.
+ * @param {'fail'|'allow'} options.shrink What a row above its unit means for this gate, covering
+ * both a unit that fell below its ceiling and one that vanished entirely.
  * @returns {{current: Function, pinned: Function, regenerated: Function}} `current()` is the
  * memoised `build()` result; `regenerated()` is true under either mode.
  */
@@ -383,7 +317,7 @@ export function ceilingLedgerGate({
   tightenEnv,
   build,
   ceiling,
-  staleRows,
+  shrink,
   floor,
   wording,
 }) {
@@ -408,7 +342,12 @@ export function ceilingLedgerGate({
             'observes would read that as every row stale and every ceiling met.'
         );
       }
-      const rows = indexCeilings(gate.pinned(), title);
+      // A tighten run writes every row from the observation without reading one, so a malformed
+      // row must not block the run that would repair it.
+      const rows =
+        mode === 'tighten'
+          ? new Map()
+          : indexCeilings(ledgerEntries(readFileSync(ledgerPath, 'utf8')), title);
       const ceilingOf = (key, value) => {
         const bound = ceiling(key, value, detail);
         if (!Number.isInteger(bound) || bound < 1) {
@@ -427,10 +366,12 @@ export function ceilingLedgerGate({
         added,
         exceeded,
         stale,
-        staleRows,
+        slack,
+        shrink,
       });
       if (failure !== '') assert.fail(failure);
-      reportHeadroom(t, { wording, stale: staleRows === 'allow' ? stale : [], slack });
+      // Under `fail` both lists are empty by the time this runs, so no branch is needed.
+      reportHeadroom(t, { wording, stale, slack });
     },
   };
   test(title, (t) => gate.check(t));

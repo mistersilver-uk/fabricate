@@ -279,7 +279,7 @@ const gate = ceilingLedgerGate({
   tightenEnv: 'TIGHTEN_COMMENT_SHARE_LEDGER',
   build: () => buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS)),
   ceiling: ceilingFor,
-  staleRows: 'allow',
+  shrink: 'allow',
   floor: SCAN_FLOOR,
   wording: {
     subject: 'comment-line share per directory',
