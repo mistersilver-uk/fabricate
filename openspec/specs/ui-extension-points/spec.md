@@ -1,5 +1,10 @@
 # UI Extension Points
 
+## Purpose
+
+Define the UI extension points: the GM Manager's downtime preview and premium extension, and the player window's navigation extension.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Downtime Preview and Premium Extension
 
 This section is GM Manager scope throughout.

@@ -1,5 +1,10 @@
 # UI Entity Editors
 
+## Purpose
+
+Define the GM Manager's per-entity editors: the recipe editor, the component studio and the step editor.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Recipe Editor
 
 Scoped to a single crafting system.
@@ -400,7 +405,7 @@ The GM component surfaces: the component browser and the component editor.
     Every system-scope writer of the map therefore flips the pair's `inherit.essences` to `false` FIRST and writes the values second, on the rules editor's own flag-before-values order (`data-models/spec.md` `### Component scope` requirement 2a).
     The flag write is per PAIR and not per batch, so a refused pair costs that pair its ESSENCE AXIS ALONE — every other axis it staged still lands on it, and the rest of the cohort lands whole — and a pair the world corpus holds no membership record for is written unchanged because nothing shadows it.
     Dropping a refused pair from the WHOLE edit was revision 19's reading, and it let a setting refusal that had nothing to say about categories take a cohort's category change with it; `data-models/spec.md` `### Component scope` requirement 2a states the rule this now follows, and the count of refused pairs is reported beside the updated count because neither answers the other's question.
-    The tags note states that world tags are shown on each record and that the system's own list is what the rows change; it never asserts the unconsumed merge (`### GM World Component Screens` requirement 1).
+    The tags note states that world tags are shown on each record and that the system's own list is what the rows change; it never asserts the unconsumed merge (`ui-world-scope/spec.md` `## GM World Component Screens` requirement 1).
     An axis whose staged value cannot be distinguished from its unstaged value — an all-zero essence map, a zero DC — carries a visible staged indicator that also unstages it, so a destructive edit is never indistinguishable from no edit.
     The panel states permanently that applying essences overwrites the values on every selected component, and additionally warns when the staged overwrite would in fact change or remove authored essence values on at least one selected component.
     One action applies every staged axis to every selected component; it names the number of components it will affect and is inert until at least one axis is staged — reading `Stage a change to apply to N components` while inert, `Apply <axes> to N components` for one or two staged axes, and `Edit N components` for more.

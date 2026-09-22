@@ -317,7 +317,7 @@
                       )}</span
                     >
                   </div>
-                  <!-- Ghost (issue 1118, row 8). `ui-integration/spec.md` defines the role
+                  <!-- Ghost (issue 1118, row 8). `ui-visual-style/spec.md` defines the role
                        as the quiet NAVIGATIONAL verb — "Back, Open, View" — which moves the
                        GM and changes no record, and this control is literally an Open. It
                        sits inside a blocker callout that already carries the alarm, so at

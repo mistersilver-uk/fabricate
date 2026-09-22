@@ -86,7 +86,8 @@
   });
 
   // The filter reads the run the ROWS draw (`essenceChips`), not the resolved map the editor is
-  // seeded from: `ui-integration` requirement 2's one-function rule exists to prevent that divergence.
+  // seeded from: `ui-world-scope` § GM World Component Screens requirement 2's one-function rule
+  // exists to prevent that divergence.
   const showComponentEssences = $derived(
     (itemCards || []).some((item) => item.showEssences || componentEssenceRun(item).length > 0)
   );

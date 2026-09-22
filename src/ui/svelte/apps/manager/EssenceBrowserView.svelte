@@ -368,7 +368,7 @@
            filter beside the search field. NEITHER LOSES A STATE A GM CANNOT REACH — every row
            states its enabled state as a pill and its source breakage in the summary line and the
            Effects chip, both of which the search box reads. The PRESENTATION toggle stays on row
-           two: it is not a filter, it is the only route to the grid, which `### GM World Essence
+           two: it is not a filter, it is the only route to the grid, which `## GM World Essence
            Screens` requirement 7 names. -->
       <!-- THE MEMBERSHIP AXIS, AS A TWO-SEGMENT CONTROL ON THE TOP ROW, because the comparison is
            the entire subject of the control and a `<select>` hides half of it. It renders only when

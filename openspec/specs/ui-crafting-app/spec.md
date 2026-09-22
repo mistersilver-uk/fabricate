@@ -1,5 +1,10 @@
 # UI Crafting App
 
+## Purpose
+
+Define the player Crafting App: the unified Fabricate window's crafting, alchemy, salvage and inventory surfaces.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Crafting App (Player)
 
 ### Shared-store refresh routing
@@ -808,7 +813,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   outcome.
 - Advancing re-invokes the craft seam for the same recipe and ingredient set (it
   carries no separate run id; the engine advances the active step).
-- The unified player-facing Journal screen (see _Journal App_) is the cross-activity
+- The unified player-facing Journal screen (see `ui-journal-app/spec.md` _Journal App (Player)_) is the cross-activity
   home for monitoring and advancing these runs; a direct cross-link from the Run
   Summary into the Journal is a deferred follow-up.
 
@@ -865,7 +870,7 @@ The a11y contract: the status pill is `aria-live="polite"`; the bench chip body 
 #### Active Runs and History (cross-reference reconciliation)
 
 - The alchemy tab does NOT host runs or history.
-  Run monitoring remains a Journal concern (see _Journal App_); the tab's internal fizzle dead-end memory is not run history.
+  Run monitoring remains a Journal concern (see `ui-journal-app/spec.md` _Journal App (Player)_); the tab's internal fizzle dead-end memory is not run history.
 - The unified Journal screen surfaces alchemy runs alongside crafting, gathering, and salvage runs; an alchemy run is redacted there for a viewer who has not discovered its recipe.
 - Forward-compat: the active station-tool chip stays in `ActorSelectTopBar` this iteration (the alchemy tab has no header/context bar yet); it migrates to an alchemy header bar if/when one is added.
 

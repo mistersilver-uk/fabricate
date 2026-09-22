@@ -343,12 +343,12 @@
   `draggable="true"`, so a mousedown-drag inside the prose would start a row drag instead
   of a text selection. This component already fought the same fight for its artwork.
 
-  It carries no link and no control of any kind. A complication belongs to the component
-  the row already names, so a player has nowhere to be sent; and per
-  `openspec/specs/ui-integration/spec.md` no player progressive surface builds any part of
-  the exclusion vocabulary — no per-stage exclude toggle, no excluded-results list, no
-  hidden-result note — because exclusion would contradict the reconciliation guarantee
-  that a result is never dropped. The prototype draws one; it is not built.
+  It carries no link and no control of any kind. A complication belongs to the component the row
+  already names, so a player has nowhere to be sent; and per
+  `openspec/specs/ui-crafting-app/spec.md` § Progressive Stage List, _Progressive salvage deltas_,
+  no player progressive surface builds any part of the exclusion vocabulary — no per-stage exclude
+  toggle, no excluded-results list, no hidden-result note — because exclusion would contradict the
+  reconciliation guarantee that a result is never dropped. The prototype draws one; it is not built.
 -->
 {#snippet complicationBand(stage)}
   {@const entries = bandEntries(stage)}

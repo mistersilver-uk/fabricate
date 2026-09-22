@@ -328,7 +328,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     // that is false at the write: `worldScopeActions.addToSystem` stamps `inherit: {}`, and
     // `isSectionInherited` reads an ABSENT `inherit.category` as TRUE — so a newly adopted record
     // inherits the one section this whole change turns on, and the adoption seed copies the
-    // world identity besides. `ui-integration/spec.md`'s `### GM World Component Screens`
+    // world identity besides. `ui-world-scope/spec.md`'s `## GM World Component Screens`
     // requirement 1 forbids a surface asserting a reach that does not exist; a surface DENYING a
     // reach that does is the same defect run backwards, and its harm is the same shape — a GM
     // reads it and overrides the category locally instead of leaving it inheriting.
@@ -420,7 +420,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
   });
 
   it('reports a refusal and carries on, instead of abandoning the run at the first one', async () => {
-    // REVIEWER 5 (r9). `ui-integration/spec.md` `### GM World Component Screens` requirement 6
+    // REVIEWER 5 (r9). `ui-world-scope/spec.md` `## GM World Component Screens` requirement 6
     // states the rule for this exact composed write: the refusal is REPORTED rather than thrown,
     // the verb answers `false` and notifies, and a bulk apply continues through its remaining
     // pairs. `WorldComponentCataloguePage.applyBulk` does that; this dialog returned at the first

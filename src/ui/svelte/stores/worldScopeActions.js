@@ -715,7 +715,7 @@ function cloneMembership(record) {
  * ## IT POSTS NO NOTICE, AND THAT IS DELIBERATE
  *
  * Both legs are wrapped so a rejected `game.settings.set` becomes `false` rather than an
- * unhandled rejection, and the FAILURE IS REPORTED BY THE PAGE (`### GM World Vocabulary Route`
+ * unhandled rejection, and the FAILURE IS REPORTED BY THE PAGE (`## GM World Vocabulary Route`
  * requirement 7). This module has no notification seam and must not grow one: Foundry already
  * posts `ui.notifications.error` for a server-refused write, so a second notice here would
  * double-notify on the commonest failure.

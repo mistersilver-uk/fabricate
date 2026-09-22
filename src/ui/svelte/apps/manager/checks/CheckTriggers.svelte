@@ -704,7 +704,7 @@
                     <span>{tierStepAmountLabel}</span>
                     {#if step.mode === 'up' || step.mode === 'down'}
                       <!-- `fill` is what keeps the canonical no-movement guarantee
-                                                 (`openspec/specs/ui-integration/spec.md`, "a stable operand slot at one pinned
+                                                 (`openspec/specs/ui-system-studio/spec.md`, "a stable operand slot at one pinned
                                                  width"): the slot stays pinned and the primitive stretches into it, so a mode
                                                  swap leaves POSITION and WIDTH unchanged, not height — this fill renders 36px
                                                  tall against the inert placeholder's 32px and the target `Select`'s 30px, and

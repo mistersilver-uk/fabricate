@@ -445,7 +445,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
   // `RecipeManager` populates `issue` and the rail consumes it, but the aggregate entry
   // dropped it — so a player carrying 1000 gp against a cleared `gp` actorPath read
   // "100 gp — Can't afford" in red. That is the original defect in a new voice, and it
-  // violates the MUST this change itself added to the ui-integration spec.
+  // violates the MUST this change itself added to the ui-crafting-app spec.
 
   it('names a configuration refusal as setup, in the warning tone, not as a shortfall', async () => {
     const target = await harness.mount({

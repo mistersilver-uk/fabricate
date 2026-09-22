@@ -10,10 +10,10 @@
   order and which two rules defer.
 
   The two cards, the six-label eligibility vocabulary, where the rule-keyed description sits, the
-  reflow and the single empty-library sentence are required by
-  `openspec/specs/ui-integration/spec.md` → "Checks studio — combination rule and pick cap".
-  Rendered for every sub-tab, INCLUDING those where the library reaches no roll, which is the
-  defect this card reports rather than hides. Controlled, and it emits no library patch.
+  reflow and the single empty-library sentence are required by `ui-entity-editors/spec.md` → "Recipe
+  crafting-check modifier control" → "Checks studio — combination rule and pick cap". Rendered for
+  every sub-tab, INCLUDING those where the library reaches no roll, which is the defect this card
+  reports rather than hides. Controlled, and it emits no library patch.
 -->
 <script>
   import Field from '../../../components/Field.svelte';

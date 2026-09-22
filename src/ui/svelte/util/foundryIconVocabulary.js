@@ -9,7 +9,7 @@ export {
 // The patterns that decide what the curated icon vocabulary leaves OUT. The rule they serve — a
 // glyph suits ANY fiction and Foundry can render it, so the question is "is there a story this
 // picture belongs in" — and every exclusion category below are specified in
-// `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`. That requirement also states why
+// `openspec/specs/ui-visual-style/spec.md`, `#### Icon vocabulary`. That requirement also states why
 // a pattern matching nothing today is RETAINED: Font Awesome promotes icons out of Pro, so a
 // deleted pattern stops excluding the moment its members are promoted, with nothing to report it.
 //

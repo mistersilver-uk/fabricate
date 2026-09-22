@@ -1,6 +1,6 @@
 /**
  * Salvage execution for the INSPECTED participation (issue 1695): the busy key, the outcome the
- * panel ribbons, and the row held under that ribbon. This is `ui-integration` §Salvage Execution's
+ * panel ribbons, and the row held under that ribbon. This is `ui-crafting-app` §Salvage Execution's
  * panel state and NOT a Salvage Run — the run record and its captured result order are the engine's
  * aggregate, which this sub-store owns no part of.
  *

@@ -485,7 +485,7 @@ describe('the pagination footer is fed the CLAMPED index', () => {
 
 describe('the host-sheet block is ADDITIVE and edits no existing rule', () => {
   // ── WHY THIS IS ASSERTED AT ALL ─────────────────────────────────────────────────────────
-  // `ui-integration/spec.md` `### GM World Scoped Entity Routes` requirement 7 closes
+  // `ui-world-scope/spec.md` `## GM World Scoped Entity Routes` requirement 7 closes
   // `styles/fabricate.css` to the scoped-entity lanes, and voids that closure only for a seam
   // the enumeration does not name — with the reopening change's own unchanged-render evidence.
   const CSS_PATH = 'styles/fabricate.css';

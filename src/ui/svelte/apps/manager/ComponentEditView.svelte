@@ -503,7 +503,7 @@
   );
   // THE WORLD BRANCH STATES WHAT IS TRUE, WHICH IS NOT WHAT THE REFERENCE STATES: the runtime does
   // not merge world tags — `resolveComponentTags` computes the additive set and the read union's
-  // trailing in-system re-spread discards it. `### GM World Component Screens` forbids asserting the
+  // trailing in-system re-spread discards it. `## GM World Component Screens` forbids asserting the
   // false half, so this is a licensed departure. The card still SHOWS the world run.
   const tagCardSubtitle = $derived(
     worldTags.length > 0

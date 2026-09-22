@@ -1296,7 +1296,7 @@ describe('craftingStore', () => {
   });
 
   it('COMPOSED: the displayed threshold agrees with the award loop at every budget', async () => {
-    // The spec requirement in ui-integration §Crafting App (Player), asserted through the
+    // The spec requirement in ui-crafting-app §Progressive Stage List, asserted through the
     // real composition rather than against the helper in isolation.
     const store = thresholdStore([5, 3, 4], 'equal', ['s2', 's3', 's1']);
     await store.load();

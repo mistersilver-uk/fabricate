@@ -1,5 +1,10 @@
 # UI Journal App
 
+## Purpose
+
+Define the player Journal, the unified Fabricate window's home for monitoring crafting, gathering and salvage runs.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Journal App (Player)
 
 The **Journal** is the unified player-facing home for monitoring runs.
@@ -8,10 +13,10 @@ It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`,
 Scope:
 
 - The Journal does NOT consume the `narrative` invalidation domain: stage purpose comes from permitted presentation captured when armed, never a live description lookup.
-  An edit that changes only prose therefore MUST NOT rebuild it — see _Shared-store refresh routing_ above and `data-models/spec.md` § Invalidation Domains.
+  An edit that changes only prose therefore MUST NOT rebuild it — see `ui-crafting-app/spec.md` _Shared-store refresh routing_ and `data-models/spec.md` § Invalidation Domains.
 - The Journal monitors active and historical runs, advances crafting runs, and collects eligible versioned gathering runs.
 - It never CREATES runs; run creation stays in the Crafting, Alchemy, and Gathering flows.
-- It is the unified player home for the per-activity run views described elsewhere in this spec — the Crafting tab _Run Summary_, the Alchemy tab _Active Runs and History_, and the Gathering App _Active Runs_ / _History_.
+- It is the unified player home for the per-activity run views described in `ui-crafting-app/spec.md` and `ui-gathering-app/spec.md` — the Crafting tab _Run Summary_, the Alchemy tab _Active Runs and History_, and the Gathering App _Active Runs_ / _History_.
   Those per-activity sections remain authoritative for their own tab, and the Journal cross-references rather than replaces them.
 
 ### Navigation and Active-Run Count Badge
@@ -224,7 +229,7 @@ The shared clock identifies the time domain; all detail countdowns and compact T
 
 ### Crafting / Alchemy Viewer Redaction
 
-Runs of recipes the viewer cannot see are redacted, mirroring the gathering blind-run redaction (_Rich Gathering Disclosure_):
+Runs of recipes the viewer cannot see are redacted, mirroring the gathering blind-run redaction (`ui-gathering-app/spec.md` _Rich Gathering Disclosure_):
 
 - A crafting or alchemy run whose recipe is undiscovered or knowledge-gated for the viewer, or whose recipe no longer resolves, is shown with a generic localized title (`FABRICATE.App.Journal.Redacted.Title`), a default image, and no recipe id, steps, results, or failure detail.
 - GM viewers and globally-visible recipes are never redacted.

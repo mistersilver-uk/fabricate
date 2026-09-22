@@ -797,7 +797,7 @@ type CurrencyConfig = {
    A GM authors a ladder incrementally, so the profile is transiently invalid the moment they add the first of two units or clear an `actorPath` to retype it; refusing those writes would make the editor unusable.
    The store normalizes on read AND on write and always saves, exactly as the per-system editor did before the move.
 5. `validate()` (`validateCurrencyProfile`) is offered so a surface can SHOW the GM what is still wrong; it never gates a write.
-   The World then Currency route is that surface and MUST render the result once a ladder exists (see `ui-world-scope/spec.md` _GM World Currency Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
+   The World then `Rules & Resources` route is that surface and MUST render the result once a ladder exists (see `ui-world-scope/spec.md` _GM World Rules & Resources Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
    Validity is also resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
    That refusal MUST carry its reason to the caller.
    A probe or gate that reduces a resolved refusal to a bare `false` reports a shortfall the player does not have, and is a defect.
@@ -2088,7 +2088,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The three vocabulary LISTS have a destination since issue 1392 — `fabricate.worldVocabulary`, modelled by `## World Vocabulary` — and nothing reads it until the consumer sweep; the two vocabulary ICON MAPS still have no destination at all.
 > `## Component`, `## EssenceDefinition` and `## Tool` therefore still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does — with the single addition that a reader's row also carries the resolver's `member` and `inherited` keys.
 >
-> **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry. `world-vocabulary` is accounted for separately rather than counted in that set, because it is not a scoped-entity corpus at all (see `### GM World Vocabulary Route`); it delegated to `ScopedPlaceholderPage` until issue 1392 gave it a real body, so no world route delegates now.
+> **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry. `world-vocabulary` is accounted for separately rather than counted in that set, because it is not a scoped-entity corpus at all (see `ui-world-scope/spec.md` `## GM World Vocabulary Route`); it delegated to `ScopedPlaceholderPage` until issue 1392 gave it a real body, so no world route delegates now.
 > `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
 > **NOT EVERY LEG HAS A CALLER, and the two that do not are named rather than left to be re-derived.** `updateMembershipSection` has none — a system's own section values are written on its in-system record through the rules editor's draft, and the membership record carries the inherit SWITCH alone.
 > `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-world-scope/spec.md` `## GM World Component Screens` requirement 5).
@@ -3556,7 +3556,7 @@ Requirements:
 
 ### Purpose
 
-Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-journal-app/spec.md` _Journal App_).
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-journal-app/spec.md` _Journal App (Player)_).
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.

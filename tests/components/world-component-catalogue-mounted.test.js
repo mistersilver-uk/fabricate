@@ -1398,11 +1398,11 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
       assert.match(note.textContent, /none of them can be deleted/);
       assert.match(note.textContent, /Remove them from those systems first/);
-      // THE CONTROL STAYS ENABLED, and that is `ui-integration/spec.md` requirement 16 rather
-      // than an oversight: "a disabled button satisfies any assertion that the delete did not
-      // happen while leaving the GM no explanation at all". The refusal is stated in the note
-      // and on the ARMED label, so the second press says the outcome before it is taken — the
-      // reading the entry's own danger card already ships.
+      // THE CONTROL STAYS ENABLED, and that is `ui-world-scope/spec.md` § Scoped entity editor
+      // patterns requirement 16 rather than an oversight: "a disabled button satisfies any
+      // assertion that the delete did not happen while leaving the GM no explanation at all".
+      // The refusal is stated in the note and on the ARMED label, so the second press says the
+      // outcome before it is taken — the reading the entry's own danger card already ships.
       const danger = () => dangerControl(target);
       assert.equal(danger().disabled, false, 'the control is live, as requirement 16 requires');
       assert.doesNotMatch(
@@ -1765,8 +1765,8 @@ describe('world Component Catalogue (issue 1371)', () => {
     // Reviewer round-2 finding 4 / Foundry round-2 finding 4. `applyBulk` had no `try`/`catch`,
     // so a throw out of one write skipped every remaining pair, never reached `clearSelection()`
     // and escaped as an unhandled rejection — leaving a page of rows still ticked, some written
-    // and some not, with no statement of which. `ui-integration/spec.md` requirement 6 states the
-    // opposite rule for the same composed verb.
+    // and some not, with no statement of which. `ui-world-scope/spec.md` § GM World Component
+    // Screens requirement 6 states the opposite rule for the same composed verb.
     it('finishes the run when ONE pair throws, and still clears the selection', async () => {
       const { calls, actions } = recordingComponentActions();
       const thrown = [];

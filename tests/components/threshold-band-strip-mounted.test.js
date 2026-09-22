@@ -366,7 +366,7 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
     // …and the component's OWN stylesheet declares none either. The mounted half above can
     // only see what lands inline, and happy-dom applies no stylesheet at all, so a gradient
     // moved into the scoped block would satisfy it and paint one in every browser. The
-    // exemption `ui-integration/spec.md` grants a full-track semantic scale is deliberately
+    // exemption `ui-visual-style/spec.md` grants a full-track semantic scale is deliberately
     // NOT claimed: it requires the gradient to run across the COMPLETE track with the fill
     // kept full-width, which is the opposite of per-band identity.
     const source = readFileSync(

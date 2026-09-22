@@ -366,7 +366,7 @@ describe('ComponentBulkEditPanel tag inset (issue 1371 r16-list)', () => {
   });
 
   it('states the TRUE half of the tag story under the inset, and never the unconsumed merge', async () => {
-    // `ui-integration/spec.md` `### GM World Component Screens` requirement 1.
+    // `ui-world-scope/spec.md` `## GM World Component Screens` requirement 1.
     const { root } = await mountPanel();
     const note = root.querySelector('[data-component-bulk-tags-note]');
     assert.equal(

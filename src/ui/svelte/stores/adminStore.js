@@ -1151,8 +1151,8 @@ function _essenceRecipeUsage(essenceId, recipes) {
 
 /**
  * The world identity's colour per essence id, for the selected system's rows to draw. A read
- * overlay on the projection, not a change to the union: `ui-integration`
- * `### GM World Essence Screens` requirement 21 (issue 1371).
+ * overlay on the projection, not a change to the union: `ui-world-scope`
+ * `## GM World Essence Screens` requirement 21 (issue 1371).
  */
 /** The essence ids the world catalogue holds; the bulk panel withholds its colour axis for them. */
 function _worldEssenceIds(worldScopeState) {
@@ -3312,7 +3312,7 @@ export function createAdminStore(services) {
     return _buildWorldScopeState({
       stores: _worldScopeStores(),
       systems: _allSystems(),
-      // Issue 1392: `### GM World Scoped Entity Routes` requirement 7 enumerates a projection's
+      // Issue 1392: `## GM World Scoped Entity Routes` requirement 7 enumerates a projection's
       // registration but not its inputs, and nothing in `{stores, systems, usage}` answers a world-wide
       // recipe question. `_allRecipes()` is already invoked every publish, so this adds no corpus read.
       recipes: worldRecipes,

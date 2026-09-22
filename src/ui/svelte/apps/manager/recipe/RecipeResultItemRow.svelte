@@ -10,8 +10,8 @@
   In `progressive` mode the quantity input is hidden, because the progressive award loop ignores
   `quantity` and awards each ordered entry once. A progressive row instead shows the component's
   DIFFICULTY and its COMPLICATIONS read-only, with a deep link out —
-  `openspec/specs/ui-integration/spec.md` → "Progressive UI" and its `### Requirements`
-  requirement 16 state both, including why neither is edited in place.
+  `openspec/specs/ui-entity-editors/spec.md` → "Progressive UI" and "Component Studio" requirement
+  16 state both, including why neither is edited in place.
 
   A progressive row is a `SortableList` row (issue 1512), so the list draws the grip, the ordinal,
   the rocker and the delete around this content; the complication band is

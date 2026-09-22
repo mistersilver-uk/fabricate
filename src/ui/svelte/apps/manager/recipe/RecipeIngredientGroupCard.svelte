@@ -8,7 +8,7 @@
   The add-affordances diverge by SHAPE — a bare row keeps ONE compact "or…" popover inline, a box
   carries four explicit dashed adders at its foot — and both append a real OR ALTERNATIVE for the
   row's own picker to fill in. Which kinds are offered, how the panel and the adders are worded
-  and why, are stated in `openspec/specs/ui-integration/spec.md` → "Adding a requirement, and
+  and why, are stated in `openspec/specs/ui-entity-editors/spec.md` → "Adding a requirement, and
   adding an alternative"; the `data-recipe-add` token family is PRESERVED on the choices.
 -->
 <script>
