@@ -8,7 +8,7 @@ A member that **asks** a question, a member that **places value**, and — since
 Every rule below that separates a question from an act binds harder on the second kind than on anything published before it, and hardest of all on the third: an award a GM did not want is value to find and reverse, while a take a GM did not want is a player's inventory gone.
 
 This specification governs a companion **consuming Fabricate's behaviour**.
-Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md`.
+Outbound **UI contribution**, by which a companion contributes navigation and content into Fabricate's own windows, lives in `ui-extension-points/spec.md`.
 **Inbound** integrations, by which Fabricate consumes another module's data or services, live in `integrations/spec.md`.
 
 ## Scope
@@ -21,7 +21,7 @@ This spec governs:
 - How the contract may change without breaking a companion that depends on it.
 
 Behaviour stays with its domain.
-The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, the learned-entry shape and the currency rules in `data-models/spec.md`, and the rendering of a granted row in `ui-integration/spec.md`.
+The knowledge grant's own gates are specified in `recipe-visibility/spec.md`, the learned-entry shape and the currency rules in `data-models/spec.md`, and the rendering of a granted row in `ui-system-studio/spec.md`.
 The award members split the same way.
 The currency credit's ladder rules, its spender write-truth rules and its consequences for a GM's `increment` macro are specified in `data-models/spec.md`; the reciprocal statement that the knowledge grant's idempotency has no counterpart on these two members is in `recipe-visibility/spec.md`; and the **gathering** award's own stacking rules, which are not these, stay in `gathering-and-harvesting/spec.md`.
 The pooled members split the same way: the pooled base-value read, the base-unit denomination of a pooled debit and the `balance` macro key are specified in `data-models/spec.md`, and what this spec governs is the contract those rules are published through.

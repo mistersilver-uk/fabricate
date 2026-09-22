@@ -104,7 +104,7 @@ popups match.
 ### 1.3 Base layer (theme-independent)
 
 The non-colour tokens live in the base `:root` of `styles/fabricate.css`.
-The spacing scale is canonically specified in `openspec/specs/ui-integration/spec.md`
+The spacing scale is canonically specified in `openspec/specs/ui-visual-style/spec.md`
 ("Spacing scale") — cite that spec for the numbers rather than re-deriving them here.
 
 ```css
@@ -226,7 +226,7 @@ sans; mono is only for dice formulas and run IDs.
 ## 4. Space, radius and elevation
 
 - **Spacing** (`--fab-space-*`, 4px base): the canonical scale is in
-  `openspec/specs/ui-integration/spec.md`; prefer flex/grid with `gap`.
+  `openspec/specs/ui-visual-style/spec.md`; prefer flex/grid with `gap`.
 - **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
   at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
   wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.

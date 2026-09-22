@@ -77,7 +77,7 @@ CraftingSystem = {
   // section — requirement 36.
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
-  membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-integration/spec.md.
+  membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-system-studio/spec.md.
 
   // NO `characterPrerequisites` KEY, and no `modifiers` key (issue 1308). Both libraries
   // moved to the `characterLibraries` WORLD setting, so `_normalizeSystem` emits neither
@@ -797,7 +797,7 @@ type CurrencyConfig = {
    A GM authors a ladder incrementally, so the profile is transiently invalid the moment they add the first of two units or clear an `actorPath` to retype it; refusing those writes would make the editor unusable.
    The store normalizes on read AND on write and always saves, exactly as the per-system editor did before the move.
 5. `validate()` (`validateCurrencyProfile`) is offered so a surface can SHOW the GM what is still wrong; it never gates a write.
-   The World then Currency route is that surface and MUST render the result once a ladder exists (see `ui-integration/spec.md` _GM World Currency Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
+   The World then Currency route is that surface and MUST render the result once a ladder exists (see `ui-world-scope/spec.md` _GM World Currency Route_ for the empty-ladder suppression), so a ladder that cannot be spent against is visible where it is authored rather than only at craft time.
    Validity is also resolved where it matters — at craft time, in `resolveCurrencyContext`, which surfaces a clear error and refuses to spend rather than spending against a broken ladder.
    That refusal MUST carry its reason to the caller.
    A probe or gate that reduces a resolved refusal to a bare `false` reports a shortfall the player does not have, and is a defect.
@@ -2070,7 +2070,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > The list joined because it is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
 > The editor joined for the same reason one route deeper: it stated the in-system value for a section the list beside it labelled `Inherits world defaults`, and `prerequisites` and `bonus` — which no adoption seed ever copied — disagreed with the world outright.
 > Each is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
-> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-integration/spec.md` -> Tools Tab).
+> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-system-studio/spec.md` -> Tools Tab).
 > Without that, a display repoint would convert every inheriting section into an override on the next save — an AUTHORITY move made by accident, which is exactly the conflation of clocks this banner warns about.
 > The rest of the UI is unchanged and stays outside.
 >
@@ -2091,7 +2091,7 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 > **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry. `world-vocabulary` is accounted for separately rather than counted in that set, because it is not a scoped-entity corpus at all (see `### GM World Vocabulary Route`); it delegated to `ScopedPlaceholderPage` until issue 1392 gave it a real body, so no world route delegates now.
 > `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
 > **NOT EVERY LEG HAS A CALLER, and the two that do not are named rather than left to be re-derived.** `updateMembershipSection` has none — a system's own section values are written on its in-system record through the rules editor's draft, and the membership record carries the inherit SWITCH alone.
-> `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-integration/spec.md` `### GM World Component Screens` requirement 5).
+> `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-world-scope/spec.md` `## GM World Component Screens` requirement 5).
 > A published leg with no caller is a REACHABLE WRITE PATH with no writer, which is a different state from an unreachable corpus and must not be counted as one.
 >
 > **THE PUBLISH READS THE WHOLE RECIPE LIBRARY EXACTLY ONCE, AND THAT IS A PINNED BUDGET RATHER THAN AN OBSERVATION** (issue 1371).
@@ -2463,7 +2463,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    **WHICH BINDS THE PROJECTION THE EDITOR IS SEEDED FROM, NOT ONLY THE EDITOR** (issue 1371 r22-store4).
    The GM component card carries TWO essence runs and they answer different questions: the whole resolved map, which is what an editor opened on that card is seeded from, and the DRAWN run — the same map through the shared chip model, in the order of the roster the site states (the system's own definitions on a system-scope surface), with nothing for an id the system's roster cannot name.
    Narrowing the seed makes the carried set EMPTY by construction, because the carried ids are exactly those the rendered rows do not cover; the editor then has no row, no carry and no way back into the write for them, and the next save drops them durably.
-   The row, the inspector and the browser's essence filter read the drawn run — `ui-integration`'s one-function rule for chips and filter — and nothing that SEEDS an editor may.
+   The row, the inspector and the browser's essence filter read the drawn run — `ui-world-scope`'s one-function rule for chips and filter — and nothing that SEEDS an editor may.
    What an in-system row may finally HOLD is still `## CraftingSystem`'s own roster rule, enforced at the in-system normalizer.
    The projection publishes, per entry, the world map as `defaults.essences` and `inheritCounts.essences`, and per system row `inherited.essences` and `resolvedEssences` — the map that system resolves, a read fact named so that no world editor writes it back.
    **EVERY GM READ OF A COMPONENT'S ESSENCES DRAWS THE RESOLVED MAP, NOT THE PERSISTED ROW** (issue 1371 r19-store2, extended at r20-store3).
@@ -2481,7 +2481,7 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    The record's muted list is `mutedTags`; both it and `tags` normalize to trimmed, de-duplicated, order-preserving labels, and an authored EMPTY list normalizes to ABSENT on the `complications` doctrine (`## Component` requirement 20), because it carries no meaning distinct from absence.
    **Per-tag muting is written through `setMutedTags`, which the COMPONENT family alone publishes.** Its absence on the essence and tool families is `taggable: false` on their write descriptors — a per-type capability flag — and is NOT requirement 4's structural `enabled` reasoning; conflating the two would suggest a later lane could add muting to a tool by relaxing a structural rule, when what it would actually need is a tag model those types do not have.
    **NO SCREEN CALLS IT.** The leg refuses silently for a non-member — it returns `false` with no membership record — and after issue 1371's prototype-parity rebuild nothing in `src/` invokes it at all, so a stored `mutedTags` list can be READ BACK and DISPLAYED but reaches the corpus only through the `1.30.0` migration, an import, or a hand edit.
-   The screens' side of that is `ui-integration/spec.md` `### GM World Component Screens` requirement 5.
+   The screens' side of that is `ui-world-scope/spec.md` `## GM World Component Screens` requirement 5.
    **A world tag list is stated WITH ITS MEMBER COUNT before the write lands**, which is what binds the world catalogue EDITOR rather than the migration: the merge is granted to every member system at once, so the reach is the fact a GM is deciding on.
    **THE ADDITIVE MERGE STAYS RESOLVER-ONLY.**
    `## Scoped Entity Definitions` requirement 15 clause 1a switches SECTIONS, and `tags` is not one — it carries no inherited-section writer and the in-system normalizer emits it unconditionally — so the union's trailing in-system re-spread discards the resolver's answer.
@@ -2667,7 +2667,7 @@ The decline is what guarantees the transition is safe: the migration writes NO w
    The record adoption writes is IDENTITY plus the SEEDED `repairRequirements` of requirement 2, and nothing else.
    `breakage` and `onBreak` were copied while requirement 15's retired clause 1 answered every key the in-system record carried: a normalizer emits both UNCONDITIONALLY, so an identity-only record won that contest with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
    Clause 1a answers an INHERITING section from the world default instead, so the union makes that row's claim true and the copy no longer does; retaining it would leave an override-shaped value on a record whose every switch says `Inheriting`, invisible while they hold and wrong the first time one is flipped.
-   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-integration/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
+   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-system-studio/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
    `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
    `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
 
@@ -2681,7 +2681,7 @@ per system and left to drift.
 
 TOP-LEVEL, and deliberately not a sub-section of `## Scoped Entity Definitions`.
 Requirement 12 there states the World Vocabulary is a separate concern and NOT a fourth layer, and
-`ui-integration/spec.md` records that folding the two together loses the boundary this file draws:
+`ui-world-scope/spec.md` records that folding the two together loses the boundary this file draws:
 a scoped entity is a RECORD with an identity, world defaults and per-system membership, and a
 vocabulary is a set of VALUES those records take.
 
@@ -3498,7 +3498,7 @@ Requirements:
    Neither field is ever written by either book-learn path.
    The field is named `grantedBy` rather than joining the `source*` family because every `source*` field on this entry already means THE BOOK.
    Adding the two fields does not widen what counts as an entry: the entry boundary is still a numeric `learnedAt`, so a node carrying only `granted` yields no entry at all.
-   Both fields are UNTRUSTED at display — the flag is public and any module may write it — so a surface tests `granted === true` and `typeof grantedBy === 'string'` strictly rather than for truth (see `ui-integration` _Knowledge Surface_).
+   Both fields are UNTRUSTED at display — the flag is public and any module may write it — so a surface tests `granted === true` and `typeof grantedBy === 'string'` strictly rather than for truth (see `ui-system-studio` _Knowledge Surface_).
 5. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
    A reader using the raw path finds nothing in a real world and silently reports zero.
 
@@ -3556,7 +3556,7 @@ Requirements:
 
 ### Purpose
 
-Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-integration/spec.md` _Journal App_).
+Define the unified, UI-safe projection the player-facing Journal screen reads (see `ui-journal-app/spec.md` _Journal App_).
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
@@ -3926,7 +3926,7 @@ Bring crafting/gathering onto the Foundry VTT canvas as **Interactables** — dr
 A Fabricate Canvas Interactable is **region-first**: it is a **Scene Region** carrying a custom **`fabricate.interactable` Region Behaviour** (a `RegionBehaviorType`) that OWNS the authoritative state.
 A **linked visual** (Tile by default; optionally a Drawing or an existing GM-placed Token) is **presentation-only**. **No synthetic actor or proxy token is ever created.** A GM drags a Tool / Gathering-Task entry from the GM-only scene-control Interactable browser (or drags a tool-linked Item) onto the canvas; a Region + behaviour + linked Tile is spawned (or a **region-only** interactable with no visible marker).
 Spawning is **GM-only**.
-Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (see `gathering-and-harvesting` and `ui-integration` for the activation pipeline).
+Activation is **token presence**: a controlled token entering the region offers the controlling player a non-blocking interact prompt (see `gathering-and-harvesting` and `ui-world-scope` for the activation pipeline).
 
 ### Interactable Region Behaviour (`fabricate.interactable`)
 
@@ -4384,7 +4384,7 @@ It is recorded here so that this gate is not read as making it safe.
 The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
 
 **Distinguished from _membership basis_.**
-`ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.
+The UI surface specs use _basis_ only as a qualified noun — **membership basis** (`ui-system-studio/spec.md` _Books & Scrolls Surface_), **routing basis** (`ui-entity-editors/spec.md` _Step Editor_), **disabled-action basis** (`ui-crafting-app/spec.md` _Player Salvage Surface_) — and in each of those it names the RULE by which something is resolved.
 _Valid Id Basis_ names the DATA a decision rests on, which is a different sense of the same noun, so the qualifier is mandatory here too and the bare noun is never used for this concept.
 
 ## Runtime Read Indexes and Revision Tokens

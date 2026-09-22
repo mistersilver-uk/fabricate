@@ -9,6 +9,9 @@ non-trivial work.
 These
   are the **only** versioned spec source of truth.
 
+A `spec.md` may carry a surface-map table routing readers to sibling specs.
+The table is navigational, never normative; every row must name an existing sibling `spec.md` and a heading that file contains.
+
 Per-change planning **deltas are no longer versioned in git.** They live in the
 GitHub issue for the work (see below), not under `openspec/changes/`.
 

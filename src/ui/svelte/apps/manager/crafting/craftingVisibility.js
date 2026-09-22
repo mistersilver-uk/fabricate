@@ -2,7 +2,8 @@
  * The crafting visibility matrix: every conditional surface derives what it renders from
  * `craftingEffect(mode)`, so the flat `visibilityMode` enum has one reading.
  * `openspec/specs/recipe-visibility/spec.md` is canonical for the enum and
- * `openspec/specs/ui-integration/spec.md` → "GM Crafting Admin" for what each flag reveals.
+ * `openspec/specs/ui-system-studio/spec.md` → "Recipe Visibility Controls" for what each flag
+ * reveals.
  */
 
 /** The four valid modes in canonical order; absent or invalid input resolves to `'knowledge'`. */

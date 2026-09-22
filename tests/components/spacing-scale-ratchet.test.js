@@ -1,6 +1,6 @@
 /**
  * The spacing scale is a rule the product can be checked against (issue 1448).
- * `openspec/specs/ui-integration/spec.md` has made the 4px spacing scale normative under its
+ * `openspec/specs/ui-visual-style/spec.md` has made the 4px spacing scale normative under its
  * "Spacing scale" section since the design system landed — padding, margin and gap "must derive
  * from a shared 4px-based spacing scale ... rather than from raw pixel literals" — and NOTHING
  * checked it. Worse, half the corpus could not have been checked by the tool that would normally
@@ -84,12 +84,12 @@ const isStylesheet = (record) => record.file.startsWith('styles/');
 
 /** The `### Spacing scale` section that owns the rule, so a fragment cannot match elsewhere. */
 function spacingRequirement() {
-  const spec = readFileSync(join(repoRoot, 'openspec/specs/ui-integration/spec.md'), 'utf8');
+  const spec = readFileSync(join(repoRoot, 'openspec/specs/ui-visual-style/spec.md'), 'utf8');
   const heading = '### Spacing scale';
   const start = spec.indexOf(heading);
   assert.ok(
     start !== -1,
-    'the ui-integration spec no longer carries a "Spacing scale" section. This gate exists only ' +
+    'the ui-visual-style spec no longer carries a "Spacing scale" section. This gate exists only ' +
       'to enforce that rule — if it has been renamed, retarget this test; if it has been dropped, ' +
       'delete this gate deliberately rather than leaving it policing a rule the specs no longer ' +
       'make.'
@@ -293,7 +293,7 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
     stray.map((record) => `${record.file}:${record.line} ${record.property} ${record.value}px`),
     [],
     'a value outside both documented bands is being treated as exempt, so the predicate has been ' +
-      'widened past what `openspec/specs/ui-integration/spec.md` publishes'
+      'widened past what `openspec/specs/ui-visual-style/spec.md` publishes'
   );
 });
 
@@ -327,7 +327,7 @@ test('no new raw spacing literal has been introduced', () => {
     floor: STYLESHEET_SPACING_DECLARATION_FLOOR + SVELTE_SPACING_DECLARATION_FLOOR,
     guidance:
       'Padding, margin and gap MUST derive from the published spacing scale — see the "Spacing ' +
-      'scale" section of `openspec/specs/ui-integration/spec.md`. Use the numeric tokens ' +
+      'scale" section of `openspec/specs/ui-visual-style/spec.md`. Use the numeric tokens ' +
       `(\`${SPACING_SCALE_PREFIX}-1\` through \`${SPACING_SCALE_PREFIX}-6\`, plus ` +
       `\`${SPACING_SCALE_PREFIX}-2xs\` and \`${SPACING_SCALE_PREFIX}-chip\`); this baseline is ` +
       'the debt already owed, not a permission to add to it. The nearest step is almost always ' +

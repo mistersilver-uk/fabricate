@@ -238,7 +238,7 @@ This is a defensive guard rather than a fix: legacy salvage tokens are normalize
 ## Player-Facing Mode Labels
 
 The `resolutionMode` token is system-internal and must never surface raw in player UI.
-The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps crafting modes through `RunJournalBuilder.MODE_LABEL_KEYS` and gathering yield modes through their dedicated keys, all resolved against `FABRICATE.App.Journal.Mode.*`.
+The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) maps crafting modes through `RunJournalBuilder.MODE_LABEL_KEYS` and gathering yield modes through their dedicated keys, all resolved against `FABRICATE.App.Journal.Mode.*`.
 
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
@@ -296,7 +296,7 @@ Inactive mode data may remain stored but never contributes awards jointly.
 Direct displays its one result set, d100 displays one shared roll cut against drop chances, and Check displays the complete noninteractive outcome ladder including failure.
 Progressive retains ordered component costs and accumulated-budget semantics rather than being rendered as drop chances or outcome tiers.
 Historical d100 uses recorded high-roll thresholds and cleared/missed evidence, and historical routed gathering uses its recorded check/outcome log rather than the authored preview ladder.
-Whether that d100 history shows one shared cut or each row's own recorded roll follows the roll-model rule in `ui-integration/spec.md`.
+Whether that d100 history shows one shared cut or each row's own recorded roll follows the roll-model rule in `ui-journal-app/spec.md`.
 Actual awards and terminal status remain independent evidence: all-miss d100 item rows do not themselves establish a failed run, and a permitted routed failure award does not make a failed run successful.
 
 ## Versioned Check Entitlement
@@ -416,7 +416,7 @@ It supersedes the retired `natStepping` boolean, which hard-coded the die (d20),
 
 **One classifier.**
 The whole post-roll resolution of a routed check — forced reroute, then tier stepping, then the recipe minimum-success-tier gate, in that order — is a SINGLE exported function (`classifyCheckTotal`), and `runFormulaRouted` calls it rather than restating it.
-That is what makes the Checks Studio's per-outcome odds histogram incapable of disagreeing with a real roll: the histogram buckets each enumerated die face through the same function the engine resolves through, so "they cannot drift" is a property of the code rather than a promise (see `ui-integration` §Per-outcome odds histogram).
+That is what makes the Checks Studio's per-outcome odds histogram incapable of disagreeing with a real roll: the histogram buckets each enumerated die face through the same function the engine resolves through, so "they cannot drift" is a property of the code rather than a promise (see `ui-system-studio` §Per-outcome odds histogram).
 Any other consumer of routed classification consumes it the same way.
 
 **One rolled formula.**
@@ -649,7 +649,7 @@ Two distinct concepts govern it and MUST NOT be collapsed: the GM-authored **Res
 - The retired system-level `craftingCheck.progressive.allowPlayerReorder` is gone from all three progressive check blocks (crafting, salvage, gathering).
 - Gathering has no reorder feature: it exposes no ordered result-stage surface, so the retired flag was removed without replacement.
 - When the permission is `false` the authored order is authoritative and any stored player order is ignored.
-- `Component.salvage.allowPlayerResultReorder` has its **first UI consumer**: the player Inventory tab's salvage panel (`ui-integration` §Player Salvage Surface).
+- `Component.salvage.allowPlayerResultReorder` has its **first UI consumer**: the player Inventory tab's salvage panel (`ui-crafting-app` §Player Salvage Surface).
 It was previously modelled, normalized, GM-authorable, captured onto every salvage run, and read at award time — with no surface that let a player exercise it, so the permission a GM set had no observable effect.
 
 #### Player Result Order (per-user runtime state)

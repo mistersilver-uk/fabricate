@@ -370,7 +370,7 @@ A progressive craft fires the component complications its committed award earned
 
 This subsection describes legacy crafting advance; version-1 crafting and gathering use the authoritative execution contract above and in `gathering-and-harvesting/spec.md`.
 A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
-The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-integration/spec.md` *Journal App*).
+The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-journal-app/spec.md` *Journal App*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
 - On step success the engine advances `currentStepIndex` to the next step, or marks the run `succeeded` and cleans up run state when the last step succeeds.
@@ -538,7 +538,7 @@ The payload names the crafting system, the component, the authored complication,
 - **A message is addressed to ONE crafting system and ONE actor, so the unit of relay is the addressed `(craftingSystemId, actorUuid)` pair, not the run.**
   Both are authorization inputs — the GM re-reads the authored complication from that system's record and re-authorizes that actor against the attested sender — so neither can be carried per entry without moving the authorization decision onto the wire.
 - ONE resolution is therefore always exactly ONE message, however many complications it carries.
-  A **bulk salvage** relays one message per distinct addressed pair, which is exactly one for the ordinary run and is bounded above by the **25-target selection cap** (`ui-integration/spec.md` § Bulk Salvage Execution) in the worst case, where every selected row names a different actor or system.
+  A **bulk salvage** relays one message per distinct addressed pair, which is exactly one for the ordinary run and is bounded above by the **25-target selection cap** (`ui-crafting-app/spec.md` § Bulk Salvage Execution) in the worst case, where every selected row names a different actor or system.
   What is forbidden is the PER-ROW emit: a run of N rows against one pair must relay once, not N times, or a long run silently loses its tail on a path the player never sees.
 - **The per-sender bound is sized against that worst case, not against the ordinary one.**
   The legitimate ceiling in one window is the selection cap times the number of fully fanned-out runs a window can hold, plus headroom for deliberate one-at-a-time resolutions and for a collapsed crafting chain, which relays once per step.
@@ -663,7 +663,7 @@ Apply tool usage/breakage as applicable.
 6. **Create**: Create result items on the actor.
 7. **Complications**: fire the component complications a committed PROGRESSIVE award earned (see § Component Complications (progressive salvage) below).
 8. **Chat**: when `features.chatOutput` is enabled, post a salvage result card on resolved success or rolled failure only (never on cancelled, misconfigured, or time-gated outcomes); card creation failures are non-fatal.
-See the `ui-integration` chat card contract.
+See the `ui-crafting-app` chat card contract.
 
 If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
 If it is present, the run must resume automatically when world time reaches the derived completion timestamp, following the same startup and `updateWorldTime` re-check pattern used for crafting time gates.
@@ -698,7 +698,7 @@ The failure branch builds the salvage recipe view the success branch builds.
   The Inventory tab's salvage panel (`InventorySalvagePanel.svelte`) is the first UI caller of
   `CraftingEngine.salvage`: players reorder Progressive stages via the store's reorder/reset
   actions persisted under the `salvage:<componentId>` scope, honouring
-  `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-integration` §Player Salvage Surface).
+  `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-crafting-app` §Player Salvage Surface).
   The GM toggle is authored policy, exported and honoured.
 
 ### Component Complications (progressive salvage)

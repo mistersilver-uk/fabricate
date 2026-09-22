@@ -1,6 +1,6 @@
 /**
  * The measured, frozen debt in RAW SPACING LITERALS (issue 1448).
- * `openspec/specs/ui-integration/spec.md` has made the 4px spacing scale normative under its
+ * `openspec/specs/ui-visual-style/spec.md` has made the 4px spacing scale normative under its
  * "Spacing scale" section since the design system landed: padding, margin and gap "must derive
  * from a shared 4px-based spacing scale ... rather than from raw pixel literals". Nothing checked
  * it, and half the corpus could not have been checked — `npm run lint:css` globs `styles/**`
@@ -17,7 +17,7 @@
  */
 import { readFileSync } from 'node:fs';
 
-/** The properties the spacing scale governs, exactly as `ui-integration/spec.md` names them: */
+/** The properties the spacing scale governs, exactly as `ui-visual-style/spec.md` names them: */
 export const SCANNED_SPACING_PROPERTIES = Object.freeze([
   'padding',
   'padding-top',

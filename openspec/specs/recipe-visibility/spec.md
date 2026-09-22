@@ -3,7 +3,7 @@
 ## Purpose
 
 Define recipe visibility, knowledge gating, recipe-item matching, and learning behaviour.
-UI rendering requirements live in `ui-integration/spec.md`.
+UI rendering requirements live in the UI surface specs indexed by `ui-integration/spec.md`.
 
 ## Scope
 
@@ -95,7 +95,7 @@ This gate is paired with the mandatory primary-GM auto-stamp (see the data-model
 > Authoring note (issue 511, PR-B): recipe↔book membership is authored **book-side** on the Books & Scrolls item Contents tab — each recipe item definition owns a `recipeIds[]` list of the recipes it contains.
 The recipe editor no longer writes a book link.
 When a definition's `originItemUuid` no longer resolves, the editor surfaces a missing/stale state and retains the reference.
-The matching rules above are unchanged; UI rendering specifics defer to `ui-integration`.
+The matching rules above are unchanged; UI rendering specifics defer to `ui-system-studio` § Books & Scrolls Surface.
 
 ## Visibility Mode (Canonical Strategy)
 
@@ -363,7 +363,7 @@ Tests MUST cover the redacted player summary directly — that it withholds avai
 
 ### Per-Recipe Detail Hydration
 
-The player crafting read is two phases: a corpus-wide summary phase and a per-recipe detail phase (see `ui-integration/spec.md` § Browse And Detail Phases).
+The player crafting read is two phases: a corpus-wide summary phase and a per-recipe detail phase (see `ui-crafting-app/spec.md` § Browse And Detail Phases).
 Splitting the read splits the gate, so the following are normative for the detail phase.
 
 - **A recipe id is not a permission.**

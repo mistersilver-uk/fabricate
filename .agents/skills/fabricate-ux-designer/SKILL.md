@@ -112,7 +112,7 @@ Two standing exceptions keep their rules in the global sheet: anything that must
 A portaled `position: fixed` element fed host-relative coordinates mis-positions (shifts by the window's viewport offset), and outside-click dismissal that relies on the portal escape hatch is fragile.
 Reuse the `IconPicker.svelte` pattern; if a portal is genuinely required to escape an `overflow: hidden` ancestor, the portal host must be a positioned containing block and the popover `position: absolute` (not `fixed`).
 Verify drop position and outside-click-dismiss in real Foundry, since Svelte scoped styles and the layout cascade differ once a node is portaled.
-- Keep product-specific UI contracts in `openspec/specs/ui-integration/spec.md` (or, while still being planned, the issue's `openspec-delta` block); UX guidance should cite those contracts rather than rely on memory.
+- Keep product-specific UI contracts in the owning `openspec/specs/ui-*/spec.md` shard named by `openspec/specs/ui-integration/spec.md`'s surface map (or, while still being planned, the issue's `openspec-delta` block); UX guidance should cite those contracts rather than rely on memory.
 When reviewing a plan, audit the UI portion of the issue delta against these contracts.
 - Be specific with file paths, selectors, viewport sizes, and screenshot names.
 - If browser tooling is unavailable, say so and rely on the Vite dev server plus code inspection first, then existing screenshots.

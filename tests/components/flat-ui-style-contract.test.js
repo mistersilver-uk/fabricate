@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
-const specPath = resolve(repoRoot, 'openspec/specs/ui-integration/spec.md');
+const specPath = resolve(repoRoot, 'openspec/specs/ui-visual-style/spec.md');
 const productRoots = [
   resolve(repoRoot, 'src/ui'),
   resolve(repoRoot, 'styles')
