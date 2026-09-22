@@ -17,7 +17,7 @@
   | `onChange(patch)` | function | no-op | The authored patch, per binding above. |
 
   Invariants:
-  - NO GRADIENT, AND NO VISUAL-STYLE EXEMPTION CLAIMED: `ui-integration/spec.md` exempts a
+  - NO GRADIENT, AND NO VISUAL-STYLE EXEMPTION CLAIMED: `ui-visual-style/spec.md` exempts a
     FULL-TRACK semantic scale, and this strip claims none, because per-band identity is the point. A
     runtime colour applied inline is authored DATA rather than a source literal, so it is outside
     `tests/components/theme-colour-contract.test.js`'s remit, and a band with no authored colour

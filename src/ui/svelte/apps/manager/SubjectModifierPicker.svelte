@@ -212,7 +212,7 @@
         onChange={toggleAuthored}
       />
       <!-- PRESENTATIONAL: `SelectionCheckbox` carries the whole accessible name, so this copy is
-           `aria-hidden` — `ui-integration/spec.md`'s "one of the two, never both". Not a
+           `aria-hidden` — `ui-entity-editors/spec.md`'s "one of the two, never both". Not a
            `<label for>` either, since the primitive renders its own. -->
       <span class="manager-muted" aria-hidden="true">
         {text(copy.authorKey, copy.author)}

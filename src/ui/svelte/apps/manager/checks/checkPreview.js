@@ -5,7 +5,7 @@
  * implementation, in `src/systems/checkRoll.js`.
  *
  * What it must NOT do — mutate, post, prompt or execute a DC macro — is stated in
- * `openspec/specs/ui-integration/spec.md` → "Outcome-preview simulator". Two mechanisms carry
+ * `openspec/specs/ui-system-studio/spec.md` → "Outcome-preview simulator". Two mechanisms carry
  * it: `rollOptions: null`, which the runners SPREAD so the chat post's `options?.interactive`
  * gate and `allowInteractive: false` both hold; and never writing to the LIVE `system` object
  * `Actor#getRollData()` returns, {@link cloneRollData} existing for a caller that must augment. */

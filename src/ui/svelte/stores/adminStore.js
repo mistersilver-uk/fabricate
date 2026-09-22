@@ -1151,8 +1151,8 @@ function _essenceRecipeUsage(essenceId, recipes) {
 
 /**
  * The world identity's colour per essence id, for the selected system's rows to draw. A read
- * overlay on the projection, not a change to the union: `ui-integration`
- * `### GM World Essence Screens` requirement 21 (issue 1371).
+ * overlay on the projection, not a change to the union: `ui-world-scope`
+ * `## GM World Essence Screens` requirement 21 (issue 1371).
  */
 /** The essence ids the world catalogue holds; the bulk panel withholds its colour axis for them. */
 function _worldEssenceIds(worldScopeState) {

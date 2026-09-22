@@ -126,7 +126,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-smithing', noParties: '1' },
     steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
     expectView: 'world',
-    // The primitive's own hook: `ui-integration` requires every manager nothing-here message to go through `EmptyState`.
+    // The primitive's own hook: `ui-visual-style` requires every manager nothing-here message to go through `EmptyState`.
     expectSelector: '[data-travel-panel="parties"] [data-travel-parties-none]',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],

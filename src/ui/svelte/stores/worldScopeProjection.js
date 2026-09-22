@@ -231,9 +231,9 @@ export function emptyWorldVocabularyState() {
  * `total` IS THE PUBLISHED FIELD NAME, and it is a contract rather than an implementation
  * detail: `CraftingSystemManagerRoot.svelte` reads `worldScope.vocabulary.total` for the
  * `Tags & Categories` rail leaf's count badge, and requirement 7 of
- * `### GM World Scoped Entity Routes` bars PR 7 from that file - so a producer that published
+ * `## GM World Scoped Entity Routes` bars PR 7 from that file - so a producer that published
  * `count` or `entries.length` instead would leave the badge reading 0 forever with every test
- * still green. `ui-integration/spec.md`'s `### GM World Vocabulary Route` names it, and
+ * still green. `ui-world-scope/spec.md`'s `## GM World Vocabulary Route` names it, and
  * `tests/world-scope-projection.test.js` pins it.
  *
  * The three vocabularies are summed rather than deduplicated across kinds: a category and a tag

@@ -1,6 +1,6 @@
 // Hand-maintained loader over the GENERATED `foundryIconCatalogue.json`; do not hand-edit that.
 // Regenerate it with `node scripts/generate-icon-catalogue.mjs <foundry>/…/fonts/fontawesome`.
-// Why the set is Foundry × Free: `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`.
+// Why the set is Foundry × Free: `openspec/specs/ui-visual-style/spec.md`, `#### Icon vocabulary`.
 
 import catalogue from './foundryIconCatalogue.json' with { type: 'json' };
 

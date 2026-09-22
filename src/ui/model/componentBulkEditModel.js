@@ -169,7 +169,7 @@ export function toBulkComponentEdit(draft) {
 /**
  * How many of the selected components would have an AUTHORED essence value CHANGED or REMOVED if
  * the staged map were applied — the count the conditional overwrite warning names, per
- * `openspec/specs/ui-integration/spec.md` Component Studio requirement 10.
+ * `openspec/specs/ui-entity-editors/spec.md` Component Studio requirement 10.
  */
 export function countComponentsChangingEssences(selectedCards, stagedEssences) {
   const staged = essenceMap(stagedEssences);

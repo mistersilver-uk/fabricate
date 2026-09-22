@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The Checks Studio's right rail. What it carries on an activity route, and that the Validation
-  route's rail is a shorter stack, are stated in `openspec/specs/ui-integration/spec.md` → "GM
+  route's rail is a shorter stack, are stated in `openspec/specs/ui-system-studio/spec.md` → "GM
   Checks Studio".
 
   THE ACTIVATION CARD HAS NO HEADING, where every other section is named by a flat kicker: the
@@ -84,7 +84,7 @@
     activeTab === 'gathering' ? !gatheringD100 : activation?.optional === true
   );
   // THE LOCKED TOGGLE ALWAYS READS ON, with no exception, every mode that hides the switch
-  // running its check (`openspec/specs/ui-integration/spec.md` → "GM Checks Studio"). Alchemy
+  // running its check (`openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio"). Alchemy
   // `checkMode: 'none'` is not one: it reports `optional: true` with `enabled: false` and
   // renders the LIVE switch off, a GM looking at an off check needing the control to turn it
   // on. Reading this from the MODE rather than `activation.enabled` is deliberate, a mandatory

@@ -9,7 +9,7 @@
   - It has TWO SHAPES and the fork is "is there a shared definition": `rulesMode` is
     `scopedKnown && !isNew`, giving the two-tab rules screen; otherwise the three-tab editor with
     its Identity tab, because a create draft's in-system record is the only record there is.
-  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-integration/spec.md`, `### GM World Essence Screens`
+  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-world-scope/spec.md`, `## GM World Essence Screens`
     requirement 10): a field edited here would rename the essence in every other system holding it,
     so the callout's `Edit shared definition` is this screen's only route to those fields.
   - EVERY TAB PROP MUST ALSO BE FORWARDED HERE, or the tab silently takes its default, which for an

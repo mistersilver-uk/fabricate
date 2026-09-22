@@ -27,7 +27,7 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <!-- NEUTRAL, per `openspec/specs/ui-integration/spec.md` → "Standing statements": it is true
+  <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements": it is true
        before the GM selects anything, and nothing is at risk until a row is armed. -->
   <Callout
     tone="neutral"

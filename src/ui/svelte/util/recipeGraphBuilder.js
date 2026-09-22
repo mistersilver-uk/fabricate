@@ -23,9 +23,9 @@ export const NODE_SPACING = 120;
 export const NODE_WIDTH = 180;
 export const NODE_HEIGHT = 80;
 
-// Recorded canonically in `openspec/specs/ui-integration/spec.md`, because which neighbourhood a GM
-// is shown is a product decision rather than an implementation detail. The measured basis is the
-// `recipe-graph` scale profile.
+// Recorded canonically in `openspec/specs/ui-system-studio/spec.md` § Recipe Dependency Graph,
+// because which neighbourhood a GM is shown is a product decision rather than an implementation
+// detail. The measured basis is the `recipe-graph` scale profile.
 export const DEFAULT_GRAPH_MAX_NODES = 500;
 export const DEFAULT_GRAPH_MAX_EDGES = 2000;
 

@@ -5,10 +5,10 @@
   that same set — and `fabricate-premium`'s downtime rewards picker is a fourth instance of the
   same idea, which is the point: a fourth row anatomy would be a fourth thing to keep in step.
 
-  Its anatomy (kind FIRST, value second), the name field's two faces, the commit rule, the
-  degraded empty-catalogue face, the per-kind tint, the absence of a `REQUIRED` badge and the
-  one-line tag arm are all stated in `openspec/specs/ui-integration/spec.md` → "Ingredients tab" →
-  "The requirement row". This file implements that section and adds nothing to it.
+  Its anatomy (kind FIRST, value second), the name field's two faces, the commit rule, the degraded
+  empty-catalogue face, the per-kind tint, the absence of a `REQUIRED` badge and the one-line tag
+  arm are all stated in `openspec/specs/ui-entity-editors/spec.md` → "Ingredients tab" → "The
+  requirement row". This file implements that section and adds nothing to it.
 
   WHERE PREMIUM AND THE DESIGN DISAGREE, WE FOLLOW PREMIUM. Six values below follow the shipped
   `RewardRow` rather than the mockup, each deliberately, and they are recorded because an audit
@@ -176,7 +176,7 @@
   );
 
   // WHICH KINDS THE SELECT OFFERS: what the ADDERS offer, plus this row's OWN kind always, per
-  // `openspec/specs/ui-integration/spec.md` → "The requirement row".
+  // `openspec/specs/ui-entity-editors/spec.md` → "The requirement row".
   const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
   // The UNFILTERED roster, matching the adders: a system whose essences are all disabled keeps
   // the essence match type, and the withholding happens in the SUGGESTION list below.

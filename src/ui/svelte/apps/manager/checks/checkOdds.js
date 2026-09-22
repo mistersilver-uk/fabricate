@@ -5,7 +5,7 @@
  * resolves a real roll with.
  *
  * The POSITIVE WHITELIST over `Roll.parse` that decides enumerability and the three properties
- * handled below rather than assumed are stated in `openspec/specs/ui-integration/spec.md` →
+ * handled below rather than assumed are stated in `openspec/specs/ui-system-studio/spec.md` →
  * "Per-outcome odds histogram", which this file's numbered references are to: (1) `Roll.parse`
  * THROWS on a mid-edit formula; (2) its `missing: "0"` hides an unresolved `@` key, so the
  * refusal reads `resolved === false`; (3) determinism must RECURSE, and

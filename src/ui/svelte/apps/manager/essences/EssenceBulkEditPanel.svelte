@@ -3,7 +3,7 @@
   REPLACING `EssenceBrowserInspector` while the selection is non-empty. Its CHROME is the shared
   `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` primitives; what is here is about
   ESSENCES — the Icon, Colour and Status axes, the per-essence note and the delete impact. See
-  `openspec/specs/ui-integration/spec.md` → "Bulk edit panels" for the shared contract.
+  `openspec/specs/ui-visual-style/spec.md` → "Bulk edit panels" for the shared contract.
 
   THREE AXES, AND NO MORE: names, descriptions, linked sources and property macros stay PER-ESSENCE,
   each either unique to one essence or carrying behaviour a whole-selection overwrite would destroy,
@@ -357,7 +357,7 @@
     onChange={(value) => onDraftChange(setBulkEssenceStatus(draft, value))}
   />
 
-  <!-- NEUTRAL, per `openspec/specs/ui-integration/spec.md` → "Standing statements": which fields
+  <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements": which fields
        stay per-essence is true of every selection. -->
   <Callout
     tone="neutral"

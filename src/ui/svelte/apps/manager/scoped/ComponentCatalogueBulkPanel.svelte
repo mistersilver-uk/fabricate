@@ -297,8 +297,8 @@
   );
 
   /**
-   * THE ARMED LABEL BRANCHES, AND THE CONTROL NEVER GOES `disabled` — `ui-integration/spec.md`
-   * `### Scoped entity editor patterns` requirement 16 states both halves and why: a disabled
+   * THE ARMED LABEL BRANCHES, AND THE CONTROL NEVER GOES `disabled` — `ui-world-scope/spec.md`
+   * `## Scoped entity editor patterns` requirement 16 states both halves and why: a disabled
    * button satisfies any assertion that the delete did not happen while explaining nothing, and
    * the armed label is what states the outcome before the second press takes it.
    */

@@ -1,6 +1,6 @@
 <!--
   THE button for a right-hand inspector's action stack (issue 1036).
-  `openspec/specs/ui-integration/spec.md`'s "Right-inspector actions" rule makes importing it the
+  `openspec/specs/ui-visual-style/spec.md`'s "Right-inspector actions" rule makes importing it the
   contract; only the ESSENCE inspector is converted so far.
 
   `tone`: `primary` is the ONE loud verb per rail, `danger` destroys a record, `warning` BREAKS A

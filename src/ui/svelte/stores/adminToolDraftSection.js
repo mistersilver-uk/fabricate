@@ -382,7 +382,8 @@ export function createToolDraftSection({
   /**
    * Move one world-default section between following the world Tool and this system's own. Turning
    * inheritance on writes the switch alone; turning it off seeds the override from the value that
-   * was on screen. `ui-integration` `### Tools Tab`, requirement 15 clause 1a (issue 1373).
+   * was on screen. `ui-system-studio` `## Tools Tab`, on data-models requirement 15 clause 1a
+   * (issue 1373).
    */
   async function setToolSectionInherited(
     toolId,
@@ -507,8 +508,8 @@ export function createToolDraftSection({
 
   /**
    * The same library through the read union — what a craft will actually do. A display read and
-   * never a write source; {@link toolRecordForSave} keeps the two apart. `ui-integration`
-   * `### Tools Tab` states the rule, on requirement 15 clause 1a (issue 1373).
+   * never a write source; {@link toolRecordForSave} keeps the two apart. `ui-system-studio`
+   * `## Tools Tab` states the rule, on data-models requirement 15 clause 1a (issue 1373).
    */
   function resolvedSystemTools(systemId) {
     const id = String(systemId || get(selectedSystemId) || '');
@@ -532,7 +533,7 @@ export function createToolDraftSection({
    * The record a save actually persists: the draft, with every inheriting section restored from the
    * live in-system record. The save reads the switch, not the draft, because persisting the draft
    * whole would freeze one moment's world default onto this system with nothing going red.
-   * `ui-integration` `### Tools Tab` states it (issue 1373).
+   * `ui-system-studio` `## Tools Tab` states it (issue 1373).
    */
   function toolRecordForSave(systemId, draft) {
     const record = clonePlain(draft);

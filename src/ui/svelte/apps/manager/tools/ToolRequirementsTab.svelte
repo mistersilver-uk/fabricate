@@ -240,7 +240,7 @@
 
   <!-- `Callout` is the manager's standing-statement primitive and already draws exactly this. -->
   {#if intro}
-    <!-- NEUTRAL, per `openspec/specs/ui-integration/spec.md` → "Standing statements". -->
+    <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements". -->
     <Callout tone="neutral" text={intro} dataAttr="data-tool-requirements-intro" />
   {/if}
 

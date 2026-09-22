@@ -152,7 +152,7 @@ function _legacyRecipeItemIndex(recipeList) {
 // this guard were dropped — the basis decision has already been taken upstream. What the
 // parameter buys is that this function does not have a SECOND, differently-shaped opinion
 // about the basis for a future caller to hand a rawer list to
-// (`ui-integration/spec.md`, the membership-basis paragraph).
+// (`ui-system-studio/spec.md` § Books & Scrolls Surface, the membership-basis paragraph).
 //
 // `learnerIndex` is the caller's ONE per-refresh build of the learned-knowledge index
 // (issue 1132). The store now needs the same index on a render path — the bulk-delete

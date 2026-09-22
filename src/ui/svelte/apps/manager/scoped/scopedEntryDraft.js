@@ -1,6 +1,6 @@
 /**
  * The BUFFERED EDIT one world entry editor holds between two Saves (issue 1372, epic 1357); the
- * rules are `ui-integration/spec.md` `### Scoped entity editor patterns` requirement 14.
+ * rules are `ui-world-scope/spec.md` `## Scoped entity editor patterns` requirement 14.
  */
 
 /** Structural equality for an OPAQUE section value; `===` and key-ordered JSON both misreport. */

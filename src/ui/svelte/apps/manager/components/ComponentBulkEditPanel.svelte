@@ -2,7 +2,7 @@
   The system Component Rules list's BULK EDIT panel. It renders in the shell's `.manager-inspector`
   column and REPLACES `ComponentBrowserInspector` while the selection is non-empty. It lives under
   the BROWSER's directory, which `scripts/ui-pr-screenshot-evidence.mjs` globs for the components
-  views, NOT `component/`, which is the EDITOR's. See `openspec/specs/ui-integration/spec.md` →
+  views, NOT `component/`, which is the EDITOR's. See `openspec/specs/ui-visual-style/spec.md` →
   "Bulk edit panels" and "Emptying a bulk selection" for the shared contract.
 
   The anatomy is the reference's and the world panel's: a `BULK EDIT · Clear` head; the
@@ -21,7 +21,7 @@
   axis chip stays, because on a fresh draft every essence is 0 and `Stepper` emits nothing there.
 
   The tags note states the TRUE HALF only: the reference's "World tags merge in on top of them" is
-  unconsumed by the read union (`ui-integration/spec.md` `### GM World Component Screens`
+  unconsumed by the read union (`ui-world-scope/spec.md` `## GM World Component Screens`
   requirement 1). The remove leg states what `deleteComponents` does — an IN-SYSTEM delete that
   repairs this system's recipes and touches neither the world record nor another system — and it
   refuses per record, so a selection of ghost rows arms to `Cannot remove` and writes nothing.
@@ -514,7 +514,7 @@
   <!-- The standing explanation, directly under the hero: it says what CANNOT be bulk-edited, so it
        belongs before the groups a GM is about to read.
 
-       INFO IS RETAINED AND THE JUDGEMENT IS RECORDED. `openspec/specs/ui-integration/spec.md` →
+       INFO IS RETAINED AND THE JUDGEMENT IS RECORDED. `openspec/specs/ui-visual-style/spec.md` →
        "Standing statements" would put a permanent explanation at neutral, and the prototype asks
        for the tint here and on the world twin at `scoped/ComponentCatalogueBulkPanel.svelte`. The
        two panels carrying this note without that anchor are already quieted, so the open question
@@ -703,7 +703,7 @@
     </BulkEditSection>
     {#if essencesStaged && essenceWarningCount > 0}
       <!-- WARNING STANDS: authored data about to be overwritten on a counted number of rows is the
-           conditional hazard `ui-integration/spec.md` → "Standing statements" reserves it for. -->
+           conditional hazard `ui-visual-style/spec.md` → "Standing statements" reserves it for. -->
       <Callout
         tone="warning"
         text={format(
