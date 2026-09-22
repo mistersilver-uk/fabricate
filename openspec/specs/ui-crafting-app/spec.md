@@ -347,7 +347,7 @@ macro that was skipped or threw — none of which may ever reach a player surfac
 
 ### Deferred (this iteration)
 
-- No learn affordance renders on the Crafting tab; recipe learning is wired only through the Inventory surface (see `ui-system-studio/spec.md` §Books & Scrolls learning and the Inventory learn path, `game.fabricate.learnRecipeFromInventory`).
+- No learn affordance renders on the Crafting tab; recipe learning is wired only through the Inventory surface (see `ui-system-studio/spec.md` §Books & Scrolls Surface and the Inventory learn path, `game.fabricate.learnRecipeFromInventory`).
 - The Alchemy tab and the Journal cross-link remain out of scope for the player
   Crafting tab.
 
