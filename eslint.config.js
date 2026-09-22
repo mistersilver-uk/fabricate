@@ -577,11 +577,11 @@ export default [
       // `page.evaluate` bodies driving `game`, `Actor` and the rendered DOM.
       'scripts/lib/foundryPerfScenarios.js',
       'scripts/foundry-perf-run.mjs',
-      // The Foundry smoke harness. It carries 174 `page.evaluate` bodies — by far the most of any
-      // file here — and was missing from this list only because the old gate never linted it
-      // (issue #1660). Its `no-undef` reports were all `window`, `document`, `game` and `foundry`
-      // inside those bodies.
-      'scripts/foundry-test-run.mjs',
+      // The smoke walk's page primitives and its scenario modules (issue #1692), which is where
+      // those bodies now live. The rest of `scripts/foundry-smoke/` — the profile, the context, the
+      // registry, the loop and the cleanup — is deliberately excluded: it holds no in-page body.
+      'scripts/foundry-smoke/pageOps/*.mjs',
+      'scripts/foundry-smoke/scenarios/*.mjs',
       // Not a `page.evaluate` user: a GM world script, pasted into Foundry and run there, so the
       // whole file is in-page code rather than a body inside it. Same globals, same reason.
       'scripts/foundry/create-mythwright-dnd5e.js',

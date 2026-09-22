@@ -1,5 +1,5 @@
 /** The Foundry smoke harness read as the OTHER END of a hand-maintained mirror (issue 1520). */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -7,12 +7,44 @@ import assert from 'node:assert/strict';
 import { byCodePoint } from './ratchetBaseline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(__dirname, '../..');
 
-/** The Foundry smoke harness, whole. Read once; every consumer reads the same text. */
-export const SMOKE_SOURCE = readFileSync(
-  resolve(__dirname, '../../scripts/foundry-test-run.mjs'),
-  'utf8'
+const smokeModulesIn = (relativeDir) =>
+  readdirSync(resolve(REPO_ROOT, relativeDir))
+    .filter((entry) => entry.endsWith('.mjs'))
+    .sort(byCodePoint)
+    .map((entry) => `${relativeDir}/${entry}`);
+
+/** Every file the walk lives in, derived from the directory so a new module cannot be missed. */
+export const SMOKE_SOURCE_FILES = [
+  'scripts/foundry-test-run.mjs',
+  ...smokeModulesIn('scripts/foundry-smoke'),
+  ...smokeModulesIn('scripts/foundry-smoke/pageOps'),
+  ...smokeModulesIn('scripts/foundry-smoke/scenarios'),
+];
+
+/** Each file's text, in order. Read once; every consumer reads the same text. */
+export const SMOKE_SOURCE_SEGMENTS = SMOKE_SOURCE_FILES.map((file) =>
+  readFileSync(resolve(REPO_ROOT, file), 'utf8')
 );
+
+/**
+ * The Foundry smoke walk, whole, as one text — a plain concatenation with no separator. An
+ * ordered or lazy-`[\s\S]`/`[^]` scan over it is unsafe (it can match across two unrelated
+ * modules); use `SMOKE_SOURCE_SEGMENTS` or `withinOneModule` instead (issue 1692).
+ */
+export const SMOKE_SOURCE = SMOKE_SOURCE_SEGMENTS.join('');
+
+/**
+ * Whether a lazy-`[\s\S]`/`[^]` pattern matches inside a SINGLE smoke module, so an ordered pin
+ * cannot be satisfied by text that spans two unrelated modules (issue 1692).
+ *
+ * @param {RegExp} pattern A non-global pattern; each segment is tested independently.
+ * @returns {boolean} True when at least one module's own text matches.
+ */
+export function withinOneModule(pattern) {
+  return SMOKE_SOURCE_SEGMENTS.some((segment) => pattern.test(segment));
+}
 
 /**
  * Read a Svelte root's source by repository-relative path.

@@ -41,6 +41,7 @@ import {
 import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
 import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 import {
   CHECKS_VIEWS,
   buildChecksNavItems,
@@ -2549,7 +2550,7 @@ test('every case records the smoke labels it corresponds to', () => {
 });
 
 /** The smoke script, read once, so the label cross-check below answers against the live harness. */
-const smokeHarnessSource = readFileSync(resolve(ROOT, 'scripts/foundry-test-run.mjs'), 'utf8');
+const smokeHarnessSource = SMOKE_SOURCE;
 
 /** A capture label's SHAPE: lowercase kebab with at least one hyphen. */
 const SMOKE_LABEL_SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
@@ -2586,6 +2587,7 @@ function labelForwardingHelpers() {
     /(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g
   )) {
     const parenIndex = smokeHarnessSource.indexOf('(', match.index);
+    if (parenIndex === -1) continue;
     const params = balancedSlice(smokeHarnessSource, parenIndex, '(', ')');
     if (!/\blabel\b/.test(params)) continue;
     const braceIndex = smokeHarnessSource.indexOf('{', parenIndex + params.length + 1);
@@ -2616,6 +2618,7 @@ function smokeEmittedLabels() {
   for (const name of labelForwardingHelpers()) {
     for (const call of smokeHarnessSource.matchAll(new RegExp(String.raw`\b${name}\s*\(`, 'g'))) {
       const parenIndex = smokeHarnessSource.indexOf('(', call.index + name.length);
+      if (parenIndex === -1) continue;
       for (const literal of balancedSlice(smokeHarnessSource, parenIndex, '(', ')').matchAll(
         /'([^']+)'/g
       )) {

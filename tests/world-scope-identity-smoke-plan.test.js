@@ -13,6 +13,7 @@ import {
 } from '../scripts/lib/worldScopeIdentitySmoke.js';
 import { remapWorldScopeIdentityFlags } from '../src/systems/remapWorldScopeIdentityFlags.js';
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -145,7 +146,7 @@ test('the REAL remap turns the seeded plan into exactly the expected values', as
 
 test('the harness wires the section, and asserts the FLAG VALUE rather than a resolution outcome', () => {
   // A source contract, because the harness cannot be imported.
-  const harness = readFileSync(resolve(HERE, '..', 'scripts', 'foundry-test-run.mjs'), 'utf8');
+  const harness = SMOKE_SOURCE;
   assert.match(harness, /planWorldScopeIdentitySmoke/, 'the harness drives the shared plan');
   assert.match(
     harness,
@@ -159,16 +160,19 @@ test('the harness wires the section, and asserts the FLAG VALUE rather than a re
   );
   // Every flag the plan seeds must be READ BACK and CHECKED.
   for (const label of [
-    "check('roles.componentId'",
-    "check('roles.toolId'",
-    "check('legacy componentId scalar'",
-    "check('craftingRuns requirement componentId'",
-    "check('craftingRuns step toolIds'",
-    "check('salvageRuns componentId'",
-    "check('gatheringRuns toolIds (single-scope depth)'",
-    "check('alchemyDeadEnds'",
+    'roles.componentId',
+    'roles.toolId',
+    'legacy componentId scalar',
+    'craftingRuns requirement componentId',
+    'craftingRuns step toolIds',
+    'salvageRuns componentId',
+    'gatheringRuns toolIds (single-scope depth)',
+    'alchemyDeadEnds',
   ]) {
-    assert.ok(harness.includes(label), `the section must assert ${label}`);
+    // Prettier may put the label on its own line, so match the call and its first argument
+    // rather than one spelling of the call site.
+    const called = new RegExp(`check\\(\\s*'${label.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)}'`);
+    assert.match(harness, called, `the section must assert check('${label}')`);
   }
   assert.ok(
     harness.includes('expected.componentFlag'),

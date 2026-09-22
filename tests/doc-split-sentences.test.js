@@ -73,10 +73,12 @@ const RENUMBERED = [
     'normal case, at 379 cases across five windows — the **View Lab** is the producer, and it is ' +
     'what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every ' +
     'case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+  // Issue #1692 moved the walk into scripts/foundry-smoke/, leaving the runner at ~230 lines.
+  'The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).',
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
-const RENUMBERED_COUNT = 3;
+const RENUMBERED_COUNT = 4;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -130,10 +132,39 @@ const RENAMED = [
       "**Adding a new editor kind:** (1) add a `confirmDiscardDirty{Kind}Draft()` helper in `adminStore.js` using the shared `_confirmDiscardDirtyDraft` factory; (2) export it on the store API; (3) add a `confirm{Kind}RouteExit(nextView)` function in `CraftingSystemManagerRoot.svelte` and chain it through `confirmRouteExit`; (4) wire the editor's Back / Cancel button to a handler that runs `afterTruthyResult(confirmRouteExit(nextView), () => { activeView = ... })` — never call `store.cancel{Kind}Draft?.()` directly, that bypasses the prompt; (5) add a stub for the new helper to the `confirmDiscardDirty{Kind}Draft` stub block in the store fixture of `tests/helpers/manager/managerStoreFake.js` (locate it with `grep -n confirmDiscardDirty`).",
     identifiers: [['tests/helpers/manager/managerStoreFake.js', 'tests/components/manager-mounted.test.js']],
   },
+  // Issue #1692 moved the smoke walk out of the runner, so these four sentences name its new home.
+  {
+    before:
+      '**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done.',
+    after:
+      '**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-smoke/` for the changed classes / text BEFORE declaring the change done.',
+    identifiers: [['scripts/foundry-smoke/', 'scripts/foundry-test-run.mjs']],
+  },
+  {
+    before:
+      '`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-test-run.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.',
+    after:
+      '`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-smoke/pageOps/pageLifecycle.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.',
+    identifiers: [['scripts/foundry-smoke/pageOps/pageLifecycle.mjs', 'scripts/foundry-test-run.mjs']],
+  },
+  {
+    before:
+      'The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text.',
+    after:
+      'The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-smoke/scenarios/`) pins many selectors by class, `.nth(N)` index, and visible button text.',
+    identifiers: [['scripts/foundry-smoke/scenarios/', 'scripts/foundry-test-run.mjs']],
+  },
+  {
+    before:
+      'The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.',
+    after:
+      'The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-smoke/scenarios/` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.',
+    identifiers: [['scripts/foundry-smoke/scenarios/', 'scripts/foundry-test-run.mjs']],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 6;
+const RENAMED_COUNT = 10;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {

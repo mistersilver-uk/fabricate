@@ -3,7 +3,7 @@
 DOM presence is not enough for overlays, menus, disabled states, card actions, and icon-only controls: CSS stacking, global Foundry styles, or a transparent overlay can swallow the click even though the element exists.
 Use browser hit-testing to prove the rendered element actually receives the pointer.
 
-Add these checks inside the Foundry smoke harness (`scripts/foundry-test-run.mjs`), which already drives a real page via Playwright — see `exerciseManagerEnvironmentPointerTargets` in that file for the in-tree usage pattern.
+Add these checks inside the Foundry smoke walk (`scripts/foundry-smoke/`), which already drives a real page via Playwright — see `exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-smoke/pageOps/pageLifecycle.mjs` for the in-tree usage pattern.
 Do not stand up a separate Playwright runner for this.
 
 ```javascript

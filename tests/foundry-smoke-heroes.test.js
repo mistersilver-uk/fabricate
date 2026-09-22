@@ -3,10 +3,11 @@ import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { SMOKE_SOURCE } from './helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const smokeRunSource = await readFile(join(root, 'scripts', 'foundry-test-run.mjs'), 'utf8');
+const smokeRunSource = SMOKE_SOURCE;
 const releaseSource = await readFile(join(root, 'scripts', 'release.js'), 'utf8');
 
 test('Foundry smoke actors are imported from the dnd5e Starter Heroes compendium', () => {
@@ -58,7 +59,7 @@ test('the smoke world seeds a restricted-visibility system so the recipe access 
   );
   assert.match(
     smokeRunSource,
-    /access: \{\s*characterIds: \[crafterId, travelMemberId, \.\.\.accessGrantActors\.map\(\(a\) => a\.id\)\]\.filter\(Boolean\),\s*playerIds: \[gathererUserId\]\.filter\(Boolean\)\s*\}/,
+    /access: \{[\s\S]{0,400}?characterIds: \[crafterId, travelMemberId, \.\.\.accessGrantActors\.map\(\(a\) => a\.id\)\][\s\S]{0,80}?playerIds: \[gathererUserId\]/,
     'the restricted recipe must carry an access grant naming BOTH characters and a player'
   );
   assert.match(

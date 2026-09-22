@@ -1,7 +1,5 @@
 /** The Foundry smoke harness and the manager rail, held in lockstep IN CI (issue 1362). */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -10,13 +8,11 @@ import {
   railSelector,
 } from '../scripts/lib/managerRailEntries.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
-
-const ROOT = resolve(import.meta.dirname, '..');
-const HARNESS_PATH = 'scripts/foundry-test-run.mjs';
+import { SMOKE_SOURCE, withinOneModule } from './helpers/interactablesSmokeLocators.js';
 
 // Read as TEXT. `foundry-test-run.mjs` launches Chromium on import, so a suite that imported it
 // would start the whole smoke run inside `node --test`.
-const harness = readFileSync(resolve(ROOT, HARNESS_PATH), 'utf8');
+const harness = SMOKE_SOURCE;
 
 const RAIL_BUTTON_CLASS = 'manager-nav-button';
 const RAIL_ENTRIES = [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES];
@@ -124,5 +120,7 @@ test('every label in the membership loop is authored beside its own rail id', ()
 test('railSelector scopes to the manager window', () => {
   // A bare `#id` would match the same id in any other open Foundry application.
   assert.equal(railSelector('manager-nav-tags'), '.fabricate-manager #manager-nav-tags');
-  assert.ok(harness.includes("from './lib/managerRailEntries.js'"));
+  // Bounded to one module (issue 1692): a lazy `[\s\S]{0,120}?` scan over the whole
+  // concatenated harness could otherwise be satisfied across two unrelated modules.
+  assert.ok(withinOneModule(/railSelector[\s\S]{0,120}?from '[^']*managerRailEntries\.js'/));
 });
