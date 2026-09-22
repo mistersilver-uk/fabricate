@@ -7,7 +7,8 @@ scripts/lib	15
 scripts/lib/view-lab-cases	10
 scripts/visual-parity	10
 scripts/visual-parity/lib	14
-src	23
+src	21
+src/bootstrap	22
 src/canvas	18
 src/canvas/linkedVisuals	21
 src/canvas/regions	19
@@ -58,6 +59,7 @@ src/utils	24
 styles	6
 tests	8
 tests/actions	9
+tests/bootstrap	13
 tests/canvas	6
 tests/canvas/regions	7
 tests/components	10
@@ -67,7 +69,7 @@ tests/fixtures/manager-select	21
 tests/fixtures/overlay-host	25
 tests/fixtures/player-select	22
 tests/fixtures/searchable-popover	52
-tests/helpers	18
+tests/helpers	19
 tests/helpers/manager	13
 tests/helpers/scale	18
 tests/journal	5

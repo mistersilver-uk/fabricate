@@ -274,7 +274,7 @@ const RENAMED = [
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 21;
+const RENAMED_COUNT = 25;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
