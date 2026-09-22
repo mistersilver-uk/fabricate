@@ -10892,10 +10892,10 @@
   overflow: auto;
 }
 
-/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it: a range input is drawn by the chance slider, which paints its own 6px track and a coloured fill BEHIND the input and relies on the input itself being transparent (issue 883). */
+/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it: a range input is drawn by the chance slider, which paints its own 6px track and a coloured fill BEHIND the input and relies on the input itself being transparent (issue 883). Both legs lost their `select` token at issue 1510, when this editor's seven selects became `<Select>` triggers: the rungs paint the box and neither element-typed leg could reach a `<button>` anyway. */
 .fabricate-manager
   .manager-gathering-task-edit-view
-  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -10906,9 +10906,22 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+.fabricate-manager .manager-gathering-task-edit-view input:not([type="checkbox"]):not([type="radio"]) {
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
+}
+
+/* The full width the narrowed rules above can no longer supply, stated once for the four converted fields that want it: each is a stacked `.manager-field` column and the `form` rung deliberately leaves its trigger hugging. The respawn interval's unit picker is not one of them and refuses it in the component's own `<style>` (issue 1510). */
+.fabricate-manager .manager-gathering-task-edit-view .manager-task-field-select .fabricate-select-trigger {
+  width: 100%;
+}
+
+/* The stamina modifier row's two pickers fill their own grid cells instead: the row is a `minmax(0, 1fr) 56px` grid whose cells the native selects filled, and a hugging trigger would leave the 1fr cell part-empty and re-measure as the GM picks a longer modifier name (issue 1510). */
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  .manager-task-stamina-modifier-row
+  .fabricate-select-trigger {
+  width: 100%;
 }
 
 .fabricate-manager .manager-gathering-task-edit-view textarea {

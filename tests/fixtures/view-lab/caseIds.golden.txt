@@ -189,6 +189,8 @@ manager-gathering-tasks-browse-normal
 manager-gathering-task-editor-normal
 manager-gathering-task-node-interval-normal
 manager-gathering-task-node-interval-narrow
+manager-gathering-task-node-respawn-list
+manager-gathering-task-stamina-modifier-list
 manager-gathering-task-availability-feedback-normal
 manager-gathering-task-tools-feedback-normal
 manager-gathering-event-availability-feedback-normal

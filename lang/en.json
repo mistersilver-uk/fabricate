@@ -2035,6 +2035,7 @@
           "RespawnOverTime": "Over world time",
           "RespawnNone": "Does not regenerate",
           "RespawnEvery": "Every",
+          "RespawnIntervalUnit": "Respawn interval unit",
           "RespawnGainMode": "Each interval",
           "GainGuaranteed": "Add one node",
           "GainChance": "Chance to add one",

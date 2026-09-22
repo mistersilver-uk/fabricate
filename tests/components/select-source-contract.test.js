@@ -11,7 +11,7 @@ import { repoRoot } from '../helpers/sourceScan.js';
 const TAG = 'Select';
 
 /** The floor the two clauses quantify over. Raised by measurement at every conversion boundary. */
-const CALL_SITE_FLOOR = 48;
+const CALL_SITE_FLOOR = 55;
 
 /**
  * A caller-rendered `<label>` around a control, in either spelling.

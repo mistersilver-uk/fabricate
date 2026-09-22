@@ -310,6 +310,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/gatheringImageDefaults.js',
     'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
+    // The gathering host's seven converted option vocabularies (issue 1510).
+    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',

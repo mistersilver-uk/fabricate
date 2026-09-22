@@ -6,7 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
 } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   // The state it would show is reached by flipping an inherit switch, and in the View Lab that write never reaches the screen.
@@ -107,12 +107,15 @@ export const CASES = Object.freeze([
           selector:
             '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
         },
-        { selector: '[data-gathering-task-node-respawn]', select: 'overTime' },
+        ...chooseSelectOption('[data-gathering-task-node-respawn]', 'overTime'),
         { selector: '[data-gathering-task-node-interval]', fill: '1440' },
         { selector: '[data-gathering-task-nodes]', scroll: true },
       ],
       expectView: 'gathering-task-edit',
-      expectSelector: '[data-gathering-task-node-respawn] option[value="overTime"]:checked',
+      // A trigger has no `:checked` and the row click shuts the panel, so the claim rides what the
+      // choice unlocks: the interval row renders only under `overTime` (issue 1510).
+      expectSelector:
+        '.manager-task-node-interval-row .fabricate-select-trigger[data-gathering-task-node-interval-unit]',
       expectVisible: '[data-gathering-task-node-interval]',
       expectCenterHit: '[data-gathering-task-node-interval]',
       expectNoHorizontalOverflow: '[data-gathering-task-nodes]',
@@ -126,6 +129,76 @@ export const CASES = Object.freeze([
       sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
     })
   ),
+  // The gathering studio's first open-panel frame (issue 1510), and the only way to photograph a
+  // converted control's list: it exists only while the panel is open, and an open panel cannot
+  // double as the route's closed-state frame. This one is unticked, unlike the checks studio's.
+  managerCase({
+    id: 'manager-gathering-task-node-respawn-list',
+    label: 'Manager — Gathering resource node respawn list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-node-respawn]' },
+    ],
+    expectView: 'gathering-task-edit',
+    // Three claims a closed frame cannot make: the panel exists, it is the unticked list, and it
+    // names the policy in the GM's words rather than the `overTime` the model stores.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover:not(.fabricate-select-popover-ticked)' +
+      ' [data-popover-option="overTime"] .fabricate-select-label',
+    // The panel sits inside the application root rather than clipped by the card it opened from.
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  // The stamina row's two pickers reached no frame at all until this case (issue 1510), and they
+  // are the only converted controls in this editor whose panel is TICKED. The row exists only under
+  // the stamina economy, so the state is driven: enable the mode in Settings, then author a row.
+  managerCase({
+    id: 'manager-gathering-task-stamina-modifier-list',
+    label: 'Manager — Gathering task stamina modifier list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // Stops ON the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '[data-economy-mode-option="stamina"]' },
+      { selector: '[data-economy-stamina-max]', fill: '12' },
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-add-stamina-modifier]' },
+      // The row renders no caption, so its own accessible name is the address (issue 1510).
+      { selector: '.fabricate-select-trigger[aria-label="Per-actor cost modifiers"]' },
+    ],
+    expectView: 'gathering-task-edit',
+    // Three claims a closed frame cannot make: the panel exists, it is the ticked list, and the
+    // world's longest modifier name renders whole in it rather than ellipsised.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="hb-mod-weather"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   ...[
     { suffix: 'normal', width: 1280, height: 820 },
     { suffix: 'narrow', width: 1000, height: 720 },
