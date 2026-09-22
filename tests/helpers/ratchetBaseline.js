@@ -305,8 +305,8 @@ function describeCeilingBreaches({ title, wording, added, exceeded, stale, slack
  * write for an observation, which is where each gate states its own headroom rule.
  * @param {'fail'|'allow'} options.shrink What a row above its unit means for this gate, covering
  * both a unit that fell below its ceiling and one that vanished entirely.
- * @returns {{current: Function, pinned: Function, regenerated: Function}} `current()` is the
- * memoised `build()` result; `regenerated()` is true under either mode.
+ * @returns {{current: Function, regenerated: Function}} `current()` is the memoised `build()`
+ * result; `regenerated()` is true under either mode.
  */
 export function ceilingLedgerGate({
   test,
@@ -328,8 +328,6 @@ export function ceilingLedgerGate({
   };
   const gate = {
     current,
-    /** The pinned ceilings as committed. */
-    pinned: () => parseLedger(readFileSync(ledgerPath, 'utf8')),
     /** True when this run rewrote the ledger instead of asserting against it. */
     regenerated: () => Boolean(process.env[updateEnv] || process.env[tightenEnv]),
     check(t) {
