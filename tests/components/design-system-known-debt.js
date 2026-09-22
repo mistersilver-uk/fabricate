@@ -101,9 +101,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // #1510: the gathering task editor's seven convert onto `Select`, so the total falls 51 -> 44
 // across 18 rows to 17.
 // #1510: the environment overview's three and the Tool rails' one convert onto `Select`, so the
-// total falls 44 -> 40 across 17 rows to 15.
+// total falls 44 -> 40 across 18 rows to 16.
 // #1510: the systems, recipe-access and recipe-item browse toolbars' six convert onto `Select`,
-// so the total falls 40 -> 34 across 15 rows to 12.
+// so the total falls 40 -> 34 across 16 rows to 13.
 export const KNOWN_NATIVE_SELECT_TOTAL = 34;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */

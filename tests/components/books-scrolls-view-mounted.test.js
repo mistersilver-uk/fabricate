@@ -306,7 +306,7 @@ describe('BooksScrollsView (mounted)', () => {
       assert.deepEqual(rowIds(root), ['scroll']);
     });
 
-    it('re-words the limits filter, its caption and its rows in item visibility mode', async () => {
+    it('re-words the limits filter, its name and its rows in item visibility mode', async () => {
       const root = await harness.mount({ recipeItems: LIBRARY, visibilityMode: 'item' });
       const filter = '[data-books-scrolls-cap-filter]';
 

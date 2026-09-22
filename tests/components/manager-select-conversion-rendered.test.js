@@ -686,6 +686,8 @@ describe('the two hints the currency card draws read in one treatment (issue 151
 
 describe('a converted manager panel is wide enough for the list it opens (issue 1510)', () => {
   const PANEL_SITES = [
+    // `start` is inert for a `drive` site, which nothing seeds through `?value=`, so those six
+    // measure the resting list; the panel still opens and every label is measured.
     ...CONVERTED_SITES.map((site) => ({ ...site, start: site.values[1] })),
     {
       subject: 'currency',

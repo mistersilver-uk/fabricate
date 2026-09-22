@@ -104,8 +104,8 @@
  * `.manager-filter select` skin still has carriers in three unconverted toolbars and stays — and
  * adds two: the shared trigger floor those six converted controls take, and the `min-width: 0` the
  * picker root needs as the bar's flex item. Both are new singletons in both keyings, so the rule,
- * key and singleton counts each rise by two, to 2,569, 3,046 and 2,936, and `pinnedTotal` stays
- * 229 across 112 rows. Re-derived by running the census twice, not subtracted.
+ * key and singleton counts each rise by two, to 2,568, 3,044 and 2,934, and `pinnedTotal` stays
+ * 225 across 110 rows. Re-derived by running the census twice, not subtracted.
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's
  * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive
