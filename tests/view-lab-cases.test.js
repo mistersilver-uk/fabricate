@@ -1,7 +1,7 @@
 /** Invariants for the View Lab case registry. */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { basename, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { parse } from 'svelte/compiler';
@@ -3521,22 +3521,66 @@ test('every case literal parses as its own attributable region', () => {
   }
 });
 
-test('the registry order and its surface coverage match the committed golden files', () => {
-  // Generated on the base commit: nothing else here would notice a run landing out of order.
-  const golden = (name) =>
-    readFileSync(resolve(ROOT, `tests/fixtures/view-lab/${name}.golden.txt`), 'utf8')
-      .split('\n')
-      .filter((line) => line !== '');
+// Registry order is guarded by one golden per case file rather than one for the whole registry, so
+// a PR adding a case to one surface changes one small file. Three assertions carry what the single
+// 505-line golden used to: cross-file order, within-file order, and no golden left behind.
 
+const CASE_ID_GOLDENS = 'tests/fixtures/view-lab/case-ids';
+const CASE_FILE_ORDER_GOLDEN = 'tests/fixtures/view-lab/caseFileOrder.golden.txt';
+
+/** A golden's lines, blank lines dropped so the trailing newline is not read as an entry. */
+const goldenLines = (relativePath) =>
+  readFileSync(resolve(ROOT, relativePath), 'utf8')
+    .split('\n')
+    .filter((line) => line !== '');
+
+/** The golden that holds one case file's ids. The frozen entry carries `path` and `cases` only. */
+const caseIdGolden = (casePath) => `${CASE_ID_GOLDENS}/${basename(casePath, '.js')}.golden.txt`;
+
+test('the case files stay in their committed order', () => {
+  assert.deepEqual(
+    VIEW_LAB_CASE_FILES.map(({ path }) => path),
+    goldenLines(CASE_FILE_ORDER_GOLDEN),
+    'the case-file order changed. `VIEW_LAB_CASES` is this list flat-mapped and ' +
+      '`chooseSurfaceRepresentatives` breaks ties first-in-order, so a reordered manifest ' +
+      'silently changes which frame represents a surface'
+  );
+});
+
+test('each case file holds its own case ids in its own order', () => {
+  for (const { path, cases } of VIEW_LAB_CASE_FILES) {
+    assert.deepEqual(
+      cases.map((viewCase) => viewCase.id),
+      goldenLines(caseIdGolden(path)),
+      `${path} changed which cases it declares, or the order it declares them in`
+    );
+  }
+});
+
+test('no case-id golden is orphaned by a renamed case file', () => {
+  assert.deepEqual(
+    readdirSync(resolve(ROOT, CASE_ID_GOLDENS)).sort(),
+    VIEW_LAB_CASE_FILES.map(({ path }) => basename(caseIdGolden(path))).sort(),
+    `a golden under ${CASE_ID_GOLDENS} names no case file, or a case file has no golden — a ` +
+      'rename that leaves the old golden behind guards a file that no longer exists'
+  );
+});
+
+test('the sharded goldens compose into the whole registry order', () => {
+  // The migration proof (issue #1937): concatenated in case-file order these reproduce the
+  // 505-line golden they replaced, so nothing outside the case files reaches the flat registry.
   assert.deepEqual(
     [...caseIds],
-    golden('caseIds'),
-    'the registry order changed. `chooseSurfaceRepresentatives` breaks ties first-in-order, so ' +
-      'a reordered run silently changes which frame represents a surface'
+    goldenLines(CASE_FILE_ORDER_GOLDEN).flatMap((path) => goldenLines(caseIdGolden(path))),
+    'the flat registry is no longer the case files concatenated in manifest order, so the ' +
+      'per-file goldens no longer guard what one whole-registry golden used to'
   );
+});
+
+test('surface coverage matches its committed golden file', () => {
   assert.deepEqual(
     [...LAB_SURFACE_CASE_IDS],
-    golden('labSurfaceCaseIds'),
+    goldenLines('tests/fixtures/view-lab/labSurfaceCaseIds.golden.txt'),
     'surface coverage changed — the frame set every unattributable change publishes'
   );
 });

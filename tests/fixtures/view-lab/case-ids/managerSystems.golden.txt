@@ -1,0 +1,14 @@
+manager-recipes-editor-roundtrip
+manager-default-selection
+manager-systems-row-menu-open
+manager-systems-empty
+manager-selected-normal
+manager-rail-expanded
+manager-rail-collapsed
+manager-selected-stacked
+manager-system-edit-normal
+manager-system-edit-validation
+manager-system-edit-narrow
+manager-system-edit-dirty
+manager-system-edit-lists
+manager-system-edit-modifier-rolls
