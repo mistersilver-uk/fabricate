@@ -117,8 +117,9 @@ import {
   createGatheringSelectableActorsGetter,
   evaluateGatheringExpression,
   processWorldTimeCallbacksSafely,
+  resolveViewerScene,
+  senseTravelMarkerRegions,
 } from './gatheringBootstrapAdapters.js';
-import { sceneRegionUuidsContainingToken } from './canvas/regionHitTest.js';
 import {
   createGatheringToolAvailability,
   matchGatheringTools
@@ -1345,29 +1346,14 @@ class Fabricate {
     this.gatheringLocationService = new GatheringLocationService({
       partyStore: this.gatheringPartyStore,
       travelStore: this.gatheringRealmStore,
-      // Which Scene Region UUIDs the party's travel marker sits inside. PREFER Foundry's
-      // AUTHORITATIVE `TokenDocument#regions`, free of the move-animation lag that makes position
-      // hit-testing report the region just left; hit-test only when membership is unavailable.
+      // Which Scene Region UUIDs the party's travel marker sits inside, on ANY scene: the active GM
+      // evaluates a player's start while viewing whatever scene it likes (issue 1912).
       senseSceneRegions: (travelActorUuid) => {
         const resolve = globalThis.fromUuidSync;
         if (typeof resolve !== 'function' || !travelActorUuid) return [];
         let actor = null;
         try { actor = resolve(String(travelActorUuid)); } catch (_) { actor = null; }
-        const tokens = actor?.getActiveTokens?.(false, true) || [];
-        const uuids = new Set();
-        for (const token of tokens) {
-          const memberRegions = token?.regions;
-          let matched = false;
-          if (memberRegions && typeof memberRegions[Symbol.iterator] === 'function') {
-            for (const region of memberRegions) {
-              if (region?.uuid) { uuids.add(String(region.uuid)); matched = true; }
-            }
-          }
-          if (matched) continue;
-          const scene = token?.parent ?? token?.scene ?? null;
-          for (const uuid of sceneRegionUuidsContainingToken({ scene, token })) uuids.add(uuid);
-        }
-        return uuids;
+        return senseTravelMarkerRegions({ actor });
       }
     });
     // Node pools live in the `gatheringEnvironments` WORLD setting and only a GM may write one, so
@@ -1416,7 +1402,14 @@ class Fabricate {
       isActorSelectable: ({ actor, viewer }) => isGatheringActorSelectableByUser(actor, viewer),
       isGamePaused: isCurrentWorldPaused,
       sceneAccess: createGatheringSceneAccess({
-        getCurrentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
+        // The REQUESTING viewer's scene, not this client's: a player's start runs on the active GM's
+        // client (issue 1912).
+        getCurrentScene: (viewer) => resolveViewerScene({
+          viewer,
+          currentUser: game.user,
+          scenes: game.scenes,
+          currentScene: () => game.scenes?.current ?? game.scene ?? globalThis.canvas?.scene ?? null
+        })
       }),
       toolAvailability: createGatheringToolAvailability({
         craftingSystemManager: this.craftingSystemManager,

@@ -405,7 +405,8 @@ Realm ids referencing *missing* realms become `staleRealmIds` and do not resolve
 The `travelActor` source token slots between the override and unresolved branches without changing the resolver contract.
 4. Clearing an override is a stamped mutation: it sets `mode: "none"`, empties `realmIds`, and updates `updatedAt`/`updatedByUserId`.
 5. Changing current realm refreshes gathering listings but must not retroactively rewrite completed gathering history.
-6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/main.js`; the runtime implementation prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
+6. The live `senseSceneRegions` collaborator is injected into `GatheringLocationService` in `src/main.js`; the runtime implementation (`senseTravelMarkerRegions` in `src/gatheringBootstrapAdapters.js`) prefers V13 `TokenDocument#regions` membership with a position hit-test fallback.
+Sensing walks the travel actor's concrete tokens on **every** scene (`Actor#getDependentTokens`), never only the evaluating client's viewed canvas: a player's attempt is evaluated on the active GM's client, so the answer must not depend on which scene that GM happens to be viewing.
 The service itself stays Foundry-free, defaulting the collaborator to `() => []`.
 
 ### Environment Location Availability
@@ -1503,8 +1504,11 @@ If `environment.sceneUuid` is set:
 
 1. Any user — **including GMs** — may only attempt gathering while viewing that scene.
 This presence gate is additive with the realm/travel and stamina/node gates (which also apply to GMs); it is NOT one of the visibility/inspection restrictions GMs bypass.
+"Viewing" is judged for the **requesting** user (`User#viewedScene`, which Foundry replicates to every client), not for the client evaluating the attempt: a player's start runs on the active GM's client, and the GM's own viewed scene is irrelevant to it.
+The local user, and a remote viewer that has broadcast no scene, fall back to the evaluating client's current scene.
 2. For a non-GM user the selected actor must be player-owned by the acting user.
 3. The selected actor must have at least one token present on the associated scene.
+Presence is read from that scene's token documents (`Actor#getDependentTokens`), so it holds whichever scene the evaluating client views.
 4. If any of the above checks fail, the environment is not attemptable by that user.
 
 If `environment.sceneUuid` is absent, the environment is not scene-gated by this specification.

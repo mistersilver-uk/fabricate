@@ -400,8 +400,8 @@ test('awaited startup settlement delays fabricate.ready until all guarded proces
 test('scene access adapter accepts Foundry V13 TokenDocument parent scene shape', () => {
   assert.match(
     adaptersSource,
-    /getActiveTokens\?\.\(false, true\)\?\.find/,
-    'scene access should request TokenDocument results from Actor#getActiveTokens'
+    /getActorTokensOnScenes\(actor, \[currentScene\]\)\.find[\s\S]*getDependentTokens\(options\)[\s\S]*getActiveTokens\?\.\(false, true\)/,
+    'scene access should read the linked scene\'s token documents through every-scene Actor#getDependentTokens, with a TokenDocument getActiveTokens fallback (issue 1912)'
   );
   assert.match(
     adaptersSource,

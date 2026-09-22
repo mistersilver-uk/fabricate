@@ -7,7 +7,7 @@ scripts/lib	1712
 scripts/lib/view-lab-cases	1054
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
-src	1251
+src	1273
 src/canvas	376
 src/canvas/linkedVisuals	64
 src/canvas/regions	331
@@ -56,7 +56,7 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1258
 src/utils	947
 styles	1060
-tests	20026
+tests	20037
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
