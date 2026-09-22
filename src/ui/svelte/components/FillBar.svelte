@@ -12,7 +12,7 @@
   | `size` / `dataAttr` / `dataValue` | `'sm'` \| `'md'` / strings | `'md'` / `''` | A 6px or 8px track height, and an optional test/screenshot hook. |
 
   Invariants:
-  - NO GRADIENT. `ui-integration/spec.md`'s semantic-slider geometry is deliberately NOT claimed:
+  - NO GRADIENT. `ui-visual-style/spec.md`'s semantic-slider geometry is deliberately NOT claimed:
     this is a value-width fill, never a full-track semantic scale.
   - Its scoped block reads theme-root tokens only, never an area-scoped `--fab-manager-*` property,
     per `openspec/specs/design-system/spec.md`.

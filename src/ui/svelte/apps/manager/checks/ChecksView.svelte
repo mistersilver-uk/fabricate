@@ -7,7 +7,7 @@
   Each activity's check is a singleton whose shape follows its resolution mode, so a route is a
   single editor page rather than a list. The five sections, which render in which mode, the
   dot-and-count contract, the "switched off" predicate and the right rail's contents are stated
-  in `openspec/specs/ui-integration/spec.md` → "GM Checks Studio". Dots and rail badges are
+  in `openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio". Dots and rail badges are
   computed on the LIVE DRAFT; the enable gate is not, and the Validation route says so.
 -->
 <script>
@@ -648,7 +648,7 @@
   const modeLabel = $derived(routeModeLabel || subsystemModeLabel('crafting', resolutionMode));
 
   // THE SECTION-LEVEL CALLOUT and THE PANE HEADING, both required by
-  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio". The callout reads the SAME
+  // `openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio". The callout reads the SAME
   // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy
   // the Validation route does; the heading is keyed on the SECTION, the activity being named
   // by the rail, the breadcrumb and the route title.

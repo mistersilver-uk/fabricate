@@ -18,7 +18,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/gatheringFormat.js'
   ],
   // `FillBar` joined the tree when issue 1096 rebuilt ChanceBar on the shared primitive
-  // `ui-integration/spec.md` §Shared product UI primitives names. Omitting it does not fail
+  // `ui-visual-style/spec.md` §Shared product UI primitives names. Omitting it does not fail
   // this suite — `createMountedComponentHarness` throws in `before()` naming the module,
   // which is the loud half of the trap; a hand-rolled harness would have HUNG instead.
   compiledModules: [

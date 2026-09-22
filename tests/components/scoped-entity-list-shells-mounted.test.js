@@ -1038,7 +1038,7 @@ describe('the page index is clamped and the footer reads the clamped value', () 
     // clamped index directly. This half is here because the foot pager is `multiPageOnly` since
     // issue 1372: the shorter-corpus case below no longer draws one, and a clamp gate that only
     // ever measured the no-footer case would stop covering the footer-reads-the-clamped-value
-    // half of `ui-integration/spec.md`'s list-shell requirement 13 altogether.
+    // half of `ui-world-scope/spec.md`'s list-shell requirement 13 altogether.
     await catalogueHarness.setProps({ scope: scopeOf('component', { count: 15 }) });
     assert.equal(
       rows(root).length,

@@ -2886,7 +2886,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     }
   });
 
-  // The crumb is shell chrome, and `### GM World Scoped Entity Routes` requirement 7 closes the
+  // The crumb is shell chrome, and `## GM World Scoped Entity Routes` requirement 7 closes the
   // shell to PRs 6a, 6b and 6c - so an entry editor, released to full width and therefore
   // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {

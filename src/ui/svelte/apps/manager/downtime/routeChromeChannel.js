@@ -2,8 +2,8 @@ import { requireNonEmptyString } from '../../../../extensionRegistry.js';
 import { normalizeRouteChrome } from '../../../../managerExtensions.js';
 
 /**
- * The runtime side of the Manager's World navigation seam. `openspec/specs/ui-integration/spec.md`
- * → "Downtime Preview and Premium Extension" is canonical for every rule below.
+ * The runtime side of the Manager's World navigation seam. `ui-extension-points/spec.md` →
+ * "Downtime Preview and Premium Extension" is canonical for every rule below.
  *
  * A CHANNEL rather than a context field: the mount context is frozen and its identity keys a
  * remount, so a mutable chrome field would break the freeze and a new context would remount; the

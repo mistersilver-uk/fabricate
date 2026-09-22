@@ -20,7 +20,7 @@ This spec introduces environmental resource acquisition without introducing a se
 
 Related specifications:
 
-- `ui-integration/spec.md` for UI surfaces and workflows
+- the UI surface specs indexed by the Surface Map in `ui-integration/spec.md` for UI surfaces and workflows (the player app is `ui-gathering-app/spec.md`)
 - `resolution-modes/spec.md` for shared routed/progressive concepts
 - `recipes-and-steps/spec.md` for recipe and salvage lifecycle
 - `destructive-changes-and-migrations/spec.md` for clean-up and destructive-change principles

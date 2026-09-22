@@ -20,7 +20,7 @@
   render compactly when placed beside another control. The parent decides whether to
   render this bar at all; the component also no-ops on a null value.
 
-  THE TRACK AND FILL ARE NO LONGER HAND-ROLLED (issue 1096). `ui-integration/spec.md`
+  THE TRACK AND FILL ARE NO LONGER HAND-ROLLED (issue 1096). `ui-visual-style/spec.md`
   §Shared product UI primitives recorded five copies of that shape as a live
   non-conformance and named the fix precisely: a shared `FillBar` leaf that ChanceBar is
   itself REBUILT on, rather than a widened ChanceBar. So the track geometry and the fill

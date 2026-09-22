@@ -5,7 +5,7 @@
   `checks-section-*` / `checks-panel-*` id stems, the `data-checks-*` hooks and the issue count's
   localized unit, and the primitive owns the strip, the keyboard contract and every mark.
 
-  Each section carries two INDEPENDENT markers per `openspec/specs/ui-integration/spec.md` → "GM
+  Each section carries two INDEPENDENT markers per `openspec/specs/ui-system-studio/spec.md` → "GM
   Checks Studio": a COUNT mark, which a section with nothing to count renders NOT AT ALL rather
   than as a zero, so `null` and `0` read the same; and a WARNING dot carrying a TEXT accessible
   name. Only the SELECTED tab carries `aria-controls` — `activePanelOnly` — this strip rendering

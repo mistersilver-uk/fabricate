@@ -252,7 +252,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
 });
 
 // The licensing guard. Why a catalogue of names is a reference in code, and why the intersection
-// is not optional: `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`.
+// is not optional: `openspec/specs/ui-visual-style/spec.md`, `#### Icon vocabulary`.
 describe('the committed catalogue names only icons Font Awesome publishes for free', () => {
   // Resolved and read at collection, so a missing devDependency throws here, naming the package.
   const stylesheetPath = resolveFreeStylesheetPath();

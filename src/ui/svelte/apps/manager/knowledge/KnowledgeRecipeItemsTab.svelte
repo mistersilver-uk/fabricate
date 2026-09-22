@@ -30,7 +30,7 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <!-- NEUTRAL, per `openspec/specs/ui-integration/spec.md` → "Standing statements": this tab also
+  <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements": this tab also
        raises a conditional hazard below, and a loud permanent hint would spend its colour. -->
   <Callout
     tone="neutral"

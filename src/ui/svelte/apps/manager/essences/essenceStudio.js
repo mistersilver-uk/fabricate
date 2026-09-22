@@ -27,7 +27,7 @@ export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([
 
 /**
  * The CREATE editor's three tabs, reached ONLY where there is no shared world definition to
- * contradict: `ui-integration/spec.md` `### GM World Essence Screens` requirement 10 makes identity
+ * contradict: `ui-world-scope/spec.md` `## GM World Essence Screens` requirement 10 makes identity
  * a WORLD field a system-scope screen may never edit.
  */
 export const ESSENCE_EDITOR_TABS = Object.freeze([

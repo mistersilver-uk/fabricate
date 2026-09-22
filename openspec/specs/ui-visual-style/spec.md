@@ -1,5 +1,10 @@
 # UI Visual Style
 
+## Purpose
+
+Define the visual style and responsive sizing rules every Fabricate product UI surface follows.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Product UI Visual Style
 
 Fabricate's Foundry-facing product UI must use a clean flat visual style.

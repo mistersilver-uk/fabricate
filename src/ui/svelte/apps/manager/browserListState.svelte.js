@@ -24,8 +24,8 @@ export function createBrowserListState({ state, resetAxes = {}, onSystemSwitch }
 }
 
 /**
- * The page window over `rows()`, resetting to page zero where `ui-integration` says the last
- * valid page. `defaultPageSize` is the unset fallback only, so Tools keeps its own size of 8.
+ * The page window over `rows()`, resetting to page zero where `ui-manager-shell` § Manager browse
+ * view-state says the last valid page. `defaultPageSize` is only the unset fallback: Tools keeps 8.
  */
 export function createBrowserPageWindow({
   state,

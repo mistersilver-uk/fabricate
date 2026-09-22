@@ -99,7 +99,7 @@ function staticAttributesAt(componentName, source = rootSource) {
   return names;
 }
 
-// (1b) THE REQUIREMENT-7 CORRECTION, EVIDENCED ON THE REOPENING CHANGE'S OWN DIFF. `### GM World
+// (1b) THE REQUIREMENT-7 CORRECTION, EVIDENCED ON THE REOPENING CHANGE'S OWN DIFF. `## GM World
 // Scoped Entity Routes` requirement 7 closes `CraftingSystemManagerRoot.svelte` to this epic's
 // later lanes, and its own amendment says the closure "is void for a seam the enumeration does not
 // name": reopening the file to supply a NAMED missing seam is a correction, reopening it to build a

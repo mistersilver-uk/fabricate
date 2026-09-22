@@ -67,7 +67,7 @@ export function componentAliasNote(entry, phrase) {
 
 /**
  * The `Global tags` card's closing note: where the value LIVES, and how many rule sets exist. It
- * no longer claims inheritance — the tag merge is unconsumed, and `### GM World Component
+ * no longer claims inheritance — the tag merge is unconsumed, and `## GM World Component
  * Screens` forbids asserting its false half. `{n}` is the RULE-SET count, not the system count.
  */
 export function componentGlobalTagNote(entry, phrase) {
@@ -1346,7 +1346,7 @@ export function componentSalvageSummary(
 /**
  * The rules LIST header's subtitle — this system's own posture. IT NAMES THE CATEGORY AND NOT THE
  * TAGS, because only one of the two resolves: the read union resolves an inherited world category,
- * while `resolveComponentTags`' answer is consumed by nothing (`### GM World Component Screens`).
+ * while `resolveComponentTags`' answer is consumed by nothing (`## GM World Component Screens`).
  */
 export function componentListSubtitle({ systemName, salvageModeLabel }, phrase) {
   return phrase(

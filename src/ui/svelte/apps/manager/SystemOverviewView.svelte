@@ -278,7 +278,7 @@
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}
                 <!-- Ghost (issue 1118, row 21). The quiet NAVIGATIONAL verb of
-                     `ui-integration/spec.md` — it moves the GM to the record and changes
+                     `ui-visual-style/spec.md` — it moves the GM to the record and changes
                      nothing. One per issue row, in a list whose SEVERITY CHIP is the loud
                      thing: a solid control repeated down every row out-shouts the ranking
                      the list exists to present. -->

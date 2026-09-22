@@ -9,7 +9,7 @@
   - It has TWO SHAPES and the fork is "is there a shared definition": `rulesMode` is
     `scopedKnown && !isNew`, giving the two-tab rules screen; otherwise the three-tab editor with
     its Identity tab, because a create draft's in-system record is the only record there is.
-  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-integration/spec.md`, `### GM World Essence Screens`
+  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-world-scope/spec.md`, `## GM World Essence Screens`
     requirement 10): a field edited here would rename the essence in every other system holding it,
     so the callout's `Edit shared definition` is this screen's only route to those fields.
   - EVERY TAB PROP MUST ALSO BE FORWARDED HERE, or the tab silently takes its default, which for an
@@ -17,7 +17,7 @@
   - `id="manager-essence-edit-form"` is a contract: the manager root's header Save submits through
     `form="manager-essence-edit-form"`, and dropping either half stops Save working silently.
   - The in-system record's fields, `enabled` included, accumulate in this draft and land on Save;
-    the MEMBERSHIP writes do not, as `### Scoped entity editor patterns` requirement 14 states.
+    the MEMBERSHIP writes do not, as `## Scoped entity editor patterns` requirement 14 states.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';

@@ -562,7 +562,7 @@ test('the composition preserves each type\'s KEY SET, which is part of the contr
 
 // THE FOURTH FAMILY IS NOT A FOURTH DESCRIPTOR (issue 1374, then issue 1392). `adminStore` supplied
 // a fourth `getStores` leg from issue 1374, matching the read path's four, because that file is a
-// gateway `### GM World Scoped Entity Routes` requirement 7 closes to the vocabulary lane.
+// gateway `## GM World Scoped Entity Routes` requirement 7 closes to the vocabulary lane.
 
 test('the vocabulary family mints its OWN key set, not the scoped-entity one', () => {
   const actions = createWorldScopeActions({
@@ -614,7 +614,7 @@ test('the first createEntity SEEDS the setting and flips isSeeded per sub-key', 
 
 // The World Vocabulary leg (issue 1362). It is the fourth leg of a projection whose other three are
 // scoped-entity corpora, and it exists NOW for a one-way-door reason: `adminStore.js` and
-// `CraftingSystemManagerRoot.svelte` are two of the gateway files `### GM World Scoped Entity
+// `CraftingSystemManagerRoot.svelte` are two of the gateway files `## GM World Scoped Entity
 // Routes` requirement 7 closes to PR 7, so neither the store leg nor the badge that reads it could
 // be added later.
 

@@ -7,7 +7,7 @@
   second copy could disagree, the head's own fallback being a regex over the AUTHORED formula. IT
   ABSTAINS LOUDLY, a formula outside the enumerable shape rendering a STATED note naming the
   reason rather than an approximation. BARS ARE `FillBar`, FLAT, per
-  `openspec/specs/ui-integration/spec.md` → "Shared product UI primitives"; it is a LEAF with no
+  `openspec/specs/ui-visual-style/spec.md` → "Shared product UI primitives"; it is a LEAF with no
   `role` and no `aria-*`, so a row announces as a label/value pair with the bar decorative. No
   gradient: the band strip's full-track semantic scale is that requirement's only exemption.
 -->

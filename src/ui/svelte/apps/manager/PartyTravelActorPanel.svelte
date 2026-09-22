@@ -5,12 +5,12 @@
 
   Three things here are Fabricate's rather than the prototype's.
 
-  1. The tile's UNLINKED state renders through `EmptyState` in its `compact` treatment, which
-     `ui-integration/spec.md` requires of every manager "nothing here" message and forbids resizing
-     per screen. The `<button>` WRAPS the primitive rather than being replaced by it, because
-     `EmptyState` has no root handlers and no element prop, so replacing the button would lose
-     click-to-open, right-click-to-open and the drop target. The wrapper therefore takes the button
-     reset and owns the `is-drop-active` affordance.
+  1. The tile's UNLINKED state renders through `EmptyState` in its `compact`
+     treatment, which `ui-visual-style/spec.md` § No-state messages requires of every manager
+     "nothing here" message and forbids resizing per screen. The `<button>` WRAPS the primitive
+     rather than being replaced by it, because `EmptyState` has no root handlers and no element
+     prop, so replacing the button would lose click-to-open, right-click-to-open and the drop
+     target. The wrapper therefore takes the button reset and owns the `is-drop-active` affordance.
   2. The LINKED state mirrors the compact metrics rather than the prototype's 38px tile, or linking
      an actor visibly shrinks the panel and swaps tile sizes in the same slot. The `min-height`, the
      fill and the radius hang on the WRAPPER — the slot both states occupy — so none of it reaches

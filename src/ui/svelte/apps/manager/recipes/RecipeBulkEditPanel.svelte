@@ -4,7 +4,7 @@
   `ComponentBulkEditPanel` records. It lives under the BROWSER's directory, which
   `scripts/ui-pr-screenshot-evidence.mjs` globs for the `manager-recipes` views, and NOT under
   `recipe/`, which is the EDITOR's and would republish five editor frames and never the browser one.
-  See `openspec/specs/ui-integration/spec.md` → "Bulk edit panels" for the shared contract.
+  See `openspec/specs/ui-visual-style/spec.md` → "Bulk edit panels" for the shared contract.
 
   Its CHROME is the shared `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` primitives,
   so this panel and the Component Studio's render the same controls rather than two implementations
@@ -200,7 +200,7 @@
   // singular delete dialog. `aria-describedby` points AT this list, so a split between the aria and
   // the visible text is a WCAG 2.5.3 smell. The DISPLAY name won rather than the canonical noun
   // because every other item-referring string in the Recipe lang namespace already says it;
-  // `recipe item` remains canonical in `openspec/` and in every identifier, as `ui-integration`'s
+  // `recipe item` remains canonical in `openspec/` and in every identifier, as `ui-system-studio`'s
   // Books & Scrolls section requires.
   //
   // THE TWO CONSEQUENCE ROWS CARRY NO PRONOUN FOR THE RECIPES. Branching the pronoun on the ITEM
