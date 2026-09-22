@@ -56,6 +56,10 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
+      // The snapshot projection this frame renders moved out of the shell (issue 1674). Inert
+      // until `mapChangedFilesToCases` stops pre-filtering the changed set through `isUiFile`,
+      // which drops a `src/systems/` path before `sourceMatches` is consulted (issue 1896).
+      /^src\/systems\/knowledgeSnapshot\.js$/,
     ],
   }),
   managerCase({
@@ -219,6 +223,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
+      // The prompt, run and report sequence this frame drives (issue 1674).
+      /^src\/ui\/managerServices\.js$/,
     ],
   }),
   managerCase({

@@ -904,7 +904,7 @@ describe('the player-character-types hook is wired at every consuming edge', () 
   it('the manager republishes its rosters through the existing data-changed seam', () => {
     // The GM who ticks the box is the one GUARANTEED to be looking at stale data: the
     // settings sidebar sits over an open manager.
-    const app = read('src/ui/SvelteCraftingSystemManagerApp.svelte.js');
+    const app = read('src/ui/managerServices.js');
     assert.match(
       app,
       /hooks\.on\('fabricate\.playerCharacterTypesChanged', playerCharacterTypeListener\);/

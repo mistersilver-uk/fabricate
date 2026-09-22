@@ -177,7 +177,7 @@ tests/svelte-warning-scope.test.js	1
 tests/systems/gatheringComposition.test.js	2
 tests/systems/pooledAllocation.test.js	3
 tests/token-generation-gate.test.js	2
-tests/view-lab-cases.test.js	15
+tests/view-lab-cases.test.js	13
 tests/world-scope-consumer-sweep.test.js	20
 tests/world-scope-entities-import-export.test.js	7
 tests/world-scope-gm-notice.test.js	3

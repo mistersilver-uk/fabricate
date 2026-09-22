@@ -102,7 +102,6 @@ src/ui/InteractableBrowserApp.svelte.js
 src/ui/InteractableConfigApp.svelte.js
 src/ui/InteractablesManagerApp.svelte.js
 src/ui/InteractionPromptApp.svelte.js
-src/ui/SvelteCraftingSystemManagerApp.svelte.js
 src/ui/SvelteFabricateApp.svelte.js
 src/ui/appFactory.js
 src/ui/compendiumDirectoryContext.js

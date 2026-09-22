@@ -300,8 +300,8 @@ const SITE_MAPPING = [
     sites: 1,
   },
   {
-    site: 'SvelteCraftingSystemManagerApp knowledge owned copies',
-    file: 'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+    site: 'knowledgeSnapshot owned copies',
+    file: 'src/systems/knowledgeSnapshot.js',
     accessor: 'readStackQuantity',
     sites: 1,
   },

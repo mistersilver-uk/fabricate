@@ -35,7 +35,7 @@ const LEGACY_GATE_FILE_COUNT = 329;
  */
 const DEBT_COUNTS = {
   scripts: { files: 14, pairs: 64 },
-  srcUi: { files: 58, pairs: 140 },
+  srcUi: { files: 58, pairs: 136 },
   // `srcRoot` GREW at issue 1677, which is the direction this pin exists to make expensive, so the
   // reason is recorded here rather than in a commit message. Issue 1715 paid fifteen of
   // `src/main.js`'s nineteen rules by moving the spans that violated them into `src/bootstrap/`,
@@ -52,7 +52,7 @@ const TESTS_DEBT_RULE_COUNT = 82;
 const PRETTIER_DEBT_MARKER = '# --- FORMATTING DEBT BASELINE';
 
 /** Entries in that section, pinned exactly. */
-const PRETTIER_DEBT_COUNT = 97;
+const PRETTIER_DEBT_COUNT = 96;
 
 /** Whether an ESLint rule entry is switched on. */
 const armed = (entry) => Array.isArray(entry) && entry[0] !== 0 && entry[0] !== 'off';
