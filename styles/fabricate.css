@@ -1358,9 +1358,11 @@
   font-weight: 700;
 }
 
+/* `display: block`, stated: core's `a.button, button` reset makes every button a centred flex container, and a flex container's text is an anonymous item that cannot shrink, so a squeezed crumb clipped its label at BOTH edges instead of taking the ellipsis the rule below declares. A block container is what `text-overflow` applies to. */
 .fabricate-manager .manager-breadcrumbs button {
   appearance: none;
   -webkit-appearance: none;
+  display: block;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -2045,6 +2047,18 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. */
+.fabricate-manager .manager-checks-tier-list > .manager-checks-tier-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
 }
 
 /* The outcome list's own append action, which lives OUTSIDE that list so it is reachable from the zero state too (issue 1097 follow-up). */
@@ -15464,11 +15478,12 @@
   min-width: 0;
 }
 
-/* The weight cell holds a FILLED Stepper, so the slot is pinned here rather than on the control: `fill` makes the stepper `width: 100%` of this item, and an `auto` basis would collapse it to its 54px of chrome (its input is `flex: 1 1 0; min-width: 0`). */
+/* The weight cell holds a FILLED Stepper, so the slot is pinned here rather than on the control: `fill` makes the stepper `width: 100%` of this item, and an `auto` basis would collapse it to its 54px of chrome (its input is `flex: 1 1 0; min-width: 0`). `min-width: 0` is what makes the 102px basis hold: a flex item's automatic minimum is its min-content width, and the filled stepper's is the number input's intrinsic ~167px plus the chrome, so without it the slot measured 221px and the stepper ran under the Override column's pill. */
 .fabricate-manager .manager-environment-comp-weight-field {
   --fab-stepper-fill-height: 28px;
 
   flex: 0 0 102px;
+  min-width: 0;
   margin: 0;
 }
 
