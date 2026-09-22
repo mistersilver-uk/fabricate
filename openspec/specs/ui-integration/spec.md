@@ -196,7 +196,7 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
   All six dead rules are repaired as `:global(...)` chained so their specificity is unchanged, and `tests/components/manager-button-scoped-class-reach.test.js` covers this primitive as the mechanical guard.
   No `.svelte` under `src/` renders a raw `class="manager-inspector-card"` any longer, with eight stated exceptions.
   `InspectorCard.svelte`'s own two occurrences are the emission itself and one line of prose on the `class` prop.
-  `CraftingSystemManagerRoot.svelte`'s five — the tags at-a-glance card and the four systems feature panels — and the gathering inspector rail's twenty-five are deferred with a named reason: issue 1707 relocated them without converting one, so where the root alone was 40% of the 80-site census these thirty are 38%, the two the de-duplication removed being gone rather than converted.
+  `CraftingSystemManagerRoot.svelte`'s four — the systems feature panels — and the gathering inspector rail's twenty-five are deferred with a named reason: issue 1707 relocated them without converting one, so where the root alone was 40% of the 80-site census these twenty-nine are 36%, the two the de-duplication removed being gone rather than converted and the tags at-a-glance card having left with the inspector rail issue 1915 retired.
   The twenty-five are `environment/GatheringTaskInspector.svelte`'s seven, `world/TravelInspector.svelte`'s eight, `environment/GatheringInspectorRail.svelte`'s four, `environment/GatheringEventInspector.svelte`'s three, `environment/GatheringModifierEditor.svelte`'s two and `environment/GatheringRulesInspector.svelte`'s one, and each file is now small enough that a conversion lane can take one screen at a time.
   They stay pinned by count so a later partial pass fails rather than silently reducing a deferral nobody is tracking.
 - THE manager's labelled form field exists at `src/ui/svelte/components/Field.svelte`, taking its HOST element from a CLOSED `as` set of three: `label`, `div` and `fieldset`.
@@ -291,7 +291,7 @@ Tone is a fixed vocabulary and each member has a meaning:
 - `warning` is amber, for a verb that BREAKS A LINK rather than destroying a record — unlinking a source is not deleting one.
 - the default is the quiet panel-surface treatment.
 
-Recorded non-conformance: the recipe, component, Tool Studio, and Tags & Categories inspectors still render their own treatments and are the declared conversion backlog.
+Recorded non-conformance: the recipe, component and Tool Studio inspectors still render their own treatments and are the declared conversion backlog; the Tags & Categories inspector left that backlog by being retired rather than converted (issue 1915), so the count is three.
 The essence inspector is converted; a primitive that coexists with unconverted duplicates has added a variant rather than removed one, so the remainder is a debt with an owner rather than an accepted state.
 
 #### No-state messages
@@ -802,11 +802,17 @@ The filter bar's state MUST therefore outlive the surface: search term, filter a
 
 The trip differs by surface and each kind counts.
 Where an editor route exists the trip is the editor round-trip — the system library, the environment library, the gathering task and encounter libraries, the three studios, and the world scoped-entity catalogues.
-Where no editor exists the trip is leaving the route or switching a sub-tab, which unmounts the surface just as completely: the tool library, the three vocabulary panels, the Knowledge roster, the grant-access rosters, World Travel's realm list and a realm row's environment pickers.
+Where no editor exists the trip is leaving the route or switching a sub-tab, which unmounts the surface just as completely: the tool library, the six vocabulary panels, the Knowledge roster, the grant-access rosters, World Travel's realm list and a realm row's environment pickers.
+For the vocabulary panels that trip is leaving the route alone, because neither vocabulary route has a sub-tab to switch (issue 1915).
 
 The state is owned by the **manager shell**, never by the surface and never by an intermediate component between the two.
 An intermediate is unmounted by the same trip, so state held one level up is destroyed by the very transition it would exist to survive.
 A surface reached through an intermediate has its state threaded through it; each surface receives its OWN slot and no surface can read another's, so a term typed into one vocabulary panel never appears in its sibling.
+
+The vocabulary surface is SIX panels across two routes, and the two routes answer this rule differently.
+The three system panels each hold a lifted slot and preserve their search term, sort key and sort direction across the trip that unmounts them.
+The three world panels hold panel-owned state that dies with the route, and that is a stated exception rather than drift: the world route carries no library search for a stale term to be carried into, and its panels are unreachable from any editor round trip.
+Because both routes render all three vocabularies at once, sequential focus traverses all three in document order on each.
 
 Where a surface resets its filters on a genuine crafting-system change, the remembered system id MUST live beside the filters it guards.
 A sentinel held by the surface re-initialises when the surface remounts, so returning from an editor reads as a system switch and clears the state the lift exists to preserve — a lift whose sentinel stays behind is inert.
@@ -885,17 +891,24 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
 #### Feature Controls
 
 - Category list editor for custom categories only; reserved `General` is always present and not removable
-- The Tags & Categories screen is a tabbed screen over the three independent vocabularies — recipe categories, component categories, and item tags — with one vocabulary per tab and a per-tab count badge.
-  Each tab has its own search plus a shown-count chip, a live-validated add form (tone-graded info / success / danger hints as the GM types: lowercase-normalization preview for tags, `General` reserved, duplicate detection, ready-to-add), and a redesigned row carrying a per-category icon, `#`-prefixed tag names, a "Built-in fallback" subtitle on the locked General row, an `N references` / `Unused` / `Locked` badge, and an inline delete-confirm strip for the destructive cascade.
-  A recipe or component category may carry a persisted per-category icon, edited inline from its row.
-- The screen has a right inspector rail: a "Vocabulary at a glance" tile set (recipe categories, component categories, item tags, total references), contextual "How it works" help, and a "Reference-safe by default" reassurance card.
-  The total-references tile sums all three vocabularies, and a tag's reference count includes the recipe tag-placeholder ingredients that name it, not only the components carrying it.
+- The Tags & Categories screen renders the three independent vocabularies — recipe categories, component categories, and component tags — simultaneously through the shared vocabulary shell, never as tabs.
+  The two category vocabularies draw as a 2-up grid and the tag vocabulary full width beneath them, each in a panel whose head states an icon, a title and a subline, and whose sort control names a key and a direction.
+  That sort key and direction ride the panel's lifted browser state, so both survive the route trip.
+  Each panel has its own search plus a shown-count chip, a live-validated add form (tone-graded info / success / danger hints as the GM types: lowercase-normalization preview for tags, `General` reserved, duplicate detection, ready-to-add), and a redesigned row carrying a per-category icon, `#`-prefixed tag names, a "Built-in fallback" subtitle on the locked General row, an `N references` / `Unused` / `Locked` badge, and an inline delete-confirm strip for the destructive cascade.
+  The locked General row and the persisted per-category icon are SYSTEM-scope differences carried as panel data, not as a second shell: the world vocabulary route renders neither, and a recipe or component category may carry a persisted per-category icon edited inline from its row.
+  A panel's `kind` — `recipeCategories`, `componentCategories` or `componentTags` — is the SCREEN's vocabulary id for one panel on both routes.
+  It is neither the system's persisted field name (`categories`, `componentCategories`, `itemTags`) nor a row's own `kind` (`category`, `component-category`, `tag`), which is the same screen-name-versus-domain-noun ruling `### GM World Scoped Entity Routes` requirement 5 makes.
+- The screen states no total across the three vocabularies: its inspector rail is retired (issue 1915), and the left rail's own `Tags & Categories` badge sums the three vocabulary sizes.
+  A tag's reference count includes the recipe tag-placeholder ingredients that name it, not only the components carrying it.
   **Known defect, recorded rather than implied correct (issue 1191):** every reference count on this screen is taken over the recipe and component cohorts as the two library searches currently filter them, not over the system's roster.
   A recipe or component that an active library search excludes therefore contributes nothing, so a vocabulary entry can read `Unused` while the system still references it — and an `Unused` row deletes in **one click**, because the confirm strip's copy reassigns references and is skipped for a zero-reference row.
   The intended contract is that `Unused` means unused _in this system_; issue 1081 preserved the existing cohort deliberately rather than change a rendered number under a performance heading.
   As of issue 1462, leaving the recipe or component library clears that library's search term (see **GM Recipe Library**), so a search can no longer be carried into this screen and left applied there.
   The clear republishes both cohorts this screen counts before the destination route renders, so the wrong counts are not shown even for one frame.
   The cohort choice itself is unchanged and issue 1191 stays open against it: a consumer reading this projection from outside the manager's route scope would still be counting the filtered cohort.
+  **Known defect, recorded rather than implied correct (issue 1397, folded into issue 1915):** two entries of one system vocabulary that differ only in case collapse to a single row, because the row builders de-duplicate on the normalized key the row id is derived from.
+  Storage stays case-preserving, so deleting that row removes only the spelling it showed and the other spelling takes its place on the next render.
+  The collapsed row carries a `title` naming every spelling it stands for, and reconciling the storage half is issue 1411's.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -2193,6 +2206,9 @@ It holds the category and tag vocabularies these entities draw FROM, and folding
    The create-from-drop resolution is likewise a value no page can compute: `foundry.utils.parseUuid` is a Foundry global, and every screen file in this family is barred from reading one.
    Of the eight, the third, sixth, seventh and eighth post-date the enumeration outright — the list-state lift, the drop resolution and the drop-target roster it bundles, the system-scope exit, the vocabulary exit and the picker host all shipped after it was written — and the first, second, fourth and fifth are values no file outside the two gateways can supply: the action pair is structurally unreachable from a page because `.manager-header` is a sibling of `.manager-main`, the reporting wires are the only way a page reaches that pair, the usage counts are over corpora the projection is not handed, and the composed verbs must be published UNDER the family's own key by the store that publishes it.
    The three earlier instances are recorded with their outcomes so the next lane inherits the ledger rather than re-deriving it: the system vocabulary view's world-scope prop bundle is owned by the `svocab` change; the `toolBreakage` allowlist gap is CLOSED unconditionally in the admin store's published system projection; and the world-wide recipe corpus is the World Vocabulary change's ONE added executable line at the world-scope projection's call site.
+   The FOURTH instance is issue 1915's convergence of the two Tags & Categories screens on one shell, which reopens `CraftingSystemManagerRoot.svelte`, `styles/fabricate.css` and the Foundry smoke harness for two named seams: the `FULL_WIDTH_VIEWS` classification of the system `tags` route, which requirement 4 records in the gateway ONCE so no screen file can supply it, and the system vocabulary row corpus the root's three row builders assemble, which is where issue 1397's crash lives and where its fix must land.
+   Its bound is at most ten added executable lines in the root, the `tags` `.manager-body` pair and the rewritten `tags` `.manager-main` rule in the stylesheet, and three locator substitutions in the smoke harness; everything else this change does to those files is a deletion or a prop removal.
+   Its evidence is `ROOT_IMPORT_SPECIFIERS` in `tests/manager-scoped-prop-contract.test.js`, where the root gains no specifier and `./ExplainerCard.svelte` leaves the list, the full-width gate's set equality with `tags` released, and that same suite's criterion (c) proving the world call site, its `FULL_WIDTH_VIEWS` entry, its stylesheet list memberships and its rail leaf byte-identical.
 8. **At the collapsed 56px rail width no leaf renders its count badge.**
    `.manager-nav-count` is suppressed under `.is-rail-collapsed`, where every entry is reduced to its glyph, so the count cannot be part of a collapsed button's accessible name and the collapsed rail's evidence shows contained glyphs and the active leaf rather than a badge.
    Each world leaf therefore carries an explicit `aria-label` naming its screen, at both rail widths.
@@ -2214,7 +2230,7 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
    It reads 0 until a world vocabulary store exists, which is truthful — a world with no vocabulary store has no world vocabulary — rather than a placeholder.
 5. **The three vocabularies are authored at world scope, independently, and are never merged WITH ONE ANOTHER, aliased or cross-populated.**
    The per-kind world/system layering `## Scoped Entity Definitions` requirement 12 mandates is a different axis and is unaffected by this.
-   Each vocabulary's reserved general bucket is not a world entry: it is implicit per system, never persisted, and refused on add at both scopes through the shipped guards — so the world badge and a system tab badge legitimately differ by one per category vocabulary.
+   Each vocabulary's reserved general bucket is not a world entry: it is implicit per system, never persisted, and refused on add at both scopes through the shipped guards — so the world badge and a system panel's entry count legitimately differ by one per category vocabulary.
 6. **A per-entry number at world scope is a REFERENCE COUNT over the whole world**, computed by the same counter the system-scope screen uses, run over every crafting system's records and — for component tags — additionally over the world component defaults' tags.
    The tag asymmetry is non-mirroring rather than exclusivity: the migration deliberately left world tags unauthored because the tag merge is additive, so a GM-authored world tag is a world-scope grant no membership record mirrors, unlike the world default category a migrated world elected from a system that already carries it.
    It is COUNTED and never derived from a name.
@@ -2228,13 +2244,17 @@ It is deliberately NOT part of `### GM World Scoped Entity Routes`, and the sepa
 8. **The deletion sentence's substitution tokens and the one-click gate are per-ROW data, not per-panel copy.**
    The vocabulary panel primitive is shared by every vocabulary surface at either scope.
    A surface whose confirm must state a second number, or whose one-click predicate reads more than the reference count alone — at world scope a strictly NARROWER conjunction, per requirement 6, and never a wider one — supplies those on the row rather than forking the primitive or writing a rule in the module stylesheet.
-   That is `design-system/spec.md`'s extend-with-a-defaulted-prop rule applied to the two fields that carry them, and the shipped callers pass neither and render byte-identically.
-   The same is true of the two renderings that ADVERTISE the gate — the row's usage chip and the delete control's destructive tone.
+   That is `design-system/spec.md`'s extend-with-a-defaulted-prop rule applied to the two fields that carry them.
+   Since issue 1915 both scopes reach the primitive through the shared vocabulary panel component, so those two fields and the two renderings that ADVERTISE the gate — the row's usage chip and the delete control's destructive tone — travel on that component's rest spread rather than through a second call site.
+   Of the panel component's six callers the three system panels pass neither field and render byte-identically; the three world panels pass both.
    All three read one per-row predicate; a primitive whose behaviour reads the row while its affordance reads a different field states one thing and does another, which is the failure `design-system/spec.md` already rules on for the single-select inset bar.
 9. **The screen renders the three vocabularies simultaneously, never as tabs**: the two category vocabularies in a two-column grid and the component-tag vocabulary full width beneath them, matching the reference.
-   Each is the shared vocabulary panel primitive, with the page supplying its head — icon, title, subline — and its sort control, and the primitive supplying the add form, the search, the entry count, the rows and the empty states.
-   The page's panel is the card; the primitive's add form runs flush inside it, because a form authored to float on the bare pane draws its own card and two nested cards invert the reference's own nesting.
-   The page states no entry count in the head, because the primitive already publishes one.
+   The composition is a THREE-WAY split, and it is the same shell both scopes render since issue 1915.
+   The shared vocabulary shell supplies the layout — the category grid, the full-width band beneath it and the always-mounted status line.
+   The shared vocabulary panel component supplies each panel's card and its head — icon, title, subline — and its sort control.
+   The vocabulary panel primitive supplies the add form, the search, the entry count, the rows and the empty states.
+   The panel component's card is the card; the primitive's add form runs flush inside it, because a form authored to float on the bare pane draws its own card and two nested cards invert the reference's own nesting.
+   The head states no entry count, because the primitive already publishes one.
    A panel column is never narrower than the primitive's own row-card track, so the grid collapses to one column before that floor is crossed; the row's trailing delete control is the element a violation clips, and the released full-width body clips horizontally rather than scrolling.
 
 ### GM World Component Screens

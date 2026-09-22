@@ -821,7 +821,9 @@ test('every explainer and fact-row site renders through the primitive, not by ha
     ['tools/ToolBehaviorPreview.svelte', ['ScopedEntityPreview']],
     ['scoped/ScopedEntityPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
-    ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
+    // `CraftingSystemManagerRoot.svelte` is NOT on this list any more (issue 1915). Its two
+    // explainer cards belonged to the Tags & Categories inspector rail, and that rail is
+    // retired rather than converted, so the root imports the primitive nowhere.
     // `checks/ChecksRightMenu.svelte` is NOT on this list any more (issue 1096). The
     // maintainer removed the `ABOUT CRAFTING CHECKS` explainer outright: the prototype's
     // rail has no such card, and it pushed every panel with a subject below the fold. This

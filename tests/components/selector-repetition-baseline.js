@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 203 repeated selectors
  * rather than these 110, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,038 `(at-context, selector)` keys, of which 2,928 appear exactly
+ * Unfiltered, the sheet holds 3,040 `(at-context, selector)` keys, of which 2,930 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,562 rules at that head, 110 repeated keys and 225 appearances
+ * printed from. The sheet holds 2,564 rules at that head, 110 repeated keys and 225 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -118,6 +118,14 @@
  * moves a figure. 2,565 -> 2,562 rules, 3,042 -> 3,038 keys, 2,932 -> 2,928 singletons, 204 ->
  * 203 keyed alone; 110 repeated keys and 225 appearances are unmoved. Re-derived by running
  * `node scripts/stylesheet-selector-census.mjs`, not subtracted.
+ * ITS PHASE 3 MOVES THE THREE CONTEXTUAL FIGURES AGAIN AND NOTHING ELSE. Retiring the system
+ * screen's inspector rail releases its grid column, which is a `.manager-body` pair — the 2-track
+ * rule and its `.is-rail-collapsed` twin at equal specificity — written as its own rules rather
+ * than appended to either released-route list, so that the seven world-route lists stay
+ * byte-identical. Both are ARRIVALS and both are singletons in both keyings, so the repeated
+ * table is untouched a second time: 2,562 -> 2,564 rules, 3,038 -> 3,040 keys, 2,928 -> 2,930
+ * singletons, 203 keyed alone unmoved, 110 repeated keys and 225 appearances unmoved. Re-derived
+ * by running `node scripts/stylesheet-selector-census.mjs`, not subtracted.
  */
 import { readFileSync } from 'node:fs';
 

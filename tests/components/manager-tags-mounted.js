@@ -119,55 +119,17 @@ export function registerTagsCases() {
       );
     }
 
-    // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
-    const howItWorks = target.querySelector('[data-tags-evidence="how-it-works"]');
-    assert.ok(howItWorks);
-    assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
-    assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
-    assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
-    const referenceSafe = target.querySelector('[data-tags-evidence="reference-safe"]');
-    assert.ok(referenceSafe);
-
-    // Issue 881: both contextual-help cards render through the SAME explainer primitive
-    // the Tool Studio's "How Tools work in Fabricate" card uses, so the rail stops
-    // re-deriving one meaning as a disc-bulleted list and a bare paragraph. Rendering the
-    // card shell, the shared card title and the glyph-led rows is the observable contract.
-    for (const card of [howItWorks, referenceSafe]) {
-      assert.ok(
-        card.classList.contains('manager-inspector-card') &&
-          card.classList.contains('manager-explainer-card'),
-        'the tags help cards wear the shared side-panel card shell'
-      );
-      assert.ok(
-        card.querySelector('h3.manager-card-title.manager-explainer-card-title > i'),
-        'the tags help cards carry the shared glyph-led card title'
-      );
-    }
+    // Issue 1915: the inspector rail is RETIRED, so the whole route runs without an aside and
+    // nothing on screen states a total across the three vocabularies.
     assert.equal(
-      howItWorks.querySelectorAll('.manager-explainer-card-list > li').length,
-      3,
-      'the recipe-categories help renders its three rows through the explainer list'
+      target.querySelectorAll('[data-tags-evidence], [data-tags-category-fact]').length,
+      0,
+      'no at-a-glance tile or explainer card survives the retired rail'
     );
-    assert.equal(
-      referenceSafe.querySelectorAll('.manager-explainer-card-list > li').length,
-      1,
-      'the reference-safety reassurance is one explainer row, not a bare paragraph'
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
+      'the tags route renders no inspector aside at all'
     );
-    assert.equal(
-      target.querySelector('.manager-evidence-list'),
-      null,
-      'the retired bullet list must be gone from the rail, not merely unstyled'
-    );
-    // A bold lead-in and its prose are one sentence.
-    for (const row of howItWorks.querySelectorAll('.manager-explainer-card-list > li')) {
-      const lead = row.querySelector('strong');
-      if (!lead) continue;
-      assert.match(
-        row.textContent,
-        new RegExp(`${lead.textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`),
-        `explainer lead-in "${lead.textContent}" must be separated from its prose`
-      );
-    }
 
     // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');

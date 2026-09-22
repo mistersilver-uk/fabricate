@@ -27,15 +27,16 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    count: 5,
+    count: 4,
     why:
-      'deferred: root convergence pending. Five hand-rolled cards remain — the tags at-a-glance ' +
-      'card and the four systems feature panels — and they are held out of the sweep because the ' +
-      'converging root is the wrong place to land its tail. The count was 32 until issue 1707 ' +
+      'deferred: root convergence pending. Four hand-rolled cards remain — the systems feature ' +
+      'panels — and they are held out of the sweep because the converging root is the wrong ' +
+      'place to land its tail. The fifth was the Tags & Categories at-a-glance card, and issue ' +
+      '1915 retired that inspector rail rather than converting it. The count was 32 until 1707 ' +
       'wrote the twice-authored modifier panel once (two cards de-duplicated, not converted), 28 ' +
       'until its phase 2 moved nineteen into the leaf rows below, and 9 until its phase 3 moved ' +
       'the four the chain drew around those branches into the rail row below. Pinned by count so ' +
-      'a later root pass that converts some of the five fails here instead of leaving a fraction ' +
+      'a later root pass that converts some of the four fails here instead of leaving a fraction ' +
       'of a deferral nobody is tracking.',
   }),
   Object.freeze({

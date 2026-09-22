@@ -7184,6 +7184,15 @@
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
+/* The system vocabulary route releases the third column in issue 1915, the other half of its `FULL_WIDTH_VIEWS` entry. It is its own pair rather than a member of either list above: the seven world-route lists stay byte-identical, and the pair is kept adjacent so the collapsed sibling cannot be separated from the rule it has to out-specify. */
+.fabricate-manager[data-manager-view="tags"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="tags"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 /* The seven world scoped-entity routes (issue 1362, epic 1357) release the third column (issues 1096, 1311). */
 .fabricate-manager[data-manager-view="world-components"] .manager-body,
 .fabricate-manager[data-manager-view="world-component-entry"] .manager-body,

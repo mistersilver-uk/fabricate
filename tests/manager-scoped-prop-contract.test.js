@@ -100,7 +100,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './EnvironmentsBrowserView.svelte',
   './EssenceBrowserView.svelte',
   './EssenceEditView.svelte',
-  './ExplainerCard.svelte',
   './GatheringEventEditView.svelte',
   './GatheringMapLinksTab.svelte',
   './GatheringRealmsTab.svelte',

@@ -20,9 +20,10 @@ const SHARED_PRIMITIVES = [
   // that mounts a tree containing that screen.
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   // The manager's ONE "how this surface works" explainer card and ONE icon fact row
-  // (issue 881). Both are side-panel primitives, so the Tool Studio and the Tags &
-  // Categories rail already pull them into two different mounted trees and the next
-  // side panel will pull them into a third.
+  // (issue 881). Both are side-panel primitives, so the shared scoped-entity preview and the
+  // essence on-craft tab already pull them into two different mounted trees and the next side
+  // panel will pull them into a third. The Tags & Categories rail was one of the two justifying
+  // trees until issue 1915 retired it; the explainer card kept its two callers without it.
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // The manager's ONE chip (issue 883). This is the sharpest case yet.
