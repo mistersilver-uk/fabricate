@@ -56,8 +56,10 @@ const harness = createMountedComponentHarness({
     // not fail a test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, which
     // `node --test` reports as `# cancelled`.
     'src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js',
-    // The shared shell's own pure leaf (issue 1915), imported by the studio AND by the panel.
+    // The shared shell's own pure leaf (issue 1915), imported by the studio AND by the panel, and
+    // the scalar helper its `inputNormalizer` folds tags with.
     'src/ui/svelte/apps/manager/vocabularyShell.js',
+    'src/utils/scalars.js',
     'src/systems/worldVocabulary.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.

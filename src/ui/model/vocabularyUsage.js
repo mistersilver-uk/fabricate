@@ -19,22 +19,25 @@ export function normalizeVocabularyKey(value) {
 }
 
 /**
- * The custom entries of one system vocabulary, one spelling per {@link normalizeVocabularyKey}.
+ * The custom entries of one system vocabulary as `{key, name, spellings}` records, one per
+ * {@link normalizeVocabularyKey}: `name` is the first spelling in stored order, `spellings` holds
+ * every stored spelling that collapses to the key, in that order, and blanks are dropped.
  *
- * The first spelling in STORED order wins, so the visible name is the one the GM authored first;
- * blanks and the reserved bucket are dropped, the latter because the category row builders prepend
- * the locked General row outside this set and a second row under its id crashes the list.
+ * `reservesGeneral` drops the reserved bucket. It is a property of the two CATEGORY vocabularies,
+ * which prepend a locked General row outside this set, never of the key: a component tag may
+ * legitimately be named `general`, and dropping it here would make it unmanageable.
  */
-export function dedupeVocabularyEntries(entries) {
-  const firstSpellingByKey = new Map();
+export function dedupeVocabularyEntries(entries, { reservesGeneral = false } = {}) {
+  const byKey = new Map();
   for (const entry of Array.isArray(entries) ? entries : []) {
     const spelling = String(entry ?? '').trim();
     if (!spelling) continue;
     const key = normalizeVocabularyKey(spelling);
-    if (key === 'general' || firstSpellingByKey.has(key)) continue;
-    firstSpellingByKey.set(key, spelling);
+    if (reservesGeneral && key === 'general') continue;
+    if (byKey.has(key)) byKey.get(key).spellings.push(spelling);
+    else byKey.set(key, { key, name: spelling, spellings: [spelling] });
   }
-  return [...firstSpellingByKey.values()].sort((left, right) => left.localeCompare(right));
+  return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function increment(map, key) {

@@ -207,6 +207,10 @@ describe('vocabularyUsage (issue 689)', () => {
 });
 
 describe('the system vocabulary row key and its de-duplication (issue 1397)', () => {
+  /** The visible names one call yields, which is what the row list draws. */
+  const names = (entries, options) =>
+    dedupeVocabularyEntries(entries, options).map((entry) => entry.name);
+
   it('keys a row on its trimmed lower-cased name and a blank on the reserved bucket', () => {
     assert.equal(normalizeVocabularyKey('  Potions '), 'potions');
     assert.equal(normalizeVocabularyKey('HERB'), 'herb');
@@ -224,23 +228,37 @@ describe('the system vocabulary row key and its de-duplication (issue 1397)', ()
   });
 
   it('keeps the FIRST spelling of a collapsed key, in stored order', () => {
-    assert.deepEqual(dedupeVocabularyEntries(['Potions', 'potions']), ['Potions']);
-    assert.deepEqual(dedupeVocabularyEntries(['potions', 'Potions']), ['potions']);
-    assert.deepEqual(dedupeVocabularyEntries(['herb', 'HERB', ' Herb ']), ['herb']);
+    assert.deepEqual(names(['Potions', 'potions']), ['Potions']);
+    assert.deepEqual(names(['potions', 'Potions']), ['potions']);
+    assert.deepEqual(names(['herb', 'HERB', ' Herb ']), ['herb']);
   });
 
-  it('drops the reserved bucket at any spelling, because the builders prepend it', () => {
-    assert.deepEqual(dedupeVocabularyEntries(['General', 'Potions']), ['Potions']);
-    assert.deepEqual(dedupeVocabularyEntries([' general ', 'GENERAL']), []);
+  it('carries every spelling that collapsed into the record, in stored order', () => {
+    // What the row's `title` is built from, and what the store must delete: a survivor left in
+    // storage renders as a second row under a name the GM thought they had removed.
+    assert.deepEqual(dedupeVocabularyEntries([' Potions ', 'potions', 'POTIONS']), [
+      { key: 'potions', name: 'Potions', spellings: ['Potions', 'potions', 'POTIONS'] },
+    ]);
+    assert.deepEqual(dedupeVocabularyEntries(['Ore'])[0].spellings, ['Ore']);
+  });
+
+  it('drops the reserved bucket only where the caller reserves one', () => {
+    // The two CATEGORY builders prepend the locked General row outside this set, so a second row
+    // under its id would crash the keyed list. The TAG vocabulary reserves nothing, and a tag
+    // literally named `general` is an entry a GM can store, reference, count and must manage.
+    assert.deepEqual(names(['General', 'Potions'], { reservesGeneral: true }), ['Potions']);
+    assert.deepEqual(names([' general ', 'GENERAL'], { reservesGeneral: true }), []);
+    assert.deepEqual(names([' general ', 'GENERAL']), ['general']);
+    assert.deepEqual(names(['General', 'Potions']), ['General', 'Potions']);
   });
 
   it('drops blanks and non-strings, and never returns an entry that renders as nothing', () => {
-    assert.deepEqual(dedupeVocabularyEntries(['  ', '', null, undefined, 'Ore']), ['Ore']);
+    assert.deepEqual(names(['  ', '', null, undefined, 'Ore']), ['Ore']);
     assert.deepEqual(dedupeVocabularyEntries(null), []);
     assert.deepEqual(dedupeVocabularyEntries(undefined), []);
   });
 
   it('orders the survivors by localeCompare rather than by storage order', () => {
-    assert.deepEqual(dedupeVocabularyEntries(['ore', 'Ale', 'herb']), ['Ale', 'herb', 'ore']);
+    assert.deepEqual(names(['ore', 'Ale', 'herb']), ['Ale', 'herb', 'ore']);
   });
 });

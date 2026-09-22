@@ -26,6 +26,9 @@
 
   // THE ROUTE'S FOUR FACTS, as module constants rather than placeholder-shell attributes.
   // `manager-contract.test.js` cross-checks the title key against `viewTitle`'s own answer.
+  // Declared for the route contract and rendered by nothing: `data-scoped-page` below must be a
+  // literal for the route map's regexp.
+  // eslint-disable-next-line no-unused-vars -- see above
   const PAGE_ID = 'world-vocabulary';
   // The route's own glyph, and the fallback a panel head takes when its vocabulary states none.
   const PAGE_ICON = 'fas fa-tags';
@@ -92,7 +95,7 @@
 <!-- `data-scoped-page` is a LITERAL and not `{PAGE_ID}` (issue 1392): the route map reads it with
      a quoted-value regexp, and an interpolated form would drop this route out of the assertion. -->
 <main class="manager-main" data-scoped-page="world-vocabulary" aria-label={title}>
-  <VocabularyShell {statusMessage} data-scoped-vocabulary={PAGE_ID}>
+  <VocabularyShell {statusMessage}>
     {#snippet grid()}
       {#each bands.grid as panel (panel.kind)}
         <VocabularyShellPanel {...propsFor(panel)} bind:browserState={panelStates[panel.kind]} />

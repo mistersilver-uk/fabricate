@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { resolveChromeCache } from '../../scripts/lib/foundryChromeCache.js';
-import { buildLabContent } from '../view-lab/world/labContent.js';
+import { buildLabContent, LAB_SYSTEM_IDS } from '../view-lab/world/labContent.js';
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -78,7 +78,8 @@ const CHROME_MARGIN = 24;
 const CHROME_ALLOWANCE = MEASURED_CHROME + CHROME_MARGIN;
 
 /** The ROW COUNTS the View Lab fixture actually seeds, per kind - DERIVED from that fixture. */
-const LAB_VOCABULARY = buildLabContent().worldVocabulary;
+const LAB_CONTENT = buildLabContent();
+const LAB_VOCABULARY = LAB_CONTENT.worldVocabulary;
 const FIXTURE_ROWS = Object.fromEntries(
   KINDS.map((kind) => [kind, (LAB_VOCABULARY[kind] ?? []).length])
 );
@@ -143,13 +144,45 @@ function document_(managerWidth, route) {
     `<div class="manager-header" style="height: ${MEASURED_CHROME}px"></div>` +
     '<div class="manager-body"><div class="manager-rail"></div>' +
     `<main ${route.mainAttributes} aria-label="Tags &amp; Categories">` +
-    `<div class="manager-vocabulary-shell ${shell.hashClass}" data-scoped-vocabulary="world-vocabulary">` +
+    `<div class="manager-vocabulary-shell ${shell.hashClass}">` +
     `<p class="manager-vocabulary-shell-status ${shell.hashClass}"></p>` +
     `<div class="manager-vocabulary-shell-grid ${shell.hashClass}">${panelFixture('recipeCategories')}${panelFixture('componentCategories')}</div>` +
     `${panelFixture('componentTags')}` +
     '</div></main></div></div></body></html>'
   );
 }
+
+/** The system vocabulary capture cases, and the lab system each of them opens. */
+const TAGS_CASES = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('manager-tags-categories-'));
+
+test('the lab system the tags cases open seeds every vocabulary those captures walk', () => {
+  // A capture step whose selector matches nothing fails the WHOLE run and publishes no frame, so
+  // a fixture that quietly lost one of these vocabularies costs every frame rather than one.
+  assert.equal(TAGS_CASES.length, 3, 'the registry still carries the three system vocabulary cases');
+  for (const entry of TAGS_CASES) {
+    const systemId = entry.query?.system ?? LAB_SYSTEM_IDS.SMITHING;
+    const system = (LAB_CONTENT.systems ?? []).find((candidate) => candidate?.id === systemId);
+    assert.ok(Boolean(system), `${entry.id} opens \`${systemId}\`, which the lab does not seed`);
+    const opens = `${entry.id} opens \`${systemId}\`, which seeds`;
+    assert.ok((system.categories ?? []).length > 0, `${opens} no recipe category`);
+    assert.ok((system.itemTags ?? []).length > 0, `${opens} no component tag`);
+    // CARRIED, not merely declared: an unreferenced row's delete wears `is-danger`, and the
+    // `-stacked` case arms its confirm strip through `:not(.is-danger)`.
+    const carried = new Set(
+      (system.components ?? []).map((component) =>
+        String(component?.category ?? '')
+          .trim()
+          .toLowerCase()
+      )
+    );
+    assert.ok(
+      (system.componentCategories ?? []).some((category) =>
+        carried.has(String(category).trim().toLowerCase())
+      ),
+      `${opens} no component category any component carries`
+    );
+  }
+});
 
 let browser;
 
@@ -256,13 +289,8 @@ perRoute('every sort select is a control rather than a full-width bar, on a COLD
 });
 
 perRoute('the sort select keeps its whole shipped skin after the toolbar rules narrow', async (route) => {
-  // ── THE NUMERIC HALF OF A DOES-NOT-MOVE CLAIM (issue 1504) ──────────────────────
-  // Issue 1504 converts the scoped-catalogue toolbar's lane filter and sort key to shared
-  // `<Select>`s, which strands the two sheet rules that painted a `.manager-scoped-list-toolbar
-  // select`. They are NARROWED onto the panel component rather than deleted, because IT still
-  // renders a native `<select data-vocabulary-sort>` and takes its entire skin from them — its own
-  // scoped block repairs width only. Issue 1915 re-keyed them off the world route attribute and
-  // onto that component's class, which is what makes this clause hold on the system route too.
+  // Issue 1915 re-keyed the sheet's `.manager-scoped-list-toolbar select` skin onto the panel
+  // component's class, which is what makes this clause hold on the system route too.
   const { tab, close } = await open(1280, route);
   try {
     const measured = await tab.evaluate((kinds) => {

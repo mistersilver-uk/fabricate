@@ -7,12 +7,11 @@
   `VocabularyShellPanel`, which the world screen renders too; all the copy and the hint machines
   belong to `systemVocabularyStudio.js`. What is left here is the wiring.
 
-  THREE LITERAL CALL SITES, not an `{#each}`: the three lifted browser slots are `$bindable` props
-  pinned by name, and a loop cannot bind one per iteration. The view renders NO page header of its
-  own — the shell's `.manager-header` is the only one.
+  The three panels are literal call sites because the browser-view-state contract pins the three
+  `bind:` props by name.
 
-  What survives the tabs as DATA rather than as shape: the locked General row and the per-row
-  persisted icon, which are the system scope's two divergences and live in the panel descriptors.
+  The system scope's two differences are data in the panel descriptors: the locked General row and
+  the per-row persisted icon.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';

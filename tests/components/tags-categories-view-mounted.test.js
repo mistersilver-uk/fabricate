@@ -288,6 +288,53 @@ describe('TagsCategoriesView (mounted)', () => {
     );
   });
 
+  it('renders a tag literally named `general`, which reserves no bucket here (issue 1397)', async () => {
+    // The two CATEGORY vocabularies prepend a locked General row, so their builders drop the key.
+    // The tag vocabulary has no reserved bucket: a `general` tag is stored, referenced and counted
+    // like any other, and dropping it left the GM a tag they could see the effects of but not
+    // manage, with the add form answering `Ready to add` forever.
+    const root = await harness.mount(
+      mountProps({ tagRows: [row('general', 'general', 3), row('herb', 'herb', 1)] })
+    );
+
+    const tags = root.querySelector(panelSelector('componentTags'));
+    assert.ok(
+      Boolean(tags.querySelector('[data-tag-id="general"]')),
+      'the `general` tag keeps its row'
+    );
+    assert.deepEqual(namesIn(root, 'componentTags', 'data-tag-id'), ['#general', '#herb']);
+    assert.ok(
+      !tags.querySelector('.manager-vocabulary-card.is-locked'),
+      'and it is an ordinary removable entry, not a reserved row'
+    );
+  });
+
+  it('names every spelling a collapsed row stands for, and only on a collapsed row', async () => {
+    const root = await harness.mount(
+      mountProps({
+        categoryRows: [
+          { id: 'general', name: 'General', totalUsage: 0 },
+          { id: 'potions', name: 'Potions', title: 'Potions, potions', totalUsage: 1 },
+          { id: 'alloys', name: 'Alloys', title: '', totalUsage: 5 },
+        ],
+      })
+    );
+
+    const mainOf = (id) =>
+      root.querySelector(`${panelSelector('recipeCategories')} [data-category-id="${id}"] .manager-vocabulary-main`);
+    assert.equal(
+      mainOf('potions').getAttribute('title'),
+      'Potions, potions',
+      'the collapsed row discloses both spellings it stands for'
+    );
+    // Pointer-only, so it must not become a tooltip on every row: a name the GM can already read
+    // repeated under the cursor is noise, and the empty string is what the builders pass.
+    assert.ok(
+      !mainOf('alloys').hasAttribute('title'),
+      'a single-spelling row carries no `title` attribute at all'
+    );
+  });
+
   it('arms a delete in one panel and leaves every other panel unarmed', async () => {
     const root = await harness.mount(mountProps());
 

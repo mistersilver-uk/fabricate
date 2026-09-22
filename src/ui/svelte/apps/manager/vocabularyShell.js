@@ -6,6 +6,8 @@
  * where the panel sits and which glyph heads it — are answered here once.
  */
 
+import { normalizeTag } from '../../../../utils/scalars.js';
+
 /**
  * The per-kind facts neither scope gets to choose. `column` is what the shell partitions on and
  * `icon` is the panel head's glyph, so the two screens read as one shell rather than two.
@@ -84,6 +86,11 @@ export function partitionVocabularyPanels(panels) {
 /** The direction a toggle click moves to; anything that is not `asc` reads as `desc`. */
 export function toggledDirection(direction) {
   return direction === 'asc' ? 'desc' : 'asc';
+}
+
+/** The value handed to `onAdd`: tags are lowercased, categories keep their authored casing. */
+export function inputNormalizer(kind) {
+  return kind === 'componentTags' ? normalizeTag : (value) => String(value || '').trim();
 }
 
 /**

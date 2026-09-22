@@ -41,11 +41,7 @@
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
-  import {
-    buildVocabularyUsage,
-    dedupeVocabularyEntries,
-    normalizeVocabularyKey,
-  } from '../../../model/vocabularyUsage.js';
+  import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
@@ -7418,19 +7414,21 @@
 
   function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
-    const customRows = dedupeVocabularyEntries(categories).map((category) => {
-      const key = normalizeVocabularyKey(category);
-      const recipeUsageCount = usage.get(key) || 0;
-      return {
-        id: key,
-        kind: 'category',
-        name: category,
-        icon: categoryIconFor(icons, category),
-        recipeUsageCount,
-        totalUsage: recipeUsageCount,
-        locked: false,
-      };
-    });
+    const customRows = dedupeVocabularyEntries(categories, { reservesGeneral: true }).map(
+      (entry) => {
+        const recipeUsageCount = usage.get(entry.key) || 0;
+        return {
+          id: entry.key,
+          kind: 'category',
+          name: entry.name,
+          title: entry.spellings.length > 1 ? entry.spellings.join(', ') : '',
+          icon: categoryIconFor(icons, entry.name),
+          recipeUsageCount,
+          totalUsage: recipeUsageCount,
+          locked: false,
+        };
+      }
+    );
     return [
       {
         id: 'general',
@@ -7448,19 +7446,21 @@
   // Component-category rows (issue 676).
   function buildComponentCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Common.General', 'General');
-    const customRows = dedupeVocabularyEntries(categories).map((category) => {
-      const key = normalizeVocabularyKey(category);
-      const componentUsageCount = usage.get(key) || 0;
-      return {
-        id: key,
-        kind: 'component-category',
-        name: category,
-        icon: categoryIconFor(icons, category),
-        componentUsageCount,
-        totalUsage: componentUsageCount,
-        locked: false,
-      };
-    });
+    const customRows = dedupeVocabularyEntries(categories, { reservesGeneral: true }).map(
+      (entry) => {
+        const componentUsageCount = usage.get(entry.key) || 0;
+        return {
+          id: entry.key,
+          kind: 'component-category',
+          name: entry.name,
+          title: entry.spellings.length > 1 ? entry.spellings.join(', ') : '',
+          icon: categoryIconFor(icons, entry.name),
+          componentUsageCount,
+          totalUsage: componentUsageCount,
+          locked: false,
+        };
+      }
+    );
     return [
       {
         id: 'general',
@@ -7475,14 +7475,15 @@
     ];
   }
 
+  // The tag vocabulary reserves no bucket, so a tag named `general` is an entry like any other.
   function buildTagRows(tags, usage) {
-    return dedupeVocabularyEntries(tags).map((tag) => {
-      const key = normalizeVocabularyKey(tag);
-      const componentUsageCount = usage.get(key) || 0;
+    return dedupeVocabularyEntries(tags).map((entry) => {
+      const componentUsageCount = usage.get(entry.key) || 0;
       return {
-        id: key,
+        id: entry.key,
         kind: 'tag',
-        name: tag,
+        name: entry.name,
+        title: entry.spellings.length > 1 ? entry.spellings.join(', ') : '',
         componentUsageCount,
         totalUsage: componentUsageCount,
       };

@@ -15,8 +15,12 @@ import { isGeneralRecipeCategory } from '../../../../../utils/recipeCategories.j
 import {
   decorateTagRows,
   defineVocabularyPanel,
+  inputNormalizer,
   vocabularyPanelProps,
 } from '../vocabularyShell.js';
+
+// Re-exported because the screen's whole add-path contract is read from this module.
+export { inputNormalizer } from '../vocabularyShell.js';
 
 /** The lang-key root every world vocabulary string hangs off. */
 const LANG_ROOT = 'FABRICATE.Admin.Manager.Scoped.WorldVocabulary';
@@ -95,17 +99,6 @@ export function cascadeClause(panel, row, text) {
     clause = clause.split(`{${token}}`).join(String(value));
   }
   return clause;
-}
-
-/** The value handed to `onAdd`: tags are lowercased, categories keep their authored casing. */
-export function inputNormalizer(kind) {
-  if (kind === 'componentTags') {
-    return (value) =>
-      String(value || '')
-        .trim()
-        .toLowerCase();
-  }
-  return (value) => String(value || '').trim();
 }
 
 /**

@@ -30,7 +30,8 @@
  * and `reagent` remain two distinct system categories while `## CraftingSystem` requirement 6c
  * already keys their shared icon map by the lowercased name. Issue 1397 is the symptom of that
  * inconsistency, and its crash is fixed at the DISPLAY layer: the three system row builders
- * de-duplicate on this same normalized key, first spelling wins in stored order, while
+ * de-duplicate on this same normalized key, first spelling wins in stored order, the one row
+ * carries a pointer-only `title` naming every spelling, and deleting it removes them all, while
  * `normalizeCustomCategoryNames` keeps de-duplicating storage on the case-preserving value.
  * Component tags diverge from nothing, because `normalizeTag` already lower-cases. This module
  * takes the rule the icon maps and the reference counter already assume; reconciling the storage

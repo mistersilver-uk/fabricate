@@ -12,6 +12,7 @@ import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import { normalizeVocabularyKey } from '../../src/ui/model/vocabularyUsage.js';
 
 let Component;
 let mounted;
@@ -206,8 +207,8 @@ export function registerTagsCases() {
     );
     assert.ok(tagIconTile, 'each tag row renders a decorative accent icon tile');
     assert.ok(
-      tagIconTile.querySelector('i.fa-tag'),
-      'the decorative tag tile uses the fa-tag glyph'
+      tagIconTile.querySelector('i.fa-hashtag'),
+      'the decorative tag tile wears the tag vocabulary’s own glyph, the one heading its panel'
     );
     assert.ok(
       !target.querySelector('[data-tag-id="ore"] [data-vocabulary-icon-picker]'),
@@ -624,7 +625,7 @@ export function registerTagsCases() {
         selectedSystemOverrides: {
           categories: ['Potions', 'potions'],
           componentCategories: ['Reagent', 'reagent'],
-          itemTags: ['herb', 'HERB'],
+          itemTags: ['general', 'herb', 'HERB'],
         },
       });
 
@@ -633,12 +634,40 @@ export function registerTagsCases() {
         'general',
         'reagent',
       ]);
-      assert.deepEqual(rowIds('componentTags', 'data-tag-id'), ['herb']);
+      // `general` is a TAG here, not a reserved bucket: the tag vocabulary prepends no locked row,
+      // so dropping the key left a stored, referenced, counted tag no GM could manage.
+      assert.deepEqual(rowIds('componentTags', 'data-tag-id'), ['general', 'herb']);
       // The FIRST spelling in stored order is the one that survives.
       assert.equal(rowName('recipeCategories', 'data-category-id', 'potions'), 'Potions');
       assert.equal(rowName('componentCategories', 'data-component-category-id', 'reagent'), 'Reagent');
       // Tag rows render their name `#`-prefixed, which is the row anatomy rather than the entry.
       assert.equal(rowName('componentTags', 'data-tag-id', 'herb'), '#herb');
+    });
+
+    it('discloses the spellings behind a collapsed row, and nothing behind a single one', async () => {
+      // The one disclosure the collapse has: pointer-only, so it reaches neither the keyboard nor
+      // a screen reader, and it is the reason the storage half is still issue 1411's to reconcile.
+      await openTagsScreen([], {
+        selectedSystemOverrides: {
+          categories: ['Potions', 'potions'],
+          itemTags: ['general', 'herb', 'HERB'],
+        },
+      });
+
+      const mainOf = (kind, rowAttr, id) =>
+        panelFor(kind).querySelector(`[${rowAttr}="${id}"] .manager-vocabulary-main`);
+      assert.equal(
+        mainOf('recipeCategories', 'data-category-id', 'potions').getAttribute('title'),
+        'Potions, potions'
+      );
+      assert.equal(
+        mainOf('componentTags', 'data-tag-id', 'herb').getAttribute('title'),
+        'herb, HERB'
+      );
+      assert.ok(
+        !mainOf('componentTags', 'data-tag-id', 'general').hasAttribute('title'),
+        'a row standing for one spelling says nothing under the cursor'
+      );
     });
 
     it('counts a custom General as the locked row it collides with, not as a second entry', async () => {
@@ -666,13 +695,13 @@ export function registerTagsCases() {
       );
     });
 
-    it('leaves the other spelling rendered once the shown one is deleted (known successor state)', async () => {
-      // Storage stays case-preserving (issue 1411 owns reconciling it), so deleting the visible
-      // `Potions` removes only that spelling and `potions` takes its place on the next publish.
+    it('takes every spelling with it when the collapsed row is deleted', async () => {
+      // Storage stays case-preserving, but the DELETE is keyed: `adminStore.removeCategory` drops
+      // every spelling that collapses to the row's key, because its cascade has already reassigned
+      // the records under all of them. A survivor would come back as an orphaned `Unused` row.
+      const stored = ['Potions', 'potions'];
       const calls = [];
-      await openTagsScreen(calls, {
-        selectedSystemOverrides: { categories: ['Potions', 'potions'] },
-      });
+      await openTagsScreen(calls, { selectedSystemOverrides: { categories: stored } });
 
       target.querySelector('[aria-label="Remove category Potions"]').click();
       await tick();
@@ -685,13 +714,22 @@ export function registerTagsCases() {
         'the delete reaches the store with the AUTHORED label of the spelling on screen'
       );
 
-      // What storage then holds, mounted as the GM would next see it.
+      // What storage then holds, under the store's own rule rather than a hand-written answer;
+      // `tests/admin-store-vocabulary-cascade.test.js` pins that the mutator applies it.
+      const remaining = stored.filter(
+        (category) => normalizeVocabularyKey(category) !== normalizeVocabularyKey('Potions')
+      );
+      assert.deepEqual(remaining, [], 'the keyed filter leaves no spelling behind');
       unmount(mounted);
       mounted = null;
       target.remove();
-      await openTagsScreen([], { selectedSystemOverrides: { categories: ['potions'] } });
-      assert.deepEqual(rowIds('recipeCategories', 'data-category-id'), ['general', 'potions']);
-      assert.equal(rowName('recipeCategories', 'data-category-id', 'potions'), 'potions');
+      await openTagsScreen([], { selectedSystemOverrides: { categories: remaining } });
+      assert.deepEqual(
+        rowIds('recipeCategories', 'data-category-id'),
+        [],
+        'and the row does NOT come back wearing the other spelling: with no custom category left ' +
+          'the panel falls to its empty state, which withholds the locked General row too'
+      );
     });
   });
 

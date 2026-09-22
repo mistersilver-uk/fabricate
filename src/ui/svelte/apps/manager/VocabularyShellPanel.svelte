@@ -13,7 +13,7 @@
   | `sortToolbarLabel` | string | `''` | the toolbar's accessible name, already substituted |
   | `sortLabelId` | string | `''` | unique per panel; three copies of one id collapse every reference |
   | `rows` | array | `[]` | UNSORTED; this component sorts by the lifted sort state |
-  | `browserState` | bindable object | `null` | both shipped callers bind one, so search and sort survive the route trip |
+  | `browserState` | bindable object | `null` | both shipped callers bind one; only the system route's slot is root-owned, so only there do search and sort survive the route trip |
 
   Rest spread:
   - `{...rest}` lands on `VocabularyPanel`, written BEFORE `rows`, `hint` and `browserState`, so
@@ -137,8 +137,7 @@
      has no business in. */
 
   /* THE SELECT WIDTH, AND WHY IT CANNOT BE LEFT TO THE SHEET: core sizes every `<select>` to
-     `width: 100%`, and the only shipped repair is in a component neither route renders.
-     Measured at 481px on a cold open and 62px once a GM had visited a catalogue first. */
+     `width: 100%`, and the only shipped repair is in a component neither route renders. */
   :global(.manager-vocabulary-shell-panel .manager-toolbar.manager-scoped-list-toolbar select) {
     flex: 0 1 auto;
     width: auto;
@@ -174,7 +173,7 @@
     background: transparent;
   }
 
-  /* The head the primitive does not draw: the retired tabbed screen had a tab label, this has none. */
+  /* The head the primitive does not draw: icon tile, title and subline, left of the sort toolbar. */
   .manager-vocabulary-shell-head {
     display: flex;
     align-items: flex-start;

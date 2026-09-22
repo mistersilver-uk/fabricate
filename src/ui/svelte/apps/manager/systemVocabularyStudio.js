@@ -10,7 +10,12 @@
 
 import { normalizeTag } from '../../../../utils/scalars.js';
 
-import { decorateTagRows, defineVocabularyPanel, vocabularyPanelProps } from './vocabularyShell.js';
+import {
+  decorateTagRows,
+  defineVocabularyPanel,
+  inputNormalizer,
+  vocabularyPanelProps,
+} from './vocabularyShell.js';
 
 /** The id the reserved bucket carries in every system vocabulary row set. */
 const GENERAL_ROW_ID = 'general';
@@ -139,8 +144,9 @@ export const SYSTEM_VOCABULARY_PANELS = Object.freeze([
     rowAttr: 'data-tag-id',
     inputId: 'manager-tag-add',
     sortLabelId: 'manager-vocabulary-sort-componentTags',
-    emptyIcon: 'fas fa-tag',
-    decorativeIcon: 'fas fa-tag',
+    // The kind's own glyph, as the head tile and the world route both draw it: one vocabulary,
+    // one glyph. `emptyIcon` takes it from the kind facts.
+    decorativeIcon: 'fas fa-hashtag',
     keys: Object.freeze({
       Title: ['FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags'],
       Subline: [
@@ -305,11 +311,6 @@ export function tagHint(rows, text) {
   };
 }
 
-/** The value handed to `onAdd`: tags are lowercased, categories keep their authored casing. */
-function inputNormalizer(kind) {
-  return kind === 'componentTags' ? normalizeTag : (value) => String(value || '').trim();
-}
-
 /** The confirmation one panel posts after a successful add. */
 function successFeedbackFor(kind, text) {
   if (kind !== 'componentTags') {
@@ -353,7 +354,10 @@ export function systemPanelProps(panel, { rows, text, onAdd, onRemove, onSetIcon
     'FABRICATE.Admin.Manager.TagsCategories.SortToolbar',
     'Sort {vocabulary}'
   ).replace('{vocabulary}', copy.label);
-  copy.confirmRemoveLabel = text('FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove', 'Remove');
+  copy.confirmRemoveLabel = text(
+    'FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove',
+    'Delete anyway'
+  );
   copy.cancelRemoveLabel = text('FABRICATE.Admin.Manager.Cancel', 'Cancel');
 
   const isTags = panel.kind === 'componentTags';
@@ -363,8 +367,7 @@ export function systemPanelProps(panel, { rows, text, onAdd, onRemove, onSetIcon
     describeInput: isTags ? tagHint(custom, text) : categoryHint(custom, text),
     normalize: inputNormalizer(panel.kind),
     successFeedback: successFeedbackFor(panel.kind, text),
-    // The ICON RIDES ALONG: the add form offers one wherever rows carry a persisted icon, and a
-    // wrapper that forwarded the value alone would silently drop the GM's choice.
+    // The add form offers an icon wherever rows carry a persisted one, so `onAdd` forwards both.
     onAdd: (value, icon) => onAdd(panel, value, icon),
     onRemove: (row) => onRemove(panel, row),
     ...iconProps(panel, text, onSetIcon),

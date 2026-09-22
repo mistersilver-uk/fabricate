@@ -581,6 +581,9 @@ export const CASES = Object.freeze([
       { selector: '#manager-nav-tags' },
       // The tag band's own direction toggle, which leaves it sorted DESCENDING in the frame.
       { selector: '[data-vocabulary-panel="componentTags"] [data-vocabulary-direction]' },
+      // And the band itself, scrolled into frame: it sits beneath the 2-up category grid, so a
+      // frame taken where the click left the page depicts the categories rather than the tags.
+      { selector: '[data-vocabulary-panel="componentTags"]', scroll: true },
     ],
     expectView: 'tags',
     expectSelector: '[data-vocabulary-panel="componentTags"] [data-vocabulary-direction="desc"]',
@@ -603,6 +606,8 @@ export const CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-tags' },
       {
+        // `:not(.is-danger)` is load-bearing: an unreferenced row's delete wears `is-danger` and
+        // fires in one click with no confirm, which would mutate the fixture mid-capture.
         selector:
           '[data-vocabulary-panel="componentCategories"] [data-component-category-id] .manager-icon-button:not(.is-danger)',
       },

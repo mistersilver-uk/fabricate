@@ -2706,9 +2706,12 @@ vocabulary is a set of VALUES those records take.
    icon map by the lowercased name — the inconsistency issue 1397 is the symptom of.
    Issue 1397's crash is fixed at the DISPLAY layer — all three system row builders de-duplicate on
    the normalized (trimmed, lower-cased) key, first spelling wins in stored order, matching this
-   rule — and the STORAGE rule is unchanged: `normalizeCustomCategoryNames`, shared by both category
+   rule, and the one row carries a pointer-only `title` naming every spelling it stands for — and
+   the STORAGE rule is unchanged: `normalizeCustomCategoryNames`, shared by both category
    vocabularies, still de-duplicates on the case-preserving value, so `Reagent` and `reagent` remain
    two distinct system categories.
+   Deleting that row removes every spelling that collapses to its key and reassigns their records by
+   the same cascade, so the case-preserving storage rule cannot strand one behind the other.
    Component tags have no such divergence; `normalizeTag` already lower-cases.
    The world rule is the one the icon maps and the reference counter already assume; reconciling
    the storage half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged

@@ -261,7 +261,9 @@
               <i class={decorativeIcon}></i>
             </span>
           {/if}
-          <div class="manager-vocabulary-main">
+          <!-- A collapsed row names every spelling it stands for as a pointer-only tooltip; a
+            single-spelling row carries no `title` at all. -->
+          <div class="manager-vocabulary-main" title={row.title || undefined}>
             <strong>{row.displayName || row.name}</strong>
           </div>
           {#if !isSilentlyDeletable(row)}

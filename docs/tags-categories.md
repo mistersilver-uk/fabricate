@@ -11,6 +11,9 @@ All three panels are shown at once, with the two category panels side by side an
 Each panel shows a count of its entries, its own search box, its own sort control, and an add form that checks your entry as you type.
 As you type, the add form tells you whether the name is ready to add, already taken, or reserved, and for a tag it previews the lowercase text that will be stored.
 
+Two entries of one vocabulary that differ only in upper and lower case show as a single row.
+Hover it to see every spelling it stands for, and deleting it removes all of them and reassigns their recipes or components in one step.
+
 Sorting a panel by name or by reference count, and reversing the direction, affects that panel alone.
 The left rail's **Tags & Categories** count is the size of all three vocabularies added together.
 

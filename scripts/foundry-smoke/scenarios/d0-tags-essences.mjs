@@ -50,6 +50,13 @@ export default {
           `Item tags panel rendered ${tagRowCount} tag rows, expected the three seeded tags.`
         );
       }
+      // The band's own direction toggle, so this producer and the View Lab case of the same id
+      // depict one state: the tag vocabulary sorted descending.
+      await itemTagsPanel.locator('[data-vocabulary-direction]').first().click();
+      await itemTagsPanel
+        .locator('[data-vocabulary-direction="desc"]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
       await itemTagsPanel.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
       await assertNoScreenshotOverlays(page);
       await screenshot(page, 'manager-tags-categories-tags-tab');

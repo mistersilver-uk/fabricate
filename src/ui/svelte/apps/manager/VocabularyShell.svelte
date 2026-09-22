@@ -46,8 +46,6 @@
 </div>
 
 <style>
-  /* THE ONE CHILD OF `<main>`. It declares no `padding`, `overflow` or `grid-template-*`: those
-     belong to the route rule, and an unlayered scoped block here would silently replace one. */
   .manager-vocabulary-shell {
     display: flex;
     flex-direction: column;
@@ -74,8 +72,7 @@
     }
   }
 
-  /* The failure line for a deletion that did not land, rendered at MOUNT and filled later: a live
-     region inserted with its content is not reliably announced. */
+  /* The failure line for a deletion that did not land. */
   .manager-vocabulary-shell-status {
     margin: 0;
     color: var(--fab-danger-text);

@@ -907,8 +907,9 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
   The clear republishes both cohorts this screen counts before the destination route renders, so the wrong counts are not shown even for one frame.
   The cohort choice itself is unchanged and issue 1191 stays open against it: a consumer reading this projection from outside the manager's route scope would still be counting the filtered cohort.
   **Known defect, recorded rather than implied correct (issue 1397, folded into issue 1915):** two entries of one system vocabulary that differ only in case collapse to a single row, because the row builders de-duplicate on the normalized key the row id is derived from.
-  Storage stays case-preserving, so deleting that row removes only the spelling it showed and the other spelling takes its place on the next render.
-  The collapsed row carries a `title` naming every spelling it stands for, and reconciling the storage half is issue 1411's.
+  That row carries a `title` naming every spelling it stands for, and the disclosure is pointer-only: it reaches neither the keyboard nor a screen reader, which is why it is a last resort rather than the repair.
+  Deleting the row removes every spelling that collapses to its key and reassigns their records by the same cascade, so no orphaned spelling returns as an `Unused` row on the next render.
+  The storage rule itself stays case-preserving, and reconciling it is issue 1411's.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
