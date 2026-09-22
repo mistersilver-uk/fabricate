@@ -24,6 +24,10 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 const SCOPED = `${MANAGER}/scoped`;
 
 const rootSource = read(`${MANAGER}/CraftingSystemManagerRoot.svelte`);
+// The gateway's route enumeration is spelled across two units since issue 1720: the shell and the
+// page-header model it resolves the eyebrow, title and lede from.
+const routeSource = `${rootSource}
+${read(`${MANAGER}/headerModel.svelte.js`)}`;
 const adminStore = read('src/ui/svelte/stores/adminStore.js');
 const cataloguePage = read(`${SCOPED}/WorldComponentCataloguePage.svelte`);
 const entryPage = read(`${SCOPED}/WorldComponentEntryPage.svelte`);
@@ -84,9 +88,9 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         './scoped/ComponentAddFromCatalogueDialog.svelte',
         './scoped/WorldComponentCataloguePage.svelte',
         './scoped/WorldComponentEntryPage.svelte',
-        // A STRING LEAF, not a screen. `componentListSubtitle` / `componentRulesSubtitle` are the
-        // C1 and D1 header subtitles, which the shell — not a page — renders, so the copy has to
-        // be reachable from here. It exports no component and mounts nothing.
+        // A string leaf, not a screen. `componentRulesSubtitle` is the D1 header subtitle the
+        // shell renders; `componentListSubtitle` left for `headerModel.svelte.js` in issue 1720.
+        // It exports no component and mounts nothing.
         './scoped/componentScoped.js',
       ],
       'a correction that had to import a new SCREEN COMPONENT would be building here rather ' +
@@ -187,7 +191,7 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
   it('ROUTE ENUMERATION: the gateway mints no route', () => {
     // The four component routes already existed. A sixth seam that minted one would show up
     // here, which is what distinguishes carrying a seam from building a screen.
-    const tokens = [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map(
+    const tokens = [...routeSource.matchAll(/currentView === '([a-z-]+)'/g)].map(
       (match) => match[1]
     );
     assert.ok(tokens.length > 20, 'the route-token scan found nothing; it is broken');

@@ -98,7 +98,7 @@
   import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
   // The three component-scope sentences this shell owns (issue 1371, parity round 4): the two
   // header subtitles it renders, and the salvage-mode label all three of them name.
-  import { componentListSubtitle, componentRulesSubtitle } from './scoped/componentScoped.js';
+  import { componentRulesSubtitle } from './scoped/componentScoped.js';
   import { salvageResolutionModeOptions } from './resolutionModeOptions.js';
   import ComponentBulkEditPanel from './components/ComponentBulkEditPanel.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
@@ -159,6 +159,7 @@
   } from './routeExitGuards.js';
   import { createBulkSelectionOwner } from './bulkSelection.svelte.js';
   import { createNavRailModel } from './navRailModel.svelte.js';
+  import { createHeaderModel } from './headerModel.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -3666,358 +3667,50 @@
     return buildComponentEditorState(selectedSystem, item).showEssences === true;
   }
 
-  // THE PAGE HEADER'S EYEBROW, ONE PER ROUTE (issue 1515).
-  function viewKicker() {
-    if (currentView === 'systems') return text('FABRICATE.Admin.Manager.Browse', 'Browse');
-    if (currentView === 'world')
-      return text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system');
-    if (
-      currentView === 'access' ||
-      currentView === 'crafting-settings' ||
-      currentView === 'environments'
-    )
-      return (
-        selectedSystem?.name || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')
-      );
-    return '';
-  }
-
-  function viewTitle() {
-    if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes');
-    if (currentView === 'recipe-edit')
-      return text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe');
-    if (currentView === 'crafting-settings')
-      return text(
-        'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
-        'Crafting settings'
-      );
-    if (currentView === 'access')
-      return text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access');
-    if (currentView === 'books-scrolls')
-      return text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls');
-    if (currentView === 'knowledge')
-      return text('FABRICATE.Admin.Manager.Knowledge.Title', 'Knowledge');
-    if (currentView === 'recipe-item-edit')
-      return text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item');
-    if (currentView === 'components')
-      return text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules');
-    if (currentView === 'component-edit')
-      return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
-    if (currentView === 'tags')
-      return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
-    if (currentView === 'essences')
-      return text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules');
-    if (currentView === 'essence-edit')
-      return text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
-    // The Gathering family titles itself after the TAB on screen (issue 1515), the same way the
-    // Downtime route below does.
-    if (currentView === 'environments')
-      return (
-        gatheringTabPageTitle ||
-        text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments')
-      );
-    if (currentView === 'world')
-      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
-    // The seven world scoped-entity routes (issue 1362). Titles are the PROTOTYPE'S, verbatim
-    // — including the lowercase `c` in `Component catalogue` and the plural `Tools Catalogue`.
-    if (currentView === 'world-components')
-      return text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle', 'Component catalogue');
-    if (currentView === 'world-component-entry')
-      return text('FABRICATE.Admin.Manager.Scoped.ComponentEntryTitle', 'Component entry');
-    if (currentView === 'world-essences')
-      return text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle', 'Essence Catalogue');
-    if (currentView === 'world-essence-entry')
-      return text('FABRICATE.Admin.Manager.Scoped.EssenceEntryTitle', 'Essence entry');
-    if (currentView === 'world-tools')
-      return text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue');
-    if (currentView === 'world-tool-entry')
-      return text('FABRICATE.Admin.Manager.Scoped.ToolEntryTitle', 'Tool entry');
-    if (currentView === 'world-vocabulary')
-      return text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories');
-    if (isWorldRulesRoute) return worldRulesPageTitle;
-    if (currentView === 'world-travel') {
-      if (worldTravelTab === 'map')
-        return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
-      return text('FABRICATE.Admin.Manager.Travel.RealmsTitle', 'Realms');
-    }
-    // The Downtime route titles itself after the tab on screen, not after the route: a GM switching
-    // sub-tabs must see the page name change with them.
-    if (currentView === 'world-downtime')
-      return downtimeChrome(
-        'title',
-        'Downtime',
-        text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')
-      );
-    if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
-    if (currentView === 'tool-edit')
-      return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
-    // Written as a LOOKUP over four whole keys rather than one interpolated template ending at the
-    // `Checks` segment.
-    if (isChecksRoute) return text(CHECKS_ROUTE_TITLE_KEYS[checksActiveTab], 'Checks');
-    if (currentView === 'environment-edit')
-      return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
-    if (currentView === 'gathering-task-edit')
-      return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
-    if (currentView === 'gathering-event-edit')
-      return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
-    // THE RECORD, NOT THE ROUTE (issue 1515).
-    if (currentView === 'system-edit')
-      return (
-        selectedSystem?.name || text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')
-      );
-    return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
-  }
-
-  // ONE derivation for each world scoped-entity route's subtitle, keyed by route, so a page and the
-  // placeholder body inside it cannot drift into saying two different things.
-  function worldScopedSubtitle() {
-    if (currentView === 'world-components')
-      return text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle', '');
-    if (currentView === 'world-component-entry')
-      return text('FABRICATE.Admin.Manager.Scoped.ComponentEntrySubtitle', '');
-    if (currentView === 'world-essences')
-      return text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueSubtitle', '');
-    if (currentView === 'world-essence-entry')
-      return text('FABRICATE.Admin.Manager.Scoped.EssenceEntrySubtitle', '');
-    if (currentView === 'world-tools')
-      return text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueSubtitle', '');
-    if (currentView === 'world-tool-entry')
-      return text('FABRICATE.Admin.Manager.Scoped.ToolEntrySubtitle', '');
-    if (currentView === 'world-vocabulary')
-      return text('FABRICATE.Admin.Manager.Scoped.VocabularySubtitle', '');
-    return '';
-  }
-
-  function viewSubtitle() {
-    // The seven world scoped-entity routes (issue 1362).
-    if (isWorldScopedRoute) return worldScopedSubtitle();
-    if (currentView === 'recipes')
-      return text(
-        'FABRICATE.Admin.Manager.Recipe.Subtitle',
-        'Manage recipes for the selected crafting system.'
-      );
-    if (currentView === 'recipe-edit') return recipeEditSubtitle();
-    // The lede states the OUTCOME rather than the mechanism (issue 1515).
-    if (currentView === 'crafting-settings')
-      return text(
-        'FABRICATE.Admin.Manager.Crafting.Settings.Subtitle',
-        'Control how players get access to the recipes in this system.'
-      );
-    // The SUPERSET of the two sentences the route used to carry (issue 1515).
-    if (currentView === 'access')
-      return text(
-        'FABRICATE.Admin.Manager.Access.Hint',
-        'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.'
-      );
-    // The system library's lede is the one sentence on that screen telling a GM what to DO with it
-    // (issue 1515).
-    if (currentView === 'systems')
-      return text(
-        'FABRICATE.Admin.Manager.SystemLibraryHint',
-        'Select a row to view counts and enabled features.'
-      );
-    if (currentView === 'books-scrolls')
-      return text(
-        'FABRICATE.Admin.Manager.BooksScrolls.Subtitle',
-        'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.'
-      );
-    if (currentView === 'knowledge')
-      return text(
-        'FABRICATE.Admin.Manager.Knowledge.Subtitle',
-        'Audit and correct what each character carries and has learned in the selected crafting system.'
-      );
-    if (currentView === 'recipe-item-edit')
-      return text(
-        'FABRICATE.Admin.Manager.RecipeItem.EditSubtitle',
-        'Link a world item and recipes, then set its use and learn caps.'
-      );
-    // ISSUE 1371, PARITY ROUND 4 (gap-list row 98).
-    if (currentView === 'components')
-      return componentListSubtitle(
-        {
-          systemName: selectedSystem?.name || '',
-          salvageModeLabel: componentSalvageModeLabel,
-        },
-        format
-      );
-    if (currentView === 'component-edit' && componentForEdit) return componentEditSubtitle();
-    if (currentView === 'component-edit')
-      return text(
-        'FABRICATE.Admin.Manager.Component.EditSubtitle',
-        'Update tags, essences, and source linkage for this component.'
-      );
-    if (currentView === 'tags')
-      return text(
-        'FABRICATE.Admin.Manager.TagsCategories.Subtitle',
-        'Manage recipe category and item tag vocabulary for the selected crafting system.'
-      );
-    // THE SUBTITLE STATES THE SCREEN'S THREE FACTS (issue 1372, maintainer parity round 8,
-    // reference `proto:4970`): what the list holds, what DISABLING actually stops.
-    if (currentView === 'essences')
-      return interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Essence.Subtitle',
-          'What each essence does on craft in {system}. Disabling stops the crafting effect — ingredient matching still sees the value. Names, icons and colours come from the Essence Catalogue.'
-        ),
-        { system: selectedSystem?.name || '' }
-      );
-    if (currentView === 'essence-edit' && showEssenceSourceUi)
-      return text(
-        'FABRICATE.Admin.Manager.Essence.EditSubtitle',
-        'Update identity, icon, and source linkage for this essence.'
-      );
-    if (currentView === 'essence-edit')
-      return text(
-        'FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle',
-        'Update identity and icon for this essence.'
-      );
-    if (currentView === 'world') {
-      if (travelParties.length === 0)
-        return text(
-          'FABRICATE.Admin.Manager.World.Parties.SubtitleEmpty',
-          'No parties yet · world-level, shared by gathering and travel in every system'
-        );
-      const template =
-        travelParties.length === 1
-          ? text(
-              'FABRICATE.Admin.Manager.World.Parties.SubtitleOne',
-              '1 party · {enabled} enabled · {assigned} of {total} characters assigned'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.World.Parties.Subtitle',
-              '{count} parties · {enabled} enabled · {assigned} of {total} characters assigned'
-            );
-      return template
-        .replace('{count}', String(travelParties.length))
-        .replace('{enabled}', String(enabledPartyCount))
-        .replace('{assigned}', String(assignedCharacterCount))
-        .replace('{total}', String(playerCharacterUuids.size));
-    }
-    if (currentView === 'world-currency') {
-      if (selectedCurrencyUnits.length === 0)
-        return text(
-          'FABRICATE.Admin.Manager.World.Currency.SubtitleEmpty',
-          'No coins yet · world-level, shared by every crafting system that enables currency'
-        );
-      const template =
-        selectedCurrencyUnits.length === 1
-          ? text(
-              'FABRICATE.Admin.Manager.World.Currency.SubtitleOne',
-              '1 coin · used by {systems} of {total} crafting systems'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.World.Currency.Subtitle',
-              '{count} coins · used by {systems} of {total} crafting systems'
-            );
-      return template
-        .replace('{count}', String(selectedCurrencyUnits.length))
-        .replace('{systems}', String(currencyEnabledSystemCount))
-        .replace('{total}', String(allSystems.length));
-    }
-    if (currentView === 'world-prerequisites') {
-      const count = selectedCharacterPrerequisites.length;
-      const template =
-        count === 0
-          ? text(
-              'FABRICATE.Admin.Manager.World.Prerequisites.SubtitleEmpty',
-              'No prerequisites yet · shared by every crafting system'
-            )
-          : count === 1
-            ? text(
-                'FABRICATE.Admin.Manager.World.Prerequisites.SubtitleOne',
-                '1 prerequisite · shared by every crafting system'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.World.Prerequisites.Subtitle',
-                '{count} prerequisites · shared by every crafting system'
-              );
-      return template.replace('{count}', String(count));
-    }
-    if (currentView === 'world-modifiers') {
-      const count = selectedSystemModifiers.length;
-      const template =
-        count === 0
-          ? text(
-              'FABRICATE.Admin.Manager.World.Modifiers.SubtitleEmpty',
-              'No modifiers yet · shared by every crafting system'
-            )
-          : count === 1
-            ? text(
-                'FABRICATE.Admin.Manager.World.Modifiers.SubtitleOne',
-                '1 modifier · shared by every crafting system'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.World.Modifiers.Subtitle',
-                '{count} modifiers · shared by every crafting system'
-              );
-      return template.replace('{count}', String(count));
-    }
-    if (currentView === 'world-downtime')
-      return downtimeChrome(
-        'subtitle',
-        'Fabricate Premium · Your party-wide command board for every activity and shared project.',
-        ''
-      );
-    if (currentView === 'world-travel') {
-      if (worldTravelTab === 'map')
-        return text(
-          'FABRICATE.Admin.Manager.Travel.MapLinksHint',
-          'Link the active scene\u2019s Foundry Scene Regions to the world\u2019s realms.'
-        );
-      return text(
-        'FABRICATE.Admin.Manager.Travel.RealmsHint',
-        'Author the world\u2019s realms \u00b7 shared by every crafting system that enables Travel & Realms.'
-      );
-    }
-    if (currentView === 'tools')
-      return text(
-        'FABRICATE.Admin.Manager.Tools.Subtitle',
-        'Manage reusable gathering tools and configure how they behave when required by tasks.'
-      );
-    if (currentView === 'tool-edit')
-      return text(
-        'FABRICATE.Admin.Manager.Tools.EditSubtitle',
-        'Configure Tool identity, breakage, requirements, and validation.'
-      );
-    if (isChecksRoute)
-      return text(
-        'FABRICATE.Admin.Manager.Checks.Subtitle',
-        'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.'
-      );
-    // Per TAB, from the rail's own record — see `gatheringTabPageTitle` (issue 1515).
-    if (currentView === 'environments')
-      return (
-        gatheringTabPageHint ||
-        text(
-          'FABRICATE.Admin.Manager.Environment.LibraryHint',
-          'Browse scene-linked gathering environments and open the existing editor for task authoring.'
-        )
-      );
-    if (currentView === 'environment-edit')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.EditSubtitle',
-        'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.'
-      );
-    if (currentView === 'gathering-task-edit')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle',
-        'Edit identity, availability, resolution, and results for the selected gathering task.'
-      );
-    if (currentView === 'gathering-event-edit')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Events.EditSubtitle',
-        'Edit identity, availability, danger, and modifiers for the selected event.'
-      );
-    if (currentView === 'system-edit')
-      return text(
-        'FABRICATE.Admin.Manager.SystemEdit.PageSubtitle',
-        'Edit base settings and review validation issues for the selected crafting system.'
-      );
-    return text(
-      'FABRICATE.Admin.Manager.Subtitle',
-      'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.'
-    );
-  }
+  // The page header's six answers, one derivation each (issue 1720). Every leg is passed as a
+  // thunk so `createHeaderModel` reads this shell's live `$derived` values rather than the ones
+  // they held when it was built.
+  const header = createHeaderModel({
+    route: {
+      checksActiveTab: () => checksActiveTab,
+      currentView: () => currentView,
+      displayedGatheringTab: () => displayedGatheringTab,
+      isChecksRoute: () => isChecksRoute,
+      isWorldDowntimeRoute: () => isWorldDowntimeRoute,
+      isWorldRulesRoute: () => isWorldRulesRoute,
+      isWorldScopedRoute: () => isWorldScopedRoute,
+      worldTravelTab: () => worldTravelTab,
+    },
+    state: {
+      allSystems: () => allSystems,
+      assignedCharacterCount: () => assignedCharacterCount,
+      componentEditSubtitle: () => componentEditSubtitle,
+      componentForEdit: () => componentForEdit,
+      componentSalvageModeLabel: () => componentSalvageModeLabel,
+      currencyEnabledSystemCount: () => currencyEnabledSystemCount,
+      downtimeChrome: () => downtimeChrome,
+      downtimeHeaderArtwork: () => downtimeHeaderArtwork,
+      enabledPartyCount: () => enabledPartyCount,
+      essenceRulesMode: () => essenceRulesMode,
+      format: () => format,
+      gatheringTabPageHint: () => gatheringTabPageHint,
+      gatheringTabPageTitle: () => gatheringTabPageTitle,
+      playerCharacterUuids: () => playerCharacterUuids,
+      recipeDraft: () => recipeDraft,
+      recipeEditSubtitle: () => recipeEditSubtitle,
+      selectedCharacterPrerequisites: () => selectedCharacterPrerequisites,
+      selectedCurrencyUnits: () => selectedCurrencyUnits,
+      selectedSystem: () => selectedSystem,
+      selectedSystemModifiers: () => selectedSystemModifiers,
+      showEssenceSourceUi: () => showEssenceSourceUi,
+      text: () => text,
+      travelParties: () => travelParties,
+      worldComponentEntryRecord: () => worldComponentEntryRecord,
+      worldEssenceEntryRecord: () => worldEssenceEntryRecord,
+      worldRulesPageTitle: () => worldRulesPageTitle,
+      worldToolEntryRecord: () => worldToolEntryRecord,
+    },
+  });
 
   function isPromise(value) {
     return value && typeof value.then === 'function';
@@ -4032,46 +3725,6 @@
     }
     if (result !== false) callback();
     return result;
-  }
-
-  function headerActionsLabel() {
-    if (currentView === 'recipes')
-      return text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions');
-    if (currentView === 'components' || currentView === 'component-edit')
-      return text('FABRICATE.Admin.Manager.Component.Actions', 'Component actions');
-    if (currentView === 'tags')
-      return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
-    if (currentView === 'essences' || currentView === 'essence-edit')
-      return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
-    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
-      return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
-    if (currentView === 'world')
-      return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
-    if (currentView === 'world-downtime')
-      return downtimeChrome(
-        'actionsLabel',
-        'Downtime actions',
-        text('FABRICATE.Admin.Manager.World.Downtime.Actions', 'Downtime actions')
-      );
-    if (currentView === 'world-travel')
-      return worldTravelTab === 'map'
-        ? text('FABRICATE.Admin.Manager.Travel.MapLinksActions', 'Map region link actions')
-        : text('FABRICATE.Admin.Manager.Travel.RealmsActions', 'Realm actions');
-    if (currentView === 'tools')
-      return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
-    if (currentView === 'knowledge')
-      return text('FABRICATE.Admin.Manager.Knowledge.Actions', 'Knowledge actions');
-    if (isChecksRoute) return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
-    if (
-      currentView === 'environments' ||
-      currentView === 'environment-edit' ||
-      currentView === 'gathering-task-edit' ||
-      currentView === 'gathering-event-edit'
-    )
-      return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
-    if (currentView === 'system-edit')
-      return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
-    return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
   }
 
   function inspectorLabel() {
@@ -4585,15 +4238,6 @@
     if (!id) return;
     target.open(id);
   }
-
-  // "{count} issue" / "{count} issues" — the badge must NAME its unit, because a bare
-  // numeral in this column is the record count every other rail entry renders there.
-  const CHECKS_ROUTE_TITLE_KEYS = {
-    crafting: 'FABRICATE.Admin.Manager.Checks.Crafting.PageTitle',
-    salvage: 'FABRICATE.Admin.Manager.Checks.Salvage.PageTitle',
-    gathering: 'FABRICATE.Admin.Manager.Checks.Gathering.PageTitle',
-    validation: 'FABRICATE.Admin.Manager.Checks.Validation.Title',
-  };
 
   // Activating the PARENT opens the group and routes to the first available child, which is
   // what makes the retained `checks` id a redirect rather than a dead route.
@@ -7602,10 +7246,10 @@
                      corpus no longer holds, has nothing to name and must not print an empty
                      crumb. -->
                 <span data-breadcrumb-world-scoped={currentView} title={worldScopedEntryCrumb}
-                  >{worldScopedEntryCrumb || viewTitle()}</span
+                  >{worldScopedEntryCrumb || header.title}</span
                 >
               {:else}
-                <span data-breadcrumb-world-scoped={currentView}>{viewTitle()}</span>
+                <span data-breadcrumb-world-scoped={currentView}>{header.title}</span>
               {/if}
             {/if}
             {#if isWorldRulesRoute}
@@ -7854,9 +7498,9 @@
         <!--
           The eyebrow sits between the trail and the title.
         -->
-        {#if viewKicker()}
+        {#if header.kicker}
           <div class="manager-page-kicker">
-            <Kicker dataAttr="data-page-kicker">{viewKicker()}</Kicker>
+            <Kicker dataAttr="data-page-kicker">{header.kicker}</Kicker>
           </div>
         {/if}
         {#if currentView === 'recipe-edit' && recipeDraft}
@@ -7872,9 +7516,9 @@
             />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={recipeDraft.name || ''}>
-                {recipeDraft.name || viewTitle()}
+                {recipeDraft.name || header.title}
               </h1>
-              <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
+              <p class="manager-subtitle" data-recipe-edit-subline>{header.subtitle}</p>
             </div>
           </div>
         {:else if currentView === 'component-edit' && componentForEdit}
@@ -7887,9 +7531,9 @@
             <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={44} />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={componentForEdit.name || ''}>
-                {componentForEdit.name || viewTitle()}
+                {componentForEdit.name || header.title}
               </h1>
-              <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
+              <p class="manager-subtitle" data-component-edit-subline>{header.subtitle}</p>
             </div>
           </div>
         {:else if isWorldDowntimeRoute && downtimeHeaderArtwork}
@@ -7912,8 +7556,8 @@
               size={44}
             />
             <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={viewTitle()}>{viewTitle()}</h1>
-              <p class="manager-subtitle" data-downtime-chrome-subline>{viewSubtitle()}</p>
+              <h1 class="manager-title" title={header.title}>{header.title}</h1>
+              <p class="manager-subtitle" data-downtime-chrome-subline>{header.subtitle}</p>
             </div>
           </div>
         {:else if worldEssenceEntryRecord}
@@ -7939,7 +7583,7 @@
             />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={worldEssenceEntryName}>
-                {worldEssenceEntryName || viewTitle()}
+                {worldEssenceEntryName || header.title}
               </h1>
               <p class="manager-subtitle" data-world-essence-entry-subline>
                 {worldEssenceEntrySubtitle}
@@ -7955,7 +7599,7 @@
             <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={essenceEditName}>
-                {essenceEditName || viewTitle()}
+                {essenceEditName || header.title}
               </h1>
               <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
             </div>
@@ -7990,7 +7634,7 @@
             />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={worldComponentEntryName}>
-                {worldComponentEntryName || viewTitle()}
+                {worldComponentEntryName || header.title}
               </h1>
               <p class="manager-subtitle" data-world-component-entry-subline>
                 {worldComponentEntrySubtitle}
@@ -8012,7 +7656,7 @@
             />
             <div class="manager-recipe-edit-heading-copy">
               <h1 class="manager-title" title={worldToolEntryName}>
-                {worldToolEntryName || viewTitle()}
+                {worldToolEntryName || header.title}
               </h1>
               <p class="manager-subtitle" data-world-tool-entry-subline>
                 {worldToolEntrySubtitle}
@@ -8020,8 +7664,8 @@
             </div>
           </div>
         {:else if currentView !== 'tool-edit'}
-          <h1 class="manager-title">{viewTitle()}</h1>
-          <p class="manager-subtitle">{viewSubtitle()}</p>
+          <h1 class="manager-title">{header.title}</h1>
+          <p class="manager-subtitle">{header.subtitle}</p>
         {/if}
         {#if currentView === 'environment-edit' && environmentDraftForDisplay}
           <div class="manager-environment-header-pills" data-environment-status-pills>
@@ -8059,7 +7703,7 @@
         ONE WORLD SCOPED ROUTE IS BACK IN, AND IT IS A SEAM RATHER THAN A RELAXATION (issue 1372).
       -->
       {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry'}
-        <div class="manager-header-actions" aria-label={headerActionsLabel()}>
+        <div class="manager-header-actions" aria-label={header.actionsLabel}>
           {#if currentView === 'world-essence-entry'}
             <!--
               THE EDITOR ACTION PAIR, THROUGH THE SHARED COMPONENT (issue 1372, parity round 4).

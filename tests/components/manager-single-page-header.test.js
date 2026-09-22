@@ -78,7 +78,7 @@ describe('one page header per manager route', () => {
         `${file} draws a second page header on the ${route} route. The shell already renders the ` +
           `breadcrumb, eyebrow, title and lede for it; this one used to say "${was}". The copy ` +
           'that survives belongs in viewKicker/viewTitle/viewSubtitle in ' +
-          'CraftingSystemManagerRoot.svelte rather than restated here.'
+          'headerModel.svelte.js rather than restated here.'
       );
       assert.equal(
         source.includes('manager-section-header'),

@@ -116,10 +116,11 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(editorSource.includes('<RecipeResultGroupCard'));
     assert.equal(editorSource.includes('checkOutcomeIds'), false);
     assert.ok(taskInspectorSource.includes("editingTask?.resolutionMode || 'd100'"));
-    assert.ok(
-      rootSource.includes(
-        'Edit identity, availability, resolution, and results for the selected gathering task.'
-      )
+    // The lede left the shell for `headerModel.svelte.js` in issue 1720, and it is pinned here
+    // against the shipped string rather than against a second unit's source text.
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle,
+      'Edit identity, availability, resolution, and results for the selected gathering task.'
     );
   });
 

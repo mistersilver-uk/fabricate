@@ -3,6 +3,7 @@ import { after, describe } from 'node:test';
 
 import { disposeManagerSuite } from './manager-mounted-shared.js';
 import { registerRailCases } from './manager-rail-mounted.js';
+import { registerHeaderCases } from './manager-header-mounted.js';
 import { registerSystemsCases } from './manager-systems-mounted.js';
 import { registerRecipesCases } from './manager-recipes-mounted.js';
 import { registerComponentsCases } from './manager-components-mounted.js';
@@ -18,6 +19,7 @@ import { registerBulkCases } from './manager-bulk-mounted.js';
 
 describe('CraftingSystemManager mounted behavior', () => {
   registerRailCases();
+  registerHeaderCases();
   registerSystemsCases();
   registerRecipesCases();
   registerComponentsCases();
