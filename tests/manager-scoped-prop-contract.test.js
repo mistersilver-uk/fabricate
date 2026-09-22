@@ -143,6 +143,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
   './essences/EssenceBulkEditPanel.svelte',
+  // Added by issue 1720: the page header's six answers are their own unit, and the root no longer
+  // resolves the eyebrow, title, lede or action-group name itself.
+  './headerModel.svelte.js',
   './navRailModel.svelte.js',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',
