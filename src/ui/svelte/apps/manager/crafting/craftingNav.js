@@ -1,7 +1,8 @@
 /**
  * The one Crafting sub-tab model the rail, the availability test and the redirect read, so they
- * cannot disagree. `openspec/specs/ui-integration/spec.md` → "GM Crafting Admin" is canonical for
- * membership, the wider `Knowledge` gate and the owning-entry reconciliation. Pure JS.
+ * cannot disagree. `openspec/specs/ui-manager-shell/spec.md` → "Manager Shell", the `Crafting` rail
+ * group, is canonical for membership, the wider `Knowledge` gate and the owning-entry
+ * reconciliation. Pure JS.
  */
 import { craftingEffect } from './craftingVisibility.js';
 
