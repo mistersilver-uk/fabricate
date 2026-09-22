@@ -11,7 +11,7 @@
 
   Every other prop is one route's crumb subject or the handler its crumb navigates through.
 
-  Invariants:
+  Invariants (both pinned by the 38-state DOM census in `tests/components/manager-header-mounted.js`):
   - A crumb is a control only when pressing it leaves the screen the GM is on; the Gathering group
     crumb is a span on `environments` and a button in its editors.
   - The world root is a span on `world` itself and a button everywhere below it.

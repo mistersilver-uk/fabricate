@@ -3,8 +3,10 @@
  *
  * `LADDER` is transcribed from the shell's own 26-branch chain as it stood before the extraction,
  * so it is an oracle rather than a re-reading of the source it checks. The observed answer is
- * evaluated out of the shipped markup, so moving a branch into another file, reordering one, or
+ * evaluated out of the shipped markup, so moving a branch into another file, dropping one, or
  * changing a predicate is visible here even though the rendered DOM of any one route is not.
+ * A reordering is not, where the predicates it crosses are disjoint by `currentView`: that
+ * reorder emits identical DOM on every route, which is why it is allowed to pass.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -204,7 +206,14 @@ function selectedBranch(scope) {
 
 /** Every route token the shell branches on, plus the Checks views its own predicate answers for. */
 function routeTokens() {
-  const files = [ROOT, ACTIONS_FILE, ...Object.values(FAMILY_CHAINS).map((chain) => chain.file)];
+  // The model too: since issue 1720 the landing route is compared only there, and a route the
+  // scan cannot see is a route the ladder is never put through.
+  const files = [
+    ROOT,
+    HEADER_MODEL,
+    ACTIONS_FILE,
+    ...Object.values(FAMILY_CHAINS).map((chain) => chain.file),
+  ];
   const views = new Set([CHECKS_REDIRECT_VIEW, ...CHECKS_VIEWS]);
   for (const file of new Set(files)) {
     for (const [, view] of sourceOf(file).matchAll(/currentView === '([a-z-]+)'/g)) views.add(view);
@@ -269,7 +278,7 @@ describe('the manager page header routes every view to one action family', () =>
 
   it('NON-VACUITY: the oracle, the route set and the shipped chain are all real', () => {
     assert.equal(LADDER.length, 26, 'the pre-extraction chain is 26 branches');
-    assert.ok(routeTokens().length >= 30, `the scan found only ${routeTokens().length} routes`);
+    assert.ok(routeTokens().length >= 33, `the scan found only ${routeTokens().length} routes`);
     assert.ok(
       chainStarting(ACTIONS_FILE, LADDER[0].id).length >= 10,
       'the shipped action chain parsed too few branches to be the ladder'

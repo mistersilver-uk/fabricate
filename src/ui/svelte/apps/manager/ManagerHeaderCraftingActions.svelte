@@ -22,7 +22,7 @@
   import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
 
   let {
-    text = () => {},
+    text = () => '',
     currentView = '',
     isChecksRoute = false,
     createRecipe = () => {},
@@ -141,10 +141,12 @@
     </p>
   {/if}
 {:else if currentView === 'components'}
-  <!-- The control opens a picker and navigates nowhere, so the dead route token it once
-       passed `openWorldScopedEntry` is absent from this file, comments included — which is
-       what `component-world-scope-screens.test.js` asserts. `size="38"` is the shared
-       opt-in rung rather than a local height. -->
+  <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The control opens a picker and
+       navigates nowhere — `proto:1046` binds `onAddFrom`, which at `proto:5545` sets
+       `modal: 'addFrom'` — so the dead route token it once passed `openWorldScopedEntry` is
+       absent from this file, comments included, which is what
+       `component-world-scope-screens.test.js` asserts. `size="38"` is the rung the reference
+       draws (`proto:1046`), taken as the shared opt-in rather than a local height. -->
   <ManagerButton
     role="primary"
     size="38"
@@ -186,9 +188,11 @@
     <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
   </ManagerButton>
 {:else if currentView === 'essences'}
-  <!-- No header action: an essence is a world record, so its only create is the Essence
-       Catalogue's. A GM joins one to this system from that catalogue's inspector rows or from
-       this list's own `All world essences` segment (issue 1372). -->
+  <!-- No header action: the reference's Essence Rules header carries nothing on the right
+       (`tmp/proto/essence-rules.png`, markup `proto:1523`-`1540`), because an essence is a
+       world record and its only create is the Essence Catalogue's. A GM joins one to this
+       system from that catalogue's inspector rows or from this list's own `All world essences`
+       segment (issue 1372). -->
 {:else if currentView === 'essence-edit'}
   <!-- The shared editor header (issue 1036), wearing this studio's own three data hooks. Its
        control inventory follows the shipped sibling rather than the prototype, because seven

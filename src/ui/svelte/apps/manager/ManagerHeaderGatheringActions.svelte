@@ -22,7 +22,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
 
   let {
-    text = () => {},
+    text = () => '',
     currentView = '',
     displayedGatheringTab = '',
     canShowEnvironments = false,

@@ -16,7 +16,8 @@
     trail or to the action group, and each declares its own.
 
   Invariants:
-  - Two `<header>` elements under no wrapper, so the shell's own children are unchanged.
+  - Two `<header>` elements under no wrapper, so the shell's own children are unchanged — pinned
+    by the 38-state DOM census in `tests/components/manager-header-mounted.js`.
   - The identity heading is keyed on `header.headingVariant` alone; the order the eight variants
     are tested in is stated once, in `headerModel.svelte.js`.
 -->
@@ -122,8 +123,9 @@
         </div>
       {:else if header.headingVariant === 'world-essence-entry'}
         <!-- The essence's own identity header, from the recipe editor's block. `tint` recolours
-             the glyph alone and resolves to the accent when unset; `glyph` is passed because the
-             primitive's default is sized for the 40px row tiles, not for this 44px one. -->
+             the glyph alone since issue 1506 and resolves to the accent when unset; `glyph` is
+             passed because the primitive's default is sized for the 40px row tiles, not for this
+             44px one (`essEntry.png`). -->
         <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
           <Medallion
             icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
@@ -156,9 +158,9 @@
         <!-- The component's own identity header, the twin of the two above (issue 1371). The
              medallion falls back to the glyph when the entry links no Item. -->
         <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
-          <!-- 42px rather than the siblings' 44, because an art size is its own ladder; the
-               `glyph-chip` variant is the borderless face, which no other prop can ask for
-               (issue 1371). -->
+          <!-- 42px rather than the siblings' 44 because `proto:814` draws this chip at 42 and an
+               art size is its own ladder; the `glyph-chip` variant is the borderless face
+               `proto:5375` draws, which no other prop can ask for (issue 1371). -->
           <Medallion
             art={worldComponentEntryImage}
             alt=""

@@ -324,7 +324,7 @@ const REVIEWED = [
     convertedReach: [
       // 29 until issue 1720 split the group across three units. The container's class token
       // lives only in `ManagerHeaderActions.svelte`, so the two family units it dispatches
-      // into are counted WHOLE-FILE: every button they hold is inside this container by
+      // into are counted whole-file: every button they hold is inside this container by
       // construction, and no synthetic token is added to their roots to make the filter work.
       {
         file: 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',

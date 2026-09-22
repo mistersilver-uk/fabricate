@@ -25,7 +25,7 @@ const SCOPED = `${MANAGER}/scoped`;
 
 const rootSource = read(`${MANAGER}/CraftingSystemManagerRoot.svelte`);
 // The page header's action ladder is its own unit since issue 1720, so the header seams below
-// are RENDERED by these two while the gateway still declares their handlers.
+// are rendered by these two while the gateway still declares their handlers.
 const headerActionsSource = read(`${MANAGER}/ManagerHeaderActions.svelte`);
 const craftingActionsSource = read(`${MANAGER}/ManagerHeaderCraftingActions.svelte`);
 // The gateway's route enumeration is spelled across two units since issue 1720: the shell and the

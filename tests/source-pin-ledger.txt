@@ -150,7 +150,7 @@ tests/manager-button-source-contract.test.js	4
 tests/manager-color-tokens.test.js	2
 tests/manager-extensions.test.js	10
 tests/manager-full-width-gate.test.js	5
-tests/manager-scoped-prop-contract.test.js	8
+tests/manager-scoped-prop-contract.test.js	11
 tests/mutation-time-valid-id-basis.test.js	2
 tests/player-character-actor-types.test.js	11
 tests/progressive-stage-complications.test.js	2

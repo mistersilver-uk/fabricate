@@ -43,7 +43,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const rootSource = readFileSync(resolve(repoRoot, ROOT_PATH), 'utf8');
 // The page header's action ladder is its own unit since issue 1720, so the three seams below
-// are RENDERED there while the gateway still declares their handlers.
+// are rendered there while the gateway still declares their handlers.
 const HEADER_ACTIONS_PATH = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const headerActionsSource = readFileSync(resolve(repoRoot, HEADER_ACTIONS_PATH), 'utf8');
 const PAGE_HEADER_PATH = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
@@ -72,11 +72,11 @@ function corpusOf({ membership = [], defaults = [] } = {}) {
 
 // ── (1) THE SOURCE CONTRACT: NO SCREEN DECLARES A PROP ITS CALL SITE DOES NOT SUPPLY ──────────
 
-/** The attribute names one call site passes, read off the root's own markup. */
+/** The attribute names one call site passes, read off the owning unit's markup. */
 function staticAttributesAt(componentName, source = rootSource) {
   const lines = source.split('\n');
   const index = lines.findIndex((line) => line.trim() === `<${componentName}`);
-  assert.ok(index >= 0, `${componentName} is not rendered by the manager root`);
+  assert.ok(index >= 0, `${componentName} is not rendered by the unit this call names`);
   const indent = lines[index].slice(0, lines[index].length - lines[index].trimStart().length);
   const end = lines.findIndex((line, at) => at > index && line === `${indent}/>`);
   assert.ok(end > index, `${componentName} never closes on its own indentation`);

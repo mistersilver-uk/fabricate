@@ -29,7 +29,7 @@
 
   let {
     header,
-    text = () => {},
+    text = () => '',
     currentView = '',
     isWorldRulesRoute = false,
     isWorldScopedRoute = false,
@@ -157,7 +157,7 @@
       />
     {:else if currentView === 'world-component-entry'}
       <!-- The third caller of the same pair, led by the unsaved marker the band had nowhere
-           else to draw (issue 1371). -->
+           else to draw (`proto:817`, gap-list row 53; issue 1371). -->
       {#if worldComponentEntryDirty}
         <span class="manager-header-unsaved" data-world-component-entry-unsaved>
           <span class="manager-header-unsaved-dot" aria-hidden="true"></span>

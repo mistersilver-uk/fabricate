@@ -478,3 +478,69 @@ test('the rail declares exactly the props the root hands it, in both directions'
     'the root passes the rail no prop the rail does not declare'
   );
 });
+
+/**
+ * Every key the shell hands `<ManagerPageHeader>` is declared by the unit that reads it. The
+ * header forwards `{...rest}` to both children, so a mis-keyed prop is not an error: it is a
+ * default, and the control it wires goes inert with the census and the compiler both silent
+ * (issue 1720).
+ */
+const HEADER_UNITS = Object.freeze([
+  'ManagerPageHeader',
+  'ManagerHeaderBreadcrumbs',
+  'ManagerHeaderActions',
+  'ManagerHeaderCraftingActions',
+  'ManagerHeaderGatheringActions',
+]);
+
+/** The prop names one component's `let { … } = $props()` destructuring declares. */
+function headerUnitProps(unit) {
+  const source = readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/${unit}.svelte`), 'utf8');
+  const open = source.indexOf('let {');
+  const block = source.slice(open + 5, source.indexOf('} = $props();', open));
+  return block
+    .split('\n')
+    .map((line) => /^\s*(\w+)\s*(?:=|,|$)/.exec(line)?.[1])
+    .filter((name) => name && name !== 'rest');
+}
+
+/** The keys the shell passes at its one `<ManagerPageHeader …/>` site. */
+function pageHeaderSiteProps() {
+  const source = rootLines.join('\n');
+  const site = source.slice(source.indexOf('<ManagerPageHeader'));
+  return site
+    .slice(0, site.indexOf('\n  />'))
+    .split('\n')
+    .slice(1)
+    .map((line) => /^\{(\w+)\}$|^(\w+)=/.exec(line.trim()))
+    .filter(Boolean)
+    .map((hit) => hit[1] ?? hit[2]);
+}
+
+test('the page-header composition site names no prop the five units leave unread', () => {
+  const declared = new Set(HEADER_UNITS.flatMap(headerUnitProps));
+  const passed = pageHeaderSiteProps();
+  // NON-VACUITY: the site is the 138-prop one, not an empty slice.
+  assert.ok(passed.length > 100, `the site parsed only ${passed.length} props`);
+  assert.deepEqual(
+    passed.filter((name) => !declared.has(name)),
+    [],
+    'a prop lands in `{...rest}` and is read by nothing, so its control is inert'
+  );
+});
+
+test('the header actions pass every prop the two family units declare down to them', () => {
+  const parent = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte'),
+    'utf8'
+  );
+  for (const unit of ['ManagerHeaderCraftingActions', 'ManagerHeaderGatheringActions']) {
+    const open = parent.indexOf(`<${unit}`);
+    const call = parent.slice(open, parent.indexOf('/>', open));
+    assert.deepEqual(
+      headerUnitProps(unit).filter((name) => !new RegExp(`[{\\s]${name}[}=]`).test(call)),
+      [],
+      `${unit} declares a prop its only caller never passes`
+    );
+  }
+});

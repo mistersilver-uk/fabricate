@@ -5868,3 +5868,30 @@ test('the crafting sources bar routes to the inventory and alchemy frames that d
     'the bar must not select a tab it does not render in; the routing has been widened'
   );
 });
+
+/**
+ * The page header and the nav rail are their own units (issues 1717, 1720), but a change to one
+ * of them changes exactly the screens the shell's own change would. The 42 `sourceMatches` rows
+ * that name the shell are extended by hand, so this equality is the only thing standing between
+ * a forgotten row and a header PR that silently publishes one frame fewer than it changed.
+ */
+test('every unit the shell extracted selects the shell\u2019s own case set', () => {
+  const MANAGER = 'src/ui/svelte/apps/manager';
+  const shell = [`${MANAGER}/CraftingSystemManagerRoot.svelte`];
+  const extracted = [
+    'ManagerPageHeader',
+    'ManagerHeaderBreadcrumbs',
+    'ManagerHeaderActions',
+    'ManagerHeaderCraftingActions',
+    'ManagerHeaderGatheringActions',
+  ].map((unit) => `${MANAGER}/${unit}.svelte`);
+  const ids = (paths) =>
+    [...new Set(mapChangedFilesToCases(paths).map((entry) => entry.id ?? entry))].sort();
+  const expected = ids(shell);
+  // NON-VACUITY: the shell selects a real, large case set, so an empty answer cannot pass.
+  assert.ok(expected.length > 40, `the shell selects only ${expected.length} cases`);
+  assert.deepEqual(ids(extracted), expected, 'the page header no longer reaches the shell\u2019s views');
+  for (const path of extracted) {
+    assert.deepEqual(ids([path]), expected, `${path} alone selects a different set`);
+  }
+});
