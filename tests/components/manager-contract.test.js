@@ -132,6 +132,13 @@ const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelt
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
+const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
+const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
+const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
+const MANAGER_HEADER_CRAFTING_ACTIONS =
+  'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte';
+const MANAGER_HEADER_GATHERING_ACTIONS =
+  'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte';
 const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
@@ -584,18 +591,52 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['class', 'manager-rail']],
   });
 
+  // `manager-header` is the page header's own identity since issue 1720, and it draws the two
+  // `<header>` elements as bare siblings rather than under a wrapper of its own.
+  defineStructureContract('names both page headers', MANAGER_PAGE_HEADER, {
+    attributes: [
+      ['class', 'manager-header'],
+      ['class', 'manager-heading'],
+    ],
+    spells: ['manager-tools-context-header'],
+    renders: ['ManagerHeaderBreadcrumbs', 'ManagerHeaderActions', 'Kicker', 'Medallion'],
+  });
+
+  // `manager-breadcrumbs` is the trail's own identity since issue 1720.
+  defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
+    attributes: [['class', 'manager-breadcrumbs']],
+  });
+
+  // `manager-header-actions` is the action group's own identity since issue 1720, and the two
+  // family units it dispatches into carry none of the group's chrome.
+  defineStructureContract('names the header action group', MANAGER_HEADER_ACTIONS, {
+    attributes: [['class', 'manager-header-actions']],
+    renders: [
+      'ManagerHeaderCraftingActions',
+      'ManagerHeaderGatheringActions',
+      'ScopedEntryHeaderActions',
+    ],
+  });
+
+  defineStructureContract('draws the crafting studios’ header actions', MANAGER_HEADER_CRAFTING_ACTIONS, {
+    renders: ['ManagerButton', 'ComponentEditorHeader'],
+    writes: ['data-checks-save', 'data-component-add-from-catalogue'],
+  });
+
+  defineStructureContract('draws the gathering studios’ header actions', MANAGER_HEADER_GATHERING_ACTIONS, {
+    renders: ['ManagerButton', 'Chip'],
+    writes: ['data-environment-edit-back', 'data-gathering-task-back', 'data-gathering-event-back'],
+  });
+
   // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
   // `data-manager-view` are not here: every route module reads them off the mounted shell
   // (`target.querySelector('.fabricate-manager').dataset.managerView`).
   defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
-    attributes: [
-      ['class', 'manager-header'],
-      ['class', 'manager-breadcrumbs'],
-      ['class', 'manager-inspector'],
-    ],
+    attributes: [['class', 'manager-inspector']],
     spells: ['is-rail-collapsed', 'manager-environment-edit-main'],
     renders: [
       'ManagerNavRail',
+      'ManagerPageHeader',
       'ComponentsBrowserView',
       'EnvironmentsBrowserView',
       'EssenceBrowserView',
@@ -966,18 +1007,22 @@ describe('CraftingSystemManager source contract', () => {
 
   // The heading is the selected system's name, falling back to the route name only when nothing
   // is selected, rather than rendering an empty heading (#429).
-  defineStructureContract('titles the page after the record it edits', [MANAGER_ROOT, MANAGER_SYSTEM_NAV], {
-    reads: ['selectedSystem.name'],
-    spellsExactly: [
-      'FABRICATE.Admin.Manager.SystemEdit.Nav',
-      'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
-    ],
-    spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
-    writes: ['data-nav-system-edit'],
-    writesNo: ['data-nav-system-overview'],
-    names: ['systemOverviewCount'],
-    assignsNo: [['activeView', 'system-overview']],
-  });
+  defineStructureContract(
+    'titles the page after the record it edits',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, MANAGER_HEADER_BREADCRUMBS],
+    {
+      reads: ['selectedSystem.name'],
+      spellsExactly: [
+        'FABRICATE.Admin.Manager.SystemEdit.Nav',
+        'FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb',
+      ],
+      spellsNo: ['SystemEdit.Summary', 'SystemEdit.PageTitle'],
+      writes: ['data-nav-system-edit'],
+      writesNo: ['data-nav-system-overview'],
+      names: ['systemOverviewCount'],
+      assignsNo: [['activeView', 'system-overview']],
+    }
+  );
 
   defineStructureContract(
     'folds a stale overview token into the system-edit page',
@@ -1094,7 +1139,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('keeps Import on the library header', () => {
-    const nodes = templateNodes(componentAstOf(MANAGER_ROOT));
+    const nodes = templateNodes(componentAstOf(MANAGER_HEADER_ACTIONS));
     // The legacy system-library header rendered an admin launch button beside Import, so the
     // `openCurrentAdmin` absence above is vacuous against a header that no longer exists.
     const [importButton] = nodes.filter((node) =>
@@ -1364,16 +1409,21 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['role', 'list']],
   });
 
-  defineStructureContract('routes essence editing to its own page', MANAGER_ROOT, {
-    imports: ['./EssenceEditView.svelte'],
-    declares: ['showEssenceSourceUi'],
-    names: ['essenceBrowserState'],
-    compares: ['essence-edit'],
-    passesProps: [['EssenceBrowserView', 'browserState']],
-    renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
-    spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
-    writesNo: ['data-essence-action'],
-  });
+  defineStructureContract(
+    'routes essence editing to its own page',
+    [MANAGER_ROOT, MANAGER_HEADER_CRAFTING_ACTIONS],
+    {
+      imports: ['./EssenceEditView.svelte'],
+      declares: ['showEssenceSourceUi'],
+      names: ['essenceBrowserState'],
+      compares: ['essence-edit'],
+      passesProps: [['EssenceBrowserView', 'browserState']],
+      renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
+      // The editor's form id and save hook are the header action unit's since issue 1720.
+      spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
+      writesNo: ['data-essence-action'],
+    }
+  );
 
   // Criterion 23: the guard compares the essence and not only the view token, so re-entering the
   // editor for the same essence skips the prompt and switching to another one does not.
@@ -1932,8 +1982,8 @@ describe('CraftingSystemManager source contract', () => {
   // within 200 characters of each other. The class literal the old match keyed on left the file
   // entirely when this toolbar moved onto `ManagerButton` (issue 1118).
   it('renders the task delete as one danger ManagerButton wired to the draft delete', () => {
-    const [remove] = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
-      declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
+    const [remove] = templateNodes(componentAstOf(MANAGER_HEADER_GATHERING_ACTIONS)).filter(
+      (node) => declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
     );
     assert.ok(Boolean(remove), 'the task editor toolbar still renders its delete control');
     assert.equal(remove.name, 'ManagerButton', 'through the shared button primitive');
@@ -2841,7 +2891,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   // rendering no inspector, would have had no way back at all if this were left to them.
   it('renders the entry trail as three crumbs, the middle one a button back to the catalogue', () => {
     const root = componentAstOf(MANAGER_ROOT);
-    const crumbs = templateNodes(root).filter((node) =>
+    const crumbs = templateNodes(componentAstOf(MANAGER_HEADER_BREADCRUMBS)).filter((node) =>
       declaresAttribute(node, 'data-breadcrumb-world-scoped-catalogue', { directives: false })
     );
     assert.equal(crumbs.length, 1, 'the entry trail draws one intermediate catalogue crumb');

@@ -15,7 +15,7 @@ tests/companion-component-award.test.js	5
 tests/companion-currency-credit.test.js	6
 tests/component-category-normalization.test.js	6
 tests/component-complications-plan.test.js	4
-tests/component-world-scope-screens.test.js	22
+tests/component-world-scope-screens.test.js	24
 tests/components/access-tab-view-mounted.test.js	3
 tests/components/alchemy-known-recipe-layout.test.js	3
 tests/components/avatar-mounted.test.js	3
@@ -44,7 +44,7 @@ tests/components/gathering-chance-bar-mounted.test.js	2
 tests/components/gathering-detail-mounted.test.js	31
 tests/components/gathering-environments-mounted.test.js	34
 tests/components/gathering-environments-source.test.js	133
-tests/components/gathering-event-editor.test.js	79
+tests/components/gathering-event-editor.test.js	80
 tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
 tests/components/gathering-realm-toggle.test.js	32
@@ -81,7 +81,7 @@ tests/components/pill-family-routing.test.js	1
 tests/components/portal-host-app-root.test.js	3
 tests/components/re-rooted-controls-host-independence.test.js	19
 tests/components/recipe-browser-mounted.test.js	5
-tests/components/recipe-edit-placeholder.test.js	36
+tests/components/recipe-edit-placeholder.test.js	38
 tests/components/recipe-studio-primitives.test.js	5
 tests/components/recipes-browser-view-mounted.test.js	3
 tests/components/record-inspector-nodes-mounted.test.js	2
@@ -90,7 +90,7 @@ tests/components/row-disclosure-mounted.test.js	3
 tests/components/run-primitives-mounted.test.js	1
 tests/components/scoped-entity-preview-fact-groups-mounted.test.js	2
 tests/components/scoped-list-inspector-geometry.test.js	2
-tests/components/scoped-shell-prop-contract.test.js	20
+tests/components/scoped-shell-prop-contract.test.js	21
 tests/components/searchable-popover-trigger-form-mounted.test.js	6
 tests/components/segmented-control-mounted.test.js	12
 tests/components/select-mounted.test.js	1
@@ -114,7 +114,7 @@ tests/crafting-modifier-config.test.js	3
 tests/crafting-nav.test.js	7
 tests/currency-balance-macro.test.js	4
 tests/essence-bulk-delete-copy.test.js	2
-tests/essence-world-scope-screens.test.js	31
+tests/essence-world-scope-screens.test.js	33
 tests/export-system-gathering-bundle.test.js	7
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
@@ -150,7 +150,7 @@ tests/manager-button-source-contract.test.js	4
 tests/manager-color-tokens.test.js	2
 tests/manager-extensions.test.js	10
 tests/manager-full-width-gate.test.js	5
-tests/manager-scoped-prop-contract.test.js	8
+tests/manager-scoped-prop-contract.test.js	11
 tests/mutation-time-valid-id-basis.test.js	2
 tests/player-character-actor-types.test.js	11
 tests/progressive-stage-complications.test.js	2

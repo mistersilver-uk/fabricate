@@ -27,6 +27,9 @@ const ACCESS_TAB = `${MANAGER}/recipe/RecipeAccessTab.svelte`;
 const BOOKS_TAB = `${MANAGER}/recipe/RecipeBooksScrollsTab.svelte`;
 const TABS = `${MANAGER}/recipe/RecipeEditorTabs.svelte`;
 const ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
+// The header's heading block and its crafting action branches moved out of the root in issue 1720.
+const PAGE_HEADER = `${MANAGER}/ManagerPageHeader.svelte`;
+const CRAFTING_ACTIONS = `${MANAGER}/ManagerHeaderCraftingActions.svelte`;
 const BROWSER = `${MANAGER}/RecipesBrowserView.svelte`;
 const BROWSER_INSPECTOR = `${MANAGER}/recipes/RecipeBrowserInspector.svelte`;
 // The Access SURFACE (the Crafting nav's grant list + its inspector).
@@ -611,7 +614,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
 
   defineStructureContract(
     'wires the recipe-edit header chip + Back/Delete/Save and the controlled view props',
-    ROOT,
+    [ROOT, CRAFTING_ACTIONS],
     {
       names: ['saveRecipeDraft', 'backToRecipesBrowse', 'deleteRecipeFromEdit'],
       spells: [
@@ -660,7 +663,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
   });
 
   it('renders Delete as a ManagerButton carrying the danger destructive role', () => {
-    const [deleteButton] = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter(
+    const [deleteButton] = renderedNodes(componentAstOf(CRAFTING_ACTIONS), 'ManagerButton').filter(
       (node) => attributeExpression(node, 'onclick')?.name === 'deleteRecipeFromEdit'
     );
     assert.ok(deleteButton, 'the recipe-edit header renders Delete as a ManagerButton');
@@ -1010,7 +1013,7 @@ describe('RecipeEditView keeps the recipe image always editable', () => {
   );
 
   it('and the header medallion and the Overview picker both route through it', () => {
-    const [medallion] = renderedNodes(componentAstOf(ROOT), 'Medallion').filter(
+    const [medallion] = renderedNodes(componentAstOf(PAGE_HEADER), 'Medallion').filter(
       (node) =>
         calledName(attributeExpression(node, 'art')) === 'resolveRecipeImage' &&
         identifierNames(attributeExpression(node, 'art')).has('recipeDraft')

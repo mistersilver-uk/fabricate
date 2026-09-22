@@ -19,6 +19,15 @@ const browserSource = readFileSync(browserPath, 'utf8');
 const inspectorSource = readFileSync(inspectorPath, 'utf8');
 const editSource = readFileSync(editPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+// The header's trail and action branches moved out of the root in issue 1720.
+const breadcrumbsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte'),
+  'utf8'
+);
+const craftingActionsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte'),
+  'utf8'
+);
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
@@ -156,7 +165,7 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
     assert.ok(rootSource.includes('<RecipeEditView'), 'RecipeEditView should be rendered');
     // The route-exit-aware Back lives in the shared header (onclick={backToRecipesBrowse}),
     // not as a view prop — the controlled editor carries no onBack.
-    assert.ok(rootSource.includes('onclick={backToRecipesBrowse}'), 'header Back wired to the route-exit-aware backToRecipesBrowse');
+    assert.ok(craftingActionsSource.includes('onclick={backToRecipesBrowse}'), 'header Back wired to the route-exit-aware backToRecipesBrowse');
   });
 
   it('defines editRecipe and backToRecipesBrowse navigation', () => {
@@ -223,9 +232,9 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   });
 
   it('renders a recipe-edit breadcrumb crumb back to Recipes', () => {
-    const idx = rootSource.indexOf("currentView === 'recipe-edit'");
+    const idx = breadcrumbsSource.indexOf("currentView === 'recipe-edit'");
     assert.ok(idx >= 0, 'recipe-edit branch should exist');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb'), 'breadcrumb uses the EditBreadcrumb key');
+    assert.ok(breadcrumbsSource.includes('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb'), 'breadcrumb uses the EditBreadcrumb key');
   });
 });
 

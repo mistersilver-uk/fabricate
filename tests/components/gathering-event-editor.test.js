@@ -18,6 +18,11 @@ const chanceSliderPath = resolve(repoRoot, 'src/ui/svelte/components/ChanceSlide
 const editorSource = readFileSync(editorPath, 'utf8');
 const chanceSliderSource = readFileSync(chanceSliderPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
+// The header's action toolbar moved out of the root in issue 1720.
+const gatheringActionsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte'),
+  'utf8'
+);
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -202,8 +207,8 @@ describe('GatheringEventEditView source contract', () => {
     assert.ok(rootSource.includes('function saveGatheringEventDraft'), 'root should expose saveGatheringEventDraft');
     assert.ok(rootSource.includes('function deleteGatheringEventDraft'), 'root should expose deleteGatheringEventDraft');
     assert.ok(ROUTE_EXIT_GUARDS.some((guard) => guard.view === 'gathering-event-edit'), 'route-exit chain should include event confirm');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
-    assert.ok(rootSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
+    assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Save'), 'toolbar Save button uses the event Save lang key');
+    assert.ok(gatheringActionsSource.includes('FABRICATE.Admin.Manager.Environment.Events.Dirty'), 'toolbar Dirty chip uses the event Dirty lang key');
     assert.ok(rootSource.includes('event={editingGatheringEvent}'), 'editor mount should bind the draft event');
   });
 

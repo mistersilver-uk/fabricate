@@ -82,10 +82,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../components/Chip.svelte',
   // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
-  // ADDED BY ISSUE 1515 (decision D12), under the message below and not as drift.
-  '../../components/Kicker.svelte',
   '../../components/ManagerButton.svelte',
-  '../../components/Medallion.svelte',
   '../../util/announceAfterFocus.js',
   '../../util/componentEditor.js',
   '../../util/craftingImageDefaults.js',
@@ -112,6 +109,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // Added by issue 1717: the rail is its own unit, which renders the two entry units and took the
   // nav-tab badge helpers with it, so `../../../navTabBadgeStore.js` left this list.
   './ManagerNavRail.svelte',
+  // Added by issue 1720: the page header is its own unit, which renders the trail and the action
+  // group and took `Kicker`, `Medallion`, `ComponentEditorHeader`, `ScopedEntryHeaderActions`
+  // and the `managerHeaderActionClass` named import with them.
+  './ManagerPageHeader.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
@@ -127,7 +128,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './checks/checksCopy.js',
   './checks/checksNav.js',
   './checks/checksReadiness.js',
-  './component/ComponentEditorHeader.svelte',
   './components/ComponentBrowserInspector.svelte',
   './components/ComponentBulkEditPanel.svelte',
   './crafting/craftingNav.js',
@@ -152,10 +152,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE.
   './resolutionModeOptions.js',
   './routeExitGuards.js',
-  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
-  // beside its sibling below because this list is asserted SORTED.
   './scoped/ComponentAddFromCatalogueDialog.svelte',
-  './scoped/ScopedEntryHeaderActions.svelte',
   './scoped/WorldComponentCataloguePage.svelte',
   './scoped/WorldComponentEntryPage.svelte',
   './scoped/WorldEssenceCataloguePage.svelte',
@@ -480,4 +477,70 @@ test('the rail declares exactly the props the root hands it, in both directions'
     [],
     'the root passes the rail no prop the rail does not declare'
   );
+});
+
+/**
+ * Every key the shell hands `<ManagerPageHeader>` is declared by the unit that reads it. The
+ * header forwards `{...rest}` to both children, so a mis-keyed prop is not an error: it is a
+ * default, and the control it wires goes inert with the census and the compiler both silent
+ * (issue 1720).
+ */
+const HEADER_UNITS = Object.freeze([
+  'ManagerPageHeader',
+  'ManagerHeaderBreadcrumbs',
+  'ManagerHeaderActions',
+  'ManagerHeaderCraftingActions',
+  'ManagerHeaderGatheringActions',
+]);
+
+/** The prop names one component's `let { … } = $props()` destructuring declares. */
+function headerUnitProps(unit) {
+  const source = readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/${unit}.svelte`), 'utf8');
+  const open = source.indexOf('let {');
+  const block = source.slice(open + 5, source.indexOf('} = $props();', open));
+  return block
+    .split('\n')
+    .map((line) => /^\s*(\w+)\s*(?:=|,|$)/.exec(line)?.[1])
+    .filter((name) => name && name !== 'rest');
+}
+
+/** The keys the shell passes at its one `<ManagerPageHeader …/>` site. */
+function pageHeaderSiteProps() {
+  const source = rootLines.join('\n');
+  const site = source.slice(source.indexOf('<ManagerPageHeader'));
+  return site
+    .slice(0, site.indexOf('\n  />'))
+    .split('\n')
+    .slice(1)
+    .map((line) => /^\{(\w+)\}$|^(\w+)=/.exec(line.trim()))
+    .filter(Boolean)
+    .map((hit) => hit[1] ?? hit[2]);
+}
+
+test('the page-header composition site names no prop the five units leave unread', () => {
+  const declared = new Set(HEADER_UNITS.flatMap(headerUnitProps));
+  const passed = pageHeaderSiteProps();
+  // NON-VACUITY: the site is the 138-prop one, not an empty slice.
+  assert.ok(passed.length > 100, `the site parsed only ${passed.length} props`);
+  assert.deepEqual(
+    passed.filter((name) => !declared.has(name)),
+    [],
+    'a prop lands in `{...rest}` and is read by nothing, so its control is inert'
+  );
+});
+
+test('the header actions pass every prop the two family units declare down to them', () => {
+  const parent = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte'),
+    'utf8'
+  );
+  for (const unit of ['ManagerHeaderCraftingActions', 'ManagerHeaderGatheringActions']) {
+    const open = parent.indexOf(`<${unit}`);
+    const call = parent.slice(open, parent.indexOf('/>', open));
+    assert.deepEqual(
+      headerUnitProps(unit).filter((name) => !new RegExp(`[{\\s]${name}[}=]`).test(call)),
+      [],
+      `${unit} declares a prop its only caller never passes`
+    );
+  }
 });

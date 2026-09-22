@@ -3,7 +3,6 @@
   import { onDestroy, untrack } from 'svelte';
   import GatheringInspectorRail from './environment/GatheringInspectorRail.svelte';
   import Chip from '../../components/Chip.svelte';
-  import Kicker from '../../components/Kicker.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
@@ -65,12 +64,10 @@
     toBulkEssenceEdit,
   } from '../../../model/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
-  import Medallion from '../../components/Medallion.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
-  import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -112,6 +109,7 @@
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
   import ManagerNavRail from './ManagerNavRail.svelte';
+  import ManagerPageHeader from './ManagerPageHeader.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -148,7 +146,6 @@
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
-  import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
   // The shipped two-step destructive control, for the world Tool entry's header `Delete` (issue
   // 1373).
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
@@ -166,10 +163,7 @@
   import WorldPrerequisitesTab from './world/WorldPrerequisitesTab.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
   import { createRouteChromeChannel } from './downtime/routeChromeChannel.js';
-  import {
-    managerHeaderActionClass,
-    WORLD_DOWNTIME_SURFACE_ID,
-  } from '../../../managerExtensions.js';
+  import { WORLD_DOWNTIME_SURFACE_ID } from '../../../managerExtensions.js';
   import {
     mapModifierToPrerequisite,
     mapPrerequisiteToModifier,
@@ -177,7 +171,6 @@
 
   let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
-  const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
   // Which provider currently holds the Downtime surface, and which one has already failed to mount.
   let downtimeProviderSnapshot = $state(null);
   let downtimeFaultedProvider = $state(null);
@@ -7145,6 +7138,28 @@
       rest: normalized.slice(firstSpace + 1),
     };
   }
+
+  // The page header's action ladder is a child component now, so every control it presses is a
+  // named function here rather than a closure written at the call site.
+  const backToWorldEssences = () => setView('world-essences');
+  const backToWorldTools = () => setView('world-tools');
+  const backToWorldComponents = () => setView('world-components');
+  const createParty = () => store.createParty?.();
+  const deleteEnvironmentDraft = () => store.deleteEnvironmentDraft?.();
+  const exportSelectedSystem = () => exportSystem();
+  const createGatheringTaskForSystem = () => createGatheringTask(selectedSystemId);
+  const createGatheringEventForSystem = () => createGatheringEvent(selectedSystemId);
+
+  function openComponentAddFromCatalogue() {
+    componentAddFromCatalogueOpen = true;
+  }
+
+  async function createTravelRealm() {
+    const created = await store.createRealmQuick?.(
+      text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
+    );
+    if (typeof created === 'string' && created) selectedTravelRealmId = created;
+  }
 </script>
 
 <div
@@ -7198,1123 +7213,146 @@
     {/if}
   </div>
 
-  {#if !isToolStudioRoute}
-    <!--
-      Two children, always: the heading block and the trailing actions.
-    -->
-    <header class="manager-header">
-      <div class="manager-heading">
-        <nav
-          class="manager-breadcrumbs"
-          aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-        >
-          <!--
-            TWO ROOTS, NOT ONE (issue 1322).
-          -->
-          {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute || isWorldScopedRoute}
-            <!--
-              `World.Heading` is the RAIL's micro-label and is authored in caps for the
-               letter-spaced treatment there.
-            -->
-            {#if isWorldRoute}
-              <span data-breadcrumb-world
-                >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
-              >
-            {:else}
-              <button type="button" data-breadcrumb-world onclick={() => openWorldParties()}
-                >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</button
-              >
-            {/if}
-            {#if isWorldScopedRoute}
-              <!--
-                A CATALOGUE IS TWO CRUMBS AND AN ENTRY IS THREE.
-              -->
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              {#if worldScopedEntryRoute}
-                <button
-                  type="button"
-                  data-breadcrumb-world-scoped-catalogue={worldScopedEntryRoute.catalogueView}
-                  onclick={() => setView(worldScopedEntryRoute.catalogueView)}
-                  >{text(
-                    worldScopedEntryRoute.catalogueTitleKey,
-                    worldScopedEntryRoute.catalogueTitleFallback
-                  )}</button
-                >
-                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                <!-- The entity's OWN name when the corpus can supply one, falling back to the
-                     screen's title: an entry route with no subject chosen yet, or a subject the
-                     corpus no longer holds, has nothing to name and must not print an empty
-                     crumb. -->
-                <span data-breadcrumb-world-scoped={currentView} title={worldScopedEntryCrumb}
-                  >{worldScopedEntryCrumb || header.title}</span
-                >
-              {:else}
-                <span data-breadcrumb-world-scoped={currentView}>{header.title}</span>
-              {/if}
-            {/if}
-            {#if isWorldRulesRoute}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}</span>
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-world-rules-tab={worldRulesTab}>{worldRulesPageTitle}</span>
-            {/if}
-            {#if isWorldTravelRoute}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}</span>
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-world-travel-tab={worldTravelTab}
-                >{worldTravelTab === 'map'
-                  ? text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')
-                  : text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}</span
-              >
-            {/if}
-            {#if isWorldDowntimeRoute}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <!--
-                THE TAB CRUMB NAMES THE TAB, so it belongs to whoever owns the tab.
-              -->
-              {#if downtimeTabCrumbNavigable}
-                <button
-                  type="button"
-                  data-breadcrumb-downtime-tab={worldDowntimeTabId}
-                  onclick={() => downtimeChromeChannel.reselect()}>{downtimeTabCrumb}</button
-                >
-              {:else}
-                <span data-breadcrumb-downtime-tab={worldDowntimeTabId}>{downtimeTabCrumb}</span>
-              {/if}
-              <!--
-                AND THE COMPANION'S OWN LEAF UNDER IT, when there is one and it says something the
-                 tab crumb does not.
-              -->
-              {#if downtimeLeafCrumb}
-                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                <span data-breadcrumb-downtime-leaf>{downtimeLeafCrumb}</span>
-              {/if}
-            {/if}
-          {:else}
-            <button type="button" onclick={() => selectSystemAndShowBrowser()}
-              >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-            >
-            {#if selectedSystem && currentView !== 'systems'}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <button type="button" onclick={() => editSystem(selectedSystem.id)}
-                >{selectedSystem.name}</button
-              >
-            {/if}
-          {/if}
-          {#if currentView === 'recipes'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
-          {/if}
-          {#if currentView === 'crafting-settings'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Settings', 'Settings')}</span
-            >
-          {/if}
-          {#if currentView === 'access'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Access', 'Access')}</span>
-          {/if}
-          {#if currentView === 'books-scrolls'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
-          {/if}
-          {#if currentView === 'knowledge'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Knowledge', 'Knowledge')}</span>
-          {/if}
-          {#if currentView === 'recipe-item-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToBooksScrolls}
-              >{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the item, not the generic "Edit recipe item" — the same rule the recipe
-               and component breadcrumbs already follow. -->
-            <span title={recipeItemCrumb}>{recipeItemCrumb}</span>
-          {/if}
-          {#if currentView === 'components'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</span>
-          {/if}
-          {#if currentView === 'tags'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-          {/if}
-          {#if currentView === 'essences'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</span>
-          {/if}
-          {#if currentView === 'essence-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEssencesBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the essence, not the generic "Edit essence" — the same rule the recipe and
-               component breadcrumbs already follow, and the reference's own trail
-               (`Crafting systems > <system> > Essence Rules > <essence>`). The generic word
-               survives as the fallback for a subject with no name yet. -->
-            <span title={essenceEditName}
-              >{essenceEditName ||
-                text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
-            >
-          {/if}
-          {#if currentView === 'recipe-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={() => openCraftingSection('recipes')}
-              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToRecipesBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the recipe (§F5), not the generic "Edit recipe". -->
-            <span
-              >{recipeDraft?.name ||
-                text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span
-            >
-          {/if}
-          {#if currentView === 'component-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToComponentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- Name the component, not the generic "Edit component" — the same rule the
-               recipe breadcrumb follows. -->
-            <span
-              >{componentForEdit?.name ||
-                text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span
-            >
-          {/if}
-          {#if currentView === 'environments'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- THE GROUP, THEN THE SCREEN. Gathering is four screens under one name, so a trail
-               that stopped at the group read identically on all four. Checks already names its
-               own sub-tab; this is that rule applied to the other group that has one.
-
-               A SPAN HERE AND A BUTTON IN THE EDITORS BELOW, which is one rule rather than two:
-               a crumb is a control when pressing it goes somewhere the GM is not. From the
-               library, `Gathering` names the screen already on the screen — `backToEnvironmentsBrowse`
-               returns to this route and leaves the active tab where it is, so a button would sit
-               there doing nothing. From an editor it really does leave, so there it is a control.
-               Same rule the Downtime tab crumb follows. -->
-            <span>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
-            {#if gatheringTabLabel}
-              <i class="fas fa-chevron-right" aria-hidden="true"></i>
-              <span data-breadcrumb-gathering-tab={activeGatheringTab}>{gatheringTabLabel}</span>
-            {/if}
-          {/if}
-          {#if currentView === 'environment-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments',
-                'Environments'
-              )}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span title={environmentCrumb}>{environmentCrumb}</span>
-          {/if}
-          {#if currentView === 'gathering-task-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <!-- THE GROUP IS NOT SKIPPED. `Tasks` is a screen INSIDE Gathering, so a trail that
-               jumped from the system straight to it described a path that does not exist. -->
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToGatheringTaskLibrary}
-              >{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks', 'Tasks')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span title={gatheringTaskCrumb}>{gatheringTaskCrumb}</span>
-          {/if}
-          {#if currentView === 'gathering-event-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToEnvironmentsBrowse}
-              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <button type="button" onclick={backToGatheringEventLibrary}
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
-                'Events'
-              )}</button
-            >
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span title={gatheringEventCrumb}>{gatheringEventCrumb}</span>
-          {/if}
-          {#if isChecksRoute}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text(
-                `FABRICATE.Admin.Manager.Checks.Tabs.${checksActiveTab[0].toUpperCase()}${checksActiveTab.slice(1)}`,
-                checksActiveTab
-              )}</span
-            >
-          {/if}
-          {#if currentView === 'system-edit'}
-            <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            <span
-              >{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span
-            >
-          {/if}
-        </nav>
-        <!--
-          The eyebrow sits between the trail and the title.
-        -->
-        {#if header.kicker}
-          <div class="manager-page-kicker">
-            <Kicker dataAttr="data-page-kicker">{header.kicker}</Kicker>
-          </div>
-        {/if}
-        {#if currentView === 'recipe-edit' && recipeDraft}
-          <!-- The recipe editor's identity header: the recipe's real image (never a
-             glyph-only avatar — a recipe HAS an img), its name, and the
-             "<category> · <resolution mode>" subline. -->
-          <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-            <Medallion
-              art={resolveRecipeImage(recipeDraft)}
-              alt=""
-              icon="fas fa-scroll"
-              size={44}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={recipeDraft.name || ''}>
-                {recipeDraft.name || header.title}
-              </h1>
-              <p class="manager-subtitle" data-recipe-edit-subline>{header.subtitle}</p>
-            </div>
-          </div>
-        {:else if currentView === 'component-edit' && componentForEdit}
-          <!-- The component editor's identity header (issue 676, decision 4 — it must match
-             the recipe editor's exactly, and was never implemented: this route fell
-             through to the generic static "Edit component" heading below). The linked
-             item's real image, its NAME, and the "<category> · Linked <source>" subline.
-             It reuses the recipe heading's classes wholesale — same shape, same CSS. -->
-          <div class="manager-recipe-edit-heading" data-component-edit-heading>
-            <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={44} />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={componentForEdit.name || ''}>
-                {componentForEdit.name || header.title}
-              </h1>
-              <p class="manager-subtitle" data-component-edit-subline>{header.subtitle}</p>
-            </div>
-          </div>
-        {:else if isWorldDowntimeRoute && downtimeHeaderArtwork}
-          <!-- A companion's drill-down identity, rendered in CORE'S header rather than inside
-             the companion's panel. It reuses the recipe editor's heading block wholesale —
-             same classes, same `Medallion`, same 44px — because the point is that a
-             companion's editor is indistinguishable from one of Fabricate's own, and a
-             parallel block would be a second implementation of the identity header that
-             agreed with the first only until one of them changed.
-
-             `image` and `icon` are validated as mutually exclusive, so `Medallion` never has
-             to choose: with `image` set it renders the picture, and with only `icon` set `src`
-             is empty and it falls back to the glyph. The default glyph is the Downtime
-             route's own, so a companion that names neither still cannot reach this branch. -->
-          <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
-            <Medallion
-              art={downtimeHeaderArtwork.image ?? ''}
-              alt=""
-              icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
-              size={44}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={header.title}>{header.title}</h1>
-              <p class="manager-subtitle" data-downtime-chrome-subline>{header.subtitle}</p>
-            </div>
-          </div>
-        {:else if worldEssenceEntryRecord}
-          <!-- The essence's own identity header. See `worldEssenceEntryRecord` above for why it
-             is derived in the shell and why it reuses the recipe editor's heading block. The
-             medallion carries the essence's colour the way every other essence tile in the
-             manager does — `tint` recolours the glyph and nothing else since issue 1506, and
-             unset resolves to the accent.
-
-             `glyph` is set because the other two headings that reuse this block carry an
-             IMAGE, and `Medallion`'s 0.9rem default is sized for the 40px row tiles: left
-             unset, a 14px glyph inside a 44px tile reads as a speck against the prototype's,
-             which fills about half the tile (`essEntry.png`). It is passed here rather than
-             derived from `size` inside the primitive for the reason its own doc gives —
-             deriving it would re-type all ~40 medallions in the manager at once, which is a
-             change with its own frames. -->
-          <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
-            <Medallion
-              icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
-              tint={worldEssenceEntryTint}
-              size={44}
-              glyph={22}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldEssenceEntryName}>
-                {worldEssenceEntryName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-world-essence-entry-subline>
-                {worldEssenceEntrySubtitle}
-              </p>
-            </div>
-          </div>
-        {:else if currentView === 'essence-edit' && essenceRulesMode}
-          <!-- The essence's own identity header on the SYSTEM rules route. See
-             `essenceRulesMode` above for why it is derived in the shell, and the world essence
-             entry branch above for why it reuses the recipe editor's heading block wholesale
-             rather than being a fifth implementation of one meaning. -->
-          <div class="manager-recipe-edit-heading" data-essence-edit-heading>
-            <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={essenceEditName}>
-                {essenceEditName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
-            </div>
-          </div>
-        {:else if worldComponentEntryRecord}
-          <!-- The component's own identity header (issue 1371, parity round 4), the twin of the
-             two branches above and rendered from the same block. The medallion carries the linked
-             Item's art where there is one; `Medallion` falls back to the glyph when `src` is
-             empty, which is the unlinked case and the one this screen has to draw without
-             inventing a picture for. -->
-          <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
-            <!-- 42px, not the 44 the three sibling headings use: `proto:814` draws this chip at
-                 42 and an art size is its own ladder rather than the control one.
-
-                 `variant="glyph-chip"` FOR THE ABSENT EDGE (issue 1371 r11-entry, UX F-B). The
-                 reference's chip here is `proto:5375` — 42px, radius 10, a slate fill and NO
-                 `border` declaration at all — so it computes `border-style: none`, while the
-                 shipped tile carries the primitive's hairline. On a 42px tile at the top of the
-                 screen that edge is plainly visible, and the parity run reads it as three lines
-                 (`borderTopWidth`, `borderTopStyle`, `borderTopColor`). The variant is the one
-                 thing `size`, `glyph` and `tint` cannot say; it is the same opt-in the world
-                 catalogue's row chip already takes, and it moves no medallion that does not ask.
-                 `borderTopLeftRadius 9 !== 10` survives on purpose: 10 is on no published rung
-                 and 9 is the 34-38px band's corner (D-C). -->
-            <Medallion
-              art={worldComponentEntryImage}
-              alt=""
-              icon="fas fa-cube"
-              size={42}
-              glyph={22}
-              variant="glyph-chip"
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldComponentEntryName}>
-                {worldComponentEntryName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-world-component-entry-subline>
-                {worldComponentEntrySubtitle}
-              </p>
-            </div>
-          </div>
-        {:else if worldToolEntryRecord}
-          <!-- The Tool's own identity header, the twin of the essence branch above. The
-             medallion carries the linked Item's art where there is one; `Medallion` falls back
-             to the glyph when `src` is empty, which is the unlinked case and the one this
-             screen has to draw without inventing a picture for. -->
-          <div class="manager-recipe-edit-heading" data-world-tool-entry-heading>
-            <Medallion
-              art={worldToolEntryRecord.entity?.img ?? ''}
-              alt=""
-              icon="fas fa-screwdriver-wrench"
-              size={44}
-              glyph={22}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldToolEntryName}>
-                {worldToolEntryName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-world-tool-entry-subline>
-                {worldToolEntrySubtitle}
-              </p>
-            </div>
-          </div>
-        {:else if currentView !== 'tool-edit'}
-          <h1 class="manager-title">{header.title}</h1>
-          <p class="manager-subtitle">{header.subtitle}</p>
-        {/if}
-        {#if currentView === 'environment-edit' && environmentDraftForDisplay}
-          <div class="manager-environment-header-pills" data-environment-status-pills>
-            <Chip
-              tone={environmentDraftForDisplay.enabled === false ? 'neutral' : 'active'}
-              data-status-pill="active"
-            >
-              {environmentDraftForDisplay.enabled === false
-                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-            </Chip>
-            <Chip tone="info" data-status-pill="selection">
-              {environmentDraftForDisplay.selectionMode === 'blind'
-                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind')
-                : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
-            </Chip>
-            <Chip tone="info" data-status-pill="composition">
-              {environmentDraftForDisplay.compositionMode === 'manual'
-                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual')
-                : text(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic',
-                    'Automatic'
-                  )}
-            </Chip>
-          </div>
-        {/if}
-      </div>
-      <!--
-        World > Currency renders NO page-header actions (issue 1278).
-      -->
-      <!--
-        The world scoped-entity routes join that exclusion (issue 1362).
-      -->
-      <!--
-        ONE WORLD SCOPED ROUTE IS BACK IN, AND IT IS A SEAM RATHER THAN A RELAXATION (issue 1372).
-      -->
-      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry'}
-        <div class="manager-header-actions" aria-label={header.actionsLabel}>
-          {#if currentView === 'world-essence-entry'}
-            <!--
-              THE EDITOR ACTION PAIR, THROUGH THE SHARED COMPONENT (issue 1372, parity round 4).
-            -->
-            <ScopedEntryHeaderActions
-              backAttribute="data-world-essence-back"
-              saveAttribute="data-world-essence-save"
-              backLabel={text(
-                'FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogueShort',
-                'Back'
-              )}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.Save', 'Save essence')}
-              saveDisabled={!worldEssenceEntryDirty}
-              saving={worldEssenceEntrySaving}
-              onBack={() => setView('world-essences')}
-              onSave={saveWorldEssenceEntry}
-            />
-          {:else if currentView === 'world-tool-entry'}
-            <!--
-              THE SAME PAIR, THROUGH THE SAME COMPONENT (issue 1373).
-            -->
-            <ScopedEntryHeaderActions
-              backAttribute="data-world-tool-back"
-              saveAttribute="data-world-tool-save"
-              backLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.BackToTools', 'Back to tools')}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.Save', 'Save tool')}
-              saveDisabled={!worldToolEntryDirty}
-              saving={worldToolEntrySaving}
-              onBack={() => setView('world-tools')}
-              onSave={saveWorldToolEntry}
-              danger={worldToolEntryDelete ? worldToolDeleteAction : undefined}
-            />
-          {:else if currentView === 'world-component-entry'}
-            <!--
-              THE THIRD CALLER OF THE SAME PAIR (issue 1371).
-            -->
-            <!--
-              THE UNSAVED MARKER, WHICH THE BAND HAD NOWHERE (`proto:817`, gap-list row 53).
-            -->
-            {#if worldComponentEntryDirty}
-              <span class="manager-header-unsaved" data-world-component-entry-unsaved>
-                <span class="manager-header-unsaved-dot" aria-hidden="true"></span>
-                {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.Unsaved', 'Unsaved changes')}
-              </span>
-            {/if}
-            <ScopedEntryHeaderActions
-              backAttribute="data-world-component-back"
-              saveAttribute="data-world-component-save"
-              backLabel={text(
-                'FABRICATE.Admin.Manager.Scoped.Component.BackToCatalogueShort',
-                'Back'
-              )}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Component.Save', 'Save entry')}
-              saveDisabled={!worldComponentEntryDirty}
-              saving={worldComponentEntrySaving}
-              onBack={() => setView('world-components')}
-              onSave={saveWorldComponentEntry}
-            />
-          {:else if currentView === 'world-essences'}
-            <!--
-              CREATE TAKES NO NAME FIELD.
-            -->
-            <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
-            </ManagerButton>
-          {:else if currentView === 'world-downtime'}
-            {#if downtimeCoreFallback}
-              <!--
-                The design puts this promotional pill at the top of every Downtime screen.
-              -->
-              <ManagerButton
-                tag="a"
-                class="manager-downtime-unlock"
-                data-downtime-unlock
-                href={PATREON_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <i class="fas fa-crown" aria-hidden="true"></i>
-                <span
-                  >{text(
-                    'FABRICATE.Admin.Manager.World.Downtime.Unlock',
-                    'Unlock with Premium'
-                  )}</span
-                >
-              </ManagerButton>
-            {:else}
-              <!--
-                The status chip leads the group, exactly where every Core editor puts its own
-                 "Unsaved" chip.
-              -->
-              {#if downtimeHeaderStatus}
-                <Chip
-                  tone={downtimeHeaderStatus.tone}
-                  truncate
-                  density="action"
-                  data-downtime-chrome-status
-                  title={downtimeHeaderStatus.tooltip ?? downtimeHeaderStatus.label}
-                  >{downtimeHeaderStatus.label}</Chip
-                >
-              {/if}
-              {#each downtimeHeaderActions as action (action.id)}
-                {#if action.href}
-                  <a
-                    class={managerHeaderActionClass(action)}
-                    data-manager-header-action={action.id}
-                    href={action.href}
-                    title={action.tooltip}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
-                    <span>{action.label}</span>
-                  </a>
-                {:else}
-                  <button
-                    type="button"
-                    class={managerHeaderActionClass(action)}
-                    data-manager-header-action={action.id}
-                    title={action.tooltip}
-                    disabled={action.disabled === true}
-                    onclick={() => runDowntimeHeaderAction(action)}
-                  >
-                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
-                    <span>{action.label}</span>
-                  </button>
-                {/if}
-              {/each}
-            {/if}
-          {:else if currentView === 'recipes'}
-            <ManagerButton role="primary" onclick={createRecipe} disabled={!selectedSystemId}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
-            </ManagerButton>
-          {:else if currentView === 'recipe-edit'}
-            {#if recipeEditDirty}
-              <Chip
-                tone="warning"
-                truncate
-                density="action"
-                title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}
-                >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton role="ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              onclick={deleteRecipeFromEdit}
-              disabled={!selectedRecipeId || recipeEditSaving}
-              title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-            </ManagerButton>
-            <ManagerButton role="primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
-              <i
-                class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{recipeEditSaveLabel()}</span>
-            </ManagerButton>
-          {:else if currentView === 'recipe-item-edit'}
-            {#if recipeItemEditDirty}
-              <Chip
-                tone="warning"
-                truncate
-                density="action"
-                data-recipe-item-dirty
-                title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}
-                >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-recipe-item-back
-              onclick={backToBooksScrolls}
-              disabled={recipeItemEditSaving}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.RecipeItem.BackToBrowse',
-                  'Back to Books & Scrolls'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              data-recipe-item-delete
-              onclick={deleteRecipeItemFromEdit}
-              disabled={!recipeItemDraft?.id || recipeItemEditSaving}
-              title={text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              data-recipe-item-save
-              onclick={saveRecipeItemDraft}
-              disabled={!canSaveRecipeItemEdit}
-            >
-              <i
-                class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
-            </ManagerButton>
-            <!--
-          An attempted-and-failed save is announced beside the control the GM just clicked (issue
-           919).
-        -->
-            {#if recipeItemSaveFailed}
-              <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>
-                {text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed. Try again.')}
-              </p>
-            {/if}
-          {:else if currentView === 'components'}
-            <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The header had no action
-                 at all, so the only route to adopt a world component into this system was the
-                 list's own `All world components` cohort.
-
-                 IT OPENS THE REFERENCE'S MODAL AND NAVIGATES NOWHERE (M9). Revision 5 handed
-                 `openWorldScopedEntry` a VIEW LAB CASE ID — a token in no route table and no view
-                 branch — and that helper assigns whatever it is given, so the control dropped the
-                 GM on the systems library. The token is deliberately not spelled here: its
-                 absence from this file, COMMENTS INCLUDED, is what
-                 `component-world-scope-screens.test.js` asserts. The reference's own action is
-                 not a route change at all: `proto:1046` binds `onAddFrom`, which at `proto:5545`
-                 sets `modal: 'addFrom'`.
-
-                 `size="38"` IS THE RUNG THE REFERENCE DRAWS (`proto:1046`), and 38 is published
-                 on the ladder (26 / 28 / 30 / 34 / 38 / 44), so nothing licensed the 34 this
-                 shipped at. It is the SHARED opt-in rather than a local `height` — the same
-                 `is-size-38` token M12b gave `ManagerSearchField` and the toolbar selects, and
-                 the prop `ManagerButton`'s own doc block names this site for. Radius 9 is already
-                 global (M12a), so the corner is right at either height. -->
-            <ManagerButton
-              role="primary"
-              size="38"
-              data-component-add-from-catalogue
-              onclick={() => (componentAddFromCatalogueOpen = true)}
-              disabled={!selectedSystemId}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Component.AddFromCatalogue',
-                  'Add from catalogue'
-                )}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'knowledge'}
-            <!-- The Knowledge surface's only actions are per-character: they live in the
-             detail-pane header, next to the character they act on. -->
-          {:else if currentView === 'component-edit'}
-            <ComponentEditorHeader
-              dirty={componentEditCombinedDirty}
-              saving={componentEditSaving}
-              canSave={canSaveComponentEdit}
-              formId="manager-component-edit-form"
-              dirtyLabel={text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}
-              backLabel={text('FABRICATE.Admin.Manager.Component.Back', 'Back')}
-              saveLabel={componentEditSaveLabel()}
-              onBack={backToComponentsBrowse}
-            />
-          {:else if currentView === 'tags'}
-            <!-- no header actions for the tags view -->
-          {:else if isChecksRoute}
-            {#if checksDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="primary"
-              data-checks-save
-              onclick={saveChecks}
-              disabled={!checksDirty || checksSaving}
-            >
-              <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
-            </ManagerButton>
-          {:else if currentView === 'essences'}
-            <!-- NO HEADER ACTION (issue 1372, maintainer parity round 8).
-
-                 The reference's Essence Rules header carries the title, the subtitle and NOTHING
-                 on the right (`tmp/proto/essence-rules.png`, markup `proto:1523`-`1540`), because
-                 an essence is a WORLD record and the only create is the Essence Catalogue's
-                 `+ New essence`. What shipped here was `+ Create essence`, whose handler opened a
-                 system-scope draft that `store.addEssence` writes straight into
-                 `system.essenceDefinitions` — a system-owned essence with its own name, icon and
-                 colour, offered a foot away from this screen's own banner saying that name, icon
-                 and colour come from the Essence Catalogue and are shared by every system.
-
-                 THE ROUTE IS NOT LOST, and this is what makes the removal safe rather than merely
-                 correct. A GM creates an essence on the world Essence Catalogue and joins it to
-                 this system either from that screen's inspector rows or from this list's own
-                 `All world essences` segment, whose absent rows carry `Add to this system`. That
-                 join now seeds the in-system record as well as the membership record — see
-                 `joinEssenceToSystem` in `adminStore.js`, without which the Add wrote a world
-                 membership row this list does not read and appeared to do nothing. -->
-          {:else if currentView === 'essence-edit'}
-            <!-- The SHARED editor header (issue 1036), wearing this studio's own three data
-                 hooks. Its own note said "extract when a second studio wants it"; this is
-                 that studio, and the extraction is a parameterization rather than a fork.
-                 For the control inventory the shipped sibling wins over the prototype —
-                 Back rather than Cancel, and a dirty-only chip rather than a persistent
-                 "All changes saved" indicator — because seven editors share it. -->
-            <ComponentEditorHeader
-              dirty={essenceEditDirty}
-              saving={essenceEditSaving}
-              canSave={canSaveEssenceEdit}
-              formId="manager-essence-edit-form"
-              dirtyAttr="data-essence-edit-dirty"
-              backAttr="data-essence-edit-back"
-              saveAttr="data-essence-edit-save"
-              dirtyLabel={text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}
-              backLabel={text('FABRICATE.Admin.Manager.Essence.Back', 'Back')}
-              saveLabel={essenceEditSaveLabel()}
-              onBack={cancelEssenceEdit}
-            />
-          {:else if currentView === 'environments' && displayedGatheringTab === 'tasks'}
-            <ManagerButton
-              role="primary"
-              onclick={() => createGatheringTask(selectedSystemId)}
-              disabled={!canShowEnvironments}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Create',
-                  'Create gathering task'
-                )}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
-            <ManagerButton
-              role="primary"
-              onclick={() => createGatheringEvent(selectedSystemId)}
-              disabled={!canShowEnvironments}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Create',
-                  'Create gathering event'
-                )}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'world'}
-            <ManagerButton
-              role="primary"
-              onclick={() => store.createParty?.()}
-              disabled={$viewState.travelSaving}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
-            </ManagerButton>
-          {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
-            <ManagerButton
-              role="primary"
-              onclick={async () => {
-                const created = await store.createRealmQuick?.(
-                  text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
-                );
-                if (typeof created === 'string' && created) selectedTravelRealmId = created;
-              }}
-              disabled={$viewState.travelSaving}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
-            </ManagerButton>
-          {:else if isWorldTravelRoute}
-            <!-- Map Region Links has no create action: a Scene Region is authored in Foundry. -->
-          {:else if currentView === 'environments'}
-            <ManagerButton
-              role="primary"
-              onclick={createEnvironment}
-              disabled={!canShowEnvironments}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'environment-edit'}
-            {#if $viewState.environmentDraftDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-environment-edit-back
-              onclick={backToEnvironmentsBrowse}
-              disabled={$viewState.environmentSaving}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.BackToBrowse',
-                  'Back to environments'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              data-action="delete-environment"
-              onclick={() => store.deleteEnvironmentDraft?.()}
-              disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              onclick={saveEnvironmentEdit}
-              disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}
-            >
-              <i
-                class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
-            </ManagerButton>
-          {:else if currentView === 'gathering-task-edit'}
-            {#if gatheringTaskDraftDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-gathering-task-back
-              onclick={backToGatheringTaskLibrary}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary',
-                  'Back to task library'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              data-gathering-task-delete
-              onclick={deleteGatheringTaskDraft}
-              disabled={!selectedGatheringTaskId || gatheringTaskSaving}
-              title={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
-                'Delete gathering task'
-              )}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
-                  'Delete gathering task'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              onclick={saveGatheringTaskDraft}
-              disabled={!gatheringTaskDraftDirty ||
-                !gatheringTaskValidation.valid ||
-                gatheringTaskSaving}
-              title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
-            >
-              <i
-                class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
-            </ManagerButton>
-            <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
-            {#if gatheringTaskSaveError}
-              <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>
-                {gatheringTaskSaveError}
-              </p>
-            {/if}
-          {:else if currentView === 'gathering-event-edit'}
-            {#if gatheringEventDraftDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-gathering-event-back
-              onclick={backToGatheringEventLibrary}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Events.BackToLibrary',
-                  'Back to event library'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              onclick={deleteGatheringEventDraft}
-              disabled={!selectedGatheringEventId || gatheringEventSaving}
-              title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span
-                >{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              onclick={saveGatheringEventDraft}
-              disabled={!gatheringEventDraftDirty ||
-                !gatheringEventValidation.valid ||
-                gatheringEventSaving}
-              title={gatheringEventValidation.valid
-                ? ''
-                : gatheringEventValidation.errors.join('\n')}
-            >
-              <i
-                class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
-            </ManagerButton>
-            <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
-            {#if gatheringEventSaveError}
-              <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>
-                {gatheringEventSaveError}
-              </p>
-            {/if}
-          {:else if currentView === 'system-edit'}
-            <!--
-              `ghost` here rests on the VERB, not on a neighbour.
-            -->
-            <ManagerButton role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span
-              >
-            </ManagerButton>
-          {:else}
-            <!-- data-manager-import-system: a zero-behaviour hook. The only other handle on
-                 this button is `manager-button`, which a dozen header controls share, so a
-                 screenshot case could not name it without matching whichever came first. -->
-            <ManagerButton data-manager-import-system onclick={importSystem}>
-              <i class="fas fa-file-import" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-            </ManagerButton>
-            <ManagerButton onclick={() => exportSystem()} disabled={!selectedSystemId}>
-              <i class="fas fa-file-export" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
-            </ManagerButton>
-            <ManagerButton role="primary" onclick={createSystem}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
-            </ManagerButton>
-          {/if}
-        </div>
-      {/if}
-    </header>
-  {/if}
-
-  {#if currentView === 'tools' && selectedSystem}
-    <header class="manager-header manager-tools-context-header" data-tool-library-context>
-      <div class="manager-heading">
-        <nav
-          class="manager-breadcrumbs"
-          aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-        >
-          <!-- THE ROOT, WHICH THIS TRAIL ALONE WAS MISSING (issue 1328). The Tool LIBRARY has its
-             own header rather than sharing the root nav above, and it began at the system name —
-             so of the two Tool screens, the EDITOR carried `Crafting Systems` and the library did
-             not. Two screens one press apart disagreed about how deep they were. -->
-          <button type="button" onclick={() => selectSystemAndShowBrowser()}
-            >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-          >
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => editSystem(selectedSystem.id)}
-            >{selectedSystem.name}</button
-          >
-          <!-- NO `Crafting` CRUMB (issue 1373). This trail claimed Tool Rules sits inside the
-               Crafting group, and the rail in the same frame shows that group holding Recipes
-               and Settings with Tool Rules a sibling OUTSIDE it. Two navigations one pane
-               apart disagreed about the shape of the app, and the rail is the one a GM
-               actually clicks. The editor's own trail never had the crumb, so dropping it
-               also makes the two Tool screens agree with each other. -->
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
-        </nav>
-        <h1 class="manager-title">
-          {text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
-        </h1>
-        <p class="manager-subtitle">
-          {text(
-            'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
-            'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
-          )}
-        </p>
-      </div>
-    </header>
-  {/if}
+  <ManagerPageHeader
+    {header}
+    {isToolStudioRoute}
+    {currentView}
+    {text}
+    {selectedSystem}
+    {selectSystemAndShowBrowser}
+    {editSystem}
+    {recipeDraft}
+    {resolveRecipeImage}
+    {componentForEdit}
+    {downtimeHeaderArtwork}
+    {worldEssenceEntryIcon}
+    {worldEssenceEntryTint}
+    {worldEssenceEntryName}
+    {worldEssenceEntrySubtitle}
+    {essenceEditIcon}
+    {essenceEditTint}
+    {essenceEditName}
+    {essenceEditSubline}
+    {worldComponentEntryImage}
+    {worldComponentEntryName}
+    {worldComponentEntrySubtitle}
+    {worldToolEntryRecord}
+    {worldToolEntryName}
+    {worldToolEntrySubtitle}
+    {environmentDraftForDisplay}
+    {isWorldRoute}
+    {isWorldDowntimeRoute}
+    {isWorldRulesRoute}
+    {isWorldTravelRoute}
+    {isWorldScopedRoute}
+    {isChecksRoute}
+    {checksActiveTab}
+    {worldScopedEntryRoute}
+    {worldScopedEntryCrumb}
+    {worldRulesTab}
+    {worldRulesPageTitle}
+    {worldTravelTab}
+    {worldDowntimeTabId}
+    {downtimeTabCrumb}
+    {downtimeTabCrumbNavigable}
+    {downtimeLeafCrumb}
+    {downtimeChromeChannel}
+    {activeGatheringTab}
+    {gatheringTabLabel}
+    {recipeItemCrumb}
+    {environmentCrumb}
+    {gatheringTaskCrumb}
+    {gatheringEventCrumb}
+    {openWorldParties}
+    {setView}
+    {openCraftingSection}
+    {backToBooksScrolls}
+    {backToEssencesBrowse}
+    {backToRecipesBrowse}
+    {backToComponentsBrowse}
+    {backToEnvironmentsBrowse}
+    {backToGatheringTaskLibrary}
+    {backToGatheringEventLibrary}
+    {selectedSystemId}
+    {worldEssenceEntryDirty}
+    {worldEssenceEntrySaving}
+    {backToWorldEssences}
+    {saveWorldEssenceEntry}
+    {worldToolEntryDirty}
+    {worldToolEntrySaving}
+    {worldToolEntryDelete}
+    {worldToolDeleteAction}
+    {backToWorldTools}
+    {saveWorldToolEntry}
+    {worldComponentEntryDirty}
+    {worldComponentEntrySaving}
+    {backToWorldComponents}
+    {saveWorldComponentEntry}
+    {createWorldEssence}
+    {downtimeCoreFallback}
+    {downtimeHeaderStatus}
+    {downtimeHeaderActions}
+    {runDowntimeHeaderAction}
+    travelSaving={$viewState.travelSaving}
+    {createParty}
+    {createTravelRealm}
+    {backToSystemsBrowser}
+    {importSystem}
+    {exportSelectedSystem}
+    {createSystem}
+    {createRecipe}
+    {recipeEditDirty}
+    {recipeEditSaving}
+    {recipeEditSaveLabel}
+    {canSaveRecipeEdit}
+    {selectedRecipeId}
+    {deleteRecipeFromEdit}
+    {saveRecipeDraft}
+    {recipeItemDraft}
+    {recipeItemEditDirty}
+    {recipeItemEditSaving}
+    {recipeItemSaveFailed}
+    {canSaveRecipeItemEdit}
+    {deleteRecipeItemFromEdit}
+    {saveRecipeItemDraft}
+    {openComponentAddFromCatalogue}
+    {componentEditCombinedDirty}
+    {componentEditSaving}
+    {componentEditSaveLabel}
+    {canSaveComponentEdit}
+    {checksDirty}
+    {checksSaving}
+    {saveChecks}
+    {essenceEditDirty}
+    {essenceEditSaving}
+    {essenceEditSaveLabel}
+    {canSaveEssenceEdit}
+    {cancelEssenceEdit}
+    {displayedGatheringTab}
+    {canShowEnvironments}
+    {createGatheringTaskForSystem}
+    {createGatheringEventForSystem}
+    {createEnvironment}
+    environmentDraftDirty={$viewState.environmentDraftDirty}
+    environmentDraftIsNew={$viewState.environmentDraftIsNew}
+    environmentSaving={$viewState.environmentSaving}
+    {deleteEnvironmentDraft}
+    {saveEnvironmentEdit}
+    {gatheringTaskDraftDirty}
+    {gatheringTaskSaving}
+    {gatheringTaskValidation}
+    {gatheringTaskSaveError}
+    {selectedGatheringTaskId}
+    {deleteGatheringTaskDraft}
+    {saveGatheringTaskDraft}
+    {gatheringEventDraftDirty}
+    {gatheringEventSaving}
+    {gatheringEventValidation}
+    {gatheringEventSaveError}
+    {selectedGatheringEventId}
+    {deleteGatheringEventDraft}
+    {saveGatheringEventDraft}
+  />
 
   <div class={`manager-body ${navRail.collapsedDisplay ? 'is-rail-collapsed' : ''}`}>
     <ManagerNavRail

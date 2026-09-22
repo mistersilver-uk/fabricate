@@ -373,7 +373,7 @@ export const CASES = Object.freeze([
       // The inspector aside this route mounts (issue 1505).
       /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
       // The manager router and the Crafting entry model (issue 1151).
-      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
