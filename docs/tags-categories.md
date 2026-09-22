@@ -56,6 +56,7 @@ Confirming moves those components to **General** rather than leaving them pointi
 Component tags allow labeling and tag-based ingredient matching.
 Tags are many-valued, so a component can carry as many as you like.
 Tags are always stored in lowercase, so the add form previews the exact text it will save.
+Unlike a category, no tag name is reserved, so a tag called **general** is just an ordinary tag.
 Tags are assigned to components in the component editor only.
 They are not shown on component browser rows and they do not filter the browser, because grouping is what categories are for.
 
