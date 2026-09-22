@@ -1,5 +1,10 @@
 # UI Gathering App
 
+## Purpose
+
+Define the player Gathering App, where a player starts and follows gathering runs.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Gathering App (Player)
 
 This is a dedicated app distinct from the Crafting App.
@@ -8,7 +13,7 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 ### App Availability
 
-- The gathering listing refreshes on a crafting-data change only when that change names one of the five invalidation domains it consumes, per _Shared-store refresh routing_ above.
+- The gathering listing refreshes on a crafting-data change only when that change names one of the five invalidation domains it consumes, per `ui-crafting-app/spec.md` _Shared-store refresh routing_.
   Two of the five — `resolution-config` and `materials-and-yield` — are consumed for the system-validity gate rather than for anything the listing renders.
   The set is read from the derived transpose, never restated here.
 - The app is available only when at least one crafting system has `features.gathering === true`.
@@ -189,7 +194,7 @@ If `task.timeRequirement` is present:
 ### Active Runs
 
 The Gathering App must include a dedicated active-runs section.
-These runs also appear in the unified player Journal (see _Journal App_), which monitors gathering, crafting, and salvage runs together; the Gathering App remains the place to START a gather.
+These runs also appear in the unified player Journal (see `ui-journal-app/spec.md` _Journal App (Player)_), which monitors gathering, crafting, and salvage runs together; the Gathering App remains the place to START a gather.
 
 Each active run entry shows:
 

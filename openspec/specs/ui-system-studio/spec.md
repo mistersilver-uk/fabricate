@@ -1,5 +1,10 @@
 # UI System Studio
 
+## Purpose
+
+Define the GM Manager's system-scope studio screens, where a GM authors a crafting system's items, essences, tools, recipes, books, access, knowledge, environments and gathering events.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Systems Tab
 
 Display list + detail editor for crafting systems.
@@ -604,10 +609,10 @@ The body includes a live behavior preview, while the inspector summarizes identi
 Breakage opens with the two per-system facts that are not rules — `Enabled in {system}` and the per-system display-label OVERRIDE — and closes with `Stop using this Tool here`.
 The label field states that it overrides the world Tool name in this crafting system only and that blank falls back to it.
 The removal callout names the consequence in full — the rules in this system go, the world Tool and every other system are untouched — and its control is the shared armed destructive button rather than a second confirmation dialog.
-Removal is TWO writes and both are required: the in-system record is deleted, because while `## CraftingSystem` requirement 36 holds it is the row the read union answers with, and the world membership record and its overrides go with it.
+Removal is TWO writes and both are required: the in-system record is deleted, because while `data-models/spec.md` `## CraftingSystem` requirement 36 holds it is the row the read union answers with, and the world membership record and its overrides go with it.
 
 **The editor DISPLAYS from the read union and SAVES only the sections the membership record marks OVERRIDING.**
-Its draft is seeded from `## Scoped Entity Definitions` requirement 15's read union rather than from the raw in-system array, so every card and every effective-rules row states the value a craft will actually take.
+Its draft is seeded from `data-models/spec.md` `## Scoped Entity Definitions` requirement 15's read union rather than from the raw in-system array, so every card and every effective-rules row states the value a craft will actually take.
 Reading the raw array gave this one screen a second answer to a question the union already answers: `breakage` only appeared to inherit because adoption copied the world value onto the record, and `prerequisites` and `bonus` — which have no such copy — stated the in-system empty over an authored world value, so the rail read `No check bonus` while every craft added the world bonus.
 The save is therefore SECTION-AWARE: a section the membership record marks INHERITING is restored from the live in-system record and never persisted from the draft, and every other key — identity, the display-label override, `enabled`, `checkBreakable`, `requirement`, `repairRequirements` — is written from the draft unchanged.
 Persisting the draft whole would write the world's answer for an inheriting section onto the in-system record, silently converting that section into an override that stops tracking its world default; the pill, the record's validity and every automated check would all still read correct, so this rule is a correctness rule rather than a presentational one.
@@ -848,7 +853,7 @@ While the selection is non-empty, the recipe browser's inspector rail renders th
 The panel stages changes without writing: category (single-valued, overwriting, with an explicit leave-unchanged option), status (leave unchanged / enable / disable), lock (leave unchanged / lock / unlock), check tier, and recipe-book membership.
 The recipe-book axis is a search-and-pick control over the system's AUTHORED recipe items — never a vocabulary derived from the items the selected recipes already belong to, which would make an item holding no recipes unreachable as an add target.
 Picking one shows how many of the selected recipes it holds and offers add and remove, each labelled with the number of recipes it would actually affect and each unavailable when that number is zero.
-The held count is resolved on the same basis every other membership reader uses (see `### Books & Scrolls Surface`), so a system on the legacy basis reports its real membership rather than reporting none and making removal unavailable.
+The held count is resolved on the same basis every other membership reader uses (see `## Books & Scrolls Surface`), so a system on the legacy basis reports its real membership rather than reporting none and making removal unavailable.
 Staging accumulates across recipe items rather than being limited to the one on screen: each staged item appears in a list stating its operation, the number of recipes it affects, and its own control to leave that item unchanged.
 This axis deliberately differs from the Component Studio's tag axis, which is a run of tri-state controls; the divergence is in the staged axis only, and both panels render the same shared bulk-edit chrome.
 The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.

@@ -1,5 +1,10 @@
 # UI Manager Shell
 
+## Purpose
+
+Define the GM Manager shell: its window, header, navigation and browse view-state.
+Sibling UI surfaces and the cross-cutting UI rules are indexed by the Surface Map in `ui-integration/spec.md`.
+
 ## Manager Shell
 
 Manager is the GM crafting-system management shell.
