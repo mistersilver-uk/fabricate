@@ -1167,7 +1167,7 @@ const WITHDRAWN_UTILITIES = Object.freeze([
       'that reads their selectors, seven are recorded non-adopters and four are unpinned. The ' +
       'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the two ' +
       'carriers that left are select skins issue 1510 took — the recipe overview cells, deleted ' +
-      'when that row became the shared `<Select>`, and the Tool rails\x27 `Preview as` actor ' +
+      'when that row became the shared `<Select>`, and the Tool rails\' `Preview as` actor ' +
       'picker, whose rule survives as a width counterpart while the `toolbar` rung paints the ' +
       "tuple; the pinned carrier that arrived is issue 1512's ordered row, " +
       '`.fabricate-sortable-list-row`, which takes the tuple from the `<SortableList>` specimen. Issue ' +
