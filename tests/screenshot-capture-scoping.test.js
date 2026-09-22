@@ -1434,6 +1434,8 @@ const CHECKS_STUDIO_SRC = [
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
   // The Checks rail entries and their issue badges are `ManagerSystemNav.svelte`'s (issue 1717).
   'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
+  // `data-checks-save` is the page header's crafting action unit (issue 1720).
+  'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
 ]
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');

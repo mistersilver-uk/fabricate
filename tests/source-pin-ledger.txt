@@ -15,7 +15,7 @@ tests/companion-component-award.test.js	5
 tests/companion-currency-credit.test.js	6
 tests/component-category-normalization.test.js	6
 tests/component-complications-plan.test.js	4
-tests/component-world-scope-screens.test.js	22
+tests/component-world-scope-screens.test.js	24
 tests/components/access-tab-view-mounted.test.js	3
 tests/components/alchemy-known-recipe-layout.test.js	3
 tests/components/avatar-mounted.test.js	3
@@ -114,7 +114,7 @@ tests/crafting-modifier-config.test.js	3
 tests/crafting-nav.test.js	7
 tests/currency-balance-macro.test.js	4
 tests/essence-bulk-delete-copy.test.js	2
-tests/essence-world-scope-screens.test.js	31
+tests/essence-world-scope-screens.test.js	32
 tests/export-system-gathering-bundle.test.js	7
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1

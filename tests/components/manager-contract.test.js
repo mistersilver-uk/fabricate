@@ -133,6 +133,11 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
 const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
+const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
+const MANAGER_HEADER_CRAFTING_ACTIONS =
+  'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte';
+const MANAGER_HEADER_GATHERING_ACTIONS =
+  'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte';
 const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
@@ -588,6 +593,27 @@ describe('CraftingSystemManager source contract', () => {
   // `manager-breadcrumbs` is the trail's own identity since issue 1720.
   defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
     attributes: [['class', 'manager-breadcrumbs']],
+  });
+
+  // `manager-header-actions` is the action group's own identity since issue 1720, and the two
+  // family units it dispatches into carry none of the group's chrome.
+  defineStructureContract('names the header action group', MANAGER_HEADER_ACTIONS, {
+    attributes: [['class', 'manager-header-actions']],
+    renders: [
+      'ManagerHeaderCraftingActions',
+      'ManagerHeaderGatheringActions',
+      'ScopedEntryHeaderActions',
+    ],
+  });
+
+  defineStructureContract('draws the crafting studios’ header actions', MANAGER_HEADER_CRAFTING_ACTIONS, {
+    renders: ['ManagerButton', 'ComponentEditorHeader'],
+    writes: ['data-checks-save', 'data-component-add-from-catalogue'],
+  });
+
+  defineStructureContract('draws the gathering studios’ header actions', MANAGER_HEADER_GATHERING_ACTIONS, {
+    renders: ['ManagerButton', 'Chip'],
+    writes: ['data-environment-edit-back', 'data-gathering-task-back', 'data-gathering-event-back'],
   });
 
   // The shell's own chrome and the eight routes it mounts. `fabricate-manager` and
@@ -1103,7 +1129,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('keeps Import on the library header', () => {
-    const nodes = templateNodes(componentAstOf(MANAGER_ROOT));
+    const nodes = templateNodes(componentAstOf(MANAGER_HEADER_ACTIONS));
     // The legacy system-library header rendered an admin launch button beside Import, so the
     // `openCurrentAdmin` absence above is vacuous against a header that no longer exists.
     const [importButton] = nodes.filter((node) =>
@@ -1373,16 +1399,21 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['role', 'list']],
   });
 
-  defineStructureContract('routes essence editing to its own page', MANAGER_ROOT, {
-    imports: ['./EssenceEditView.svelte'],
-    declares: ['showEssenceSourceUi'],
-    names: ['essenceBrowserState'],
-    compares: ['essence-edit'],
-    passesProps: [['EssenceBrowserView', 'browserState']],
-    renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
-    spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
-    writesNo: ['data-essence-action'],
-  });
+  defineStructureContract(
+    'routes essence editing to its own page',
+    [MANAGER_ROOT, MANAGER_HEADER_CRAFTING_ACTIONS],
+    {
+      imports: ['./EssenceEditView.svelte'],
+      declares: ['showEssenceSourceUi'],
+      names: ['essenceBrowserState'],
+      compares: ['essence-edit'],
+      passesProps: [['EssenceBrowserView', 'browserState']],
+      renders: ['EssenceBrowserInspector', 'EssenceBulkEditPanel'],
+      // The editor's form id and save hook are the header action unit's since issue 1720.
+      spellsExactly: ['manager-essence-edit-form', 'data-essence-edit-save'],
+      writesNo: ['data-essence-action'],
+    }
+  );
 
   // Criterion 23: the guard compares the essence and not only the view token, so re-entering the
   // editor for the same essence skips the prompt and switching to another one does not.
@@ -1941,8 +1972,8 @@ describe('CraftingSystemManager source contract', () => {
   // within 200 characters of each other. The class literal the old match keyed on left the file
   // entirely when this toolbar moved onto `ManagerButton` (issue 1118).
   it('renders the task delete as one danger ManagerButton wired to the draft delete', () => {
-    const [remove] = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
-      declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
+    const [remove] = templateNodes(componentAstOf(MANAGER_HEADER_GATHERING_ACTIONS)).filter(
+      (node) => declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
     );
     assert.ok(Boolean(remove), 'the task editor toolbar still renders its delete control');
     assert.equal(remove.name, 'ManagerButton', 'through the shared button primitive');

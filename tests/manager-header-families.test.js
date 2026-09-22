@@ -25,8 +25,17 @@ const ROOT = `${MANAGER}/CraftingSystemManagerRoot.svelte`;
 const HEADER_MODEL = `${MANAGER}/headerModel.svelte.js`;
 
 /** The file holding the ladder's first branch, and the chain each family arm dispatches into. */
-const ACTIONS_FILE = ROOT;
-const FAMILY_CHAINS = Object.freeze({});
+const ACTIONS_FILE = `${MANAGER}/ManagerHeaderActions.svelte`;
+const FAMILY_CHAINS = Object.freeze({
+  crafting: Object.freeze({
+    file: `${MANAGER}/ManagerHeaderCraftingActions.svelte`,
+    anchor: "currentView === 'recipes'",
+  }),
+  gathering: Object.freeze({
+    file: `${MANAGER}/ManagerHeaderGatheringActions.svelte`,
+    anchor: "currentView === 'environments' && displayedGatheringTab === 'tasks'",
+  }),
+});
 
 /** The route lists the shell's own predicates are built from. */
 const WORLD_SCOPED_VIEWS = [

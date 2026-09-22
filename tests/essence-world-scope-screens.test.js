@@ -42,6 +42,10 @@ import { essenceValidationPresentation } from '../src/ui/svelte/apps/manager/ess
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const rootSource = readFileSync(resolve(repoRoot, ROOT_PATH), 'utf8');
+// The page header's action ladder is its own unit since issue 1720, so the three seams below
+// are RENDERED there while the gateway still declares their handlers.
+const HEADER_ACTIONS_PATH = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
+const headerActionsSource = readFileSync(resolve(repoRoot, HEADER_ACTIONS_PATH), 'utf8');
 
 /** The four keys `essenceScopeProps` supplies at every one of its call sites. */
 const BUNDLE_KEYS = ['actions', 'scope', 'systemId', 'systems'];
@@ -67,8 +71,8 @@ function corpusOf({ membership = [], defaults = [] } = {}) {
 // ── (1) THE SOURCE CONTRACT: NO SCREEN DECLARES A PROP ITS CALL SITE DOES NOT SUPPLY ──────────
 
 /** The attribute names one call site passes, read off the root's own markup. */
-function staticAttributesAt(componentName) {
-  const lines = rootSource.split('\n');
+function staticAttributesAt(componentName, source = rootSource) {
+  const lines = source.split('\n');
   const index = lines.findIndex((line) => line.trim() === `<${componentName}`);
   assert.ok(index >= 0, `${componentName} is not rendered by the manager root`);
   const indent = lines[index].slice(0, lines[index].length - lines[index].trimStart().length);
@@ -152,10 +156,10 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
   it('SEAM 2 renders ONE header control and composes two things the shell already owns', () => {
     // The RENDER bound: one branch, one button, in the header-actions chain — no new element type,
     // no new region, no screen.
-    const branches = [...rootSource.matchAll(/data-world-essence-create/g)];
+    const branches = [...headerActionsSource.matchAll(/data-world-essence-create/g)];
     assert.equal(branches.length, 1, 'the header carries exactly one create control');
     assert.match(
-      rootSource,
+      headerActionsSource,
       /<ManagerButton role="primary" data-world-essence-create onclick=\{createWorldEssence\}>/,
       'and it is the shipped button primitive, not hand-rolled markup'
     );
@@ -222,11 +226,11 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     // The RENDER bound: ONE ELEMENT PER WORLD ENTRY ROUTE, each in its own branch, and never a pair
     // of buttons a screen spells out for itself (issue 1373).
     assert.equal(
-      [...rootSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
+      [...headerActionsSource.matchAll(/<ScopedEntryHeaderActions\b/g)].length,
       3,
       'one scoped-entry action pair per world entry route, and no route carrying two'
     );
-    const attributes = staticAttributesAt('ScopedEntryHeaderActions');
+    const attributes = staticAttributesAt('ScopedEntryHeaderActions', headerActionsSource);
     assert.deepEqual(
       attributes,
       [
@@ -244,13 +248,13 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     // The two hooks the capture registry and the mounted suites name are still rendered, and are
     // rendered BY THIS FILE — the component takes them as props precisely so it cannot rename a
     // selector out from under a site.
-    assert.match(rootSource, /backAttribute="data-world-essence-back"/);
-    assert.match(rootSource, /saveAttribute="data-world-essence-save"/);
+    assert.match(headerActionsSource, /backAttribute="data-world-essence-back"/);
+    assert.match(headerActionsSource, /saveAttribute="data-world-essence-save"/);
     // The tool entry's own two, for the same reason: they are per-site selectors the capture
     // registry and the mounted suites name, and the component takes them as props so that a
     // shared change cannot rename one site out from under the other.
-    assert.match(rootSource, /backAttribute="data-world-tool-back"/);
-    assert.match(rootSource, /saveAttribute="data-world-tool-save"/);
+    assert.match(headerActionsSource, /backAttribute="data-world-tool-back"/);
+    assert.match(headerActionsSource, /saveAttribute="data-world-tool-save"/);
   });
 
   it('SEAM 3 puts the editor in the route-exit chain, so the rail and the breadcrumb prompt too', () => {
@@ -286,7 +290,7 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
       'the shell discards what the flush answered, so a refused write still navigates'
     );
     assert.match(
-      rootSource,
+      headerActionsSource,
       /saveDisabled=\{!worldEssenceEntryDirty\}/,
       'the Save button is never disabled, so it cannot say whether there is anything to save'
     );

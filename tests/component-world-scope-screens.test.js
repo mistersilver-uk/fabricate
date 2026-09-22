@@ -24,6 +24,10 @@ const MANAGER = 'src/ui/svelte/apps/manager';
 const SCOPED = `${MANAGER}/scoped`;
 
 const rootSource = read(`${MANAGER}/CraftingSystemManagerRoot.svelte`);
+// The page header's action ladder is its own unit since issue 1720, so the header seams below
+// are RENDERED by these two while the gateway still declares their handlers.
+const headerActionsSource = read(`${MANAGER}/ManagerHeaderActions.svelte`);
+const craftingActionsSource = read(`${MANAGER}/ManagerHeaderCraftingActions.svelte`);
 // The gateway's route enumeration is spelled across two units since issue 1720: the shell and the
 // page-header model it resolves the eyebrow, title and lede from.
 const routeSource = `${rootSource}
@@ -81,7 +85,8 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         '../../util/componentEditor.js',
         './ComponentEditView.svelte',
         './ComponentsBrowserView.svelte',
-        './component/ComponentEditorHeader.svelte',
+        // `./component/ComponentEditorHeader.svelte` left this list in issue 1720 with the
+        // header action ladder that renders it.
         './components/ComponentBrowserInspector.svelte',
         './components/ComponentBulkEditPanel.svelte',
         // THE `Add from catalogue` PICKER (revision 8, M9).
@@ -314,8 +319,8 @@ describe('the world component entry’s gateway-owned wires are pinned at source
     // not: `grep data-world-component-save` over the whole repository answered the gateway's own
     // attribute and ONE `disabled` read, so a rename would have been caught by nothing that could
     // name the button.
-    assert.match(rootSource, /backAttribute="data-world-component-back"/);
-    assert.match(rootSource, /saveAttribute="data-world-component-save"/);
+    assert.match(headerActionsSource, /backAttribute="data-world-component-back"/);
+    assert.match(headerActionsSource, /saveAttribute="data-world-component-save"/);
   });
 
   it('hands the entry the WORLD essence roster, which is what makes the M31 card non-empty', () => {
@@ -336,14 +341,16 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
   // Revision 5's control read `openWorldScopedEntry('world-component-' + 'catalogue', '')`.
   const DEAD_TOKEN = `world-component-${'catalogue'}`;
   const body = withoutComments(rootSource);
+  const actionBody = withoutComments(craftingActionsSource);
 
   it('the token that resolves to nothing is gone from the gateway entirely', () => {
     // COMMENTS INCLUDED. The revision-5 line came with a comment claiming the handler widened the
     // list's own membership filter, which it never did — so the prose was as wrong as the call,
     // and a scan over stripped source would have left the claim standing.
     assert.ok(
-      !rootSource.includes(DEAD_TOKEN),
-      'the gateway names the dead token nowhere, in code or in prose'
+      !`${rootSource}${craftingActionsSource}`.includes(DEAD_TOKEN),
+      'neither the gateway nor the ladder that took its control names the dead token, in '  +
+        'code or in prose'
     );
     // NON-VACUITY: the token IS a live capture-case id, so a scan that had stopped matching
     // anything would report the same clean answer above.
@@ -355,9 +362,14 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
 
   it('the header action opens the picker, and the picker is mounted with the composed write', () => {
     assert.match(
+      actionBody,
+      /data-component-add-from-catalogue\s+onclick=\{openComponentAddFromCatalogue\}/,
+      'the action presses one named gateway handler and no navigation helper at all'
+    );
+    assert.match(
       body,
-      /data-component-add-from-catalogue\s+onclick=\{\(\) => \(componentAddFromCatalogueOpen = true\)\}/,
-      'the action sets the picker open and calls no navigation helper at all'
+      /function openComponentAddFromCatalogue\(\) \{\s*componentAddFromCatalogueOpen = true;\s*\}/,
+      'and that handler only sets the picker open'
     );
     const mount = /<ComponentAddFromCatalogueDialog\s([\s\S]*?)\/>/.exec(body);
     assert.ok(mount, 'the gateway mounts the picker');
@@ -401,12 +413,14 @@ describe('the `Add from catalogue` header action opens a picker and navigates no
   it('the header action is drawn at the rung the reference draws it at', () => {
     // UX F-A (r9). `proto:1046` draws `+ Add from catalogue` at 38px and 38 is a published rung, so
     // the 34 it shipped at was licensed by nothing.
-    const action = /<ManagerButton\s([\s\S]*?)data-component-add-from-catalogue\b/.exec(body);
+    const action = /<ManagerButton\s([\s\S]*?)data-component-add-from-catalogue\b/.exec(
+      actionBody
+    );
     assert.ok(action, 'the gateway renders the header action through the shared button');
     assert.match(action[1], /size="38"/, 'at the 38px rung');
     // NON-VACUITY: the stale paragraph that said the prop did not exist is gone with it.
     assert.ok(
-      !rootSource.includes('ManagerButton` has NO size prop yet'),
+      !craftingActionsSource.includes('ManagerButton` has NO size prop yet'),
       'and the note claiming there was no prop to pass does not outlive the prop'
     );
   });

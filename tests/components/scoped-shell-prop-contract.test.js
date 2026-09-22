@@ -1355,7 +1355,7 @@ describe('the world Component entry header wires the borderless medallion', () =
  * renders identically in every state a mounted census can reach (issue 1720).
  */
 describe('each world entry header action pair binds its own entity’s save legs', () => {
-  const LADDER = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+  const LADDER = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
   const ENTITIES = Object.freeze([
     ['essence', 'Essence'],
     ['tool', 'Tool'],

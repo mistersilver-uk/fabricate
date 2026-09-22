@@ -109,7 +109,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './ImportReportModal.svelte',
   './ItemPageInspector.svelte',
   './KnowledgeView.svelte',
-  // Added by issue 1720: the page header's breadcrumb trail is its own unit.
+  // Added by issue 1720: the page header's trailing action group and its breadcrumb trail are
+  // their own units, and the action group took `ComponentEditorHeader`, `ScopedEntryHeaderActions`
+  // and the `managerHeaderActionClass` named import with it.
+  './ManagerHeaderActions.svelte',
   './ManagerHeaderBreadcrumbs.svelte',
   // Added by issue 1717: the rail is its own unit, which renders the two entry units and took the
   // nav-tab badge helpers with it, so `../../../navTabBadgeStore.js` left this list.
@@ -129,7 +132,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './checks/checksCopy.js',
   './checks/checksNav.js',
   './checks/checksReadiness.js',
-  './component/ComponentEditorHeader.svelte',
   './components/ComponentBrowserInspector.svelte',
   './components/ComponentBulkEditPanel.svelte',
   './crafting/craftingNav.js',
@@ -154,10 +156,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE.
   './resolutionModeOptions.js',
   './routeExitGuards.js',
-  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
-  // beside its sibling below because this list is asserted SORTED.
   './scoped/ComponentAddFromCatalogueDialog.svelte',
-  './scoped/ScopedEntryHeaderActions.svelte',
   './scoped/WorldComponentCataloguePage.svelte',
   './scoped/WorldComponentEntryPage.svelte',
   './scoped/WorldEssenceCataloguePage.svelte',

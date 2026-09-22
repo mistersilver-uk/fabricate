@@ -70,7 +70,6 @@
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
-  import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
   import ChecksView from './checks/ChecksView.svelte';
   import EnvironmentEditView from './EnvironmentEditView.svelte';
@@ -111,6 +110,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
+  import ManagerHeaderActions from './ManagerHeaderActions.svelte';
   import ManagerHeaderBreadcrumbs from './ManagerHeaderBreadcrumbs.svelte';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import {
@@ -149,7 +149,6 @@
   import WorldVocabularyPage from './scoped/WorldVocabularyPage.svelte';
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
-  import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
   // The shipped two-step destructive control, for the world Tool entry's header `Delete` (issue
   // 1373).
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
@@ -167,10 +166,7 @@
   import WorldPrerequisitesTab from './world/WorldPrerequisitesTab.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
   import { createRouteChromeChannel } from './downtime/routeChromeChannel.js';
-  import {
-    managerHeaderActionClass,
-    WORLD_DOWNTIME_SURFACE_ID,
-  } from '../../../managerExtensions.js';
+  import { WORLD_DOWNTIME_SURFACE_ID } from '../../../managerExtensions.js';
   import {
     mapModifierToPrerequisite,
     mapPrerequisiteToModifier,
@@ -178,7 +174,6 @@
 
   let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
-  const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
   // Which provider currently holds the Downtime surface, and which one has already failed to mount.
   let downtimeProviderSnapshot = $state(null);
   let downtimeFaultedProvider = $state(null);
@@ -7146,6 +7141,28 @@
       rest: normalized.slice(firstSpace + 1),
     };
   }
+
+  // The page header's action ladder is a child component now, so every control it presses is a
+  // named function here rather than a closure written at the call site.
+  const backToWorldEssences = () => setView('world-essences');
+  const backToWorldTools = () => setView('world-tools');
+  const backToWorldComponents = () => setView('world-components');
+  const createParty = () => store.createParty?.();
+  const deleteEnvironmentDraft = () => store.deleteEnvironmentDraft?.();
+  const exportSelectedSystem = () => exportSystem();
+  const createGatheringTaskForSystem = () => createGatheringTask(selectedSystemId);
+  const createGatheringEventForSystem = () => createGatheringEvent(selectedSystemId);
+
+  function openComponentAddFromCatalogue() {
+    componentAddFromCatalogueOpen = true;
+  }
+
+  async function createTravelRealm() {
+    const created = await store.createRealmQuick?.(
+      text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
+    );
+    if (typeof created === 'string' && created) selectedTravelRealmId = created;
+  }
 </script>
 
 <div
@@ -7447,586 +7464,101 @@
           </div>
         {/if}
       </div>
-      <!--
-        World > Currency renders NO page-header actions (issue 1278).
-      -->
-      <!--
-        The world scoped-entity routes join that exclusion (issue 1362).
-      -->
-      <!--
-        ONE WORLD SCOPED ROUTE IS BACK IN, AND IT IS A SEAM RATHER THAN A RELAXATION (issue 1372).
-      -->
-      {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry'}
-        <div class="manager-header-actions" aria-label={header.actionsLabel}>
-          {#if currentView === 'world-essence-entry'}
-            <!--
-              THE EDITOR ACTION PAIR, THROUGH THE SHARED COMPONENT (issue 1372, parity round 4).
-            -->
-            <ScopedEntryHeaderActions
-              backAttribute="data-world-essence-back"
-              saveAttribute="data-world-essence-save"
-              backLabel={text(
-                'FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogueShort',
-                'Back'
-              )}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Essence.Save', 'Save essence')}
-              saveDisabled={!worldEssenceEntryDirty}
-              saving={worldEssenceEntrySaving}
-              onBack={() => setView('world-essences')}
-              onSave={saveWorldEssenceEntry}
-            />
-          {:else if currentView === 'world-tool-entry'}
-            <!--
-              THE SAME PAIR, THROUGH THE SAME COMPONENT (issue 1373).
-            -->
-            <ScopedEntryHeaderActions
-              backAttribute="data-world-tool-back"
-              saveAttribute="data-world-tool-save"
-              backLabel={text('FABRICATE.Admin.Manager.Scoped.Entry.BackToTools', 'Back to tools')}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Tool.Save', 'Save tool')}
-              saveDisabled={!worldToolEntryDirty}
-              saving={worldToolEntrySaving}
-              onBack={() => setView('world-tools')}
-              onSave={saveWorldToolEntry}
-              danger={worldToolEntryDelete ? worldToolDeleteAction : undefined}
-            />
-          {:else if currentView === 'world-component-entry'}
-            <!--
-              THE THIRD CALLER OF THE SAME PAIR (issue 1371).
-            -->
-            <!--
-              THE UNSAVED MARKER, WHICH THE BAND HAD NOWHERE (`proto:817`, gap-list row 53).
-            -->
-            {#if worldComponentEntryDirty}
-              <span class="manager-header-unsaved" data-world-component-entry-unsaved>
-                <span class="manager-header-unsaved-dot" aria-hidden="true"></span>
-                {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.Unsaved', 'Unsaved changes')}
-              </span>
-            {/if}
-            <ScopedEntryHeaderActions
-              backAttribute="data-world-component-back"
-              saveAttribute="data-world-component-save"
-              backLabel={text(
-                'FABRICATE.Admin.Manager.Scoped.Component.BackToCatalogueShort',
-                'Back'
-              )}
-              saveLabel={text('FABRICATE.Admin.Manager.Scoped.Component.Save', 'Save entry')}
-              saveDisabled={!worldComponentEntryDirty}
-              saving={worldComponentEntrySaving}
-              onBack={() => setView('world-components')}
-              onSave={saveWorldComponentEntry}
-            />
-          {:else if currentView === 'world-essences'}
-            <!--
-              CREATE TAKES NO NAME FIELD.
-            -->
-            <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
-            </ManagerButton>
-          {:else if currentView === 'world-downtime'}
-            {#if downtimeCoreFallback}
-              <!--
-                The design puts this promotional pill at the top of every Downtime screen.
-              -->
-              <ManagerButton
-                tag="a"
-                class="manager-downtime-unlock"
-                data-downtime-unlock
-                href={PATREON_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <i class="fas fa-crown" aria-hidden="true"></i>
-                <span
-                  >{text(
-                    'FABRICATE.Admin.Manager.World.Downtime.Unlock',
-                    'Unlock with Premium'
-                  )}</span
-                >
-              </ManagerButton>
-            {:else}
-              <!--
-                The status chip leads the group, exactly where every Core editor puts its own
-                 "Unsaved" chip.
-              -->
-              {#if downtimeHeaderStatus}
-                <Chip
-                  tone={downtimeHeaderStatus.tone}
-                  truncate
-                  density="action"
-                  data-downtime-chrome-status
-                  title={downtimeHeaderStatus.tooltip ?? downtimeHeaderStatus.label}
-                  >{downtimeHeaderStatus.label}</Chip
-                >
-              {/if}
-              {#each downtimeHeaderActions as action (action.id)}
-                {#if action.href}
-                  <a
-                    class={managerHeaderActionClass(action)}
-                    data-manager-header-action={action.id}
-                    href={action.href}
-                    title={action.tooltip}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
-                    <span>{action.label}</span>
-                  </a>
-                {:else}
-                  <button
-                    type="button"
-                    class={managerHeaderActionClass(action)}
-                    data-manager-header-action={action.id}
-                    title={action.tooltip}
-                    disabled={action.disabled === true}
-                    onclick={() => runDowntimeHeaderAction(action)}
-                  >
-                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
-                    <span>{action.label}</span>
-                  </button>
-                {/if}
-              {/each}
-            {/if}
-          {:else if currentView === 'recipes'}
-            <ManagerButton role="primary" onclick={createRecipe} disabled={!selectedSystemId}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
-            </ManagerButton>
-          {:else if currentView === 'recipe-edit'}
-            {#if recipeEditDirty}
-              <Chip
-                tone="warning"
-                truncate
-                density="action"
-                title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}
-                >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton role="ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              onclick={deleteRecipeFromEdit}
-              disabled={!selectedRecipeId || recipeEditSaving}
-              title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-            </ManagerButton>
-            <ManagerButton role="primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
-              <i
-                class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{recipeEditSaveLabel()}</span>
-            </ManagerButton>
-          {:else if currentView === 'recipe-item-edit'}
-            {#if recipeItemEditDirty}
-              <Chip
-                tone="warning"
-                truncate
-                density="action"
-                data-recipe-item-dirty
-                title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}
-                >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-recipe-item-back
-              onclick={backToBooksScrolls}
-              disabled={recipeItemEditSaving}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.RecipeItem.BackToBrowse',
-                  'Back to Books & Scrolls'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              data-recipe-item-delete
-              onclick={deleteRecipeItemFromEdit}
-              disabled={!recipeItemDraft?.id || recipeItemEditSaving}
-              title={text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              data-recipe-item-save
-              onclick={saveRecipeItemDraft}
-              disabled={!canSaveRecipeItemEdit}
-            >
-              <i
-                class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
-            </ManagerButton>
-            <!--
-          An attempted-and-failed save is announced beside the control the GM just clicked (issue
-           919).
-        -->
-            {#if recipeItemSaveFailed}
-              <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>
-                {text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed. Try again.')}
-              </p>
-            {/if}
-          {:else if currentView === 'components'}
-            <!-- `+ Add from catalogue` (gap-list row 99, `proto:1046`). The header had no action
-                 at all, so the only route to adopt a world component into this system was the
-                 list's own `All world components` cohort.
-
-                 IT OPENS THE REFERENCE'S MODAL AND NAVIGATES NOWHERE (M9). Revision 5 handed
-                 `openWorldScopedEntry` a VIEW LAB CASE ID — a token in no route table and no view
-                 branch — and that helper assigns whatever it is given, so the control dropped the
-                 GM on the systems library. The token is deliberately not spelled here: its
-                 absence from this file, COMMENTS INCLUDED, is what
-                 `component-world-scope-screens.test.js` asserts. The reference's own action is
-                 not a route change at all: `proto:1046` binds `onAddFrom`, which at `proto:5545`
-                 sets `modal: 'addFrom'`.
-
-                 `size="38"` IS THE RUNG THE REFERENCE DRAWS (`proto:1046`), and 38 is published
-                 on the ladder (26 / 28 / 30 / 34 / 38 / 44), so nothing licensed the 34 this
-                 shipped at. It is the SHARED opt-in rather than a local `height` — the same
-                 `is-size-38` token M12b gave `ManagerSearchField` and the toolbar selects, and
-                 the prop `ManagerButton`'s own doc block names this site for. Radius 9 is already
-                 global (M12a), so the corner is right at either height. -->
-            <ManagerButton
-              role="primary"
-              size="38"
-              data-component-add-from-catalogue
-              onclick={() => (componentAddFromCatalogueOpen = true)}
-              disabled={!selectedSystemId}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Component.AddFromCatalogue',
-                  'Add from catalogue'
-                )}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'knowledge'}
-            <!-- The Knowledge surface's only actions are per-character: they live in the
-             detail-pane header, next to the character they act on. -->
-          {:else if currentView === 'component-edit'}
-            <ComponentEditorHeader
-              dirty={componentEditCombinedDirty}
-              saving={componentEditSaving}
-              canSave={canSaveComponentEdit}
-              formId="manager-component-edit-form"
-              dirtyLabel={text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}
-              backLabel={text('FABRICATE.Admin.Manager.Component.Back', 'Back')}
-              saveLabel={componentEditSaveLabel()}
-              onBack={backToComponentsBrowse}
-            />
-          {:else if currentView === 'tags'}
-            <!-- no header actions for the tags view -->
-          {:else if isChecksRoute}
-            {#if checksDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="primary"
-              data-checks-save
-              onclick={saveChecks}
-              disabled={!checksDirty || checksSaving}
-            >
-              <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
-            </ManagerButton>
-          {:else if currentView === 'essences'}
-            <!-- NO HEADER ACTION (issue 1372, maintainer parity round 8).
-
-                 The reference's Essence Rules header carries the title, the subtitle and NOTHING
-                 on the right (`tmp/proto/essence-rules.png`, markup `proto:1523`-`1540`), because
-                 an essence is a WORLD record and the only create is the Essence Catalogue's
-                 `+ New essence`. What shipped here was `+ Create essence`, whose handler opened a
-                 system-scope draft that `store.addEssence` writes straight into
-                 `system.essenceDefinitions` — a system-owned essence with its own name, icon and
-                 colour, offered a foot away from this screen's own banner saying that name, icon
-                 and colour come from the Essence Catalogue and are shared by every system.
-
-                 THE ROUTE IS NOT LOST, and this is what makes the removal safe rather than merely
-                 correct. A GM creates an essence on the world Essence Catalogue and joins it to
-                 this system either from that screen's inspector rows or from this list's own
-                 `All world essences` segment, whose absent rows carry `Add to this system`. That
-                 join now seeds the in-system record as well as the membership record — see
-                 `joinEssenceToSystem` in `adminStore.js`, without which the Add wrote a world
-                 membership row this list does not read and appeared to do nothing. -->
-          {:else if currentView === 'essence-edit'}
-            <!-- The SHARED editor header (issue 1036), wearing this studio's own three data
-                 hooks. Its own note said "extract when a second studio wants it"; this is
-                 that studio, and the extraction is a parameterization rather than a fork.
-                 For the control inventory the shipped sibling wins over the prototype —
-                 Back rather than Cancel, and a dirty-only chip rather than a persistent
-                 "All changes saved" indicator — because seven editors share it. -->
-            <ComponentEditorHeader
-              dirty={essenceEditDirty}
-              saving={essenceEditSaving}
-              canSave={canSaveEssenceEdit}
-              formId="manager-essence-edit-form"
-              dirtyAttr="data-essence-edit-dirty"
-              backAttr="data-essence-edit-back"
-              saveAttr="data-essence-edit-save"
-              dirtyLabel={text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}
-              backLabel={text('FABRICATE.Admin.Manager.Essence.Back', 'Back')}
-              saveLabel={essenceEditSaveLabel()}
-              onBack={cancelEssenceEdit}
-            />
-          {:else if currentView === 'environments' && displayedGatheringTab === 'tasks'}
-            <ManagerButton
-              role="primary"
-              onclick={() => createGatheringTask(selectedSystemId)}
-              disabled={!canShowEnvironments}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Create',
-                  'Create gathering task'
-                )}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
-            <ManagerButton
-              role="primary"
-              onclick={() => createGatheringEvent(selectedSystemId)}
-              disabled={!canShowEnvironments}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Create',
-                  'Create gathering event'
-                )}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'world'}
-            <ManagerButton
-              role="primary"
-              onclick={() => store.createParty?.()}
-              disabled={$viewState.travelSaving}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
-            </ManagerButton>
-          {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
-            <ManagerButton
-              role="primary"
-              onclick={async () => {
-                const created = await store.createRealmQuick?.(
-                  text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
-                );
-                if (typeof created === 'string' && created) selectedTravelRealmId = created;
-              }}
-              disabled={$viewState.travelSaving}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
-            </ManagerButton>
-          {:else if isWorldTravelRoute}
-            <!-- Map Region Links has no create action: a Scene Region is authored in Foundry. -->
-          {:else if currentView === 'environments'}
-            <ManagerButton
-              role="primary"
-              onclick={createEnvironment}
-              disabled={!canShowEnvironments}
-            >
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
-              >
-            </ManagerButton>
-          {:else if currentView === 'environment-edit'}
-            {#if $viewState.environmentDraftDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-environment-edit-back
-              onclick={backToEnvironmentsBrowse}
-              disabled={$viewState.environmentSaving}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.BackToBrowse',
-                  'Back to environments'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              data-action="delete-environment"
-              onclick={() => store.deleteEnvironmentDraft?.()}
-              disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              onclick={saveEnvironmentEdit}
-              disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}
-            >
-              <i
-                class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
-            </ManagerButton>
-          {:else if currentView === 'gathering-task-edit'}
-            {#if gatheringTaskDraftDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-gathering-task-back
-              onclick={backToGatheringTaskLibrary}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary',
-                  'Back to task library'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              data-gathering-task-delete
-              onclick={deleteGatheringTaskDraft}
-              disabled={!selectedGatheringTaskId || gatheringTaskSaving}
-              title={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
-                'Delete gathering task'
-              )}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
-                  'Delete gathering task'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              onclick={saveGatheringTaskDraft}
-              disabled={!gatheringTaskDraftDirty ||
-                !gatheringTaskValidation.valid ||
-                gatheringTaskSaving}
-              title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
-            >
-              <i
-                class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
-            </ManagerButton>
-            <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
-            {#if gatheringTaskSaveError}
-              <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>
-                {gatheringTaskSaveError}
-              </p>
-            {/if}
-          {:else if currentView === 'gathering-event-edit'}
-            {#if gatheringEventDraftDirty}
-              <Chip tone="warning" density="action"
-                >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
-              >
-            {/if}
-            <ManagerButton
-              role="ghost"
-              data-gathering-event-back
-              onclick={backToGatheringEventLibrary}
-            >
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Events.BackToLibrary',
-                  'Back to event library'
-                )}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="danger"
-              onclick={deleteGatheringEventDraft}
-              disabled={!selectedGatheringEventId || gatheringEventSaving}
-              title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
-            >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-              <span
-                >{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span
-              >
-            </ManagerButton>
-            <ManagerButton
-              role="primary"
-              onclick={saveGatheringEventDraft}
-              disabled={!gatheringEventDraftDirty ||
-                !gatheringEventValidation.valid ||
-                gatheringEventSaving}
-              title={gatheringEventValidation.valid
-                ? ''
-                : gatheringEventValidation.errors.join('\n')}
-            >
-              <i
-                class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
-            </ManagerButton>
-            <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
-            {#if gatheringEventSaveError}
-              <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>
-                {gatheringEventSaveError}
-              </p>
-            {/if}
-          {:else if currentView === 'system-edit'}
-            <!--
-              `ghost` here rests on the VERB, not on a neighbour.
-            -->
-            <ManagerButton role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
-              <i class="fas fa-arrow-left" aria-hidden="true"></i>
-              <span
-                >{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span
-              >
-            </ManagerButton>
-          {:else}
-            <!-- data-manager-import-system: a zero-behaviour hook. The only other handle on
-                 this button is `manager-button`, which a dozen header controls share, so a
-                 screenshot case could not name it without matching whichever came first. -->
-            <ManagerButton data-manager-import-system onclick={importSystem}>
-              <i class="fas fa-file-import" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-            </ManagerButton>
-            <ManagerButton onclick={() => exportSystem()} disabled={!selectedSystemId}>
-              <i class="fas fa-file-export" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
-            </ManagerButton>
-            <ManagerButton role="primary" onclick={createSystem}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
-            </ManagerButton>
-          {/if}
-        </div>
-      {/if}
+      <ManagerHeaderActions
+        {header}
+        {text}
+        {currentView}
+        {isWorldRulesRoute}
+        {isWorldScopedRoute}
+        {isWorldTravelRoute}
+        {worldTravelTab}
+        {selectedSystemId}
+        {worldEssenceEntryDirty}
+        {worldEssenceEntrySaving}
+        {backToWorldEssences}
+        {saveWorldEssenceEntry}
+        {worldToolEntryDirty}
+        {worldToolEntrySaving}
+        {worldToolEntryDelete}
+        {worldToolDeleteAction}
+        {backToWorldTools}
+        {saveWorldToolEntry}
+        {worldComponentEntryDirty}
+        {worldComponentEntrySaving}
+        {backToWorldComponents}
+        {saveWorldComponentEntry}
+        {createWorldEssence}
+        {downtimeCoreFallback}
+        {downtimeHeaderStatus}
+        {downtimeHeaderActions}
+        {runDowntimeHeaderAction}
+        travelSaving={$viewState.travelSaving}
+        {createParty}
+        {createTravelRealm}
+        {backToSystemsBrowser}
+        {importSystem}
+        {exportSelectedSystem}
+        {createSystem}
+        {isChecksRoute}
+        {createRecipe}
+        {recipeEditDirty}
+        {recipeEditSaving}
+        {recipeEditSaveLabel}
+        {canSaveRecipeEdit}
+        {selectedRecipeId}
+        {backToRecipesBrowse}
+        {deleteRecipeFromEdit}
+        {saveRecipeDraft}
+        {recipeItemDraft}
+        {recipeItemEditDirty}
+        {recipeItemEditSaving}
+        {recipeItemSaveFailed}
+        {canSaveRecipeItemEdit}
+        {backToBooksScrolls}
+        {deleteRecipeItemFromEdit}
+        {saveRecipeItemDraft}
+        {openComponentAddFromCatalogue}
+        {componentEditCombinedDirty}
+        {componentEditSaving}
+        {componentEditSaveLabel}
+        {canSaveComponentEdit}
+        {backToComponentsBrowse}
+        {checksDirty}
+        {checksSaving}
+        {saveChecks}
+        {essenceEditDirty}
+        {essenceEditSaving}
+        {essenceEditSaveLabel}
+        {canSaveEssenceEdit}
+        {cancelEssenceEdit}
+        {displayedGatheringTab}
+        {canShowEnvironments}
+        {createGatheringTaskForSystem}
+        {createGatheringEventForSystem}
+        {createEnvironment}
+        environmentDraftDirty={$viewState.environmentDraftDirty}
+        environmentDraftIsNew={$viewState.environmentDraftIsNew}
+        environmentSaving={$viewState.environmentSaving}
+        {backToEnvironmentsBrowse}
+        {deleteEnvironmentDraft}
+        {saveEnvironmentEdit}
+        {gatheringTaskDraftDirty}
+        {gatheringTaskSaving}
+        {gatheringTaskValidation}
+        {gatheringTaskSaveError}
+        {selectedGatheringTaskId}
+        {backToGatheringTaskLibrary}
+        {deleteGatheringTaskDraft}
+        {saveGatheringTaskDraft}
+        {gatheringEventDraftDirty}
+        {gatheringEventSaving}
+        {gatheringEventValidation}
+        {gatheringEventSaveError}
+        {selectedGatheringEventId}
+        {backToGatheringEventLibrary}
+        {deleteGatheringEventDraft}
+        {saveGatheringEventDraft}
+      />
     </header>
   {/if}
 

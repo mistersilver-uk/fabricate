@@ -28,10 +28,23 @@ const CONVERTED_BATCHES = Object.freeze([
       // 39 sites — 30 `<button>` and 9 `<a href>` — less 2 that issue 1707 phase 2 moved into
       // `environment/GatheringTaskInspector.svelte` (the drop Duplicate/Delete pair) and 2 its
       // phase 3 moved into `environment/GatheringInspectorRail.svelte` (the empty-library setup
-      // card's docs links), both below. The sum over the three rows is still 39.
+      // card's docs links), both below. Issue 1720 split the root's remaining 35 across the
+      // page header's three action units, 29 of them leaving. The sum over the six rows is 39.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-        sites: 35,
+        sites: 6,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
+        sites: 8,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
+        sites: 9,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
+        sites: 12,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/environment/GatheringInspectorRail.svelte',
@@ -268,9 +281,19 @@ const REVIEWED = [
         buttons: 1,
       },
       {
-        file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
         role: 'ghost',
-        buttons: 6,
+        buttons: 1,
+      },
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
+        role: 'ghost',
+        buttons: 2,
+      },
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
+        role: 'ghost',
+        buttons: 3,
       },
     ],
     why:
@@ -286,9 +309,9 @@ const REVIEWED = [
     disposition: 'INTENDED',
     convertedReach: [
       {
-        file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
         role: 'ghost',
-        buttons: 6,
+        buttons: 3,
       },
     ],
     why:
@@ -299,16 +322,22 @@ const REVIEWED = [
     id: globalRule('.fabricate-manager .manager-header-actions .manager-button'),
     disposition: 'INTENDED',
     convertedReach: [
+      // 29 until issue 1720 split the group across three units. The container's class token
+      // lives only in `ManagerHeaderActions.svelte`, so the two family units it dispatches
+      // into are counted WHOLE-FILE: every button they hold is inside this container by
+      // construction, and no synthetic token is added to their roots to make the filter work.
       {
-        file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
         container: 'manager-header-actions',
-        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own.
-        // 28 -> 29 with issue 1371's C1 `+ Add from catalogue` (`proto:1046`), the `components`
-        // branch's first header action of its own: the system Components header carried nothing
-        // on the right, so the only route to adopt a world component into the system was the
-        // list's `All world components` cohort. It is a `role="primary"` `<ManagerButton>` this
-        // file renders itself, so it moves the `is-primary` count one line below by one too.
-        buttons: 29,
+        buttons: 8,
+      },
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
+        buttons: 9,
+      },
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
+        buttons: 12,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -332,12 +361,23 @@ const REVIEWED = [
     id: globalRule('.fabricate-manager .manager-header-actions .manager-button.is-primary'),
     disposition: 'INTENDED',
     convertedReach: [
+      // 15 until issue 1720 split the group; the two family units are counted whole-file for
+      // the reason the row above gives.
       {
-        file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte',
         container: 'manager-header-actions',
         role: 'primary',
-        // 14 -> 15 with issue 1372's world-essence header create action.
-        buttons: 15,
+        buttons: 4,
+      },
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderCraftingActions.svelte',
+        role: 'primary',
+        buttons: 5,
+      },
+      {
+        file: 'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte',
+        role: 'primary',
+        buttons: 6,
       },
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -1061,10 +1101,11 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    43,
+    46,
     // 41 -> 42 (issue 1707 phase 2), -> 43 (phase 3): the root's task-5 sites split across the two
-    // files they moved into. The 123-site total above is unchanged, because nothing converted.
-    'across 43 components'
+    // files they moved into. -> 46 (issue 1720), across the page header's three action units.
+    // The 123-site total above is unchanged, because nothing converted.
+    'across 46 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the
