@@ -6,8 +6,11 @@ import { mount } from 'svelte';
 
 import en from '../../../lang/en.json';
 
+import AccessTabView from '../../../src/ui/svelte/apps/manager/AccessTabView.svelte';
+import BooksScrollsView from '../../../src/ui/svelte/apps/manager/BooksScrollsView.svelte';
 import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte';
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
+import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
@@ -124,6 +127,57 @@ const OVERVIEW_DANGERS = [
 const PREVIEW_ACTORS = [
   { uuid: 'Actor.brenna', name: 'Brenna Karrunsdottir' },
   { uuid: 'Actor.wagon', name: 'The Ashfall Wagon of the Long Road' },
+];
+
+// The three browse toolbars' fixture data (issue 1510). Every vocabulary is kept inside the range
+// the conversion measured in the product — the widest filter label in the manager's browse bars is
+// 92px — because the shared 144px trigger floor is what pins these controls, and a label wider than
+// the floor is a control that grows with the GM's choice whatever the floor says.
+const BROWSE_SYSTEMS = [
+  { id: 'alchemy', name: 'Alchemy', description: 'Potion work', enabled: true, featureCount: 3 },
+  { id: 'smithing', name: 'Smithing', description: 'Heavy work', enabled: false, featureCount: 1 },
+];
+const ACCESS_RECIPES = [
+  {
+    id: 'alloy',
+    name: 'Alloy Bronze',
+    img: 'icons/svg/book.svg',
+    category: 'Smithing',
+    accessSummary: { characterCount: 2, playerCount: 0 },
+  },
+  {
+    id: 'tincture',
+    name: 'Tincture of clarity',
+    img: 'icons/svg/book.svg',
+    category: 'Alchemy',
+    accessSummary: { characterCount: 0, playerCount: 0 },
+  },
+];
+const ACCESS_CATEGORIES = [
+  { name: 'Smithing', count: 1 },
+  { name: 'Alchemy', count: 1 },
+];
+const RECIPE_ITEMS = [
+  {
+    id: 'primer',
+    resolvedName: "Journeyman's Primer",
+    resolvedImg: 'icons/svg/book.svg',
+    derivedType: 'Book',
+    enabled: true,
+    caps: { item: { limitUses: false }, learn: { limitLearning: true, learnsAllowed: 2 } },
+    recipes: [{ id: 'r1', name: 'Smelt Copper', category: 'Smithing' }],
+    learnedByCount: 1,
+  },
+  {
+    id: 'scroll',
+    resolvedName: 'Scroll of Soul-Ash',
+    resolvedImg: 'icons/svg/book.svg',
+    derivedType: 'Scroll',
+    enabled: false,
+    caps: { item: { limitUses: false }, learn: { limitLearning: false } },
+    recipes: [],
+    learnedByCount: 0,
+  },
 ];
 
 /** The 340px column the tool-edit grid gives the rail, reproduced as fixture chrome. */
@@ -258,6 +312,20 @@ const SUBJECTS = {
         biomeOptions: OVERVIEW_BIOMES,
         dangerOptions: OVERVIEW_DANGERS,
       },
+    }),
+  // The three browse toolbars, whose filter values are component state rather than props: each is
+  // driven through its own panel here, exactly as the GM drives it.
+  'systems-browser': () =>
+    mount(SystemsBrowserView, { target: mountPoint, props: { systems: BROWSE_SYSTEMS } }),
+  'access-tab': () =>
+    mount(AccessTabView, {
+      target: mountPoint,
+      props: { recipes: ACCESS_RECIPES, recipeCategories: ACCESS_CATEGORIES },
+    }),
+  'books-scrolls': () =>
+    mount(BooksScrollsView, {
+      target: mountPoint,
+      props: { recipeItems: RECIPE_ITEMS, visibilityMode: 'knowledge' },
     }),
   // The `Preview as` roster, whose value is component state rather than a prop.
   'tool-preview': () =>

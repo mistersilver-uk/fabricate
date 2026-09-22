@@ -2400,7 +2400,6 @@
           "EmptyTitle": "No recipe items yet",
           "EmptyHint": "Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.",
           "CapAll": "All",
-          "CapFilterLabel": "Filter recipe items by limits",
           "DropZoneLabel": "Drop a world or compendium item to create a recipe item",
           "DropZoneTitle": "Drop an item to create a recipe item",
           "DropZoneHint": "Drag a world or compendium item here to make it a book or scroll that teaches recipes.",

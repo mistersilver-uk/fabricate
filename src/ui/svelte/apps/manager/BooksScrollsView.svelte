@@ -48,6 +48,12 @@
   import IconButton from '../../components/IconButton.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import Select from '../../components/Select.svelte';
+  import {
+    buildCapOptions,
+    buildStatusOptions,
+    buildTypeOptions,
+  } from './booksScrollsSelectOptions.js';
 
   let {
     recipeItems = [],
@@ -190,6 +196,13 @@
     Array.from(new Set((recipeItems || []).map((item) => item?.derivedType || 'Book'))).sort()
   );
 
+  const instanceId = $props.id();
+  const capCaptionId = `${instanceId}-cap-filter`;
+
+  const statusSelectOptions = $derived(buildStatusOptions(text));
+  const typeSelectOptions = $derived(buildTypeOptions(typeOptions, text));
+  const capSelectOptions = $derived(buildCapOptions(isItemMode, text));
+
   const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
 
   const filteredItems = $derived(
@@ -301,74 +314,55 @@
       ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
       inputAttrs={{ 'data-books-scrolls-search': '' }}
     />
-    <label class="manager-filter">
+    <!-- Three `<span>`s rather than the `<label>`s they were: `Select.svelte`'s host invariant.
+         The first two triggers keep the `aria-label` their select carried; the limits filter is
+         named by its own caption instead, because that caption reads "Uses" or "Learning" and a
+         name that did not contain it broke WCAG 2.5.3 label-in-name (issue 1510). -->
+    <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={statusFilter}
-        onchange={(event) => (statusFilter = event.currentTarget.value)}
-        data-books-scrolls-status-filter
-        aria-label={text(
+        options={statusSelectOptions}
+        showTick={false}
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.BooksScrolls.StatusFilterLabel',
           'Filter recipe items by status'
         )}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.BooksScrolls.StatusAll', 'All statuses')}</option
-        >
-        <option value="enabled">{text('FABRICATE.Admin.Manager.StatusOn', 'On')}</option>
-        <option value="disabled">{text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</option>
-      </select>
-    </label>
-    <label class="manager-filter">
+        triggerData={{ 'data-books-scrolls-status-filter': '' }}
+        onChange={(next) => (statusFilter = next)}
+      />
+    </span>
+    <span class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.TypeFilter', 'Type')}</span>
-      <select
+      <Select
+        size="toolbar"
         value={typeFilter}
-        onchange={(event) => (typeFilter = event.currentTarget.value)}
-        data-books-scrolls-type-filter
-        aria-label={text(
+        options={typeSelectOptions}
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.BooksScrolls.TypeFilterLabel',
           'Filter recipe items by type'
         )}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.BooksScrolls.TypeAll', 'All types')}</option
-        >
-        {#each typeOptions as option (option)}
-          <option value={option}>{option}</option>
-        {/each}
-      </select>
-    </label>
-    <label class="manager-filter">
-      <span
+        triggerData={{ 'data-books-scrolls-type-filter': '' }}
+        onChange={(next) => (typeFilter = next)}
+      />
+    </span>
+    <span class="manager-filter">
+      <span id={capCaptionId}
         >{isItemMode
           ? text('FABRICATE.Admin.Manager.BooksScrolls.UsesFilter', 'Uses')
           : text('FABRICATE.Admin.Manager.BooksScrolls.LearningFilter', 'Learning')}</span
       >
-      <select
+      <Select
+        size="toolbar"
         value={capFilter}
-        onchange={(event) => (capFilter = event.currentTarget.value)}
-        data-books-scrolls-cap-filter
-        aria-label={text(
-          'FABRICATE.Admin.Manager.BooksScrolls.CapFilterLabel',
-          'Filter recipe items by limits'
-        )}
-      >
-        <option value="all">{text('FABRICATE.Admin.Manager.BooksScrolls.CapAll', 'All')}</option>
-        <option value="limited"
-          >{isItemMode
-            ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use')
-            : text(
-                'FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning',
-                'Limited learning'
-              )}</option
-        >
-        <option value="unlimited"
-          >{isItemMode
-            ? text('FABRICATE.Admin.Manager.BooksScrolls.Unlimited', 'Unlimited')
-            : text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely')}</option
-        >
-      </select>
-    </label>
+        options={capSelectOptions}
+        showTick={false}
+        ariaLabelledBy={capCaptionId}
+        triggerData={{ 'data-books-scrolls-cap-filter': '' }}
+        onChange={(next) => (capFilter = next)}
+      />
+    </span>
     <Chip data-books-scrolls-count
       >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
         .replace('{shown}', filteredItems.length)

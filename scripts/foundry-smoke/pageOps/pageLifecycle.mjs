@@ -9,6 +9,8 @@ import {
 } from '../../lib/foundryTourSuppression.js';
 import { railSelector } from '../../lib/managerRailEntries.js';
 
+import { chooseSelectOption } from './selectControl.mjs';
+
 /** Normalize text for stable UI matching. */
 export function normalizeText(value) {
   return String(value ?? '')
@@ -458,9 +460,14 @@ export async function exerciseManagerPointerTargets(page, systemId) {
   await search.fill('');
   await page.waitForTimeout(250);
 
-  await page.locator('.fabricate-manager .manager-filter select').first().selectOption('active');
+  // The browse toolbar's status filter is a shared `<Select>` since issue 1510, so it is driven by
+  // clicking its trigger and then its row; `selectOption` throws on a `<button role="combobox">`.
+  const statusFilter = page
+    .locator('.fabricate-manager .manager-filter .fabricate-select-trigger')
+    .first();
+  await chooseSelectOption(page, statusFilter, { value: 'active' });
   await page.waitForTimeout(250);
-  await page.locator('.fabricate-manager .manager-filter select').first().selectOption('all');
+  await chooseSelectOption(page, statusFilter, { value: 'all' });
 
   await page
     .locator(`${managerSystemRowSelector(systemId)} .manager-system-identity`)

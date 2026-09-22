@@ -283,6 +283,52 @@ const CONVERTED_SITES = Object.freeze([
     columnSelector: '.manager-environment-context-field',
     rung: 'form',
   }),
+  // Issue 1510 commit 3a — the systems, access and recipe-item browse toolbars. Their filter values
+  // are component state no `?value=` can seed, so each is `drive`n through its own panel; and their
+  // claim is the shared 144px floor under `.manager-filter` rather than a column, because a browse
+  // bar's filters hug in a row of siblings. `pinned` is the regression the floor exists to stop: at
+  // the native rule's 128 four of these bars re-measured as the GM chose, shifting every control to
+  // the right of the one that changed.
+  ...[
+    {
+      subject: 'systems-browser',
+      name: 'the systems status filter',
+      hook: '.manager-filter .fabricate-select-trigger',
+      values: ['all', 'active'],
+    },
+    {
+      subject: 'access-tab',
+      name: 'the recipe access category filter',
+      hook: '[data-access-category-filter]',
+      values: ['all', 'Smithing'],
+    },
+    {
+      subject: 'access-tab',
+      name: 'the recipe access state filter',
+      hook: '[data-access-filter]',
+      values: ['all', 'granted'],
+    },
+    {
+      subject: 'books-scrolls',
+      name: 'the recipe-item status filter',
+      hook: '[data-books-scrolls-status-filter]',
+      values: ['all', 'enabled'],
+    },
+    {
+      subject: 'books-scrolls',
+      name: 'the recipe-item type filter',
+      hook: '[data-books-scrolls-type-filter]',
+      values: ['all', 'Scroll'],
+    },
+    {
+      subject: 'books-scrolls',
+      name: 'the recipe-item limits filter',
+      hook: '[data-books-scrolls-cap-filter]',
+      values: ['all', 'limited'],
+    },
+  ].map((site) =>
+    Object.freeze({ ...site, column: false, floor: 144, pinned: true, drive: true, rung: 'toolbar' })
+  ),
 ]);
 
 /**
@@ -343,17 +389,24 @@ function readOpenPanel(page) {
  * @param {string} hook
  * @param {string} value
  * @returns {Promise<{shipped: number, unfloored: number, face: string, column: number,
- *   rung: string}>}
+ *   rung: string, label: string}>}
  */
-async function measureTrigger(subject, hook, value, columnSelector = '.manager-field') {
-  const page = await openFixture(subject, value);
+async function measureTrigger(subject, hook, value, columnSelector = '.manager-field', drive = false) {
+  const page = await openFixture(subject, drive ? '' : value);
   try {
+    // A CONTROL WHOSE VALUE NO PROP CAN SEED is put in the state by the act that reaches it: open
+    // the panel and click the row, which is what the GM does and what `select-control.js` does.
+    if (drive) {
+      await pressPointerOn(page, hook);
+      await pressPointerOn(page, `.fabricate-select-popover [data-popover-option="${value}"]`);
+    }
     return await page.evaluate(([selector, column_]) => {
       const trigger = document.querySelector(selector);
       const shipped = trigger.getBoundingClientRect().width;
       const face = globalThis.getComputedStyle(trigger).fontFamily;
       const column = trigger.closest(column_)?.getBoundingClientRect().width ?? 0;
       const rung = trigger.getAttribute('data-select-size');
+      const label = trigger.querySelector('.fabricate-select-value')?.textContent.trim() ?? '';
       trigger.style.width = 'auto';
       trigger.style.minWidth = '0px';
       const unfloored = trigger.getBoundingClientRect().width;
@@ -363,6 +416,7 @@ async function measureTrigger(subject, hook, value, columnSelector = '.manager-f
         column: Number(column.toFixed(2)),
         face,
         rung,
+        label,
       };
     }, [hook, columnSelector]);
   } finally {
@@ -406,8 +460,14 @@ describe('a converted manager trigger keeps the width its native select had (iss
       : `holds ${site.name} at or above its ${site.floor}px floor across its rows`;
     it(claim, async () => {
       const [shortest, longest] = await Promise.all([
-        measureTrigger(site.subject, site.hook, site.values[0], site.columnSelector),
-        measureTrigger(site.subject, site.secondHook ?? site.hook, site.values[1], site.columnSelector),
+        measureTrigger(site.subject, site.hook, site.values[0], site.columnSelector, site.drive),
+        measureTrigger(
+          site.subject,
+          site.secondHook ?? site.hook,
+          site.values[1],
+          site.columnSelector,
+          site.drive
+        ),
       ]);
 
       assertRung(site, shortest.rung);
@@ -440,6 +500,22 @@ describe('a converted manager trigger keeps the width its native select had (iss
           `${site.name} measured ${longest.shipped}px on its second row, below the ` +
             `${site.floor}px floor its own scoped rule declares`
         );
+        if (site.pinned) {
+          // NON-VACUITY FOR THE PINNING CLAIM. A driven site's two states are reached by clicking a
+          // row, and a click that missed would measure the resting value twice and pass.
+          assert.notEqual(
+            shortest.label,
+            longest.label,
+            `${site.name} read "${shortest.label}" in both measured states, so the two figures ` +
+              'below are of one rendered string and the floor is proving nothing'
+          );
+          assert.ok(
+            Math.abs(shortest.shipped - longest.shipped) < EPSILON,
+            `${site.name} measured ${shortest.shipped}px on its shortest option and ` +
+              `${longest.shipped}px on its longest, so the floor is not absorbing the difference ` +
+              'and every control to the right of it shifts when the GM changes the filter'
+          );
+        }
       }
     });
   }
@@ -610,6 +686,8 @@ describe('the two hints the currency card draws read in one treatment (issue 151
 
 describe('a converted manager panel is wide enough for the list it opens (issue 1510)', () => {
   const PANEL_SITES = [
+    // `start` is inert for a `drive` site, which nothing seeds through `?value=`, so those six
+    // measure the resting list; the panel still opens and every label is measured.
     ...CONVERTED_SITES.map((site) => ({ ...site, start: site.values[1] })),
     {
       subject: 'currency',
