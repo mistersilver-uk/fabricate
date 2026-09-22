@@ -129,7 +129,7 @@ When `features.multiStepRecipes` is disabled for a system that has multi-step re
 1. Existing multi-step recipes are **retained verbatim** in persisted data.
    No recipe is deleted, migrated, reverted, or rewritten, and no active run, learned flag, or per-user preference is cleaned up.
 2. Each such recipe stays **listed and craftable** for every viewer — it is never hidden from the player listing and the crafting guard never rejects it on multi-step grounds.
-   Its player-listing PRODUCES row still resolves the recipe's product step (`ui-integration`, Multi-Step Recipe Presentation), because the projected step count reads AUTHORED structure rather than the feature flag, and the collapsed chain does award that step's results (issue 1907).
+   Its player-listing PRODUCES row still resolves the recipe's product step (`ui-crafting-app`, Multi-Step Recipe Presentation), because the projected step count reads AUTHORED structure rather than the feature flag, and the collapsed chain does award that step's results (issue 1907).
 3. A collapsed recipe executes as an **atomic chain**: one craft action runs the authored steps sequentially, back-to-back, in a single call, with no step-triggering UX and no between-step waiting.
    Each step keeps its own consumption, crafting check, tool, and result-creation behaviour, so the chain reuses the existing per-step machinery.
 4. **Time requirements sum into one gate.** When time requirements are enabled, the single atomic action waits behind one gate whose duration is the **sum** of every step's duration; the chain then executes all steps at maturity.

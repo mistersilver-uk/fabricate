@@ -4,7 +4,7 @@
 
 This capability is the canonical, normative record of Fabricate's shared UI design system: the token foundations every product surface draws from, the set of shared primitives that set is allowed to contain, the rules that route a new case to an existing primitive, and the recipes that compose those primitives into the app's screen archetypes.
 It exists because a design system that lives only in prototypes drifts: the audit that produced this capability found 99 distinct button signatures, 79 icon-chip signatures, 75 field signatures, 70 card signatures and 55 kicker variants across the surfaces it swept.
-`ui-integration` states the requirement that a repeated thing MUST be one shared primitive; this capability states what that set IS.
+`ui-visual-style` states the requirement that a repeated thing MUST be one shared primitive; this capability states what that set IS.
 
 The set itself is ENUMERATED in `openspec/specs/design-system/library.html`, one primitive per `div.spec-head > h4` heading, each rendered at its canonical geometry.
 That file is part of this capability rather than a companion to it: it is the same normative content with specimens attached, and it is the artifact to open when a written geometry needs to be seen rather than read.
@@ -585,7 +585,7 @@ The forwarding-alias rule below is scoped to COLOUR, and that is narrower than a
 A colour alias is different in kind because the value it forwards is the one thing a theme swap must be able to change.
 No gate decides the colour case on its own; what a gate can decide is that the retired names do not return, which is what `tests/token-generation-gate.test.js` holds.
 
-A theme foundation read only by a companion module is declared and exempted the same way, and the companion-read set and its change-control rule are specified in `Downtime Preview and Premium Extension` in `openspec/specs/ui-integration/spec.md`.
+A theme foundation read only by a companion module is declared and exempted the same way, and the companion-read set and its change-control rule are specified in `Downtime Preview and Premium Extension` in `openspec/specs/ui-extension-points/spec.md`.
 
 #### Scenario: A surface wants its own colour vocabulary
 
@@ -619,14 +619,14 @@ A pill that CONTAINS a square element — an icon chip, a thumbnail — takes th
 `tests/components/design-system-debt-ratchets.test.js` holds the RADIUS ladder over both stylesheet corpora, resolving a `var()` token to its definitions first so that moving a banned value into a custom property does not pay the debt down.
 `tests/components/control-height-ladder.test.js` holds the control-height ladder the same way.
 
-Padding, margin and gap MUST derive from the spacing scale in `ui-integration`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
+Padding, margin and gap MUST derive from the spacing scale in `ui-visual-style`, whose documented literal exemptions are 1px hairlines and one-off fixed dimensions in the 34 to 42px range.
 `tests/components/spacing-scale-ratchet.test.js` is what holds that rule, over the same two corpora and with the published scale held opaque, since deriving FROM the scale is what the rule asks for.
 Radius, width, height, border widths, font sizes, grid track sizes and breakpoints are NOT spacing-scale members and MUST NOT be derived from `--fab-space-*`.
 They are written as literals by default, and a token is minted for one of them only where the value is SHARED across surfaces or DERIVED from another, in which case the token's declaration MUST record which it is.
 Two shipped pairs illustrate the two kinds, as examples rather than as a closed list a further token would have to join: `--fab-icon-picker-chip`/`--fab-icon-picker-row`, whose row height is computed from the chip, and `--fab-books-control-radius`/`--fab-books-panel-radius`, which carry two radii off the ladder for the elements they paint, shared by the Books & Scrolls tab and the item-page inspector so that correcting them onto the ladder stays a one-line edit.
 A token of this kind is a local convenience and never a ladder: naming one for a control class rather than for its surface asserts a rung, and 5px is not one.
 
-Type follows the ladder in `ui-integration`: the serif face names things, the mono face carries every number a GM compares or tunes, and the interface face stays host-owned and untokenized.
+Type follows the ladder in `ui-visual-style`: the serif face names things, the mono face carries every number a GM compares or tunes, and the interface face stays host-owned and untokenized.
 The mono face ships weights 400 and 500 ONLY, so a mono step MUST NOT specify 600 or 700 — those synthesize as faux-bold.
 Emphasis in mono comes from size and ink.
 `tests/components/design-system-debt-ratchets.test.js` holds both halves of the weight rule: that no `font-weight` anywhere leaves the 400/500/600/700 ramp, and that no rule setting `var(--fab-font-mono)` asks for a weight above 500.
@@ -950,7 +950,7 @@ Every persisted edit refreshes that store, and state held there collapses the ro
 A collapsed body that the LIST renders STAYS IN THE DOM under `display: none` rather than being unmounted, and its controls leave the tab order with it.
 One markup tree is easier to reason about than a second rendering path, and retention holds the uncommitted field state that unmounting discards.
 This MUST be one switch in one component: no caller chooses it and no prop exposes it.
-A whole-header row outside the list is not yet bound by this, and that debt is recorded in the non-conformance list under `ui-integration`'s "Shared product UI primitives" rather than treated as a conforming case.
+A whole-header row outside the list is not yet bound by this, and that debt is recorded in the non-conformance list under `ui-visual-style`'s "Shared product UI primitives" rather than treated as a conforming case.
 
 Reorder answers BOTH inputs, and the list owns both halves because no shared action supports either one for a reorder.
 The grip is the pointer's drag handle and a real button that moves its row with the up and down arrow keys, since HTML5 drag and drop has no keyboard path at all.
@@ -1720,7 +1720,7 @@ An inspector rail is OPTIONAL and several shipped editors have none; where one i
 A blocking notice is the only element permitted between the tab bar and the first card.
 An info strip precedes the cards it describes and is never nested inside them.
 The inspector rail is READ-ONLY by convention: it shows consequences and links out, and never hosts editing controls.
-`openspec/specs/ui-integration/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
+`openspec/specs/ui-visual-style/spec.md` contradicts that sentence at its "Right-inspector actions" rule, which requires every GM studio's inspector to END in a stack of verbs rendered through one shared primitive — `InspectorActionButton.svelte` today, and the contradiction is recorded as an OPEN row in the library's planned-migrations table for a maintainer to rule on rather than resolved here.
 The reading that register recommends is that READ-ONLY means no editing INPUTS — nothing that edits the record in place — and that a stack of verbs rendered through the shared button is permitted.
 The environments screen's inspector rail is a declared repurposing of that third track: its gathering task, gathering event and gathering rules leaves all edit in place, and issue 1707 gave that departure file names in `environment/GatheringTaskInspector.svelte`, `environment/GatheringEventInspector.svelte`, `environment/GatheringRulesInspector.svelte` and the `environment/GatheringModifierEditor.svelte` the first two share.
 The maintainer ruled on 2026-09-19 that this departure is a declared exception to the read-only convention rather than an open row in the library's planned-migrations table.
@@ -1863,12 +1863,12 @@ The chip keeps drawing its own remove control.
 
 ### Requirement: Run detail composes the specified run controls
 
-The player Journal MUST use the active-current, active-browsed, ordinary-history and recovery compositions specified by `ui-integration` rather than a universal detail order.
+The player Journal MUST use the active-current, active-browsed, ordinary-history and recovery compositions specified by `ui-journal-app` rather than a universal detail order.
 It MUST reuse the run-control contracts and geometry specified in `library.html`.
 `RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
 An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
 `WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
-Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-integration`, independently of the zero-spend automatic blockers in `recipes-and-steps`.
+Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-journal-app`, independently of the zero-spend automatic blockers in `recipes-and-steps`.
 The detail MUST preserve readable permitted identity, compact This run timing and one untitled contextual guidance callout; ordinary history MUST NOT show an expanded Run record, active progress/navigation or the TIME/CHECK pair.
 Terminal and recovery guidance MUST describe recorded evidence and uncertainty rather than inviting another execution.
 Finished MUST remain the Journal's sole history browser, and the browse/detail composition MUST preserve Active, Finished, detail order when stacked at the player window's minimum width.
@@ -1890,7 +1890,7 @@ A missing field MUST NOT hide other known fields or rows, and unknown outcomes M
 A known shared roll whose unknown outcomes prevent locating a cut MUST remain visible as a standalone roll reading without inventing a cut position.
 Default preview callers MUST retain the existing shared comparison and ordering.
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
-`OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-integration`.
+`OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-journal-app`.
 
 #### Scenario: A player views another stage while allocating materials
 
