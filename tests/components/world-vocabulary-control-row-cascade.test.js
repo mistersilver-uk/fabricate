@@ -463,7 +463,7 @@ perRoute('all three panels’ first rows fit inside the frame the capture case d
     assert.equal(
       new Set(bottoms.map((entry) => Math.round(entry.bottom))).size,
       2,
-      `expected the 2-up grid and the band beneath it, got ${JSON.stringify(bottoms)}`
+      `expected the 2-up grid and the tag panel beneath it, got ${JSON.stringify(bottoms)}`
     );
 
     const budget = frame.height - CHROME_ALLOWANCE;
