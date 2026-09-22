@@ -210,7 +210,7 @@ describe('browserListState', () => {
   });
 
   it('answers an out-of-range index with nothing rather than with the last page', () => {
-    // The shipped divergence from `ui-integration`'s "clamped to the last valid page":
+    // The shipped divergence from `ui-manager-shell`'s "clamped to the last valid page":
     // `paginateRows` would answer [9, 10] here, and adopting it would be a behaviour change.
     const { page } = openWindow({ seed: { pageIndex: 7, pageSize: 4 }, rows: numbers(10) });
 

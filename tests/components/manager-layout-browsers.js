@@ -314,7 +314,7 @@ test('a selected browser row reads as an identity cue in the accent family, not 
   );
 });
 
-// The typographic contract (issue 643, `openspec/specs/ui-integration/spec.md`
+// The typographic contract (issue 643, `openspec/specs/ui-visual-style/spec.md`
 // § Typographic contract): serif on names and headings, mono + tabular figures on
 // every numeric. A count badge that shifts width between 9 and 10 moves the control
 // beside it, so tabular-nums is part of the contract, not a nicety.

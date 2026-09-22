@@ -494,7 +494,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
   });
 
   it('AC5: the persisted `routed` token is DISPLAYED as "Routed by check", never raw', async () => {
-    // `ui-integration` -> Component Studio req 4, added by this change.
+    // `ui-entity-editors` -> Component Studio req 4, added by this change.
     const target = await harness.mount(props({ salvageResolutionMode: 'routed' }));
     const pill = target.querySelector('[data-salvage-mode]');
     assert.ok(pill, 'the salvage card names its mode');

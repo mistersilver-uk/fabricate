@@ -106,7 +106,7 @@ test('no .svelte under src writes the manager-button class literal', () => {
     [],
     'a manager button is a `<ManagerButton role="…">`, never a remembered class string. The ' +
       'role vocabulary is closed and a per-site visual tweak travels as a pass-through on the ' +
-      '`class` prop — see `openspec/specs/ui-integration/spec.md`:\n  ' +
+      '`class` prop — see `openspec/specs/ui-visual-style/spec.md` `### Shared product UI primitives`:\n  ' +
       offenders.join('\n  ')
   );
 

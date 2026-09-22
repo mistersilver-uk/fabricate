@@ -107,7 +107,7 @@ describe('1132/copy essence bulk-delete names contain their visible labels', () 
 // the commonest single delete of all — an essence carried by nothing and required by no
 // recipe — read "This removes it from 0 component(s) and rewrites 0 recipe(s) that require
 // it." The recipe dialog fixed this for its own consequences in #1152 and added the
-// `ui-integration` clause making zero-omission the rule for every studio's singular dialog;
+// `ui-system-studio` clause making zero-omission the rule for every studio's singular dialog;
 // this is the essence sibling of that fix.
 describe('1156/copy the essence delete dialog omits zero consequences', () => {
   const deleteConfirm = lang.FABRICATE.Admin.Manager.Essence.DeleteConfirm;
