@@ -552,15 +552,15 @@ export const CASES = Object.freeze([
     // The three delete controls, one per panel, each keyed on its own panel (issue 1392).
     expectContained: [
       {
-        container: '[data-wvocab-panel="recipeCategories"]',
+        container: '[data-vocabulary-panel="recipeCategories"]',
         target: '[data-recipe-category-id] .manager-icon-button',
       },
       {
-        container: '[data-wvocab-panel="componentCategories"]',
+        container: '[data-vocabulary-panel="componentCategories"]',
         target: '[data-component-category-id] .manager-icon-button',
       },
       {
-        container: '[data-wvocab-panel="componentTags"]',
+        container: '[data-vocabulary-panel="componentTags"]',
         target: '[data-component-tag-id] .manager-icon-button',
       },
     ],
@@ -571,7 +571,10 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldVocabularyStudio\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
+      // The shared shell issue 1915 extracted from this page. A change to it moves BOTH Tags &
+      // Categories screens, so this frame is claimed beside the three system ones.
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/vocabularyShell\.js$/,
     ],
   }),
   // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns.

@@ -139,7 +139,15 @@ const SHARED_PRIMITIVES = [
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */
-const ADJUDICATED_NON_MEMBERS = Object.freeze([]);
+const ADJUDICATED_NON_MEMBERS = Object.freeze([
+  // The shared vocabulary shell and its panel (issue 1915). They clear the DESIGN-SYSTEM bar at two
+  // independent callers, and they are one tree short of THIS list's bar: the two Tags & Categories
+  // screens are the only trees that render them, and both are already named by the two suites that
+  // mount them. They join the moment a third mounted tree draws a vocabulary panel, which is the
+  // overturn condition rather than a preference.
+  'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+  'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
+]);
 
 test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {
   // Two ways this record rots, and both leave it looking like configuration. A path that no

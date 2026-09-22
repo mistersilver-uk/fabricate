@@ -7384,9 +7384,9 @@
   font-size: var(--fab-recipe-control-font);
 }
 
-/* ── THE TOOLBAR'S SELECT SKIN IS NARROWED, NOT DELETED ── These declarations used to reach every scoped-catalogue toolbar select and are retargeted onto the one remaining native carrier, `WorldVocabularyPage`'s `<select data-wvocab-sort>`; they keep a `.fabricate-manager` compound because they read the area-scoped `--fab-recipe-control-font` and because `tests/styles-namespacing.test.js` requires every selector here to begin `.fabricate`. It is also the one filter-bar rule issue 1508 left application-rooted — the family compound stands THIRD, behind an attribute ancestor that is not the application root, so neither re-rooting form exists for it. skin census (issue 1523): pinned by `tests/components/world-vocabulary-control-row-cascade.test.js`, which measures this select's computed height, corner, fill and type directly, and by a sheet-text clause in `manager-layout.test.js` (issues 1504, 1507, 1508, 1510). */
+/* ── THE TOOLBAR'S SELECT SKIN IS NARROWED, NOT DELETED ── These declarations used to reach every scoped-catalogue toolbar select and are retargeted onto the one component that still renders a native one, `VocabularyShellPanel`'s `<select data-vocabulary-sort>`, which both Tags & Categories screens draw (issue 1915); they keep a `.fabricate-manager` compound because they read the area-scoped `--fab-recipe-control-font` and because `tests/styles-namespacing.test.js` requires every selector here to begin `.fabricate`. It is also the one filter-bar rule issue 1508 left application-rooted — the family compound stands THIRD, behind an ancestor that is not the application root, so neither re-rooting form exists for it. skin census (issue 1523): pinned by `tests/components/world-vocabulary-control-row-cascade.test.js`, which measures this select's computed height, corner, fill and type directly, and by a sheet-text clause in `manager-layout.test.js` (issues 1504, 1507, 1508, 1510). */
 .fabricate-manager
-  [data-scoped-page='world-vocabulary']
+  .manager-vocabulary-shell-panel
   .manager-toolbar.manager-scoped-list-toolbar
   select {
   height: 34px;

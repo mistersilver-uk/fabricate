@@ -72,9 +72,9 @@ export function createRealmEnvironmentsBrowserState() {
   };
 }
 
-/** One vocabulary panel's search box. */
+/** One vocabulary panel's search box and its sort pair (issue 1915). */
 export function createVocabularyBrowserState() {
-  return { searchTerm: '' };
+  return { searchTerm: '', sortKey: 'name', sortDirection: 'asc' };
 }
 
 /** The shared scoped-entity list frame (`EntityListInspectorFrame`). */

@@ -8,9 +8,8 @@ import {
   inputNormalizer,
   panelKey,
   panelRows,
-  sortVocabularyRows,
   WORLD_VOCABULARY_PANELS,
-  WORLD_VOCABULARY_SORT_KEYS,
+  worldPanelProps,
 } from '../src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js';
 
 const panelFor = (kind) => WORLD_VOCABULARY_PANELS.find((panel) => panel.kind === kind);
@@ -34,31 +33,6 @@ test('the three panels carry distinct row hooks, input ids and sort-label ids', 
     ['componentTags'],
     'and the tag vocabulary is the full-width band beneath it'
   );
-  assert.deepEqual(
-    WORLD_VOCABULARY_SORT_KEYS.map((option) => option.id),
-    ['name', 'references'],
-    'two sort keys, and neither mints a lang key of its own'
-  );
-});
-
-test('sortVocabularyRows orders by name and by references, in both directions', () => {
-  const rows = [row('b', 'Beta', 5), row('a', 'Alpha', 1), row('c', 'Gamma', 5)];
-  const names = (sorted) => sorted.map((entry) => entry.name);
-
-  assert.deepEqual(names(sortVocabularyRows(rows, 'name', 'asc')), ['Alpha', 'Beta', 'Gamma']);
-  assert.deepEqual(names(sortVocabularyRows(rows, 'name', 'desc')), ['Gamma', 'Beta', 'Alpha']);
-  assert.deepEqual(names(sortVocabularyRows(rows, 'references', 'asc')), ['Alpha', 'Beta', 'Gamma']);
-  assert.deepEqual(
-    names(sortVocabularyRows(rows, 'references', 'desc')),
-    ['Beta', 'Gamma', 'Alpha'],
-    'and a tie falls back to the NAME, so the order is deterministic rather than the engine’s'
-  );
-
-  // IT COPIES. The projection publishes these arrays and the store owns the corpus behind them.
-  const original = [...rows];
-  sortVocabularyRows(rows, 'references', 'desc');
-  assert.deepEqual(rows, original, 'the published array is never reordered in place');
-  assert.deepEqual(sortVocabularyRows(null, 'name', 'asc'), [], 'and it is total');
 });
 
 test('the tag vocabulary lowercases on submit and displays a # prefix', () => {
@@ -156,4 +130,66 @@ test('the cascade clause is per kind, per row, and already substituted', () => {
     '',
     'a recipe category rewrites nothing anywhere, so it has no second number and no clause'
   );
+});
+
+test('worldPanelProps carries every per-kind string the panel component needs', () => {
+  const panel = panelFor('componentTags');
+  const rows = [row('herb', 'herb', 2)];
+  const props = worldPanelProps(panel, {
+    rows,
+    text: echo,
+    onAdd: () => {},
+    onRemove: () => {},
+  });
+
+  // THE HOOKS THE THREE MOUNTED PANELS MUST NOT SHARE come from the descriptor, not from here.
+  assert.equal(props.kind, 'componentTags');
+  assert.equal(props.rowAttr, panel.rowAttr);
+  assert.equal(props.inputId, panel.inputId);
+  assert.equal(props.sortLabelId, panel.sortLabelId);
+  assert.equal(props.rows, rows, 'the rows are handed on UNSORTED; the panel component sorts');
+  assert.equal(props.lockedRow, null, 'the world scope has no reserved row to lock');
+  assert.equal(props.showIcon, false, 'and no per-row persisted icon');
+
+  // EVERY STRING RESOLVES THROUGH THIS MODULE'S OWN KEY BUILDER, which is what the lang contract
+  // reads; a prop that fell back to a hard-coded English literal would pass a smoke test and ship
+  // untranslated.
+  for (const [prop, field] of [
+    ['title', 'Title'],
+    ['label', 'Title'],
+    ['subline', 'Subline'],
+    ['inputLabel', 'InputLabel'],
+    ['addLabel', 'AddLabel'],
+    ['emptyTitle', 'EmptyTitle'],
+    ['removeConfirmHint', 'RemoveConfirm'],
+  ]) {
+    assert.equal(props[prop], panelKey(panel, field), `${prop} reads ${field}`);
+  }
+  // AND THE TOOLBAR NAME IS SUBSTITUTED rather than left carrying its token.
+  const named = worldPanelProps(panel, {
+    rows,
+    text: (key, fallback) => (key.endsWith('.SortToolbar') ? 'Sort {vocabulary}' : fallback || key),
+    onAdd: () => {},
+    onRemove: () => {},
+  });
+  assert.equal(named.sortToolbarLabel.includes('{vocabulary}'), false);
+  assert.ok(named.sortToolbarLabel.startsWith('Sort '));
+});
+
+test('worldPanelProps routes add and remove back to the page with their panel', () => {
+  const panel = panelFor('recipeCategories');
+  const added = [];
+  const removed = [];
+  const props = worldPanelProps(panel, {
+    rows: [],
+    text: echo,
+    onAdd: (target, value) => added.push([target.kind, value]),
+    onRemove: (target, entry) => removed.push([target.kind, entry.id]),
+  });
+
+  props.onAdd('Potions');
+  props.onRemove({ id: 'potions' });
+  // WITHOUT THE PANEL the page cannot tell which of three simultaneous vocabularies it is writing.
+  assert.deepEqual(added, [['recipeCategories', 'Potions']]);
+  assert.deepEqual(removed, [['recipeCategories', 'potions']]);
 });

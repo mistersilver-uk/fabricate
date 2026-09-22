@@ -990,14 +990,16 @@ test('the shared Select paints identically in both areas, and beats the paint it
                   selectPanelFixture('manager', 'toolbar', { ticked: false }),
                 ].join('\n')
               )}
-              <!-- THE ROUTE ATTRIBUTE IS ON THE HOST BECAUSE THE SHIPPED SELECT MOVED WITH
+              <!-- THE PANEL CLASS IS ON THE HOST BECAUSE THE SHIPPED SELECT MOVED WITH
                    IT (issue 1504). Converting this toolbar's two controls left one native
-                   carrier, the world-vocabulary sort select, so the geometry and type rules are
-                   NARROWED onto that route rather than deleted — and this is where a shipped
-                   scoped-list-toolbar select still takes its skin. The search field and the
-                   direction toggle are unaffected by the narrowing and are measured in the same
-                   row. -->
-              <div data-scoped-page="world-vocabulary">
+                   carrier, the vocabulary panel's sort select, so the geometry and type rules are
+                   NARROWED onto the one panel component that still renders a native select rather
+                   than deleted — and this is where a shipped scoped-list-toolbar select still
+                   takes its skin. Issue 1915 re-keyed the narrowing off the world route attribute
+                   and onto that component's class, because BOTH Tags & Categories screens draw it
+                   now. The search field and the direction toggle are unaffected by the narrowing
+                   and are measured in the same row. -->
+              <div class="manager-vocabulary-shell-panel">
                 <div class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar">
                   <div class="fabricate-search manager-search"><input type="text" data-probe="shipped-search"></div>
                   <select data-probe="shipped-select"><option>Name</option></select>
@@ -1608,8 +1610,10 @@ test('the stranded toolbar select rules are narrowed onto their last native carr
   // ── THE CI-ARMED HALF OF A DOES-NOT-MOVE CLAIM (issue 1504) ──────────────────────────────
   // Converting the scoped-catalogue toolbar's lane filter and sort key strands the two sheet
   // rules that painted a `.manager-scoped-list-toolbar select`. They are NARROWED onto the one
-  // route that still renders one — the world-vocabulary sort select — rather than deleted,
-  // because that select takes its ENTIRE skin from them.
+  // PANEL COMPONENT that still renders one — `VocabularyShellPanel`'s sort select — rather than
+  // deleted, because that select takes its ENTIRE skin from them. The anchor is that component's
+  // class rather than a route attribute since issue 1915: the same component draws the world and
+  // the system Tags & Categories screens, so a route anchor would have painted only one of them.
   const declarations = css.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
   const preludes = declarations
     .split('}')
@@ -1629,10 +1633,10 @@ test('the stranded toolbar select rules are narrowed onto their last native carr
   );
   for (const prelude of withSelect) {
     assert.ok(
-      prelude.includes("[data-scoped-page='world-vocabulary']"),
-      'every surviving scoped-list-toolbar select rule names the one route that still renders ' +
-        `one, and \`${prelude}\` does not — an unnarrowed rule paints every catalogue toolbar, ` +
-        'none of which has a native select in it any more'
+      prelude.includes('.manager-vocabulary-shell-panel'),
+      'every surviving scoped-list-toolbar select rule names the one panel component that still ' +
+        `renders a native select, and \`${prelude}\` does not — an unnarrowed rule paints every ` +
+        'catalogue toolbar, none of which has a native select in it any more'
     );
     assert.ok(
       prelude.startsWith('.fabricate-manager'),

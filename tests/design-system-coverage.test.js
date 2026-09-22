@@ -626,6 +626,10 @@ const UNDOCUMENTED_ROWS = [
   // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
   // `library.html` specimen names.
   'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
+  // Issue 1915's shared vocabulary shell and its per-panel card. No `library.html` specimen names
+  // a page-level vocabulary layout, and each is a COMPOSITION over entries that do exist.
+  'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+  'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   // Issue 1707's gathering modifier panel: no specimen names a condition-and-character editor.
