@@ -229,7 +229,9 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 // by the shared list rendering their reorder controls; the other two declare the attribute in place.
 // Its second phase closes the book detail's whole slot (206 - 4): all four of that file's raw
 // buttons declare the attribute, so nothing is left open for the next author to fill for free.
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 202;
+// #1717: the rail's 35 left the root for four units that hold 32 (202 - 3). The three the count
+// lost are the world catalogue leaves, written once as an `{#each}` rather than converted.
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 199;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
 /** An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`. */

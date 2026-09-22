@@ -112,6 +112,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
+  import ManagerNavRail from './ManagerNavRail.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -158,6 +159,7 @@
     runRouteExitGuard,
   } from './routeExitGuards.js';
   import { createBulkSelectionOwner } from './bulkSelection.svelte.js';
+  import { createNavRailModel } from './navRailModel.svelte.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import WorldCurrencyTab from './world/WorldCurrencyTab.svelte';
   import WorldModifiersTab from './world/WorldModifiersTab.svelte';
@@ -168,7 +170,6 @@
     managerHeaderActionClass,
     WORLD_DOWNTIME_SURFACE_ID,
   } from '../../../managerExtensions.js';
-  import { resolveNavTabBadge, navTabBadgeTotal } from '../../../navTabBadgeStore.js';
   import {
     mapModifierToPrerequisite,
     mapPrerequisiteToModifier,
@@ -374,23 +375,6 @@
   let activeTravelTab = $state('parties');
   // World > Travel's destination: `realms` or `map`. Realms is the landing tab.
   let worldTravelTab = $state('realms');
-  // ── Rail group expansion: USER INTENT only (issue 1185) ──────────────────────────────
-  const RAIL_GROUP_IDS = Object.freeze([
-    'crafting',
-    'checks',
-    'gathering',
-    'worldTravel',
-    'worldRules',
-    'worldDowntime',
-  ]);
-  let railGroupUserExpanded = $state({
-    crafting: false,
-    checks: false,
-    gathering: false,
-    worldTravel: false,
-    worldRules: false,
-    worldDowntime: false,
-  });
   // The selected Downtime preview is owned here rather than inside the extension host
   // because the rail, the page header and the breadcrumb all name it.
   let worldDowntimeTabId = $state('tracking');
@@ -419,17 +403,6 @@
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
   // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere.
   let componentAddFromCatalogueOpen = $state(false);
-  // svelte-ignore state_referenced_locally
-  let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
-
-  function toggleManagerRail() {
-    // Belt and braces beside the `disabled` attribute, exactly as `toggleRailGroup` does it:
-    // the rail lock (issue 1213) is a rule about state, not about one control.
-    if (railLockedOpen) return;
-    railCollapsed = !railCollapsed;
-    services?.setSetting?.('managerRailCollapsed', railCollapsed);
-  }
-
   let selectedGatheringTaskId = $state('');
   let selectedGatheringEventId = $state('');
   let selectedGatheringDropId = $state('');
@@ -645,19 +618,6 @@
   let checksActiveSection = $state('');
   // The REQUEST's identity, bumped on every deep link.
   let checksSectionRequestNonce = $state(0);
-  // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
-  // and, as of issue 745, renders only when experimental features are enabled.
-  const placeholderViews = [
-    {
-      id: 'graph',
-      // The rail id, as a COMPLETE LITERAL rather than a `manager-nav-${view.id}` template.
-      navId: 'manager-nav-graph',
-      icon: 'fas fa-project-diagram',
-      labelKey: 'FABRICATE.Admin.Manager.Nav.Graph',
-      fallback: 'Graph',
-    },
-  ];
-
   const selectedSystem = $derived($viewState.selectedSystem);
   const selectedSystemId = $derived(selectedSystem?.id || '');
   const systemsLoading = $derived($viewState.systemsLoading === true);
@@ -1844,11 +1804,6 @@
     updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
-  const visiblePlaceholderViews = $derived(
-    selectedSystem
-      ? placeholderViews.filter((view) => isViewAvailableForSystem(view, selectedSystem))
-      : []
-  );
   const showRecipeCategories = $derived(!!selectedSystem);
   const selectedRecipe = $derived(
     ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeId) ||
@@ -2853,22 +2808,9 @@
     if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
     worldDowntimeTabId = tabs[0].id;
   });
-  // The rail's Downtime children render the active tab set.
-  const downtimeNavItems = $derived(downtimeTabs);
-  // The rail sub-item BUTTON's element id. It is the click target the mounted suite drives and
-  // the anchor the group's markup is keyed on.
-  const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
   // The id of the element carrying the sub-item's VISIBLE LABEL, stated once and used twice: the
   // rail stamps it.
   const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
-  // The id of the sub-item's badge element (issue 1302) — the `aria-describedby` target, and
-  // never a descendant of `downtimeNavLabelId`'s span, which names the companion panel region.
-  const downtimeNavBadgeId = (tabId) => `manager-downtime-nav-badge-${tabId}`;
-  // The badge Core renders for one sub-item, in provider mode only: Core's own preview tabs never
-  // carry a `badge`.
-  function downtimeSubitemBadge(item) {
-    return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);
-  }
   // Gated on provider mode rather than merely on the channel being empty.
   const downtimeRuntimeChrome = $derived(downtimeCoreFallback ? null : downtimeRouteChrome);
   // Header actions belong to the live mount, then to the active TAB, then to the provider's own
@@ -3043,116 +2985,27 @@
   const isChecksRoute = $derived(isChecksView(currentView));
   const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
 
-  // ── Rail group expansion: the LOCK, and what the rail actually renders (issue 1185) ───
-  const railGroupLockedOpen = $derived({
-    crafting: isCraftingRoute,
-    checks: isChecksRoute,
-    gathering: isActiveGatheringChildRoute,
-    worldTravel: isWorldTravelRoute,
-    worldRules: isWorldRulesRoute,
-    worldDowntime: isWorldDowntimeRoute,
+  // ── Rail group expansion, and the collapse seam (issue 1185, extracted by issue 1717) ───
+  // Both inputs are thunks: the model reads them inside its own `$derived.by` to subscribe to
+  // these route deriveds across the module boundary.
+  const navRail = createNavRailModel({
+    services: () => services,
+    groupLocks: () => ({
+      crafting: isCraftingRoute,
+      checks: isChecksRoute,
+      gathering: isActiveGatheringChildRoute,
+      worldTravel: isWorldTravelRoute,
+      worldRules: isWorldRulesRoute,
+      worldDowntime: isWorldDowntimeRoute,
+    }),
+    // The whole rail locks open over a companion's Downtime surface (issue 1213).
+    railLocked: () => isWorldDowntimeRoute && !downtimeCoreFallback,
   });
-  const railGroupExpanded = $derived({
-    crafting: railGroupUserExpanded.crafting || railGroupLockedOpen.crafting,
-    checks: railGroupUserExpanded.checks || railGroupLockedOpen.checks,
-    gathering: railGroupUserExpanded.gathering || railGroupLockedOpen.gathering,
-    worldTravel: railGroupUserExpanded.worldTravel || railGroupLockedOpen.worldTravel,
-    worldRules: railGroupUserExpanded.worldRules || railGroupLockedOpen.worldRules,
-    worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
-  });
-  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later navigates
-  // away instead of snapping shut behind them.
-  $effect(() => {
-    const locked = railGroupLockedOpen;
-    for (const group of RAIL_GROUP_IDS) {
-      if (locked[group]) railGroupUserExpanded[group] = true;
-    }
-  });
+  $effect(() => navRail.syncLocks());
   // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its breadcrumb
   // reads "<system> › Crafting › Tools" — so entering it opens the Crafting group.
   $effect(() => {
-    if (isToolStudioRoute) railGroupUserExpanded.crafting = true;
-  });
-  function toggleRailGroup(group, event) {
-    event?.stopPropagation?.();
-    // Belt and braces beside the `disabled` attribute: the lock is a rule about state, not
-    // about one control, so it holds for a programmatic call too.
-    if (railGroupLockedOpen[group]) return;
-    railGroupUserExpanded[group] = !railGroupUserExpanded[group];
-  }
-  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
-  // children come from whichever provider holds the surface, so this cannot name a section.
-  const railGroupLockedTitle = $derived(
-    text(
-      'FABRICATE.Admin.Manager.Nav.LockedOpen',
-      'This section stays open while you are on one of its pages.'
-    )
-  );
-  // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
-  const railLockedOpen = $derived(isWorldDowntimeRoute && !downtimeCoreFallback);
-  // DISPLAY-ONLY.
-  const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
-  // The Downtime parent rollup total (issue 1302) — Core's own summary of what is hidden behind a
-  // closed disclosure.
-  const downtimeNavRollupTotal = $derived(
-    downtimeCoreFallback ? 0 : navTabBadgeTotal(downtimeTabs, downtimeNavTabBadges)
-  );
-  // Renders only while the children are hidden — BOTH disjuncts are load-bearing.
-  const downtimeNavRollupVisible = $derived(
-    !downtimeCoreFallback &&
-      downtimeNavRollupTotal > 0 &&
-      (!railGroupExpanded.worldDowntime || railCollapsedDisplay)
-  );
-  // "{count} update" / "{count} updates" — Core's own generic word.
-  function downtimeRollupName(count) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOne'
-        : 'FABRICATE.Admin.Manager.World.Downtime.BadgeTotalOther';
-    const fallback = count === 1 ? '{count} update' : '{count} updates';
-    return text(key, fallback).replace('{count}', String(count));
-  }
-  // The parent row's composed accessible name while the rollup shows.
-  function downtimeParentName(count) {
-    const key =
-      count === 1
-        ? 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOne'
-        : 'FABRICATE.Admin.Manager.World.Downtime.NavWithBadgeOther';
-    const fallback = count === 1 ? '{label}, {count} update' : '{label}, {count} updates';
-    const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
-    return text(key, fallback).replace('{label}', label).replace('{count}', String(count));
-  }
-  // Every rail-toggle attribute reads the DISPLAY value, never the stored one.
-  const railToggleLabel = $derived(
-    railCollapsedDisplay
-      ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-      : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')
-  );
-  // Its own string, not the group lock's: `Nav.LockedOpen` is section-worded and wrong for the
-  // whole sidebar.
-  const railToggleTitle = $derived(
-    railLockedOpen
-      ? text('FABRICATE.Admin.Manager.Nav.RailLockedOpen', 'The sidebar stays open on this page.')
-      : railToggleLabel
-  );
-  const railToggleIcon = $derived(
-    railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
-  );
-  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213).
-  const downtimeNavNodes = $state({});
-  let revealedDowntimeNavId = null;
-  $effect(() => {
-    if (!railLockedOpen || !railGroupExpanded.worldDowntime) {
-      revealedDowntimeNavId = null;
-      return;
-    }
-    const tabId = worldDowntimeTabId;
-    if (revealedDowntimeNavId === tabId) return;
-    const node = downtimeNavNodes[tabId];
-    if (!node) return;
-    revealedDowntimeNavId = tabId;
-    // happy-dom does not implement it, hence the optional call.
-    node.scrollIntoView?.({ block: 'nearest' });
+    if (isToolStudioRoute) navRail.expandGroup('crafting');
   });
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off `selectedSystem`
   // (issue 785).
@@ -3576,7 +3429,7 @@
     gatheringEventDraftBaseline = null;
     gatheringEventSaving = false;
     gatheringEventSaveError = '';
-    railGroupUserExpanded.gathering = isGatheringRoute;
+    navRail.setGroupExpanded('gathering', isGatheringRoute);
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -4274,13 +4127,6 @@
     );
   }
 
-  function isViewAvailableForSystem(view, system) {
-    // Issue 745: the Graph placeholder is advertised only behind the experimental toggle.
-    if (view.id === 'graph') return experimentalFeaturesEnabled;
-    if (!view.feature) return true;
-    return system?.features?.[view.feature] === true;
-  }
-
   function isPromise(value) {
     return value && typeof value.then === 'function';
   }
@@ -4862,19 +4708,10 @@
     validation: 'FABRICATE.Admin.Manager.Checks.Validation.Title',
   };
 
-  function checksIssueName(count) {
-    const key = count === 1 ? 'IssueCountOne' : 'IssueCountOther';
-    const fallback = count === 1 ? '{count} issue' : '{count} issues';
-    return text(`FABRICATE.Admin.Manager.Checks.Sections.${key}`, fallback).replace(
-      '{count}',
-      String(count)
-    );
-  }
-
   // Activating the PARENT opens the group and routes to the first available child, which is
   // what makes the retained `checks` id a redirect rather than a dead route.
   function activateChecksParent() {
-    railGroupUserExpanded.checks = true;
+    navRail.expandGroup('checks');
     setView(resolveChecksRedirect(checksNavArgs));
   }
 
@@ -4887,7 +4724,7 @@
   function backToEnvironmentsBrowse() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
-      if (canShowEnvironments) railGroupUserExpanded.gathering = true;
+      if (canShowEnvironments) navRail.expandGroup('gathering');
     });
   }
 
@@ -6014,7 +5851,7 @@
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'gathering-task-edit';
   }
 
@@ -6027,7 +5864,7 @@
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'tasks';
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
@@ -6088,7 +5925,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'environments';
   }
 
@@ -6150,7 +5987,7 @@
     gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringEventSaveError = '';
     activeGatheringTab = 'encounters';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'gathering-event-edit';
   }
 
@@ -6164,7 +6001,7 @@
   function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'encounters';
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
@@ -6230,7 +6067,7 @@
     if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
     clearGatheringEventDraft();
     activeGatheringTab = 'encounters';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
     activeView = 'environments';
   }
 
@@ -6755,7 +6592,7 @@
     activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
       ? tabId
       : 'environments';
-    railGroupUserExpanded.gathering = true;
+    navRail.expandGroup('gathering');
   }
 
   function openWorldParties() {
@@ -6775,13 +6612,13 @@
     const view = WORLD_RULES_ROUTES[destination];
     if (!view) return;
     return afterTruthyResult(confirmRouteExit(view, destination), () => {
-      railGroupUserExpanded.worldRules = true;
+      navRail.expandGroup('worldRules');
       activeView = view;
     });
   }
 
   function activateWorldRulesParent() {
-    railGroupUserExpanded.worldRules = true;
+    navRail.expandGroup('worldRules');
     if (isWorldRulesRoute) return;
     openWorldRulesDestination('currency');
   }
@@ -6824,7 +6661,7 @@
     // Issue 1257.
     if (!worldDowntimeAvailable) return;
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
-      railGroupUserExpanded.worldDowntime = true;
+      navRail.expandGroup('worldDowntime');
       activeView = 'world-downtime';
     });
   }
@@ -6845,7 +6682,7 @@
     // the "same view token, different subject" case that parameter exists for.
     return afterTruthyResult(confirmRouteExit('world-downtime', tabId), () => {
       worldDowntimeTabId = tabId;
-      railGroupUserExpanded.worldDowntime = true;
+      navRail.expandGroup('worldDowntime');
       activeView = 'world-downtime';
     });
   }
@@ -6875,13 +6712,13 @@
     if (!['realms', 'map'].includes(destination)) return;
     return afterTruthyResult(confirmRouteExit('world-travel', destination), () => {
       worldTravelTab = destination;
-      railGroupUserExpanded.worldTravel = true;
+      navRail.expandGroup('worldTravel');
       activeView = 'world-travel';
     });
   }
 
   function activateWorldTravelParent() {
-    railGroupUserExpanded.worldTravel = true;
+    navRail.expandGroup('worldTravel');
     if (isWorldTravelRoute) return;
     openWorldTravelDestination('realms');
   }
@@ -6893,7 +6730,7 @@
       : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       activeView = 'environments';
     });
   }
@@ -6968,7 +6805,7 @@
 
   function activateGatheringParent() {
     if (isActiveGatheringChildRoute) {
-      railGroupUserExpanded.gathering = true;
+      navRail.expandGroup('gathering');
       return;
     }
     openGatheringSection('environments');
@@ -6980,13 +6817,13 @@
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
       activeView = nextView;
-      railGroupUserExpanded.crafting = true;
+      navRail.expandGroup('crafting');
     });
   }
 
   function activateCraftingParent() {
     if (isCraftingRoute) {
-      railGroupUserExpanded.crafting = true;
+      navRail.expandGroup('crafting');
       return;
     }
     openCraftingSection('recipes');
@@ -7057,7 +6894,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(source);
       recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       activeView = 'recipe-item-edit';
-      railGroupUserExpanded.crafting = true;
+      navRail.expandGroup('crafting');
       Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
         worldItemOptions = options || [];
       });
@@ -8950,927 +8787,68 @@
     </header>
   {/if}
 
-  <div class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}>
-    <aside
-      class="manager-rail"
-      aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}
-    >
-      <!--
-        Name the workspace before its scope controls. Every manager route.
-      -->
-      <p class="manager-rail-title" data-manager-rail-section>
-        {text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}
-      </p>
-
-      <!--
-        The rail's crafting-system card.
-      -->
-      <section
-        class="manager-rail-block"
-        aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}
-      >
-        {#if selectedSystem}
-          <div class="manager-scope-card">
-            <div class="manager-scope-card-head">
-              <p class="manager-kicker">
-                {text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}
-              </p>
-              <button
-                type="button"
-                class="manager-rail-toggle manager-scope-collapse"
-                data-manager-rail-toggle
-                aria-pressed={railCollapsedDisplay}
-                aria-label={railToggleLabel}
-                title={railToggleTitle}
-                disabled={railLockedOpen}
-                aria-disabled={railLockedOpen}
-                onclick={toggleManagerRail}
-              >
-                <i class={railToggleIcon} aria-hidden="true"></i>
-              </button>
-            </div>
-            <select
-              class="manager-scope-select"
-              data-manager-scope-select
-              value={selectedSystem.id}
-              aria-label={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-              onchange={(event) => changeScopeSystem(event.currentTarget.value)}
-            >
-              {#each $viewState.systems || [] as system (system.id)}
-                <option value={system.id}>{system.name}</option>
-              {/each}
-            </select>
-            <!--
-              The systems browser IS the destination this link returns to.
-            -->
-            <button
-              type="button"
-              class={`manager-scope-return ${currentView === 'systems' ? 'is-disabled' : ''}`}
-              disabled={currentView === 'systems'}
-              aria-disabled={currentView === 'systems'}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
-                'Return to System Library'
-              )}
-              title={text(
-                'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
-                'Return to System Library'
-              )}
-              onclick={backToSystemsBrowser}
-            >
-              <i class="fas fa-arrow-left-long" aria-hidden="true"></i>
-              <span
-                >{text('FABRICATE.Admin.Manager.AllCraftingSystems', 'All crafting systems')}</span
-              >
-            </button>
-          </div>
-        {:else}
-          <div class="manager-scope-card">
-            <div class="manager-scope-card-head">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Product', 'Fabricate')}</p>
-              <button
-                type="button"
-                class="manager-rail-toggle manager-scope-collapse"
-                data-manager-rail-toggle
-                aria-pressed={railCollapsedDisplay}
-                aria-label={railToggleLabel}
-                title={railToggleTitle}
-                disabled={railLockedOpen}
-                aria-disabled={railLockedOpen}
-                onclick={toggleManagerRail}
-              >
-                <i class={railToggleIcon} aria-hidden="true"></i>
-              </button>
-            </div>
-            <h2 class="manager-title">
-              {text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}
-            </h2>
-          </div>
-        {/if}
-      </section>
-
-      <nav
-        class="manager-nav"
-        aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}
-      >
-        {#if selectedSystem}
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`}
-            id="manager-nav-system-overview"
-            aria-current={currentView === 'system-edit' ? 'page' : undefined}
-            data-nav-system-edit
-            onclick={() => editSystem(selectedSystem.id)}
-          >
-            <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span
-            >
-            {#if systemOverviewCount > 0}
-              <span
-                class="manager-nav-count"
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria',
-                  'Open validation issues'
-                )}>{systemOverviewCount}</span
-              >
-            {/if}
-          </button>
-          <!--
-            Crafting group is unconditional as of issue 745 (v1.3 headline).
-          -->
-          <div class={`manager-nav-group ${railGroupExpanded.crafting ? 'is-expanded' : ''}`}>
-            <button
-              type="button"
-              class="manager-nav-button manager-nav-parent"
-              id="manager-nav-crafting"
-              aria-current={isCraftingRoute ? 'page' : undefined}
-              aria-expanded={railGroupExpanded.crafting}
-              onclick={activateCraftingParent}
-            >
-              <i class="fas fa-hammer" aria-hidden="true"></i>
-              <span class="manager-nav-label"
-                >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span
-              >
-              <span class="manager-nav-count">{craftingNavCount}</span>
-            </button>
-            <!--
-              Locked ⇒ genuinely `disabled`, with the reason on the control.
-            -->
-            <button
-              type="button"
-              class="manager-nav-toggle"
-              aria-label={railGroupExpanded.crafting
-                ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
-                : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
-              aria-controls="manager-crafting-submenu"
-              aria-expanded={railGroupExpanded.crafting}
-              disabled={railGroupLockedOpen.crafting}
-              aria-disabled={railGroupLockedOpen.crafting}
-              title={railGroupLockedOpen.crafting ? railGroupLockedTitle : undefined}
-              onclick={(event) => toggleRailGroup('crafting', event)}
-            >
-              <i
-                class={railGroupExpanded.crafting ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                aria-hidden="true"
-              ></i>
-            </button>
-            {#if railGroupExpanded.crafting}
-              <div
-                class="manager-nav-submenu"
-                id="manager-crafting-submenu"
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label',
-                  'Crafting sections'
-                )}
-              >
-                {#each craftingNavItems as craftingItem (craftingItem.id)}
-                  <button
-                    type="button"
-                    class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
-                    id={`manager-crafting-nav-${craftingItem.id}`}
-                    aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id
-                      ? 'page'
-                      : undefined}
-                    onclick={() => openCraftingSection(craftingItem.id)}
-                  >
-                    <i class={craftingItem.icon} aria-hidden="true"></i>
-                    <span class="manager-nav-label"
-                      >{text(craftingItem.labelKey, craftingItem.labelFallback)}</span
-                    >
-                    {#if craftingItem.count != null}
-                      <span class="manager-nav-count">{craftingItem.count}</span>
-                    {/if}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-          <!--
-            SCREEN TITLE, NOT A DOMAIN NOUN (issue 1362).
-          -->
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`}
-            id="manager-nav-component-rules"
-            aria-current={currentView === 'components' || currentView === 'component-edit'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('components')}
-          >
-            <i class="fas fa-boxes" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}</span
-            >
-            <span class="manager-nav-count">{selectedCounts.components}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`}
-            id="manager-nav-tags"
-            aria-current={currentView === 'tags' ? 'page' : undefined}
-            onclick={() => setView('tags')}
-          >
-            <i class="fas fa-tags" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span
-            >
-            <!--
-              The rail badge is the whole screen's vocabulary.
-            -->
-            <span class="manager-nav-count"
-              >{tagCategoryCounts.recipeCategories +
-                tagCategoryCounts.componentCategories +
-                tagCategoryCounts.itemTags}</span
-            >
-          </button>
-          {#if canShowEssences}
-            <button
-              type="button"
-              class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`}
-              id="manager-nav-essence-rules"
-              aria-current={currentView === 'essences' || currentView === 'essence-edit'
-                ? 'page'
-                : undefined}
-              onclick={() => setView('essences')}
-            >
-              <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-              <span class="manager-nav-label"
-                >{text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules')}</span
-              >
-              <span class="manager-nav-count">{selectedCounts.essences}</span>
-            </button>
-          {/if}
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'tools' || currentView === 'tool-edit' ? 'is-active' : ''}`}
-            id="manager-nav-tool-rules"
-            aria-current={currentView === 'tools' || currentView === 'tool-edit'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('tools')}
-          >
-            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span
-            >
-            <!-- NO ZERO BADGE (issue 1373). The rail states counts where there is something to
-                 count; a `0` beside `Tool Rules` on a system that has adopted none is a badge
-                 whose whole content is the absence the row already reads as, and the reference
-                 draws none. Scoped to this row: the other rail counts are the other lanes' and
-                 their reference frames were not read in this pass. -->
-            {#if toolsNavCount > 0}
-              <span class="manager-nav-count">{toolsNavCount}</span>
-            {/if}
-          </button>
-          <div class={`manager-nav-group ${railGroupExpanded.checks ? 'is-expanded' : ''}`}>
-            <button
-              type="button"
-              class={`manager-nav-button manager-nav-parent ${isChecksRoute ? 'is-active' : ''}`}
-              id="manager-nav-checks"
-              aria-current={isChecksRoute ? 'page' : undefined}
-              aria-expanded={railGroupExpanded.checks}
-              onclick={activateChecksParent}
-            >
-              <i class="fas fa-dice-d20" aria-hidden="true"></i>
-              <span class="manager-nav-label"
-                >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
-              >
-              <!-- The parent badge is an ISSUE COUNT, not a record count, so it wears the
-                   pill treatment and names its unit. A collapsed rail still renders it —
-                   that is the only signal left when the children are hidden. -->
-              {#if checksNavCount > 0}
-                <span
-                  class="manager-nav-issue-badge"
-                  data-checks-nav-issues="checks"
-                  role="img"
-                  aria-label={checksIssueName(checksNavCount)}>{checksNavCount}</span
-                >
-              {/if}
-            </button>
-            <button
-              type="button"
-              class="manager-nav-toggle"
-              aria-label={railGroupExpanded.checks
-                ? text('FABRICATE.Admin.Manager.Nav.CollapseChecks', 'Collapse checks menu')
-                : text('FABRICATE.Admin.Manager.Nav.ExpandChecks', 'Expand checks menu')}
-              aria-controls="manager-checks-submenu"
-              aria-expanded={railGroupExpanded.checks}
-              disabled={railGroupLockedOpen.checks}
-              aria-disabled={railGroupLockedOpen.checks}
-              title={railGroupLockedOpen.checks ? railGroupLockedTitle : undefined}
-              onclick={(event) => toggleRailGroup('checks', event)}
-            >
-              <i
-                class={railGroupExpanded.checks ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                aria-hidden="true"
-              ></i>
-            </button>
-            {#if railGroupExpanded.checks}
-              <div
-                class="manager-nav-submenu"
-                id="manager-checks-submenu"
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
-              >
-                {#each checksNavItems as checksItem (checksItem.id)}
-                  <button
-                    type="button"
-                    class={`manager-nav-subitem ${currentView === checksItem.view ? 'is-active' : ''}`}
-                    id={`manager-checks-nav-${checksItem.id}`}
-                    data-checks-nav-item={checksItem.id}
-                    aria-current={currentView === checksItem.view ? 'page' : undefined}
-                    onclick={() => setView(checksItem.view)}
-                  >
-                    <i class={checksItem.icon} aria-hidden="true"></i>
-                    <span class="manager-nav-label"
-                      >{text(checksItem.labelKey, checksItem.labelFallback)}</span
-                    >
-                    <!-- THREE distinguishable markers can land in this column, and they must
-                         not be confusable: a record-count numeral (`.manager-nav-count`,
-                         which Checks never has), an ISSUE badge (a pill naming its unit),
-                         and an UNSAVED marker (a different SHAPE with its own name, not the
-                         same dot in another colour). -->
-                    {#if checksItem.dirty}
-                      <span
-                        class="manager-nav-dirty-marker"
-                        data-checks-nav-dirty={checksItem.id}
-                        role="img"
-                        aria-label={text(
-                          'FABRICATE.Admin.Manager.Checks.Nav.Unsaved',
-                          'Unsaved changes'
-                        )}
-                      ></span>
-                    {/if}
-                    {#if checksItem.issueCount > 0}
-                      <span
-                        class="manager-nav-issue-badge"
-                        data-checks-nav-issues={checksItem.id}
-                        role="img"
-                        aria-label={checksIssueName(checksItem.issueCount)}
-                        >{checksItem.issueCount}</span
-                      >
-                    {/if}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-          {#if canShowEnvironments}
-            <div class={`manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}`}>
-              <button
-                type="button"
-                class="manager-nav-button manager-nav-parent"
-                id="manager-nav-gathering"
-                aria-current={isGatheringRoute ? 'page' : undefined}
-                aria-expanded={railGroupExpanded.gathering}
-                onclick={activateGatheringParent}
-              >
-                <i class="fas fa-seedling" aria-hidden="true"></i>
-                <span class="manager-nav-label"
-                  >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span
-                >
-                <span class="manager-nav-count">{gatheringNavCounts.total}</span>
-              </button>
-              <button
-                type="button"
-                class="manager-nav-toggle"
-                aria-label={railGroupExpanded.gathering
-                  ? text('FABRICATE.Admin.Manager.Nav.CollapseGathering', 'Collapse gathering menu')
-                  : text('FABRICATE.Admin.Manager.Nav.ExpandGathering', 'Expand gathering menu')}
-                aria-controls="manager-gathering-submenu"
-                aria-expanded={railGroupExpanded.gathering}
-                disabled={railGroupLockedOpen.gathering}
-                aria-disabled={railGroupLockedOpen.gathering}
-                title={railGroupLockedOpen.gathering ? railGroupLockedTitle : undefined}
-                onclick={(event) => toggleRailGroup('gathering', event)}
-              >
-                <i
-                  class={railGroupExpanded.gathering ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                  aria-hidden="true"
-                ></i>
-              </button>
-              {#if railGroupExpanded.gathering}
-                <div
-                  class="manager-nav-submenu"
-                  id="manager-gathering-submenu"
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Environment.GatheringTabs.Label',
-                    'Gathering sections'
-                  )}
-                >
-                  {#each visibleGatheringNavItems as gatheringItem (gatheringItem.id)}
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem ${isGatheringRoute && displayedGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
-                      id={`manager-gathering-nav-${gatheringItem.id}`}
-                      aria-current={isGatheringRoute && displayedGatheringTab === gatheringItem.id
-                        ? 'page'
-                        : undefined}
-                      onclick={() => openGatheringSection(gatheringItem.id)}
-                    >
-                      <i class={gatheringItem.icon} aria-hidden="true"></i>
-                      <span class="manager-nav-label"
-                        >{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span
-                      >
-                      {#if gatheringNavCounts[gatheringItem.id] != null}
-                        <span class="manager-nav-count">{gatheringNavCounts[gatheringItem.id]}</span
-                        >
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/if}
-        {/if}
-        {#each visiblePlaceholderViews as view (view.labelKey)}
-          <!-- A stable id here too (issue 1362). Both harnesses target every rail entry by id,
-               and a planned-view placeholder is still a rail entry the smoke's membership loop
-               names. -->
-          <button
-            type="button"
-            class="manager-nav-button"
-            id={view.navId}
-            disabled
-            title={text(
-              'FABRICATE.Admin.Manager.PlannedView',
-              '{view} is planned for a future release.'
-            ).replace('{view}', text(view.labelKey, view.fallback))}
-          >
-            <i class={view.icon} aria-hidden="true"></i>
-            <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
-            <!-- NOT a rail marker. The Rail Marker Family is four marks and a record COUNT
-                 is one of them: a bare mono numeral standing for records behind the row. "Soon"
-                 is a word on a row that has no records and no route, so drawing it through the
-                 count vehicle made that vehicle's own definition false wherever a reader
-                 checked it. It gets `.manager-nav-planned` (issue 1515): the same quiet trailing
-                 text at the same rung, in the BODY face rather than the mono one, because a
-                 word has no numerals to align and this sheet ships no real mono 600. -->
-            <span class="manager-nav-planned">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
-          </button>
-        {/each}
-        <section
-          class="manager-world-nav"
-          data-world-nav-section
-          aria-labelledby="manager-world-heading"
-        >
-          <div class="manager-world-heading-row">
-            <h2 id="manager-world-heading">
-              {text('FABRICATE.Admin.Manager.World.Heading', 'WORLD')}
-            </h2>
-            <span id="manager-world-scope">
-              {text('FABRICATE.Admin.Manager.World.Scope', 'every system')}
-            </span>
-          </div>
-          <!--
-            The four world scoped-entity leaves (issue 1362, epic 1357).
-          -->
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-components' || currentView === 'world-component-entry' ? 'is-active' : ''}`}
-            id="manager-world-nav-component-catalogue"
-            data-world-nav-item="component-catalogue"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
-              'Component catalogue'
-            )}
-            aria-current={currentView === 'world-components' ||
-            currentView === 'world-component-entry'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('world-components')}
-          >
-            <i class="fas fa-cubes-stacked" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text(
-                'FABRICATE.Admin.Manager.Scoped.ComponentCatalogueTitle',
-                'Component catalogue'
-              )}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.components}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-vocabulary' ? 'is-active' : ''}`}
-            id="manager-world-nav-vocabulary"
-            data-world-nav-item="vocabulary"
-            aria-label={text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
-            aria-current={currentView === 'world-vocabulary' ? 'page' : undefined}
-            onclick={() => setView('world-vocabulary')}
-          >
-            <i class="fas fa-tags" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Scoped.VocabularyTitle', 'Tags & Categories')}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.vocabulary}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-essences' || currentView === 'world-essence-entry' ? 'is-active' : ''}`}
-            id="manager-world-nav-essence-catalogue"
-            data-world-nav-item="essence-catalogue"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle',
-              'Essence Catalogue'
-            )}
-            aria-current={currentView === 'world-essences' || currentView === 'world-essence-entry'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('world-essences')}
-          >
-            <i class="fas fa-flask-vial" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Scoped.EssenceCatalogueTitle', 'Essence Catalogue')}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.essences}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${currentView === 'world-tools' || currentView === 'world-tool-entry' ? 'is-active' : ''}`}
-            id="manager-world-nav-tool-catalogue"
-            data-world-nav-item="tool-catalogue"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle',
-              'Tools Catalogue'
-            )}
-            aria-current={currentView === 'world-tools' || currentView === 'world-tool-entry'
-              ? 'page'
-              : undefined}
-            onclick={() => setView('world-tools')}
-          >
-            <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle', 'Tools Catalogue')}
-            </span>
-            <span class="manager-nav-count">{worldScopedCounts.tools}</span>
-          </button>
-          <button
-            type="button"
-            class={`manager-nav-button manager-world-nav-item ${isWorldRoute ? 'is-active' : ''}`}
-            id="manager-world-nav-parties"
-            data-world-nav-item="parties"
-            aria-label={text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
-            aria-current={isWorldRoute ? 'page' : undefined}
-            onclick={openWorldParties}
-          >
-            <i class="fas fa-users" aria-hidden="true"></i>
-            <span class="manager-nav-label">
-              {text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
-            </span>
-            <span class="manager-nav-count">{travelParties.length}</span>
-          </button>
-          <!--
-            World > Travel (issue 1282).
-          -->
-          <div
-            class={`manager-nav-group manager-world-travel-group ${railGroupExpanded.worldTravel ? 'is-expanded' : ''}`}
-            data-world-travel-section
-          >
-            <button
-              type="button"
-              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldTravelRoute ? 'is-active' : ''}`}
-              id="manager-world-nav-travel"
-              data-world-nav-item="travel"
-              aria-label={text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}
-              aria-current={isWorldTravelRoute ? 'page' : undefined}
-              aria-controls="manager-travel-submenu"
-              aria-expanded={railGroupExpanded.worldTravel}
-              onclick={activateWorldTravelParent}
-            >
-              <i class="fas fa-route" aria-hidden="true"></i>
-              <span class="manager-nav-label">
-                {text('FABRICATE.Admin.Manager.World.TravelNav', 'Travel')}
-              </span>
-              <span class="manager-nav-count">{worldRealms.length}</span>
-            </button>
-            <button
-              type="button"
-              class="manager-nav-toggle"
-              id="manager-travel-toggle"
-              data-world-travel-toggle
-              aria-label={railGroupExpanded.worldTravel
-                ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
-                : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
-              aria-controls="manager-travel-submenu"
-              aria-expanded={railGroupExpanded.worldTravel}
-              disabled={railGroupLockedOpen.worldTravel}
-              aria-disabled={railGroupLockedOpen.worldTravel}
-              title={railGroupLockedOpen.worldTravel ? railGroupLockedTitle : undefined}
-              onclick={(event) => toggleRailGroup('worldTravel', event)}
-            >
-              <i
-                class={railGroupExpanded.worldTravel ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                aria-hidden="true"
-              ></i>
-            </button>
-            {#if railGroupExpanded.worldTravel}
-              <div
-                class="manager-nav-submenu"
-                id="manager-travel-submenu"
-                data-world-travel-submenu
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.World.TravelDestinations',
-                  'Travel destinations'
-                )}
-              >
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldTravelRoute && worldTravelTab === 'realms' ? 'is-active' : ''}`}
-                  id="manager-travel-nav-realms"
-                  data-world-travel-item="realms"
-                  aria-current={isWorldTravelRoute && worldTravelTab === 'realms'
-                    ? 'page'
-                    : undefined}
-                  onclick={() => openWorldTravelDestination('realms')}
-                >
-                  <i class="fas fa-mountain-sun" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldTravelRoute && worldTravelTab === 'map' ? 'is-active' : ''}`}
-                  id="manager-travel-nav-map"
-                  data-world-travel-item="map"
-                  aria-current={isWorldTravelRoute && worldTravelTab === 'map' ? 'page' : undefined}
-                  onclick={() => openWorldTravelDestination('map')}
-                >
-                  <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')}
-                  </span>
-                </button>
-              </div>
-            {/if}
-          </div>
-          <!--
-            World > Rules & Resources (issue 1311).
-          -->
-          <div
-            class={`manager-nav-group manager-world-rules-group ${railGroupExpanded.worldRules ? 'is-expanded' : ''}`}
-            data-world-rules-section
-          >
-            <button
-              type="button"
-              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldRulesRoute ? 'is-active' : ''}`}
-              id="manager-world-nav-rules"
-              data-world-nav-item="rules"
-              aria-label={text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}
-              aria-current={isWorldRulesRoute ? 'page' : undefined}
-              aria-controls="manager-rules-submenu"
-              aria-expanded={railGroupExpanded.worldRules}
-              onclick={activateWorldRulesParent}
-            >
-              <i class="fas fa-scale-balanced" aria-hidden="true"></i>
-              <span class="manager-nav-label">
-                {text('FABRICATE.Admin.Manager.World.RulesNav', 'Rules & Resources')}
-              </span>
-              <span class="manager-nav-count">
-                {selectedCurrencyUnits.length +
-                  selectedCharacterPrerequisites.length +
-                  selectedSystemModifiers.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              class="manager-nav-toggle"
-              id="manager-rules-toggle"
-              data-world-rules-toggle
-              aria-label={railGroupExpanded.worldRules
-                ? text('FABRICATE.Admin.Manager.World.CollapseRules', 'Collapse Rules & Resources')
-                : text('FABRICATE.Admin.Manager.World.ExpandRules', 'Expand Rules & Resources')}
-              aria-controls="manager-rules-submenu"
-              aria-expanded={railGroupExpanded.worldRules}
-              disabled={railGroupLockedOpen.worldRules}
-              aria-disabled={railGroupLockedOpen.worldRules}
-              title={railGroupLockedOpen.worldRules ? railGroupLockedTitle : undefined}
-              onclick={(event) => toggleRailGroup('worldRules', event)}
-            >
-              <i
-                class={railGroupExpanded.worldRules ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                aria-hidden="true"
-              ></i>
-            </button>
-            {#if railGroupExpanded.worldRules}
-              <div
-                class="manager-nav-submenu"
-                id="manager-rules-submenu"
-                data-world-rules-submenu
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.World.RulesDestinations',
-                  'Rules & Resources'
-                )}
-              >
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldCurrencyRoute ? 'is-active' : ''}`}
-                  id="manager-rules-nav-currency"
-                  data-world-rules-item="currency"
-                  aria-current={isWorldCurrencyRoute ? 'page' : undefined}
-                  onclick={() => openWorldRulesDestination('currency')}
-                >
-                  <i class="fas fa-coins" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.World.CurrencyNav', 'Currency')}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldPrerequisitesRoute ? 'is-active' : ''}`}
-                  id="manager-rules-nav-prerequisites"
-                  data-world-rules-item="prerequisites"
-                  aria-current={isWorldPrerequisitesRoute ? 'page' : undefined}
-                  onclick={() => openWorldRulesDestination('prerequisites')}
-                >
-                  <i class="fas fa-user-shield" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text(
-                      'FABRICATE.Admin.Manager.CharacterPrerequisites.Title',
-                      'Character prerequisites'
-                    )}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class={`manager-nav-subitem ${isWorldModifiersRoute ? 'is-active' : ''}`}
-                  id="manager-rules-nav-modifiers"
-                  data-world-rules-item="modifiers"
-                  aria-current={isWorldModifiersRoute ? 'page' : undefined}
-                  onclick={() => openWorldRulesDestination('modifiers')}
-                >
-                  <i class="fas fa-user-gear" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
-                  </span>
-                </button>
-              </div>
-            {/if}
-          </div>
-          <!--
-            Downtime is a GROUP, not a leaf: the design nests the same four previews under it that
-             Core's own tab strip offers, each carrying a premium padlock.
-          -->
-          {#if worldDowntimeAvailable}
-            <div
-              class={`manager-nav-group manager-world-downtime-group ${railGroupExpanded.worldDowntime ? 'is-expanded' : ''}`}
-              data-world-downtime-section
-            >
-              <button
-                type="button"
-                class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
-                id="manager-world-nav-downtime"
-                data-world-nav-item="downtime"
-                title={downtimeCoreFallback
-                  ? text(
-                      'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
-                      'Unlock Downtime Studio with Fabricate Premium'
-                    )
-                  : text(
-                      'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
-                      'Downtime Studio is unlocked by Fabricate Premium'
-                    )}
-                aria-label={downtimeNavRollupVisible
-                  ? downtimeParentName(downtimeNavRollupTotal)
-                  : text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
-                aria-current={isWorldDowntimeRoute ? 'page' : undefined}
-                aria-controls="manager-downtime-submenu"
-                aria-expanded={railGroupExpanded.worldDowntime}
-                onclick={openWorldDowntime}
-              >
-                <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-                <span class="manager-nav-label">
-                  {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
-                </span>
-                <!--
-                The chip is MUTED, never removed, once a companion holds the surface (issue 1185).
-              -->
-                {#if !downtimeNavRollupVisible}
-                  <span
-                    class={`manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
-                    data-world-nav-premium
-                    data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
-                    >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
-                  >
-                {/if}
-                <!--
-                The rollup — Core's own summary of what the closed disclosure is hiding.
-              -->
-                {#if !downtimeCoreFallback}
-                  {#if downtimeNavRollupVisible}
-                    <span
-                      class="manager-nav-issue-badge"
-                      data-world-downtime-badge-total
-                      role="img"
-                      aria-label={downtimeRollupName(downtimeNavRollupTotal)}
-                      >{downtimeNavRollupTotal}</span
-                    >
-                  {/if}
-                {/if}
-              </button>
-              <button
-                type="button"
-                class="manager-nav-toggle"
-                id="manager-downtime-toggle"
-                data-world-downtime-toggle
-                aria-label={railGroupExpanded.worldDowntime
-                  ? text('FABRICATE.Admin.Manager.World.Downtime.CollapseNav', 'Collapse Downtime')
-                  : text('FABRICATE.Admin.Manager.World.Downtime.ExpandNav', 'Expand Downtime')}
-                aria-controls="manager-downtime-submenu"
-                aria-expanded={railGroupExpanded.worldDowntime}
-                disabled={railGroupLockedOpen.worldDowntime}
-                aria-disabled={railGroupLockedOpen.worldDowntime}
-                title={railGroupLockedOpen.worldDowntime ? railGroupLockedTitle : undefined}
-                onclick={(event) => toggleRailGroup('worldDowntime', event)}
-              >
-                <i
-                  class={railGroupExpanded.worldDowntime
-                    ? 'fas fa-chevron-up'
-                    : 'fas fa-chevron-down'}
-                  aria-hidden="true"
-                ></i>
-              </button>
-              {#if railGroupExpanded.worldDowntime}
-                <div
-                  class="manager-nav-submenu"
-                  id="manager-downtime-submenu"
-                  data-world-downtime-submenu
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.World.Downtime.NavSections',
-                    'Downtime previews'
-                  )}
-                >
-                  {#each downtimeNavItems as item (item.id)}
-                    <!--
-                    `accessibleName` and `tooltip` LAND HERE in provider mode (issue 1213).
-                  -->
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
-                      id={downtimeNavItemId(item.id)}
-                      bind:this={downtimeNavNodes[item.id]}
-                      data-world-downtime-item={item.id}
-                      title={downtimeTabText(item, 'tooltip')}
-                      aria-label={downtimeCoreFallback
-                        ? undefined
-                        : downtimeTabText(item, 'accessibleName')}
-                      aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
-                        ? 'true'
-                        : undefined}
-                      aria-describedby={downtimeSubitemBadge(item)
-                        ? downtimeNavBadgeId(item.id)
-                        : undefined}
-                      onclick={() => openWorldDowntimePreview(item.id)}
-                    >
-                      <i class={item.icon} aria-hidden="true"></i>
-                      <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
-                        >{downtimeTabText(item, 'label')}</span
-                      >
-                      <!--
-                      IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515).
-                    -->
-                      {#if !downtimeCoreFallback}
-                        {@const badge = downtimeSubitemBadge(item)}
-                        {#if badge}
-                          <span
-                            class="manager-nav-issue-badge"
-                            data-world-downtime-badge={item.id}
-                            id={downtimeNavBadgeId(item.id)}
-                            role="img"
-                            aria-label={badge.accessibleName}>{badge.count}</span
-                          >
-                        {/if}
-                      {/if}
-                      <!--
-                      The padlock and the premium note below advertise CORE'S preview. A
-                      companion owning the surface has nothing locked, so neither renders.
-                    -->
-                      {#if downtimeCoreFallback}
-                        <span class="manager-nav-lock" data-world-downtime-lock
-                          ><i class="fas fa-lock" aria-hidden="true"></i></span
-                        >
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-                {#if downtimeCoreFallback}
-                  <p class="manager-nav-callout" data-world-downtime-callout>
-                    <span class="manager-nav-callout-kicker">
-                      <i class="fas fa-lock" aria-hidden="true"></i>
-                      {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
-                    </span>
-                    {text(
-                      'FABRICATE.Admin.Manager.World.Downtime.RailNote',
-                      'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
-                    )}
-                  </p>
-                {/if}
-              {/if}
-            </div>
-          {/if}
-        </section>
-      </nav>
-    </aside>
+  <div class={`manager-body ${navRail.collapsedDisplay ? 'is-rail-collapsed' : ''}`}>
+    <ManagerNavRail
+      {navRail}
+      systems={$viewState.systems || []}
+      {selectedSystem}
+      {currentView}
+      {changeScopeSystem}
+      {backToSystemsBrowser}
+      {setView}
+      {editSystem}
+      {systemOverviewCount}
+      {isCraftingRoute}
+      {activateCraftingParent}
+      {craftingNavCount}
+      {craftingNavItems}
+      {activeCraftingTab}
+      {openCraftingSection}
+      {selectedCounts}
+      {tagCategoryCounts}
+      {canShowEssences}
+      {toolsNavCount}
+      {isChecksRoute}
+      {activateChecksParent}
+      {checksNavCount}
+      {checksNavItems}
+      {canShowEnvironments}
+      {isGatheringRoute}
+      {activateGatheringParent}
+      {gatheringNavCounts}
+      {visibleGatheringNavItems}
+      {displayedGatheringTab}
+      {openGatheringSection}
+      {experimentalFeaturesEnabled}
+      {worldScopedCounts}
+      {isWorldRoute}
+      {openWorldParties}
+      {travelParties}
+      {isWorldTravelRoute}
+      {activateWorldTravelParent}
+      {worldRealms}
+      {worldTravelTab}
+      {openWorldTravelDestination}
+      {isWorldRulesRoute}
+      {activateWorldRulesParent}
+      {selectedCurrencyUnits}
+      {selectedCharacterPrerequisites}
+      {selectedSystemModifiers}
+      {isWorldCurrencyRoute}
+      {isWorldPrerequisitesRoute}
+      {isWorldModifiersRoute}
+      {openWorldRulesDestination}
+      {worldDowntimeAvailable}
+      {isWorldDowntimeRoute}
+      {downtimeCoreFallback}
+      {downtimeTabs}
+      {downtimeNavTabBadges}
+      {downtimeTabText}
+      {downtimeNavLabelId}
+      {worldDowntimeTabId}
+      {openWorldDowntime}
+      {openWorldDowntimePreview}
+    />
 
     {#if currentView === 'world-components'}
       <!--

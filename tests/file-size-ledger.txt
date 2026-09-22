@@ -133,7 +133,7 @@ src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	547
 src/ui/svelte/apps/manager/ComponentEditView.svelte	2429
 src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	832
-src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	11575
+src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	10553
 src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte::viewSubtitle	230
 src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte	1432
 src/ui/svelte/apps/manager/EssenceBrowserView.svelte	639

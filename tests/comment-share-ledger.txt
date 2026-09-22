@@ -34,7 +34,7 @@ src/ui/svelte/apps/inventory/bulk	525
 src/ui/svelte/apps/inventory/detail	598
 src/ui/svelte/apps/inventory/detail/salvage	293
 src/ui/svelte/apps/journal	530
-src/ui/svelte/apps/manager	5031
+src/ui/svelte/apps/manager	5091
 src/ui/svelte/apps/manager/checks	1628
 src/ui/svelte/apps/manager/component	356
 src/ui/svelte/apps/manager/components	309
@@ -56,11 +56,11 @@ src/ui/svelte/stores	4536
 src/ui/svelte/util	1258
 src/utils	947
 styles	1060
-tests	20038
+tests	20061
 tests/actions	85
 tests/canvas	392
 tests/canvas/regions	210
-tests/components	15291
+tests/components	15356
 tests/fixtures	34
 tests/fixtures/chip	15
 tests/fixtures/manager-select	25

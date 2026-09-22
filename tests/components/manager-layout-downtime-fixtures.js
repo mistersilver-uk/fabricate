@@ -76,11 +76,11 @@ export async function readDowntimePreviewArrangement(paneWidth) {
 }
 
 // -- Downtime rail tab badges, measured (issue 1302) --------------------------------------
-const managerRootPath = resolve(
+const downtimeNavGroupPath = resolve(
   __dirname,
-  '../../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'
+  '../../src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte'
 );
-const managerRootSource = readFileSync(managerRootPath, 'utf8');
+const downtimeNavGroupSource = readFileSync(downtimeNavGroupPath, 'utf8');
 
 export function assertBadgeFixtureMirrorsComponent() {
   // BOTH Downtime badges are the ISSUE-SUMMARY vehicle (issue 1515). The sub-item badge was
@@ -89,17 +89,17 @@ export function assertBadgeFixtureMirrorsComponent() {
   // ADJACENCY rather than as two independent `includes`, which any two unrelated lines satisfy
   // now that both marks name the same class.
   assert.match(
-    managerRootSource,
+    downtimeNavGroupSource,
     /class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
     'the sub-item badge fixture below must be the marker the component actually emits'
   );
   assert.match(
-    managerRootSource,
+    downtimeNavGroupSource,
     /class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
     'and so must the parent rollup fixture'
   );
   assert.equal(
-    /class="manager-nav-count"\s+data-world-downtime-badge/.test(managerRootSource),
+    /class="manager-nav-count"\s+data-world-downtime-badge/.test(downtimeNavGroupSource),
     false,
     'and neither Downtime badge has gone back to the record-count vehicle'
   );
