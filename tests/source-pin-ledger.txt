@@ -114,7 +114,7 @@ tests/crafting-modifier-config.test.js	3
 tests/crafting-nav.test.js	7
 tests/currency-balance-macro.test.js	4
 tests/essence-bulk-delete-copy.test.js	2
-tests/essence-world-scope-screens.test.js	32
+tests/essence-world-scope-screens.test.js	33
 tests/export-system-gathering-bundle.test.js	7
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1

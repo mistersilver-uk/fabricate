@@ -1295,7 +1295,8 @@ describe('the entry’s pointer proofs survive in the capture registry', () => {
 
 /** THE ENTRY HEADER'S IDENTITY CHIP IS BORDERLESS (issue 1371 r11-entry, UX F-B). */
 describe('the world Component entry header wires the borderless medallion', () => {
-  const ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+  // The eight identity headings are the page header's own unit since issue 1720.
+  const ROOT = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
 
   /**
    * One `<Medallion …/>` call, sliced from the branch that carries a route hook.

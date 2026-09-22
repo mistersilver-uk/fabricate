@@ -46,6 +46,8 @@ const rootSource = readFileSync(resolve(repoRoot, ROOT_PATH), 'utf8');
 // are RENDERED there while the gateway still declares their handlers.
 const HEADER_ACTIONS_PATH = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const headerActionsSource = readFileSync(resolve(repoRoot, HEADER_ACTIONS_PATH), 'utf8');
+const PAGE_HEADER_PATH = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
+const pageHeaderSource = readFileSync(resolve(repoRoot, PAGE_HEADER_PATH), 'utf8');
 
 /** The four keys `essenceScopeProps` supplies at every one of its call sites. */
 const BUNDLE_KEYS = ['actions', 'scope', 'systemId', 'systems'];
@@ -992,8 +994,11 @@ describe('the rules route header draws the same layer the callout below it does'
     assert.match(shellDerived('essenceEditIcon'), /essenceEditDraft\?\.icon/);
     // Non-vacuity for the whole describe: the derivation this precedence is measured against is
     // the one the header and the breadcrumb actually render.
-    assert.match(rootSource, /<Medallion icon=\{essenceEditIcon\} tint=\{essenceEditTint\}/);
-    assert.match(rootSource, /<h1 class="manager-title" title=\{essenceEditName\}>/);
+    assert.match(
+      pageHeaderSource,
+      /<Medallion icon=\{essenceEditIcon\} tint=\{essenceEditTint\}/
+    );
+    assert.match(pageHeaderSource, /<h1 class="manager-title" title=\{essenceEditName\}>/);
   });
 
   it('leaves the TINT reading the in-system projection, because M29 already put the world colour there', () => {

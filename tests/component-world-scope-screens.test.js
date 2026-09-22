@@ -76,12 +76,9 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         '../../components/Chip.svelte',
         // Moved by issue 1710's file move, and it is neither a screen nor a new dependency.
         '../../components/EmptyState.svelte',
-        // DRAGGED IN BY ISSUE 1515's HEADER CONVERSION (D12), and it is a LABEL PRIMITIVE rather
-        // than a screen — the same reading as the two file-move rows above, reached from what the
-        // import DOES rather than from where it moved.
-        '../../components/Kicker.svelte',
+        // `Kicker.svelte` and `Medallion.svelte` left this list in issue 1720 with the page
+        // header that renders the eyebrow and the eight identity headings.
         '../../components/ManagerButton.svelte',
-        '../../components/Medallion.svelte',
         '../../util/componentEditor.js',
         './ComponentEditView.svelte',
         './ComponentsBrowserView.svelte',

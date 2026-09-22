@@ -82,10 +82,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   '../../components/Chip.svelte',
   // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
-  // ADDED BY ISSUE 1515 (decision D12), under the message below and not as drift.
-  '../../components/Kicker.svelte',
   '../../components/ManagerButton.svelte',
-  '../../components/Medallion.svelte',
   '../../util/announceAfterFocus.js',
   '../../util/componentEditor.js',
   '../../util/craftingImageDefaults.js',
@@ -109,14 +106,13 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './ImportReportModal.svelte',
   './ItemPageInspector.svelte',
   './KnowledgeView.svelte',
-  // Added by issue 1720: the page header's trailing action group and its breadcrumb trail are
-  // their own units, and the action group took `ComponentEditorHeader`, `ScopedEntryHeaderActions`
-  // and the `managerHeaderActionClass` named import with it.
-  './ManagerHeaderActions.svelte',
-  './ManagerHeaderBreadcrumbs.svelte',
   // Added by issue 1717: the rail is its own unit, which renders the two entry units and took the
   // nav-tab badge helpers with it, so `../../../navTabBadgeStore.js` left this list.
   './ManagerNavRail.svelte',
+  // Added by issue 1720: the page header is its own unit, which renders the trail and the action
+  // group and took `Kicker`, `Medallion`, `ComponentEditorHeader`, `ScopedEntryHeaderActions`
+  // and the `managerHeaderActionClass` named import with them.
+  './ManagerPageHeader.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',

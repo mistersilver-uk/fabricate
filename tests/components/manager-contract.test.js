@@ -132,6 +132,7 @@ const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelt
 const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
+const MANAGER_PAGE_HEADER = 'src/ui/svelte/apps/manager/ManagerPageHeader.svelte';
 const MANAGER_HEADER_BREADCRUMBS = 'src/ui/svelte/apps/manager/ManagerHeaderBreadcrumbs.svelte';
 const MANAGER_HEADER_ACTIONS = 'src/ui/svelte/apps/manager/ManagerHeaderActions.svelte';
 const MANAGER_HEADER_CRAFTING_ACTIONS =
@@ -590,6 +591,17 @@ describe('CraftingSystemManager source contract', () => {
     attributes: [['class', 'manager-rail']],
   });
 
+  // `manager-header` is the page header's own identity since issue 1720, and it draws the two
+  // `<header>` elements as bare siblings rather than under a wrapper of its own.
+  defineStructureContract('names both page headers', MANAGER_PAGE_HEADER, {
+    attributes: [
+      ['class', 'manager-header'],
+      ['class', 'manager-heading'],
+    ],
+    spells: ['manager-tools-context-header'],
+    renders: ['ManagerHeaderBreadcrumbs', 'ManagerHeaderActions', 'Kicker', 'Medallion'],
+  });
+
   // `manager-breadcrumbs` is the trail's own identity since issue 1720.
   defineStructureContract('names the breadcrumb trail', MANAGER_HEADER_BREADCRUMBS, {
     attributes: [['class', 'manager-breadcrumbs']],
@@ -620,13 +632,11 @@ describe('CraftingSystemManager source contract', () => {
   // `data-manager-view` are not here: every route module reads them off the mounted shell
   // (`target.querySelector('.fabricate-manager').dataset.managerView`).
   defineStructureContract('renders the manager shell and the routes it hosts', MANAGER_ROOT, {
-    attributes: [
-      ['class', 'manager-header'],
-      ['class', 'manager-inspector'],
-    ],
+    attributes: [['class', 'manager-inspector']],
     spells: ['is-rail-collapsed', 'manager-environment-edit-main'],
     renders: [
       'ManagerNavRail',
+      'ManagerPageHeader',
       'ComponentsBrowserView',
       'EnvironmentsBrowserView',
       'EssenceBrowserView',

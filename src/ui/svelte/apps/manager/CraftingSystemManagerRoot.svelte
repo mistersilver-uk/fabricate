@@ -3,7 +3,6 @@
   import { onDestroy, untrack } from 'svelte';
   import GatheringInspectorRail from './environment/GatheringInspectorRail.svelte';
   import Chip from '../../components/Chip.svelte';
-  import Kicker from '../../components/Kicker.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
@@ -65,7 +64,6 @@
     toBulkEssenceEdit,
   } from '../../../model/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
-  import Medallion from '../../components/Medallion.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
@@ -110,9 +108,8 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
-  import ManagerHeaderActions from './ManagerHeaderActions.svelte';
-  import ManagerHeaderBreadcrumbs from './ManagerHeaderBreadcrumbs.svelte';
   import ManagerNavRail from './ManagerNavRail.svelte';
+  import ManagerPageHeader from './ManagerPageHeader.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -7216,391 +7213,146 @@
     {/if}
   </div>
 
-  {#if !isToolStudioRoute}
-    <!--
-      Two children, always: the heading block and the trailing actions.
-    -->
-    <header class="manager-header">
-      <div class="manager-heading">
-        <ManagerHeaderBreadcrumbs
-          {header}
-          {text}
-          {currentView}
-          {selectedSystem}
-          {isWorldRoute}
-          {isWorldDowntimeRoute}
-          {isWorldRulesRoute}
-          {isWorldTravelRoute}
-          {isWorldScopedRoute}
-          {isChecksRoute}
-          {checksActiveTab}
-          {worldScopedEntryRoute}
-          {worldScopedEntryCrumb}
-          {worldRulesTab}
-          {worldRulesPageTitle}
-          {worldTravelTab}
-          {worldDowntimeTabId}
-          {downtimeTabCrumb}
-          {downtimeTabCrumbNavigable}
-          {downtimeLeafCrumb}
-          {downtimeChromeChannel}
-          {activeGatheringTab}
-          {gatheringTabLabel}
-          {recipeDraft}
-          {recipeItemCrumb}
-          {componentForEdit}
-          {essenceEditName}
-          {environmentCrumb}
-          {gatheringTaskCrumb}
-          {gatheringEventCrumb}
-          {openWorldParties}
-          {setView}
-          {selectSystemAndShowBrowser}
-          {editSystem}
-          {openCraftingSection}
-          {backToBooksScrolls}
-          {backToEssencesBrowse}
-          {backToRecipesBrowse}
-          {backToComponentsBrowse}
-          {backToEnvironmentsBrowse}
-          {backToGatheringTaskLibrary}
-          {backToGatheringEventLibrary}
-        />
-        <!--
-          The eyebrow sits between the trail and the title.
-        -->
-        {#if header.kicker}
-          <div class="manager-page-kicker">
-            <Kicker dataAttr="data-page-kicker">{header.kicker}</Kicker>
-          </div>
-        {/if}
-        {#if currentView === 'recipe-edit' && recipeDraft}
-          <!-- The recipe editor's identity header: the recipe's real image (never a
-             glyph-only avatar — a recipe HAS an img), its name, and the
-             "<category> · <resolution mode>" subline. -->
-          <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-            <Medallion
-              art={resolveRecipeImage(recipeDraft)}
-              alt=""
-              icon="fas fa-scroll"
-              size={44}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={recipeDraft.name || ''}>
-                {recipeDraft.name || header.title}
-              </h1>
-              <p class="manager-subtitle" data-recipe-edit-subline>{header.subtitle}</p>
-            </div>
-          </div>
-        {:else if currentView === 'component-edit' && componentForEdit}
-          <!-- The component editor's identity header (issue 676, decision 4 — it must match
-             the recipe editor's exactly, and was never implemented: this route fell
-             through to the generic static "Edit component" heading below). The linked
-             item's real image, its NAME, and the "<category> · Linked <source>" subline.
-             It reuses the recipe heading's classes wholesale — same shape, same CSS. -->
-          <div class="manager-recipe-edit-heading" data-component-edit-heading>
-            <Medallion art={componentForEdit.img} alt="" icon="fas fa-cube" size={44} />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={componentForEdit.name || ''}>
-                {componentForEdit.name || header.title}
-              </h1>
-              <p class="manager-subtitle" data-component-edit-subline>{header.subtitle}</p>
-            </div>
-          </div>
-        {:else if isWorldDowntimeRoute && downtimeHeaderArtwork}
-          <!-- A companion's drill-down identity, rendered in CORE'S header rather than inside
-             the companion's panel. It reuses the recipe editor's heading block wholesale —
-             same classes, same `Medallion`, same 44px — because the point is that a
-             companion's editor is indistinguishable from one of Fabricate's own, and a
-             parallel block would be a second implementation of the identity header that
-             agreed with the first only until one of them changed.
-
-             `image` and `icon` are validated as mutually exclusive, so `Medallion` never has
-             to choose: with `image` set it renders the picture, and with only `icon` set `src`
-             is empty and it falls back to the glyph. The default glyph is the Downtime
-             route's own, so a companion that names neither still cannot reach this branch. -->
-          <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
-            <Medallion
-              art={downtimeHeaderArtwork.image ?? ''}
-              alt=""
-              icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
-              size={44}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={header.title}>{header.title}</h1>
-              <p class="manager-subtitle" data-downtime-chrome-subline>{header.subtitle}</p>
-            </div>
-          </div>
-        {:else if worldEssenceEntryRecord}
-          <!-- The essence's own identity header. See `worldEssenceEntryRecord` above for why it
-             is derived in the shell and why it reuses the recipe editor's heading block. The
-             medallion carries the essence's colour the way every other essence tile in the
-             manager does — `tint` recolours the glyph and nothing else since issue 1506, and
-             unset resolves to the accent.
-
-             `glyph` is set because the other two headings that reuse this block carry an
-             IMAGE, and `Medallion`'s 0.9rem default is sized for the 40px row tiles: left
-             unset, a 14px glyph inside a 44px tile reads as a speck against the prototype's,
-             which fills about half the tile (`essEntry.png`). It is passed here rather than
-             derived from `size` inside the primitive for the reason its own doc gives —
-             deriving it would re-type all ~40 medallions in the manager at once, which is a
-             change with its own frames. -->
-          <div class="manager-recipe-edit-heading" data-world-essence-entry-heading>
-            <Medallion
-              icon={worldEssenceEntryIcon || 'fas fa-mortar-pestle'}
-              tint={worldEssenceEntryTint}
-              size={44}
-              glyph={22}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldEssenceEntryName}>
-                {worldEssenceEntryName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-world-essence-entry-subline>
-                {worldEssenceEntrySubtitle}
-              </p>
-            </div>
-          </div>
-        {:else if currentView === 'essence-edit' && essenceRulesMode}
-          <!-- The essence's own identity header on the SYSTEM rules route. See
-             `essenceRulesMode` above for why it is derived in the shell, and the world essence
-             entry branch above for why it reuses the recipe editor's heading block wholesale
-             rather than being a fifth implementation of one meaning. -->
-          <div class="manager-recipe-edit-heading" data-essence-edit-heading>
-            <Medallion icon={essenceEditIcon} tint={essenceEditTint} size={44} glyph={22} />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={essenceEditName}>
-                {essenceEditName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-essence-edit-subline>{essenceEditSubline}</p>
-            </div>
-          </div>
-        {:else if worldComponentEntryRecord}
-          <!-- The component's own identity header (issue 1371, parity round 4), the twin of the
-             two branches above and rendered from the same block. The medallion carries the linked
-             Item's art where there is one; `Medallion` falls back to the glyph when `src` is
-             empty, which is the unlinked case and the one this screen has to draw without
-             inventing a picture for. -->
-          <div class="manager-recipe-edit-heading" data-world-component-entry-heading>
-            <!-- 42px, not the 44 the three sibling headings use: `proto:814` draws this chip at
-                 42 and an art size is its own ladder rather than the control one.
-
-                 `variant="glyph-chip"` FOR THE ABSENT EDGE (issue 1371 r11-entry, UX F-B). The
-                 reference's chip here is `proto:5375` — 42px, radius 10, a slate fill and NO
-                 `border` declaration at all — so it computes `border-style: none`, while the
-                 shipped tile carries the primitive's hairline. On a 42px tile at the top of the
-                 screen that edge is plainly visible, and the parity run reads it as three lines
-                 (`borderTopWidth`, `borderTopStyle`, `borderTopColor`). The variant is the one
-                 thing `size`, `glyph` and `tint` cannot say; it is the same opt-in the world
-                 catalogue's row chip already takes, and it moves no medallion that does not ask.
-                 `borderTopLeftRadius 9 !== 10` survives on purpose: 10 is on no published rung
-                 and 9 is the 34-38px band's corner (D-C). -->
-            <Medallion
-              art={worldComponentEntryImage}
-              alt=""
-              icon="fas fa-cube"
-              size={42}
-              glyph={22}
-              variant="glyph-chip"
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldComponentEntryName}>
-                {worldComponentEntryName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-world-component-entry-subline>
-                {worldComponentEntrySubtitle}
-              </p>
-            </div>
-          </div>
-        {:else if worldToolEntryRecord}
-          <!-- The Tool's own identity header, the twin of the essence branch above. The
-             medallion carries the linked Item's art where there is one; `Medallion` falls back
-             to the glyph when `src` is empty, which is the unlinked case and the one this
-             screen has to draw without inventing a picture for. -->
-          <div class="manager-recipe-edit-heading" data-world-tool-entry-heading>
-            <Medallion
-              art={worldToolEntryRecord.entity?.img ?? ''}
-              alt=""
-              icon="fas fa-screwdriver-wrench"
-              size={44}
-              glyph={22}
-            />
-            <div class="manager-recipe-edit-heading-copy">
-              <h1 class="manager-title" title={worldToolEntryName}>
-                {worldToolEntryName || header.title}
-              </h1>
-              <p class="manager-subtitle" data-world-tool-entry-subline>
-                {worldToolEntrySubtitle}
-              </p>
-            </div>
-          </div>
-        {:else if currentView !== 'tool-edit'}
-          <h1 class="manager-title">{header.title}</h1>
-          <p class="manager-subtitle">{header.subtitle}</p>
-        {/if}
-        {#if currentView === 'environment-edit' && environmentDraftForDisplay}
-          <div class="manager-environment-header-pills" data-environment-status-pills>
-            <Chip
-              tone={environmentDraftForDisplay.enabled === false ? 'neutral' : 'active'}
-              data-status-pill="active"
-            >
-              {environmentDraftForDisplay.enabled === false
-                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-            </Chip>
-            <Chip tone="info" data-status-pill="selection">
-              {environmentDraftForDisplay.selectionMode === 'blind'
-                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind')
-                : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
-            </Chip>
-            <Chip tone="info" data-status-pill="composition">
-              {environmentDraftForDisplay.compositionMode === 'manual'
-                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual')
-                : text(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic',
-                    'Automatic'
-                  )}
-            </Chip>
-          </div>
-        {/if}
-      </div>
-      <ManagerHeaderActions
-        {header}
-        {text}
-        {currentView}
-        {isWorldRulesRoute}
-        {isWorldScopedRoute}
-        {isWorldTravelRoute}
-        {worldTravelTab}
-        {selectedSystemId}
-        {worldEssenceEntryDirty}
-        {worldEssenceEntrySaving}
-        {backToWorldEssences}
-        {saveWorldEssenceEntry}
-        {worldToolEntryDirty}
-        {worldToolEntrySaving}
-        {worldToolEntryDelete}
-        {worldToolDeleteAction}
-        {backToWorldTools}
-        {saveWorldToolEntry}
-        {worldComponentEntryDirty}
-        {worldComponentEntrySaving}
-        {backToWorldComponents}
-        {saveWorldComponentEntry}
-        {createWorldEssence}
-        {downtimeCoreFallback}
-        {downtimeHeaderStatus}
-        {downtimeHeaderActions}
-        {runDowntimeHeaderAction}
-        travelSaving={$viewState.travelSaving}
-        {createParty}
-        {createTravelRealm}
-        {backToSystemsBrowser}
-        {importSystem}
-        {exportSelectedSystem}
-        {createSystem}
-        {isChecksRoute}
-        {createRecipe}
-        {recipeEditDirty}
-        {recipeEditSaving}
-        {recipeEditSaveLabel}
-        {canSaveRecipeEdit}
-        {selectedRecipeId}
-        {backToRecipesBrowse}
-        {deleteRecipeFromEdit}
-        {saveRecipeDraft}
-        {recipeItemDraft}
-        {recipeItemEditDirty}
-        {recipeItemEditSaving}
-        {recipeItemSaveFailed}
-        {canSaveRecipeItemEdit}
-        {backToBooksScrolls}
-        {deleteRecipeItemFromEdit}
-        {saveRecipeItemDraft}
-        {openComponentAddFromCatalogue}
-        {componentEditCombinedDirty}
-        {componentEditSaving}
-        {componentEditSaveLabel}
-        {canSaveComponentEdit}
-        {backToComponentsBrowse}
-        {checksDirty}
-        {checksSaving}
-        {saveChecks}
-        {essenceEditDirty}
-        {essenceEditSaving}
-        {essenceEditSaveLabel}
-        {canSaveEssenceEdit}
-        {cancelEssenceEdit}
-        {displayedGatheringTab}
-        {canShowEnvironments}
-        {createGatheringTaskForSystem}
-        {createGatheringEventForSystem}
-        {createEnvironment}
-        environmentDraftDirty={$viewState.environmentDraftDirty}
-        environmentDraftIsNew={$viewState.environmentDraftIsNew}
-        environmentSaving={$viewState.environmentSaving}
-        {backToEnvironmentsBrowse}
-        {deleteEnvironmentDraft}
-        {saveEnvironmentEdit}
-        {gatheringTaskDraftDirty}
-        {gatheringTaskSaving}
-        {gatheringTaskValidation}
-        {gatheringTaskSaveError}
-        {selectedGatheringTaskId}
-        {backToGatheringTaskLibrary}
-        {deleteGatheringTaskDraft}
-        {saveGatheringTaskDraft}
-        {gatheringEventDraftDirty}
-        {gatheringEventSaving}
-        {gatheringEventValidation}
-        {gatheringEventSaveError}
-        {selectedGatheringEventId}
-        {backToGatheringEventLibrary}
-        {deleteGatheringEventDraft}
-        {saveGatheringEventDraft}
-      />
-    </header>
-  {/if}
-
-  {#if currentView === 'tools' && selectedSystem}
-    <header class="manager-header manager-tools-context-header" data-tool-library-context>
-      <div class="manager-heading">
-        <nav
-          class="manager-breadcrumbs"
-          aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
-        >
-          <!-- THE ROOT, WHICH THIS TRAIL ALONE WAS MISSING (issue 1328). The Tool LIBRARY has its
-             own header rather than sharing the root nav above, and it began at the system name —
-             so of the two Tool screens, the EDITOR carried `Crafting Systems` and the library did
-             not. Two screens one press apart disagreed about how deep they were. -->
-          <button type="button" onclick={() => selectSystemAndShowBrowser()}
-            >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
-          >
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => editSystem(selectedSystem.id)}
-            >{selectedSystem.name}</button
-          >
-          <!-- NO `Crafting` CRUMB (issue 1373). This trail claimed Tool Rules sits inside the
-               Crafting group, and the rail in the same frame shows that group holding Recipes
-               and Settings with Tool Rules a sibling OUTSIDE it. Two navigations one pane
-               apart disagreed about the shape of the app, and the rail is the one a GM
-               actually clicks. The editor's own trail never had the crumb, so dropping it
-               also makes the two Tool screens agree with each other. -->
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.ToolRules', 'Tool Rules')}</span>
-        </nav>
-        <h1 class="manager-title">
-          {text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
-        </h1>
-        <p class="manager-subtitle">
-          {text(
-            'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
-            'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
-          )}
-        </p>
-      </div>
-    </header>
-  {/if}
+  <ManagerPageHeader
+    {header}
+    {isToolStudioRoute}
+    {currentView}
+    {text}
+    {selectedSystem}
+    {selectSystemAndShowBrowser}
+    {editSystem}
+    {recipeDraft}
+    {resolveRecipeImage}
+    {componentForEdit}
+    {downtimeHeaderArtwork}
+    {worldEssenceEntryIcon}
+    {worldEssenceEntryTint}
+    {worldEssenceEntryName}
+    {worldEssenceEntrySubtitle}
+    {essenceEditIcon}
+    {essenceEditTint}
+    {essenceEditName}
+    {essenceEditSubline}
+    {worldComponentEntryImage}
+    {worldComponentEntryName}
+    {worldComponentEntrySubtitle}
+    {worldToolEntryRecord}
+    {worldToolEntryName}
+    {worldToolEntrySubtitle}
+    {environmentDraftForDisplay}
+    {isWorldRoute}
+    {isWorldDowntimeRoute}
+    {isWorldRulesRoute}
+    {isWorldTravelRoute}
+    {isWorldScopedRoute}
+    {isChecksRoute}
+    {checksActiveTab}
+    {worldScopedEntryRoute}
+    {worldScopedEntryCrumb}
+    {worldRulesTab}
+    {worldRulesPageTitle}
+    {worldTravelTab}
+    {worldDowntimeTabId}
+    {downtimeTabCrumb}
+    {downtimeTabCrumbNavigable}
+    {downtimeLeafCrumb}
+    {downtimeChromeChannel}
+    {activeGatheringTab}
+    {gatheringTabLabel}
+    {recipeItemCrumb}
+    {environmentCrumb}
+    {gatheringTaskCrumb}
+    {gatheringEventCrumb}
+    {openWorldParties}
+    {setView}
+    {openCraftingSection}
+    {backToBooksScrolls}
+    {backToEssencesBrowse}
+    {backToRecipesBrowse}
+    {backToComponentsBrowse}
+    {backToEnvironmentsBrowse}
+    {backToGatheringTaskLibrary}
+    {backToGatheringEventLibrary}
+    {selectedSystemId}
+    {worldEssenceEntryDirty}
+    {worldEssenceEntrySaving}
+    {backToWorldEssences}
+    {saveWorldEssenceEntry}
+    {worldToolEntryDirty}
+    {worldToolEntrySaving}
+    {worldToolEntryDelete}
+    {worldToolDeleteAction}
+    {backToWorldTools}
+    {saveWorldToolEntry}
+    {worldComponentEntryDirty}
+    {worldComponentEntrySaving}
+    {backToWorldComponents}
+    {saveWorldComponentEntry}
+    {createWorldEssence}
+    {downtimeCoreFallback}
+    {downtimeHeaderStatus}
+    {downtimeHeaderActions}
+    {runDowntimeHeaderAction}
+    travelSaving={$viewState.travelSaving}
+    {createParty}
+    {createTravelRealm}
+    {backToSystemsBrowser}
+    {importSystem}
+    {exportSelectedSystem}
+    {createSystem}
+    {createRecipe}
+    {recipeEditDirty}
+    {recipeEditSaving}
+    {recipeEditSaveLabel}
+    {canSaveRecipeEdit}
+    {selectedRecipeId}
+    {deleteRecipeFromEdit}
+    {saveRecipeDraft}
+    {recipeItemDraft}
+    {recipeItemEditDirty}
+    {recipeItemEditSaving}
+    {recipeItemSaveFailed}
+    {canSaveRecipeItemEdit}
+    {deleteRecipeItemFromEdit}
+    {saveRecipeItemDraft}
+    {openComponentAddFromCatalogue}
+    {componentEditCombinedDirty}
+    {componentEditSaving}
+    {componentEditSaveLabel}
+    {canSaveComponentEdit}
+    {checksDirty}
+    {checksSaving}
+    {saveChecks}
+    {essenceEditDirty}
+    {essenceEditSaving}
+    {essenceEditSaveLabel}
+    {canSaveEssenceEdit}
+    {cancelEssenceEdit}
+    {displayedGatheringTab}
+    {canShowEnvironments}
+    {createGatheringTaskForSystem}
+    {createGatheringEventForSystem}
+    {createEnvironment}
+    environmentDraftDirty={$viewState.environmentDraftDirty}
+    environmentDraftIsNew={$viewState.environmentDraftIsNew}
+    environmentSaving={$viewState.environmentSaving}
+    {deleteEnvironmentDraft}
+    {saveEnvironmentEdit}
+    {gatheringTaskDraftDirty}
+    {gatheringTaskSaving}
+    {gatheringTaskValidation}
+    {gatheringTaskSaveError}
+    {selectedGatheringTaskId}
+    {deleteGatheringTaskDraft}
+    {saveGatheringTaskDraft}
+    {gatheringEventDraftDirty}
+    {gatheringEventSaving}
+    {gatheringEventValidation}
+    {gatheringEventSaveError}
+    {selectedGatheringEventId}
+    {deleteGatheringEventDraft}
+    {saveGatheringEventDraft}
+  />
 
   <div class={`manager-body ${navRail.collapsedDisplay ? 'is-rail-collapsed' : ''}`}>
     <ManagerNavRail

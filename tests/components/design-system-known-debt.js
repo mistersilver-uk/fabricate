@@ -235,6 +235,9 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
 // buttons declare the attribute, so nothing is left open for the next author to fill for free.
 // #1717: the rail's 35 left the root for four units that hold 32 (202 - 3). The three the count
 // lost are the world catalogue leaves, written once as an `{#each}` rather than converted.
+// #1720: the root's last 25 leave for three page-header units that hold 25 between them --
+// the trail's 22, the action group's downtime provider button and the Tool Studio trail's two
+// -- so the total is unchanged (199 - 0). Nothing was converted, and no slot is left open.
 export const KNOWN_FORMLESS_BUTTON_TOTAL = 199;
 
 /** A shared component outside `components/` with no manifest row, keyed `path`. */
