@@ -10,8 +10,10 @@ import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/syst
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import RecipeOverviewTab from '../../../src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
+import ToolBehaviorPreview from '../../../src/ui/svelte/apps/manager/tools/ToolBehaviorPreview.svelte';
 import WorldCurrencyTab from '../../../src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 import { installFixtureI18n, mountCaptionShape } from '../select-fixture-shared.js';
 
@@ -101,6 +103,36 @@ const RECIPE_CHECK_TIERS = [
   { id: 'tier-easy', name: 'Easy', dc: 8 },
   { id: 'tier-legendary', name: 'Legendary craftsmanship', dc: 28 },
 ];
+
+// Label lengths that differ sharply, so the overview's three pickers measure on a short value and
+// a long one (issue 1510).
+const OVERVIEW_REALMS = [
+  { id: 'verdant', name: 'Verdant' },
+  { id: 'ashfall', name: 'The Ashfall Marches' },
+];
+const OVERVIEW_BIOMES = [
+  { id: 'forest', label: 'Forest' },
+  { id: 'saltmarsh', label: 'Saltmarsh and tidal flat' },
+];
+const OVERVIEW_DANGERS = [
+  { id: 'safe', label: 'Safe' },
+  { id: 'hazardous', label: 'Hazardous, with warnings' },
+];
+
+// The longest actor name a world realistically holds, so the `toolbar` rung's 320px panel cap is
+// measured against something that can exceed it.
+const PREVIEW_ACTORS = [
+  { uuid: 'Actor.brenna', name: 'Brenna Karrunsdottir' },
+  { uuid: 'Actor.wagon', name: 'The Ashfall Wagon of the Long Road' },
+];
+
+/** The 340px column the tool-edit grid gives the rail, reproduced as fixture chrome. */
+function railColumn() {
+  const rail = document.createElement('div');
+  rail.className = 'fixture-rail';
+  mountPoint.append(rail);
+  return rail;
+}
 
 const SUBJECTS = {
   prerequisites: () =>
@@ -204,6 +236,37 @@ const SUBJECTS = {
         },
         componentOptions: [{ id: 'cmp-iron', name: 'Iron ingot' }],
         itemTags: ['herb', 'rare'],
+      },
+    }),
+  // The overview's three: two add controls measurable only at their sentinel, and the ceiling.
+  'environment-overview': () =>
+    mount(EnvironmentOverviewTab, {
+      target: mountPoint,
+      props: {
+        environment: {
+          id: 'env-1',
+          name: 'Sunlit Grove',
+          enabled: true,
+          biomes: [],
+          includedRealmIds: [],
+          dangerLevel: OVERVIEW_DANGERS.some((entry) => entry.id === startValue)
+            ? startValue
+            : 'safe',
+        },
+        realmsEnabled: true,
+        realmRecords: OVERVIEW_REALMS,
+        biomeOptions: OVERVIEW_BIOMES,
+        dangerOptions: OVERVIEW_DANGERS,
+      },
+    }),
+  // The `Preview as` roster, whose value is component state rather than a prop.
+  'tool-preview': () =>
+    mount(ToolBehaviorPreview, {
+      target: railColumn(),
+      props: {
+        tool: { id: 'anvil', name: 'Anvil', img: '', breakage: { mode: 'unlimited' } },
+        systemName: 'Karrun Forgecraft',
+        actorOptions: PREVIEW_ACTORS,
       },
     }),
 };

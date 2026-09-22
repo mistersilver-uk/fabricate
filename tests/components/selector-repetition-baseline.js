@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 203 repeated selectors
  * rather than these 110, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,040 `(at-context, selector)` keys, of which 2,930 appear exactly
+ * Unfiltered, the sheet holds 3,042 `(at-context, selector)` keys, of which 2,932 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,564 rules at that head, 110 repeated keys and 225 appearances
+ * printed from. The sheet holds 2,566 rules at that head, 110 repeated keys and 225 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -86,6 +86,18 @@
  * rules arrive and are singletons in both keyings while the two narrowed selectors re-key in place:
  * the rule, key and singleton counts each rise by two, to 2,573, 3,056 and 2,944, and `pinnedTotal`
  * stays 229 across 112 rows. Re-derived by running the census twice, not subtracted.
+ * Issue 1510 phase 2's fifth commit moves the three contextual figures and none of the repeated
+ * ones. Converting the environment overview's three selects and the Tool rails' actor picker adds
+ * one rule — the context column's shared trigger width — while the actor picker's own skin rule
+ * re-keys in place onto its trigger rather than leaving: the rule, key and singleton counts each
+ * rise by one, to 2,574, 3,057 and 2,945, and `pinnedTotal` stays 229 across 112 rows. Re-derived
+ * by running the census twice, not subtracted.
+ * Issue 1510 phase 2's fifth commit also restores one rule issue 1512 deleted by mistake: the
+ * outcome tier row's own box, `.manager-checks-tier-list > .manager-checks-tier-row`, which the
+ * SortableList conversion took out with the recipe tier list while `CraftingCheckEditor.svelte`'s
+ * outcome list still drew the rows itself. A new singleton in both keyings, so the rule, key and
+ * singleton counts each rise by one over the rebased tree, to 2,567, 3,044 and 2,934, and
+ * `pinnedTotal` is unmoved. Re-derived by running the census twice, not subtracted.
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's
  * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive

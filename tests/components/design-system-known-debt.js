@@ -100,7 +100,9 @@ export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 // 59 -> 51 and the file rows 22 -> 18.
 // #1510: the gathering task editor's seven convert onto `Select`, so the total falls 51 -> 44
 // across 18 rows to 17.
-export const KNOWN_NATIVE_SELECT_TOTAL = 44;
+// #1510: the environment overview's three and the Tool rails' one convert onto `Select`, so the
+// total falls 44 -> 40 across 17 rows to 15.
+export const KNOWN_NATIVE_SELECT_TOTAL = 40;
 
 /** A native `<select>` written into a JavaScript template string, keyed `file`. */
 export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');

@@ -869,6 +869,13 @@ test('manager environments browser and edit route define compact responsive geom
       weightFieldBlock.includes('--fab-stepper-fill-height: 28px;'),
     'the blind task weight slot pins the stepper to its natural width and to the row height the bare input had'
   );
+  // The basis holds only against the automatic minimum: a filled Stepper's min-content width is
+  // its number input's intrinsic ~167px plus the chrome, and without `min-width: 0` the slot
+  // measured 221px in the 158px Weight track and the stepper ran under the Override pill.
+  assert.ok(
+    weightFieldBlock.includes('min-width: 0;'),
+    'the blind task weight slot zeroes its automatic minimum so the 102px basis is what the stepper measures'
+  );
   assert.ok(
     compQuickActionBlock.includes('flex: 0 0 34px;'),
     'composition quick actions should keep the same fixed geometry as manager icon buttons'

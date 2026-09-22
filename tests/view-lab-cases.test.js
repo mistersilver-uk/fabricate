@@ -1240,7 +1240,13 @@ test('environment empty membership evidence clears the actual fixture and is sel
         2,
         `${id} clears, adds, then removes the last ${kind}`
       );
-      assert.ok(viewCase.steps.some((step) => step.select === member));
+      // The add step is `chooseSelectOption`'s pair since issue 1510, not the `select:` verb.
+      assert.ok(
+        viewCase.steps.some((step) =>
+          step.selector?.endsWith(`.fabricate-select-popover [data-popover-option="${member}"]`)
+        ),
+        `${id} adds the ${kind} back by clicking its option row`
+      );
     }
     assert.equal(viewCase.expectContained.length, 4);
     for (const entry of viewCase.expectContained.filter(({ target }) =>
@@ -2383,23 +2389,26 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The twenty-five frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty-seven frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
 // and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first to twenty-fifth at issue 1510, which are the recipe studio's
-// kind list, the component studio's category list, the checks studio's trigger comparison list and
-// the gathering studio's respawn policy and stamina modifier lists — the first five converted
-// manager selects whose panels have a frame at all, the third the first opened from inside a card
-// the walk has to author before it exists, the fourth the first in an editor the rail reaches
-// through a submenu, and the fifth the first whose row has to be authored before its trigger
-// exists).
+// option panels, and the twenty-first to twenty-seventh at issue 1510, which are the recipe
+// studio's kind list, the component studio's category list, the checks studio's trigger comparison
+// list, the gathering studio's respawn policy and stamina modifier lists, the environment editor's
+// danger ceiling and the Tool rails' `Preview as` roster — the seven converted manager selects
+// whose panels have a frame at all, the third the first opened from inside a card the walk has to
+// author before it exists, the fourth the first in an editor the rail reaches through a submenu,
+// the fifth the first whose row has to be authored before its trigger exists, the sixth the first
+// in an environment editor and the seventh the first opened from an inspector rail rather than from
+// an editor body).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
   'manager-checks-trigger-operator-list',
   'manager-component-edit-category-list',
+  'manager-environment-danger-level-list',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',
@@ -2412,6 +2421,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-system-edit-lists',
+  'manager-tool-preview-actor-list',
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',
@@ -2422,6 +2432,36 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-journal-sort-list',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
+
+// The anchored-panel class families a member's own `expectSelector` can name: every portaled panel
+// in the tree is either a `*-popover` or the action menu's `fabricate-action-menu-panel`.
+const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel/u;
+
+// The one member whose selector claims no panel. Its walk DOES open the shared icon picker, but its
+// `expectSelector` was spent on issue 1117's bounds pair, so it is listed here by name rather than
+// silently tolerated by a weaker clause.
+const ANCHORED_POPOVER_FRAMES_WITHOUT_A_PANEL_CLAIM = ['manager-system-edit-lists'];
+
+test('every anchored-popover frame claims an open panel in its own expectSelector', () => {
+  // The membership list above is gated against `sourceMatches` routing and NOTHING ELSE: reducing
+  // either issue 1510 case's `expectSelector` to a bare `.fabricate-manager` left all of this
+  // file's registry tests green. So the sentence the failure message makes about what each id
+  // proves is asserted here rather than only asserted about.
+  const byId = new Map(VIEW_LAB_CASES.map((viewCase) => [viewCase.id, viewCase]));
+  const claimless = [];
+  for (const id of ANCHORED_POPOVER_FRAMES) {
+    const viewCase = byId.get(id);
+    assert.ok(Boolean(viewCase), `${id} is listed as an anchored-popover frame but is not a case`);
+    if (!ANCHORED_PANEL_CLAIM.test(viewCase.expectSelector ?? '')) claimless.push(id);
+  }
+  assert.deepEqual(
+    claimless,
+    ANCHORED_POPOVER_FRAMES_WITHOUT_A_PANEL_CLAIM,
+    'these frames are published for the positioning seam but their own `expectSelector` names no ' +
+      'portaled panel, so the capture would pass with the panel closed and the evidence the seam ' +
+      'is published for cannot move'
+  );
+});
 
 for (const seamFile of [
   'src/ui/svelte/actions/anchoredPopover.js',
@@ -2434,9 +2474,10 @@ for (const seamFile of [
       selected.sort((a, b) => a.localeCompare(b)),
       ANCHORED_POPOVER_FRAMES,
       `a change confined to ${seamFile} publishes the wrong set of frames. Every id here is a ` +
-        'frame whose own `expectSelector` requires a panel to have been measured, clamped and ' +
-        'portaled, so a regression in that pass is visible in each of them and in no other frame ' +
-        'in the registry. A SHORTER list means a case dropped the seam from its `sourceMatches` ' +
+        'frame whose walk leaves a panel measured, clamped and portaled, so a regression in that ' +
+        'pass is visible in each of them and in no other frame in the registry; the clause above ' +
+        'asserts each one says so in its own `expectSelector`, bar the one exception it names. ' +
+        'A SHORTER list means a case dropped the seam from its `sourceMatches` ' +
         'and now shows a panel nothing routes to; a LONGER one means the seam was added to a ' +
         'frame that draws its trigger closed, which publishes evidence that cannot move.'
     );

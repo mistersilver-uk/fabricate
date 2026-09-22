@@ -208,6 +208,7 @@ manager-gathering-task-editor-stacked
 manager-environment-edit-placeholder
 manager-environment-empty-membership-normal
 manager-environment-empty-membership-narrow
+manager-environment-danger-level-list
 manager-environment-edit-events
 manager-gathering-events-normal
 manager-gathering-event-editor-normal
@@ -264,6 +265,7 @@ manager-tool-rules-sorted-desc-1280x720
 manager-tool-rules-row-hovered-1280x720
 manager-tool-rules-breakage-overridden-1280x720
 manager-tool-editor-rail-scrolled-1280x720
+manager-tool-preview-actor-list
 manager-tool-editor-dirty-1280x720
 manager-tool-parity-02-remove-1280x720
 manager-tool-stress-long-name

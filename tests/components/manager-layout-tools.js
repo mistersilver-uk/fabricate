@@ -1134,6 +1134,131 @@ test('the band-strip hint keeps its 20px separation from the first tier row', as
   );
 });
 
+// The outcome row's box (issue 1512 regression). `SortableList` took the recipe tier list and
+// its conversion deleted the `.manager-checks-tier-row` layout rule with it, but the OUTCOME
+// list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so
+// every child (swatch, name, stepper, toggle, remove) stacked unboxed at content width and the
+// capture published it that way. This fixture renders one row of each host against the real
+// sheet: the outcome row must lay its children on ONE line inside one bordered box, and the
+// SortableList-hosted recipe tier row — which carries the same class on a
+// `.fabricate-sortable-list-row` whose line already owns the box — must NOT gain a second one.
+test('an outcome tier row lays its controls on one line inside its own box', async () => {
+  const measured = await withBandStripPage(async (page) => {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate-manager">' +
+        '<div class="manager-checks-tier-list" role="list">' +
+        '<div class="manager-checks-tier-row" role="listitem" data-outcome-row="a">' +
+        '<span class="manager-checks-tier-swatch" aria-hidden="true"></span>' +
+        '<input class="manager-checks-tier-name" value="Masterwork">' +
+        '<div class="manager-checks-tier-stepper"><div style="height:28px">5</div></div>' +
+        '<div class="manager-segmented"><span>Success</span></div>' +
+        '<button type="button" class="manager-checks-tier-remove">x</button>' +
+        '</div></div>' +
+        '<ul class="fabricate-sortable-list">' +
+        '<li class="fabricate-sortable-list-row manager-checks-tier-row" data-tier-row="t1">' +
+        '<div class="fabricate-sortable-list-line">' +
+        '<div class="fabricate-sortable-list-content">' +
+        '<input class="manager-checks-tier-name" value="Apprentice work">' +
+        '</div></div></li></ul></div>'
+    );
+    return page.evaluate(() => {
+      const outcome = document.querySelector('[data-outcome-row]');
+      const outcomeStyle = getComputedStyle(outcome);
+      const centres = [...outcome.children].map((child) => {
+        const box = child.getBoundingClientRect();
+        return Math.round(box.top + box.height / 2);
+      });
+      const hosted = document.querySelector('[data-tier-row]');
+      const hostedStyle = getComputedStyle(hosted);
+      return {
+        outcomeDisplay: outcomeStyle.display,
+        outcomeBorder: outcomeStyle.borderTopWidth,
+        outcomePadding: outcomeStyle.paddingLeft,
+        centreSpread: Math.max(...centres) - Math.min(...centres),
+        childCount: centres.length,
+        hostedDirection: hostedStyle.flexDirection,
+        hostedPadding: hostedStyle.paddingLeft,
+      };
+    });
+  });
+  assert.equal(measured.childCount, 5, 'the fixture renders the row\'s five controls');
+  assert.equal(measured.outcomeDisplay, 'flex', 'the outcome row is a flex row');
+  assert.equal(measured.outcomeBorder, '1px', 'the outcome row draws its own 1px box');
+  assert.equal(
+    measured.outcomePadding,
+    '12px',
+    'the outcome row pads its box one scale step (--fab-space-3) inline'
+  );
+  assert.ok(
+    measured.centreSpread <= 1,
+    `every control on the outcome row shares one line; their centres spread ${measured.centreSpread}px`
+  );
+  assert.equal(
+    measured.hostedDirection,
+    'column',
+    'the SortableList-hosted tier row keeps the primitive\'s column layout'
+  );
+  assert.equal(
+    measured.hostedPadding,
+    '0px',
+    'the SortableList-hosted tier row takes no second padding: its line owns the box'
+  );
+});
+
+// The crumb buttons under core's button reset. Foundry 14's `a.button, button` makes every
+// button a centred flex container, and a flex container's text is an anonymous item that
+// cannot shrink below its own width — so a crumb squeezed by the heading's actions clipped its
+// label at BOTH edges ("rafting System", "reenwarden Herbalis") while the sheet's
+// `text-overflow: ellipsis` did nothing, because that property applies to block containers only.
+// `tests/fixtures/foundry-core-min.css` carries none of core's button reset, so the stand-in
+// below states the three declarations that cause it, verbatim from the harvested chrome.
+test('a squeezed breadcrumb crumb ellipsises from its left edge under the core button reset', async () => {
+  const measured = await withBandStripPage(async (page) => {
+    await page.setContent(
+      '<style>a.button, button { display: flex; justify-content: center; align-items: center; }</style>' +
+        `<style>${css}</style>` +
+        '<div class="fabricate-manager" style="width: 300px">' +
+        '<nav class="manager-breadcrumbs" aria-label="Breadcrumbs">' +
+        '<button type="button">Crafting Systems</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
+        '<button type="button">Greenwarden Herbalism</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
+        '<button type="button">Environments</button><i class="fas fa-chevron-right" aria-hidden="true"></i>' +
+        '<span>Sunlit Grove of the Long Evening</span>' +
+        '</nav></div>'
+    );
+    return page.evaluate(() => {
+      return [...document.querySelectorAll('.manager-breadcrumbs > button')].map((button) => {
+        const range = document.createRange();
+        range.selectNodeContents(button);
+        const text = range.getBoundingClientRect();
+        const box = button.getBoundingClientRect();
+        return {
+          label: button.textContent,
+          display: getComputedStyle(button).display,
+          squeezed: Math.round(text.width) > Math.round(box.width),
+          textStart: Math.round(text.left - box.left),
+        };
+      });
+    });
+  });
+  assert.ok(
+    measured.some((crumb) => crumb.squeezed),
+    'the fixture must squeeze at least one crumb below its label, or the clause proves nothing'
+  );
+  for (const crumb of measured) {
+    assert.equal(
+      crumb.display,
+      'block',
+      `"${crumb.label}" is a block container, the one thing text-overflow applies to`
+    );
+    assert.equal(
+      crumb.textStart,
+      0,
+      `"${crumb.label}" starts its label at its own left edge; a centred flex item would start it at ${crumb.textStart}px`
+    );
+  }
+});
+
 test('every outcome band name clears WCAG AA in every shipped theme', async () => {
   // The ramp is READ OUT OF the editor rather than restated.
   const toneNames = /const BAND_TONES = \[([^\]]+)\];/

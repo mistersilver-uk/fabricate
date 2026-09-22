@@ -36,12 +36,12 @@ src/ui/svelte/apps/inventory/detail	25
 src/ui/svelte/apps/inventory/detail/salvage	29
 src/ui/svelte/apps/journal	13
 src/ui/svelte/apps/manager	14
-src/ui/svelte/apps/manager/checks	19
+src/ui/svelte/apps/manager/checks	20
 src/ui/svelte/apps/manager/component	20
 src/ui/svelte/apps/manager/components	20
 src/ui/svelte/apps/manager/crafting	28
 src/ui/svelte/apps/manager/downtime	20
-src/ui/svelte/apps/manager/environment	11
+src/ui/svelte/apps/manager/environment	12
 src/ui/svelte/apps/manager/essences	19
 src/ui/svelte/apps/manager/knowledge	21
 src/ui/svelte/apps/manager/library	24
@@ -50,7 +50,7 @@ src/ui/svelte/apps/manager/recipe-item	20
 src/ui/svelte/apps/manager/recipes	20
 src/ui/svelte/apps/manager/scoped	18
 src/ui/svelte/apps/manager/system	23
-src/ui/svelte/apps/manager/tools	19
+src/ui/svelte/apps/manager/tools	20
 src/ui/svelte/apps/manager/world	18
 src/ui/svelte/components	16
 src/ui/svelte/stores	26
@@ -65,7 +65,7 @@ tests/canvas/regions	7
 tests/components	10
 tests/fixtures	12
 tests/fixtures/chip	49
-tests/fixtures/manager-select	21
+tests/fixtures/manager-select	19
 tests/fixtures/overlay-host	25
 tests/fixtures/player-select	22
 tests/fixtures/searchable-popover	52

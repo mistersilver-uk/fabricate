@@ -17,6 +17,15 @@ import {
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+
+/** The `Preview as` roster's trigger, which the conversion moved its hook onto (issue 1510). */
+const PREVIEW_ACTOR = '.fabricate-select-trigger[data-tool-preview-actor]';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
@@ -413,9 +422,13 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(root.querySelector('[data-tool-player-name]').textContent, "Smith's Hammer");
 
     // PREVIEW AS — the actor selector, the gate sentence and the usability row.
-    const actorSelect = root.querySelector('[data-tool-preview-actor]');
-    assert.ok(Boolean(actorSelect), 'the actor selector renders');
-    assert.equal(actorSelect.querySelector('option').textContent, 'No actor');
+    assert.ok(Boolean(root.querySelector(PREVIEW_ACTOR)), 'the actor selector renders');
+    assert.equal(
+      assertSelectHasResolvedName(root, PREVIEW_ACTOR),
+      'Preview as actor',
+      'the kicker above it is a paragraph, so the trigger keeps its own name string'
+    );
+    assert.equal(selectTriggerText(root, PREVIEW_ACTOR), 'No actor');
     assert.match(root.querySelector('[data-tool-preview-gate]').textContent, /One prerequisite/);
     assert.match(
       root.querySelector('[data-tool-preview-usability]').textContent,
@@ -538,16 +551,12 @@ describe('Tool Studio editor (mounted)', () => {
       })
     );
 
-    const select = root.querySelector('[data-tool-preview-actor]');
-    assert.deepEqual(
-      [...select.querySelectorAll('option')].map((option) => option.textContent),
-      ['No actor', 'Brawn', 'Wisp']
-    );
+    assert.deepEqual(selectOptionLabels(root, PREVIEW_ACTOR), ['No actor', 'Brawn', 'Wisp']);
 
-    select.value = 'Actor.brawn';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(root, PREVIEW_ACTOR, 'Actor.brawn');
     await tick();
     await tick();
+    assert.equal(selectTriggerText(root, PREVIEW_ACTOR), 'Brawn', 'the trigger states the choice');
     assert.match(
       root.querySelector('[data-tool-preview-gate]').textContent,
       /Brawn meets every prerequisite\./
@@ -557,8 +566,7 @@ describe('Tool Studio editor (mounted)', () => {
       /Usable, with no check bonus/
     );
 
-    select.value = 'Actor.wisp';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(root, PREVIEW_ACTOR, 'Actor.wisp');
     await tick();
     await tick();
     assert.match(
@@ -569,6 +577,24 @@ describe('Tool Studio editor (mounted)', () => {
     assert.match(
       root.querySelector('[data-tool-preview-usability]').textContent,
       /Unusable here/
+    );
+
+    // AND BACK TO NO ACTOR. The sentinel row is the one whose `dataId` differs from the id the
+    // primitive hands to `onChange` — `__unchanged__` against the empty string — so it is the row
+    // a reader cannot check without driving it; the spelling is the hand-maintained mirror
+    // `select-mounted.test.js` pins against `Select.svelte`.
+    chooseSelectOption(root, PREVIEW_ACTOR, '__unchanged__');
+    await tick();
+    await tick();
+    assert.equal(
+      selectTriggerText(root, PREVIEW_ACTOR),
+      'No actor',
+      'the roster clears back to its sentinel'
+    );
+    assert.match(
+      root.querySelector('[data-tool-preview-gate]').textContent,
+      /One prerequisite must be met\./u,
+      'and the gate sentence returns to the no-actor copy rather than keeping Wisp’s verdict'
     );
   });
 

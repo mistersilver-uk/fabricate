@@ -3,11 +3,18 @@
   import Field from '../../../components/Field.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import Select from '../../../components/Select.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../../gatheringImageDefaults.js';
   import { formatList, localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
+  import {
+    ADD_SENTINEL,
+    membershipAddOptions,
+    optId,
+    optLabel,
+  } from './environmentSelectOptions.js';
 
   let {
     environment = null,
@@ -31,12 +38,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function optId(option) {
-    return String(option?.id ?? option ?? '').trim();
-  }
-  function optLabel(option) {
-    return String(option?.label ?? option?.id ?? option ?? '').trim();
-  }
   function defaultDangerLabel(id) {
     return text(
       `FABRICATE.Admin.Manager.EnvironmentEditor.Events.DangerTag.${id}`,
@@ -77,9 +78,8 @@
   function realmLabel(id) {
     return optLabel(realmOptions.find((option) => optId(option) === id)) || id;
   }
-  function addRealm(event) {
-    const id = String(event.currentTarget.value || '').trim();
-    event.currentTarget.value = '';
+  function addRealm(chosen) {
+    const id = String(chosen || '').trim();
     if (!id) return;
     if (!includedRealmIds.includes(id)) onUpdate({ includedRealmIds: [...includedRealmIds, id] });
   }
@@ -114,11 +114,10 @@
   );
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
 
-  function addBiome(event) {
-    const id = String(event.currentTarget.value || '').trim();
+  function addBiome(chosen) {
+    const id = String(chosen || '').trim();
     if (!id) return;
     if (!biomes.includes(id)) onUpdate({ biomes: [...biomes, id] });
-    event.currentTarget.value = '';
   }
   function removeBiome(id) {
     onUpdate({ biomes: biomes.filter((value) => value !== id) });
@@ -157,6 +156,27 @@
     const option = renderedDangerOptions.find((option) => option.id === id);
     return option?.label || defaultDangerLabel(id);
   }
+
+  // The danger caption's id and the hint's: the picker is named by that caption rather than by a
+  // string, and the hint is announced by nothing unless pointed at as well (issue 1510).
+  const instanceId = $props.id();
+  const dangerCaptionId = `${instanceId}-danger-level`;
+  const dangerHintId = `${instanceId}-danger-level-hint`;
+
+  // Each add control's name, stated once: the trigger's `aria-label` and its sentinel row's label.
+  function addRealmLabel() {
+    return text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm', 'Add realm');
+  }
+  function addBiomeLabel() {
+    return text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome');
+  }
+
+  // The three converted option lists (issue 1510).
+  const realmAddOptions = $derived(membershipAddOptions(addRealmLabel(), availableRealms));
+  const biomeAddOptions = $derived(membershipAddOptions(addBiomeLabel(), availableBiomes));
+  const dangerSelectOptions = $derived(
+    renderedDangerOptions.map((option) => ({ value: option.id, label: dangerLabel(option.id) }))
+  );
 </script>
 
 <section
@@ -310,36 +330,29 @@
                   </p>
                 {:else}
                   {#if availableRealms.length > 0}
-                    <select
-                      class="manager-environment-membership-add"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm',
-                        'Add realm'
-                      )}
-                      onchange={addRealm}
-                      data-chip-remove-fallback=""
-                    >
-                      <option value=""
-                        >{text(
-                          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm',
-                          'Add realm'
-                        )}</option
-                      >
-                      {#each availableRealms as option (optId(option))}
-                        <option value={optId(option)}>{optLabel(option)}</option>
-                      {/each}
-                    </select>
+                    <!-- The wrapper holds a caption, a hint, this control and a pill row and is
+                         not label-typed, so it stays and the trigger keeps its own `aria-label`.
+                         The sentinel is its resting value too, so the picker resets itself once
+                         the add has landed (issue 1510). -->
+                    <Select
+                      value={ADD_SENTINEL}
+                      options={realmAddOptions}
+                      showTick={false}
+                      ariaLabel={addRealmLabel()}
+                      triggerData={{ 'data-chip-remove-fallback': '' }}
+                      onChange={addRealm}
+                    />
                   {/if}
                   <!-- THE ROW IS THE LAST RUNG OF THE CHIP'S FOCUS LADDER (issue 1515).
                        `Chip` takes the focus destination BEFORE it removes the chip - the next
                        remove control, else the previous one, else the nearest
-                       `[data-chip-remove-fallback]` - and the `<select>` above carries that hook
-                       only while an unselected realm remains. Remove the LAST chip with every
-                       realm already selected and the select is gone, so the ladder ran out and
+                       `[data-chip-remove-fallback]` - and the picker trigger above carries that
+                       hook only while an unselected realm remains. Remove the LAST chip with every
+                       realm already selected and the picker is gone, so the ladder ran out and
                        focus fell to `<body>`: the unfocused-window state, with the keyboard user
                        stranded at the top of the document. The row is always rendered inside this
                        branch, so it is the rung that cannot disappear; `tabindex="-1"` is what
-                       makes it focusable without adding a tab stop. The select still wins while it
+                       makes it focusable without adding a tab stop. The trigger still wins while it
                        exists, because the search runs outwards from the chip and finds both at the
                        same ancestor in document order. -->
                   <div
@@ -387,28 +400,29 @@
               </Field>
             {/if}
 
-            <Field as="label" class="manager-environment-context-field">
-              <span
+            <!-- A `<div>`, not the `<label>` it was: `Select.svelte`'s host invariant, so the caption
+                 names the trigger and the hint it used to contribute is reattached (issue 1510). -->
+            <Field as="div" class="manager-environment-context-field">
+              <span id={dangerCaptionId}
                 >{text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger',
                   'Danger level'
                 )}</span
               >
-              <p class="manager-muted manager-environment-context-hint">
+              <p id={dangerHintId} class="manager-muted manager-environment-context-hint">
                 {text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint',
                   'A ceiling — events up to and including this level can appear.'
                 )}
               </p>
-              <select
-                data-environment-field="dangerLevel"
+              <Select
                 value={dangerLevel}
-                onchange={(event) => onUpdate({ dangerLevel: event.currentTarget.value })}
-              >
-                {#each renderedDangerOptions as option (option.id)}
-                  <option value={option.id}>{dangerLabel(option.id)}</option>
-                {/each}
-              </select>
+                options={dangerSelectOptions}
+                ariaLabelledBy={dangerCaptionId}
+                ariaDescribedBy={dangerHintId}
+                triggerData={{ 'data-environment-field': 'dangerLevel' }}
+                onChange={(next) => onUpdate({ dangerLevel: next })}
+              />
             </Field>
           </div>
 
@@ -426,25 +440,16 @@
               )}
             </p>
             {#if availableBiomes.length > 0}
-              <select
-                class="manager-environment-membership-add"
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome',
-                  'Add biome'
-                )}
-                onchange={addBiome}
-                data-chip-remove-fallback=""
-              >
-                <option value=""
-                  >{text(
-                    'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome',
-                    'Add biome'
-                  )}</option
-                >
-                {#each availableBiomes as option (optId(option))}
-                  <option value={optId(option)}>{optLabel(option)}</option>
-                {/each}
-              </select>
+              <!-- The realms row above records why this wrapper stays and the trigger names
+                   itself. -->
+              <Select
+                value={ADD_SENTINEL}
+                options={biomeAddOptions}
+                showTick={false}
+                ariaLabel={addBiomeLabel()}
+                triggerData={{ 'data-chip-remove-fallback': '' }}
+                onChange={addBiome}
+              />
             {/if}
             <!-- `tint` AND a `style`, and both are load-bearing (issue 1515). `tint` is what
                  arms the primitive's tinted face; the `style` states the colour that face
@@ -559,9 +564,3 @@
     </div>
   {/if}
 </section>
-
-<style>
-  .manager-environment-membership-add {
-    height: 34px;
-  }
-</style>

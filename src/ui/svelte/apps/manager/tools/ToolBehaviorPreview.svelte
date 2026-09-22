@@ -22,6 +22,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import Pagination from '../../../components/Pagination.svelte';
+  import Select from '../../../components/Select.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import ScopedEntityPreview from '../scoped/ScopedEntityPreview.svelte';
   import {
@@ -126,6 +127,12 @@
   const previewActorName = $derived(
     actorOptions.find((actor) => actor.uuid === previewActorUuid)?.name || ''
   );
+  // The roster the app draws since issue 1510, resting on the no-actor sentinel. No tick: the
+  // trigger states the chosen actor and no two actors are cousins.
+  const previewActorOptions = $derived([
+    { value: '', label: text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoActor', 'No actor') },
+    ...actorOptions.map((actor) => ({ value: actor.uuid, label: actor.name })),
+  ]);
   const selectedPrerequisites = $derived(
     tool?.prerequisites?.enabled
       ? prerequisiteOptions.filter((option) =>
@@ -346,20 +353,18 @@
     )}
   </p>
   <section class="fab-stack" data-gap="2" data-tool-actor-preview>
-    <select
+    <!-- The kicker above is a `<p>` rather than a caption, so the trigger keeps its own
+         `aria-label`; `class` rides the picker root, where the sheet hangs the rail width. -->
+    <Select
+      size="toolbar"
       class="manager-tool-actor-select"
-      data-tool-preview-actor
-      aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewAsLabel', 'Preview as actor')}
       value={previewActorUuid}
-      onchange={(event) => choosePreviewActor(event.currentTarget.value)}
-    >
-      <option value=""
-        >{text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoActor', 'No actor')}</option
-      >
-      {#each actorOptions as actor (actor.uuid)}
-        <option value={actor.uuid}>{actor.name}</option>
-      {/each}
-    </select>
+      options={previewActorOptions}
+      showTick={false}
+      ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.PreviewAsLabel', 'Preview as actor')}
+      triggerData={{ 'data-tool-preview-actor': '' }}
+      onChange={(next) => choosePreviewActor(next)}
+    />
     <EmptyState
       compact
       inline

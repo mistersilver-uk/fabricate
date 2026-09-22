@@ -136,9 +136,10 @@ test('the host set is the closed three, and all three still have real users', ()
   // that name itself (`ariaLabelledBy`/`ariaLabel`), so no site changed which host announces it.
   // It dropped again 40 → 36 when the gathering task editor's four captioned selects converted:
   // each `<Field as="label">` demoted to `as="div"` and the caption's id became the trigger's
-  // `ariaLabelledBy`, so the same caption still names the same control.
+  // `ariaLabelledBy`, so the same caption still names the same control. And again 36 → 35 when the
+  // environment overview's danger ceiling converted, the one captioned select of that commit.
   for (const [host, floor] of [
-    ['label', 36],
+    ['label', 35],
     ['div', 28],
     ['fieldset', 1],
   ]) {
