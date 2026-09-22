@@ -51,6 +51,8 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { TOTALS_DOCUMENT, totalsRegion } from '../scripts/view-lab-registry-totals.mjs';
+
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
@@ -3293,43 +3295,60 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
   assert.equal(noMatch.steps.at(-1).selector, '[data-access-roster-search="players"]');
 });
 
-test('the registry counts quoted in prose match the registry', () => {
-  // These four numbers are hand-copied registry facts, and they have drifted three separate times:
-  // this change found `AGENTS.md` claiming 155 cases, `CONTRIBUTING.md` claiming 181, and
-  // `scripts/README.md` claiming 219 with a `reaches` split to match — three different wrong
-  // answers, none of which anything failed on.
-  const reaches = (value) =>
-    publishableCases().filter((viewCase) => viewCase.reaches === value).length;
-  const total = publishableCases().length;
-  const coverage = LAB_SURFACE_CASE_IDS.length;
+// The registry totals used to be hand-copied into four documents, and they drifted three separate
+// times: `AGENTS.md` once claimed 155 cases, `CONTRIBUTING.md` 181 and `scripts/README.md` 219 —
+// three different wrong answers, none of which anything failed on. They are generated now, and
+// these two tests are the gate: the region must say what the registry says, and no carrier may
+// quote a count again.
 
-  for (const [file, pattern, expected] of [
-    [
-      'CONTRIBUTING.md',
-      /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
-      [total, reaches('exact'), reaches('window'), reaches('beyond')],
-    ],
-    ['CONTRIBUTING.md', /which is (\d+) of the (\d+) publishable cases/, [coverage, total]],
-    [
-      'scripts/README.md',
-      /There are (\d+) `exact` cases, (\d+) `window`, and (\d+) `beyond`, out of (\d+) total/,
-      [reaches('exact'), reaches('window'), reaches('beyond'), total],
-    ],
-    ['AGENTS.md', /the normal case, at (\d+) cases across five windows/, [total]],
-    ['AGENTS.md', /one frame of every route and tab the lab renders, (\d+) cases/, [coverage]],
-    [
-      '.agents/skills/fabricate-orchestrator/SKILL.md',
-      /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
-      [coverage, total],
-    ],
-  ]) {
-    const found = readFileSync(resolve(ROOT, file), 'utf8').match(pattern);
-    assert.ok(found, `${file} no longer contains the sentence this guards: ${pattern}`);
-    assert.deepEqual(
-      found.slice(1).map(Number),
-      expected,
-      `${file} quotes stale registry counts in "${found[0]}"`
-    );
+/** The documents that carried a hand-copied count, plus the one that carries the generated region. */
+const TOTALS_CARRIERS = Object.freeze([
+  'AGENTS.md',
+  'CONTRIBUTING.md',
+  TOTALS_DOCUMENT,
+  '.agents/skills/fabricate-orchestrator/SKILL.md',
+]);
+
+/** The six sentence shapes the generated region retired, as each document used to state it. */
+const RETIRED_COUNT_PATTERNS = Object.freeze([
+  /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
+  /which is (\d+) of the (\d+) publishable cases/,
+  /There are (\d+) `exact` cases, (\d+) `window`, and (\d+) `beyond`, out of (\d+) total/,
+  /the normal case, at (\d+) cases across five windows/,
+  /one frame of every route and tab the lab renders, (\d+) cases/,
+  /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
+]);
+
+/** A carrier with the generated region cut out, so the guard cannot read the writer's own output. */
+function outsideGeneratedRegion(markdown) {
+  const lines = totalsRegion().split('\n');
+  const [start] = lines;
+  const end = lines.at(-1);
+  const from = markdown.indexOf(start);
+  if (from === -1) return markdown;
+  return markdown.slice(0, from) + markdown.slice(markdown.indexOf(end, from) + end.length);
+}
+
+test('the generated totals region says what the registry says', () => {
+  const carrier = readFileSync(resolve(ROOT, TOTALS_DOCUMENT), 'utf8');
+  const expected = totalsRegion();
+  assert.ok(
+    carrier.includes(expected),
+    `${TOTALS_DOCUMENT}'s totals region is stale — run \`npm run viewlab:totals\`. It should read:` +
+      `\n${expected}`
+  );
+});
+
+test('no carrier quotes a registry count outside the generated region', () => {
+  for (const carrier of TOTALS_CARRIERS) {
+    const prose = outsideGeneratedRegion(readFileSync(resolve(ROOT, carrier), 'utf8'));
+    for (const pattern of RETIRED_COUNT_PATTERNS) {
+      assert.ok(
+        !pattern.test(prose),
+        `${carrier} states a registry count in prose again (${pattern}). The numbers are ` +
+          `generated into ${TOTALS_DOCUMENT}; point at that region instead of copying it.`
+      );
+    }
   }
 });
 

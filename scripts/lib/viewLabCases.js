@@ -761,6 +761,25 @@ export function publishableCases() {
   return VIEW_LAB_CASES.filter((viewCase) => viewCase.publish);
 }
 
+/**
+ * How big the registry is, by the `reaches` claim each case makes, alongside the surface-coverage
+ * subset. The prose that once hand-copied these numbers is generated from them instead — see
+ * `scripts/view-lab-registry-totals.mjs`.
+ *
+ * @returns {{total: number, exact: number, window: number, beyond: number, coverage: number}}
+ */
+export function registryTotals() {
+  const published = publishableCases();
+  const reaching = (claim) => published.filter((viewCase) => viewCase.reaches === claim).length;
+  return Object.freeze({
+    total: published.length,
+    exact: reaching('exact'),
+    window: reaching('window'),
+    beyond: reaching('beyond'),
+    coverage: LAB_SURFACE_CASE_IDS.length,
+  });
+}
+
 export {
   BROAD_SIGNAL_CASE_OVERRIDES,
   BROAD_SIGNAL_PATTERN,
