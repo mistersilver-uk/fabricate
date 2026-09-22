@@ -376,6 +376,40 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(outputName(targetB), 'Steel Boss', 'Produces follows the selected route (set-b)');
   });
 
+  it('reads the terminal-step product for a MULTI-step routed recipe (issue 1907)', async () => {
+    // Every projected set resolves against the first step, whose group may legally be empty on a
+    // multi-step recipe, so the headline follows `result.items` instead of the selected route.
+    const routed = (stepCount) =>
+      recipe({
+        modeToken: 'routedByIngredients',
+        modeLabel: 'Routed by ingredients',
+        defaultSetId: 'set-a',
+        stepCount,
+        result: { items: [{ name: 'Folded Blade', img: null, qty: 1 }], time: null, timeLabel: null, xp: null },
+        ingredientSets: [
+          { id: 'set-a', label: 'Fold', craftability: craftability(), products: [] },
+        ],
+      });
+
+    const outputNames = (target) =>
+      [...target.querySelectorAll('[data-io-group="outputs"] .crafting-io-output-name')].map(
+        (node) => node.textContent.trim()
+      );
+
+    const hint = (target) =>
+      target.querySelector('[data-recipe-section="routing-hint"]')?.textContent.trim();
+
+    const multi = await harness.mount({ recipe: routed(2), selectedSetId: 'set-a' });
+    assert.deepEqual(outputNames(multi), ['Folded Blade'], 'the terminal product is shown');
+    // The hint has to agree with the row above it: on a multi-step recipe the chosen option no
+    // longer decides the product, so the absolute copy would contradict the screen.
+    assert.equal(hint(multi), 'FABRICATE.App.Crafting.Detail.IngredientRoutingHintMultiStep');
+
+    const single = await harness.mount({ recipe: routed(1), selectedSetId: 'set-a' });
+    assert.deepEqual(outputNames(single), [], 'a single-step recipe still follows its selected set');
+    assert.equal(hint(single), 'FABRICATE.App.Crafting.Detail.IngredientRoutingHint');
+  });
+
   it('colours tiered outcomes green for success and red for failure', async () => {
     const target = await harness.mount({
       recipe: recipe({

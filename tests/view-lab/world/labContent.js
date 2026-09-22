@@ -22,6 +22,10 @@ export const LAB_SYSTEM_IDS = Object.freeze({
   // !activeSystemId`, so with a single discipline the chooser is not a state the app can be driven
   // into — it is a screen that does not exist.
   TIDEWRACK: 'lab-tidewrack',
+  // The world's SECOND `routedByIngredients` system, and the only one whose multi-step feature is
+  // on: Jewellery's is deliberately off so its collapsed-editor frame keeps its subject, so the
+  // legal empty non-terminal step (issue 1907) has nowhere else to be photographed.
+  GLASSWORK: 'lab-glasswork',
 });
 
 /** One component definition plus the world item it originates from. */
@@ -791,6 +795,26 @@ const ESSENCES = [
     icon: 'fas fa-hand-sparkles',
     colorToken: 'butter',
   },
+];
+
+const GLASSWORK_COMPONENTS = [
+  component('gl-silica', 'Silica Sand', 'commodities/stone/stone-pile-grey.webp', {
+    categories: ['Batch'],
+    tags: ['batch'],
+    difficulty: 2,
+    essences: { earth: 1 },
+  }),
+  component('gl-soda', 'Soda Ash', 'commodities/materials/bowl-powder-grey.webp', {
+    categories: ['Batch'],
+    tags: ['batch'],
+    difficulty: 3,
+    essences: { fire: 1 },
+  }),
+  component('gl-lens', 'Ground Lens', 'commodities/gems/gem-faceted-radiant-blue.webp', {
+    categories: ['Finished Goods'],
+    tags: ['glass'],
+    difficulty: 7,
+  }),
 ];
 
 function recipe(id, name, systemId, icon, { categories = [], ...config } = {}) {
@@ -2759,6 +2783,75 @@ const HERBALISM_GATHERING_CHECK = Object.freeze({
   defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
 });
 
+/**
+ * The multi-step routed recipe whose FIRST step awards nothing (issue 1907). Melting the batch
+ * costs sand, ash and time and leaves the crafter with a crucible of metal, not an item; only the
+ * terminal step yields the lens, and that is the product the Crafting tab must headline.
+ */
+const GLASSWORK_RECIPES = [
+  recipe(
+    'gl-r-lens',
+    'Grind a Reading Lens',
+    LAB_SYSTEM_IDS.GLASSWORK,
+    'commodities/gems/gem-faceted-radiant-blue.webp',
+    {
+      description: 'Melt the batch, then grind the blank down until it reads true.',
+      categories: ['Optics'],
+      complex: true,
+      steps: [
+        {
+          id: 'gl-step-melt',
+          name: 'Melt the batch',
+          description: 'Charge the crucible and hold it at heat until the metal runs clear.',
+          timeRequirement: { minutes: 0, hours: 6, days: 0, months: 0, years: 0 },
+          ingredientSets: [
+            {
+              id: 'gl-step-melt-s1',
+              name: 'Soda batch',
+              resultGroupId: 'gl-step-melt-rg',
+              ingredientGroups: [
+                {
+                  id: 'gl-step-melt-s1-g1',
+                  name: 'Batch',
+                  options: [
+                    { componentId: 'gl-silica', quantity: 4 },
+                    { componentId: 'gl-soda', quantity: 1 },
+                  ],
+                },
+              ],
+            },
+          ],
+          // AUTHORED EMPTY, and legal: the step advances the craft and awards nothing.
+          resultGroups: [{ id: 'gl-step-melt-rg', name: 'Nothing yet', results: [] }],
+        },
+        {
+          id: 'gl-step-grind',
+          name: 'Grind the blank',
+          description: 'Work the blank down against the lap until the focus is right.',
+          timeRequirement: { minutes: 30, hours: 2, days: 0, months: 0, years: 0 },
+          ingredientSets: [
+            {
+              id: 'gl-step-grind-s1',
+              name: 'Lapping',
+              resultGroupId: 'gl-step-grind-rg',
+              ingredientGroups: [
+                {
+                  id: 'gl-step-grind-s1-g1',
+                  name: 'Abrasive',
+                  options: [{ componentId: 'gl-silica', quantity: 2 }],
+                },
+              ],
+            },
+          ],
+          resultGroups: [
+            { id: 'gl-step-grind-rg', name: 'Lens', results: [{ componentId: 'gl-lens', quantity: 1 }] },
+          ],
+        },
+      ],
+    }
+  ),
+];
+
 export function buildLabContent({ journalCaseState = null } = {}) {
   const systems = [
     {
@@ -2984,6 +3077,35 @@ export function buildLabContent({ journalCaseState = null } = {}) {
       tools: [],
       gatheringRealmSettings: { enabled: false },
     },
+    // APPENDED after Tidewrack rather than inserted, for the positional reason stated above.
+    {
+      id: LAB_SYSTEM_IDS.GLASSWORK,
+      name: 'Emberlight Glassworks',
+      description: 'Furnace glass: the melt buys nothing but a blank, and the lap makes it read true.',
+      img: `${ICON_BASE}/commodities/gems/gem-faceted-radiant-blue.webp`,
+      enabled: true,
+      visibilityMode: 'global',
+      // The world's second `routedByIngredients` system, and the ONLY one whose multi-step feature
+      // is on — see `LAB_SYSTEM_IDS.GLASSWORK`.
+      resolutionMode: 'routedByIngredients',
+      craftingCheck: SIMPLE_CHECK,
+      salvageResolutionMode: 'routed',
+      features: {
+        essences: true,
+        recipeCategories: true,
+        itemTags: true,
+        gathering: false,
+        multiStepRecipes: true,
+      },
+      essenceDefinitions: ESSENCES,
+      categories: ['Optics'],
+      itemTags: ['batch', 'glass'],
+      components: GLASSWORK_COMPONENTS,
+      componentCategories: componentCategoryVocabulary(GLASSWORK_COMPONENTS),
+      recipeItemDefinitions: [],
+      tools: [],
+      gatheringRealmSettings: { enabled: false },
+    },
   ];
 
   const gatheringConfig = {
@@ -3056,6 +3178,7 @@ export function buildLabContent({ journalCaseState = null } = {}) {
       ...JEWELRY_RECIPES,
       ...RUNEWORK_RECIPES,
       ...TIDEWRACK_RECIPES,
+      ...GLASSWORK_RECIPES,
     ],
     environments: ENVIRONMENTS,
     gatheringConfig,

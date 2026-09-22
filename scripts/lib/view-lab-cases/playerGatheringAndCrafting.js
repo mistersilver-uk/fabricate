@@ -243,7 +243,12 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-crafting-routed-by-check'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' }],
+    // The crafting list pages at twelve rows, and the lab world now holds more recipes than
+    // that ahead of the Runeblade alphabetically (issue 1907), so narrow the list first.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Runeblade' },
+      { selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' },
+    ],
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SHARED,
@@ -482,6 +487,42 @@ export const CASES = Object.freeze([
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  playerCase({
+    id: 'player-crafting-routed-multistep',
+    label: 'Player app — Crafting routed multistep with an empty first step',
+    // Issue 1907: the first step's routed group is authored EMPTY, so the selected set produces
+    // nothing and the Produces row has to come from the TERMINAL step instead. `gl-r-lens` is the
+    // world's only multi-step `routedByIngredients` recipe — Jewellery's feature is off by design.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { tab: 'crafting' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reading Lens' },
+      { selector: '.crafting-recipe-row[data-recipe-id="gl-r-lens"]' },
+      // The Produces row sits below the requirements and the alternatives, so the frame has to be
+      // scrolled to it or it photographs everything except the thing it exists to show.
+      { selector: '[data-io-group="outputs"]', scroll: true },
+    ],
+    // The routed body over a product row: without the terminal-step read the Output section is not
+    // rendered at all, so this selector is satisfied only by the fixed behaviour.
+    expectSelector:
+      '[data-recipe-mode="routedByIngredients"] [data-io-group="outputs"] .crafting-io-output-name',
+    // The PRODUCT NAME is what the frame has to make legible; `scrollIntoViewIfNeeded` leaves the
+    // group itself flush against the scroll container's edge once the multi-step hint wraps.
+    expectContained: [
+      {
+        container: '[data-crafting-detail-scroll]',
+        target: '[data-io-group="outputs"] .crafting-io-output-name',
+      },
+    ],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_INGREDIENTS,
+      /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-progressive',

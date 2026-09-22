@@ -1582,6 +1582,7 @@ Recipe = {
 ### Requirements
 
 1. A _craftable_ Recipe must include at least one ingredient set and at least one result group, either at recipe level (single-step mode) or within steps (multistep mode).
+   In multistep mode only the TERMINAL step's non-`failure` result groups must be non-empty; an earlier step's result groups may be empty (issue 1907).
    This is a _completeness_ requirement: it gates crafting and craftable-visibility, not persistence.
    `Recipe.validate()` enforces completeness and is the craftability contract; the crafting engine gates on it, so an incomplete recipe is never craftable.
    `Recipe.validateStructure()` omits completeness (it waives the missing-ingredient-set / missing-result-group / missing-result errors) and is the persistence contract.
@@ -1591,6 +1592,7 @@ Recipe = {
    Issue 554 retired the per-recipe `resultSelection.provider`, so `Recipe._validateRoutedResultSelection` no longer governs alchemy name-uniqueness.
    `routedByCheck` `ResultGroup.name` integrity is enforced at the service level (`ResolutionModeService._validateRoutedGroupNames`, a per-mode reference-integrity check that always applies), independent of this persistence gate.
    Incompleteness is _derived_ from the recipe's structure (no stored flag): an implicit recipe is incomplete when it has no ingredient sets or no result groups; an explicit multi-step recipe is incomplete when any step is missing an ingredient set or result group.
+   An EMPTY result group is not a missing one: a non-terminal step carrying an empty result group is complete, not a shell (issue 1907).
 3. Resolution-mode constraints are defined in `resolution-modes/spec.md`.
 4. `resultSelection.provider` is RETIRED for alchemy (issue 554): alchemy routes on the SYSTEM-level `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`), not a per-recipe provider.
    The 1.14.0 migration strips `resultSelection` from every alchemy recipe.
@@ -2952,7 +2954,8 @@ GatheringDropReference = {
 
 ### Purpose
 
-Group one or more results.
+Group the results one outcome awards.
+A group normally holds one or more results; the reserved `role: "failure"` group (issue 554) and a result group on a non-terminal step of a multi-step recipe (issue 1907) may hold none.
 
 ### Properties
 

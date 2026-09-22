@@ -5,7 +5,8 @@
   the group name, its items, an "Add item" picker and a remove-group button, and emits a
   shallow-updated copy via `onChange(nextGroup)` with new items appended id-less for the store to
   normalize. Empty groups and component-less items are gated at the model/save path
-  (`Recipe.validate`), not at readiness, so an empty group being edited here is expected.
+  (`Recipe.validate`), not at readiness, so an empty group being edited here is expected — and on a
+  non-terminal step it is a legal finished state rather than a draft (issue 1907).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -48,6 +49,9 @@
     // Progressive systems award the group's results in ORDER — the award loop spends the check
     // budget down the list — so each row grows a reorder affordance. Other modes render as-is.
     progressive = false,
+    // Whether this card's scope is the recipe, or the terminal step of a multi-step recipe. Only
+    // a terminal scope must produce, so an empty group elsewhere is authored intent (issue 1907).
+    isTerminalStep = true,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     onRemove = () => {},
@@ -268,7 +272,14 @@
     </div>
   {/if}
 
-  {#if results.length === 0}
+  {#if results.length === 0 && !isTerminalStep}
+    <p class="manager-muted" data-recipe-result-empty>
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.ResultSetEmptyIntermediatePanel',
+        'Nothing produced on this step — it only advances the craft.'
+      )}
+    </p>
+  {:else if results.length === 0}
     <!-- Danger-bordered dashed panel: an outcome that produces nothing is a gap. -->
     <div class="manager-recipe-result-empty" data-recipe-result-empty>
       <p class="manager-muted">

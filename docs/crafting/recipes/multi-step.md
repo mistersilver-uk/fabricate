@@ -15,13 +15,22 @@ Multi-step recipes chain several steps that must be completed in sequence.
 Each step can have its own ingredients, required tools, results, and time requirements.
 An ingredient inside a step can still offer a currency cost as an alternative to its items, the same as in a single-step recipe.
 
+A step that comes before the last one does not have to produce anything.
+Leave its result group empty and the step still costs its materials, its tools, its time and its crafting check.
+The run simply advances to the next step with nothing awarded.
+This is how you author preparation work that has no item to show for it.
+The last step is different.
+Each of its result groups must produce something, because that is what the recipe makes.
+An on-failure result group is the exception, as always, and is allowed to award nothing.
+Progressive mode is the exception, and every one of its steps must still award results, because a progressive stage is defined by what it awards.
+
 ---
 
 ## How It Works
 
 1. Player starts the recipe and a **crafting run** is created
 2. The first step's ingredients are validated
-3. On success, the step's results are created and the run advances
+3. On success, the step's results, if any, are created and the run advances
 4. Repeat for each step
 5. When the last step succeeds, the run completes
 
@@ -53,6 +62,9 @@ Instant steps do not show a duration.
 The intermediate items a step produces along the way are not listed as separate results.
 Only the recipe's final product is shown, as a single **Produces** row beneath the steps.
 This keeps the focus on what the whole recipe makes rather than on the parts made on the way there.
+The headline **Produces** row reads the recipe's last step, so a recipe whose early steps award nothing still shows the player what it makes.
+Routed by check recipes have no single Produces row.
+They list one outcome per check result instead, and that list also reads the recipe's last step for the same reason.
 
 The **Craft** button reflects the first step.
 A later step showing missing materials never stops a player from starting the recipe, so players can gather what a later step needs before it comes up in the run.
@@ -60,6 +72,7 @@ A later step showing missing materials never stops a player from starting the re
 {: .note }
 > The step-by-step preview, with its numbered per-step blocks and single final Produces row, is shown only for multi-step recipes in Simple mode.
 > In the routed and progressive modes a multi-step recipe still lists its first step's required materials, it just isn't broken out into per-step blocks.
+> In Routed by ingredients mode, a hint above the ingredient options reminds players that the option they choose only decides what that step consumes, since Produces already shows the final product made on the recipe's last step.
 
 If the crafting system has no crafting check turned on, a recipe no longer shows an empty crafting-check box in its detail.
 A crafting-check box still appears when the system has a check that always applies to the recipe, or when a roll formula has been configured for the check.
@@ -92,6 +105,12 @@ Each step has its own ingredient sets, result groups, optional required tools, a
 For the example above, the Forge step requires the Forge tool and a 4-hour time gate, the Assemble step consumes the unfinished plates plus leather straps, and the Enchant step combines the plate armour with an enchanting gem.
 You author each step on the Ingredients and Results tabs of the recipe editor in the Crafting Admin panel.
 
+A step you have deliberately left without results is not treated as unfinished work.
+Its result set on the Results tab, and the matching step in the recipe browser's inspector, show a plain note that the step only advances the craft.
+This replaces the red warning an empty last step still gets.
+A step with no result group at all is a different thing.
+That is unfinished authoring, so it keeps the red warning wherever it sits.
+
 {% include screenshot.html case="manager-recipe-edit-multistep" caption="The steps of a multi-step recipe on the Overview tab." %}
 
 The public API can create and configure recipes too.
@@ -121,5 +140,7 @@ See [Journal]({% link player-app/journal.md %}) for what each stage action does 
 > Disabling the Multi-Step Recipes feature is not destructive.
 > Your multi-step recipes are kept exactly as you authored them.
 > While the feature is off, each multi-step recipe collapses into a single combined action: crafting it runs all of its steps back-to-back in one go and produces the results of its final step, and any step time requirements are added together into a single wait.
-> In the editor the recipe shows as single-step — its steps are read-only, and you edit its final results directly.
-> Turning the feature off asks you to confirm this first; turning it back on restores the full multi-step recipe and editor with nothing lost.
+> In the editor the recipe shows as single-step.
+> Its steps are read-only, and you edit its final results directly.
+> Turning the feature off asks you to confirm this first.
+> Turning it back on restores the full multi-step recipe and editor with nothing lost.

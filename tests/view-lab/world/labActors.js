@@ -117,6 +117,11 @@ const INVENTORIES = {
     // Routed stock, deliberately ASYMMETRIC.
     'jw-ingot-silver': 2,
     'jw-wire': 2,
+    // The multi-step routed batch (issue 1907). Held so `gl-r-lens` reads CRAFTABLE: an empty
+    // first step whose materials are missing photographs a missing-materials banner, not the
+    // terminal-step Produces row the frame exists to show.
+    'gl-silica': 4,
+    'gl-soda': 1,
     'rw-bar': 2,
     'rw-chalk': 4,
     // The world's only WORKING routed salvage (`rw-slag` — Jewelry's routed config is the

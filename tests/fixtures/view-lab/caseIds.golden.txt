@@ -66,6 +66,7 @@ world-scoped-rail-collapsed
 world-scoped-narrow
 manager-recipes-normal
 manager-recipes-blocked-enable-flash
+manager-recipes-inspector-empty-step
 manager-recipes-narrow
 manager-recipes-no-check
 manager-recipes-grouped-continuation
@@ -110,6 +111,7 @@ manager-recipe-edit-step-narrow
 manager-recipe-edit-results-narrow
 manager-recipe-edit-results
 manager-recipe-edit-results-multistep
+manager-recipe-edit-results-empty-step
 manager-multistep-disable-confirm
 manager-recipe-edit-collapsed
 manager-recipe-edit-results-progressive
@@ -342,6 +344,7 @@ player-crafting-pick-for-me
 player-crafting-essence-pool-shared
 player-crafting-consumption-plan
 player-crafting-multistep
+player-crafting-routed-multistep
 player-crafting-progressive
 player-crafting-progressive-reordered
 player-crafting-progressive-fixed

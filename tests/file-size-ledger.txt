@@ -9,7 +9,7 @@ src/migration/MigrationRunner.js::run	227
 src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	123
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	117
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	247
-src/models/Recipe.js::_validate	120
+src/models/Recipe.js::_validate	107
 src/systems/BulkSalvageService.js	819
 src/systems/CompendiumImporter.js	1580
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
@@ -95,7 +95,7 @@ src/ui/navTabBadgeStore.js::createNavTabBadgeStore	114
 src/ui/presenters/AlchemyListingBuilder.js::buildListing	120
 src/ui/presenters/CraftingListingBuilder.js	1285
 src/ui/presenters/CraftingListingBuilder.js::_buildCheck	111
-src/ui/presenters/CraftingListingBuilder.js::_buildRecipeModel	165
+src/ui/presenters/CraftingListingBuilder.js::_buildRecipeModel	156
 src/ui/presenters/GatheringListingBuilder.js	1074
 src/ui/presenters/GatheringListingBuilder.js::_buildEnvironmentListing	225
 src/ui/presenters/GatheringListingBuilder.js::listForActor	108
@@ -171,7 +171,7 @@ src/ui/svelte/apps/manager/essences/essenceStudio.js::projectEssenceBehaviourFac
 src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte	950
 src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte	663
 src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte	847
-src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte	801
+src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte	827
 src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte	1249
 src/ui/svelte/apps/manager/scoped/ComponentCatalogueBulkPanel.svelte	953
 src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte	1391
