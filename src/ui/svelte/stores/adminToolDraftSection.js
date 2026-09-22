@@ -509,7 +509,8 @@ export function createToolDraftSection({
   /**
    * The same library through the read union — what a craft will actually do. A display read and
    * never a write source; {@link toolRecordForSave} keeps the two apart. `ui-system-studio`
-   * `## Tools Tab` states the rule, on data-models requirement 15 clause 1a (issue 1373).
+   * `## Tools Tab` states the rule, on `data-models` `## Scoped Entity Definitions` requirement 15
+   * clause 1a (issue 1373).
    */
   function resolvedSystemTools(systemId) {
     const id = String(systemId || get(selectedSystemId) || '');
