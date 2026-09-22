@@ -16,6 +16,7 @@
     DEFAULT_BROWSER_PAGE_SIZE,
     createGatheringTasksBrowserState,
   } from '../../../model/managerBrowserViewState.js';
+  import { createBrowserListState, createBrowserPageWindow } from './browserListState.svelte.js';
 
   let {
     tasks = [],
@@ -87,24 +88,23 @@
       biomeFilter !== 'all' ||
       availabilityFilter !== 'all'
   );
-  const paginatedTasks = $derived(
-    filteredTasks.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
-  );
-
-  $effect(() => {
-    if (selectedSystemId === ui.systemId) return;
-    ui.searchTerm = '';
-    ui.statusFilter = 'all';
-    ui.biomeFilter = 'all';
-    ui.availabilityFilter = 'all';
-    ui.pageIndex = 0;
-    ui.systemId = selectedSystemId;
+  const page = createBrowserPageWindow({ state: () => ui, rows: () => filteredTasks });
+  const paginatedTasks = $derived(page.pageRows);
+  const list = createBrowserListState({
+    state: () => ui,
+    resetAxes: {
+      searchTerm: '',
+      statusFilter: 'all',
+      biomeFilter: 'all',
+      availabilityFilter: 'all',
+      pageIndex: 0,
+    },
   });
-
   $effect(() => {
-    if (pageIndex > 0 && pageIndex * pageSize >= filteredTasks.length) {
-      ui.pageIndex = 0;
-    }
+    list.syncSystem(selectedSystemId);
+  });
+  $effect(() => {
+    page.clampPage();
   });
 
   function text(key, fallback) {
