@@ -52,7 +52,7 @@ const TESTS_DEBT_RULE_COUNT = 82;
 const PRETTIER_DEBT_MARKER = '# --- FORMATTING DEBT BASELINE';
 
 /** Entries in that section, pinned exactly. */
-const PRETTIER_DEBT_COUNT = 97;
+const PRETTIER_DEBT_COUNT = 96;
 
 /** Whether an ESLint rule entry is switched on. */
 const armed = (entry) => Array.isArray(entry) && entry[0] !== 0 && entry[0] !== 'off';
