@@ -123,32 +123,6 @@ Do run `npm run lint:md` (and `npm run lint:md:fix`) over the docs you change be
 
 When routed only to cross-review domain output, use a fresh detached read-only lane and return the documentation verdict with recommended text without committing.
 
-## PR description template
-
-PR titles must comply with Conventional Commits.
-For `feat`, `fix`, and `perf`, use `<type>(#<issue>): <short description>` when a GitHub issue exists.
-
-Tell the workflow driver not to edit a PR body while CI is running on its current HEAD, because editing cancels the in-flight run.
-The driver should push, let CI finish, and then edit the body.
-
-Recommend these H2 sections in order when the workflow driver opens or updates a PR.
-The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
-Use the non-closing `Refs #<issue>` only for a partial change that should leave the issue open.
-
-```md
-## Description
-
-Closes #<issue>
-
-## Benefit(s)
-
-## Changes in this PR
-
-## Testing
-
-## Screenshots (if applicable)
-```
-
 ## Expected output
 
 First line is the verdict: `DOCS APPROVED` or `DOCS NEEDS_CHANGES` (use `DOCS NEEDS_CHANGES` when the paired domain-expert output or the diff still requires changes).

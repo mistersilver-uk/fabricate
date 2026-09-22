@@ -147,28 +147,7 @@ Use Conventional Commits in this form:
 
 `<type>(#<issue>): <short description>`
 
-Use a Conventional Commits-compliant PR title.
-For `feat`, `fix`, and `perf`, use the same `<type>(#<issue>): <short description>` format when a GitHub issue exists.
-
 Validate the commit message with `npx commitlint` before handoff when the assignment brief permits that focused check.
-
-Recommend this PR description template to the workflow driver.
-The `Description` section must carry a GitHub closing keyword (`Closes #<issue>`, or `Fixes`/`Resolves`) on its own line so merging the PR auto-closes the issue — the `<type>(#<issue>):` title prefix does **not** auto-close.
-Use the non-closing `Refs #<issue>` only when the change is partial and the issue should stay open.
-
-```md
-## Description
-
-Closes #<issue>
-
-## Benefit(s)
-
-## Changes in this PR
-
-## Testing
-
-## Screenshots (if applicable)
-```
 
 ## Expected output
 
