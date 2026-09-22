@@ -133,6 +133,7 @@ const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
 const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
 const MANAGER_NAV_RAIL = 'src/ui/svelte/apps/manager/ManagerNavRail.svelte';
 const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
+const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
@@ -140,6 +141,12 @@ const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
 // The rail's three entry units answer together for a claim over the entries they share; a claim
 // narrowed to one of them would drop most of its population (issue 1717).
 const MANAGER_NAV_UNITS = [MANAGER_SYSTEM_NAV, MANAGER_WORLD_NAV, MANAGER_WORLD_DOWNTIME_NAV_GROUP];
+// The page header's copy is spelled across two units since issue 1720 — the shell's markup and the
+// model it resolves from — so a key that must appear once appears once across the pair.
+const headerCopyLiterals = () => [
+  ...spelledLiterals(componentAstOf(MANAGER_ROOT)),
+  ...literalStrings(moduleAstOf(HEADER_MODEL).ast),
+];
 const DOWNTIME_PREVIEW_PROVIDER =
   'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 const COMPONENTS_BROWSER = 'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte';
@@ -660,16 +667,20 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
-  defineStructureContract('uses manager localization keys rather than hard-coded copy', [MANAGER_ROOT, MANAGER_SYSTEM_NAV], {
-    // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted cases
-    // render this copy, which `text(key, fallback)` still produces under a renamed key.
-    spellsExactly: [
-      'FABRICATE.Admin.Manager.Title',
-      'FABRICATE.Admin.Manager.Soon',
-      'FABRICATE.Admin.Manager.Titlebar.Premium',
-    ],
-    spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
-  });
+  defineStructureContract(
+    'uses manager localization keys rather than hard-coded copy',
+    [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
+    {
+      // In full: a substring claim is satisfied by `…Titlebar.Premium` next door. The mounted
+      // cases render this copy, which `text(key, fallback)` still produces under a renamed key.
+      spellsExactly: [
+        'FABRICATE.Admin.Manager.Title',
+        'FABRICATE.Admin.Manager.Soon',
+        'FABRICATE.Admin.Manager.Titlebar.Premium',
+      ],
+      spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
+    }
+  );
 
   it('uses localized manager copy keys', () => {
     assert.ok(lang.FABRICATE.Admin.Manager, 'English localization should define manager copy');
@@ -986,14 +997,14 @@ describe('CraftingSystemManager source contract', () => {
   // Deleting the six per-route page headers moved the eyebrow up rather than removing it, so the
   // shell resolves one per route (issue 1515). What the old "no kicker" clauses were protecting —
   // that an eyebrow must not restate the title — is stated positively here.
-  defineStructureContract('resolves the page eyebrow per route, beside the title', MANAGER_ROOT, {
+  defineStructureContract('resolves the page eyebrow per route, beside the title', HEADER_MODEL, {
     names: ['viewKicker'],
     calls: ['viewKicker'],
   });
 
   defineStructureContract(
     'gives system-edit no eyebrow, and resolves none from a route title',
-    { file: MANAGER_ROOT, fn: 'viewKicker' },
+    { file: HEADER_MODEL, fn: 'viewKicker' },
     { spellsExactlyNo: ['system-edit'], callsNo: ['viewTitle'] }
   );
 
@@ -1221,7 +1232,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('keeps the environment and task action keys to their header aria labels alone', () => {
-    const spelled = spelledLiterals(componentAstOf(MANAGER_ROOT));
+    const spelled = headerCopyLiterals();
     for (const key of [
       'FABRICATE.Admin.Manager.Environment.Actions',
       'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
@@ -1909,7 +1920,7 @@ describe('CraftingSystemManager source contract', () => {
 
   it('keeps the gathering task actions key to the header aria label alone', () => {
     const key = 'FABRICATE.Admin.Manager.Environment.Tasks.Actions';
-    const spelled = spelledLiterals(componentAstOf(MANAGER_ROOT)).filter((text) => text === key);
+    const spelled = headerCopyLiterals().filter((text) => text === key);
     assert.equal(
       spelled.length,
       1,
@@ -2692,7 +2703,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   /** The `{key, fallback}` pair `viewTitle` declares per world scoped-entity route. */
   function scopedTitlesFromRoot() {
     const titles = new Map();
-    const viewTitle = namedCodeAst(componentAstOf(MANAGER_ROOT).instance, 'viewTitle');
+    const viewTitle = namedCodeAst(moduleAstOf(HEADER_MODEL).ast, 'viewTitle');
     for (const node of walkNodes(viewTitle)) {
       if (node.type !== 'IfStatement') continue;
       const view = comparedLiteral(node.test, 'currentView');

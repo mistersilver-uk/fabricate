@@ -15,7 +15,7 @@ tests/companion-component-award.test.js	5
 tests/companion-currency-credit.test.js	6
 tests/component-category-normalization.test.js	6
 tests/component-complications-plan.test.js	4
-tests/component-world-scope-screens.test.js	21
+tests/component-world-scope-screens.test.js	22
 tests/components/access-tab-view-mounted.test.js	3
 tests/components/alchemy-known-recipe-layout.test.js	3
 tests/components/avatar-mounted.test.js	3
@@ -50,7 +50,7 @@ tests/components/gathering-parties-tab.test.js	2
 tests/components/gathering-realm-toggle.test.js	32
 tests/components/gathering-task-browser-redesign.test.js	24
 tests/components/gathering-task-editor-economy.test.js	40
-tests/components/gathering-task-editor-summary.test.js	44
+tests/components/gathering-task-editor-summary.test.js	43
 tests/components/gathering-view-actor-bar.test.js	32
 tests/components/icon-picker-layout.test.js	4
 tests/components/interactable-browser-app.test.js	86
