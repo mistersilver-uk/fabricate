@@ -4,7 +4,7 @@
  * `headerActionsLabel` as they stood at `b581be315`, before the move, so this is an oracle rather
  * than a re-reading of the module it tests.
  *
- * The localizer here answers with the KEY, which is the fact this suite owns: a route wearing its
+ * The localizer here answers with the key, which is the fact this suite owns: a route wearing its
  * sibling's key renders plausible copy and is invisible to a string assertion. The rendered
  * sentences are pinned separately by the DOM census in `tests/components/manager-header-mounted.js`.
  *
@@ -459,7 +459,7 @@ describe('headerModel', () => {
     }
   });
 
-  it('gives every route a DISTINCT title, apart from the four routes that share one on purpose', () => {
+  it('gives every route a distinct title, apart from the four routes that share one on purpose', () => {
     const byTitle = new Map();
     for (const [view, row] of Object.entries(ROUTES)) {
       byTitle.set(row.title, [...(byTitle.get(row.title) ?? []), view]);

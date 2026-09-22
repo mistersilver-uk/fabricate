@@ -43,10 +43,8 @@ const { mountDowntimeManager, mountManager, openRecipeEditor } = createManagerMo
 });
 
 // ── The page header's rendered DOM, pinned per reachable state (issue 1720) ──────────────────
-// The extraction lifts a 1,100-line header out of the root and hands each child its props by
-// hand, so the defect it can produce is a correctly-shaped element fed the wrong prop; only a
-// census of attribute values sees that. The walk, the delta and the literal writer are
-// `tests/helpers/domCensus.js`, shared with the nav rail's census.
+// The walk, the delta and the literal writer are `tests/helpers/domCensus.js`, shared with the
+// nav rail's census.
 const CENSUS_REGENERATE =
   'UPDATE_HEADER_CENSUS=1 node --conditions=browser --test tests/components/manager-mounted.test.js';
 const CENSUS_FILE = resolve(import.meta.dirname, 'manager-header-mounted.js');
@@ -78,7 +76,7 @@ function headerCensus(host) {
   return lines;
 }
 
-// NAMED world records, one corpus per leg: a heading is about a name, so an id-only corpus is
+// Named world records, one corpus per leg: a heading is about a name, so an id-only corpus is
 // mute. `water` matches the in-system essence the store double publishes, which is what puts the
 // essence rules editor into its world-backed branch.
 const WORLD_ESSENCES = Object.freeze([
@@ -87,7 +85,7 @@ const WORLD_ESSENCES = Object.freeze([
 ]);
 const WORLD_TOOLS = Object.freeze([Object.freeze({ id: 'pick', name: 'Mining Pick' })]);
 const WORLD_COMPONENTS = Object.freeze([Object.freeze({ id: 'vial', name: 'Glass Vial' })]);
-// The store double publishes an EMPTY event library by default, and an empty library offers no
+// The store double publishes an empty event library by default, and an empty library offers no
 // row to open the event editor by.
 const GATHERING_EVENTS = Object.freeze([
   Object.freeze({ id: 'event-thorns', name: 'Thorn Snare', enabled: true, dropRate: 10 }),
@@ -279,7 +277,7 @@ const saveTitled = (expected, why) => assert.equal(headerSaveButton(target).titl
 /**
  * Every state the header draws, as `{ view, open, prove }`. `view` is asserted against the
  * rendered route token and `prove` against the hook that distinguishes this state from its
- * siblings, BEFORE the census is taken: a navigation that silently went nowhere, or a keystroke
+ * siblings, before the census is taken: a navigation that silently went nowhere, or a keystroke
  * that never dirtied a draft, would otherwise freeze one state under another's name and thirty
  * such rows would agree with each other.
  */
@@ -515,7 +513,7 @@ const CENSUS_STATES = {
     },
     prove: () => hook('.manager-header-actions .manager-chip', 'the draft never went dirty'),
   },
-  'the Tool Studio, which is the OTHER header element': {
+  'the Tool Studio, which is the other header element': {
     view: 'tools',
     open: async () => {
       mountManager();
@@ -1388,7 +1386,7 @@ const HEADER_CENSUS = Object.freeze({
       "+ 3 i aria-hidden=\"true\" class=\"fas fa-save\"",
       "+ 3 span | Save event",
     ],
-    "the Tool Studio, which is the OTHER header element": [
+    "the Tool Studio, which is the other header element": [
       "- 0 header class=\"manager-header\"",
       "+ 0 header class=\"manager-header manager-tools-context-header\" data-tool-library-context=\"\"",
       "- 2 div class=\"manager-page-kicker\"",

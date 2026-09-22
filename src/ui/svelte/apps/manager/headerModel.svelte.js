@@ -405,8 +405,10 @@ function viewSubtitle(inputs) {
         'Browse scene-linked gathering environments and open the existing editor for task authoring.'
       )
     );
-  const keyed = SUBTITLE_KEYS[currentView];
-  if (keyed) return text(keyed[0], keyed[1]);
+  if (Object.hasOwn(SUBTITLE_KEYS, currentView)) {
+    const keyed = SUBTITLE_KEYS[currentView];
+    return text(keyed[0], keyed[1]);
+  }
   return text(
     'FABRICATE.Admin.Manager.Subtitle',
     'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.'

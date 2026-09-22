@@ -4,7 +4,7 @@
  *
  * The defect a hand-split component produces is a correctly-shaped element fed the wrong prop, so
  * the census pins every element's tag, nesting depth, own text and every attribute name and value.
- * Attribute ORDER is deliberately not pinned: it is a compiler artefact of which attributes are
+ * Attribute order is deliberately not pinned: it is a compiler artefact of which attributes are
  * static, and nothing rendered, styled, announced or serialised reads it.
  */
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ import { byCodePoint } from './ratchetBaseline.js';
 const censusMark = (name, edge) => `/* ${name}-census:${edge} */`;
 
 /** One element as `{ tag, attrs, text }`: every attribute name and value, and its own text. */
-export function censusRecord(element) {
+function censusRecord(element) {
   return {
     tag: element.tagName.toLowerCase(),
     attrs: Object.fromEntries([...element.attributes].map((a) => [a.name, a.value])),
@@ -36,7 +36,7 @@ export function censusRecord(element) {
  * are sorted by name, exactly as the `deepEqual` over `Object.fromEntries` this serialises is
  * key-order-insensitive.
  */
-export function censusLine(element) {
+function censusLine(element) {
   const { tag, attrs, text } = censusRecord(element);
   const written = Object.entries(attrs)
     .sort(([left], [right]) => byCodePoint(left, right))
@@ -89,7 +89,7 @@ function censusDepth(element, root) {
 }
 
 /**
- * Every ELEMENT of `root`, itself included, depth-prefixed and in document order. Document order
+ * Every element of `root`, itself included, depth-prefixed and in document order. Document order
  * survives lifting an element out of its parent into the parent's own position — the characteristic
  * defect of a markup split — and the depth prefix is what makes the record a tree rather than a
  * sequence. Comment and anchor nodes are outside the walk by construction, so the anchors a split
