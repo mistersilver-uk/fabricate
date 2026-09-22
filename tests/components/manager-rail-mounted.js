@@ -2,7 +2,6 @@
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
@@ -10,7 +9,7 @@ import { useShippedLocalization } from '../helpers/manager/managerLocalization.j
 import { createStore, downtimeProvider } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { byCodePoint } from '../helpers/ratchetBaseline.js';
+import { censusDelta, censusOf, writeCensus } from '../helpers/domCensus.js';
 import {
   assertHook,
   assertNoHook,
@@ -47,118 +46,22 @@ const { mountManager, openRecipeEditor } = createManagerMounts({
 // ── The rail's rendered DOM, pinned per reachable state (issue 1717) ─────────────────────────
 // The extraction forwards about sixty bindings by hand across two component levels, so the defect
 // it can produce is a correctly-shaped element fed the wrong prop; only a census of attribute
-// values sees that. It pins, per state, every element's tag, nesting depth, own text and every
-// attribute name and value, order-insensitively — attribute insertion order is a compiler
-// artefact and is deliberately not pinned.
+// values sees that. The walk and the literal writer live in `tests/helpers/domCensus.js`, which the
+// page-header census shares (issue 1720).
 const CENSUS_REGENERATE =
   'UPDATE_RAIL_CENSUS=1 node --conditions=browser --test tests/components/manager-mounted.test.js';
 const CENSUS_FILE = resolve(import.meta.dirname, 'manager-rail-mounted.js');
+const CENSUS_NAME = 'rail';
 // The state the other four are pinned as a difference from; it must be the first entry of
 // `CENSUS_STATES`, because `writeCensus` emits the baseline before the deltas taken against it.
 const CENSUS_BASE_STATE = 'a system selected, the rail expanded, every group collapsed';
-// Built from a token so the marks below are not themselves a match: the writer rewrites the
-// first region it finds, and a literal sentinel in its own source would be that region.
-const censusMark = (edge) => `/* rail-census:${edge} */`;
-
-/** One element as `{ tag, attrs, text }`: every attribute name and value, and its own text. */
-function censusRecord(element) {
-  return {
-    tag: element.tagName.toLowerCase(),
-    attrs: Object.fromEntries([...element.attributes].map((a) => [a.name, a.value])),
-    text: [...element.childNodes]
-      .filter((node) => node.nodeType === 3)
-      .map((node) => node.textContent)
-      .join('')
-      .replace(/\s+/g, ' ')
-      .trim(),
-  };
-}
-
-// The one record builder every literal below is emitted from: the record as a single line, so
-// five states of a 150-element rail stay inside one screen of diff and repeat no markup.
-// Attributes are sorted by name, exactly as the `deepEqual` over `Object.fromEntries` this
-// serialises is key-order-insensitive: DOM attribute insertion order is a compiler artefact of
-// which attributes are static and which are not, and nothing rendered, styled, announced or
-// serialised reads it. Every attribute name and value is still in the compared value.
-function censusLine(element) {
-  const { tag, attrs, text } = censusRecord(element);
-  const written = Object.entries(attrs)
-    .sort(([left], [right]) => byCodePoint(left, right))
-    .map(([name, value]) => `${name}=${JSON.stringify(value)}`);
-  return [tag, ...written, ...(text ? [`| ${text}`] : [])].join(' ');
-}
-
-// Each further state is pinned as its difference from the baseline, because four of the five
-// censuses are over 90% the same rows: collapsing the rail moves two records, and stating that is
-// both the clearer claim and the one that does not multiply the pinned text. `-` is a row the
-// baseline has and this state does not; `+` the reverse.
-function censusDelta(base, next) {
-  const common = Array.from({ length: base.length + 1 }, () => new Array(next.length + 1).fill(0));
-  for (let i = base.length - 1; i >= 0; i -= 1) {
-    for (let j = next.length - 1; j >= 0; j -= 1) {
-      common[i][j] =
-        base[i] === next[j]
-          ? common[i + 1][j + 1] + 1
-          : Math.max(common[i + 1][j], common[i][j + 1]);
-    }
-  }
-  const delta = [];
-  let i = 0;
-  let j = 0;
-  while (i < base.length && j < next.length) {
-    if (base[i] === next[j]) {
-      i += 1;
-      j += 1;
-    } else if (common[i + 1][j] >= common[i][j + 1]) {
-      delta.push(`- ${base[i]}`);
-      i += 1;
-    } else {
-      delta.push(`+ ${next[j]}`);
-      j += 1;
-    }
-  }
-  return [
-    ...delta,
-    ...base.slice(i).map((row) => `- ${row}`),
-    ...next.slice(j).map((row) => `+ ${row}`),
-  ];
-}
-
-// `querySelectorAll('*')` is document order, and document order survives lifting an element out
-// of its parent into the parent's own position — the characteristic defect of a markup split. The
-// depth prefix is what makes the record a tree rather than a sequence.
-function censusDepth(element, rail) {
-  let depth = 0;
-  for (let node = element; node && node !== rail; node = node.parentElement) depth += 1;
-  return depth;
-}
 
 function railCensus(host) {
   const rail = host.querySelector('.manager-rail');
   assert.ok(Boolean(rail), 'the census needs the rail itself to render');
-  const lines = [rail, ...rail.querySelectorAll('*')].map(
-    (element) => `${censusDepth(element, rail)} ${censusLine(element)}`
-  );
+  const lines = censusOf(rail);
   assert.ok(lines.length > 40, `the census walked ${lines.length} elements; the scan broke`);
   return lines;
-}
-
-/** Rewrite the sentinel-delimited literal in place, so it stays derived rather than hand-edited. */
-function writeCensus(observed) {
-  const source = readFileSync(CENSUS_FILE, 'utf8');
-  const open = source.indexOf(censusMark('start'));
-  const close = source.indexOf(censusMark('end'));
-  assert.ok(open >= 0 && close > open, 'the census literal lost its sentinels');
-  const rowsOf = (lines, indent) =>
-    lines.map((line) => `${indent}${JSON.stringify(line)},`).join('\n');
-  const deltas = Object.entries(observed.deltas)
-    .map(([state, lines]) => `    ${JSON.stringify(state)}: [\n${rowsOf(lines, '      ')}\n    ],`)
-    .join('\n');
-  const body = `  base: [\n${rowsOf(observed.base, '    ')}\n  ],\n  deltas: {\n${deltas}\n  },`;
-  writeFileSync(
-    CENSUS_FILE,
-    `${source.slice(0, open + censusMark('start').length)}\n${body}\n  ${source.slice(close)}`
-  );
 }
 
 const RAIL_CENSUS = Object.freeze({
@@ -1513,7 +1416,7 @@ export function registerRailCases() {
     };
 
     if (process.env.UPDATE_RAIL_CENSUS) {
-      writeCensus(observed);
+      writeCensus(CENSUS_FILE, CENSUS_NAME, observed);
       return;
     }
     assert.deepEqual(
