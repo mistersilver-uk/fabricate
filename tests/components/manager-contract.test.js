@@ -163,6 +163,8 @@ const ROUTE_EXIT_GUARDS = 'src/ui/svelte/apps/manager/routeExitGuards.js';
 const SYSTEMS_BROWSER = 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
+// The system screen's presentation model (issue 1915), the world screen's twin.
+const SYSTEM_VOCABULARY = 'src/ui/svelte/apps/manager/systemVocabularyStudio.js';
 const WORLD_CURRENCY = 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte';
 const WORLD_MODIFIERS = 'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte';
 // The world Tool entry, which took the linked-item card off the system editor (issue 1373).
@@ -1318,8 +1320,15 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract('owns the vocabulary wiring on that page', TAGS_CATEGORIES, {
     declaresProp: ['onRemoveCategory', 'onRemoveComponentCategory', 'onSetComponentCategoryIcon'],
-    spellsExactly: ['FABRICATE.Admin.Manager.TagsCategories.GeneralReservedFeedback'],
+    renders: ['VocabularyShell', 'VocabularyShellPanel'],
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
+  // The copy and the hint machines moved OUT of the view at issue 1915: it states no vocabulary
+  // string of its own any more, so the key that pinned the reserved-bucket refusal is re-pointed
+  // at the presentation model that now spells it.
+  defineStructureContract('states the system vocabulary copy in its own model', SYSTEM_VOCABULARY, {
+    spellsExactly: ['FABRICATE.Admin.Manager.TagsCategories.GeneralReservedFeedback'],
   });
 
   // What the browser renders — the rows, the disabled marker, the capability pills, the usage

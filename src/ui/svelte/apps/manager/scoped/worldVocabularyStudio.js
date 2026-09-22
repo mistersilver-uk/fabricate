@@ -1,8 +1,9 @@
 /**
- * The pure presentation model behind the world Tags & Categories screen (issue 1392, epic 1357).
- * It imports NOTHING from `src/ui/`: a store reached from here would land in the closure of every
- * mounted suite rendering this page. Three panels mount SIMULTANEOUSLY, so per-kind row
- * attributes and control ids are DATA in {@link WORLD_VOCABULARY_PANELS}, not spelled per panel.
+ * The pure presentation model behind the WORLD Tags & Categories screen (issue 1392, epic 1357).
+ * It imports NOTHING from `src/ui/` except the shared shell's own pure leaf: a store reached from
+ * here would land in the closure of every mounted suite rendering this page. Three panels mount
+ * SIMULTANEOUSLY, so per-kind row attributes and control ids are DATA in
+ * {@link WORLD_VOCABULARY_PANELS}, not spelled per panel.
  */
 
 import {
@@ -11,43 +12,42 @@ import {
 } from '../../../../../systems/worldVocabulary.js';
 import { isGeneralComponentCategory } from '../../../../../utils/componentCategories.js';
 import { isGeneralRecipeCategory } from '../../../../../utils/recipeCategories.js';
+import {
+  decorateTagRows,
+  defineVocabularyPanel,
+  inputNormalizer,
+  vocabularyPanelProps,
+} from '../vocabularyShell.js';
+
+// Re-exported because the screen's whole add-path contract is read from this module.
+export { inputNormalizer } from '../vocabularyShell.js';
 
 /** The lang-key root every world vocabulary string hangs off. */
 const LANG_ROOT = 'FABRICATE.Admin.Manager.Scoped.WorldVocabulary';
 
 /**
  * The three panels, in draw order: the two category vocabularies in the 2-up grid, then the
- * component tags full width. `column` is what the page groups on, so the layout is stated once.
+ * component tags full width. Only the fields the WORLD scope owns are stated; the column and the
+ * head glyph belong to the vocabulary and come from `defineVocabularyPanel`.
  */
 export const WORLD_VOCABULARY_PANELS = Object.freeze([
-  Object.freeze({
+  defineVocabularyPanel({
     kind: 'recipeCategories',
-    column: 'grid',
     langGroup: 'RecipeCategories',
-    icon: 'fas fa-scroll',
-    emptyIcon: 'fas fa-scroll',
-    decorativeIcon: '',
     rowAttr: 'data-recipe-category-id',
     inputId: 'world-vocabulary-recipe-category-add',
     sortLabelId: 'world-vocabulary-sort-recipe-categories',
   }),
-  Object.freeze({
+  defineVocabularyPanel({
     kind: 'componentCategories',
-    column: 'grid',
     langGroup: 'ComponentCategories',
-    icon: 'fas fa-cubes-stacked',
-    emptyIcon: 'fas fa-cubes-stacked',
-    decorativeIcon: '',
     rowAttr: 'data-component-category-id',
     inputId: 'world-vocabulary-component-category-add',
     sortLabelId: 'world-vocabulary-sort-component-categories',
   }),
-  Object.freeze({
+  defineVocabularyPanel({
     kind: 'componentTags',
-    column: 'full',
     langGroup: 'ComponentTags',
-    icon: 'fas fa-hashtag',
-    emptyIcon: 'fas fa-hashtag',
     // The tag rows take the shipped `decorativeIcon` card treatment rather than the reference's
     // pill: a pill needs a panel prop issue 1411 owns. Recorded as an accepted deviation.
     decorativeIcon: 'fas fa-hashtag',
@@ -62,43 +62,13 @@ export function panelKey(panel, field) {
   return `${LANG_ROOT}.${panel.langGroup}.${field}`;
 }
 
-/** The two sort keys the page offers; both labels are shipped keys, and neither is minted here. */
-export const WORLD_VOCABULARY_SORT_KEYS = Object.freeze([
-  Object.freeze({
-    id: 'name',
-    key: 'FABRICATE.Admin.Manager.Scoped.List.SortKeyName',
-    fallback: 'Name',
-  }),
-  Object.freeze({
-    id: 'references',
-    key: 'FABRICATE.Admin.Manager.TagsCategories.References',
-    fallback: 'References',
-  }),
-]);
-
-/** Sort one panel's rows: copied before sorting, and every comparator ties back to the name. */
-export function sortVocabularyRows(rows, sortKey, direction) {
-  const list = Array.isArray(rows) ? [...rows] : [];
-  const sign = direction === 'desc' ? -1 : 1;
-  const byName = (a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? ''));
-  list.sort((a, b) => {
-    if (sortKey === 'references') {
-      const delta = (Number(a?.totalUsage) || 0) - (Number(b?.totalUsage) || 0);
-      return delta === 0 ? byName(a, b) : sign * delta;
-    }
-    return sign * byName(a, b);
-  });
-  return list;
-}
-
 /**
  * One panel's rows, decorated; nothing is recomputed. Component tags gain a `displayName` of
  * `#name` WITHOUT disturbing `name`, which the remove handler and confirm sentence both read.
  */
 export function panelRows(vocabulary, panel) {
   const rows = Array.isArray(vocabulary?.[panel.kind]) ? vocabulary[panel.kind] : [];
-  if (panel.kind !== 'componentTags') return rows;
-  return rows.map((row) => ({ ...row, displayName: `#${row.name}` }));
+  return panel.kind === 'componentTags' ? decorateTagRows(rows) : rows;
 }
 
 /** Whether this kind refuses the reserved general bucket, read from the shipped guards. */
@@ -129,17 +99,6 @@ export function cascadeClause(panel, row, text) {
     clause = clause.split(`{${token}}`).join(String(value));
   }
   return clause;
-}
-
-/** The value handed to `onAdd`: tags are lowercased, categories keep their authored casing. */
-export function inputNormalizer(kind) {
-  if (kind === 'componentTags') {
-    return (value) =>
-      String(value || '')
-        .trim()
-        .toLowerCase();
-  }
-  return (value) => String(value || '').trim();
 }
 
 /**
@@ -183,4 +142,61 @@ export function describeVocabularyInput(panel, rows, text) {
       blocked: false,
     };
   };
+}
+
+/**
+ * One panel's localized string. The panel is the FIRST argument at every call site because
+ * `world-vocabulary-lang-contract.test.js` extracts the field names from that shape.
+ */
+function panelText(panel, field, text, fallback = '') {
+  return text(panelKey(panel, field), fallback);
+}
+
+/**
+ * The whole prop bag for one world panel. Every per-kind copy spelling lives here rather than on
+ * the page, and the shared assembler carries the structural half both scopes agree on.
+ *
+ * @param {object} panel one {@link WORLD_VOCABULARY_PANELS} descriptor
+ * @param {{rows: object[], text: Function, routeIcon: string, onAdd: Function, onRemove: Function}} wiring
+ * @returns {object} the props `VocabularyShellPanel` takes and spreads over `VocabularyPanel`
+ */
+export function worldPanelProps(panel, { rows, text, routeIcon = '', onAdd, onRemove }) {
+  const label = panelText(panel, 'Title', text);
+  return vocabularyPanelProps(
+    panel,
+    {
+      label,
+      subline: panelText(panel, 'Subline', text),
+      sortToolbarLabel: text(`${LANG_ROOT}.SortToolbar`, 'Sort {vocabulary}').replace(
+        '{vocabulary}',
+        label
+      ),
+      inputLabel: panelText(panel, 'InputLabel', text),
+      inputPlaceholder: panelText(panel, 'Placeholder', text),
+      addLabel: panelText(panel, 'AddLabel', text),
+      emptyTitle: panelText(panel, 'EmptyTitle', text),
+      emptyHint: panelText(panel, 'EmptyHint', text),
+      searchPlaceholder: panelText(panel, 'SearchPlaceholder', text),
+      searchLabel: panelText(panel, 'SearchLabel', text),
+      searchMissTitle: panelText(panel, 'SearchMiss', text, 'No matches for "{query}".'),
+      removeLabel: panelText(panel, 'RemoveLabel', text),
+      removeNamedLabel: panelText(panel, 'RemoveNamedLabel', text, '{name}'),
+      removeConfirmHint: panelText(panel, 'RemoveConfirm', text),
+      confirmRemoveLabel: text(
+        'FABRICATE.Admin.Manager.TagsCategories.ConfirmRemove',
+        'Delete anyway'
+      ),
+      cancelRemoveLabel: text('FABRICATE.Admin.Manager.Cancel', 'Cancel'),
+      addFailedFeedback: panelText(panel, 'AddFailedFeedback', text),
+    },
+    {
+      icon: panel.icon || routeIcon,
+      rows,
+      describeInput: describeVocabularyInput(panel, rows, text),
+      normalize: inputNormalizer(panel.kind),
+      successFeedback: () => panelText(panel, 'AddedFeedback', text),
+      onAdd: (value) => onAdd(panel, value),
+      onRemove: (row) => onRemove(panel, row),
+    }
+  );
 }

@@ -1,4 +1,8 @@
-/** The Tags & Categories route: both tabs, their icons, badges and cascade-safe delete. */
+/**
+ * The Tags & Categories route: three vocabularies on one screen, their icons, counters and
+ * cascade-safe delete. Since issue 1915 there are no tabs, so every locator below is scoped to
+ * its own `[data-vocabulary-panel]` - an unscoped one now matches the first of three panels.
+ */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +12,7 @@ import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries, setInputValue } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
 import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
+import { normalizeVocabularyKey } from '../../src/ui/model/vocabularyUsage.js';
 
 let Component;
 let mounted;
@@ -16,6 +21,16 @@ let target;
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { navButton, vocabularyCounters } = queries;
+
+/** One vocabulary panel's subtree. Three are mounted at once, so nothing is asked of `target`. */
+const panelFor = (kind) => target.querySelector(`[data-vocabulary-panel="${kind}"]`);
+
+/** Submit one panel's add form, exactly as pressing Enter in its field does. */
+function submitAddForm(kind) {
+  panelFor(kind)
+    .querySelector('form')
+    .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}
 const { mountManager, openTagsScreen } = createManagerMounts({
   queries,
   component: () => Component,
@@ -43,7 +58,7 @@ export function registerTagsCases() {
   });
 
 
-  it('routes to the tabbed tags and categories screen with live validation, icons, and cascade-safe inline delete (issue 689)', async () => {
+  it('routes to the tags and categories screen with live validation, icons, and cascade-safe inline delete (issue 689)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -64,11 +79,14 @@ export function registerTagsCases() {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'tags');
-    // The three vocabularies are tabs; the recipe tab is shown first.
-    assert.ok(target.querySelector('[data-vocabulary-tab="recipe"]'));
-    assert.ok(target.querySelector('[data-vocabulary-tab="component"]'));
-    assert.ok(target.querySelector('[data-vocabulary-tab="tag"]'));
-    assert.ok(target.textContent.includes('potions'), 'recipe tab shows its custom category');
+    // The three vocabularies mount SIMULTANEOUSLY since issue 1915; none is behind a tab.
+    assert.ok(panelFor('recipeCategories'));
+    assert.ok(panelFor('componentCategories'));
+    assert.ok(panelFor('componentTags'));
+    assert.ok(
+      target.textContent.includes('potions'),
+      'the recipe-category panel shows its custom category'
+    );
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
     // A referenced category carries a per-category icon on its row.
     assert.ok(
@@ -84,90 +102,44 @@ export function registerTagsCases() {
       null,
       'the tags route must not render a second page header'
     );
-    // Item 3: the strip uses the shared editor-tab treatment, not a bespoke one.
-    const vocabularyTabs = target.querySelector('.manager-vocabulary-tabs');
-    assert.ok(
-      vocabularyTabs.classList.contains('manager-editor-tabs'),
-      'the vocabulary tab strip reuses the shared editor tab bar'
+    // Issue 1915: the strip is RETIRED, roles and classes together, and each panel carries its
+    // own head and sort control instead.
+    assert.equal(
+      target.querySelectorAll('[data-vocabulary-tab], .manager-vocabulary-tabs').length,
+      0,
+      'no tab strip survives on this route'
     );
-    assert.ok(
-      target
-        .querySelector('[data-vocabulary-tab="recipe"]')
-        .classList.contains('manager-editor-tab-button'),
-      'each vocabulary tab reuses the shared editor tab button'
-    );
-    assert.ok(
-      target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-count'),
-      'each vocabulary tab carries the shared editor tab RECORD COUNT (issue 1429): these are ' +
-        'whole-vocabulary counts, and the Rail Marker Family draws a record count as a bare ' +
-        'mono numeral rather than through the issue-summary chip this strip used to pass'
-    );
-    assert.ok(
-      !target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-badge'),
-      'and must not ALSO draw a chip: substituting one vehicle for another is what the family ' +
-        'exists to prevent, so the chip is gone rather than kept alongside'
-    );
-
-    // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
-    const howItWorks = target.querySelector('[data-tags-evidence="how-it-works"]');
-    assert.ok(howItWorks);
-    assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
-    assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
-    assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
-    const referenceSafe = target.querySelector('[data-tags-evidence="reference-safe"]');
-    assert.ok(referenceSafe);
-
-    // Issue 881: both contextual-help cards render through the SAME explainer primitive
-    // the Tool Studio's "How Tools work in Fabricate" card uses, so the rail stops
-    // re-deriving one meaning as a disc-bulleted list and a bare paragraph. Rendering the
-    // card shell, the shared card title and the glyph-led rows is the observable contract.
-    for (const card of [howItWorks, referenceSafe]) {
+    for (const kind of ['recipeCategories', 'componentCategories', 'componentTags']) {
       assert.ok(
-        card.classList.contains('manager-inspector-card') &&
-          card.classList.contains('manager-explainer-card'),
-        'the tags help cards wear the shared side-panel card shell'
+        panelFor(kind).querySelector('.manager-vocabulary-shell-head h3'),
+        `the ${kind} panel states its own title in its head`
       );
       assert.ok(
-        card.querySelector('h3.manager-card-title.manager-explainer-card-title > i'),
-        'the tags help cards carry the shared glyph-led card title'
+        panelFor(kind).querySelector('select[data-vocabulary-sort]'),
+        `the ${kind} panel carries its own sort control`
       );
     }
+
+    // Issue 1915: the inspector rail is RETIRED, so the whole route runs without an aside and
+    // nothing on screen states a total across the three vocabularies.
     assert.equal(
-      howItWorks.querySelectorAll('.manager-explainer-card-list > li').length,
-      3,
-      'the recipe-categories help renders its three rows through the explainer list'
+      target.querySelectorAll('[data-tags-evidence], [data-tags-category-fact]').length,
+      0,
+      'no at-a-glance tile or explainer card survives the retired rail'
     );
-    assert.equal(
-      referenceSafe.querySelectorAll('.manager-explainer-card-list > li').length,
-      1,
-      'the reference-safety reassurance is one explainer row, not a bare paragraph'
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
+      'the tags route renders no inspector aside at all'
     );
-    assert.equal(
-      target.querySelector('.manager-evidence-list'),
-      null,
-      'the retired bullet list must be gone from the rail, not merely unstyled'
-    );
-    // A bold lead-in and its prose are one sentence.
-    for (const row of howItWorks.querySelectorAll('.manager-explainer-card-list > li')) {
-      const lead = row.querySelector('strong');
-      if (!lead) continue;
-      assert.match(
-        row.textContent,
-        new RegExp(`${lead.textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`),
-        `explainer lead-in "${lead.textContent}" must be separated from its prose`
-      );
-    }
 
     // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
     setInputValue(categoryInput, 'General');
     await tick();
     flushSync();
-    assert.ok(target.querySelector('.manager-vocabulary-hint.is-danger'));
+    assert.ok(panelFor('recipeCategories').querySelector('.manager-vocabulary-hint.is-danger'));
     assert.ok(target.textContent.includes('General is already available as the base category.'));
-    target
-      .querySelector('[aria-label="Recipe categories"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('recipeCategories');
     await tick();
     flushSync();
     assert.ok(
@@ -181,10 +153,8 @@ export function registerTagsCases() {
     setInputValue(categoryInput, 'Elixirs');
     await tick();
     flushSync();
-    assert.ok(target.querySelector('.manager-vocabulary-hint.is-success'));
-    target
-      .querySelector('[aria-label="Recipe categories"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    assert.ok(panelFor('recipeCategories').querySelector('.manager-vocabulary-hint.is-success'));
+    submitAddForm('recipeCategories');
     await tick();
     await tick();
     flushSync();
@@ -192,12 +162,22 @@ export function registerTagsCases() {
     assert.deepEqual(addCall, ['addCategory', 'Elixirs', '']);
     assert.equal(categoryInput.value, '');
 
-    // Per-tab search filters only the active vocabulary and shows an empty state.
-    const search = target.querySelector('.manager-vocabulary-search input[type="search"]');
+    // Per-PANEL search filters only its own vocabulary and shows an empty state; the two
+    // neighbours on the same screen keep every row.
+    const search = panelFor('recipeCategories').querySelector(
+      '.manager-vocabulary-search input[type="search"]'
+    );
     setInputValue(search, 'zzzz');
     await tick();
     flushSync();
-    assert.ok(target.textContent.includes('No matches for "zzzz".'));
+    assert.ok(
+      panelFor('recipeCategories').textContent.includes('No matches for "zzzz".'),
+      'the searched panel states the miss'
+    );
+    assert.ok(
+      panelFor('componentTags').querySelector('[data-tag-id]'),
+      'and the tag panel beside it still lists its rows'
+    );
     setInputValue(search, '');
     await tick();
     flushSync();
@@ -219,19 +199,16 @@ export function registerTagsCases() {
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'removeCategory' && call[1] === 'potions'));
 
-    // The tag tab lowercases as you type and delegates the normalized value.
-    target.querySelector('[data-vocabulary-tab="tag"]').click();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('[data-tag-id="ore"]'), 'the tag tab lists item tags');
+    // The tag panel lowercases as you type and delegates the normalized value.
+    assert.ok(panelFor('componentTags').querySelector('[data-tag-id="ore"]'), 'it lists item tags');
     // Tag rows carry a fixed, non-editable decorative accent tile (issue 689 fidelity):
-    const tagIconTile = target.querySelector(
+    const tagIconTile = panelFor('componentTags').querySelector(
       '[data-tag-id="ore"] .manager-vocabulary-icon.is-decorative'
     );
     assert.ok(tagIconTile, 'each tag row renders a decorative accent icon tile');
     assert.ok(
-      tagIconTile.querySelector('i.fa-tag'),
-      'the decorative tag tile uses the fa-tag glyph'
+      tagIconTile.querySelector('i.fa-hashtag'),
+      'the decorative tag tile wears the tag vocabulary’s own glyph, the one heading its panel'
     );
     assert.ok(
       !target.querySelector('[data-tag-id="ore"] [data-vocabulary-icon-picker]'),
@@ -241,11 +218,9 @@ export function registerTagsCases() {
     setInputValue(tagInput, 'SPICE');
     await tick();
     flushSync();
-    assert.ok(target.querySelector('.manager-vocabulary-hint.is-info'));
+    assert.ok(panelFor('componentTags').querySelector('.manager-vocabulary-hint.is-info'));
     assert.ok(target.textContent.includes('Will be added as "spice"'));
-    target
-      .querySelector('[aria-label="Component tags"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('componentTags');
     await tick();
     await tick();
     flushSync();
@@ -254,7 +229,7 @@ export function registerTagsCases() {
 
     // An UNUSED entry deletes in one click, matching the prototype.
     assert.ok(
-      target.querySelector('[data-tag-id="herb"] .manager-vocabulary-chip-unused'),
+      panelFor('componentTags').querySelector('[data-tag-id="herb"] .manager-vocabulary-chip-unused'),
       'the unused tag row is flagged Unused'
     );
     target.querySelector('[aria-label="Remove tag herb"]').click();
@@ -271,8 +246,8 @@ export function registerTagsCases() {
     );
   });
 
-  it('manages COMPONENT categories as an independent tab, distinct from recipe categories (issue 676, 689)', async () => {
-    // The three vocabularies are tabs (issue 689).
+  it('manages COMPONENT categories as an independent panel, distinct from recipe categories (issue 676, 689)', async () => {
+    // The three vocabularies are panels on one screen (issues 689, 1915).
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -288,14 +263,8 @@ export function registerTagsCases() {
     await tick();
     flushSync();
 
-    // The recipe tab leads; the component vocabulary is not yet mounted.
-    assert.equal(target.querySelector('[data-component-category-id]'), null);
-    target.querySelector('[data-vocabulary-tab="component"]').click();
-    await tick();
-    flushSync();
-
-    const panel = target.querySelector('[aria-label="Component categories"]');
-    assert.ok(panel, 'the component-categories tab renders its panel');
+    const panel = panelFor('componentCategories');
+    assert.ok(panel, 'the component-categories vocabulary renders its own panel');
     // The seeded vocabulary reaches it through the selectedSystem viewState projection.
     assert.ok(
       target.querySelector('[data-component-category-id="reagent"]'),
@@ -305,11 +274,12 @@ export function registerTagsCases() {
       target.querySelector('[data-component-category-id="general"]'),
       'the reserved General row renders, locked'
     );
-    // The recipe vocabulary is a different tab, so it never leaks into this one.
+    // The recipe vocabulary is a different PANEL on the same screen, so its rows carry a
+    // different hook and never resolve inside this one.
     assert.equal(
       panel.querySelector('[data-category-id]'),
       null,
-      'the recipe vocabulary never leaks into the component tab'
+      'the recipe vocabulary never leaks into the component panel'
     );
 
     // The reserved bucket is refused before it can reach the store (live-blocked).
@@ -317,9 +287,7 @@ export function registerTagsCases() {
     setInputValue(input, 'General');
     await tick();
     flushSync();
-    panel
-      .querySelector('form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('componentCategories');
     await tick();
     flushSync();
     assert.ok(!calls.some((call) => call[0] === 'addComponentCategory'));
@@ -328,16 +296,14 @@ export function registerTagsCases() {
     setInputValue(input, 'Metal');
     await tick();
     flushSync();
-    panel
-      .querySelector('form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('componentCategories');
     await tick();
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'addComponentCategory' && call[1] === 'Metal'));
     assert.ok(
       !calls.some((call) => call[0] === 'addCategory'),
-      'the recipe vocabulary is never written by the component tab'
+      'the recipe vocabulary is never written by the component panel'
     );
     assert.equal(input.value, '');
 
@@ -371,42 +337,39 @@ export function registerTagsCases() {
     );
   });
 
-  it('counts the reserved General bucket in the tab badge, the glance tile and the entry chip alike (issue 878)', async () => {
+  it('counts the reserved General bucket in the rail badge, the entry chip and the rows alike (issue 878)', async () => {
     // Three counters used to disagree on one screen.
     await openTagsScreen();
 
     // The fixture seeds exactly one custom recipe category (`potions`) and one custom
     // component category (`Reagent`), so a correct category counter reads 2. A counter
-    // still subtracting General reads 1 and one double-counting it reads 3.
+    // still subtracting General reads 1 and one double-counting it reads 3. The RAIL badge is
+    // the whole screen's vocabulary, so it is the sum of all three: 2 + 2 + 3.
     assert.deepEqual(
-      vocabularyCounters('recipe', 'recipe-categories'),
-      { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
-      'one custom recipe category plus General is two, on all three surfaces'
+      vocabularyCounters('recipeCategories', 'data-category-id'),
+      { railBadge: '7', entryChip: '2 entries', rowCount: 2 },
+      'one custom recipe category plus General is two, on the panel and in its rows'
     );
     // With a custom entry present General has something to be distinguished FROM.
     assert.ok(
-      target.querySelector('[data-category-id="general"]'),
+      panelFor('recipeCategories').querySelector('[data-category-id="general"]'),
       'the reserved row is listed once a custom category exists'
     );
 
-    target.querySelector('[data-vocabulary-tab="component"]').click();
-    await tick();
-    flushSync();
     assert.deepEqual(
-      vocabularyCounters('component', 'component-categories'),
-      { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
-      'the sibling component vocabulary counts its own General the same way'
+      vocabularyCounters('componentCategories', 'data-component-category-id'),
+      { railBadge: '7', entryChip: '2 entries', rowCount: 2 },
+      'the sibling component vocabulary counts its own General the same way, at the same time'
     );
-    assert.ok(target.querySelector('[data-component-category-id="general"]'));
+    assert.ok(
+      panelFor('componentCategories').querySelector('[data-component-category-id="general"]')
+    );
 
     // Tags are the control: they pass `lockedRow={null}` and have no reserved bucket at
-    // all, so their three counters must equal the raw tag count with nothing added.
-    target.querySelector('[data-vocabulary-tab="tag"]').click();
-    await tick();
-    flushSync();
+    // all, so their counters equal the raw tag count with nothing added.
     assert.deepEqual(
-      vocabularyCounters('tag', 'item-tags'),
-      { tabBadge: '3', glanceTile: '3', entryChip: '3 entries' },
+      vocabularyCounters('componentTags', 'data-tag-id'),
+      { railBadge: '7', entryChip: '3 entries', rowCount: 3 },
       'the tag vocabulary has no reserved bucket, so nothing is added to its count'
     );
   });
@@ -417,22 +380,18 @@ export function registerTagsCases() {
       selectedSystemOverrides: { categories: [], componentCategories: [] },
     });
 
-    assert.equal(
-      target.querySelector('[data-category-id]'),
-      null,
-      'no rows at all render for an empty recipe-category vocabulary, General included'
-    );
     assert.deepEqual(
-      vocabularyCounters('recipe', 'recipe-categories'),
-      { tabBadge: '1', glanceTile: '1', entryChip: '1 entry' },
-      'General is counted even while it is not listed, and the chip reads as a singular'
+      vocabularyCounters('recipeCategories', 'data-category-id'),
+      { railBadge: '5', entryChip: '1 entry', rowCount: 0 },
+      'General is counted even while it is not listed, the chip reads as a singular, and no ' +
+        'rows at all render for an empty recipe-category vocabulary, General included'
     );
 
-    const emptyPanel = target.querySelector('.manager-vocabulary-empty-panel');
+    const emptyPanel = panelFor('recipeCategories').querySelector('.manager-vocabulary-empty-panel');
     assert.ok(emptyPanel, 'the empty-state card renders in place of the reserved row');
     assert.ok(
       emptyPanel.textContent.includes('Only General so far'),
-      'the card names General, so the counters reading 1 have a visible referent'
+      'the card names General, so the counter reading 1 has a visible referent'
     );
     assert.ok(
       emptyPanel.textContent.includes('Every recipe falls under General until you add one.'),
@@ -443,29 +402,23 @@ export function registerTagsCases() {
       'the card is the full panel now that it is the only thing in the list'
     );
 
-    target.querySelector('[data-vocabulary-tab="component"]').click();
-    await tick();
-    flushSync();
-    assert.equal(target.querySelector('[data-component-category-id]'), null);
     assert.deepEqual(
-      vocabularyCounters('component', 'component-categories'),
-      { tabBadge: '1', glanceTile: '1', entryChip: '1 entry' },
+      vocabularyCounters('componentCategories', 'data-component-category-id'),
+      { railBadge: '5', entryChip: '1 entry', rowCount: 0 },
       'the component vocabulary resolves the same way from its own reserved bucket'
     );
     assert.ok(
-      target
+      panelFor('componentCategories')
         .querySelector('.manager-vocabulary-empty-panel')
         .textContent.includes('Every component falls under General until you add one.'),
       'the component card explains its own General, not the recipe one'
     );
 
-    // Tags again as the control: an empty tag vocabulary has genuinely nothing.
-    target.querySelector('[data-vocabulary-tab="tag"]').click();
-    await tick();
-    flushSync();
+    // Tags again as the control: suppressing a reserved row never touches the vocabulary that
+    // has none, and it is rendered beside the two empty ones rather than behind a tab.
     assert.deepEqual(
-      vocabularyCounters('tag', 'item-tags'),
-      { tabBadge: '3', glanceTile: '3', entryChip: '3 entries' },
+      vocabularyCounters('componentTags', 'data-tag-id'),
+      { railBadge: '5', entryChip: '3 entries', rowCount: 3 },
       'suppressing a reserved row never touches the vocabulary that has none'
     );
   });
@@ -530,9 +483,6 @@ export function registerTagsCases() {
   it('commits a component-category icon through the component seam alone', async () => {
     const calls = [];
     await openTagsScreen(calls);
-    target.querySelector('[data-vocabulary-tab="component"]').click();
-    await tick();
-    flushSync();
 
     await chooseRowIcon('reagent', 'vial');
 
@@ -563,9 +513,15 @@ export function registerTagsCases() {
     await tick();
     flushSync();
 
-    // The add form's icon field is the SAME control as the row tile.
-    const iconField = target.querySelector('[data-vocabulary-add-icon]');
+    // The add form's icon field is the SAME control as the row tile. BOTH category panels draw
+    // one now, so it is taken from the recipe panel by name rather than from the document.
+    const iconField = panelFor('recipeCategories').querySelector('[data-vocabulary-add-icon]');
     assert.ok(iconField, 'the add form renders an icon field');
+    assert.equal(
+      panelFor('componentTags').querySelector('[data-vocabulary-add-icon]'),
+      null,
+      'and the tag vocabulary, which has no persisted row icon, renders none'
+    );
     assert.equal(
       iconField.querySelector('input'),
       null,
@@ -590,9 +546,7 @@ export function registerTagsCases() {
     setInputValue(target.querySelector('#manager-category-add'), 'Elixirs');
     await tick();
     flushSync();
-    target
-      .querySelector('[aria-label="Recipe categories"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('recipeCategories');
     await tick();
     await tick();
     flushSync();
@@ -627,9 +581,7 @@ export function registerTagsCases() {
     setInputValue(categoryInput, 'Elixirs');
     await tick();
     flushSync();
-    target
-      .querySelector('[aria-label="Recipe categories"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('recipeCategories');
     await tick();
     await tick();
     flushSync();
@@ -638,16 +590,11 @@ export function registerTagsCases() {
     assert.equal(document.activeElement, categoryInput);
     assert.ok(target.textContent.includes('Category could not be added.'));
 
-    target.querySelector('[data-vocabulary-tab="tag"]').click();
-    await tick();
-    flushSync();
     const tagInput = target.querySelector('#manager-tag-add');
     setInputValue(tagInput, 'spice');
     await tick();
     flushSync();
-    target
-      .querySelector('[aria-label="Component tags"] form')
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    submitAddForm('componentTags');
     await tick();
     await tick();
     flushSync();
@@ -655,6 +602,135 @@ export function registerTagsCases() {
     assert.equal(tagInput.value, 'spice');
     assert.equal(document.activeElement, tagInput);
     assert.ok(target.textContent.includes('Tag could not be added.'));
+  });
+
+  // ── Case-only duplicates collapse to one row rather than crashing the list (issue 1397) ──
+  describe('two entries differing only in case (issue 1397)', () => {
+    /** Every row id one panel renders, in document order. */
+    const rowIds = (kind, rowAttr) =>
+      [...panelFor(kind).querySelectorAll(`[${rowAttr}]`)].map((row) =>
+        row.getAttribute(rowAttr)
+      );
+
+    /** One row's visible name. */
+    const rowName = (kind, rowAttr, id) =>
+      panelFor(kind)
+        .querySelector(`[${rowAttr}="${id}"] .manager-vocabulary-main strong`)
+        .textContent.trim();
+
+    it('renders one row per normalized key across all three vocabularies', async () => {
+      // Before issue 1397 each pair minted two rows under one `id`, and Svelte's keyed `{#each}`
+      // threw `each_key_duplicate` while the screen was rendering - so the whole route died.
+      await openTagsScreen([], {
+        selectedSystemOverrides: {
+          categories: ['Potions', 'potions'],
+          componentCategories: ['Reagent', 'reagent'],
+          itemTags: ['general', 'herb', 'HERB'],
+        },
+      });
+
+      assert.deepEqual(rowIds('recipeCategories', 'data-category-id'), ['general', 'potions']);
+      assert.deepEqual(rowIds('componentCategories', 'data-component-category-id'), [
+        'general',
+        'reagent',
+      ]);
+      // `general` is a TAG here, not a reserved bucket: the tag vocabulary prepends no locked row,
+      // so dropping the key left a stored, referenced, counted tag no GM could manage.
+      assert.deepEqual(rowIds('componentTags', 'data-tag-id'), ['general', 'herb']);
+      // The FIRST spelling in stored order is the one that survives.
+      assert.equal(rowName('recipeCategories', 'data-category-id', 'potions'), 'Potions');
+      assert.equal(rowName('componentCategories', 'data-component-category-id', 'reagent'), 'Reagent');
+      // Tag rows render their name `#`-prefixed, which is the row anatomy rather than the entry.
+      assert.equal(rowName('componentTags', 'data-tag-id', 'herb'), '#herb');
+    });
+
+    it('discloses the spellings behind a collapsed row, and nothing behind a single one', async () => {
+      // The one disclosure the collapse has: pointer-only, so it reaches neither the keyboard nor
+      // a screen reader, and it is the reason the storage half is still issue 1411's to reconcile.
+      await openTagsScreen([], {
+        selectedSystemOverrides: {
+          categories: ['Potions', 'potions'],
+          itemTags: ['general', 'herb', 'HERB'],
+        },
+      });
+
+      const mainOf = (kind, rowAttr, id) =>
+        panelFor(kind).querySelector(`[${rowAttr}="${id}"] .manager-vocabulary-main`);
+      assert.equal(
+        mainOf('recipeCategories', 'data-category-id', 'potions').getAttribute('title'),
+        'Potions, potions'
+      );
+      assert.equal(
+        mainOf('componentTags', 'data-tag-id', 'herb').getAttribute('title'),
+        'herb, HERB'
+      );
+      assert.ok(
+        !mainOf('componentTags', 'data-tag-id', 'general').hasAttribute('title'),
+        'a row standing for one spelling says nothing under the cursor'
+      );
+    });
+
+    it('counts a custom General as the locked row it collides with, not as a second entry', async () => {
+      // The other half of the defect: the two category builders PREPEND the locked General row,
+      // so a GM-authored `General` produced a second row under an id the list already held.
+      // The COUNTERS are what see this one. `splitGeneralRow` lifts every `general`-id row out of
+      // the custom list before it is rendered, so the duplicate never reaches the keyed `{#each}`
+      // and the row list alone cannot tell a collapsed pair from a correct build.
+      await openTagsScreen([], {
+        selectedSystemOverrides: { categories: ['General', 'Potions'], componentCategories: [] },
+      });
+
+      assert.deepEqual(
+        vocabularyCounters('recipeCategories', 'data-category-id'),
+        { railBadge: '6', entryChip: '2 entries', rowCount: 2 },
+        'General plus one custom category is two entries in the panel and two of the six the ' +
+          'rail badge sums, not three'
+      );
+      assert.deepEqual(rowIds('recipeCategories', 'data-category-id'), ['general', 'potions']);
+      assert.ok(
+        panelFor('recipeCategories')
+          .querySelector('[data-category-id="general"]')
+          .textContent.includes('Locked'),
+        'the surviving General row is the locked reserved one, not the GM-authored duplicate'
+      );
+    });
+
+    it('takes every spelling with it when the collapsed row is deleted', async () => {
+      // Storage stays case-preserving, but the DELETE is keyed: `adminStore.removeCategory` drops
+      // every spelling that collapses to the row's key, because its cascade has already reassigned
+      // the records under all of them. A survivor would come back as an orphaned `Unused` row.
+      const stored = ['Potions', 'potions'];
+      const calls = [];
+      await openTagsScreen(calls, { selectedSystemOverrides: { categories: stored } });
+
+      target.querySelector('[aria-label="Remove category Potions"]').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-vocabulary-confirm="potions"] .manager-button.is-danger').click();
+      await tick();
+      flushSync();
+      assert.ok(
+        calls.some((call) => call[0] === 'removeCategory' && call[1] === 'Potions'),
+        'the delete reaches the store with the AUTHORED label of the spelling on screen'
+      );
+
+      // What storage then holds, under the store's own rule rather than a hand-written answer;
+      // `tests/admin-store-vocabulary-cascade.test.js` pins that the mutator applies it.
+      const remaining = stored.filter(
+        (category) => normalizeVocabularyKey(category) !== normalizeVocabularyKey('Potions')
+      );
+      assert.deepEqual(remaining, [], 'the keyed filter leaves no spelling behind');
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      await openTagsScreen([], { selectedSystemOverrides: { categories: remaining } });
+      assert.deepEqual(
+        rowIds('recipeCategories', 'data-category-id'),
+        [],
+        'and the row does NOT come back wearing the other spelling: with no custom category left ' +
+          'the panel falls to its empty state, which withholds the locked General row too'
+      );
+    });
   });
 
   // ── The nav badge reads the pre-counted tag placeholders (issue 1081) ────────────────
@@ -736,12 +812,9 @@ export function registerTagsCases() {
       navButton('Tags & Categories').click();
       await tick();
       flushSync();
-      target.querySelector('[data-vocabulary-tab="tag"]').click();
-      await tick();
-      flushSync();
 
-      const herbRow = target.querySelector('[data-tag-id="herb"]');
-      assert.ok(Boolean(herbRow), 'pre-condition: the tag tab lists `herb`');
+      const herbRow = panelFor('componentTags').querySelector('[data-tag-id="herb"]');
+      assert.ok(Boolean(herbRow), 'pre-condition: the tag panel lists `herb`');
       assert.ok(
         !herbRow.querySelector('.manager-vocabulary-chip-unused'),
         'a tag used only as a recipe ingredient placeholder is NOT unused'

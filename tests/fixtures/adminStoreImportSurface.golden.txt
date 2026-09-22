@@ -44,6 +44,7 @@ import {
   planTagRemovals,
   planRecipeTagRemovals,
 } from '../../model/vocabularyCascade.js';
+import { normalizeVocabularyKey } from '../../model/vocabularyUsage.js';
 import {
   authoredCheckModifierIds,
   isRollExpression,

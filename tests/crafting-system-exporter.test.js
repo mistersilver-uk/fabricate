@@ -267,6 +267,20 @@ test('prepareForImport: keep mode preserves IDs', () => {
   assert.equal(prepared.recipes[0].id, 'r1');
 });
 
+test('prepareForImport: carries a case-only duplicate vocabulary through UNNORMALIZED', () => {
+  // Issue 1397 is fixed at the DISPLAY layer and nowhere else. Storage and transport stay
+  // case-preserving, so `Potions` and `potions` are two entries here and remain two after an
+  // import; the screen collapses them to one row and issue 1411 owns reconciling the two halves.
+  const data = {
+    system: { id: 'sys-1', name: 'Test', categories: ['Potions', 'potions'], itemTags: ['herb'] },
+    recipes: []
+  };
+
+  const prepared = prepareForImport(data, 'keep');
+
+  assert.deepEqual(prepared.system.categories, ['Potions', 'potions']);
+});
+
 test('prepareForImport: copy mode strips the system ID, appends "(Copy)", and regenerates recipe IDs', () => {
   const data = {
     system: { id: 'sys-1', name: 'Test System' },

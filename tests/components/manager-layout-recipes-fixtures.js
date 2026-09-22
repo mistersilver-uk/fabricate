@@ -15,8 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * round 3), because it is one defect family and it has now shipped three times.
  * A list does not fail on an unknown tag: it silently stops counting one, and the track assertion
  * then compares a short count against a short template and passes. Issue 1429 turned a grid child
- * into `<VocabularyTabs>`, a name no list was holding, and `<Pagination>` and
- * `<SharedDefinitionCallout>` are capitalised too.
+ * into `<VocabularyTabs>` and issue 1915 replaced it with `<VocabularyShell>`, neither a name any
+ * list was holding, and `<Pagination>` and `<SharedDefinitionCallout>` are capitalised too.
  *
  * @param {object} args
  * @param {string} args.viewFile the `.svelte` under `apps/manager/`.

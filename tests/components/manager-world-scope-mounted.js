@@ -1062,7 +1062,7 @@ export function registerWorldScopeCases() {
         'vocabulary',
         'world-vocabulary',
         'Tags & Categories',
-        '[data-wvocab-panel="componentCategories"]',
+        '[data-vocabulary-panel="componentCategories"]',
       ],
       ['essence-catalogue', 'world-essences', 'Essence Catalogue', '[data-scoped-list]'],
       // Issue 1373: the real catalogue. `data-scoped-list` is the shell's own hook.

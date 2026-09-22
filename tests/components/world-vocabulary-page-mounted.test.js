@@ -56,6 +56,10 @@ const harness = createMountedComponentHarness({
     // not fail a test: it HANGS the whole file behind one ERR_MODULE_NOT_FOUND, which
     // `node --test` reports as `# cancelled`.
     'src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js',
+    // The shared shell's own pure leaf (issue 1915), imported by the studio AND by the panel, and
+    // the scalar helper its `inputNormalizer` folds tags with.
+    'src/ui/svelte/apps/manager/vocabularyShell.js',
+    'src/utils/scalars.js',
     'src/systems/worldVocabulary.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
@@ -75,6 +79,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+    'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte',
@@ -112,7 +118,7 @@ function mountProps(overrides = {}) {
   };
 }
 
-const panelSelector = (kind) => `[data-wvocab-panel="${kind}"]`;
+const panelSelector = (kind) => `[data-vocabulary-panel="${kind}"]`;
 const categoryCard = (root, id) =>
   root.querySelector(`${panelSelector('componentCategories')} [data-component-category-id="${id}"]`);
 
@@ -274,19 +280,19 @@ describe('the world Tags & Categories screen', () => {
     assert.equal(new Set(inputIds).size, inputIds.length, 'no two add fields share an id');
     assert.equal(inputIds.length, 3, 'one add field per panel');
 
-    const labels = [...root.querySelectorAll('.wvocab-sort-label')];
+    const labels = [...root.querySelectorAll('.manager-vocabulary-shell-sort-label')];
     assert.equal(labels.length, 3, 'one Sort by label per panel');
     assert.equal(
       new Set(labels.map((label) => label.id)).size,
       3,
       'three copies of one hardcoded id would send every aria-labelledby to the first'
     );
-    for (const select of root.querySelectorAll('select[data-wvocab-sort]')) {
+    for (const select of root.querySelectorAll('select[data-vocabulary-sort]')) {
       const target = root.querySelector(`#${select.getAttribute('aria-labelledby')}`);
       assert.ok(Boolean(target), 'each sort select names a label that exists');
       assert.equal(
-        target.closest('[data-wvocab-panel]'),
-        select.closest('[data-wvocab-panel]'),
+        target.closest('[data-vocabulary-panel]'),
+        select.closest('[data-vocabulary-panel]'),
         'and it is the label inside its OWN panel'
       );
     }
@@ -295,7 +301,7 @@ describe('the world Tags & Categories screen', () => {
   it('renders the direction control as a real toggle that reverses the order', async () => {
     const root = await harness.mount(mountProps());
     const panel = root.querySelector(panelSelector('componentCategories'));
-    const toggle = panel.querySelector('button[data-wvocab-direction]');
+    const toggle = panel.querySelector('button[data-vocabulary-direction]');
     assert.equal(toggle.getAttribute('type'), 'button', 'a bare <button> would submit nothing');
     assert.equal(toggle.getAttribute('aria-pressed'), 'true', 'ascending is the resting state');
     assert.ok(Boolean(toggle.getAttribute('title')), 'the toggle states what it does');
@@ -308,7 +314,7 @@ describe('the world Tags & Categories screen', () => {
     toggle.click();
     flushSync();
     assert.equal(
-      panel.querySelector('button[data-wvocab-direction]').getAttribute('aria-pressed'),
+      panel.querySelector('button[data-vocabulary-direction]').getAttribute('aria-pressed'),
       'false'
     );
     assert.deepEqual(namesNow(), ['Spare', 'Reagent', 'Curios'], 'and the toggle reverses it');
@@ -319,7 +325,7 @@ describe('the world Tags & Categories screen', () => {
       mountProps({ actions: { addEntry: async () => true, removeEntry: async () => false } })
     );
     // THE REGION IS IN THE DOCUMENT AT MOUNT.
-    const before = root.querySelector('[data-wvocab-status]');
+    const before = root.querySelector('[data-vocabulary-status]');
     assert.ok(Boolean(before), 'the live region exists before there is anything to announce');
     assert.equal(before.textContent.trim(), '', 'and it is empty until then');
     assert.equal(
@@ -332,7 +338,7 @@ describe('the world Tags & Categories screen', () => {
     await Promise.resolve();
     await Promise.resolve();
     flushSync();
-    const status = root.querySelector('[data-wvocab-status]');
+    const status = root.querySelector('[data-vocabulary-status]');
     assert.equal(status, before, 'the SAME element is filled, never a replacement one');
     assert.ok(status.textContent.trim().length > 0, 'a refused deletion is stated on the page');
   });
@@ -454,7 +460,7 @@ describe('the world Tags & Categories screen', () => {
   it('sorts by References, and the direction toggle reverses that too', async () => {
     const root = await harness.mount(mountProps());
     const panel = root.querySelector(panelSelector('componentCategories'));
-    const select = panel.querySelector('select[data-wvocab-sort]');
+    const select = panel.querySelector('select[data-vocabulary-sort]');
     select.value = 'references';
     select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
     flushSync();
@@ -465,7 +471,7 @@ describe('the world Tags & Categories screen', () => {
       );
     // 0, 0, 3 ascending, with the two zeroes tie-broken by name.
     assert.deepEqual(namesNow(), ['Curios', 'Spare', 'Reagent']);
-    panel.querySelector('button[data-wvocab-direction]').click();
+    panel.querySelector('button[data-vocabulary-direction]').click();
     flushSync();
     assert.deepEqual(namesNow(), ['Reagent', 'Curios', 'Spare']);
   });

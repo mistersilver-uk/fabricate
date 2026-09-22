@@ -5,7 +5,6 @@
   import Chip from '../../components/Chip.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import ExplainerCard from './ExplainerCard.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
     DEFAULT_GATHERING_TASK_IMG,
@@ -42,7 +41,7 @@
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
-  import { buildVocabularyUsage } from '../../../model/vocabularyUsage.js';
+  import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
@@ -1262,116 +1261,7 @@
     recipeCategories: categoryRows.length,
     componentCategories: componentCategoryRows.length,
     itemTags: tagRows.length,
-    categoryReferences: tagCategoryUsage.categoryReferenceCount,
-    componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
-    tagReferences: tagCategoryUsage.tagReferenceCount,
   });
-  // The Tags & Categories screen shows one vocabulary tab at a time.
-  let tagsActiveTab = $state('recipe');
-  const tagsHelp = $derived.by(() => {
-    if (tagsActiveTab === 'component') {
-      return {
-        title: text(
-          'FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle',
-          'How component categories work'
-        ),
-        items: [
-          {
-            icon: 'fas fa-cubes',
-            text: text(
-              'FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1',
-              'Every component belongs to General until you add categories to group them.'
-            ),
-          },
-          {
-            icon: 'fas fa-scroll',
-            text: text(
-              'FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2',
-              'Component categories are independent of recipe categories.'
-            ),
-          },
-          {
-            icon: 'fas fa-arrow-rotate-left',
-            text: text(
-              'FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3',
-              'Deleting a category reassigns its components back to General.'
-            ),
-          },
-        ],
-      };
-    }
-    if (tagsActiveTab === 'tag') {
-      return {
-        title: text(
-          'FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle',
-          'How component tags work'
-        ),
-        items: [
-          {
-            icon: 'fas fa-tag',
-            text: text(
-              'FABRICATE.Admin.Manager.TagsCategories.TagHelp1',
-              'Tags appear on components and on tag-placeholder ingredients in recipes.'
-            ),
-          },
-          {
-            icon: 'fas fa-font',
-            text: text(
-              'FABRICATE.Admin.Manager.TagsCategories.TagHelp2',
-              'Tag names are normalised to lowercase so they stay consistent.'
-            ),
-          },
-          {
-            icon: 'fas fa-list-check',
-            text: text(
-              'FABRICATE.Admin.Manager.TagsCategories.TagHelp3',
-              'A recipe can require any component carrying a tag instead of a specific item.'
-            ),
-          },
-        ],
-      };
-    }
-    return {
-      title: text(
-        'FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle',
-        'How recipe categories work'
-      ),
-      items: [
-        {
-          icon: 'fas fa-folder-tree',
-          text: text(
-            'FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1',
-            'Categories are flat — each recipe picks one, with no parent or child folders.'
-          ),
-        },
-        {
-          icon: 'fas fa-lock',
-          text: text(
-            'FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2',
-            'General is the reserved fallback for recipes without a custom category.'
-          ),
-        },
-        {
-          icon: 'fas fa-scroll',
-          text: text(
-            'FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3',
-            'Adding a category makes it selectable in the recipe editor immediately.'
-          ),
-        },
-      ],
-    };
-  });
-  // The reference-safety reassurance was a bare `.manager-muted` paragraph under its own card title
-  // — the third re-derivation of the explainer (issue 881).
-  const tagsReferenceSafeItems = $derived([
-    {
-      icon: 'fas fa-shield-halved',
-      text: text(
-        'FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint',
-        'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.'
-      ),
-    },
-  ]);
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
   const selectedGatheringConditionShortcuts = $derived(
@@ -2667,6 +2557,14 @@
       predicate: (view) => view === 'system-edit',
     },
     {
+      // The system vocabulary screen joins the released routes in issue 1915: its inspector
+      // rail is retired, not converted, so the column it held has no content to return to.
+      id: 'tags',
+      layoutClass: 'full-width-2-track',
+      selector: '.fabricate-manager[data-manager-view="tags"] .manager-body',
+      predicate: (view) => view === 'tags',
+    },
+    {
       id: 'world-currency',
       layoutClass: 'full-width-2-track',
       selector: '.fabricate-manager[data-manager-view="world-currency"] .manager-body',
@@ -3621,12 +3519,6 @@
       .map(([, key, fallback]) => text(key, fallback));
   }
 
-  function uniqueSorted(values) {
-    return Array.from(
-      new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
-    ).sort((a, b) => a.localeCompare(b));
-  }
-
   function buildSelectedCountFacts(counts) {
     const offLabel = text('FABRICATE.Admin.Manager.Off', 'Off');
     return [
@@ -4198,11 +4090,6 @@
       return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
     if (currentView === 'components')
       return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
-    if (currentView === 'tags')
-      return text(
-        'FABRICATE.Admin.Manager.TagsCategories.Inspector',
-        'Tags and categories inspector'
-      );
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
     if (currentView === 'environments' && displayedGatheringTab === 'tasks')
@@ -7525,28 +7412,23 @@
     return parts.join(', ');
   }
 
-  function normalizeVocabularyKey(value) {
-    const normalized = String(value || '')
-      .trim()
-      .toLowerCase();
-    return normalized || 'general';
-  }
-
   function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
-    const customRows = uniqueSorted(categories || []).map((category) => {
-      const key = normalizeVocabularyKey(category);
-      const recipeUsageCount = usage.get(key) || 0;
-      return {
-        id: key,
-        kind: 'category',
-        name: category,
-        icon: categoryIconFor(icons, category),
-        recipeUsageCount,
-        totalUsage: recipeUsageCount,
-        locked: false,
-      };
-    });
+    const customRows = dedupeVocabularyEntries(categories, { reservesGeneral: true }).map(
+      (entry) => {
+        const recipeUsageCount = usage.get(entry.key) || 0;
+        return {
+          id: entry.key,
+          kind: 'category',
+          name: entry.name,
+          title: entry.spellings.length > 1 ? entry.spellings.join(', ') : '',
+          icon: categoryIconFor(icons, entry.name),
+          recipeUsageCount,
+          totalUsage: recipeUsageCount,
+          locked: false,
+        };
+      }
+    );
     return [
       {
         id: 'general',
@@ -7564,19 +7446,21 @@
   // Component-category rows (issue 676).
   function buildComponentCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Common.General', 'General');
-    const customRows = uniqueSorted(categories || []).map((category) => {
-      const key = normalizeVocabularyKey(category);
-      const componentUsageCount = usage.get(key) || 0;
-      return {
-        id: key,
-        kind: 'component-category',
-        name: category,
-        icon: categoryIconFor(icons, category),
-        componentUsageCount,
-        totalUsage: componentUsageCount,
-        locked: false,
-      };
-    });
+    const customRows = dedupeVocabularyEntries(categories, { reservesGeneral: true }).map(
+      (entry) => {
+        const componentUsageCount = usage.get(entry.key) || 0;
+        return {
+          id: entry.key,
+          kind: 'component-category',
+          name: entry.name,
+          title: entry.spellings.length > 1 ? entry.spellings.join(', ') : '',
+          icon: categoryIconFor(icons, entry.name),
+          componentUsageCount,
+          totalUsage: componentUsageCount,
+          locked: false,
+        };
+      }
+    );
     return [
       {
         id: 'general',
@@ -7591,14 +7475,15 @@
     ];
   }
 
+  // The tag vocabulary reserves no bucket, so a tag named `general` is an entry like any other.
   function buildTagRows(tags, usage) {
-    return uniqueSorted(tags || []).map((tag) => {
-      const key = normalizeVocabularyKey(tag);
-      const componentUsageCount = usage.get(key) || 0;
+    return dedupeVocabularyEntries(tags).map((entry) => {
+      const componentUsageCount = usage.get(entry.key) || 0;
       return {
-        id: key,
+        id: entry.key,
         kind: 'tag',
-        name: tag,
+        name: entry.name,
+        title: entry.spellings.length > 1 ? entry.spellings.join(', ') : '',
         componentUsageCount,
         totalUsage: componentUsageCount,
       };
@@ -9396,9 +9281,6 @@
         {categoryRows}
         {componentCategoryRows}
         {tagRows}
-        counts={tagCategoryCounts}
-        activeTab={tagsActiveTab}
-        onTabChange={(id) => (tagsActiveTab = id)}
         onAddCategory={addCategory}
         onRemoveCategory={removeCategory}
         onAddComponentCategory={addComponentCategory}
@@ -9698,87 +9580,12 @@
          tracks, so a full-width-only test would put their inspector back. -->
     {#if !fullWidthLayout}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
-        {#if currentView === 'tags' && selectedSystem}
-          <section class="fabricate-card manager-inspector-card" data-tags-evidence="at-a-glance">
-            <h3 class="manager-card-title">
-              {text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}
-            </h3>
-            <div class="manager-fact-grid">
-              <div class="manager-fact" data-tags-category-fact="recipe-categories">
-                <span class="manager-fact-line"
-                  ><strong>{tagCategoryCounts.recipeCategories}</strong>
-                  <span class="manager-fact-label"
-                    >{text(
-                      'FABRICATE.Admin.Manager.TagsCategories.RecipeCategories',
-                      'Recipe categories'
-                    )}</span
-                  ></span
-                >
-              </div>
-              <div class="manager-fact" data-tags-category-fact="component-categories">
-                <span class="manager-fact-line"
-                  ><strong>{tagCategoryCounts.componentCategories}</strong>
-                  <span class="manager-fact-label"
-                    >{text(
-                      'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
-                      'Component categories'
-                    )}</span
-                  ></span
-                >
-              </div>
-              <div class="manager-fact" data-tags-category-fact="item-tags">
-                <span class="manager-fact-line"
-                  ><strong>{tagCategoryCounts.itemTags}</strong>
-                  <span class="manager-fact-label"
-                    >{text(
-                      'FABRICATE.Admin.Manager.TagsCategories.ItemTags',
-                      'Component tags'
-                    )}</span
-                  ></span
-                >
-              </div>
-              <div class="manager-fact" data-tags-category-fact="references">
-                <span class="manager-fact-line"
-                  ><strong
-                    >{tagCategoryCounts.categoryReferences +
-                      tagCategoryCounts.componentCategoryReferences +
-                      tagCategoryCounts.tagReferences}</strong
-                  >
-                  <span class="manager-fact-label"
-                    >{text(
-                      'FABRICATE.Admin.Manager.TagsCategories.TotalReferences',
-                      'Total references'
-                    )}</span
-                  ></span
-                >
-              </div>
-            </div>
-          </section>
-
-          <ExplainerCard
-            icon="fas fa-circle-question"
-            title={tagsHelp.title}
-            items={tagsHelp.items}
-            dataAttr="data-tags-evidence"
-            dataValue="how-it-works"
-          />
-
-          <ExplainerCard
-            icon="fas fa-shield-halved"
-            title={text(
-              'FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle',
-              'Reference-safe by default'
-            )}
-            items={tagsReferenceSafeItems}
-            dataAttr="data-tags-evidence"
-            dataValue="reference-safe"
-          />
-          <!-- `world-travel` belongs in this list even though it renders its own `manager-main`:
+        <!-- `world-travel` belongs in this list even though it renders its own `manager-main`:
              the travel inspector is a BRANCH of the chain nested inside here, so leaving the
              route out makes that branch unreachable and the aside falls through to nothing.
              The symptom is silent — the route commits, its panel renders, and only the detail
              pane is missing, which is why only the view lab caught it. -->
-        {:else if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit' || isWorldTravelRoute}
+        {#if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit' || isWorldTravelRoute}
           <GatheringInspectorRail
             {currentView}
             {displayedGatheringTab}

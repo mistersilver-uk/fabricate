@@ -998,12 +998,19 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/ui/presenters/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
-    // 1429 — the vocabulary tab strip, extracted OUT of `TagsCategoriesView`.
-    assert.deepEqual(
-      idsFor('src/ui/svelte/apps/manager/VocabularyTabs.svelte').sort(byCodePoint),
-      ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
-      'the extracted strip renders on BOTH tags frames, so both must republish for it'
-    );
+    // 1915 — the shared vocabulary shell, which replaced the tab strip issue 1429 extracted.
+    for (const file of [
+      'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+      'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
+      'src/ui/svelte/apps/manager/vocabularyShell.js',
+      'src/ui/svelte/apps/manager/systemVocabularyStudio.js',
+    ]) {
+      assert.deepEqual(
+        idsFor(file).sort(byCodePoint),
+        ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
+        `${file} renders on BOTH tags frames, so both must republish for it`
+      );
+    }
 
     // Each new frame carries exactly its own single smoke label.
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));

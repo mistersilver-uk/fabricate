@@ -20,9 +20,10 @@ const SHARED_PRIMITIVES = [
   // that mounts a tree containing that screen.
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   // The manager's ONE "how this surface works" explainer card and ONE icon fact row
-  // (issue 881). Both are side-panel primitives, so the Tool Studio and the Tags &
-  // Categories rail already pull them into two different mounted trees and the next
-  // side panel will pull them into a third.
+  // (issue 881). Both are side-panel primitives, so the shared scoped-entity preview and the
+  // essence on-craft tab already pull them into two different mounted trees and the next side
+  // panel will pull them into a third. The Tags & Categories rail was one of the two justifying
+  // trees until issue 1915 retired it; the explainer card kept its two callers without it.
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   // The manager's ONE chip (issue 883). This is the sharpest case yet.
@@ -139,7 +140,15 @@ const SHARED_PRIMITIVES = [
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */
-const ADJUDICATED_NON_MEMBERS = Object.freeze([]);
+const ADJUDICATED_NON_MEMBERS = Object.freeze([
+  // The shared vocabulary shell and its panel (issue 1915). They clear the DESIGN-SYSTEM bar at two
+  // independent callers, and they are one tree short of THIS list's bar: the two Tags & Categories
+  // screens are the only trees that render them, and both are already named by the two suites that
+  // mount them. They join the moment a third mounted tree draws a vocabulary panel, which is the
+  // overturn condition rather than a preference.
+  'src/ui/svelte/apps/manager/VocabularyShell.svelte',
+  'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
+]);
 
 test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {
   // Two ways this record rots, and both leave it looking like configuration. A path that no

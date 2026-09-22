@@ -44,7 +44,8 @@ definePrimitiveAdoptionContract({
   primitive: PRIMITIVE,
   contractClass: 'manager-editor-tab-button',
   allowlist: RAW_BUTTON_ALLOWLIST,
-  // 10 call sites in 10 components as this lands. 7 is a real floor with headroom.
+  // 12 call sites in 12 components, measured with `scripts/lib/componentImporters.js`. 7 is a
+  // real floor with headroom.
   callSiteFloor: 7,
   fileFloor: 7,
   detectorFixture: {

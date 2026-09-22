@@ -82,6 +82,9 @@ Deleting a vocabulary entry that records still reference is a confirmed destruct
    A placeholder emptied by the strip is persisted as an incomplete ingredient rather than left naming the deleted tag.
 5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
 6. Reassigning every carrying component to `general`, and stripping a deleted tag from every carrying component, each persist as part of the single crafting-systems write that drops the vocabulary entry — never one write per carrying component.
+7. **The unit of deletion is the NORMALIZED key and not the authored spelling** (issue 1397, folded into issue 1915).
+   A system's category vocabularies store case-preserving values, so `Reagent` and `reagent` can both be stored; the screen collapses them to one row, and deleting that row drops EVERY stored spelling folding to its trimmed lower-cased key in the same write.
+   Dropping only the clicked spelling would still reassign the records under both, because every planner in `src/ui/model/vocabularyCascade.js` matches on that same folded key, and would leave the survivor behind as an entry nothing references — which is clause 5's dangling case arriving from the vocabulary side instead of the record side.
 
 ### Delete Essence Definition
 

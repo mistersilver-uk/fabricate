@@ -1,9 +1,43 @@
 /** Reference counting for the Tags & Categories screen (issue 689). */
 
+/** The COUNTING key: a record's stored value trimmed and lower-cased, a blank keying as `''`. */
 function vocabularyKey(value) {
   return String(value || '')
     .trim()
     .toLowerCase();
+}
+
+/**
+ * The ROW ID key: the same trim and lower-case, with a blank falling into the reserved `general`
+ * bucket because a vocabulary row always names a bucket a record can belong to.
+ *
+ * It is deliberately not {@link vocabularyKey}: folding a blank into `general` there would count an
+ * uncategorised record as a reference to the reserved bucket.
+ */
+export function normalizeVocabularyKey(value) {
+  return vocabularyKey(value) || 'general';
+}
+
+/**
+ * The custom entries of one system vocabulary as `{key, name, spellings}` records, one per
+ * {@link normalizeVocabularyKey}: `name` is the first spelling in stored order, `spellings` holds
+ * every stored spelling that collapses to the key, in that order, and blanks are dropped.
+ *
+ * `reservesGeneral` drops the reserved bucket. It is a property of the two CATEGORY vocabularies,
+ * which prepend a locked General row outside this set, never of the key: a component tag may
+ * legitimately be named `general`, and dropping it here would make it unmanageable.
+ */
+export function dedupeVocabularyEntries(entries, { reservesGeneral = false } = {}) {
+  const byKey = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const spelling = String(entry ?? '').trim();
+    if (!spelling) continue;
+    const key = normalizeVocabularyKey(spelling);
+    if (reservesGeneral && key === 'general') continue;
+    if (byKey.has(key)) byKey.get(key).spellings.push(spelling);
+    else byKey.set(key, { key, name: spelling, spellings: [spelling] });
+  }
+  return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function increment(map, key) {

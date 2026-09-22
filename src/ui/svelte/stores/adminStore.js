@@ -48,6 +48,7 @@ import {
   planTagRemovals,
   planRecipeTagRemovals,
 } from '../../model/vocabularyCascade.js';
+import { normalizeVocabularyKey } from '../../model/vocabularyUsage.js';
 import {
   authoredCheckModifierIds,
   isRollExpression,
@@ -4286,8 +4287,11 @@ export function createAdminStore(services) {
         { allowIncomplete: true, notify: false }
       );
     }
+    // Every spelling that collapses to the deleted row's key, because the cascade above reassigned
+    // the records under all of them and a survivor would render as an orphaned `Unused` row.
+    const deletedKey = normalizeVocabularyKey(category);
     const categories = normalizeCustomRecipeCategories(
-      (system.categories || []).filter((c) => c !== category)
+      (system.categories || []).filter((c) => normalizeVocabularyKey(c) !== deletedKey)
     );
     const categoryIcons = withCategoryIcon(system.categoryIcons, category, '');
     await systemManager.updateSystem(sysId, { categories, categoryIcons });
@@ -4340,8 +4344,9 @@ export function createAdminStore(services) {
     )) {
       await systemManager.updateItem(sysId, id, { category: reassigned });
     }
+    const deletedKey = normalizeVocabularyKey(category);
     const componentCategories = normalizeCustomComponentCategories(
-      (system.componentCategories || []).filter((c) => c !== category)
+      (system.componentCategories || []).filter((c) => normalizeVocabularyKey(c) !== deletedKey)
     );
     const componentCategoryIcons = withCategoryIcon(system.componentCategoryIcons, category, '');
     await systemManager.updateSystem(sysId, { componentCategories, componentCategoryIcons });
@@ -4392,7 +4397,10 @@ export function createAdminStore(services) {
     for (const { id, updates } of planRecipeTagRemovals(recipes, tag)) {
       await recipeManager.updateRecipe(id, updates, { allowIncomplete: true, notify: false });
     }
-    const tags = (system.itemTags || system.tags || []).filter((t) => t !== tag);
+    const deletedKey = normalizeVocabularyKey(tag);
+    const tags = (system.itemTags || system.tags || []).filter(
+      (t) => normalizeVocabularyKey(t) !== deletedKey
+    );
     await systemManager.updateSystem(sysId, { itemTags: tags });
     await refresh();
   }

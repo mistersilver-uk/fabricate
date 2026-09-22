@@ -1562,9 +1562,14 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
-/* Tab strip, then the scrolling vocabulary workspace which takes the slack (issue 878). */
+/* ONE SCROLLING ROW HOLDING THE SHARED VOCABULARY SHELL, at the same values the seven world routes declare (issue 1915). The tab strip this route used to lead with is retired, so a leading `auto` track would size the shell's status line and leave the growing track to the panels beneath it; and the shell declares none of these properties itself, because an unlayered scoped rule beats this layered one at any specificity. It is its own rule rather than a member of the world list, which stays byte-identical. */
 .fabricate-manager[data-manager-view="tags"] .manager-main {
-  grid-template-rows: auto minmax(0, 1fr);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--fab-space-4);
 }
 
 /* Tab strip, then the scrolling tab body. One track was right while the editor was a single flat card; the tabbed editor has two children and a single `1fr` would stretch the strip (issue 1036). */
@@ -6442,15 +6447,6 @@
   line-height: 1.35;
 }
 
-/* The active vocabulary panel fills the whole main column; the multi-column card layout lives inside the row list, not by splitting the workspace (issue 689). */
-.fabricate-manager .manager-tags-categories-workspace {
-  display: block;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--fab-space-3);
-}
-
 .fabricate-manager .manager-vocabulary-panel {
   display: flex;
   flex-direction: column;
@@ -6462,11 +6458,6 @@
 .fabricate-manager .manager-vocabulary-desc {
   margin: 0;
   max-width: 760px;
-}
-
-/* Tags & Categories tab bar (issue 689, restyled in issue 878). The strip's own look — underline, badge, hover and active treatment — is the shared `.manager-editor-tab*` set the recipe-item, recipe, environment, system, tool and knowledge tab bars use, so the ONLY thing left here is the panel inset: this strip is `.manager-main`'s first child now that the view's duplicate page header is gone, so it owns the top padding that header used to supply. */
-.fabricate-manager .manager-vocabulary-tabs {
-  padding: var(--fab-space-3) var(--fab-space-3) 0;
 }
 
 /* Search sits inline with the entry count on one row; the search sizes to content (not flex-grow) so the row list below it absorbs the panel's remaining height. */
@@ -7193,6 +7184,15 @@
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
+/* The system vocabulary route releases the third column in issue 1915, the other half of its `FULL_WIDTH_VIEWS` entry. It is its own pair rather than a member of either list above: the seven world-route lists stay byte-identical, and the pair is kept adjacent so the collapsed sibling cannot be separated from the rule it has to out-specify. */
+.fabricate-manager[data-manager-view="tags"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="tags"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 /* The seven world scoped-entity routes (issue 1362, epic 1357) release the third column (issues 1096, 1311). */
 .fabricate-manager[data-manager-view="world-components"] .manager-body,
 .fabricate-manager[data-manager-view="world-component-entry"] .manager-body,
@@ -7384,9 +7384,9 @@
   font-size: var(--fab-recipe-control-font);
 }
 
-/* ── THE TOOLBAR'S SELECT SKIN IS NARROWED, NOT DELETED ── These declarations used to reach every scoped-catalogue toolbar select and are retargeted onto the one remaining native carrier, `WorldVocabularyPage`'s `<select data-wvocab-sort>`; they keep a `.fabricate-manager` compound because they read the area-scoped `--fab-recipe-control-font` and because `tests/styles-namespacing.test.js` requires every selector here to begin `.fabricate`. It is also the one filter-bar rule issue 1508 left application-rooted — the family compound stands THIRD, behind an attribute ancestor that is not the application root, so neither re-rooting form exists for it. skin census (issue 1523): pinned by `tests/components/world-vocabulary-control-row-cascade.test.js`, which measures this select's computed height, corner, fill and type directly, and by a sheet-text clause in `manager-layout.test.js` (issues 1504, 1507, 1508, 1510). */
+/* ── THE TOOLBAR'S SELECT SKIN IS NARROWED, NOT DELETED ── These declarations used to reach every scoped-catalogue toolbar select and are retargeted onto the one component that still renders a native one, `VocabularyShellPanel`'s `<select data-vocabulary-sort>`, which both Tags & Categories screens draw (issue 1915); they keep a `.fabricate-manager` compound because they read the area-scoped `--fab-recipe-control-font` and because `tests/styles-namespacing.test.js` requires every selector here to begin `.fabricate`. It is also the one filter-bar rule issue 1508 left application-rooted — the family compound stands THIRD, behind an ancestor that is not the application root, so neither re-rooting form exists for it. skin census (issue 1523): pinned by `tests/components/world-vocabulary-control-row-cascade.test.js`, which measures this select's computed height, corner, fill and type directly, and by a sheet-text clause in `manager-layout.test.js` (issues 1504, 1507, 1508, 1510). */
 .fabricate-manager
-  [data-scoped-page='world-vocabulary']
+  .manager-vocabulary-shell-panel
   .manager-toolbar.manager-scoped-list-toolbar
   select {
   height: 34px;
@@ -13123,11 +13123,6 @@
   /* The workspace releases its 300px side rail through the TOKEN its base rule reads, not through `grid-template-columns`: that base rule is declared later in this file and a container query adds no specificity, so the direct property tied and lost. */
   .fabricate-manager .manager-environment-workspace {
     --fab-env-workspace-grid: minmax(0, 1fr);
-  }
-
-  .fabricate-manager .manager-tags-categories-workspace,
-  .fabricate-manager .manager-environment-details-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .fabricate-manager .manager-table-head,

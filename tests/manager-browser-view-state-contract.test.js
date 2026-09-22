@@ -107,6 +107,9 @@ describe('the lifted manager browser view-state is wired end to end (issue 1438)
       [`${MANAGER_DIR}/EnvironmentsBrowserView.svelte`, 'gatheringTasksBrowserState'],
       [`${MANAGER_DIR}/EnvironmentsBrowserView.svelte`, 'gatheringEventsBrowserState'],
       [`${MANAGER_DIR}/GatheringRealmsTab.svelte`, 'realmEnvironmentsBrowserState'],
+      // The shared vocabulary panel (issue 1915) is a pass-through on BOTH routes: it sorts
+      // from the slot and hands the same object to `VocabularyPanel`, which owns the search.
+      [`${MANAGER_DIR}/VocabularyShellPanel.svelte`, 'browserState'],
       [`${MANAGER_DIR}/TagsCategoriesView.svelte`, 'recipeCategoryBrowserState'],
       [`${MANAGER_DIR}/TagsCategoriesView.svelte`, 'componentCategoryBrowserState'],
       [`${MANAGER_DIR}/TagsCategoriesView.svelte`, 'componentTagBrowserState'],
