@@ -1266,9 +1266,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 21,
+    replacements.length >= 22,
     `only ${replacements.length} \`chooseSelectOption(\` occurrences remain in the registry, ` +
-      'against a floor of 21 — 20 call sites plus the definition in `caseFactories.js`, which the ' +
+      'against a floor of 22 — 21 call sites plus the definition in `caseFactories.js`, which the ' +
       'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
       'was renamed and this clause is now judging an empty set.'
   );

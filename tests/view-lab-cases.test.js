@@ -2395,27 +2395,13 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The thirty-one frames a change to the shared positioning seam must publish (issue 1500; the
-// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
-// twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
-// PLAYER window, which is a second application root for the seam to clamp against — the fourteenth
-// and fifteenth at issue 1520's second review round, which is the two GM canvas windows' open
-// option panels, and the twenty-first to thirty-first at issue 1510, which are the recipe
-// studio's kind list, the component studio's category list, the checks studio's trigger comparison
-// list, the gathering studio's respawn policy and stamina modifier lists, the environment editor's
-// danger ceiling, the Tool rails' `Preview as` roster, the recipe-item library's limits filter and
-// the gathering conditions card's current weather, the gathering task library's availability
-// filter and the component library's essence filter — the eleven converted manager selects whose
-// panels have a frame at all, the third the first opened from inside a card the walk has to author
-// before it exists, the fourth the first in an editor the rail reaches through a submenu, the fifth
-// the first whose row has to be authored before its trigger exists, the sixth the first in an
-// environment editor, the seventh the first opened from an inspector rail rather than from an
-// editor body, the eighth the first opened from a BROWSE toolbar, where the trigger sits in a row of
-// siblings a mis-clamped panel would cover, and the ninth the first whose panel is wider than its
-// rung's own ceiling, at the 1024px window where its trigger fills a one-column card, and the
-// tenth the first whose trigger is addressed by the caption id that names it rather than by a
-// hook, a class or an aria-label, and the eleventh the first whose call site raises its panel's
-// floor above the rung's own).
+// The thirty-three frames a change to the shared positioning seam must publish: every case whose
+// walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
+// canvas windows (issues 1500, 1503, 1504, 1520). Issue 1510's thirteen are the converted manager
+// selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
+// authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
+// wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
+// floor the call site raises above its rung's.
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',
@@ -2437,8 +2423,10 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-item-contents-picker',
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
+  'manager-recipes-inspector-route-list',
   'manager-system-edit-lists',
   'manager-tool-preview-actor-list',
+  'manager-tool-rules-sort-key-list',
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',

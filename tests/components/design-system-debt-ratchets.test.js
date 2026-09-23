@@ -1163,12 +1163,13 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at fourteen carriers of the target tuple: three are PINNED by a test or a script ' +
+      'measured at thirteen carriers of the target tuple: two are PINNED by a test or a script ' +
       'that reads their selectors, seven are recorded non-adopters and four are unpinned. The ' +
-      'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the three ' +
-      'carriers that left are select skins issue 1510 took — the recipe overview cells and the ' +
-      "recipe, component and essence browse toolbars' shared select skin, each deleted when its " +
-      "selects became the shared `<Select>`, and the Tool rails' `Preview as` actor " +
+      'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the four ' +
+      'carriers that left are select skins issue 1510 took — the recipe overview cells, the ' +
+      "recipe, component and essence browse toolbars' shared select skin and the vocabulary " +
+      "panel's sort skin, each deleted when its selects became the shared `<Select>`, and the " +
+      "Tool rails' `Preview as` actor " +
       'picker, whose rule survives as a width counterpart while the `toolbar` rung paints the ' +
       "tuple; the pinned carrier that arrived is issue 1512's ordered row, " +
       '`.fabricate-sortable-list-row`, which takes the tuple from the `<SortableList>` specimen. Issue ' +
@@ -1433,9 +1434,9 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    14,
-    'the census is fourteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its three-pinned / seven-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
+    13,
+    'the census is thirteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its two-pinned / seven-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
       'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );

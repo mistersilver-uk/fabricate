@@ -206,7 +206,7 @@ export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-sources-picker',
     label: 'Player app — Crafting component sources picker',
-    // The panel twenty-seven frames claim and none opens (issue 1513).
+    // The panel thirty-three frames claim and none opens (issue 1513).
     reaches: 'beyond',
     smokeLabels: [],
     query: { tab: 'crafting' },
