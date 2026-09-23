@@ -40,6 +40,8 @@ Narrow (stacked) layout:
 - At or below the manager's stacked container width, the rail, main and inspector regions each keep **their own content height** and the body scrolls.
   They must not share the body's height between them: every region carries `min-height: 0` and clips its overflow, so an `auto` grid track would size each to a fraction of the body and silently render a browser's rows at full height inside a collapsed, invisible scroll box.
 - The stacked rail is bounded and scrolls its own navigation, rather than becoming a full-height wall of nav above the content it navigates to.
+  This is the default for every Manager route below the manager's stacked container width; a route documents its own departure in its own section rather than here.
+  Two routes currently do: the World Downtime route (`ui-extension-points/spec.md` §Downtime Preview and Premium Extension) keeps a definite-height grid instead of restacking, and the Knowledge Surface (`ui-system-studio/spec.md` §Knowledge Surface) keeps its three columns and their own scrolling down to 832px before this rule takes over.
 
 Selected-system navigation:
 

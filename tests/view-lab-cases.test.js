@@ -659,6 +659,9 @@ function caseSelectors(viewCase) {
   if (typeof viewCase.expectLayout?.gridSelector === 'string') {
     selectors.push(viewCase.expectLayout.gridSelector);
   }
+  if (typeof viewCase.expectLayout?.fillSelector === 'string') {
+    selectors.push(viewCase.expectLayout.fillSelector);
+  }
   return selectors;
 }
 
@@ -682,16 +685,19 @@ const FRAME_STACK_LAYOUT_CASE_IDS = [
   'world-component-entry-stacked',
   'manager-component-edit-stacked',
 ];
+// And the Knowledge band case, whose rail must reach the body's bottom edge (issue 1972).
+const RAIL_FILL_LAYOUT_CASE_IDS = ['manager-knowledge-narrow'];
 const LAYOUT_CASE_IDS = [
   ...RESPONSIVE_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
+  ...RAIL_FILL_LAYOUT_CASE_IDS,
   'fabricate-journal-lifecycle-narrow',
   'fabricate-journal-lifecycle-wide',
 ];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
-test('exactly the declared 1024px cases carry complete layout expectations', () => {
+test('exactly the declared layout cases carry complete layout expectations', () => {
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
@@ -707,12 +713,7 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
     }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
     // shared literal would be asserting one screen's threshold about another's.
-    assert.deepEqual(
-      viewCase.position,
-      FRAME_STACK_LAYOUT_CASE_IDS.includes(viewCase.id)
-        ? { width: 980, height: 860 }
-        : { width: 1024, height: 860 }
-    );
+    assert.deepEqual(viewCase.position, layoutCasePosition(viewCase.id));
     assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
     assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
   }
@@ -742,7 +743,21 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.expectedTracks, 2);
     assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
   }
+  for (const viewCase of declared.filter((entry) =>
+    RAIL_FILL_LAYOUT_CASE_IDS.includes(entry.id)
+  )) {
+    assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
+    assert.equal(viewCase.expectLayout.expectedTracks, 3);
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
+    assert.equal(viewCase.expectLayout.absentSelector, undefined);
+  }
 });
+
+function layoutCasePosition(id) {
+  if (FRAME_STACK_LAYOUT_CASE_IDS.includes(id)) return { width: 980, height: 860 };
+  if (RAIL_FILL_LAYOUT_CASE_IDS.includes(id)) return { width: 880, height: 900 };
+  return { width: 1024, height: 860 };
+}
 
 test('compact Journal captures add full, short, empty, restored and tool witnesses at both widths', () => {
   const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'));
@@ -955,6 +970,15 @@ test('layout expectation selectors name UI that still exists', () => {
       haystack,
       missing
     );
+    if (viewCase.expectLayout.fillSelector) {
+      collectSelectorHookFailures(
+        viewCase,
+        viewCase.expectLayout.fillSelector,
+        sources,
+        haystack,
+        missing
+      );
+    }
   }
   assert.deepEqual(
     missing,
