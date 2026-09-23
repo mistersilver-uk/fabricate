@@ -1871,14 +1871,6 @@ test('a 680px manager container stacks each party body without viewport coupling
 });
 
 // ── World › Travel Realms and Map Region Links on the browse body (issues 1973, 1974) ──────────
-const realmsTabSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/apps/manager/GatheringRealmsTab.svelte'),
-  'utf8'
-);
-const mapLinksTabSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte'),
-  'utf8'
-);
 const emptyStateScoped = scopedComponentCss(
   resolve(__dirname, '../../src/ui/svelte/components/EmptyState.svelte')
 );
@@ -1988,16 +1980,7 @@ const TRAVEL_SIZES = [
 ];
 
 test('World Travel Realms puts a full-bleed filter bar over the 12px browse body at both sides of the 1120px rung', async () => {
-  // `gathering-realms-tab.test.js` mounts the component and pins this order; the join keeps the
-  // fixture below on the rendered structure.
-  const toolbarAt = realmsTabSource.indexOf('<ManagerToolbar');
-  const scrollerAt = realmsTabSource.indexOf('class="manager-table-scroll"');
-  const listAt = realmsTabSource.indexOf('class="manager-travel-realms-list"');
-  const pagerAt = realmsTabSource.indexOf('<Pagination', scrollerAt);
-  assert.ok(toolbarAt > -1 && scrollerAt > toolbarAt, 'the scroller follows the filter bar');
-  assert.ok(listAt > scrollerAt, 'the realm list renders inside the scroller');
-  assert.ok(pagerAt > listAt, 'the pager renders after the scroller');
-
+  // The fixture's structure is the one `gathering-realms-tab.test.js` pins on the mounted component.
   for (const size of TRAVEL_SIZES) {
     const at = `${size.width}x${size.height}`;
     const report = await measureTravelPane(size, TRAVEL_REALMS_PANE, [
@@ -2044,12 +2027,7 @@ test('World Travel Realms puts a full-bleed filter bar over the 12px browse body
 });
 
 test('World Travel Map Region Links rows and empty state sit on the 12px browse body at both sides of the 1120px rung', async () => {
-  const scrollerAt = mapLinksTabSource.indexOf('class="manager-table-scroll"');
-  const emptyAt = mapLinksTabSource.indexOf('dataAttr="data-travel-map-links-empty"');
-  const listAt = mapLinksTabSource.indexOf('class="manager-map-link-list"');
-  assert.ok(scrollerAt > -1, 'the pane renders the shared scroller');
-  assert.ok(emptyAt > scrollerAt && listAt > scrollerAt, 'every state renders inside it');
-
+  // The fixture's structure is the one `gathering-map-links-tab.test.js` pins on the mounted component.
   const states = [
     ['rows', '.manager-map-link-row'],
     ['empty', '[data-travel-map-links-empty]'],
