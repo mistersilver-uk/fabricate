@@ -714,7 +714,7 @@ export function registerToolsCases() {
     });
     const SORT = '[data-tool-sort-key]';
     assert.equal(assertSelectHasResolvedName(target, SORT), 'Sort by');
-    assert.equal(target.querySelector(SORT).getAttribute('data-select-size'), 'inline');
+    assert.equal(target.querySelector(SORT).dataset.selectSize, 'inline');
     assert.ok(
       !openSelectPanel(target, SORT).classList.contains('fabricate-select-popover-ticked'),
       'two unrelated keys, so the list draws no tick column'
