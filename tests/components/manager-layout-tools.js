@@ -414,6 +414,9 @@ test('Tool library pins a full-width pagination footer outside its scrolling res
   const mainBlock = blockFor('.fabricate-manager[data-manager-view="tools"] .manager-tools-main');
   const mainContentBlock = blockFor('.fabricate-manager .manager-tools-main-content');
   const libraryBlock = blockFor('.fabricate-manager .manager-tools-library-card');
+  const listCardBlock = blockFor(
+    '.fabricate-manager .manager-tools-main-content > .manager-tools-library-card:last-child'
+  );
   const scrollBlock = blockFor('.fabricate-manager .manager-tools-library-scroll');
   const footerBlock = blockFor('.fabricate-manager .manager-tools-browser-pagination');
   const paginationBlock = blockFor(
@@ -424,7 +427,11 @@ test('Tool library pins a full-width pagination footer outside its scrolling res
   assert.ok(mainBlock.includes('overflow: hidden;'));
   assert.ok(mainContentBlock.includes('flex: 1 1 auto;'));
   assert.ok(mainContentBlock.includes('overflow: hidden;'));
-  assert.ok(libraryBlock.includes('min-height: 0;'));
+  // Every library card is chrome; only the list card, the last child, gives up height (issue 1977).
+  assert.ok(libraryBlock.includes('flex: 0 0 auto;'));
+  assert.ok(!libraryBlock.includes('min-height'));
+  assert.ok(listCardBlock.includes('flex: 1 1 auto;'));
+  assert.ok(listCardBlock.includes('overflow: hidden;'));
   assert.ok(scrollBlock.includes('flex: 1 1 auto;'));
   assert.ok(scrollBlock.includes('overflow: hidden auto;'));
   assert.ok(footerBlock.includes('flex: 0 0 auto;'));
