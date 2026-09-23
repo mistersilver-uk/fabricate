@@ -28,7 +28,11 @@ The pooled members split the same way: the pooled base-value read, the base-unit
 
 ## The Published Contract
 
-Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.COMPANION`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
+Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
+This publication rename leaves schema version 1, those four fields and their order, every member row and order, the outcome and call-site vocabularies, signatures, result shapes, and readiness semantics unchanged.
+`game.fabricate.api.COMPANION` remains an enumerable deprecated accessor to that identical descriptor until an explicitly released breaking major version.
+Reading the alias emits at most one warning per client page session, including across the `init`/`ready` rebind, and names both the lowercase replacement and the migration documentation.
+Reading the lowercase publication emits no alias warning, and warning machinery never changes or throws instead of the descriptor result.
 
 `schemaVersion` is readable from **Fabricate's own `init` hook onward**, and for the whole of `setup` and `ready`, before any collaborator exists.
 It is **not** guaranteed readable from another package's `init`.
@@ -112,7 +116,7 @@ A failed grant must not report itself in the words of a failed reset.
 
 ## The Outcome Vocabulary
 
-`COMPANION.outcomes` is **open by declaration and closed by enumeration**.
+`companion.outcomes` is **open by declaration and closed by enumeration**.
 It is complete for the current `schemaVersion`.
 A member may emit a **new** outcome without a version bump; renaming or removing one is a bump.
 
@@ -214,7 +218,7 @@ Nothing in the request or the environment distinguishes a GM's deliberate click 
 `broadcast` declares a handler that fires on every connected client and is additionally gated on the elected executor.
 `invalidCallSite` covers **both** a missing and an unrecognised declaration, because "not declared" is wrong for the second.
 
-The accepted pair is **published on the descriptor** as `COMPANION.callSites`, on the same rule that publishes `COMPANION.outcomes`: a caller reads a symbol rather than writing a bare string.
+The accepted pair is **published on the descriptor** as `companion.callSites`, on the same rule that publishes `companion.outcomes`: a caller reads a symbol rather than writing a bare string.
 The rule binds harder here than there, because `callSite` is the contract's one required, no-default, refused-on-mismatch input, so `invalidCallSite` is the entirety of a typo's feedback and a documented worked example that instructs an author to hand-write the literal is the surface that produces the typo.
 
 The refusal **is** the enforcement.
@@ -536,7 +540,7 @@ Each member answers with its OWN message key table, because a failed take must n
 
 ## The Compatibility Promise
 
-While `game.fabricate.api.COMPANION.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.
+While `game.fabricate.api.companion.schemaVersion` is unchanged, every member of the declared set keeps its name, keeps accepting the arguments documented for it, and keeps answering in the documented shape.
 A member may gain an optional argument or an additional result field; it may not lose one, change the meaning of one, or begin throwing where it returned a result.
 A new member may be added without a version change, because adding one cannot break a companion that does not call it.
 **Rows in the published member set are appended and never interleaved**, so a member's declared position is stable.

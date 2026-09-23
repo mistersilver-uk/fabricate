@@ -14,7 +14,7 @@ Fabricate exposes its API through two Foundry globals:
 - **`globalThis.fabricate`** (alias: `fabricate`).
   Convenience functions for macros.
 - **`game.fabricate.api`**.
-  Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names — and `COMPANION`, the versioned [companion contract](#companion-contract)).
+  Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names — and `companion`, the versioned [companion contract](#companion-contract)).
 
 All APIs except the two extension-registration seams are available after the `fabricate.ready` hook fires:
 
@@ -574,11 +574,13 @@ If you render a name from this list and get a blank glyph, that is the check to 
 
 ## Companion Contract
 
-`game.fabricate.api.COMPANION` is Fabricate's named, versioned contract for outbound **behavioural** consumption — the capabilities a companion module needs to settle a downtime activity against an actor, or against a whole party.
+`game.fabricate.api.companion` is Fabricate's named, versioned contract for outbound **behavioural** consumption — the capabilities a companion module needs to settle a downtime activity against an actor, or against a whole party.
 It is the behavioural sibling of the two navigation seams below, which are outbound **UI contribution** rather than consumption.
 
+The enumerable `game.fabricate.api.COMPANION` alias remains available for compatibility, but reading it warns once per client page session and points here for migration.
+
 ```javascript
-const contract = game.fabricate?.api?.COMPANION;
+const contract = game.fabricate?.api?.companion;
 if (!contract) return;                    // Fabricate has not loaded yet — retry, do not degrade.
 if (contract.schemaVersion !== 1) return; // A version this companion does not understand.
 ```
@@ -600,7 +602,7 @@ Every member is declared at exactly one promise tier, and nothing outside this s
 
 | Member | Promise | Read from | What it answers |
 |:-------|:--------|:----------|:----------------|
-| `schemaVersion` | `stable` | the `COMPANION` descriptor | The contract version, as a number. Readable before any service exists. |
+| `schemaVersion` | `stable` | the `companion` descriptor | The contract version, as a number. Readable before any service exists. |
 | `grantRecipeKnowledge` | `stable` | `game.fabricate` | `({ actorId, recipeId, grantedBy })` teaches one actor one recipe with no owned book required. GM-gated, idempotent, and it refuses where a learned entry would be invisible to the player. |
 | `checkAffordability` | `stable` | `game.fabricate` | `({ actorId, unitId, amount })` answers whether an actor can afford a cost against the **world** coin ladder. GM-gated, ladder-aware, single-unit, and **this member** writes nothing — `creditCurrency` below is the one that does. |
 | `getCurrencyConfigStore` | `handle` | `game.fabricate` | The world currency configuration store Fabricate itself uses, or `null` before readiness. Read it as `getCurrencyConfigStore()?.get?.() ?? null`, because `.get()` on the `null` throws. |
@@ -650,7 +652,7 @@ const result = await game.fabricate.grantRecipeKnowledge({
   grantedBy: 'Downtime: Research'   // optional; refused, never truncated, max 64 characters
 });
 if (!result.success) return ui.notifications.warn(game.i18n.format(result.message, result.messageData ?? {}));
-const alreadyKnew = result.outcome === game.fabricate.api.COMPANION.outcomes.alreadyKnown;
+const alreadyKnew = result.outcome === game.fabricate.api.companion.outcomes.alreadyKnown;
 ```
 
 An already-known recipe answers `success: true` with the `alreadyKnown` outcome and performs **no write**, because an automation tick may legitimately re-run.
@@ -680,7 +682,7 @@ If you want a system's modifiers applied, route a real craft or salvage instead.
 > Foundry's dice resolver cannot do that: closing it fulfils the roll with a random face indistinguishable from a typed one.
 
 ```javascript
-const { callSites, outcomes } = game.fabricate.api.COMPANION;
+const { callSites, outcomes } = game.fabricate.api.companion;
 
 const result = await game.fabricate.rollActorCheck({
   actorId: actor.id,
@@ -705,12 +707,12 @@ A legitimate rolled `0` answers `0`, never `null`, so you can always tell a real
 Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.
 Declare `broadcast` from any handler that fires on every connected client, and Fabricate refuses `notElected` on every client but the elected GM's.
 Declaring `gmAction` from a synced hook **bypasses that gate entirely** and puts the single-executor obligation back on you.
-The two accepted values are published as `game.fabricate.api.COMPANION.callSites`, so read `callSites.broadcast` rather than retyping the literal: a mistyped string is refused as `invalidCallSite` and nothing else tells you it was a typo.
+The two accepted values are published as `game.fabricate.api.companion.callSites`, so read `callSites.broadcast` rather than retyping the literal: a mistyped string is refused as `invalidCallSite` and nothing else tells you it was a typo.
 
 `resolveBulkCheckDecision` is for the case where you will roll for several characters at once and want to ask the GM **once**:
 
 ```javascript
-const { callSites, outcomes } = game.fabricate.api.COMPANION;
+const { callSites, outcomes } = game.fabricate.api.companion;
 
 const decision = await game.fabricate.resolveBulkCheckDecision({
   callSite: callSites.gmAction,
@@ -744,7 +746,7 @@ Its accepted values are `publicroll`, `gmroll`, `blindroll`, and `selfroll`, and
 Everything in this section follows from that, and none of it applies to the members above.
 
 ```javascript
-const { callSites, outcomes } = game.fabricate.api.COMPANION;
+const { callSites, outcomes } = game.fabricate.api.companion;
 
 const award = await game.fabricate.awardComponents({
   actorId: actor.id,
@@ -842,7 +844,7 @@ A component name that matches in two crafting systems, or a coin name that answe
 You are about to consume by the id the read handed back, so a quietly chosen system is a quietly chosen set of documents and a quietly chosen coin is a quietly chosen debit.
 
 ```javascript
-const { callSites, outcomes } = game.fabricate.api.COMPANION;
+const { callSites, outcomes } = game.fabricate.api.companion;
 const actorUuids = party.map((character) => character.uuid);  // at most 32
 
 const read = await game.fabricate.readPooledHoldings({
@@ -985,7 +987,7 @@ The item-side hits are deduped per session on `(systemId, definition, item name)
 
 ### The Outcome Vocabulary
 
-`COMPANION.outcomes` is **open by declaration and closed by enumeration**: it is complete for this `schemaVersion`, a member may emit a **new** outcome without a version bump, and renaming or removing one is a bump.
+`companion.outcomes` is **open by declaration and closed by enumeration**: it is complete for this `schemaVersion`, a member may emit a **new** outcome without a version bump, and renaming or removing one is a bump.
 Branch on `success` first and treat an unrecognised `outcome` as a generic refusal — an exhaustive `switch` is a caller bug, not a contract breach.
 
 ### The Compatibility Promise

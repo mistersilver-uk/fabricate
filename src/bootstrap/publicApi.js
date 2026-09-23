@@ -46,6 +46,9 @@ import { openDeferredAppRethrowing } from '../utils/deferredEntryNotice.js';
 
 import { deprecate } from './gatheringRuntime.js';
 
+const COMPANION_MIGRATION_DOCS =
+  'https://mistersilver-uk.github.io/fabricate/api/#companion-contract';
+
 /** The published `game.fabricate.gathering` namespace, deprecated region aliases included. */
 function buildGatheringNamespace(fabricate) {
   return {
@@ -97,7 +100,7 @@ function buildGatheringNamespace(fabricate) {
 
 /** The classes and named contracts exposed for advanced users and companion modules. */
 function buildApiClasses(io) {
-  return {
+  const api = {
     Recipe,
     Ingredient,
     IngredientGroup,
@@ -129,11 +132,22 @@ function buildApiClasses(io) {
     CraftingSystemExporter,
     // Public hook names module authors may subscribe to.
     HOOKS: FABRICATE_HOOKS,
-    // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289), frozen at
-    // module load and assigned HERE AND NOWHERE ELSE. ITS `stable` MEMBERS ARE METHODS ON THE
-    // FACADE: publishing a grant symbol here would hand out a GM-gated write without its gate.
-    COMPANION: COMPANION_CONTRACT,
+    // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289).
+    companion: COMPANION_CONTRACT,
   };
+  Object.defineProperty(api, 'COMPANION', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      deprecate(
+        'game.fabricate.api.COMPANION',
+        'game.fabricate.api.companion',
+        COMPANION_MIGRATION_DOCS
+      );
+      return COMPANION_CONTRACT;
+    },
+  });
+  return api;
 }
 
 /** `game.fabricate.exportSystem`: one system, its recipes and every world-scope slice. */

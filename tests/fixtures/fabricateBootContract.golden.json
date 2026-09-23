@@ -1595,6 +1595,7 @@
     "ResolutionModeService",
     "SalvageRunManager",
     "SignatureValidator",
+    "companion",
     "getCraftingSystemManagerAppClass",
     "getFabricateAppClass",
     "getInteractableConfigAppClass",
@@ -1614,6 +1615,22 @@
     "listRecipes",
     "openRecipeManager"
   ],
+  "companionPublication": {
+    "keysAtInitIncludeBoth": true,
+    "warningsBeforeAlias": 0,
+    "warnings": [
+      "Fabricate: game.fabricate.api.COMPANION is deprecated; use game.fabricate.api.companion instead. See https://mistersilver-uk.github.io/fabricate/api/#companion-contract"
+    ],
+    "lowercaseIsContractAtInit": true,
+    "aliasIsContractAtInit": true,
+    "lowercaseIsContractAfterReady": true,
+    "lowercaseWarningsAfterReady": 0,
+    "aliasSurvivesReadyRebind": true,
+    "spreadAliasIsPrimary": true,
+    "serializedAliasMatchesPrimary": true,
+    "aliasEnumerable": true,
+    "aliasIsAccessor": true
+  },
   "references": {
     "apiHooksIsFabricateHooks": true,
     "apiCompanionIsCompanionContract": true,
