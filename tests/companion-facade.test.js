@@ -1010,10 +1010,8 @@ describe('criterion 14 — the member table resolves, and says where', () => {
         `the member table does not carry \`${member.name}\` at the ${member.promise} tier`
       );
     }
-    assert.ok(
-      DOCS_API_INDEX.includes('game.fabricate.api.COMPANION'),
-      'and the docs name where the contract is published'
-    );
+    assert.ok(DOCS_API_INDEX.includes('game.fabricate.api.companion'));
+    assert.ok(DOCS_API_INDEX.includes('game.fabricate.api.COMPANION'));
   });
 });
 
@@ -1646,18 +1644,8 @@ describe('the harness copies are faithful to src/main.js', () => {
     }
   });
 
-  it('publishes COMPANION beside HOOKS, and publishes no grant symbol anywhere else', () => {
+  it('publishes no grant symbol outside the gated facade', () => {
     const source = FABRICATE_ENTRY_SOURCE;
-    assert.ok(
-      source.includes('HOOKS: FABRICATE_HOOKS,') &&
-        source.includes('COMPANION: COMPANION_CONTRACT'),
-      'the descriptor is assigned onto game.fabricate.api beside the hook aggregate'
-    );
-    assert.equal(
-      (source.match(/COMPANION: COMPANION_CONTRACT/g) || []).length,
-      1,
-      'assigned in exactly one place, so its version cannot differ between init and ready'
-    );
     // `getRecipeVisibilityService()` hands out the live service UNGATED, so an unbounded
     // self-benefiting write published beside the class constructors — or re-exported from this
     // module — would be reachable by any player from the console with no gate at all.

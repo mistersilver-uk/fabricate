@@ -1,5 +1,5 @@
 /**
- * The vocabulary of `game.fabricate.api.COMPANION` — Fabricate's named, versioned contract
+ * The vocabulary of `game.fabricate.api.companion` — Fabricate's named, versioned contract
  * for outbound BEHAVIOURAL consumption by a companion module (issue 1289).
  *
  * This module is deliberately a Foundry-free leaf: it reads no global, touches no document
@@ -9,7 +9,7 @@
  * their behaviour lives (`companionKnowledgeGrant.js`, `companionCheckRoll.js`,
  * `companionComponentAward.js`, `companionPooledHoldings.js`,
  * `companionPooledConsumption.js`, `currencyAffordance.js`) and the descriptor is assigned
- * onto the facade in `src/main.js`.
+ * onto the facade by `buildApiClasses` in `src/bootstrap/publicApi.js`.
  *
  * It sits under `src/systems/` rather than beside `src/ui/managerExtensions.js` because the
  * navigation seam is UI — route chrome pinned against a Svelte component — while this one is
@@ -80,7 +80,7 @@ export const COMPANION_PROMISES = Object.freeze({
  * accessor RETURNS. Every row therefore declares its host and the path read off it, which is
  * what makes the member-resolution test mechanical rather than assumed.
  *
- * - `contract` — the frozen `game.fabricate.api.COMPANION` descriptor itself.
+ * - `contract` — the frozen `game.fabricate.api.companion` descriptor itself.
  * - `facade` — the `game.fabricate` facade object.
  * - `craftingEngine` — the object `game.fabricate.getCraftingEngine()` answers.
  */
@@ -1691,7 +1691,7 @@ export function normalizeGrantedBy(value) {
 }
 
 /**
- * The descriptor published as `game.fabricate.api.COMPANION`, beside the shipped
+ * The descriptor published as `game.fabricate.api.companion`, beside the shipped
  * `api.HOOKS`.
  *
  * Frozen data assembled at module load, so `bindFabricateGlobal` assigns it and nothing

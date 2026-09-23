@@ -139,9 +139,14 @@ export function localizeGathering(key, data = {}) {
  */
 const _deprecationWarned = new Set();
 
-/** One-time console deprecation notice for a renamed public API method. Never throws. */
-export function deprecate(oldName, newName) {
+/** One-time console deprecation notice for a renamed public API name. Never throws. */
+export function deprecate(oldName, newName, documentation = null) {
   if (_deprecationWarned.has(oldName)) return;
   _deprecationWarned.add(oldName);
-  console.warn(`Fabricate: ${oldName} is deprecated; use ${newName} instead.`);
+  const hint = documentation ? ` See ${documentation}` : '';
+  try {
+    console.warn(`Fabricate: ${oldName} is deprecated; use ${newName} instead.${hint}`);
+  } catch {
+    // A broken console shim must not replace the deprecated API's result with a throw.
+  }
 }

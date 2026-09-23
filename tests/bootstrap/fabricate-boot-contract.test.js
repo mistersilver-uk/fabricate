@@ -291,6 +291,25 @@ async function measureBootContract({ init, ready, loadModule }) {
   const keybindingRecorder = installKeybindingRecorder();
   await init();
   keybindingRecorder.phase = 'after-init';
+  const { COMPANION_CONTRACT: COMPANION_CONTRACT_FOR_PUBLICATION } = await loadModule(
+    '/src/systems/companionContract.js'
+  );
+  let companionPublication;
+  const companionWarnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    const [first] = args;
+    if (typeof first === 'string' && first.includes('game.fabricate.api.COMPANION')) {
+      companionWarnings.push(first);
+      throw new Error('the warning sink failed');
+    }
+  };
+  const apiAtInit = globalThis.game.fabricate.api;
+  const companionAtInit = apiAtInit.companion;
+  const apiKeysAtInit = Object.keys(apiAtInit);
+  const warningsBeforeAlias = companionWarnings.length;
+  const aliasDescriptor = Object.getOwnPropertyDescriptor(apiAtInit, 'COMPANION');
+  const aliasAtInit = apiAtInit.COMPANION;
   const composition = installCompositionRecorder(instance);
   // The `ready` backstop re-binds `game.fabricate` BEFORE `initialize()`, so a listener of the
   // `fabricate.journalRunAuthorityRestored` that pass fires meets a bound global. The bind
@@ -317,7 +336,31 @@ async function measureBootContract({ init, ready, loadModule }) {
 
   try {
     await ready();
+    const reboundApi = globalThis.game.fabricate.api;
+    const warningCountBeforeLowercaseReadyRead = companionWarnings.length;
+    const companionAfterReady = reboundApi.companion;
+    const aliasAfterReady = reboundApi.COMPANION;
+    const spreadApi = { ...reboundApi };
+    const serializedApi = JSON.parse(JSON.stringify(reboundApi));
+    companionPublication = {
+      keysAtInitIncludeBoth:
+        apiKeysAtInit.includes('companion') && apiKeysAtInit.includes('COMPANION'),
+      warningsBeforeAlias,
+      warnings: [...companionWarnings],
+      lowercaseIsContractAtInit: companionAtInit === COMPANION_CONTRACT_FOR_PUBLICATION,
+      aliasIsContractAtInit: aliasAtInit === COMPANION_CONTRACT_FOR_PUBLICATION,
+      lowercaseIsContractAfterReady: companionAfterReady === COMPANION_CONTRACT_FOR_PUBLICATION,
+      lowercaseWarningsAfterReady:
+        companionWarnings.length - warningCountBeforeLowercaseReadyRead,
+      aliasSurvivesReadyRebind: aliasAfterReady === companionAfterReady,
+      spreadAliasIsPrimary: spreadApi.COMPANION === spreadApi.companion,
+      serializedAliasMatchesPrimary:
+        JSON.stringify(serializedApi.COMPANION) === JSON.stringify(serializedApi.companion),
+      aliasEnumerable: aliasDescriptor?.enumerable === true,
+      aliasIsAccessor: typeof aliasDescriptor?.get === 'function',
+    };
   } finally {
+    console.warn = originalWarn;
     keybindingRecorder.restore();
     hooks.callAll = originalCallAll;
     Object.defineProperty(gameGlobal, 'fabricate', {
@@ -348,9 +391,10 @@ async function measureBootContract({ init, ready, loadModule }) {
     gatheringKeys: Object.keys(facade.gathering).sort(byCodePoint),
     apiKeys: Object.keys(facade.api).sort(byCodePoint),
     macroApiKeys: Object.keys(globalThis.fabricate).sort(byCodePoint),
+    companionPublication,
     references: {
       apiHooksIsFabricateHooks: facade.api.HOOKS === FABRICATE_HOOKS,
-      apiCompanionIsCompanionContract: facade.api.COMPANION === COMPANION_CONTRACT,
+      apiCompanionIsCompanionContract: facade.api.companion === COMPANION_CONTRACT,
       facadeIsEntrySingleton: facade === instance,
       recipeManagerTookCurrencyStore:
         facade.recipeManager.currencyConfigStore === facade.currencyConfigStore,
@@ -386,6 +430,25 @@ test('the module entry boots to its pinned contract', { timeout: 300000 }, async
   let measured = null;
   await withFabricateLifecycleReplay(async (context) => {
     measured = await measureBootContract(context);
+  });
+
+  assert.deepStrictEqual(measured.companionPublication, {
+    keysAtInitIncludeBoth: true,
+    warningsBeforeAlias: 0,
+    warnings: [
+      'Fabricate: game.fabricate.api.COMPANION is deprecated; use ' +
+        'game.fabricate.api.companion instead. See ' +
+        'https://mistersilver-uk.github.io/fabricate/api/#companion-contract',
+    ],
+    lowercaseIsContractAtInit: true,
+    aliasIsContractAtInit: true,
+    lowercaseIsContractAfterReady: true,
+    lowercaseWarningsAfterReady: 0,
+    aliasSurvivesReadyRebind: true,
+    spreadAliasIsPrimary: true,
+    serializedAliasMatchesPrimary: true,
+    aliasEnumerable: true,
+    aliasIsAccessor: true,
   });
 
   if (process.env.UPDATE_BOOT_CONTRACT_GOLDEN === '1') {
