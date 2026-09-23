@@ -3929,10 +3929,11 @@ export function createAdminStore(services) {
     _clearSystemScopedSearches();
     // The Knowledge snapshot is scoped to ONE system's recipe-item definitions
     // (identity is system-scoped), so it can never survive a system change.
-    knowledge.clearCache();
+    knowledge.resetForSystemChange();
     environment.resetForSystem(systemId);
     await services.setSetting('lastManagedCraftingSystem', systemId);
     await refresh();
+    await knowledge.refreshKnowledge();
     return true;
   }
 
