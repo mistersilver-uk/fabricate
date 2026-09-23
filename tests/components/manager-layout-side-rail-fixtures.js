@@ -317,6 +317,7 @@ export async function readSideRailGeometry(route, { width, height = 686, collaps
                 layout: box('.manager-scoped-list-layout'),
                 layoutScroll: scroll('.manager-scoped-list-layout'),
                 rows: box('.manager-scoped-list-rows'),
+                rowsScroll: scroll('.manager-scoped-list-rows'),
               }
             : null,
         };

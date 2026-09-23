@@ -302,6 +302,8 @@ export const CASES = Object.freeze([
     ],
     expectView: 'world-component-entry',
     expectSelector: '[data-scoped-page="world-component-entry"]',
+    // The tab strip's pointer hit, moved here from the stacked twin (issue 1976).
+    expectCenterHit: '[data-scoped-entry-tab="definition"]',
     expectContained: [
       {
         container: '[data-scoped-page="world-component-entry"]',
@@ -514,8 +516,8 @@ export const CASES = Object.freeze([
       { selector: '[data-scoped-list-search]', fill: 'Coal' },
       { selector: '[data-scoped-list-inspect="sm-coal"]' },
       { selector: '[data-scoped-component-open-entry]' },
-      // The strip into view before the pointer test.
-      { selector: '[data-scoped-entry-tab="definition"]', scroll: true },
+      // The bounded frame scrolls itself, so the stacked preview tile is below its fold (issue 1976).
+      { selector: '[data-scoped-entry-preview-tile]', scroll: true },
     ],
     expectView: 'world-component-entry',
     expectSelector: '[data-scoped-page="world-component-entry"]',
@@ -526,7 +528,7 @@ export const CASES = Object.freeze([
       // The side rail runs the body's full height beside the stacked frame (issue 1976).
       fillSelector: '.manager-rail',
     },
-    expectCenterHit: '[data-scoped-entry-tab="definition"]',
+    expectCenterHit: '[data-scoped-entry-preview-tile]',
     expectContained: [
       {
         container: '.manager-component-entry-page',

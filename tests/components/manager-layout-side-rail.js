@@ -69,6 +69,12 @@ function assertStackedCatalogue(route, report, label) {
     report.list.rows.height >= 62,
     `${tag} the list rows keep at least one row's height (${report.list.rows.height}px)`
   );
+  // And every row, not a squeezed window onto them: the layout is the one scroller.
+  assert.ok(
+    report.list.rowsScroll.scrollHeight <= report.list.rowsScroll.clientHeight + 1,
+    `${tag} the list rows are not clipped into a second scroller ` +
+      `(${report.list.rowsScroll.scrollHeight} > ${report.list.rowsScroll.clientHeight})`
+  );
 }
 
 for (const route of SIDE_RAIL_ROUTES) {

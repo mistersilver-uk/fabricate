@@ -728,14 +728,23 @@ test('exactly the declared layout cases carry complete layout expectations', () 
   )) {
     // No width bound and no absent aside: the subject is the frame's own grid, and what makes the
     // case worth capturing is that BOTH halves survive the stack — which the capture driver reads
-    // as one column track plus the pointer hit on the first tab the case also declares.
+    // as one column track plus the pointer hit on the stacked preview tile, scrolled into the
+    // bounded frame's view. The first tab's hit is its wide twin's to prove (issue 1976).
     assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, undefined);
     assert.equal(viewCase.expectLayout.expectedTracks, 1);
     assert.equal(viewCase.expectLayout.absentSelector, undefined);
-    assert.equal(typeof viewCase.expectCenterHit, 'string');
+    assert.equal(viewCase.expectCenterHit, '[data-scoped-entry-preview-tile]');
     // The side rail beside the stacked frame runs the body's full height (issue 1976).
     assert.equal(viewCase.expectLayout.fillSelector, '.manager-rail');
   }
+  assert.equal(
+    getCaseById('manager-component-edit-normal').expectCenterHit,
+    '[data-component-edit-tab="rules"]'
+  );
+  assert.equal(
+    getCaseById('world-component-entry-definition').expectCenterHit,
+    '[data-scoped-entry-tab="definition"]'
+  );
   for (const viewCase of declared.filter((entry) =>
     FULL_WIDTH_LAYOUT_CASE_IDS.includes(entry.id)
   )) {
