@@ -24,6 +24,7 @@ import {
   assertSelectHasResolvedName,
   chooseSelectOption,
   selectOptionValues,
+  selectTriggerText,
 } from '../helpers/select-control.js';
 
 let Component;
@@ -149,10 +150,11 @@ export function registerComponentsCases() {
       'rows render no tag chips'
     );
 
-    const categoryFilter = target.querySelector('[data-component-category-filter]');
-    assert.ok(categoryFilter, 'the browser filters by category');
-    categoryFilter.value = 'Reagent';
-    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    assert.ok(
+      target.querySelector('[data-component-category-filter]'),
+      'the browser filters by category'
+    );
+    chooseSelectOption(target, '[data-component-category-filter]', 'Reagent');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
@@ -172,8 +174,7 @@ export function registerComponentsCases() {
       'Reagent',
       'and THAT is where the category is stated'
     );
-    categoryFilter.value = 'general';
-    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-component-category-filter]', 'general');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
@@ -191,8 +192,7 @@ export function registerComponentsCases() {
     );
 
     // The filter is cleared through the control that set it, and the list widens again.
-    categoryFilter.value = 'all';
-    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-component-category-filter]', 'all');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 2);
@@ -1077,9 +1077,7 @@ export function registerComponentsCases() {
     flushSync();
 
     // Issue 676: the facet is CATEGORY now.
-    const categoryFilter = target.querySelector('[data-component-category-filter]');
-    categoryFilter.value = 'Reagent';
-    categoryFilter.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-component-category-filter]', 'Reagent');
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);
@@ -1090,8 +1088,8 @@ export function registerComponentsCases() {
     flushSync();
 
     assert.equal(
-      target.querySelector('[data-component-category-filter]').value,
-      'all',
+      selectTriggerText(target, '[data-component-category-filter]'),
+      'All categories',
       'a stale category facet is cleared when the selected system changes'
     );
     assert.equal(target.querySelectorAll('.manager-component-row').length, 1);

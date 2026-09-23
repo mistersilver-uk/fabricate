@@ -430,9 +430,10 @@ export async function captureRecipeEditorRoundtrip(ctx, craftingSetup) {
 
     await openManagerCraftingSection(page, 'recipes', 'recipes');
 
-    // Filter to the seeded category: a visible chip and a single-group filtered list.
+    // Filter to the seeded category: a visible chip and a single-group filtered list. The filter is
+    // the app's own option list, so it is driven by clicking its trigger and then its row.
     const categoryFilter = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
-    await categoryFilter.selectOption(CATEGORY);
+    await chooseSelectOption(page, categoryFilter, { value: CATEGORY });
     await settleManagerNav(page);
     await page
       .locator('.fabricate-manager [data-recipe-filter-chip="category"]')
@@ -501,7 +502,7 @@ export async function captureRecipeEditorRoundtrip(ctx, craftingSetup) {
   } finally {
     const categoryReset = page.locator('.fabricate-manager [data-recipe-category-filter]').first();
     if ((await categoryReset.count()) > 0) {
-      await categoryReset.selectOption('all').catch(() => {});
+      await chooseSelectOption(page, categoryReset, { value: 'all' }).catch(() => {});
       await settleManagerNav(page);
     }
     if (ids.length > 0) {

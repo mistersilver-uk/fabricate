@@ -329,7 +329,7 @@ const CONTROLS = Object.freeze([
     id: 'toolbar',
     classes: TOOLBAR_CLASSES,
     markup: (host) =>
-      `<section class="fabricate-filter-bar manager-toolbar" data-probe="${host}-toolbar" aria-label="Filter"><div><select class="is-size-38" data-probe="${host}-toolbar-select"><option>All</option></select></div></section>`,
+      `<section class="fabricate-filter-bar manager-toolbar" data-probe="${host}-toolbar" aria-label="Filter"><div></div></section>`,
   }),
   Object.freeze({
     id: 'card',
@@ -455,7 +455,6 @@ const CONTROLS = Object.freeze([
 
 /** Probes measured across the three hosts that are not themselves `CONTROLS` entries. */
 const EXTRA_PROBES = Object.freeze([
-  'toolbar-select',
   'toggle-track',
   'toggle-knob',
   'toggle-label',
@@ -522,11 +521,6 @@ const EXTRA_PROBES = Object.freeze([
   'pill-select-empty-row',
   'pill-select-any',
 ]);
-
-/** The extra probes that are the issue-1508 families' OWN elements. */
-const FAMILY_EXTRA_PROBES = Object.freeze(
-  EXTRA_PROBES.filter((probe) => probe !== 'toolbar-select')
-);
 
 /** The two family RAILS whose rendered border box follows the host's `box-sizing`. */
 const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
@@ -729,9 +723,6 @@ const CARD_COMPARED = Object.freeze([
   'font-size',
   'line-height',
 ]);
-
-/** The two properties the bar's one control-reaching rule declares. */
-const TOOLBAR_SELECT_COMPARED = Object.freeze(['height', 'border-radius']);
 
 /** What acceptance 2 compares on the switch itself — its root `<button>`, which IS the control. */
 const TOGGLE_COMPARED = Object.freeze([
@@ -1406,7 +1397,6 @@ const ALL_COMPARED = Object.freeze([
   ...new Set([
     ...COMPARED,
     ...Object.values(COMPARED_BY_CONTROL).flat(),
-    ...TOOLBAR_SELECT_COMPARED,
   ]),
 ]);
 
@@ -1503,7 +1493,7 @@ const MEASURED_PROBES = Object.freeze([
     Object.freeze({ id: control.id, comparesBox: control.comparesBox !== false })
   ),
   // TWO PROBES OPT OUT, and both for the switch's own reason above.
-  ...FAMILY_EXTRA_PROBES.map((id) =>
+  ...EXTRA_PROBES.map((id) =>
     Object.freeze({
       id,
       comparesBox:
@@ -2263,7 +2253,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
  * `ManagerToolbar` and `InspectorCard` are the first re-rooted families whose root is not a
  * control and does not CONTAIN one of their own: the bar renders `{@render children?.()}` and the
  * card renders its caller's children. So they declare no font floor and no focus pair, and the
- * three clauses below are the two halves of that decision plus its one residue.
+ * two clauses below are the two halves of that decision.
  */
 
 test('the filter bar and the card declare their own box rather than inheriting it', async () => {
@@ -2335,42 +2325,6 @@ test('the filter bar and the card declare their own box rather than inheriting i
   }
 });
 
-test('the bar`s 38px select rung travels with the family, and the select`s type does not', async () => {
-  // THE ONE FAMILY RULE THAT REACHES A CALLER'S CONTROL, and both halves of what that means.
-  const measured = await measure(sheet);
-  for (const property of TOOLBAR_SELECT_COMPARED) {
-    const values = HOSTS.map((host) => measured['toolbar-select'][host.id][property]);
-    assert.ok(
-      values.some((value) => value !== ''),
-      `the rung computed an empty \`${property}\` in every host, so comparing them proves nothing`
-    );
-    assert.equal(
-      new Set(values).size,
-      1,
-      `the toolbar select rung computes a different \`${property}\` depending on which ` +
-        `application class is above it — ${HOSTS.map((host, index) => `${host.id}=${values[index]}`).join(', ')}`
-    );
-  }
-  assert.equal(measured['toolbar-select'].bare.height, '38px', 'the rung is the ladder`s 38');
-  assert.equal(measured['toolbar-select'].bare['border-radius'], '9px', 'and the band`s 9 corner');
-
-  // THE RESIDUE, MEASURED. Outside the manager that select takes Foundry-less defaults for its
-  // type, because no rule this family declares reaches it.
-  assert.doesNotMatch(
-    measured['toolbar-select'].bare['font-family'],
-    /Signika/,
-    'the toolbar select inherits the ambient font outside the manager, which would mean some ' +
-      'rule IS flooring a control the bar does not own — the thing this family deliberately ' +
-      'refuses to declare'
-  );
-  assert.match(
-    measured['toolbar-select'].manager['font-family'],
-    /Signika/,
-    'inside the manager the AREA`s own bare-element baseline still types that select, which is ' +
-      'what makes the bare-host difference a residue rather than a regression'
-  );
-});
-
 test('neither the filter bar nor the card declares a font floor or a focus pair', async () => {
   // THE NEGATIVE CONTROL FOR A POSITIVE DECISION. `openspec/specs/design-system/spec.md` forbids
   // a primitive displacing an area's chrome for a control it does not own — the clause the
@@ -2412,9 +2366,24 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
         typed.map((rule) => `${rule.selectorText} :: ${rule.cssText}`),
         [],
         `\`${root}\` declares type. Neither of these families owns a control, so neither gets a ` +
-          'font floor: the bar`s own `select.is-size-38` rung reaches a control the CALLER owns, ' +
-          'and flooring it here is the displacement the requirement refuses. Its unfloored type ' +
-          'in a bare host is a recorded residue owned by issues 1510/1511.'
+          'font floor: every control in the bar is the CALLER\'s, and flooring one here is the ' +
+          'displacement the requirement refuses.'
+      );
+
+      // AND NO FAMILY RULE REACHES A CONTROL. A height or a corner written here for a caller's
+      // control is the same displacement as a font floor; a caller lifts its own control in a
+      // rule keyed on its own bar.
+      const reaching = family.filter((rule) =>
+        rule.selectorText
+          .split(',')
+          .map((selector) => selector.split(named).slice(1).join(''))
+          .some((tail) => /(?:^|[\s>+~(])(?:select|input|button|textarea)(?![\w-])/.test(tail))
+      );
+      assert.deepEqual(
+        reaching.map((rule) => rule.selectorText),
+        [],
+        `\`${root}\` declares a rule that reaches a control the CALLER renders. This family owns ` +
+          'no control, so a rung or a skin for one belongs to the caller’s own bar rule.'
       );
     }
 

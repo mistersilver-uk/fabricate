@@ -20,10 +20,12 @@ const FIXTURE = `
             <label class="fabricate-search manager-search">
               <input type="search" data-m="search" value="iron">
             </label>
-            <select class="manager-component-essence-filter" data-m="essence-select"><option>All essences</option></select>
+            <!-- The toolbar controls are the shared Select, drawn as it renders: the picker ROOT
+                 carrying the caller class, the trigger nested inside it. -->
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-essence-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="essence-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by essence"><span class="manager-travel-picker-value fabricate-select-value">All essences</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
           </div>
           <div class="manager-component-filter-row is-secondary">
-            <select class="manager-component-category-filter" data-m="filter-select"><option>All categories (4)</option></select>
+            <div class="fabricate-picker manager-travel-picker fabricate-select manager-component-category-filter is-size-38"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="filter-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter components by category"><span class="manager-travel-picker-value fabricate-select-value">All categories</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
@@ -34,7 +36,7 @@ const FIXTURE = `
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label">Sort by</span>
-              <select data-m="sort-select"><option>Name</option></select>
+              <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="sort-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort components"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
               <!-- Carries fab-manager-button because the shipped control does (issue 1118):
                    ComponentsBrowserView renders this toggle through ManagerButton, and the
                    .manager-button.manager-component-sort-direction rule was chained onto the
@@ -372,12 +374,10 @@ const EXPECTED = {
   // it. Route-scoped in the sheet, so the Recipe Studio's and the Essence library's labels are
   // untouched at 8.8 — which is why this fixture's root carries `data-manager-view="components"`.
   'filter-label': 8.5, // proto:1062 toolbar micro-label 8.5px @ .08em (was 8.8, and 12.48 before)
-  // 0.72rem. These were 14 — Foundry's app base bleeding through — because the Component
-  // Studio's own bleed patch covers `.manager-search input` and `.manager-toolbar
-  // .manager-button` but NOT `select`, and the browser's selects had no font-size rule
-  // at all. Joining `.manager-component-toolbar select` to the recipe rule closed it.
-  // The two FILTER selects moved to the reference's own 12px at issue 1371 r11 (F-K); the SORT
-  // select did not, because the reference draws that one at 11.5px (`proto:1066`) against the
+  // 0.72rem, the shared `Select`'s `toolbar` rung, which states the literal on the trigger
+  // itself rather than leaving it to inherit Foundry's 14px app base.
+  // The two FILTER triggers take the reference's own 12px (issue 1371 r11, F-K); the SORT
+  // trigger does not, because the reference draws that one at 11.5px (`proto:1066`) against the
   // shipped 11.52px and a fiftieth of a pixel is rounding rather than drift. Three selects in one
   // bar with two pinned sizes is the reference's own arrangement, not an oversight.
   'filter-select': 12, // proto:1054 — the category filter (was 11.52)

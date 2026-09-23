@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 225,
+  "pinnedTotal": 219,
   "rows": [
     {
       "key": "(top level) | .fabricate-list-row.is-truncated .fabricate-list-row-detail",
@@ -98,10 +98,6 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-manager .manager-component-toolbar select",
-      "count": 2
-    },
-    {
       "key": "(top level) | .fabricate-manager .manager-condition-add .essence-icon-picker-trigger.icon-only",
       "count": 2
     },
@@ -147,10 +143,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-essence-toolbar .manager-search input",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-essence-toolbar select",
       "count": 2
     },
     {
@@ -231,10 +223,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-recipe-tool-row",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-recipe-toolbar select",
       "count": 2
     },
     {

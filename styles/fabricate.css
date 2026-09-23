@@ -5033,17 +5033,14 @@
 
 /* The three-row filter bar. Row one is every FILTER (search, status, lock, category); row two is the two VIEW controls (grouping, ordering), split by a rule; row three is the active-filter chips and the count. */
 .fabricate-manager .manager-recipe-toolbar {
-  /* The whole bar reads at the shared --fab-recipe-control-font (issue 643): the search input, both selects and the sort-direction toggle — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
+  /* The whole bar reads at the shared --fab-recipe-control-font (issue 643): the search input and the sort-direction toggle, with both select triggers at the `toolbar` rung's own 0.72rem — matching the segmented status/lock toggles (their component sets the same 0.72rem) — so the filters no longer mix 14 / 12.48 / 11.52px. */
   gap: var(--fab-space-2);
 }
 
 /* The Component Studio's toolbar is the SAME bar: ruling 1 makes the recipe treatment win wherever the two disagree, so the component browser joins every rule below rather than re-deriving a second, drifting filter bar (issues 676, 1036). */
 .fabricate-manager .manager-recipe-toolbar .manager-search input,
-.fabricate-manager .manager-recipe-toolbar select,
 .fabricate-manager .manager-component-toolbar .manager-search input,
-.fabricate-manager .manager-component-toolbar select,
-.fabricate-manager .manager-essence-toolbar .manager-search input,
-.fabricate-manager .manager-essence-toolbar select {
+.fabricate-manager .manager-essence-toolbar .manager-search input {
   font-size: var(--fab-recipe-control-font);
 }
 
@@ -5084,29 +5081,19 @@
   border-top: 1px solid var(--fab-border);
 }
 
-/* Both recipe-filter dropdowns (category + sort) wear the Fabricate select treatment — themed surface, border, radius, text colour and the native dark chevron under `color-scheme: dark` — rather than Foundry core's default light select chrome, which they rendered with before (issue 643). */
-
-/* skin census (issue 1523): pinned three ways — tests/components/manager-layout.test.js (a selector-list lookup asserting `height: 34px`), tests/components/essence-studio- fidelity.test.js (a sheet-text occurrence count), and tests/components/component-studio- font-size.test.js / tests/components/recipe-studio-font-size.test.js (fixture markup rendered against this sheet). */
-.fabricate-manager .manager-recipe-toolbar select,
-.fabricate-manager .manager-component-toolbar select,
-.fabricate-manager .manager-essence-toolbar select {
-  height: 34px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  cursor: pointer;
-}
-
-/* The bare category select. It carries no visible label — the `aria-label` is its accessible name — because a filter bar whose controls each announce themselves in sentence case reads as a form, not a bar. */
+/* The bare filter pickers. Each carries no visible label — the `aria-label` is its trigger's accessible name — because a filter bar whose controls each announce themselves in sentence case reads as a form, not a bar. The class lands on the picker ROOT, which is the row's flex item and takes the cap; the trigger is sized to its value, so it is held to the root and its value ellipsises there instead of overflowing it. */
 .fabricate-manager .manager-recipe-category-filter,
 .fabricate-manager .manager-component-category-filter,
 .fabricate-manager .manager-component-essence-filter {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
-  text-overflow: ellipsis;
+}
+
+.fabricate-manager .manager-recipe-category-filter .fabricate-select-trigger,
+.fabricate-manager .manager-component-category-filter .fabricate-select-trigger,
+.fabricate-manager .manager-component-essence-filter .fabricate-select-trigger {
+  max-width: 100%;
 }
 
 /* A row-two field: its uppercase micro-label, then its control. */
@@ -20616,13 +20603,8 @@
   border-radius: 9px;
 }
 
-.fabricate-manager .manager-filter.is-size-38 select,
-.fabricate-filter-bar.manager-toolbar select.is-size-38 {
-  height: 38px;
-  border-radius: 9px;
-}
-
-.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger {
+.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger,
+.fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger {
   min-height: 38px;
   border-radius: 9px;
 }
@@ -20707,15 +20689,14 @@
 
 /* === issue 1371 r11-list — the system Component Rules list's TOOLBAR MICRO-TYPE (UX finding F-K). === */
 
-/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)` at weight 500. */
-.fabricate-manager[data-manager-view="components"] .manager-component-toolbar select {
+/* `proto:1054` (the category filter), `proto:1056` (the essence filter) and `proto:1066` (the sort key) all ink their select `var(--text2)`; the `toolbar` rung already states their weight 500. */
+.fabricate-manager[data-manager-view="components"] .manager-component-toolbar .fabricate-select-trigger {
   color: var(--fab-text-secondary);
-  font-weight: 500;
 }
 
-/* And the two FILTER selects at the reference's own 12px. The sort select is deliberately absent: the reference draws IT at 11.5px (`proto:1066`) against the shipped 11.52px, a fiftieth of a pixel, which belongs to the rounding class rather than to this finding. */
-.fabricate-manager[data-manager-view="components"] .manager-component-category-filter,
-.fabricate-manager[data-manager-view="components"] .manager-component-essence-filter {
+/* And the two FILTER triggers at the reference's own 12px. The sort trigger is deliberately absent: the reference draws IT at 11.5px (`proto:1066`) against the rung's 11.52px, a fiftieth of a pixel, which belongs to the rounding class rather than to this finding. */
+.fabricate-manager[data-manager-view="components"] .manager-component-category-filter .fabricate-select-trigger,
+.fabricate-manager[data-manager-view="components"] .manager-component-essence-filter .fabricate-select-trigger {
   font-size: 12px;
 }
 

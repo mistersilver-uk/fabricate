@@ -7,7 +7,7 @@ import {
   BULK_DELETE_CARD_PATTERN,
   BULK_EDIT_CHROME_PATTERN,
 } from './caseConstants.js';
-import { managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -44,7 +44,7 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     steps: [
       { selector: '#manager-nav-component-rules' },
-      { selector: '[data-component-essence-filter]', select: '__any' },
+      ...chooseSelectOption('[data-component-essence-filter]', '__any'),
       // Open a carrying row through its identity button: the list opens on its first drawn row, which may carry nothing.
       { selector: '.manager-component-row:has([data-chip-tint]) .manager-component-identity' },
     ],
@@ -65,6 +65,31 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components\/EssenceChip\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/components\/ComponentRow\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/components\/ComponentBrowserInspector\.svelte$/,
+    ],
+  }),
+  // The component toolbar's open-panel frame (issue 1510), on the tightest list in the phase:
+  // `Carries any essence` in the 116px a ticked row leaves inside the call site's 168px panel
+  // floor.
+  managerCase({
+    id: 'manager-components-essence-filter-list',
+    label: 'Manager — Components essence filter list',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Stops on the trigger and clicks no row, so the list is still open when the frame is taken.
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      { selector: '[data-component-essence-filter]' },
+    ],
+    expectView: 'components',
+    // Two claims a closed frame cannot make: the panel exists and it is the ticked essence list.
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover.fabricate-select-popover-ticked' +
+      ' [data-popover-option="__any"] .fabricate-select-label',
+    expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({

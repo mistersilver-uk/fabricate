@@ -6,7 +6,10 @@ import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
 // Issue 1504: a converted control is a shared `<Select>`.
 import {
+  assertSelectHasResolvedName,
   chooseSelectOption,
+  closeSelectPanel,
+  openSelectPanel,
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
@@ -600,9 +603,7 @@ export function registerRecipesCases() {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipes');
 
     // Filter to the potions category, then shrink the page and step to page 2.
-    const categorySelect = target.querySelector('[data-recipe-category-filter]');
-    categorySelect.value = 'potions';
-    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-recipe-category-filter]', 'potions');
     await tick();
     flushSync();
 
@@ -641,6 +642,73 @@ export function registerRecipesCases() {
       '11–12 of 12',
       'the browser returned to page 2, not page 1'
     );
+
+    // A category choice resets the page, so a narrower list never opens on a page it lacks.
+    chooseSelectOption(target, '[data-recipe-category-filter]', 'all');
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-recipe-count]').textContent.trim(), '1–10 of 12');
+  });
+
+  it('names and drives the recipe toolbar’s converted category filter and sort (issue 1510)', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        // r1 yields three result items and r2 none, so the result order inverts the name order.
+        store: createStore([], {
+          experimentalFeaturesEnabled: true,
+          recipeOverrides: { resultItemCount: 3 },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+
+    const CATEGORY = '[data-recipe-category-filter]';
+    const SORT = '[data-recipe-sort]';
+    // Category names are distinct names and drop the tick; the sort keys are cousins and keep it.
+    for (const [hook, name, ticked] of [
+      [CATEGORY, 'Filter recipes by category', false],
+      [SORT, 'Sort recipes', true],
+    ]) {
+      assert.equal(assertSelectHasResolvedName(target, hook), name);
+      assert.equal(target.querySelector(hook).getAttribute('data-select-size'), 'toolbar');
+      assert.equal(
+        openSelectPanel(target, hook).classList.contains('fabricate-select-popover-ticked'),
+        ticked
+      );
+      closeSelectPanel(target, hook);
+    }
+    assert.deepEqual(selectOptionValues(target, CATEGORY), ['all', 'elixirs', 'potions']);
+    closeSelectPanel(target, CATEGORY);
+
+    const rows = () =>
+      [...target.querySelectorAll('.manager-recipe-row')].map((row) => row.dataset.recipeId);
+    for (const [category, expected] of [
+      ['potions', ['r1']],
+      ['elixirs', ['r2']],
+      ['all', ['r2', 'r1']],
+    ]) {
+      chooseSelectOption(target, CATEGORY, category);
+      await tick();
+      flushSync();
+      assert.deepEqual(rows(), expected, `the ${category} category keeps ${expected.join(', ')}`);
+    }
+
+    target.querySelector('[data-recipe-group-toggle]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(rows(), ['r1', 'r2'], 'ungrouped, by name');
+    chooseSelectOption(target, SORT, 'results');
+    await tick();
+    flushSync();
+    assert.deepEqual(rows(), ['r2', 'r1'], 'by result count, none before three');
+    assert.equal(selectTriggerText(target, SORT), 'Results');
   });
 
   it('creates a recipe from the recipes header and opens the recipe-edit route', async () => {

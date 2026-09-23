@@ -453,8 +453,9 @@ test('manager components browser defines drop target and compact responsive list
     'manager toolbar grid should keep rows bounded to the main content width'
   );
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
-  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its
-  // own selects carried no font-size at all and were rendering at Foundry's 14px app base.
+  // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its search
+  // input takes the shared control font from them; its select triggers take the same 0.72rem
+  // from the shared `Select`'s `toolbar` rung.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'
@@ -463,18 +464,9 @@ test('manager components browser defines drop target and compact responsive list
   );
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar select,\n.fabricate-manager .manager-essence-toolbar .manager-search input,\n.fabricate-manager .manager-essence-toolbar select'
+      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-essence-toolbar .manager-search input'
     ).includes('font-size: var(--fab-recipe-control-font);'),
-    'the component and essence toolbar controls are typed by the shared control font, not the Foundry bleed'
-  );
-  // The essence toolbar's selects also take the Fabricate select TREATMENT. Without it they
-  // rendered with Foundry core's own chrome — full-width, taller than the segmented controls
-  // beside them, and wrapping one filter row into three.
-  assert.ok(
-    blockFor(
-      '.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar select,\n.fabricate-manager .manager-essence-toolbar select'
-    ).includes('height: 34px;'),
-    'every studio filter bar dresses its own selects rather than inheriting Foundry core chrome'
+    'the component and essence toolbar search inputs are typed by the shared control font, not the Foundry bleed'
   );
   // The ESSENCE browser's toggle is the third selector in that group (issue 1118). It is
   // addressed by its `data-*` hook because the class it used to carry styled nothing at all —

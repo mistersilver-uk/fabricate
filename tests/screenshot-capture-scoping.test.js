@@ -1104,6 +1104,16 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   '-biome-filter',
   '-availability-filter',
   '-danger-filter',
+  // Issue 1510 phase 3, commit 3d — the recipe, component and essence toolbars. Each is spelled
+  // bare, checked rather than assumed: the three `-sort` hooks prefix their sibling direction
+  // buttons' `-sort-direction` hooks, which name buttons rather than native selects, and no entry
+  // here prefixes a hook on a native control that survives.
+  'data-recipe-category-filter',
+  'data-recipe-sort',
+  'data-component-category-filter',
+  'data-component-essence-filter',
+  'data-component-sort',
+  'data-essence-sort',
 ]);
 
 /**
@@ -1121,7 +1131,12 @@ function assertEveryConvertedHookResolves() {
     // attribute, so both spellings count as resolving it.
     const valued = /^([^=]+)="(.+)"$/u.exec(hook);
     const needles = valued ? [`'${valued[1]}': '${valued[2]}'`, hook] : [hook];
-    return !sources.some((source) => needles.some((needle) => source.includes(needle)));
+    // A hook resolves only where it ENDS: `data-recipe-sort` is a prefix of the sibling button's
+    // `data-recipe-sort-direction`, which would otherwise keep a renamed sort hook resolving.
+    const patterns = needles.map(
+      (needle) => new RegExp(`${needle.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?![\\w-])`, 'u')
+    );
+    return !sources.some((source) => patterns.some((pattern) => pattern.test(source)));
   });
   assert.deepEqual(
     missing,
@@ -1219,9 +1234,9 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
 // manager's. Its first phase took the two `[data-world-currency-strategy-select]` steps; phase 2
 // took the gathering task editor's respawn policy in commit 2d and the environment overview's two
-// membership add controls in commit 2e. Three native `select:` steps remain, all of them phase 3's
-// to retire: the recipe category filter, the system Component Rules list's essence filter and the
-// system Tool Rules list's sort. The surface this clause covers is still shrinking towards zero.
+// membership add controls in commit 2e. One native `select:` step remains, phase 3's to retire:
+// the system Tool Rules list's sort. The surface this clause covers is still shrinking towards
+// zero.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
   // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
   // which is how every one of these steps is authored.
@@ -1244,9 +1259,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 19,
+    replacements.length >= 21,
     `only ${replacements.length} \`chooseSelectOption(\` occurrences remain in the registry, ` +
-      'against a floor of 19 — 18 call sites plus the definition in `caseFactories.js`, which the ' +
+      'against a floor of 21 — 20 call sites plus the definition in `caseFactories.js`, which the ' +
       'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
       'was renamed and this clause is now judging an empty set.'
   );

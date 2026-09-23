@@ -1,5 +1,6 @@
 manager-components-normal
 manager-components-essence-chips
+manager-components-essence-filter-list
 manager-component-edit-inheriting
 manager-component-edit-category-list
 manager-component-edit-world-tags

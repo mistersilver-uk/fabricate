@@ -177,12 +177,11 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   after(() => harness.teardown());
 
   const fieldRule = '.fabricate-search.manager-search.is-size-38 input';
-  // The SECOND member re-rooted at issue 1508.
-  const selectRule =
-    '.fabricate-manager .manager-filter.is-size-38 select, .fabricate-filter-bar.manager-toolbar select.is-size-38';
-  // THE SCOPED CATALOGUE'S MEMBER LEFT THAT LIST AT ISSUE 1504 and is a rule of its own.
+  // The converted select triggers' opt-in: the scoped catalogue's lead row and the component
+  // toolbar's two filters, one member per host bar.
   const triggerRule =
-    '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger';
+    '.fabricate-manager .manager-scoped-list-toolbar .is-size-38 .fabricate-select-trigger, ' +
+    '.fabricate-manager .manager-component-toolbar .is-size-38 .fabricate-select-trigger';
 
   it('is on the published height ladder, which is why it needs no deviation', () => {
     assert.ok(LADDER_RUNGS.includes(38), '38 is a rung, so drawing it is compliance and not drift');
@@ -191,7 +190,6 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('states 38px and the band’s 9px corner for the field and for a toolbar select', () => {
     for (const [label, selector, heightProperty] of [
       ['field', fieldRule, 'height'],
-      ['select', selectRule, 'height'],
       ['converted select trigger', triggerRule, 'min-height']
     ]) {
       const [body] = bodiesOf(selector);
@@ -223,7 +221,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
       ),
       34
     );
-    for (const selector of [fieldRule, ...selectRule.split(', '), triggerRule]) {
+    for (const selector of [fieldRule, ...triggerRule.split(', ')]) {
       const classes = (selector.match(/\.[\w-]+/g) ?? []).length;
       assert.ok(classes >= 3, `\`${selector}\` carries a third class, so it wins on specificity`);
     }

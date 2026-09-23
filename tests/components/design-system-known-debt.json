@@ -100,11 +100,8 @@
     "styles/fabricate.css | .fabricate-roll-prompt__modifier-option input[type='radio']:checked:focus | inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent) | 1"
   ],
   "nativeSelectElements": [
-    "src/ui/svelte/apps/manager/ComponentsBrowserView.svelte | 3",
     "src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte | 1",
-    "src/ui/svelte/apps/manager/EssenceBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/ManagerNavRail.svelte | 1",
-    "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 2",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte | 2",
     "src/ui/svelte/apps/manager/environment/GatheringRulesInspector.svelte | 10",

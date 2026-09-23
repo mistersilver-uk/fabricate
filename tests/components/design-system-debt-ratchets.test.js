@@ -1163,11 +1163,12 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at fifteen carriers of the target tuple: four are PINNED by a test or a script ' +
+      'measured at fourteen carriers of the target tuple: three are PINNED by a test or a script ' +
       'that reads their selectors, seven are recorded non-adopters and four are unpinned. The ' +
-      'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the two ' +
-      'carriers that left are select skins issue 1510 took — the recipe overview cells, deleted ' +
-      'when that row became the shared `<Select>`, and the Tool rails\' `Preview as` actor ' +
+      'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the three ' +
+      'carriers that left are select skins issue 1510 took — the recipe overview cells and the ' +
+      "recipe, component and essence browse toolbars' shared select skin, each deleted when its " +
+      "selects became the shared `<Select>`, and the Tool rails' `Preview as` actor " +
       'picker, whose rule survives as a width counterpart while the `toolbar` rung paints the ' +
       "tuple; the pinned carrier that arrived is issue 1512's ordered row, " +
       '`.fabricate-sortable-list-row`, which takes the tuple from the `<SortableList>` specimen. Issue ' +
@@ -1432,9 +1433,9 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    15,
-    'the census is fifteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its four-pinned / seven-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
+    14,
+    'the census is fourteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its three-pinned / seven-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
       'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );
@@ -1531,8 +1532,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,043 `(at-context, selector)`
-  // keys under this very keying, of which 2,933 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,042 `(at-context, selector)`
+  // keys under this very keying, of which 2,935 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

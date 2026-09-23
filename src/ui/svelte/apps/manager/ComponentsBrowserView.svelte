@@ -11,6 +11,7 @@
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
   import { createBulkSelection } from './bulkSelection.svelte.js';
   import { createBrowserListState } from './browserListState.svelte.js';
   import {
@@ -271,10 +272,42 @@
 
   const sortOptions = $derived(
     COMPONENT_SORT_KEYS.map((key) => ({
-      key,
+      value: key,
       label: sortLabel(key),
     }))
   );
+  // The two filter lists, each label carried verbatim from the `<option>` text it replaced
+  // (issue 1510).
+  const categorySelectOptions = $derived([
+    {
+      value: 'all',
+      label: text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories'),
+    },
+    ...categoryOptions.map((category) => ({
+      value: category.name,
+      label: `${categoryLabel(category.name)} (${category.count})`,
+    })),
+  ]);
+  // The one `toolbar` panel floor in the manager's select conversion. A ticked row spends 52px on
+  // the tick and the padding, leaving 108px of the band's 160px floor for a label: `Carries any
+  // essence` measures 100.8px at 12px in Signika, the product face, and 109.4px in the Arial the
+  // rendered suite measures with, because the repository cannot ship Signika. 168 is the next
+  // multiple of 8 that draws it whole in both, and the only slack this label has for translation.
+  const ESSENCE_FILTER_PANEL_MIN_WIDTH = 168;
+  // The reference's two PREDICATES ahead of the per-essence entries. Their values are the model's
+  // sentinels, not names.
+  const essenceSelectOptions = $derived([
+    { value: 'all', label: text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences') },
+    {
+      value: COMPONENT_ESSENCE_FILTER_ANY,
+      label: text('FABRICATE.Admin.Manager.Component.EssenceAny', 'Carries any essence'),
+    },
+    {
+      value: COMPONENT_ESSENCE_FILTER_NONE,
+      label: text('FABRICATE.Admin.Manager.Component.EssenceNone', 'No essences'),
+    },
+    ...componentEssenceOptions.map((essence) => ({ value: essence, label: essence })),
+  ]);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -523,11 +556,11 @@
     <div class="manager-component-filter-row">
       <!--
         THREE CONTROLS AT 38px, a published rung (26 / 28 / 30 / 34 / 38 / 44) and what the reference
-        draws: the field takes `size="38"` and each select carries `is-size-38`. The asymmetry is the
-        tree's shape — `ManagerSearchField` owns its own class list, while the manager has no select
-        COMPONENT because the control beside the field is three different things across eleven bars.
-        NEITHER IS A LOCAL HEIGHT: `.manager-toolbar select.is-size-38` is (0,3,1) and beats this
-        bar's own (0,2,1) 34px rule, so it lands wherever the class is written.
+        draws: the field takes `size="38"` and each filter's `Select` root carries `is-size-38`. The
+        asymmetry is the primitives' shape — `ManagerSearchField` publishes a size prop, while
+        `Select` publishes three rungs and no 38, so the opt-in is this bar's rule: it lifts the
+        `toolbar` rung's 34px trigger to 38 beside the scoped catalogue's lead row, which takes the
+        same rule for the same reason.
       -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component types
            into this field rather than depending on where that component happens to sort. -->
@@ -543,52 +576,38 @@
         ariaLabel={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
       />
 
-      <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose controls each
-           announce themselves in sentence case reads as a form. -->
-      <select
+      <!-- Bare: the `aria-label` is the trigger's accessible name. A filter bar whose controls
+           each announce themselves in sentence case reads as a form. Category names are distinct
+           names, so that list drops the tick; the essence list keeps it for the three
+           near-identical predicates heading it. -->
+      <Select
+        size="toolbar"
         class="manager-component-category-filter is-size-38"
-        data-component-category-filter
         value={ui.categoryFilter}
-        onchange={(event) => setCategoryFilter(event.currentTarget.value)}
-        aria-label={text(
+        options={categorySelectOptions}
+        showTick={false}
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.Component.CategoryFilterLabel',
           'Filter components by category'
         )}
-      >
-        <option value="all"
-          >{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option
-        >
-        {#each categoryOptions as category (category.name)}
-          <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
-        {/each}
-      </select>
+        triggerData={{ 'data-component-category-filter': '' }}
+        onChange={setCategoryFilter}
+      />
 
       {#if showComponentEssences && componentEssenceOptions.length > 0}
-        <select
+        <Select
+          size="toolbar"
           class="manager-component-essence-filter is-size-38"
-          data-component-essence-filter
           value={ui.essenceFilter}
-          onchange={(event) => setEssenceFilter(event.currentTarget.value)}
-          aria-label={text(
+          options={essenceSelectOptions}
+          minWidth={ESSENCE_FILTER_PANEL_MIN_WIDTH}
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Component.EssenceFilterLabel',
             'Filter components by essence'
           )}
-        >
-          <option value="all"
-            >{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option
-          >
-          <!-- The reference's two PREDICATES ahead of the per-essence entries. Their values are
-               the model's sentinels, not names. -->
-          <option value={COMPONENT_ESSENCE_FILTER_ANY}
-            >{text('FABRICATE.Admin.Manager.Component.EssenceAny', 'Carries any essence')}</option
-          >
-          <option value={COMPONENT_ESSENCE_FILTER_NONE}
-            >{text('FABRICATE.Admin.Manager.Component.EssenceNone', 'No essences')}</option
-          >
-          {#each componentEssenceOptions as essence (essence)}
-            <option value={essence}>{essence}</option>
-          {/each}
-        </select>
+          triggerData={{ 'data-component-essence-filter': '' }}
+          onChange={setEssenceFilter}
+        />
       {/if}
 
       <!-- THE COHORT SWITCH, as the two-segment inline filter the reference draws rather than the
@@ -655,16 +674,14 @@
         <span class="manager-component-filter-label"
           >{text('FABRICATE.Admin.Manager.Component.SortBy', 'Sort by')}</span
         >
-        <select
+        <Select
+          size="toolbar"
           value={ui.sortKey}
-          data-component-sort
-          onchange={(event) => setSortKey(event.currentTarget.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Component.SortLabel', 'Sort components')}
-        >
-          {#each sortOptions as option (option.key)}
-            <option value={option.key}>{option.label}</option>
-          {/each}
-        </select>
+          options={sortOptions}
+          ariaLabel={text('FABRICATE.Admin.Manager.Component.SortLabel', 'Sort components')}
+          triggerData={{ 'data-component-sort': '' }}
+          onChange={setSortKey}
+        />
         <ManagerButton
           class="manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}

@@ -5,10 +5,10 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 203 repeated selectors
- * rather than these 110, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 200 repeated selectors
+ * rather than these 107, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,933 appear exactly
+ * Unfiltered, the sheet holds 3,042 `(at-context, selector)` keys, of which 2,935 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,568 rules at that head, 110 repeated keys and 225 appearances
+ * printed from. The sheet holds 2,567 rules at that head, 107 repeated keys and 219 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -115,6 +115,14 @@
  * gathering task and event toolbars' six filters. It was a singleton in both keyings, so the rule,
  * key and singleton counts each fall by one, to 2,568, 3,043 and 2,933, and `pinnedTotal` stays
  * 225 across 110 rows. Re-derived by running the census twice, not subtracted.
+ * Its fourth commit moves the repeated table. The recipe, component and essence toolbars' native
+ * select skin is deleted and their shared control-font rule narrowed to the search inputs, so each
+ * `.manager-*-toolbar select` key loses both appearances and its row: 110 -> 107 rows, 225 -> 219
+ * appearances, 203 -> 200 keyed alone. Of the singletons, the `select.is-size-38` rung and the
+ * components route's select ink leave, the ink and the 12px filter type are re-keyed onto the
+ * trigger, the 38px trigger rung gains the component toolbar's member and the filter roots' cap
+ * reaches the trigger in a rule of its own: 2,568 -> 2,567 rules, 3,043 -> 3,042 keys and
+ * 2,933 -> 2,935 singletons. Re-derived by running the census twice, not subtracted.
  * ISSUE 1505 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting
  * three rule blocks the shared `Callout` made redundant: the Checks studio's
  * `[data-failure-salvage-note]` override and its glyph rule, whose whole content the primitive
@@ -196,6 +204,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  * The SUM of the counts, not the number of rows.
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 225 across 110 rows.
+ * measured commit it is 219 across 107 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;
