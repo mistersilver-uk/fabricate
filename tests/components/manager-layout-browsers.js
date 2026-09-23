@@ -1813,3 +1813,57 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
     assert.equal(report.overflow, false, `${width}px surface does not overflow`);
   }
 });
+// Between the 1120 and 832 rungs the shared restack must not reach Knowledge (issue 1972).
+function assertKnowledgeFillsTheBody(report, label) {
+  for (const column of ['rail', 'roster', 'detail']) {
+    assert.ok(
+      Math.abs(report[column].bottom - report.body.bottom) <= 1,
+      `${label} ${column} bottom ${report[column].bottom} reaches the body bottom ${report.body.bottom}`
+    );
+  }
+  assert.ok(
+    report.bodyScroll.scrollHeight <= report.bodyScroll.clientHeight + 1,
+    `${label} the body does not scroll (${report.bodyScroll.scrollHeight} > ${report.bodyScroll.clientHeight})`
+  );
+  assert.match(report.panelScroll.overflowY, /^(auto|scroll)$/, `${label} the tab panel scrolls`);
+  assert.ok(
+    report.panelScroll.scrollHeight > report.panelScroll.clientHeight,
+    `${label} the tab panel owns the overflow`
+  );
+  assert.equal(report.railBorder.right, '1px', `${label} the rail keeps its right divider`);
+}
+
+test('Knowledge keeps full-height columns and its own scrollers down to 832px, and stacks a bounded rail below', async () => {
+  const wide = await readRenderedKnowledgeGeometry(1212);
+  assert.ok(
+    wide.tabBodyHeight > wide.bodyScroll.clientHeight,
+    'precondition: the detail content is taller than the body, so a body scroll is measurable'
+  );
+  assertKnowledgeFillsTheBody(wide, '1212px');
+  for (const width of [1121, 1120, 1000, 880, 832]) {
+    assertKnowledgeFillsTheBody(await readRenderedKnowledgeGeometry(width), `${width}px`);
+  }
+  assertKnowledgeFillsTheBody(
+    await readRenderedKnowledgeGeometry(880, { collapsed: true }),
+    '880px collapsed'
+  );
+  // The Manager's narrow-band stress floor (manager-layout-shared.js, the Checks Studio restack).
+  const floor = await readRenderedKnowledgeGeometry(1024, { height: 640, longName: true });
+  assert.ok(
+    floor.headerHeight > wide.headerHeight,
+    'precondition: the detail header wraps at the floor, taller than its one-line 1212px height'
+  );
+  assertKnowledgeFillsTheBody(floor, '1024x640 long name');
+
+  for (const width of [831, 700, 600]) {
+    const report = await readRenderedKnowledgeGeometry(width);
+    assert.ok(
+      Math.abs(report.rail.width - report.bodyScroll.clientWidth) <= 1,
+      `${width}px the stacked rail spans the body`
+    );
+    assert.ok(report.rail.height <= 320.5, `${width}px the stacked rail is capped at 320px`);
+    assert.ok(report.rail.bottom <= report.roster.top + 1, `${width}px the rail precedes the roster`);
+    assert.equal(report.railBorder.right, '0px', `${width}px the stacked rail has no right divider`);
+    assert.equal(report.railBorder.bottom, '1px', `${width}px the stacked rail keeps its bottom rule`);
+  }
+});
