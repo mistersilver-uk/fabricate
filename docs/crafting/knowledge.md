@@ -27,6 +27,10 @@ A character with nothing tracked shows a dimmed **Nothing tracked** row.
 The detail pane has two tabs, **Recipe items** and **Learned recipes**.
 Knowledge opens on **Recipe items**, unless the selected system has no recipe items registered at all, in which case it opens on **Learned recipes** instead.
 
+Knowledge briefly shows a loading state in the roster and the detail pane while Fabricate reads each player character's recipe items and learned recipes, such as when you first open it or switch crafting systems.
+If that read fails, the detail pane shows a notice that character knowledge could not be loaded.
+Open another section from the left menu, then return to Knowledge, to try again.
+
 {% include screenshot.html case="manager-knowledge-owned-copies" caption="The copies a character is carrying, on the Recipe items tab." %}
 
 At the top of the detail pane, a reset control lets you clear a character's knowledge outright.
