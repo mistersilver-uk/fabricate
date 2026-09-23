@@ -13205,7 +13205,7 @@
     overflow: hidden;
   }
 
-  /* THE SIDE-RAIL ROUTES KEEP A BOUNDED BODY ROW, as they do above this rung: their columns out-specify the stack above, so without this their body stays a page scroller under a full-height rail. Knowledge heads the list so its top-level body rule is the first one naming it; its own 831px block, later in the sheet, still restacks it (issue 1976). */
+  /* The side-rail routes keep a bounded body row, as they do above this rung: their columns out-specify the stack above, so without this the body scrolls as one page under a full-height rail. Knowledge leads the list so its top-level body rule is the first one naming it; its own 831px block, later in the sheet, still restacks it (issue 1976). */
   .fabricate-manager[data-manager-view="knowledge"] .manager-body,
   .fabricate-manager[data-manager-view="component-edit"] .manager-body,
   .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
@@ -13321,7 +13321,7 @@
   grid-template-columns: 56px minmax(0, 1fr) 340px;
 }
 
-/* THE SHARED SIDE-RAIL RESET: every route that keeps its rail beside its content below the 1120px rung lifts the stacked-rail cap and keeps its right divider (issue 1976). */
+/* The shared side-rail reset: every route that keeps its rail beside its content below the 1120px rung lifts the stacked-rail cap and keeps its right divider (issue 1976). */
 .fabricate-manager[data-manager-view="tool-edit"] .manager-rail,
 .fabricate-manager[data-manager-view="tools"] .manager-rail,
 .fabricate-manager[data-manager-view="knowledge"] .manager-rail,
@@ -13346,7 +13346,7 @@
   border-bottom: 0;
 }
 
-/* THE STACKED CATALOGUE SCROLLS AS ONE. Below the list frame's own 760px stack the inspector sits under the list; in a bounded body row the list rows would shrink to nothing, so the list-over-inspector layout sizes its rows to content and becomes the one scroller (issue 1976). */
+/* Below the list frame's own 760px stack the inspector sits under the list, and in a bounded body row the list rows would shrink to nothing, so the list-over-inspector layout sizes its rows to content and is the one scroller (issue 1976). */
 @container (max-width: 760px) {
   .fabricate-manager[data-manager-view="world-components"] .manager-scoped-list-layout.has-inspector,
   .fabricate-manager[data-manager-view="world-essences"] .manager-scoped-list-layout.has-inspector,
