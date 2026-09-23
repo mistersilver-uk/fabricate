@@ -1,6 +1,7 @@
 manager-environments-browse-normal
 manager-environments-browse-stacked
 manager-gathering-tasks-browse-normal
+manager-gathering-tasks-availability-filter-list
 manager-gathering-task-editor-normal
 manager-gathering-task-node-interval-normal
 manager-gathering-task-node-interval-narrow
