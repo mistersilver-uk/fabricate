@@ -22,6 +22,7 @@ import {
   assertSelectHasResolvedName,
   chooseSelectOption,
   closeSelectPanel,
+  openSelectPanel,
   selectOptionLabels,
   selectOptionValues,
   selectTriggerText,
@@ -226,9 +227,7 @@ export function registerEnvironmentsCases() {
       assert.deepEqual(selectOptionValues(target, filter(axis)), values);
       assert.deepEqual(selectOptionLabels(target, filter(axis)), labels);
       assert.equal(
-        target
-          .querySelector('.fabricate-select-popover')
-          .classList.contains('fabricate-select-popover-ticked'),
+        openSelectPanel(target, filter(axis)).classList.contains('fabricate-select-popover-ticked'),
         ticked,
         `the ${axis} list ${ticked ? 'keeps' : 'drops'} its tick column`
       );
@@ -252,6 +251,7 @@ export function registerEnvironmentsCases() {
     };
     await narrowsTo('status', 'disabled', ['env-cavern']);
     await narrowsTo('selection mode', 'targeted', ['env-forest']);
+    await narrowsTo('risk', 'safe', ['env-forest', 'env-cavern']);
     await narrowsTo('risk', 'hazardous', []);
     await narrowsTo('biome', 'forest', ['env-forest']);
     assert.equal(selectTriggerText(target, filter('biome')), 'All biomes');

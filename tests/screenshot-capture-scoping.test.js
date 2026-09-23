@@ -1130,8 +1130,7 @@ function assertEveryConvertedHookResolves() {
  * characters above the drive that uses it (issue 1510). A name keeps EVERY selector bound to it,
  * because a second walk re-declaring the name would otherwise hide the first drive behind it, and
  * each binding resolves to its initializer's LAST `.locator()` hop — `page.locator('.card')
- * .locator('select#y')` names the select, not the card, and a lazy read of the first hop let that
- * shape escape an element-typed ban issue 1510 retired once its last native drive converted.
+ * .locator('[data-x]')` names the control, not the card, so a hook written on the last hop is judged.
  */
 function locatorBindings(source) {
   const bindings = new Map();

@@ -761,36 +761,41 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
     });
   }
 
-  it('draws the conditions card panel as wide as its trigger once it outgrows the form ceiling', async () => {
-    // THE `maxWidth` SITE. The band resolves to `clamp(max(trigger, min), min, max)`, and the
-    // `form` rung's own max is 340px — so in a one-column card at a 1024px window, where the
-    // trigger fills the card, a panel under the rung's ceiling would draw narrower than the
-    // control it opened from. The call site raises the cap to 1024 instead.
-    const page = await openFixture('environments-settings-1024');
-    try {
-      await page.locator(CONDITION_PICKER).first().scrollIntoViewIfNeeded();
-      await pressPointerOn(page, CONDITION_PICKER);
-      const [trigger, panel] = await page.evaluate((selector) => {
-        const width = (element) => Number(element.getBoundingClientRect().width.toFixed(2));
-        return [
-          width(document.querySelector(selector)),
-          width(document.querySelector('.fabricate-select-popover')),
-        ];
-      }, CONDITION_PICKER);
-      assert.ok(
-        trigger > 340,
-        `the trigger measured ${trigger}px, inside the \`form\` rung's 340px ceiling, so this ` +
-          'clause is not measuring the overflow the call site raises the cap for'
-      );
-      assert.ok(
-        Math.abs(panel - trigger) < EPSILON,
-        `the panel measured ${panel}px under a ${trigger}px trigger, so the call site's ` +
-          '`maxWidth` is not reaching the band and the list draws narrower than its control'
-      );
-    } finally {
-      await page.close();
-    }
-  });
+  // THE `maxWidth` SITE, at both ends of the one-column band. The band resolves to
+  // `clamp(max(trigger, min), min, max)`: at a 1024px window the trigger outgrows the `form` rung's
+  // own 340px ceiling, and at the 1120px restack breakpoint it outgrows a 1024px cap as well, so a
+  // cap below the breakpoint would draw the list narrower than the control it opened from.
+  for (const [subject, overflow] of [
+    ['environments-settings-1024', 340],
+    ['environments-settings-1120', 1024],
+  ]) {
+    it(`draws the conditions card panel as wide as its trigger past ${overflow}px (${subject})`, async () => {
+      const page = await openFixture(subject);
+      try {
+        await page.locator(CONDITION_PICKER).first().scrollIntoViewIfNeeded();
+        await pressPointerOn(page, CONDITION_PICKER);
+        const [trigger, panel] = await page.evaluate((selector) => {
+          const width = (element) => Number(element.getBoundingClientRect().width.toFixed(2));
+          return [
+            width(document.querySelector(selector)),
+            width(document.querySelector('.fabricate-select-popover')),
+          ];
+        }, CONDITION_PICKER);
+        assert.ok(
+          trigger > overflow,
+          `the trigger measured ${trigger}px, inside ${overflow}px, so this subject is not ` +
+            'measuring the overflow the call site raises the cap for'
+        );
+        assert.ok(
+          Math.abs(panel - trigger) < EPSILON,
+          `the panel measured ${panel}px under a ${trigger}px trigger, so the call site's ` +
+            '`maxWidth` is not reaching the band and the list draws narrower than its control'
+        );
+      } finally {
+        await page.close();
+      }
+    });
+  }
 
   it('shows the non-truncation clause CAN see a panel that is too narrow', async () => {
     // THE NEGATIVE CONTROL, and it perturbs the PANEL rather than the assertion.

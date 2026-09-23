@@ -390,6 +390,13 @@ const SUBJECTS = {
     mountPoint.classList.remove('fixture-column');
     return environmentsSettings();
   },
+  // The top of the one-column band: the restack breakpoint itself, with no fixture gutter, so the
+  // manager's own container gets the full width and the trigger outgrows even a 1024px cap.
+  'environments-settings-1120': () => {
+    frame.style.width = '1120px';
+    mountPoint.classList.remove('fixture-column', 'fixture-mount');
+    return environmentsSettings();
+  },
   // The `Preview as` roster, whose value is component state rather than a prop.
   'tool-preview': () =>
     mount(ToolBehaviorPreview, {

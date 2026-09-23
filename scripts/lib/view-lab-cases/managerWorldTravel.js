@@ -252,8 +252,8 @@ export const CASES = Object.freeze([
   }),
   // The conditions card's current-value list (issue 1510), pinned at a 1024 window: the settings
   // grid restacks to one column there, so the trigger fills the card far past the `form` rung's
-  // 340px panel ceiling and the frame shows the panel following it out to the call site's own
-  // 1024px cap. At the default 1280 the trigger sits under the ceiling and proves nothing.
+  // 340px panel ceiling and the frame shows the panel matching the trigger's width under the call
+  // site's raised cap. At the default 1280 the trigger sits under the ceiling and proves nothing.
   managerCase({
     id: 'manager-gathering-condition-current-list',
     label: 'Manager — Gathering condition current weather list',

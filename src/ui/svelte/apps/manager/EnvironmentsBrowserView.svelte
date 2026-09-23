@@ -721,9 +721,8 @@
           )}
           ariaLabel={text('FABRICATE.Admin.Manager.Environment.SearchLabel', 'Search environments')}
         />
-        <!-- Four `<span>`s rather than the `<label>`s they were: `Select.svelte`'s host invariant.
-             Each trigger keeps the `aria-label` its select carried, the caption never having been
-             its accessible name (issue 1510). -->
+        <!-- Spans, not labels: a label forwards a caption click into the trigger and re-opens its
+             panel. Each trigger is named by its own aria-label (issue 1510). -->
         <span class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <Select
@@ -1129,10 +1128,10 @@
           </header>
           <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
 
-          <!-- A `<div>`, not the `<label>` it was: `Select.svelte`'s host invariant, so the caption
-               names the trigger through its id. The hint above is a sibling of this field and was
-               never part of the name. The panel may grow past the `form` rung's 340px ceiling to
-               the trigger, which fills a single-column card at a narrow window (issue 1510). -->
+          <!-- A div host: a label would forward a caption click into the trigger. The caption names
+               it through its id, and the panel may grow past the form rung's 340px ceiling to
+               follow a trigger that fills a one-column card up to the 1120px restack breakpoint
+               (issue 1510). -->
           <Field as="div" class="manager-condition-current">
             <span id={`${instanceId}-condition-${condition.kind}`}
               >{conditionCurrentLabel(condition.kind)}</span
@@ -1140,7 +1139,7 @@
             <Select
               value={condition.setting.current}
               options={conditionSelectOptions(condition.setting)}
-              maxWidth={1024}
+              maxWidth={1120}
               ariaLabelledBy={`${instanceId}-condition-${condition.kind}`}
               onChange={(next) => updateCurrentCondition(condition.kind, next)}
             />
