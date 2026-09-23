@@ -274,9 +274,10 @@ test('upsertTool rollback of provenance absent before the write (unreachable on 
 
   assert.deepEqual(source.updates, [
     { '_stats.duplicateSource': null },
-    { '_stats.duplicateSource': 'Item.clone-origin', '_stats.-=compendiumSource': null },
+    { '_stats.duplicateSource': 'Item.clone-origin', '_stats.compendiumSource': null },
   ]);
   assert.equal(source._stats.duplicateSource, 'Item.clone-origin');
+  assert.equal(source._stats.compendiumSource, null);
 });
 
 test('upsertTool relink restores both source flags and the Tool array when clearing fails', async () => {
