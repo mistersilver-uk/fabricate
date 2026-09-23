@@ -7,7 +7,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 /** Stands in for V14's `foundry.data.operators.ForcedDeletion`. */
-export class FakeForcedDeletion {}
+export class FakeForcedDeletion {
+  /** Names the operator in an assertion diff, as core's own class name would. */
+  get [Symbol.toStringTag]() {
+    return 'ForcedDeletion';
+  }
+}
 
 export function isForcedDeletion(value) {
   return value instanceof FakeForcedDeletion;
@@ -79,7 +84,7 @@ export function installForcedDeletion() {
     const created = { data: { operators: { ForcedDeletion: FakeForcedDeletion } } };
     globalThis.foundry = created;
     return () => {
-      if (Reflect.get(globalThis, 'foundry') === created) Reflect.deleteProperty(globalThis, 'foundry');
+      if (Object.is(globalThis.foundry, created)) delete globalThis.foundry;
     };
   }
   if (!Object.hasOwn(root, 'data')) {
