@@ -2413,7 +2413,8 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
 // editor body, the eighth the first opened from a BROWSE toolbar, where the trigger sits in a row of
 // siblings a mis-clamped panel would cover, and the ninth the first whose panel is wider than its
 // rung's own ceiling, at the 1024px window where its trigger fills a one-column card, and the
-// tenth the first whose trigger is named by its caption rather than by a hook or an aria-label).
+// tenth the first whose trigger is addressed by the caption id that names it rather than by a
+// hook, a class or an aria-label).
 const ANCHORED_POPOVER_FRAMES = [
   'interactables-config-source-open',
   'interactables-manager-region-open',

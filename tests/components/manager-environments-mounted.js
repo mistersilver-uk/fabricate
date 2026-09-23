@@ -301,8 +301,8 @@ export function registerEnvironmentsCases() {
     ]);
   });
 
-  // The gathering task and event toolbars' six filters (issue 1510). None ever carried an
-  // `aria-label`, so each trigger is named by its own caption through an instance-scoped id.
+  // The gathering task and event toolbars' six filters (issue 1510), each trigger named by its own
+  // caption through an instance-scoped id.
   for (const [browser, subitem, axes, library] of [
     [
       'tasks',
@@ -633,7 +633,6 @@ export function registerEnvironmentsCases() {
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    // Region filter is removed; the biome filter is now the second select.
     chooseSelectOption(target, gatheringFilter('tasks', 'biome'), 'cavern');
     await tick();
     flushSync();

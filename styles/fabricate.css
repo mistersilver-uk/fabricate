@@ -4127,13 +4127,11 @@
   outline-offset: 2px;
 }
 
-/* THE FILTERS' FLOOR, at 144px rather than the 128 the retired native rule declared (issue 1510).
-   The native control was sized to its widest option and stayed there; the trigger is sized to its
-   VALUE, so at 128 four of these bars re-measured as the GM chose — 144 is the widest
-   caption-to-chevron measurement, 92px of label plus 48.4px of trigger chrome rounded up to the
-   next multiple of 8, which pins all of them and still resolves every panel to the `toolbar`
-   band's own 160px floor. The `toolbar` rung
-   paints the box; the picker root is the bar's flex item and must be allowed to shrink. */
+/* THE FILTERS' FLOOR (issue 1510). The trigger is sized to its VALUE, so without a floor each
+   bar re-measures as the GM chooses — 144 is the widest caption-to-chevron measurement, 92px of
+   label plus 48.4px of trigger chrome rounded up to the next multiple of 8, which pins all of them
+   and still resolves every panel to the `toolbar` band's own 160px floor. The `toolbar` rung paints
+   the box; the picker root is the bar's flex item and must be allowed to shrink. */
 .fabricate-manager .manager-filter .fabricate-select {
   min-width: 0;
 }

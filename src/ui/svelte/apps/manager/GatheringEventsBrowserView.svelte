@@ -360,8 +360,7 @@
       )}
     />
     <!-- Spans, not labels: a label forwards a caption click into the trigger and re-opens its
-         panel. No filter here ever carried an aria-label, so each caption names its trigger
-         through an instance-scoped id (issue 1510). -->
+         panel, so each caption names its trigger through an instance-scoped id (issue 1510). -->
     <span class="manager-filter">
       <span id={`${instanceId}-status-filter`}
         >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
