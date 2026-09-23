@@ -233,6 +233,12 @@ export const CASES = Object.freeze([
     ],
     expectView: 'tools',
     expectSelector: '[data-tool-sort-direction="desc"]',
+    expectContained: [
+      {
+        container: '[data-manager-tools-search]',
+        target: '[data-manager-tools-search] .manager-toolbar',
+      },
+    ],
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],
@@ -272,6 +278,13 @@ export const CASES = Object.freeze([
     expectView: 'tools',
     expectSelector: '.manager-tools-library-list > .manager-tools-row:nth-child(9)',
     expectScrollable: '[data-tool-library-scroll]',
+    expectContained: [
+      {
+        container: '[data-manager-tools-search]',
+        target: '[data-manager-tools-search] .manager-toolbar',
+      },
+    ],
+    expectCenterHit: '.manager-tools-sort-direction',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],
