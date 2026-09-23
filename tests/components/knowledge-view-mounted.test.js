@@ -118,9 +118,9 @@ function rawCharacter(overrides = {}) {
   };
 }
 
-function makeKnowledge({ characters, definitionCount = 2, ...options } = {}) {
+function makeKnowledge({ characters, definitionCount = 2, systemId = 'alchemy', ...options } = {}) {
   return projectKnowledgeSnapshot(
-    { systemId: 'alchemy', definitionCount, characters: characters ?? [rawCharacter()] },
+    { systemId, definitionCount, characters: characters ?? [rawCharacter()] },
     {
       active: true,
       defaultTab: KNOWLEDGE_TAB_RECIPE_ITEMS,
@@ -222,6 +222,24 @@ describe('KnowledgeView mounted behaviour', () => {
       KNOWLEDGE_TAB_LEARNED_RECIPES
     );
     assert.ok(target.querySelector('[data-knowledge-learned-banner]'));
+  });
+
+  it('keeps a manual tab within a system and re-seeds the default after a system switch', async () => {
+    const panel = (target) => target.querySelector('[data-knowledge-panel]').dataset.knowledgePanel;
+    const target = await harness.mount(makeProps());
+    assert.equal(panel(target), KNOWLEDGE_TAB_RECIPE_ITEMS);
+
+    target.querySelector(`[data-knowledge-tab="${KNOWLEDGE_TAB_LEARNED_RECIPES}"]`).click();
+    await harness.setProps({});
+    assert.equal(panel(target), KNOWLEDGE_TAB_LEARNED_RECIPES);
+
+    await harness.setProps({ knowledge: makeKnowledge() });
+    assert.equal(panel(target), KNOWLEDGE_TAB_LEARNED_RECIPES, 'a same-system refresh keeps it');
+
+    await harness.setProps({
+      knowledge: makeKnowledge({ systemId: 'smithing', defaultTab: KNOWLEDGE_TAB_RECIPE_ITEMS }),
+    });
+    assert.equal(panel(target), KNOWLEDGE_TAB_RECIPE_ITEMS, 'a switch lands on the new default');
   });
 
   // The five chip COMBINATIONS. `inert` is an independent chip.

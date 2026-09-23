@@ -67,12 +67,12 @@
 
   const searchTerm = $derived(String(ui.searchTerm || ''));
   let armedToken = $state('');
-  // Seeded ONCE from the store's `defaultTab` (itself resolved once on surface
+  // Seeded ONCE per system from the store's `defaultTab` (itself resolved once on surface
   // entry from the DEFINITION count). Never a live `$derived` over that count: a
   // GM authoring the system's first recipe item on another surface would flip
   // 0 → 1 and yank the open tab — silently disarming any armed row with it.
   let activeTab = $state(KNOWLEDGE_TAB_RECIPE_ITEMS);
-  let tabSeeded = $state(false);
+  let seededSystemId = $state('');
   let panelElement = $state(null);
 
   const characters = $derived(knowledge?.characters || []);
@@ -83,9 +83,10 @@
 
   $effect(() => {
     const defaultTab = knowledge?.defaultTab;
-    if (tabSeeded || !knowledge?.active || !defaultTab) return;
+    const systemId = knowledge?.systemId || '';
+    if (!knowledge?.active || !defaultTab || !systemId || systemId === seededSystemId) return;
     activeTab = defaultTab;
-    tabSeeded = true;
+    seededSystemId = systemId;
   });
 
   // Disarm on character change. Reading the id inside the effect is what makes the
