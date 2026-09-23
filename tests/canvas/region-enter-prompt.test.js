@@ -137,6 +137,22 @@ sealed('the keybinding re-trigger takes the first controlled token, or nothing',
   assert.equal(empty.calls.reprompted.length + malformed.calls.reprompted.length, 0);
 });
 
+sealed('the keybinding re-trigger answers true only when it raised a prompt', () => {
+  const inside = collaborators({
+    controlledTokens: () => [OWNED_TOKEN],
+    behaviorsContainingToken: () => [{ behavior: placedBehavior() }],
+  });
+  inside.deps.promptForTokenInsideRegion = (token) => promptForTokenInsideRegion(token, inside.deps);
+  assert.equal(interactHere(inside.deps), true);
+  assert.equal(inside.calls.shown.length, 1);
+
+  const outside = collaborators({ controlledTokens: () => [OWNED_TOKEN] });
+  outside.deps.promptForTokenInsideRegion = (token) => promptForTokenInsideRegion(token, outside.deps);
+  assert.ok(!interactHere(outside.deps), 'a token outside every eligible region raises nothing');
+  assert.ok(!interactHere(collaborators().deps), 'no controlled token raises nothing');
+  assert.equal(outside.calls.shown.length, 0);
+});
+
 sealed('the in-region re-prompt raises one prompt for the first eligible behaviour', () => {
   const concealed = interactableSystem();
   concealed.presentation.hidden = true;

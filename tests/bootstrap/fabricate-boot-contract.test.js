@@ -1,7 +1,8 @@
 /**
  * The module entry's boot contract (issue 1715), observed from a real boot: the facade's
  * descriptors and key sets, the ordered hook registrations, the composition phase order, the socket
- * router and the deprecation log. It reads no `src/` text and is frozen once regenerated.
+ * router, the deprecation log and the keybinding registrations. It reads no `src/` text and is
+ * frozen once regenerated.
  */
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -215,6 +216,20 @@ function installSocketRecorder() {
   return listeners;
 }
 
+/** Record `game.keybindings.register`; after `init` it throws, as core does. */
+function installKeybindingRecorder() {
+  const keybindings = globalThis.game.keybindings;
+  const original = keybindings.register;
+  const rows = [];
+  const recorder = { rows, phase: 'init', restore: () => (keybindings.register = original) };
+  keybindings.register = function register(namespace, action, definition) {
+    rows.push({ phase: recorder.phase, action: `${namespace}.${action}`, editable: definition?.editable });
+    if (recorder.phase !== 'init') throw new Error('You cannot register a Keybinding after the init hook');
+    return original.call(this, namespace, action, definition);
+  };
+  return recorder;
+}
+
 /** Exercise each deprecated alias once and return the warnings it produced, in order. */
 function recordDeprecationWarnings(facade) {
   const originalWarn = console.warn;
@@ -268,10 +283,14 @@ async function probeBinding(facade) {
 }
 
 /** Everything the boot contract compares, measured from one real boot. */
-async function measureBootContract({ ready, loadModule }) {
+async function measureBootContract({ init, ready, loadModule }) {
   const hooks = globalThis.Hooks;
   const hookEventsAtYield = [...hooks.registrations.values()].map((entry) => entry.event);
   const instance = (await loadModule('/src/main.js')).default;
+  // Before every recorder below, so `init`'s `game.fabricate` bind leaves the composition log alone.
+  const keybindingRecorder = installKeybindingRecorder();
+  await init();
+  keybindingRecorder.phase = 'after-init';
   const composition = installCompositionRecorder(instance);
   // The `ready` backstop re-binds `game.fabricate` BEFORE `initialize()`, so a listener of the
   // `fabricate.journalRunAuthorityRestored` that pass fires meets a bound global. The bind
@@ -299,6 +318,7 @@ async function measureBootContract({ ready, loadModule }) {
   try {
     await ready();
   } finally {
+    keybindingRecorder.restore();
     hooks.callAll = originalCallAll;
     Object.defineProperty(gameGlobal, 'fabricate', {
       value: boundFacade,
@@ -356,6 +376,7 @@ async function measureBootContract({ ready, loadModule }) {
       whenReadyResolution: whenReady,
     },
     compositionLog: composition.log,
+    keybindingRegistrations: keybindingRecorder.rows,
     deprecationWarnings: recordDeprecationWarnings(facade),
     binding: await probeBinding(facade),
   };
@@ -416,6 +437,11 @@ test('the module entry boots to its pinned contract', { timeout: 300000 }, async
     golden.binding,
     'a facade member written as an arrow rather than method shorthand fails attached too'
   );
+  assert.deepStrictEqual(
+    measured.keybindingRegistrations,
+    golden.keybindingRegistrations,
+    'every keybinding registers during `init`; core refuses one registered any later'
+  );
   assert.deepStrictEqual(measured, golden, REGENERATE);
 });
 
@@ -445,6 +471,11 @@ test('the boot contract golden is not vacuous', () => {
     'there is no accessor among them, so no descriptor lacks `writable`'
   );
   assert.ok(golden.compositionLog.length >= 30);
+  assert.deepStrictEqual(
+    golden.keybindingRegistrations,
+    [{ phase: 'init', action: 'fabricate.fabricateInteractHere', editable: [{ key: 'KeyE' }] }],
+    'the interact keybinding registers exactly once, during `init`, and nothing registers after'
+  );
   assert.deepEqual(
     Object.entries(golden.references).filter(([, value]) => value !== true && value !== 'resolved'),
     [],

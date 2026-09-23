@@ -1671,6 +1671,17 @@
     "assign:complicationDeliveryWriter",
     "assign:ready"
   ],
+  "keybindingRegistrations": [
+    {
+      "phase": "init",
+      "action": "fabricate.fabricateInteractHere",
+      "editable": [
+        {
+          "key": "KeyE"
+        }
+      ]
+    }
+  ],
   "deprecationWarnings": [
     "Fabricate: getGatheringRegionStore is deprecated; use getGatheringRealmStore instead.",
     "Fabricate: setGatheringPartyRegionOverride is deprecated; use setGatheringPartyRealmOverride instead.",

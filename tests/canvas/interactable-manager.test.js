@@ -8,6 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InteractableManager } from '../../src/canvas/InteractableManager.js';
+import { placedBehavior } from '../helpers/interactableFixtures.js';
 import { gridScene, tokenDoc as tokenDocFake } from '../helpers/regionContainmentFakes.js';
 import { underFoundryGlobalTrap } from '../helpers/foundryGlobalTrap.js';
 
@@ -129,13 +130,19 @@ const TOOL_DROP = { fabricate: { interactableType: 'tool', systemId: 'sysA', too
 const TASK_DROP = { fabricate: { interactableType: 'gatheringTask', systemId: 'sysA', taskId: 'task-9' } };
 const FOREIGN_DROP = { type: 'Item', uuid: 'Item.unknown' };
 
-test('register() binds ONLY dropCanvasData + controlToken, once', () => {
+/** A `game.keybindings` whose `register` records each call as `{ ns, id, def }`. */
+function recordingKeybindings() {
+  const calls = [];
+  return { calls, keybindings: { register: (ns, id, def) => calls.push({ ns, id, def }) } };
+}
+
+test('register() binds ONLY dropCanvasData + controlToken, once, and registers no keybinding', () => {
   const saved = snapshotGlobals();
   try {
     const registrations = [];
     globalThis.Hooks = { on: (hook, fn) => registrations.push({ hook, fn }) };
-    // No keybindings API ⇒ the keybinding registration is a no-op.
-    globalThis.game = {};
+    const { calls, keybindings } = recordingKeybindings();
+    globalThis.game = { keybindings };
 
     const manager = new InteractableManager();
     manager.register();
@@ -145,28 +152,101 @@ test('register() binds ONLY dropCanvasData + controlToken, once', () => {
     assert.deepEqual(hooks, ['controlToken', 'dropCanvasData'], 'only the region-first hooks are bound');
     assert.equal(registrations.length, 2, 'each hook is bound only once');
     assert.equal(manager._registered, true);
+    assert.equal(calls.length, 0, 'the keybinding is registered at init, never from register()');
   } finally {
     restoreGlobals(saved);
   }
 });
 
-test('register() registers the "interact here" client keybinding when the API exists', () => {
+test('registerKeybinding() registers "interact here" on KeyE once across repeat calls', () => {
   const saved = snapshotGlobals();
   try {
-    const registrations = [];
-    const keybindings = [];
-    globalThis.Hooks = { on: () => {} };
-    globalThis.game = {
-      keybindings: { register: (ns, id, def) => keybindings.push({ ns, id, def }) }
-    };
-    void registrations;
+    const { calls, keybindings } = recordingKeybindings();
+    globalThis.game = { keybindings };
 
-    new InteractableManager().register();
+    const manager = new InteractableManager();
+    manager.registerKeybinding();
+    manager.registerKeybinding();
 
-    assert.equal(keybindings.length, 1);
-    assert.equal(keybindings[0].ns, 'fabricate');
-    assert.equal(keybindings[0].id, 'fabricateInteractHere');
-    assert.equal(typeof keybindings[0].def.onDown, 'function');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ns, 'fabricate');
+    assert.equal(calls[0].id, 'fabricateInteractHere');
+    assert.deepEqual(calls[0].def.editable, [{ key: 'KeyE' }]);
+    assert.equal(calls[0].def.restricted, false);
+    assert.equal(calls[0].def.name, 'FABRICATE.Canvas.Interactable.Keybinding.Name');
+    assert.equal(calls[0].def.hint, 'FABRICATE.Canvas.Interactable.Keybinding.Hint');
+    assert.equal(typeof calls[0].def.onDown, 'function');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('a throwing registration warns once, never throws, and a later call still registers', (t) => {
+  const saved = snapshotGlobals();
+  try {
+    const warned = t.mock.method(console, 'warn', () => {});
+    const refusal = new Error('You cannot register a Keybinding after the init hook');
+    globalThis.game = { keybindings: { register: () => { throw refusal; } } };
+    const manager = new InteractableManager();
+
+    assert.doesNotThrow(() => manager.registerKeybinding());
+    assert.equal(warned.mock.callCount(), 1);
+    const [message, error] = warned.mock.calls[0].arguments;
+    assert.ok(String(message).startsWith('Fabricate |'), 'the warning carries the module prefix');
+    assert.equal(error, refusal, 'the warning carries the thrown error');
+
+    const { calls, keybindings } = recordingKeybindings();
+    globalThis.game = { keybindings };
+    manager.registerKeybinding();
+    assert.equal(calls.length, 1, 'a failed registration does not mark the keybinding as registered');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('the keybinding consumes the key only when a prompt was raised', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { calls, keybindings } = recordingKeybindings();
+    globalThis.game = { keybindings };
+    const manager = new InteractableManager();
+    manager.registerKeybinding();
+    const { onDown } = calls[0].def;
+
+    let invoked = 0;
+    manager._interactHere = () => { invoked += 1; return true; };
+    assert.equal(onDown(), true);
+    assert.equal(invoked, 1);
+
+    for (const answer of [undefined, false]) {
+      manager._interactHere = () => answer;
+      assert.equal(onDown(), false, 'the key falls through to core ascend on KeyE');
+    }
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('the registered onDown answers through the real re-trigger path', () => {
+  const saved = snapshotGlobals();
+  try {
+    const { calls, keybindings } = recordingKeybindings();
+    globalThis.game = { keybindings };
+    const shown = [];
+    const manager = new InteractableManager();
+    const token = { document: { isOwner: true, actorId: 'actor-1' } };
+    manager._promptDeps.getPromptAppClass = () => ({ show: (args) => shown.push(args) });
+    manager._promptDeps.controlledTokens = () => [token];
+    manager.registerKeybinding();
+    const { onDown } = calls[0].def;
+
+    manager._promptDeps.behaviorsContainingToken = () => [{ behavior: placedBehavior() }];
+    assert.equal(onDown(), true, 'a controlled token inside an eligible region consumes the key');
+    assert.equal(shown.length, 1);
+
+    manager._promptDeps.behaviorsContainingToken = () => [];
+    assert.equal(onDown(), false, 'outside every region the key falls through');
+    assert.equal(shown.length, 1);
   } finally {
     restoreGlobals(saved);
   }
