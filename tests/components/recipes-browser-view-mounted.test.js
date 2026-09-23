@@ -16,7 +16,13 @@ import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js'
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 // Issue 1504: a converted control is a shared `<Select>`.
-import { chooseSelectOption } from '../helpers/select-control.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionLabels,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 // Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
 import { chipToneOf } from '../helpers/chipTone.js';
 // Issue 1515: the blocked-enable strip is a `<Notice>`.
@@ -1323,11 +1329,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
   }
 
-  function changeSelect(select, value) {
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    flushSync();
-  }
+  const ROUTE_SET = '[data-recipe-route="ingredient-set"]';
 
   it('routed by ingredients: one ingredient-set dropdown filters both lists and drops the group pill', async () => {
     const root = await inspector.mount({
@@ -1337,12 +1339,17 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    const setSelect = root.querySelector('[data-recipe-route="ingredient-set"]');
-    assert.ok(setSelect, 'the ingredient-set dropdown renders');
+    assert.ok(root.querySelector(ROUTE_SET), 'the ingredient-set dropdown renders');
     // The lower result-set dropdown was removed — the single set dropdown drives both lists.
     assert.equal(root.querySelector('[data-recipe-route="result-set"]'), null, 'no redundant result-set dropdown');
-    assert.deepEqual([...setSelect.options].map((o) => o.textContent.trim()), ['Herb route', 'Potion route']);
-    assert.equal(setSelect.value, 'set-1', 'defaults to the first set');
+    assert.equal(assertSelectHasResolvedName(root, ROUTE_SET), 'Select ingredient set');
+    assert.equal(root.querySelector(ROUTE_SET).getAttribute('data-select-size'), 'inline');
+    assert.ok(
+      openSelectPanel(root, ROUTE_SET).classList.contains('fabricate-select-popover-ticked'),
+      'the routes are cousins, so the list keeps its tick column'
+    );
+    assert.deepEqual(selectOptionLabels(root, ROUTE_SET), ['Herb route', 'Potion route']);
+    assert.equal(selectTriggerText(root, ROUTE_SET), 'Herb route', 'defaults to the first set');
 
     const requires = root.querySelector('.manager-recipe-flow-list');
     assert.match(requires.textContent, /Mountain Herb/, 'Requires shows set-1 requirement');
@@ -1362,7 +1369,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       componentOptions: INSPECTOR_COMPONENTS
     });
 
-    changeSelect(root.querySelector('[data-recipe-route="ingredient-set"]'), 'set-2');
+    chooseSelectOption(root, ROUTE_SET, 'set-2');
+    assert.equal(selectTriggerText(root, ROUTE_SET), 'Potion route');
 
     const requires = root.querySelector('.manager-recipe-flow-list');
     assert.match(requires.textContent, /Healing Potion/, 'Requires now shows set-2');

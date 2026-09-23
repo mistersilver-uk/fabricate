@@ -237,37 +237,6 @@ export async function toggleToolControlAndRestore(page, locator, label) {
   );
 }
 
-export async function selectOptionAndAssertSingleChange(
-  locator,
-  value,
-  label,
-  { expectRetainedValue = true } = {}
-) {
-  await locator.evaluate((element) => {
-    element.__fabricateSelectChangeCount = 0;
-    element.__fabricateSelectChangeListener = () => {
-      element.__fabricateSelectChangeCount += 1;
-    };
-    element.addEventListener('change', element.__fabricateSelectChangeListener);
-  });
-  await locator.selectOption(value);
-  const effect = await locator.evaluate((element) => {
-    element.removeEventListener('change', element.__fabricateSelectChangeListener);
-    const report = {
-      changes: element.__fabricateSelectChangeCount,
-      value: element.value,
-    };
-    delete element.__fabricateSelectChangeCount;
-    delete element.__fabricateSelectChangeListener;
-    return report;
-  });
-  if (effect.changes !== 1 || (expectRetainedValue && effect.value !== value)) {
-    throw new Error(
-      `${label} did not dispatch exactly one select mutation: ${JSON.stringify(effect)}`
-    );
-  }
-}
-
 export async function saveToolStudioDraftIfDirty(editor) {
   if ((await editor.locator('[data-tool-editor-dirty]').count()) === 0) return;
   await editor.locator('[data-tool-editor-save]').click();

@@ -115,7 +115,7 @@ export function registerTagsCases() {
         `the ${kind} panel states its own title in its head`
       );
       assert.ok(
-        panelFor(kind).querySelector('select[data-vocabulary-sort]'),
+        panelFor(kind).querySelector('[data-vocabulary-sort].fabricate-select-trigger'),
         `the ${kind} panel carries its own sort control`
       );
     }

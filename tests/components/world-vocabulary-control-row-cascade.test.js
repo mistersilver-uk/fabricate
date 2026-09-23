@@ -107,8 +107,12 @@ function panelFixture(kind) {
     '</div></header>' +
     '<section class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar" aria-label="Sort">' +
     `<span class="manager-vocabulary-shell-sort-label ${panel.hashClass}" id="sort-${kind}">Sort by</span>` +
-    `<select data-vocabulary-sort="${kind}" aria-labelledby="sort-${kind}">` +
-    '<option>Name</option><option>References</option></select>' +
+    // The converted sort as `Select` renders it: the picker root, then its toolbar-rung trigger.
+    '<div class="fabricate-picker manager-travel-picker fabricate-select">' +
+    '<button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" ' +
+    `data-select-size="toolbar" data-vocabulary-sort="${kind}" aria-labelledby="sort-${kind}">` +
+    '<span class="manager-travel-picker-value fabricate-select-value">Name</span>' +
+    '<i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>' +
     `<button type="button" class="manager-vocabulary-shell-direction ${panel.hashClass}" data-vocabulary-direction="asc">` +
     '<i class="fas fa-arrow-down-a-z"></i><span>Asc</span></button>' +
     '</section>' +
@@ -278,9 +282,8 @@ perRoute('every sort select is a control rather than a full-width bar, on a COLD
     for (const { kind, width } of widths) {
       assert.ok(
         width < 200,
-        `${kind}'s sort select is ${Math.round(width)}px. Core sizes a bare <select> to 100% of ` +
-          'its flex line and the module sheet declares no width, so without the panel component’s ' +
-          'own repair the control fills the row and wraps it onto three lines'
+        `${kind}'s sort trigger is ${Math.round(width)}px. It hugs its value, so a width reaching ` +
+          'it from a toolbar or panel rule fills the row and wraps it onto three lines'
       );
     }
   } finally {
@@ -288,9 +291,8 @@ perRoute('every sort select is a control rather than a full-width bar, on a COLD
   }
 });
 
-perRoute('the sort select keeps its whole shipped skin after the toolbar rules narrow', async (route) => {
-  // Issue 1915 re-keyed the sheet's `.manager-scoped-list-toolbar select` skin onto the panel
-  // component's class, which is what makes this clause hold on the system route too.
+perRoute('the sort trigger takes the toolbar rung under the panel’s own fill', async (route) => {
+  // One shell draws both routes, so the rung and the panel's fill must hold on each.
   const { tab, close } = await open(1280, route);
   try {
     const measured = await tab.evaluate((kinds) => {
@@ -319,27 +321,25 @@ perRoute('the sort select keeps its whole shipped skin after the toolbar rules n
     for (const select of measured.selects) {
       assert.ok(
         Math.abs(select.height - 34) <= 1,
-        `${select.kind}'s sort select is ${select.height.toFixed(1)}px tall against the ` +
-          'documented 34px control line — the narrowed geometry rule is what supplies it, and ' +
-          'core gives a bare select its own height'
+        `${select.kind}'s sort trigger is ${select.height.toFixed(1)}px tall against the ` +
+          'documented 34px control line the `toolbar` rung supplies'
       );
       assert.equal(
         select.radius,
         '9px',
-        `${select.kind}: the row's 9px corner, from the same narrowed rule`
+        `${select.kind}: the row's 9px corner, from the same rung`
       );
       // AND THE FILL IS THE COMPONENT'S OWN, WHICH IS WORTH MEASURING FOR THE OPPOSITE REASON.
       assert.equal(
         select.background,
         measured.expectedFill,
         `${select.kind}: the panel's own --fab-bg-0 override, one rung below its card, rather ` +
-          'than the --fab-bg-1 the narrowed sheet rule declares beneath it'
+          'than the --fab-bg-1 the `toolbar` rung declares beneath it'
       );
       assert.equal(
         select.fontSize,
         '11.52px',
-        `${select.kind}: the manager control-font scale, from the narrowed TYPE rule — which is ` +
-          'the half that must keep a .fabricate-manager compound in every member of its list'
+        `${select.kind}: the manager control-font scale, which the rung states as a literal`
       );
     }
   } finally {

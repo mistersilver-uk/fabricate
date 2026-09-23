@@ -1,6 +1,7 @@
 manager-recipes-normal
 manager-recipes-blocked-enable-flash
 manager-recipes-inspector-empty-step
+manager-recipes-inspector-route-list
 manager-recipes-narrow
 manager-recipes-no-check
 manager-recipes-grouped-continuation

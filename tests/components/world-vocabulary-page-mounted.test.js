@@ -5,7 +5,17 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -67,15 +77,10 @@ const harness = createMountedComponentHarness({
     'src/utils/recipeCategories.js',
   ],
   compiledModules: [
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/EmptyState.svelte',
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
@@ -287,12 +292,14 @@ describe('the world Tags & Categories screen', () => {
       3,
       'three copies of one hardcoded id would send every aria-labelledby to the first'
     );
-    for (const select of root.querySelectorAll('select[data-vocabulary-sort]')) {
-      const target = root.querySelector(`#${select.getAttribute('aria-labelledby')}`);
-      assert.ok(Boolean(target), 'each sort select names a label that exists');
+    const triggers = [...root.querySelectorAll('[data-vocabulary-sort]')];
+    assert.equal(triggers.length, 3, 'one sort trigger per panel');
+    for (const trigger of triggers) {
+      const target = root.querySelector(`#${trigger.getAttribute('aria-labelledby')}`);
+      assert.ok(Boolean(target), 'each sort trigger names a label that exists');
       assert.equal(
         target.closest('[data-vocabulary-panel]'),
-        select.closest('[data-vocabulary-panel]'),
+        trigger.closest('[data-vocabulary-panel]'),
         'and it is the label inside its OWN panel'
       );
     }
@@ -460,10 +467,16 @@ describe('the world Tags & Categories screen', () => {
   it('sorts by References, and the direction toggle reverses that too', async () => {
     const root = await harness.mount(mountProps());
     const panel = root.querySelector(panelSelector('componentCategories'));
-    const select = panel.querySelector('select[data-vocabulary-sort]');
-    select.value = 'references';
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    const sort = `${panelSelector('componentCategories')} [data-vocabulary-sort]`;
+    assert.equal(assertSelectHasResolvedName(root, sort), 'Sort by');
+    assert.equal(root.querySelector(sort).getAttribute('data-select-size'), 'toolbar');
+    assert.ok(
+      openSelectPanel(root, sort).classList.contains('fabricate-select-popover-ticked'),
+      'the sort keys are cousins, so the list keeps its tick column'
+    );
+    assert.deepEqual(selectOptionValues(root, sort), ['name', 'references']);
+    chooseSelectOption(root, sort, 'references');
+    assert.equal(selectTriggerText(root, sort), 'References');
 
     const namesNow = () =>
       [...panel.querySelectorAll('[data-component-category-id] .manager-vocabulary-main strong')].map(

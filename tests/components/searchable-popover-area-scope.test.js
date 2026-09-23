@@ -333,9 +333,9 @@ const PRIMITIVES = Object.freeze([
     anchors: Object.freeze(['manager-toolbar']),
     // COMPOSES its family in `const classes = $derived([…])` rather than in markup.
     composesClasses: true,
-    // Measured at this commit: 1 written, 8 family selectors, 1 owned.
+    // Measured at this commit: 1 written, 7 family selectors, 1 owned.
     writtenFloor: 1,
-    familyFloor: 8,
+    familyFloor: 7,
     ownedFloor: 1,
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-toolbar', root: 'fabricate-filter-bar' }),

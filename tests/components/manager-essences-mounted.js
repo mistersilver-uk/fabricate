@@ -16,6 +16,18 @@ let target;
 const queries = createManagerQueries(() => target);
 const { craftingParent, navButton } = queries;
 
+/**
+ * The accessible names of the essence toolbar's filter and arrangement controls, chips excluded.
+ * An absence check on one retired label passes for any other control a later change adds, so the
+ * bar is pinned to the exact set it carries instead.
+ */
+function essenceToolbarControlNames() {
+  const toolbar = target.querySelector('[data-essence-toolbar]');
+  return [...toolbar.querySelectorAll('[aria-label]')]
+    .filter((control) => control !== toolbar && !control.closest('[data-essence-filter-chip]'))
+    .map((control) => control.getAttribute('aria-label'));
+}
+
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
 export function registerEssencesCases() {
   before(async () => {
@@ -308,11 +320,14 @@ export function registerEssencesCases() {
       )
     );
 
-    // THE SOURCE-STATE FILTER IS GONE (issue 1372, maintainer parity round 8).
-    assert.ok(
-      !target.querySelector('[aria-label="Filter essences by source state"]'),
-      'the source-state select is not on the bar'
-    );
+    // The source-state filter is gone (issue 1372, maintainer parity round 8).
+    assert.deepEqual(essenceToolbarControlNames(), [
+      'Search essences',
+      'Sort essences',
+      'Toggle sort direction',
+      'Essence presentation',
+      'Select all',
+    ], 'the essence toolbar controls');
     const essenceSearch = target.querySelector('[aria-label="Search essences"]');
     essenceSearch.value = 'Water';
     essenceSearch.dispatchEvent(new Event('input', { bubbles: true }));
@@ -572,7 +587,13 @@ export function registerEssencesCases() {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('[aria-label="Filter essences by source state"]'), null);
+    assert.deepEqual(essenceToolbarControlNames(), [
+      'Search essences',
+      'Sort essences',
+      'Toggle sort direction',
+      'Essence presentation',
+      'Select all',
+    ], 'the essence toolbar controls');
     assert.equal(target.textContent.includes('Linked source'), false);
     assert.equal(target.textContent.includes('Source evidence'), false);
     // The capability pills are GATED by the feature, not merely by the card's own fields:

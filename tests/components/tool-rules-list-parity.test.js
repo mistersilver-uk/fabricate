@@ -151,7 +151,7 @@ const LIST_SCREEN = `
         </section>
         <div class="manager-tools-sort-row" data-manager-tools-sort>
           <span class="manager-tools-sort-label" data-probe="sort-label">Sort by</span>
-          <select class="manager-tools-sort-select" data-probe="sort-select"><option>Name</option></select>
+          <div class="fabricate-picker manager-travel-picker fabricate-select manager-tools-sort-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-inline" data-probe="sort-select" data-select-size="inline" data-tool-sort-key="" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort by"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
           <button type="button" class="manager-tools-sort-direction" data-probe="sort-direction"><i class="fas fa-arrow-down-a-z"></i><span>Asc</span></button>
           <span class="manager-tools-result-summary" data-probe="result-count">3 shown</span>
         </div>

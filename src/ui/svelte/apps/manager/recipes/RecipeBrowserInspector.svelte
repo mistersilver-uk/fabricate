@@ -32,6 +32,7 @@
     groupProduceRowsByResultGroup,
   } from '../../../../model/recipeBrowserModel.js';
   import IconButton from '../../../components/IconButton.svelte';
+  import Select from '../../../components/Select.svelte';
 
   let {
     selectedRecipe = null,
@@ -348,6 +349,10 @@
     return set.name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
   }
 
+  const routingSetOptions = $derived(
+    routingModel.sets.map((set, index) => ({ value: set.id, label: routingSetLabel(set, index) }))
+  );
+
   const UNNAMED_COMPONENT = 'FABRICATE.Admin.Manager.Recipe.UnknownComponent';
 
   function requirementName(row) {
@@ -508,20 +513,22 @@
     {#if routedPairing}
       <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
            set's requirements to show — and drives the paired result-set dropdown below. -->
-      <select
+      <!-- `maxWidth` is the manager's 1120px one-column breakpoint: below it the inspector spans
+           the window, so the trigger outgrows the `inline` band's 240px ceiling, and the panel is
+           then held by the overlay host's inset rather than by this cap. -->
+      <Select
         class="manager-recipe-route-select"
-        data-recipe-route="ingredient-set"
+        size="inline"
         value={selectedRoutingSetId}
-        aria-label={text(
+        options={routingSetOptions}
+        maxWidth={1120}
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.Recipe.SelectIngredientSet',
           'Select ingredient set'
         )}
-        onchange={(event) => selectRoutingSet(event.currentTarget.value)}
-      >
-        {#each routingModel.sets as set, index (set.id)}
-          <option value={set.id}>{routingSetLabel(set, index)}</option>
-        {/each}
-      </select>
+        triggerData={{ 'data-recipe-route': 'ingredient-set' }}
+        onChange={selectRoutingSet}
+      />
     {/if}
     {#snippet requirementRow(row)}
       <div class="manager-recipe-flow-row" data-recipe-requirement={row.kind}>

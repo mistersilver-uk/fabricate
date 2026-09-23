@@ -1114,6 +1114,13 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-component-essence-filter',
   'data-component-sort',
   'data-essence-sort',
+  // Issue 1510 phase 3, commit 3e — the Tool library's sort, the vocabulary panel's sort and the
+  // recipe inspector's ingredient-set picker. `data-tool-sort-key` is not a bare `data-tool-sort`
+  // because that would prefix the sibling button's `data-tool-sort-direction`; the route hook is
+  // spelled with its value, the value naming which of the inspector's route controls it is.
+  'data-tool-sort-key',
+  'data-vocabulary-sort',
+  'data-recipe-route="ingredient-set"',
 ]);
 
 /**
@@ -1196,10 +1203,9 @@ test('no capture producer drives a converted select with Playwright’s <select>
       }
     }
   }
-  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — five capture steps and
-  // several smoke assertions drive genuinely native selects, every one of them the MANAGER'S since
-  // issue 1511 converted the player app's six, and all of them issue 1510's to retire — or this
-  // scan is reading a corpus with nothing in it to judge.
+  // NON-VACUITY, both ways. `selectOption` must still appear somewhere — the smoke's two drives of
+  // the manager's crafting-system scope select, a residue control issue 1777 owns — or this scan
+  // is reading a corpus with nothing in it to judge.
   assert.ok(
     calls > 0,
     'no capture producer calls `selectOption` at all, so this guard is judging an empty set. ' +
@@ -1234,9 +1240,8 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
 // manager's. Its first phase took the two `[data-world-currency-strategy-select]` steps; phase 2
 // took the gathering task editor's respawn policy in commit 2d and the environment overview's two
-// membership add controls in commit 2e. One native `select:` step remains, phase 3's to retire:
-// the system Tool Rules list's sort. The surface this clause covers is still shrinking towards
-// zero.
+// membership add controls in commit 2e, and phase 3 took the last, the system Tool Rules list's
+// sort, in commit 3e. No native `select:` step remains; this clause now stops one coming back.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
   // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
   // which is how every one of these steps is authored.
@@ -1259,9 +1264,9 @@ test('no View Lab step drives a converted select with the registry’s native `s
   // it.
   const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    replacements.length >= 21,
+    replacements.length >= 22,
     `only ${replacements.length} \`chooseSelectOption(\` occurrences remain in the registry, ` +
-      'against a floor of 21 — 20 call sites plus the definition in `caseFactories.js`, which the ' +
+      'against a floor of 22 — 21 call sites plus the definition in `caseFactories.js`, which the ' +
       'glob reads too. Converted steps were reverted to the native `select:` verb, or the helper ' +
       'was renamed and this clause is now judging an empty set.'
   );

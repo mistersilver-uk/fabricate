@@ -24,13 +24,14 @@
   - No `aria-label` on the section: the inner `VocabularyPanel` section is the landmark, and a
     second one would name the same region twice.
   - `hint` is always empty: the head's SUBLINE is the line under the title, and a hint as well would draw two.
-  - The five `:global` repairs stay chained onto `.manager-toolbar`: the class sits on a COMPONENT
-    tag, and a bare (0,1,0) would win ties it has no business in.
+  - The toolbar's `:global` repair stays chained onto `.manager-toolbar`: the class sits on a
+    component tag, and a bare (0,1,0) would win ties it has no business in.
   - Pinned by `tests/components/world-vocabulary-control-row-cascade.test.js` and
     `tests/manager-browser-view-state-contract.test.js`.
 -->
 <script>
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import Select from '../../components/Select.svelte';
   import { createVocabularyBrowserState } from '../../../model/managerBrowserViewState.js';
   import { localize } from '../../util/foundryBridge.js';
   import VocabularyPanel from './VocabularyPanel.svelte';
@@ -61,7 +62,7 @@
   const sortedRows = $derived(sortVocabularyRows(rows, sortKey, sortDirection));
   const sortKeyOptions = $derived(
     VOCABULARY_SORT_KEYS.map((option) => ({
-      id: option.id,
+      value: option.id,
       label: text(option.key, option.fallback),
     }))
   );
@@ -82,16 +83,14 @@
     <span class="manager-vocabulary-shell-sort-label" id={sortLabelId}>
       {text('FABRICATE.Admin.Manager.Scoped.List.SortByLabel', 'Sort by')}
     </span>
-    <select
+    <Select
+      size="toolbar"
       value={sortKey}
-      data-vocabulary-sort={kind}
-      aria-labelledby={sortLabelId}
-      onchange={(event) => (ui.sortKey = event.currentTarget.value)}
-    >
-      {#each sortKeyOptions as option (option.id)}
-        <option value={option.id}>{option.label}</option>
-      {/each}
-    </select>
+      options={sortKeyOptions}
+      ariaLabelledBy={sortLabelId}
+      triggerData={{ 'data-vocabulary-sort': kind }}
+      onChange={(next) => (ui.sortKey = next)}
+    />
     <!-- The direction is a TOGGLE that states its position. `data-keyboard-focus="true"` is not
          decoration: `KeyboardManager#hasFocus` reads `!!focused.form` for a BUTTON and neither
          route renders a `<form>` around it, so without it Space pauses the game behind the
@@ -132,17 +131,8 @@
     background: var(--fab-bg-1);
   }
 
-  /* THE FIVE CONTROL-ROW REPAIRS, all `:global` and the toolbar pair chained onto
-     `.manager-toolbar`: the class sits on a COMPONENT tag, and a bare (0,1,0) would win ties it
-     has no business in. */
-
-  /* THE SELECT WIDTH, AND WHY IT CANNOT BE LEFT TO THE SHEET: core sizes every `<select>` to
-     `width: 100%`, and the only shipped repair is in a component neither route renders. */
-  :global(.manager-vocabulary-shell-panel .manager-toolbar.manager-scoped-list-toolbar select) {
-    flex: 0 1 auto;
-    width: auto;
-    min-width: 0;
-  }
+  /* The four control-row repairs, all `:global` and the toolbar's chained onto `.manager-toolbar`:
+     the class sits on a component tag, and a bare (0,1,0) would win ties it has no business in. */
 
   /* THE ADD FORM RUNS FLUSH, because the PANEL is the card now; its own fill sits two rungs above
      the panel's, so inside one it is a card in a card brighter than the rows below it. */
@@ -159,7 +149,7 @@
 
   /* EVERY CONTROL SITS ONE RAMP RUNG BELOW THE PANEL, which is a relationship rather than a
      colour: left alone they inherit the control rung, which is the PANEL's own fill. */
-  :global(.manager-vocabulary-shell-panel select),
+  :global(.manager-vocabulary-shell-panel .fabricate-select-trigger),
   :global(.manager-vocabulary-shell-panel .manager-search input),
   :global(.manager-vocabulary-shell-panel .manager-vocabulary-form input) {
     background: var(--fab-bg-0);

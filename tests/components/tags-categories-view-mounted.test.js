@@ -7,7 +7,11 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -40,16 +44,12 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
     // rather than failing it, so the whole static closure is declared.
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/EmptyState.svelte',
+    // Each panel's sort is a `Select`, whose closure also carries `ManagerButton` for
+    // VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add.
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
-    'src/ui/svelte/components/Field.svelte',
-    // THE manager's labelled push-button (issue 1118). VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add render it.
-    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     // The shared shell and the sort toolbar it hangs each panel's controls on (issue 1915). The
@@ -64,6 +64,7 @@ const harness = createMountedComponentHarness({
 
 const KINDS = ['recipeCategories', 'componentCategories', 'componentTags'];
 const panelSelector = (kind) => `[data-vocabulary-panel="${kind}"]`;
+const RECIPE_CATEGORY_SORT = `${panelSelector('recipeCategories')} [data-vocabulary-sort]`;
 
 function row(id, name, totalUsage = 0) {
   return { id, name, totalUsage };
@@ -157,12 +158,14 @@ describe('TagsCategoriesView (mounted)', () => {
 
     const labels = [...root.querySelectorAll('.manager-vocabulary-shell-sort-label')];
     assert.equal(labels.length, 3, 'one Sort by label per panel');
-    for (const select of root.querySelectorAll('select[data-vocabulary-sort]')) {
-      const target = root.querySelector(`#${select.getAttribute('aria-labelledby')}`);
-      assert.ok(Boolean(target), 'each sort select names a label that exists');
+    const triggers = [...root.querySelectorAll('[data-vocabulary-sort]')];
+    assert.equal(triggers.length, 3, 'one sort trigger per panel');
+    for (const trigger of triggers) {
+      const target = root.querySelector(`#${trigger.getAttribute('aria-labelledby')}`);
+      assert.ok(Boolean(target), 'each sort trigger names a label that exists');
       assert.equal(
         target.closest('[data-vocabulary-panel]'),
-        select.closest('[data-vocabulary-panel]'),
+        trigger.closest('[data-vocabulary-panel]'),
         'and it is the label inside its OWN panel'
       );
     }
@@ -174,12 +177,7 @@ describe('TagsCategoriesView (mounted)', () => {
     const root = await harness.mount(mountProps());
     assert.deepEqual(namesIn(root, 'recipeCategories', 'data-category-id'), ['Alloys', 'Potions']);
 
-    const select = root.querySelector(
-      `${panelSelector('recipeCategories')} select[data-vocabulary-sort]`
-    );
-    select.value = 'references';
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, RECIPE_CATEGORY_SORT, 'references');
     assert.deepEqual(
       namesIn(root, 'recipeCategories', 'data-category-id'),
       ['Potions', 'Alloys'],
@@ -213,11 +211,7 @@ describe('TagsCategoriesView (mounted)', () => {
     const lifted = { searchTerm: '', sortKey: 'name', sortDirection: 'asc' };
     const root = await harness.mount(mountProps({ recipeCategoryBrowserState: lifted }));
 
-    const select = root.querySelector(
-      `${panelSelector('recipeCategories')} select[data-vocabulary-sort]`
-    );
-    select.value = 'references';
-    select.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    chooseSelectOption(root, RECIPE_CATEGORY_SORT, 'references');
     root
       .querySelector(`${panelSelector('recipeCategories')} button[data-vocabulary-direction]`)
       .click();
@@ -243,9 +237,8 @@ describe('TagsCategoriesView (mounted)', () => {
       'with the toggle stating the direction it is actually sorting in'
     );
     assert.equal(
-      returned.querySelector(`${panelSelector('recipeCategories')} select[data-vocabulary-sort]`)
-        .value,
-      'references',
+      selectTriggerText(returned, RECIPE_CATEGORY_SORT),
+      'References',
       'and the select showing the key it is actually sorting on'
     );
   });
